@@ -291,7 +291,13 @@ Deno.serve(withApiLogging('asset-service-reminders-cron', async (req: Request) =
       // a 60/30/7 warranty added at day 45 would fire again tomorrow for the 30-day window.
       const stamp: Record<string, string> = { ...sent };
       for (const n of pending) stamp[String(n)] = nowIso;
-      await db.from('customer_asset_warranties').update({ reminded_at: stamp }).eq('id', w.id);
+      // The reminder has ALREADY been sent at this point, so the stamp is the only record that
+      // stops it sending again. supabase-js resolves rather than throwing on an RLS denial, so a
+      // discarded result here means the row stays unstamped, the next run re-sends, and the
+      // customer is emailed on every tick — while this loop counts it a success either way.
+      const { error: stampErr } = await db.from('customer_asset_warranties')
+        .update({ reminded_at: stamp }).eq('id', w.id);
+      if (stampErr) throw stampErr;
       warrantyExpiring++;
     } catch (_err) {
       failed++;

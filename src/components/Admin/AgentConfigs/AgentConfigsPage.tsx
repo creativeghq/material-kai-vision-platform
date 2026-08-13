@@ -200,8 +200,17 @@ export const AgentConfigsPage: React.FC = () => {
 
       const usesSystemPrompt = editingPrompt.prompt_type === 'agent' || editingPrompt.prompt_type === 'tool';
 
-      // Save to history
-      await supabase.from('prompt_history').insert({
+      // Save to history.
+      //
+      // The error MUST be destructured and thrown. supabase-js RESOLVES on an RLS denial rather
+      // than throwing, so discarding the result let a rejected write fall straight through to the
+      // "updated successfully" toast below — the enclosing try/catch cannot help, because nothing
+      // threw. That is the same defect already documented on `product_prices` in
+      // `PriceLookupDrawer`, and it is worse here: since #347 phase 3P every prompt is loaded from
+      // this table with NO code fallback, so a silently-rejected edit means the admin believes a
+      // prompt changed when the model is still being sent the old one — and the history row that
+      // would have shown the intended change is missing too.
+      const { error: histErr } = await supabase.from('prompt_history').insert({
         prompt_id: editingPrompt.id,
         old_prompt_text: editingPrompt.prompt_text,
         new_prompt_text: usesSystemPrompt ? editingPrompt.prompt_text : editedText,
@@ -218,7 +227,10 @@ export const AgentConfigsPage: React.FC = () => {
         ? { system_prompt: editedText, description: editedDescription }
         : { prompt_text: editedText, description: editedDescription };
 
-      await supabase.from('prompts').update(updateData).eq('id', editingPrompt.id);
+      if (histErr) throw histErr;
+
+      const { error: updErr } = await supabase.from('prompts').update(updateData).eq('id', editingPrompt.id);
+      if (updErr) throw updErr;
 
       toast({ title: 'Success', description: `${editingPrompt.name} updated successfully` });
       setEditingPrompt(null);

@@ -103,7 +103,12 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
       // email-only reminder with no owner email — retrying can't fix it). Leave unstamped on a transient
       // failure with nothing delivered so the next run retries.
       if (deliveredAny || !transientFailure) {
-        await supabase.from('crm_meetings').update({ reminder_sent_at: new Date().toISOString() }).eq('id', m.id);
+        // Same as the warranty cron: the reminder is already out, so an unstamped row re-sends on
+        // every subsequent run. supabase-js resolves on an RLS denial instead of throwing, so the
+        // result has to be checked explicitly — the surrounding catch would never see it.
+        const { error: stampErr } = await supabase.from('crm_meetings')
+          .update({ reminder_sent_at: new Date().toISOString() }).eq('id', m.id);
+        if (stampErr) throw stampErr;
       }
     } catch (_) {
       failed++;
