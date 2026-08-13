@@ -37328,9 +37328,11 @@ export type Database = {
           credit: number
           currency: string
           debit: number
+          doc_id: string
           doc_kind: string
           doc_number: string
           entry_date: string
+          related_id: string
         }[]
       }
       finance_party_opening_balance: {

@@ -2745,7 +2745,14 @@ export interface CashflowPerDayRow { period: string; receipts: number; payments:
 export interface PnlPerCategoryRow { category_id: string | null; category_name: string; income: number; customer_credits: number; expenses: number; supplier_credits: number; net: number; vat_income: number; vat_expense: number }
 export interface VatReportRow { section: 'output' | 'output_credit' | 'input' | 'input_credit'; vat_rate: number | null; net: number; vat: number; doc_count: number }
 export interface VatByCodeRow { vat_category: number | null; vat_rate: number | null; income_classification_type: string; income_classification_category: string; net: number; vat: number; line_count: number }
-export interface PartyLedgerRow { entry_date: string | null; doc_kind: string; doc_number: string | null; debit: number; credit: number; currency: string | null }
+export interface PartyLedgerRow {
+  entry_date: string | null; doc_kind: string; doc_number: string | null;
+  debit: number; credit: number; currency: string | null;
+  /** The row's own record id — every ledger line IS a document that exists somewhere. */
+  doc_id: string | null;
+  /** What it settles/credits: a credit note's invoice, a supplier credit note's bill. */
+  related_id: string | null;
+}
 export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed' | 'not_transmitted';
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
 export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }

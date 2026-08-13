@@ -33,7 +33,12 @@ interface Props {
   className?: string;
 }
 
-export const RefreshResearchButton: React.FC<Props> = ({ companyId, workspaceId, onDone, size = 'sm', className }) => {
+/**
+ * The run, without the button — for surfaces that put "Refresh research" in an Actions menu
+ * rather than a button row. The caller owns the trigger and where the progress/summary text
+ * goes; the CHAIN stays here so a menu and a button can't drift into two different runs.
+ */
+export function useCompanyResearch({ companyId, workspaceId, onDone }: Pick<Props, 'companyId' | 'workspaceId' | 'onDone'>) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -83,6 +88,12 @@ export const RefreshResearchButton: React.FC<Props> = ({ companyId, workspaceId,
       setStatus(null);
     }
   };
+
+  return { run, busy, status, summary };
+}
+
+export const RefreshResearchButton: React.FC<Props> = ({ companyId, workspaceId, onDone, size = 'sm', className }) => {
+  const { run, busy, status, summary } = useCompanyResearch({ companyId, workspaceId, onDone });
 
   return (
     <div className={className}>

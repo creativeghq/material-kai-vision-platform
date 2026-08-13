@@ -8,6 +8,12 @@
  *   • View CRM — open the party's CRM record (hidden when already on it)
  *
  * Rendered as compact icon buttons by default (`variant="icons"`), or labelled buttons.
+ *
+ * A surface that puts these in an "Actions" menu instead of a button row calls
+ * `usePartyStatementActions` and renders its own menu items — the WORK stays here so a menu
+ * and a button row can never drift into two different email/share behaviours. The hook must be
+ * called by the component that OWNS the menu, never inside `DropdownMenuContent`: Radix unmounts
+ * that subtree on close, which would take the Connect-email modal down with it mid-flow.
  */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -35,9 +41,16 @@ export interface StatementActionsProps {
   className?: string;
 }
 
-export const StatementActions: React.FC<StatementActionsProps> = ({
-  partyType, partyId, email, side, from, to, statementsEnabled = true, crmHref, variant = 'icons', className,
-}) => {
+/** Everything `StatementActions` does, without the button row — for menu-shaped callers. */
+export function usePartyStatementActions(opts: {
+  partyType: 'company' | 'contact';
+  partyId: string;
+  email?: string | null;
+  side?: 'customer' | 'supplier';
+  from?: string;
+  to?: string;
+}) {
+  const { partyType, partyId, email, side, from, to } = opts;
   const { toast } = useToast();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [busy, setBusy] = useState<null | 'email' | 'download' | 'share'>(null);
@@ -98,6 +111,15 @@ export const StatementActions: React.FC<StatementActionsProps> = ({
       toast({ title: 'Could not create link', description: err?.message, variant: 'destructive' });
     } finally { setBusy(null); }
   };
+
+  return { emailStatement, downloadStatement, shareStatement, busy, copied, connectEmailGate };
+}
+
+export const StatementActions: React.FC<StatementActionsProps> = ({
+  partyType, partyId, email, side, from, to, statementsEnabled = true, crmHref, variant = 'icons', className,
+}) => {
+  const { emailStatement, downloadStatement, shareStatement, busy, copied, connectEmailGate } =
+    usePartyStatementActions({ partyType, partyId, email, side, from, to });
 
   const iconMode = variant === 'icons';
   const spin = (k: typeof busy, icon: React.ReactNode) => (busy === k ? <Loader2 className="h-4 w-4 animate-spin" /> : icon);
