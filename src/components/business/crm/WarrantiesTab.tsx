@@ -164,7 +164,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
     <div className="space-y-4">
       {/* ── Coming up ─────────────────────────────────────────────────────── */}
       {due.length > 0 && (
-        <Card className="dashboard-card">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-4 w-4" />
@@ -225,7 +225,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
       )}
 
       {/* ── The register ──────────────────────────────────────────────────── */}
-      <Card className="dashboard-card">
+      <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-2 flex-wrap">
           <div>
             <CardTitle>Warranties</CardTitle>
@@ -317,7 +317,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
 
       {/* ── What has already been done, across every unit this customer owns ─────── */}
       {history.length > 0 && (
-        <Card className="dashboard-card">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-4 w-4" />
