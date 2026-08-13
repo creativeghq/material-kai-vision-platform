@@ -2481,15 +2481,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
-        {/* A DOCUMENT header, not a dialog caption. Identity reads left — icon, number, who and
-            when — and the money reads right, where every order/invoice document in the world puts
-            it. `pr-8` keeps the amount clear of the dialog's own close button; the rule under both
-            is what separates "what this is" from the controls that act on it. Before this the
-            title stood alone and the type + settlement verdict sat loose in the toolbar below as
-            two bare words ("Sales  Paid") — a status with no figure anywhere near it, sharing a
-            line with the controls. */}
+        {/* A DOCUMENT header, not a dialog caption: an icon tile, the order number, and ONE line
+            of facts under it — direction · party · date · what it is worth · how much of it is
+            settled. Everything the list row states about an order, in the list's own order, read
+            left to right in a single pass. The rule under it is what separates "what this is"
+            from the controls that act on it; before this the title stood alone and the type and
+            settlement verdict sat loose in the toolbar below as two bare words ("Sales  Paid"),
+            a status with no figure anywhere near it, sharing a line with the controls.
+            `pr-8` keeps the block clear of the dialog's own close button. */}
         <DialogHeader className="space-y-0 pr-8 text-left">
-          <div className="flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-border/60 pb-4">
+          <div className="flex items-start gap-x-4 border-b border-border/60 pb-4">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               {/* The direction of the trade, said once more in a glyph: a sale goes out of the
                   basket, a purchase arrives as goods. */}
@@ -2498,15 +2499,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             <div className="min-w-0 space-y-1.5">
               <DialogTitle>Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle>
               <DialogDescription className="sr-only">Order form.</DialogDescription>
-              {/* The order's IDENTITY, in the order the list row states it: which direction of
-                  trade this is, who it is with (one click from their CRM record — the header named
-                  a number and nothing else, so answering "who is this for?" meant leaving the
-                  order), and when it was raised. */}
               {order && (
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                   <span className={`font-medium ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>
                     {order.order_type === 'sales' ? 'Sales order' : 'Purchase order'}
                   </span>
+                  {/* Who the order is with, one click from their CRM record — the header named a
+                      number and nothing else, so answering "who is this for?" meant leaving the
+                      order. */}
                   {party && (
                     <>
                       <span aria-hidden>·</span>
@@ -2521,17 +2521,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   )}
                   <span aria-hidden>·</span>
                   <span>{formatDate(order.created_at)}</span>
-                </div>
-              )}
-            </div>
-            {/* What the order is WORTH, and how much of it is actually settled. Both are READ,
-                never recomputed: `order.total` is the stored order total and `outstanding` comes
-                straight off `get_order_settlements` (see the const above). */}
-            {order && (
-              <div className="ml-auto shrink-0 space-y-1 sm:text-right">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Order total</div>
-                <div className="font-display text-xl font-semibold leading-none tabular-nums">{formatMoney(Number(order.total), order.currency)}</div>
-                <div className="flex flex-wrap items-center gap-x-1.5 text-xs sm:justify-end">
+                  {/* What the order is WORTH, and how much of it is actually settled — carried at
+                      the end of the same line, where the sentence has already said whose order it
+                      is and when. Both are READ, never recomputed: `order.total` is the stored
+                      order total and `outstanding` comes straight off `get_order_settlements`
+                      (see the const above). */}
+                  <span aria-hidden>·</span>
+                  <span className="text-sm font-semibold tabular-nums text-foreground" title="Order total">
+                    {formatMoney(Number(order.total), order.currency)}
+                  </span>
+                  <span aria-hidden>·</span>
                   {/* DERIVED, not the cached `orders.payment_status` column. The list one click up
                       has read the derivation since the "Paid beside a non-zero Outstanding" fix;
                       this header kept reading the cache, which is the same bug one screen deeper —
@@ -2546,14 +2545,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       printing a confident zero. */}
                   {fin && order.status !== 'cancelled' && (outstanding < -0.005 ? (
                     <>
-                      <span className="text-muted-foreground/40" aria-hidden>·</span>
+                      <span aria-hidden>·</span>
                       <span className="font-medium tabular-nums text-purple-600 dark:text-purple-400" title="More has been settled than this order is worth">
                         Overpaid {formatMoney(Math.abs(outstanding), order.currency)}
                       </span>
                     </>
                   ) : outstanding > 0.005 ? (
                     <>
-                      <span className="text-muted-foreground/40" aria-hidden>·</span>
+                      <span aria-hidden>·</span>
                       <span className={`font-medium tabular-nums ${order.order_type === 'sales' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
                         {formatMoney(outstanding, order.currency)}
                         <span className="ml-1 font-normal">{order.order_type === 'sales' ? 'still to collect' : 'still to pay'}</span>
@@ -2561,8 +2560,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     </>
                   ) : null)}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </DialogHeader>
         {loading || !order ? (
