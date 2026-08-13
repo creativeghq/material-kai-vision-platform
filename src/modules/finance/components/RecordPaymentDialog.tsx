@@ -66,7 +66,7 @@ export const RecordPaymentDialog: React.FC<{
    *  re-derives it — and `onIssueDoc` runs after the payment is recorded. */
   fiscalDocKind?: SalesDocumentKind;
   fiscalDocReason?: string;
-  onIssueDoc?: () => Promise<void>;
+  onIssueDoc?: (kind?: SalesDocumentKind) => Promise<void>;
   /** Which side of the trade this payment is. 'supplier' = money OUT to the party we're buying
    *  from (a purchase order). Defaults to 'customer' — money in from whoever we sold to. */
   side?: 'customer' | 'supplier';
@@ -108,12 +108,24 @@ export const RecordPaymentDialog: React.FC<{
    * document are separate acts — a deposit taken before delivery, or a part-payment against an
    * already-issued invoice, should often produce nothing at all. Previously this was two
    * independent switches ("Send receipt" + "Also issue a …") whose combination was ambiguous.
-   *  - `none`            — record the money only.
-   *  - `payment_receipt` — email a payment receipt (απόδειξη είσπραξης). NOT sent to myDATA.
-   *  - `fiscal`          — issue the myDATA sales document (τιμολόγιο / ΑΛΠ), kind decided by the
-   *                        shared buyer rule, offered only when the caller says it's possible.
+   *  - `none`             — record the money only.
+   *  - `payment_receipt`  — email a payment receipt (απόδειξη είσπραξης). NOT sent to myDATA.
+   *  - `fiscal_invoice`   — issue a τιμολόγιο (1.1).
+   *  - `fiscal_receipt`   — issue a retail receipt / ΑΛΠ (11.1).
+   *
+   * The two fiscal rows used to be ONE row whose kind the buyer rule picked, which is right by
+   * default and wrong whenever the operator knows better — a business buying for private use
+   * takes an ΑΛΠ. They are separate rows now, and the same asymmetry as the order menu applies:
+   * a buyer with no ΑΦΜ is offered the receipt only, because AADE rejects a τιμολόγιο issued to a
+   * consumer, while the reverse is legal and simply costs them the VAT deduction. `fiscalDocKind`
+   * carries that fact — 'receipt' means the shared rule found no VAT identity.
    */
-  const [issueChoice, setIssueChoice] = useState<'none' | 'payment_receipt' | 'fiscal'>('payment_receipt');
+  type IssueChoice = 'none' | 'payment_receipt' | 'fiscal_invoice' | 'fiscal_receipt';
+  const [issueChoice, setIssueChoice] = useState<IssueChoice>('payment_receipt');
+  const issuesFiscal = issueChoice === 'fiscal_invoice' || issueChoice === 'fiscal_receipt';
+  /** What the picked row actually issues — the argument `onIssueDoc` is given. */
+  const pickedFiscalKind: SalesDocumentKind | undefined = issueChoice === 'fiscal_invoice'
+    ? 'invoice' : issueChoice === 'fiscal_receipt' ? 'receipt' : undefined;
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
@@ -483,7 +495,7 @@ export const RecordPaymentDialog: React.FC<{
       });
       // Order-attached: also create the order's receipt/invoice when asked (best-effort — the
       // payment is already recorded; a doc-issue hiccup shouldn't roll it back).
-      if (issueChoice === 'fiscal' && onIssueDoc) { try { await onIssueDoc(); } catch { /* issue separately from Actions */ } }
+      if (issuesFiscal && onIssueDoc) { try { await onIssueDoc(pickedFiscalKind); } catch { /* issue separately from Actions */ } }
       if (creditNoteFiscalError) {
         // Cash-out logged + credit note created, but myDATA transmission failed —
         // don't pretend it's filed. Operator must retransmit from the credit-note list.
@@ -690,16 +702,29 @@ export const RecordPaymentDialog: React.FC<{
                 <SelectContent>
                   <SelectItem value="none">No document — just record the money</SelectItem>
                   <SelectItem value="payment_receipt">Payment receipt — email only, not sent to myDATA</SelectItem>
+                  {/* Offered only when the caller says a sales document is still possible.
+                      Invoice is withheld from a buyer with no ΑΦΜ — not a preference we can
+                      honour, since AADE rejects that document and generate_invoice_from_order
+                      refuses it too. */}
+                  {fiscalDocKind === 'invoice' && (
+                    <SelectItem value="fiscal_invoice">Issue an invoice (τιμολόγιο) to myDATA</SelectItem>
+                  )}
                   {fiscalDocKind && (
-                    <SelectItem value="fiscal">
-                      Issue {salesDocumentKindLabel(fiscalDocKind)} to myDATA
-                    </SelectItem>
+                    <SelectItem value="fiscal_receipt">Issue a retail receipt (ΑΛΠ) to myDATA</SelectItem>
                   )}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                {issueChoice === 'fiscal'
-                  ? <><strong>{salesDocumentKindLabel(fiscalDocKind!)}</strong> is transmitted to myDATA and cannot be deleted — correcting it needs a credit note.{fiscalDocReason ? ` ${fiscalDocReason}` : ''}</>
+                {issuesFiscal
+                  ? <>
+                      <strong>{salesDocumentKindLabel(pickedFiscalKind!)}</strong> is transmitted to myDATA and cannot be deleted — correcting it needs a credit note.
+                      {fiscalDocReason ? ` ${fiscalDocReason}` : ''}
+                      {/* Say the cost of overriding the derived kind, rather than letting a
+                          silent pick take the buyer's VAT deduction away. */}
+                      {pickedFiscalKind === 'receipt' && fiscalDocKind === 'invoice'
+                        ? ' This buyer has a VAT number — a retail receipt is legal, but they cannot deduct the VAT.'
+                        : ''}
+                    </>
                   : issueChoice === 'payment_receipt'
                     ? 'Proof the money was received. Not a sales document — nothing is filed with AADE.'
                     : 'Nothing is issued or emailed. Use this for a deposit you will invoice later, or a part-payment on an invoice that already exists.'}

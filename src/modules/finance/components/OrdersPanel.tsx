@@ -3730,7 +3730,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         // second from a payment would duplicate the filing. A purchase order issues nothing.
         fiscalDocKind={order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 ? salesDocKind : undefined}
         fiscalDocReason={salesDocumentKindReason(buyerIdentity)}
-        onIssueDoc={() => void createSalesDocument()}
+        // Forward the operator's pick. Dropping the argument here would make the dialog's
+        // τιμολόγιο/ΑΛΠ choice decorative — it would issue whatever the buyer rule derived.
+        onIssueDoc={(kind) => createSalesDocument(kind)}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}
       />
     )}
