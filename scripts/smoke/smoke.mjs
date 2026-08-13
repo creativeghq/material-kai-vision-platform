@@ -168,6 +168,10 @@ const DEALS_SELECTS = [
   ['crm_deal_stages', 'id, deal_type_id, key, label, sort, is_won, is_lost'],
   ['crm_deal_tasks', 'id, deal_id, title, done, due_date, created_at'],
   ['crm_contacts', 'id, lifecycle_stage, lead_status, lead_source'],
+  // Phase 2-4 reads. crm_deal_members.user_id FKs to auth.users, NOT user_profiles — the
+  // first version of the team card embedded user_profiles and 400'd on every load.
+  ['crm_deal_members', 'id, deal_id, user_id, role'],
+  ['crm_deals', 'id, stage, status, value, title, property:properties ( title ), contact:crm_contacts!crm_deals_contact_id_fkey ( name ), type:crm_deal_types ( label )'],
 ];
 
 await check('db.deals.selects-resolve', ['ANON_KEY'], async () => {

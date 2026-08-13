@@ -437,16 +437,33 @@ export interface DealMember {
 }
 
 export const dealTeam = {
+  /**
+   * Two queries, not an embed. `crm_deal_members.user_id` FKs to **auth.users**, so PostgREST has
+   * no relationship to `user_profiles` and `profile:user_profiles(…)` is a 400 (PGRST200) — which
+   * would have failed the whole card, silently, on every load.
+   */
   async list(dealId: string): Promise<DealMember[]> {
     const { data, error } = await supabase
       .from('crm_deal_members')
-      .select('id, deal_id, user_id, role, profile:user_profiles ( full_name, email )')
+      .select('id, deal_id, user_id, role')
       .eq('deal_id', dealId)
       .order('created_at');
     if (error) throw error;
-    return ((data ?? []) as any[]).map((r) => ({
-      id: r.id, deal_id: r.deal_id, user_id: r.user_id, role: r.role,
-      full_name: r.profile?.full_name ?? null, email: r.profile?.email ?? null,
+    const rows = (data ?? []) as { id: string; deal_id: string; user_id: string; role: string }[];
+    if (!rows.length) return [];
+
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('user_id, full_name, email')
+      .in('user_id', rows.map((r) => r.user_id));
+    const byUser = new Map<string, { full_name: string | null; email: string | null }>(
+      (profiles ?? []).map((p: any) => [p.user_id as string, { full_name: p.full_name ?? null, email: p.email ?? null }]),
+    );
+
+    return rows.map((r) => ({
+      ...r,
+      full_name: byUser.get(r.user_id)?.full_name ?? null,
+      email: byUser.get(r.user_id)?.email ?? null,
     }));
   },
 

@@ -133,7 +133,13 @@ export const DealDetailPage: React.FC = () => {
             <CrmRecordActivity
               target={{ kind: 'deal', id: deal.id }}
               workspaceId={activeWorkspaceId}
-              people={deal.contact?.id ? [{ id: deal.contact.id, name: deal.contact.name ?? 'Contact', email: null }] as any : []}
+              // Typed against TimelinePerson rather than cast: the cast hid whether the shape
+              // was right at all, and `kind` is what decides who can be a meeting attendee.
+              people={deal.contact?.id
+                ? [{ id: deal.contact.id, name: deal.contact.name ?? 'Contact', kind: 'contact' as const }]
+                : deal.company?.id
+                  ? [{ id: deal.company.id, name: deal.company.name ?? 'Company', kind: 'company' as const }]
+                  : []}
               recordLabel={label}
               refreshKey={activityKey}
             />
