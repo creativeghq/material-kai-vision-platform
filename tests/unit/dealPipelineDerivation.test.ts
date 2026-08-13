@@ -253,4 +253,18 @@ describe('the deal pipeline has one object and data-driven stages', () => {
       'crm-api never applies the lifecycle_stage filter, so the UI control returns the full list.',
     ).toBe(true);
   });
+  it('CrmActivityTargetKind matches the CHECK on crm_activities.target_kind', () => {
+    // The union and the CHECK are a PAIR. Adding 'deal' to one and not the other logs a call
+    // against a deal that throws a CHECK violation at runtime while typechecking clean — the same
+    // four-places shape that made three workspace roles invitable but not storable.
+    const src = SOURCES.get('src/services/crmActivitiesService.ts')!;
+    const m = src.match(/export type CrmActivityTargetKind\s*=\s*([^;]+);/);
+    expect(m, 'CrmActivityTargetKind is gone or reshaped').toBeTruthy();
+    const declared = (m![1].match(/'[a-z_]+'/g) ?? []).map((x) => x.replace(/'/g, '')).sort();
+    expect(
+      declared,
+      'This union must equal the CHECK on crm_activities.target_kind. Widening it needs the ' +
+      'migration in the same change.',
+    ).toEqual(['company', 'contact', 'deal', 'user']);
+  });
 });
