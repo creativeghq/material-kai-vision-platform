@@ -677,20 +677,45 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           tags.push({ name: 'type', value: body.emailType || 'transactional' });
         }
 
-        const messageId = await sendViaResend(sender.apiKey, {
-          from: fromAddress,
-          to: toAddresses,
-          subject,
-          html: htmlBody,
-          text: textBody,
-          cc: body.cc,
-          bcc: body.bcc,
-          reply_to: replyTo,
-          tags,
-          attachments: body.attachments,
-          // Caller headers first so the platform's own (List-Unsubscribe) always win a clash.
-          headers: { ...(body.headers || {}), ...(unsubHeaders || {}) },
-        });
+        // The row was inserted as 'queued' a few lines up. If the send throws — no
+        // RESEND_API_KEY, a Resend 4xx/5xx, a network fault — that row has to reach a
+        // TERMINAL state here, because nothing else will ever touch it: there is no
+        // drainer, no retry and no reaper for email_logs. Before this catch existed a
+        // failed send left `status='queued'`, `error_message` NULL and
+        // `updated_at == created_at` forever, and the caller's 500 was the only trace.
+        // Two "Your order DN-2026-000x has shipped" mails sat like that for 16 days —
+        // the customer was never told and nothing anywhere said so (audit 2026-08-13).
+        // Explicit failure marker over an ambiguous empty state, per pipeline convention §1.
+        let messageId: string;
+        try {
+          messageId = await sendViaResend(sender.apiKey, {
+            from: fromAddress,
+            to: toAddresses,
+            subject,
+            html: htmlBody,
+            text: textBody,
+            cc: body.cc,
+            bcc: body.bcc,
+            reply_to: replyTo,
+            tags,
+            attachments: body.attachments,
+            // Caller headers first so the platform's own (List-Unsubscribe) always win a clash.
+            headers: { ...(body.headers || {}), ...(unsubHeaders || {}) },
+          });
+        } catch (sendErr) {
+          const reason = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          // Best-effort: a failure to record the failure must not mask the send failure.
+          const { error: markErr } = await supabaseClient
+            .from('email_logs')
+            .update({ status: 'failed', error_message: reason })
+            .eq('id', logData.id);
+          if (markErr) {
+            console.error(
+              `[email-api] send failed AND could not mark log ${logData.id} failed: ${markErr.message}`,
+            );
+          }
+          throw sendErr;
+        }
 
         // Update log with Resend message ID
         await supabaseClient

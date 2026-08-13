@@ -36266,19 +36266,7 @@ export type Database = {
           with_embedding: number
         }[]
       }
-      count_vecs_embeddings:
-        | {
-            Args: { p_workspace_id: string }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.count_vecs_embeddings(p_workspace_id => text), public.count_vecs_embeddings(p_workspace_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
-        | {
-            Args: { p_workspace_id: string }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.count_vecs_embeddings(p_workspace_id => text), public.count_vecs_embeddings(p_workspace_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
+      count_vecs_embeddings: { Args: { p_workspace_id: string }; Returns: number }
       country_normalize_key: { Args: { p_input: string }; Returns: string }
       country_ref: {
         Args: { p_input: string }

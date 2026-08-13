@@ -182,11 +182,14 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     for (const pdf of pdfs) {
       let pdfCharged = false;
       try {
+        await markPdfStatus(supabase, pdf.id, 'processing', 'Extracting candidates…');
+
         const { data: blob, error: dlErr } = await supabase.storage
           .from('pdf-documents')
           .download(pdf.storage_path);
         if (dlErr || !blob) {
           errors.push(`download failed: ${pdf.id}`);
+          await markPdfStatus(supabase, pdf.id, 'failed', `Download failed: ${dlErr?.message ?? 'no file at storage path'}`);
           continue;
         }
         const bytes = new Uint8Array(await (blob as Blob).arrayBuffer());
@@ -214,6 +217,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
         const drow = Array.isArray(dd) ? dd[0] : dd;
         if (de || !drow?.success) {
           errors.push(`insufficient credits: ${pdf.id}`);
+          await markPdfStatus(supabase, pdf.id, 'failed', 'Insufficient credits for extraction');
           break; // out of credits → remaining PDFs would also fail
         }
         pdfCharged = true;
@@ -244,12 +248,23 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
           const errText = await resp.text();
           if (pdfCharged) await refundExtract(pdf.id, pdf.workspace_id ?? null, 'anthropic_error');
           errors.push(`anthropic ${resp.status}: ${errText.slice(0, 200)}`);
+          await markPdfStatus(supabase, pdf.id, 'failed', `Vision extraction failed (Anthropic ${resp.status})`);
           continue;
         }
 
         const data = await resp.json();
         const toolUse = data?.content?.find((c: any) => c.type === 'tool_use');
-        if (!toolUse?.input?.candidates) continue;
+        // tool_choice forces the tool, so a missing block means the model did not do what
+        // we asked — a real fault, not an empty result. Distinguish it from "ran clean and
+        // found nothing" below, which is a legitimate 'ready'.
+        if (!toolUse?.input?.candidates) {
+          if (pdfCharged) await refundExtract(pdf.id, pdf.workspace_id ?? null, 'no_tool_use');
+          errors.push(`no tool_use returned: ${pdf.id}`);
+          await markPdfStatus(supabase, pdf.id, 'failed', 'Model returned no candidate block despite forced tool use');
+          continue;
+        }
+
+        const candidatesBefore = allCandidates.length;
 
         for (const c of toolUse.input.candidates) {
           if (!c?.name) continue;
@@ -270,10 +285,22 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
         await logCost(supabase, body.caller_user_id, pdf.workspace_id ?? null, body.catalog_id, pdf.id, data?.usage);
 
+        // Ran clean. Zero candidates is a valid verdict — say so explicitly rather than
+        // leaving the row indistinguishable from one that never ran (pipeline convention §1).
+        const found = allCandidates.length - candidatesBefore;
+        await markPdfStatus(
+          supabase,
+          pdf.id,
+          'ready',
+          found > 0 ? `Extracted ${found} candidate${found === 1 ? '' : 's'}` : 'Ran clean — no candidates matched the query',
+        );
+
         if (allCandidates.length >= maxResults) break;
       } catch (perPdfErr) {
         if (pdfCharged) await refundExtract(pdf.id, pdf.workspace_id ?? null, 'exception');
-        errors.push(`pdf ${pdf.id}: ${perPdfErr instanceof Error ? perPdfErr.message : 'error'}`);
+        const reason = perPdfErr instanceof Error ? perPdfErr.message : 'error';
+        errors.push(`pdf ${pdf.id}: ${reason}`);
+        await markPdfStatus(supabase, pdf.id, 'failed', `Extraction threw: ${reason}`);
       }
     }
 
@@ -296,6 +323,37 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Extraction failed' }, 500);
   }
 }));
+
+/**
+ * Advance a source PDF through its own state machine.
+ *
+ * `catalog_source_pdfs.status` is typed `'uploaded' | 'processing' | 'ready' | 'failed'`
+ * (CatalogSourcePdf in src/services/catalogsService.ts) and read back by the agent's
+ * catalog `attach` step (_shared/tools/catalog-tools.ts). Until 2026-08-13 NOTHING in the
+ * repo ever wrote it after the insert: every row sat at 'uploaded' with an empty
+ * status_message and `updated_at == created_at` forever, so a 403, a download failure and
+ * a clean run that found nothing were all indistinguishable from "just uploaded". Three
+ * rows had been stuck that way since 14–15 July while this function was 403-ing 7 of 11
+ * calls (audit 2026-08-13).
+ *
+ * Best-effort by design: a bookkeeping write must never fail the extraction that
+ * succeeded, so this logs and swallows. It is the ONLY swallowed write here — every
+ * outcome path calls it, which is what makes the silence meaningful.
+ */
+async function markPdfStatus(
+  supabase: any,
+  sourcePdfId: string,
+  status: 'processing' | 'ready' | 'failed',
+  statusMessage: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('catalog_source_pdfs')
+    .update({ status, status_message: statusMessage, updated_at: new Date().toISOString() })
+    .eq('id', sourcePdfId);
+  if (error) {
+    console.error(`[catalog-extract] could not mark ${sourcePdfId} ${status}: ${error.message}`);
+  }
+}
 
 function isValidBbox(b: any): b is { x1: number; y1: number; x2: number; y2: number } {
   if (!b || typeof b !== 'object') return false;
