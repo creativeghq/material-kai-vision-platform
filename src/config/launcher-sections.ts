@@ -44,6 +44,8 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Property Mgmt', to: '/properties?tab=lettings', icon: FolderOpen },
     { label: 'Investments', to: '/properties?tab=investments', icon: BarChart3 },
   ],
+  // No Pipeline entry on purpose: that tab is gated on the `deals` add-on, and this file lists
+  // only always-available tabs so a launcher link never lands on an upsell.
   crm: [
     { label: 'Users', to: '/crm?tab=users', icon: Users },
     { label: 'Contacts', to: '/crm?tab=contacts', icon: Contact },

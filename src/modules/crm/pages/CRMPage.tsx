@@ -44,6 +44,9 @@ import {
   professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
 
+// Pipeline renders FIRST, but 'users' stays the landing tab: bare `/crm` is the main nav
+// target, and defaulting to a module-gated tab would show an upsell as the front door of a
+// free module. Deep link with ?tab=pipeline.
 const TAB_VALUES = ['pipeline', 'users', 'contacts', 'companies', 'categories'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
@@ -117,21 +120,23 @@ export const CRMManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const { activeWorkspaceId } = useWorkspace();
-  // Reps move their own cards; RLS on crm_deals is what actually decides (admin OR deal owner).
-  const canManageDeals = !!activeWorkspaceId;
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
+  // Reps and above create/move cards; a `client` is read-only. RLS on crm_deals is the real
+  // boundary (admin OR the deal's owner) — this only decides whether to offer the controls,
+  // and offering them to someone RLS will reject is a worse experience than hiding them.
+  const canManageDeals = !!activeWorkspaceId && workspaceRole !== 'client';
 
   const initialTab: TabValue = (() => {
     const t = searchParams.get('tab');
-    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'pipeline';
+    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'users';
   })();
   const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
   const handleTabChange = (val: string) => {
-    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'pipeline';
+    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'users';
     setActiveTab(next);
     setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
-    if (next === 'pipeline') params.delete('tab'); else params.set('tab', next);
+    if (next === 'users') params.delete('tab'); else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
 

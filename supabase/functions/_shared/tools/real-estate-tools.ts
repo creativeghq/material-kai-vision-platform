@@ -160,11 +160,13 @@ export const createManageRealEstateTool = (
           // Real-estate deals are crm_deals of the real_estate type. Stage names come from the
           // rows, never a list in this file — each type owns its own stages.
           const sb = dealsClient(jwt);
+          const { data: reType } = await sb.from('crm_deal_types').select('id').is('workspace_id', null).eq('key', 'real_estate').maybeSingle();
+          if (!reType) return JSON.stringify({ success: false, error: 'the real_estate deal type is missing' });
           const { data, error } = await sb
             .from('crm_deals')
-            .select('id, stage, status, value, title, property:properties ( title ), contact:crm_contacts!crm_deals_contact_id_fkey ( name ), type:crm_deal_types!inner ( key )')
+            .select('id, stage, status, value, title, property:properties ( title ), contact:crm_contacts!crm_deals_contact_id_fkey ( name )')
             .eq('workspace_id', workspaceId)
-            .eq('crm_deal_types.key', 'real_estate')
+            .eq('deal_type_id', reType.id)
             .neq('status', 'lost');
           if (error) return JSON.stringify({ success: false, error: error.message });
           const deals = (data ?? []) as any[];
