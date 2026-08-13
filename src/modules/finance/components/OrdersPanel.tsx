@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , Dialog
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
@@ -28,6 +29,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import {
   salesDocumentKindFor,
+  salesDocumentKindLabel,
   salesDocumentKindReason,
   type BuyerIdentity,
   type SalesDocumentKind,
@@ -2081,13 +2083,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
 
-  // #3 — edit the order's line items (only while it has no invoice yet).
-  // Lines are frozen once a document has been derived FROM them. This checked invoices only —
-  // the sales side — so a purchase order stayed editable after "Record supplier bill" had already
-  // copied its lines into a supplier_bills row. Editing then silently left the bill holding the
-  // old figures, which is exactly the €420 gap the 3-way match had to catch after the fact.
+  // #3 — edit the order's line items. Lines freeze once a document has been DERIVED FROM them:
+  //   · sales    → the invoice is built from these lines, so an invoice freezes them.
+  //   · purchase → the supplier's bill is built from these lines too, so a bill freezes them.
+  // An expense attached to a SALES order is the cost side of the sale — transport, the goods
+  // bought in — and copies nothing from the sales lines. Freezing the sale because a cost was
+  // recorded is what stopped an operator adding the item they had forgotten AFTER booking its
+  // cost, which is the exact pairing the "Add expense" action beside it exists to support.
+  const derivedDocExists = (fin?.invoices.length ?? 0) > 0
+    || (order?.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) > 0);
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled'
-    && (fin?.invoices.length ?? 0) === 0 && (fin?.supplierBills.length ?? 0) === 0;
+    && !derivedDocExists;
   /** A document or settled cash exists — the order's classification is already copied onto it. */
   const metaFrozen = !!fin && (fin.invoices.length > 0 || fin.supplierBills.length > 0);
   /**
@@ -2150,19 +2156,49 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     } finally { setSaving(false); }
   };
 
-  // #2 — raise a draft invoice from this (manual/quote-less) sales order, then open it to issue.
-  const createInvoice = async () => {
+  // #2 — raise a draft fiscal document from this (manual/quote-less) sales order, then open it
+  // to issue. `kind` is the operator's explicit choice; omitting it lets the RPC derive the
+  // document from the buyer, which is what every other caller does and what the recommended
+  // entry in the menu passes. The RPC refuses 'invoice' for a buyer with no VAT id — AADE
+  // rejects a τιμολόγιο issued to a consumer, so that one is not a preference we can honour.
+  const createSalesDocument = async (kind?: SalesDocumentKind) => {
     if (!order) return;
     setSaving(true);
     try {
-      const { data, error } = await supabase.rpc('generate_invoice_from_order', { p_order: order.id });
+      const { data, error } = await supabase.rpc('generate_invoice_from_order', {
+        p_order: order.id,
+        p_doc_kind: kind ?? null,
+      });
       if (error) throw error;
       await load(order.id); onChanged();
-      toast({ title: `Draft ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} created`, description: 'Review it, then issue & transmit to myDATA.' });
+      toast({ title: `Draft ${salesDocumentKindLabel(kind ?? salesDocKind).toLowerCase()} created`, description: 'Review it, then issue & transmit to myDATA.' });
       if (data) navigate(`${financeBase}/invoices/${data}`);
     } catch (err: any) {
       // The 0%-VAT gate refuses BY NAME so this can name the lines instead of leaking raw SQL.
       toast({ title: 'Failed', description: invoiceGenerationErrorMessage(err), variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  /**
+   * The simple receipt — απόδειξη εισπράξεως. Proof that money was taken, NOT a sales document
+   * and never transmitted to myDATA, which is why it sits below a separator from the two fiscal
+   * ones. It is issued against a PAYMENT, so it names the payment it covers rather than picking
+   * one silently; an order with several money-in payments keeps a receipt button on every row of
+   * the Payments list below, and this entry covers the most recent.
+   */
+  const createPaymentReceipt = async () => {
+    if (!latestMoneyIn) return;
+    setSaving(true);
+    try {
+      const { pdf_url } = await financeService.generatePaymentReceiptPdf(latestMoneyIn.id);
+      if (!pdf_url) throw new Error('The receipt PDF is not ready yet — try again in a moment.');
+      window.open(pdf_url, '_blank', 'noopener');
+      toast({
+        title: 'Payment receipt ready',
+        description: `${formatMoney(latestMoneyIn.amount, latestMoneyIn.currency)} received on ${formatDate(latestMoneyIn.paid_at)}. Not a fiscal document — nothing goes to myDATA.`,
+      });
+    } catch (err: any) {
+      toast({ title: 'Could not create the payment receipt', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -2359,6 +2395,74 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // the SHARED rule — never from `customer_company_id`, which calls a sole trader (a contact
   // carrying an ΑΦΜ) retail and proposes an ΑΛΠ to a business.
   const salesDocKind: SalesDocumentKind = salesDocumentKindFor(buyerIdentity);
+  /** The payment "Payment receipt" issues against — the most recent money-in on this order. */
+  const latestMoneyIn = useMemo(() => {
+    const ins = (fin?.payments ?? []).filter((p) => p.direction === 'in');
+    return ins.length ? [...ins].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1))[0] : null;
+  }, [fin]);
+
+  /**
+   * The documents an order can produce, offered as a choice rather than as one derived button.
+   *
+   * Three, and they are not the same KIND of thing:
+   *  · τιμολόγιο (1.1) and ΑΛΠ (11.1) are the fiscal SALES documents — one sale gets exactly one
+   *    of them, and both are transmitted to myDATA. Which one the buyer is entitled to is derived
+   *    (salesDocumentKindFor) and marked, because AADE REJECTS a τιμολόγιο issued to a party with
+   *    no ΑΦΜ — so that combination is refused here and again in the RPC. The reverse is legal: a
+   *    business may take a retail receipt, it simply loses the VAT deduction, so it is offered
+   *    with the consequence spelled out instead of being hidden.
+   *  · απόδειξη εισπράξεως is proof that CASH was taken. It is not a sale, goes to nobody at AADE,
+   *    and an order can produce as many as it has payments — hence its own group below the line.
+   */
+  const invoiceBlocked = salesDocKind === 'receipt';
+  const salesDocumentItems = (
+    <>
+      {order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+        <>
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Fiscal document · myDATA
+          </DropdownMenuLabel>
+          <DropdownMenuItem
+            disabled={saving || invoiceBlocked}
+            onClick={() => void createSalesDocument('invoice')}
+            title={invoiceBlocked
+              ? salesDocumentKindReason(buyerIdentity)
+              : `Τιμολόγιο (1.1). ${salesDocumentKindReason(buyerIdentity)}`}>
+            <FileText className="h-3.5 w-3.5 mr-2" />
+            <span className="flex-1">Invoice <span className="text-muted-foreground">· τιμολόγιο</span></span>
+            {salesDocKind === 'invoice' && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={saving}
+            onClick={() => void createSalesDocument('receipt')}
+            title={salesDocKind === 'invoice'
+              ? 'ΑΛΠ (11.1). This buyer has a VAT number — a retail receipt is legal but they cannot deduct the VAT.'
+              : `ΑΛΠ (11.1). ${salesDocumentKindReason(buyerIdentity)}`}>
+            <Receipt className="h-3.5 w-3.5 mr-2" />
+            <span className="flex-1">Retail receipt <span className="text-muted-foreground">· ΑΛΠ</span></span>
+            {salesDocKind === 'receipt' && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+          </DropdownMenuItem>
+        </>
+      )}
+      {latestMoneyIn && (
+        <>
+          {order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && <DropdownMenuSeparator />}
+          <DropdownMenuItem
+            disabled={saving}
+            onClick={() => void createPaymentReceipt()}
+            title="Proof that the money was received. Not a sales document and never transmitted to myDATA.">
+            <Banknote className="h-3.5 w-3.5 mr-2 text-emerald-500" />
+            <span className="flex-1">
+              Payment receipt <span className="text-muted-foreground">· εισπράξεως</span>
+              <span className="block text-[10px] text-muted-foreground">
+                {formatMoney(latestMoneyIn.amount, latestMoneyIn.currency)} · {formatDate(latestMoneyIn.paid_at)}
+              </span>
+            </span>
+          </DropdownMenuItem>
+        </>
+      )}
+    </>
+  );
   // Remaining owed per supplier → drives per-line "Mark paid" visibility: once a line's supplier is
   // fully settled, its "Mark paid" button hides (nothing left to pay).
   //
@@ -2527,11 +2631,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         already settled by the time this menu opens — and asking the operator to
                         apply it by hand was the whole complication we removed. */}
                     <DropdownMenuSeparator />
-                    {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
-                      <DropdownMenuItem onClick={createInvoice}>
-                        <FileText className="h-3.5 w-3.5 mr-2" /> {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}
-                      </DropdownMenuItem>
-                    )}
+                    {salesDocumentItems}
                     {/* In-app first when the supplier is on the platform (claimed identity); the
                         email PDF stays as the universal fallback. Once handed off, neither shows —
                         the round-trip status in the header is the record. */}
@@ -3117,10 +3217,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     document from the same lines. Nothing is offered on a purchase — a purchase is
                     documented by the supplier's own bill, which is an expense, and the empty state
                     below sends you there rather than pretending there is an invoice to issue. */}
-                {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
-                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" disabled={saving} onClick={createInvoice}>
-                    <FileText className="h-3 w-3 mr-1" /> {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}
-                  </Button>
+                {(((fin?.invoices.length ?? 0) === 0 && order.order_type === 'sales') || latestMoneyIn) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="ghost" className="h-6 text-[11px]" disabled={saving}>
+                        <FileText className="h-3 w-3 mr-1" /> Create document <ChevronDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">{salesDocumentItems}</DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
               {!fin || fin.invoices.length === 0 ? (
@@ -3608,7 +3713,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         // second from a payment would duplicate the filing. A purchase order issues nothing.
         fiscalDocKind={order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 ? salesDocKind : undefined}
         fiscalDocReason={salesDocumentKindReason(buyerIdentity)}
-        onIssueDoc={createInvoice}
+        onIssueDoc={() => void createSalesDocument()}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}
       />
     )}

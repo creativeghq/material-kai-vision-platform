@@ -3,7 +3,7 @@
 // and lazy-loads its data on first render.
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock, Plus, Coins } from 'lucide-react';
+import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, CalendarClock, Plus, Coins } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -20,7 +20,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
-import { netPositionTermCount, netPositionDirection } from '@/modules/finance/utils/netPosition';
+import { netPositionDirection, netPositionTotal, netPositionVisible } from '@/modules/finance/utils/netPosition';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
@@ -58,8 +58,9 @@ export const PartyAccountSummary: React.FC<{
   supplier?: { billed: number; paid: number; outstanding: number; ordered?: number } | null;
   /** Per-customer AR aging breakdown (exclusive buckets, by days past due). */
   aging?: { not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null;
-  /** Orders roll-up (count, total ordered value, amount still owed on un-invoiced orders). */
-  orders?: { count: number; ordered: number; owedUninvoiced: number } | null;
+  /** Orders roll-up. `owedNet` is cash on un-invoiced orders, SIGNED by direction (sales
+   *  positive, purchase negative) — it is a term of the account balance, not a tile of its own. */
+  orders?: { count: number; ordered: number; owedNet: number } | null;
   /** Cash of theirs we're holding that isn't settled against anything yet (unallocated money-in). */
   credit?: number | null;
   /**
@@ -78,7 +79,16 @@ export const PartyAccountSummary: React.FC<{
   // anything yet — so it pushes the net position into THEIR favour, exactly like a supplier
   // balance does. Leaving it out was why a customer who had overpaid still read "settled · €0".
   const heldCredit = Math.max(0, credit ?? 0);
-  const net = (customer?.outstanding ?? 0) - heldCredit - (supplier?.outstanding ?? 0);
+  // Un-invoiced order cash is the FOURTH term, not a tile beside the balance. It used to print as
+  // "Owed on orders" — a one-directional number on a page whose whole subject is a two-directional
+  // account, so a customer who had paid ahead read €0 instead of "we hold theirs".
+  const netTerms = {
+    customerOutstanding: customer?.outstanding ?? 0,
+    heldCredit,
+    supplierOutstanding: supplier?.outstanding ?? 0,
+    orderOutstanding: orders?.owedNet ?? 0,
+  };
+  const net = netPositionTotal(netTerms);
   const netDir = netPositionDirection(net);
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
   const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
@@ -115,9 +125,15 @@ export const PartyAccountSummary: React.FC<{
   // there we fold it into the first role grid as the leading column instead of
   // leaving a lonely card. The full CRM Account tab keeps it in the top strip.
   const balanceStat = stat(
-    <Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>,
+    <Wallet className="h-3.5 w-3.5" />, <>Account balance <span className="normal-case text-[9px]">· {netDir}</span></>,
     formatMoney(Math.abs(net)),
-    { tone: netTone, title: 'Net invoiced position: outstanding on issued invoices, less any credit held for them and anything outstanding to them as a supplier. Separate from un-invoiced order cash (Owed on orders).' },
+    {
+      tone: netTone,
+      title: 'The whole account in one number: outstanding on issued invoices, PLUS cash still owed'
+        + ' on orders nobody has invoiced yet, LESS money of theirs we hold on account, LESS'
+        + ' anything outstanding to them as a supplier. Positive is due to us; negative sits in'
+        + ' their favour.',
+    },
   );
   const showCredit = heldCredit > 0.005;
   /**
@@ -138,11 +154,7 @@ export const PartyAccountSummary: React.FC<{
    * net against. The rule this restores is the one stated above: Balance appears only when it
    * says something the tiles beside it do not.
    */
-  const showBalance = netPositionTermCount({
-    customerOutstanding: customer?.outstanding ?? 0,
-    heldCredit,
-    supplierOutstanding: supplier?.outstanding ?? 0,
-  }) > 1;
+  const showBalance = netPositionVisible(netTerms);
   const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
   /**
    * How many tiles the strip will ACTUALLY render. Never guess the column count: the contents
@@ -150,7 +162,7 @@ export const PartyAccountSummary: React.FC<{
    * each — so any guess leaves a hole at the end of the row for the parties it does not match.
    * Counting what is about to render fills the width at 3, 4, 5 or 6 tiles alike.
    */
-  const topTiles = (orders ? 3 : 0) + (showCredit ? 1 : 0) + (showBalance ? 1 : 0)
+  const topTiles = (orders ? 2 : 0) + (showCredit ? 1 : 0) + (showBalance ? 1 : 0)
     + (meta && meta.length > 0 ? 1 : 0);
   const balanceInCustomer = showBalance && !showTopStrip && !!customer;
   const balanceInSupplier = showBalance && !showTopStrip && !customer && !!supplier;
@@ -171,7 +183,6 @@ export const PartyAccountSummary: React.FC<{
         <div className={`grid grid-cols-2 gap-3 ${TOP_STRIP_SM[topTiles]} ${TOP_STRIP_LG[topTiles]}`}>
           {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
           {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
-          {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
           {showCredit && (
             <Card className="dashboard-card border-0" title="Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, refund it — or keep it as income.">
               <CardContent className="p-3">
@@ -293,7 +304,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
   // not as a separate party-level section.
-  const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedUninvoiced: number } | null>(null);
+  const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedNet: number } | null>(null);
   // Their cash we hold that isn't settled against anything (overpayment / deposit on account).
   const [credit, setCredit] = useState(0);
   const [releaseOpen, setReleaseOpen] = useState(false);
@@ -325,7 +336,13 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           setOrderStats({
             count: active.length,
             ordered: active.reduce((a, o) => a + Number(o.total), 0),
-            owedUninvoiced: uninvoiced.reduce((a, o) => a + o.outstanding, 0),
+            // SIGNED by order type before it is summed. `listUninvoicedOutstanding` returns both
+            // sides of the trade for a party that buys AND sells, and `outstanding` is a magnitude
+            // in each row's own direction — so adding them raw reported a supplier's unpaid bill
+            // as the customer owing us more. A sales order they still owe on is due to us; a
+            // purchase order we still owe on is due to them.
+            owedNet: uninvoiced.reduce(
+              (a, o) => a + (o.order_type === 'purchase' ? -o.outstanding : o.outstanding), 0),
           });
           setOpenOrders(active.filter((o) => o.status !== 'fulfilled').length);
         } catch { setOrderStats(null); }

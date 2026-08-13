@@ -11,14 +11,22 @@
  * not a net" makes it visible, so that rule gets a test.
  */
 import { describe, it, expect } from 'vitest';
-import { netPositionTermCount, netPositionDirection } from '@/modules/finance/utils/netPosition';
+import {
+  netPositionDirection, netPositionTotal, netPositionVisible,
+} from '@/modules/finance/utils/netPosition';
 
-const show = (t: { customerOutstanding?: number; heldCredit?: number; supplierOutstanding?: number }) =>
-  netPositionTermCount({
-    customerOutstanding: t.customerOutstanding ?? 0,
-    heldCredit: t.heldCredit ?? 0,
-    supplierOutstanding: t.supplierOutstanding ?? 0,
-  }) > 1;
+type T = {
+  customerOutstanding?: number; heldCredit?: number;
+  supplierOutstanding?: number; orderOutstanding?: number;
+};
+const terms = (t: T) => ({
+  customerOutstanding: t.customerOutstanding ?? 0,
+  heldCredit: t.heldCredit ?? 0,
+  supplierOutstanding: t.supplierOutstanding ?? 0,
+  orderOutstanding: t.orderOutstanding ?? 0,
+});
+const show = (t: T) => netPositionVisible(terms(t));
+const total = (t: T) => netPositionTotal(terms(t));
 
 describe('the Balance tile only appears when it nets something', () => {
   it('hides when unallocated credit is the only term — the reported duplicate', () => {
@@ -51,6 +59,47 @@ describe('the Balance tile only appears when it nets something', () => {
 
   it('treats sub-cent noise as zero, so rounding dust cannot resurrect the tile', () => {
     expect(show({ customerOutstanding: 5000, heldCredit: 0.004 })).toBe(false);
+  });
+
+  /**
+   * The rule is "does not restate a tile rendered beside it", not "more than one term". Three of
+   * the four terms have their own tile; un-invoiced order cash does not, so it is the one term
+   * that can stand alone. Getting this backwards hides the balance of a party whose only position
+   * is an open order — the case that started this.
+   */
+  it('shows when un-invoiced order cash is the only term — it has no tile of its own', () => {
+    expect(show({ orderOutstanding: 150 })).toBe(true);
+    expect(show({ orderOutstanding: -850 })).toBe(true);
+  });
+
+  it('still hides when a mirrored term stands alone, even with order cash at zero', () => {
+    expect(show({ heldCredit: 1373, orderOutstanding: 0 })).toBe(false);
+  });
+});
+
+/**
+ * A sales order they owe on and a purchase order we owe on are opposite sides of the trade. The
+ * caller signs `orderOutstanding` before it gets here; this pins the direction the balance applies
+ * to each term, so a future edit cannot quietly turn a credit into a debt.
+ */
+describe('the account balance nets every term in the right direction', () => {
+  it('adds what they owe on invoices and on un-invoiced orders', () => {
+    expect(total({ customerOutstanding: 5000, orderOutstanding: 150 })).toBe(5150);
+  });
+
+  it('subtracts cash of theirs we hold and anything we owe them as a supplier', () => {
+    expect(total({ customerOutstanding: 5000, heldCredit: 1000, supplierOutstanding: 900 })).toBe(3100);
+  });
+
+  it('goes negative when they have paid ahead — the case a one-directional tile could not show', () => {
+    // Paid €3,850 against a €3,000 order: the account holds €850 of theirs.
+    expect(total({ orderOutstanding: -850 })).toBe(-850);
+    expect(netPositionDirection(total({ orderOutstanding: -850 }))).toBe('in their favour');
+  });
+
+  it('never lets a purchase order we owe on read as the customer owing us more', () => {
+    // Sales order €150 due to us, purchase order €400 due to them → €250 in their favour.
+    expect(total({ orderOutstanding: 150 - 400 })).toBe(-250);
   });
 });
 

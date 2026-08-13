@@ -37399,7 +37399,7 @@ export type Database = {
         Returns: string
       }
       generate_invoice_from_order: {
-        Args: { p_order: string }
+        Args: { p_doc_kind?: string; p_order: string }
         Returns: string
       }
       generate_order_from_invoice: {

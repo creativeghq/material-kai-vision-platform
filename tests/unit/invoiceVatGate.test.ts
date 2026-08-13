@@ -51,6 +51,21 @@ describe('invoiceGenerationErrorMessage', () => {
     expect(msg).toMatch(/customer/i);
   });
 
+  /**
+   * The second refusal. Once the operator can PICK Invoice vs Retail receipt, the pick has to be
+   * checked where the buyer is visible — AADE rejects a τιμολόγιο issued to a party with no ΑΦΜ,
+   * and a menu rendered in the browser is not evidence of one.
+   */
+  it('explains a τιμολόγιο refused for a buyer with no ΑΦΜ, and says how to fix it', () => {
+    const msg = invoiceGenerationErrorMessage({
+      message: 'invoice_requires_vat_id: this buyer has no VAT number, and AADE rejects a τιμολόγιο issued to a consumer. Issue a retail receipt (ΑΛΠ) instead.',
+    });
+
+    expect(msg).not.toContain('invoice_requires_vat_id');
+    expect(msg).toMatch(/ΑΛΠ/);
+    expect(msg).toMatch(/ΑΦΜ/);
+  });
+
   it('passes an unrelated failure through unchanged', () => {
     // Only the gate is translated. Swallowing or rewording other errors would hide real faults —
     // "not authorized" must still read as "not authorized".
