@@ -43,6 +43,7 @@ import {
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1029,24 +1030,42 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       ? String(body.embed_key_id)
       : null;
 
-    await supabase.from('ai_usage_logs').insert({
-      user_id: resolvedUserId,
-      workspace_id: body.workspace_id ?? null,
-      operation_type: 'interior_design_generation',
-      model_name: modelLabel,
-      credits_debited: credits,
-      raw_cost_usd: rawCostUsd,
-      billed_cost_usd: billedCostUsd,
-      markup_multiplier: imagePricing?.markup_multiplier ?? null,
-      metadata: {
-        mode,
-        model: modelLabel,
-        billing_type: 'per_unit',
-        units: 1,
-        ...(attributedSource ? { source: attributedSource } : {}),
-        ...(attributedKeyId ? { embed_key_id: attributedKeyId } : {}),
-      },
-    }).then(() => {}, () => {});
+    // Billing row: never throw (credits are already debited and the upstream call already
+    // happened), but never silent either — the old `.then(() => {}, () => {})` discarded the
+    // outcome, which is the `stamp_job_refresh_cost` shape: spend charged to a tenant and
+    // reported against nobody. try/catch covers both failure modes, since supabase-js RESOLVES
+    // with `{ error }` on an RLS denial and REJECTS on a transport error (#347 audit).
+    try {
+      const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+        user_id: resolvedUserId,
+        workspace_id: body.workspace_id ?? null,
+        operation_type: 'interior_design_generation',
+        model_name: modelLabel,
+        credits_debited: credits,
+        raw_cost_usd: rawCostUsd,
+        billed_cost_usd: billedCostUsd,
+        markup_multiplier: imagePricing?.markup_multiplier ?? null,
+        metadata: {
+          mode,
+          model: modelLabel,
+          billing_type: 'per_unit',
+          units: 1,
+          ...(attributedSource ? { source: attributedSource } : {}),
+          ...(attributedKeyId ? { embed_key_id: attributedKeyId } : {}),
+        },
+      });
+      if (usageErr) throw usageErr;
+    } catch (usageErr) {
+      console.error('[generate-interior-gemini] ai_usage_logs insert FAILED — spend is unattributed', usageErr);
+      await captureException(
+        usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)),
+        {
+          tags: { area: 'billing', operation: 'interior_design_generation' },
+          extra: { user_id: resolvedUserId, workspace_id: body.workspace_id ?? null, credits },
+          fingerprint: ['ai-usage-log-write-failed', 'interior_design_generation'],
+        },
+      );
+    }
 
     // Persist to generation_3d.
     // `request_type` is CHECK-constrained to exactly 'text_to_image' | 'image_to_image' |

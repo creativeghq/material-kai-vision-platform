@@ -16,6 +16,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { checkCreditBalance, getServicePricing } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 /**
  * Download a finished Replicate video into our own bucket and return the public URL.
@@ -309,23 +310,39 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       const rawCostUsd = videoPricing ? videoPricing.cost_per_unit * units : null;
       const billedCostUsd = videoPricing ? rawCostUsd! * videoPricing.markup_multiplier : null;
 
-      await supabase.from('ai_usage_logs').insert({
-        user_id: userId,
-        workspace_id: workspace_id ?? null,
-        operation_type: 'social_video_generation',
-        model_name: model,
-        api_provider: 'replicate',
-        input_tokens: 0, output_tokens: 0,
-        input_cost_usd: 0, output_cost_usd: 0,
-        raw_cost_usd: rawCostUsd,
-        markup_multiplier: videoPricing?.markup_multiplier ?? null,
-        billed_cost_usd: billedCostUsd,
-        credits_debited: creditCost,
-        metadata: {
-          model, duration_seconds, aspect_ratio, replicate_prediction_id: predictionId,
-          billing_type: 'per_unit', units, unit: videoPricing?.unit ?? null,
-        },
-      });
+      // Billing row: never throw, never silent. The result was discarded entirely — spend
+      // charged to a tenant and reported against nobody. try/catch because supabase-js RESOLVES
+      // with `{ error }` on an RLS denial and REJECTS on transport (#347).
+      try {
+        const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+          user_id: userId,
+          workspace_id: workspace_id ?? null,
+          operation_type: 'social_video_generation',
+          model_name: model,
+          api_provider: 'replicate',
+          input_tokens: 0, output_tokens: 0,
+          input_cost_usd: 0, output_cost_usd: 0,
+          raw_cost_usd: rawCostUsd,
+          markup_multiplier: videoPricing?.markup_multiplier ?? null,
+          billed_cost_usd: billedCostUsd,
+          credits_debited: creditCost,
+          metadata: {
+            model, duration_seconds, aspect_ratio, replicate_prediction_id: predictionId,
+            billing_type: 'per_unit', units, unit: videoPricing?.unit ?? null,
+          },
+        });
+        if (usageErr) throw usageErr;
+      } catch (usageErr) {
+        console.error('[generate-social-video] ai_usage_logs insert FAILED — spend is unattributed', usageErr);
+        await captureException(
+          usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)),
+          {
+            tags: { area: 'billing', operation: 'social_video_generation' },
+            extra: { user_id: userId, workspace_id: workspace_id ?? null, credits: creditCost },
+            fingerprint: ['ai-usage-log-write-failed', 'social_video_generation'],
+          },
+        );
+      }
 
       return jsonResponse({
         success: true,

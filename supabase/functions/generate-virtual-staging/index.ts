@@ -18,6 +18,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -231,17 +232,33 @@ async function handleRequest(
     const rawCostUsd = stagingPricing ? stagingPricing.cost_per_unit : null;
     const billedCostUsd = stagingPricing ? rawCostUsd! * stagingPricing.markup_multiplier : null;
 
-    await supabase.from('ai_usage_logs').insert({
-      user_id: userId,
-      workspace_id: body.workspace_id ?? null,
-      operation_type: 'virtual_staging',
-      model_name: PRICING_KEY,
-      credits_debited: CREDIT_COST,
-      raw_cost_usd: rawCostUsd,
-      billed_cost_usd: billedCostUsd,
-      markup_multiplier: stagingPricing?.markup_multiplier ?? null,
-      metadata: { room, furniture_style: furnitureStyle, billing_type: 'per_unit', units: 1 },
-    }).then(() => {}, () => {});
+    // Billing row: never throw, never silent. The old `.then(() => {}, () => {})` discarded the
+    // outcome — spend charged to a tenant and reported against nobody. try/catch because
+    // supabase-js RESOLVES with `{ error }` on an RLS denial and REJECTS on transport (#347).
+    try {
+      const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+        user_id: userId,
+        workspace_id: body.workspace_id ?? null,
+        operation_type: 'virtual_staging',
+        model_name: PRICING_KEY,
+        credits_debited: CREDIT_COST,
+        raw_cost_usd: rawCostUsd,
+        billed_cost_usd: billedCostUsd,
+        markup_multiplier: stagingPricing?.markup_multiplier ?? null,
+        metadata: { room, furniture_style: furnitureStyle, billing_type: 'per_unit', units: 1 },
+      });
+      if (usageErr) throw usageErr;
+    } catch (usageErr) {
+      console.error('[generate-virtual-staging] ai_usage_logs insert FAILED — spend is unattributed', usageErr);
+      await captureException(
+        usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)),
+        {
+          tags: { area: 'billing', operation: 'virtual_staging' },
+          extra: { user_id: userId, workspace_id: body.workspace_id ?? null, credits: CREDIT_COST },
+          fingerprint: ['ai-usage-log-write-failed', 'virtual_staging'],
+        },
+      );
+    }
 
     // Delivered by the "Virtual Staging Done" flow (Flows dashboard).
     emitFlowEvent('virtual_staging_completed', {

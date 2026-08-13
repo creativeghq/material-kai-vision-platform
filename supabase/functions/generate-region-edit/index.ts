@@ -27,6 +27,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -178,19 +179,43 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     const rawCostUsd = editPricing ? editPricing.cost_per_unit : null;
     const billedCostUsd = editPricing ? rawCostUsd! * editPricing.markup_multiplier : null;
 
-    await supabase.from('ai_usage_logs').insert({
-      user_id: userId,
-      // Same value the debit above used. It was in scope and never reached the log row, so
-      // this spend was charged to a tenant and then reported against nobody.
-      workspace_id: body.workspace_id ?? null,
-      operation_type: 'region_edit',
-      model_name: PRICING_KEY,
-      credits_debited: CREDITS_REQUIRED,
-      raw_cost_usd: rawCostUsd,
-      billed_cost_usd: billedCostUsd,
-      markup_multiplier: editPricing?.markup_multiplier ?? null,
-      metadata: { provider_model: result.model, billing_type: 'per_unit', units: 1 },
-    }).then(() => {}, () => {});
+    // The billing row is best-effort for the REQUEST but not for the books (#347 audit).
+    //
+    // It must never throw: the credits are already debited and the upstream call already
+    // happened, so failing here would punish the user for an accounting problem. But the old
+    // `.then(() => {}, () => {})` discarded the outcome entirely, which is the
+    // `stamp_job_refresh_cost` shape — spend charged to a tenant and reported against nobody,
+    // with billing sitting at zero and the exception swallowed.
+    //
+    // try/catch rather than checking `error` alone, because both failure modes have to be
+    // caught: supabase-js RESOLVES with `{ error }` on an RLS denial, and REJECTS on a
+    // transport error. This function has no top-level Sentry reach for a mid-pipeline swallow.
+    try {
+      const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+        user_id: userId,
+        // Same value the debit above used. It was in scope and never reached the log row, so
+        // this spend was charged to a tenant and then reported against nobody.
+        workspace_id: body.workspace_id ?? null,
+        operation_type: 'region_edit',
+        model_name: PRICING_KEY,
+        credits_debited: CREDITS_REQUIRED,
+        raw_cost_usd: rawCostUsd,
+        billed_cost_usd: billedCostUsd,
+        markup_multiplier: editPricing?.markup_multiplier ?? null,
+        metadata: { provider_model: result.model, billing_type: 'per_unit', units: 1 },
+      });
+      if (usageErr) throw usageErr;
+    } catch (usageErr) {
+      console.error('[generate-region-edit] ai_usage_logs insert FAILED — spend is unattributed', usageErr);
+      await captureException(
+        usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)),
+        {
+          tags: { area: 'billing', operation: 'region_edit' },
+          extra: { user_id: userId, workspace_id: body.workspace_id ?? null, credits: CREDITS_REQUIRED },
+          fingerprint: ['ai-usage-log-write-failed', 'region_edit'],
+        },
+      );
+    }
 
     return jsonResponse({
       success: true,
