@@ -138,6 +138,62 @@ await check('db.products.sample', ['DB_KEY'], async () => {
   return sampleProductId;
 });
 
+/**
+ * The deals pipeline ships its PostgREST selects as runtime STRINGS — embed hints like
+ * `contact:crm_contacts!crm_deals_contact_id_fkey`. A renamed constraint or a dropped column makes
+ * every one of them a 400 at request time while `tsc` stays green, and a board that errored reads
+ * exactly like a board with no deals. That is the silent-zero shape, so it gets a probe.
+ *
+ * ANON is the right principal and a 401 is the PASS. PostgREST parses the select, resolves the
+ * embeds and PLANS the query before RLS runs; anon then trips on `is_workspace_member`, which it
+ * has no EXECUTE grant for. So:
+ *    401  → the select parsed, the columns exist, the embeds resolved   (what we assert)
+ *    400  → a column or a relationship is gone                          (the regression)
+ * The control below proves the distinction is real by sending a knowingly-bad embed and requiring
+ * a 400 — without it, a harness that accepted everything would look like a pass.
+ */
+const DEALS_SELECTS = [
+  ['crm_deals', 'id, workspace_id, deal_type_id, title, stage, status, value, currency, probability, ' +
+    'expected_close_date, lost_reason, notes, contact_id, company_id, property_id, project_id, ' +
+    'owner_user_id, created_at, updated_at, ' +
+    'contact:crm_contacts!crm_deals_contact_id_fkey ( id, name ), ' +
+    'company:crm_companies ( id, name ), ' +
+    'property:properties ( id, title, reference_code, town ), ' +
+    'tasks:crm_deal_tasks ( id, done )'],
+  ['crm_deals', 'id, workspace_id, deal_type_id, title, stage, status, value, currency, ' +
+    'expected_close_date, property_id, contact_id, company_id, updated_at, type:crm_deal_types ( label )'],
+  ['crm_deals', 'id, stage, status, value, title, property:properties ( title ), ' +
+    'contact:crm_contacts!crm_deals_contact_id_fkey ( name )'],
+  ['crm_deal_types', 'id, workspace_id, key, label, subject_kind, sort, is_active'],
+  ['crm_deal_stages', 'id, deal_type_id, key, label, sort, is_won, is_lost'],
+  ['crm_deal_tasks', 'id, deal_id, title, done, due_date, created_at'],
+  ['crm_contacts', 'id, lifecycle_stage, lead_status, lead_source'],
+];
+
+await check('db.deals.selects-resolve', ['ANON_KEY'], async () => {
+  const hdr = { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` };
+
+  // Control first: a relationship that does not exist MUST be rejected at parse time.
+  const control = await http(
+    `${SUPABASE_URL}/rest/v1/crm_deals?select=${encodeURIComponent('id, nope:crm_contacts!crm_deals_no_such_fkey ( id )')}&limit=1`,
+    { headers: hdr },
+  );
+  assert(control.res.status === 400, `control: a bogus embed returned ${control.res.status}, not 400 — this check proves nothing`);
+
+  for (const [table, select] of DEALS_SELECTS) {
+    const { res, json, text } = await http(
+      `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}&limit=1`,
+      { headers: hdr },
+    );
+    // 200 (grants widened) is fine; 401 is the expected anon outcome. 400 is the regression.
+    assert(
+      res.status !== 400,
+      `${table}: select no longer resolves → ${json?.message || text?.slice(0, 160)}`,
+    );
+  }
+  return `${DEALS_SELECTS.length} deal selects resolve`;
+});
+
 await check('db.rpc.get_related_products.anon-denied', ['ANON_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/get_related_products`, {
     method: 'POST',
