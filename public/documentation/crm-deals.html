@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM: Deals & Pipeline | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Deals &amp; Pipeline</div>
+  <h1>CRM · Deals &amp; Pipeline <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/crm?tab=pipeline</span> <span class="badge route">/crm/deals/:id</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The Pipeline is where you track <strong>deals</strong> — the opportunities you're working to close — as they move through the <strong>stages</strong> of a sales process. Each deal is linked to a <a href="crm-contacts.html">contact</a> or <a href="crm-companies.html">company</a>, carries a value and a probability, and rolls up into a <strong>weighted forecast</strong>. Crucially, stages belong to a <strong>deal type</strong> — a construction deal and a property sale run different playbooks — so a deal can only ever sit in a stage its own process defines. This guide covers the board, deal types &amp; stages, the deal record, the team, the forecast, and the automation that fires as a deal advances.</p>
+
+  <div class="callout"><p><strong>Where:</strong> <a href="crm.html">CRM</a> → the <strong>Pipeline</strong> tab (<span class="badge route">/crm?tab=pipeline</span>). It's a <strong>Pro add-on</strong> — an owner enables <em>Deals &amp; Pipeline</em> from the tab (a member can request it). The same board also appears in <a href="real-estate.html">Real Estate</a>, pinned to the property deal type.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/pipeline.png" alt="The Pipeline board">
+    <figcaption>The Pipeline board — one column per stage of the selected deal type, each deal a card you move with a stage dropdown. The header shows the open count and the weighted <strong>forecast</strong>.</figcaption>
+  </figure>
+
+  <h2>The board</h2>
+  <p>The board lays a deal type's <strong>stages out as columns</strong>, each column headed with its deal count and total value. A deal is a <strong>card</strong> showing its name, the linked contact/company and value, its expected close date, and a small checklist.</p>
+  <ul class="feat">
+    <li><strong>Move a deal by picking a stage</strong> — each card has a <strong>stage dropdown</strong> (it's deliberately not drag-and-drop). Choosing a later stage advances the deal; the move is recorded on its timeline.</li>
+    <li><strong>Mark won / lost</strong> — the card's <strong>⋮</strong> menu moves a deal to the type's <em>winning</em> stage, or opens a short <strong>reason</strong> dialog for a loss. Lost deals collapse into their own section with a <strong>Reopen</strong> action.</li>
+    <li><strong>Checklist</strong> — a per-deal to-do list (<em>done / total</em>) you tick off from the card.</li>
+    <li><strong>Header stats</strong> — the open-deal count, a toggle to reveal lost deals, and the <strong>weighted forecast</strong> per currency.</li>
+    <li><strong>Deal type switcher</strong> — flip the board between your pipelines (hidden in Real Estate, which is locked to the property type).</li>
+  </ul>
+
+  <h2>Deal types &amp; stages</h2>
+  <p><strong>What it is —</strong> a <strong>deal type</strong> is a pipeline with its own <strong>stages</strong>. <strong>Why it matters —</strong> different sales run differently, and the platform enforces that: a deal belongs to one type, and <strong>can only sit in a stage that type defines</strong> — a Construction deal physically cannot land in a property "Conveyancing" stage. Which stage counts as <em>won</em> or <em>lost</em> is a property of the stage (a flag you set), never a magic status word.</p>
+  <p><strong>Platform defaults</strong> come ready to use — <strong>Real Estate</strong>, <strong>Project</strong>, <strong>Construction</strong> and <strong>General</strong> — and are read-only. A workspace <strong>admin</strong> can add their own from the board's <strong>Types</strong> button:</p>
+  <ul class="feat">
+    <li><strong>Create a type</strong> — give it a name and a <em>subject</em> (a property, a project, or none); it's created with a starter set of stages in one step.</li>
+    <li><strong>Manage stages</strong> — add, reorder, rename, delete (blocked while a stage still holds deals), and mark which stages are <strong>winning</strong> or <strong>losing</strong>.</li>
+    <li><strong>Per-stage email</strong> — the ✉ on a stage sets up an automatic email to the contact when a deal reaches it (see Automation below).</li>
+  </ul>
+
+  <h2>Creating a deal</h2>
+  <p><strong>New deal</strong> opens a form:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Title</strong></td><td>What the deal is (falls back to the property/company/contact name if left blank).</td></tr>
+      <tr><td><strong>Subject</strong></td><td>Driven by the type: a <strong>Property</strong> picker for property pipelines, a <strong>Project</strong> picker for project pipelines, nothing for a plain type.</td></tr>
+      <tr><td><strong>Contact / Company</strong></td><td>Who the deal is with. <strong>A deal must be linked to a contact or a company</strong> — it can't belong to nobody.</td></tr>
+      <tr><td><strong>Value</strong> &amp; currency</td><td>The deal's amount.</td></tr>
+      <tr><td><strong>Expected close</strong></td><td>The date you expect to close it.</td></tr>
+      <tr><td><strong>Probability %</strong></td><td>Your confidence — <em>feeds the weighted forecast</em>. Leave it blank and the forecast uses the stage's position instead.</td></tr>
+      <tr><td><strong>Notes</strong></td><td>Free text.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The deal record</h2>
+  <p>Clicking a deal opens its record page at <span class="badge route">/crm/deals/:id</span>:</p>
+  <ul class="feat">
+    <li><strong>Stage card</strong> — move the deal (the same dropdown), see its position (<em>“3 of 5”</em>), and reopen it if closed.</li>
+    <li><strong>Activity timeline</strong> — the deal's history and where you log notes and activity (the same activity feed as a contact/company record).</li>
+    <li><strong>Details</strong> — contact, company, property, project (each a link), value, probability and expected close.</li>
+    <li><strong>Deal team</strong> and <strong>Notes</strong> cards (below).</li>
+  </ul>
+
+  <h3>Deal team</h3>
+  <p>Assign several workspace members to a deal, each with a functional <strong>role</strong> — Account Executive, BDR, Account Manager, Solutions, Exec Sponsor or Contributor. This is <strong>“who to chase,” not an access grant</strong>: adding someone to a deal team doesn't change what they can see or do — that's still governed by their workspace role. Add from a member search, change a role inline, or remove.</p>
+
+  <h2>The forecast</h2>
+  <p>The board header shows a <strong>weighted forecast</strong>: each open deal's value multiplied by its probability (or, where no probability is set, by how far along its stage is), summed up. It's <strong>grouped by currency</strong> — EUR and GBP are never added into one made-up number — and it's derived in the database, so what you see is a single consistent figure across the board and the assistant. The line reads, per currency, <em>“€X weighted of €Y · avg Z%.”</em></p>
+
+  <h2>The timeline — pipeline history</h2>
+  <p>Every stage and status change is written to the deal's timeline automatically — <em>“Moved to Tender from Estimate,” “Deal won at Handover,” “Deal lost — price.”</em> Because it's recorded at the database level, the history is the same whoever made the move: you on the board, you on the record page, or the assistant from chat.</p>
+
+  <h2>Automation — when a deal changes stage</h2>
+  <p>A stage move raises a <a href="flows.html">Flow</a> event — <strong>Deal Stage Changed</strong>, <strong>Deal Won</strong> or <strong>Deal Lost</strong> — carrying the deal, its stage, value, and the contact/company. You route these through Flows like any other trigger (notify the owner, post to a channel, start an onboarding). Each comes with a seeded default you can retarget or pause without a deploy.</p>
+  <p>For the common case, there's a shortcut: the <strong>✉ “email the contact when a deal reaches this stage”</strong> on a stage in the Types manager. You write the subject and body (with <code>{{contact_name}}</code>, <code>{{deal_title}}</code>, <code>{{stage}}</code>, <code>{{value}}</code> variables) and it's saved as an ordinary workspace flow — so it shows up under <a href="flows.html">Flows</a> with run history and can be edited or paused there. A contact with no email is simply skipped, not a failed send.</p>
+
+  <h2>From the assistant</h2>
+  <p>The assistant can run your pipeline from chat with the <strong>Deal pipeline</strong> tool (<a href="agent-tools.html">Agent tools</a>): list your open deals, give the weighted forecast, create a deal for a contact, move one to a stage <em>by name</em>, or mark one lost with a reason. It works under your own permissions, so it sees exactly the deals you would. (Property and project deals are created on the board, since they need a listing or project attached.)</p>
+
+  <h2>Gating &amp; access</h2>
+  <ul class="feat">
+    <li><strong>Pro add-on.</strong> <em>Deals &amp; Pipeline</em> is a paid add-on that depends only on CRM (you don't need Real Estate). Enabling it from either CRM or Real Estate lights it up in both.</li>
+    <li><strong>Roles.</strong> Everyone with CRM access can see the board; sales roles and above can create and manage deals; a <em>client</em> role is read-only; managing <strong>types and stages</strong> is owner/admin only.</li>
+    <li><strong>No per-deal credits.</strong> Deals don't cost credits; only the stage-email <em>automation</em> draws on the flow run cost like any automation.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

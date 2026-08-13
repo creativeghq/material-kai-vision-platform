@@ -78,37 +78,44 @@
   <p><strong>Editing line items.</strong> While an order is still a <strong>draft / un-invoiced</strong>, you can edit it freely — change a line's <strong>quantity, price, cost, unit or VAT</strong>, and <strong>add or remove</strong> lines; totals and margin recompute as you go. Once an invoice has been raised against the order, the lines are locked so the order and its invoice can't drift apart.</p>
 
   <h2>Inside an order — the detail view</h2>
-  <p>Click any order in the list to open its <strong>detail view</strong>. This is where an order earns its keep: everything about the deal — what was sold, how much has shipped, what's been invoiced and paid, and what you made — is consolidated on one screen. From top to bottom you get:</p>
+  <p>Click any order in the list to open its <strong>detail view</strong>. It opens as a <strong>document</strong>: a masthead header that's true of the whole order, then a <strong>tab strip</strong> for its contents.</p>
 
-  <h3>1. The header</h3>
-  <p>The order's <strong>number</strong>, a <strong>type</strong> badge (sales / purchase), the <strong>fulfilment status</strong> badge, the <strong>payment status</strong>, and the order <strong>total</strong>.</p>
+  <h3>1. The document header (masthead)</h3>
+  <p>An icon (cart for a sale, box for a purchase) and <strong>“Order {number}”</strong>, then <strong>one identity-and-money line</strong> read left to right: the <strong>direction</strong> (Sales / Purchase order) · the <strong>customer or supplier</strong> (a link to their CRM record) · the <strong>date</strong> · the order <strong>total</strong> · the <strong>payment status</strong> · and the outstanding clause — <em>“{amount} still to collect”</em> on a sale, <em>“still to pay”</em> on a purchase, or <em>“Overpaid {amount}”</em> when it's been over-settled. The money here is <strong>derived</strong> — the settled/outstanding figures come from the one settlement source, never a re-computation. Below the line sit the verbs that act on the whole order: the <strong>Project</strong> picker, the <strong>Status</strong> dropdown, and the <strong>Actions</strong> menu.</p>
 
-  <h3>2. Line items (with cost, profit, units, supplier &amp; delivery)</h3>
-  <p>A table of the order's lines — <strong>Item</strong>, <strong>Qty</strong>, <strong>Unit</strong>, <strong>Delivered</strong>, <strong>Price</strong>, <strong>Cost</strong>, <strong>VAT</strong> and line totals (Net / Total), plus each line's <strong>cost total and profit</strong> so you can see the margin line by line, not just for the whole order. Each line carries its unit of measure and a snapshot <strong>cost</strong>, and is marked <em>“(off-warehouse)”</em> when it isn't linked to stock. Per line you can:</p>
+  <h3>2. The tabs</h3>
+  <p>The order's contents are split across tabs — only the ones that apply show: <strong>Details</strong> (the lines, totals, cash and margin — below), <strong>Suppliers</strong> (on a sale, once lines have suppliers), <strong>Invoices</strong>, <strong>Expenses</strong>, <strong>Payments</strong>, <strong>3-Way Match</strong> (purchase), and <strong>Customs</strong>.</p>
+
+  <h3>3. Line items — on the Details tab (with cost, profit, units, supplier &amp; delivery)</h3>
+  <p>A table of the order's lines — <strong>Item</strong>, <strong>Qty</strong>, <strong>Unit</strong>, <strong>Delivered</strong>, <strong>Price</strong>, <strong>Cost</strong>, <strong>VAT</strong> and line totals (Net / Total), plus each line's <strong>cost total and profit</strong> so you can see the margin line by line, not just for the whole order. Each line carries its unit of measure and a snapshot <strong>cost</strong>, and is marked <em>“(off-warehouse)”</em> when it isn't linked to stock. A line linked to a catalogue product shows that link inline as <strong>“→ {product} · unlink”</strong> — so editing the description no longer silently breaks the product link (breaking it is now a deliberate click), which keeps the warehouse/stock connection intact. Per line you can:</p>
   <ul class="feat">
     <li>Set <strong>delivery</strong> directly — a small menu offers <strong>Mark fully delivered</strong>, <strong>Mark half delivered</strong> or <strong>Mark not delivered</strong>.</li>
     <li>Set the line's <strong>supplier</strong> inline — who supplies it / who you'll owe when you restock (auto-filled from the product's supplier, editable on any line).</li>
+    <li><strong>Register a warranty</strong> (sales orders) — the line's <strong>⋮</strong> menu adds or edits warranty cover for what you sold, which registers it on the customer's <a href="crm-installed-base.html">installed base</a>. The line then reads <em>“Under warranty until …”</em>.</li>
   </ul>
   <p>While the order is still a draft / un-invoiced, <strong>Edit items</strong> turns this into an editable grid.</p>
 
-  <h3>3. The Actions menu</h3>
-  <p>A <strong>Status</strong> dropdown (plus one-click <strong>Mark completed</strong>) and an <strong>Actions</strong> menu gather the operations — <strong>Record money in / out</strong>, <strong>Create invoice / receipt</strong>, <strong>Record supplier bill</strong>, <strong>Receive into warehouse</strong> and <strong>Dispatch board</strong> — covered in the next section.</p>
+  <h3>4. The Actions menu (in the header)</h3>
+  <p>The header's <strong>Status</strong> dropdown (plus one-click <strong>Mark completed</strong>) and <strong>Actions</strong> menu gather the operations — <strong>Record money in / out</strong>, <strong>Create invoice / receipt</strong>, <strong>Record supplier bill</strong>, <strong>Receive into warehouse</strong> and <strong>Dispatch board</strong> — covered in the next section.</p>
 
-  <h3>4. Cost, margin &amp; real cash</h3>
+  <h3>5. Cost, margin &amp; real cash — on the Details tab</h3>
   <p>An order shows its economics two ways, which answer two different questions:</p>
   <ul class="feat">
     <li><strong>Margin (on paper)</strong> — sell price − cost across the lines. This is the profit the deal <em>should</em> make, visible the moment you've priced it (before any cash moves).</li>
     <li><strong>Real cash</strong> — the order deals only in actual money: <strong>Received</strong> (money in), <strong>Paid to suppliers</strong> (money out), and <strong>Profit</strong> (<em>Received − Paid</em>) — what's <em>actually</em> happened so far. There are no “virtual” receivables/payables; a figure here means real money changed hands.</li>
   </ul>
 
-  <h3>5. Attached documents</h3>
-  <p>Below, the order lists everything financial that hangs off it — each appearing only when present:</p>
+  <h3>6. The document tabs — invoices, expenses, payments &amp; more</h3>
+  <p>Everything financial that hangs off the order lives on its own tab (each shows only when it applies):</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>Section</th><th>What it lists</th></tr></thead>
+    <thead><tr><th>Tab</th><th>What it lists</th></tr></thead>
     <tbody>
       <tr><td><strong>Invoices</strong></td><td>Every <a href="finance-doc-invoices.html">invoice</a> (or receipt) raised against the order — number, status, total and amount still <em>due</em>.</td></tr>
-      <tr><td><strong>Supplier bills</strong></td><td>(Purchase orders) the supplier bills recorded against the order — number, status, total and amount due.</td></tr>
+      <tr><td><strong>Expenses</strong></td><td>(Purchase orders) the <a href="finance-doc-expenses.html">supplier bills</a> recorded against the order — number, status, total and amount due.</td></tr>
       <tr><td><strong>Payments</strong></td><td>Each payment linked to the order — date, direction (<em>In</em> / <em>Out</em>), method and amount (green/red by direction).</td></tr>
+      <tr><td><strong>Suppliers</strong></td><td>(Sales orders, once lines have suppliers) who supplies each line and your exposure to them.</td></tr>
+      <tr><td><strong>3-Way Match</strong></td><td>(Purchase orders) the ordered × received × billed check — see below.</td></tr>
+      <tr><td><strong>Customs</strong></td><td>Customs / import classification for the order, when relevant.</td></tr>
     </tbody>
   </table></div>
 
@@ -119,7 +126,7 @@
     <tbody>
       <tr><td><strong>Record money in</strong></td><td>Sales</td><td>Logs cash <em>received from the customer</em>. For a cash sale you can tick to <strong>issue the receipt/invoice in the same step</strong>. Updates payment status + the cash figures.</td></tr>
       <tr><td><strong>Record money out</strong></td><td>Purchase</td><td>Logs cash <em>paid to the supplier</em> (or a refund). Money out is <strong>attached to the supplier</strong> you're paying, so it registers against what you owe them. The order also tracks your <strong>supplier exposure</strong> — what's still owed to each supplier (their line costs minus what you've already paid out).</td></tr>
-      <tr><td><strong>Create invoice / receipt</strong></td><td>Sales</td><td>Raises the sales document for the order's lines and links it back. A sale to a <strong>company (B2B)</strong> raises an <a href="finance-doc-invoices.html">invoice</a>; a sale to a bare <strong>contact (retail)</strong> raises a <strong>receipt</strong>. You review it, then issue &amp; transmit to myDATA.</td></tr>
+      <tr><td><strong>Create invoice / receipt</strong></td><td>Sales</td><td>Raises the sales document for the order's lines and links it back. Instead of guessing, you <strong>pick which document</strong> from a menu of three: a <strong>Τιμολόγιο (1.1)</strong> invoice, an <strong>ΑΛΠ (11.1)</strong> retail receipt, or a <strong>Payment receipt</strong> (εισπράξεως) — proof of cash that is <em>not</em> sent to myDATA (the two fiscal documents are). You review the chosen document, then issue &amp; transmit to myDATA.</td></tr>
       <tr><td><strong>Record supplier bill</strong></td><td>Purchase</td><td>Records the supplier's bill against the order (the purchase-side equivalent of an invoice) → it appears in <a href="finance-rp-payables.html">Payables</a>.</td></tr>
       <tr><td><strong>Receive into warehouse</strong></td><td>Purchase</td><td>Receives the ordered goods into <a href="finance-op-warehouse.html">Warehouse</a> stock (catalogue lines), so on-hand quantities go up.</td></tr>
     </tbody>

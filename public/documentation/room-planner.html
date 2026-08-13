@@ -36,6 +36,7 @@
     <li><strong>Rotate</strong> in 45° steps and <strong>delete</strong> from the controls on the selected item.</li>
     <li>See <strong>overlaps flagged in red</strong>, so two things can't silently occupy the same spot.</li>
   </ul>
+  <p>Each placed product is drawn as its <strong>photo, clipped to its real footprint</strong> — so a sofa reads as the space it takes up, not a labelled box — with its name kept on a scrim (at plan scale two beige sofas are otherwise indistinguishable).</p>
   <div class="callout"><p><strong>“Measured” vs “placeholder” size.</strong> An item's footprint is taken from its <strong>3D model's real dimensions</strong> where it has one, or an explicit size override, otherwise a neutral default — and the planner <strong>labels which</strong>. A product with no model is shown at an assumed size marked <em>placeholder</em>, so you never mistake a default box for a real measurement.</p></div>
 
   <h3>The 3D view</h3>
@@ -46,7 +47,7 @@
   <div class="callout"><p><strong>The quantity is worked out for you.</strong> Each applied surface's ordered area is <strong>derived from the room's dimensions</strong> — you never type square metres — and it automatically adds <strong>+10% for waste</strong> (cuts and breakage). So a floor finish on a 4×5 m room orders the right amount without a hand calculation.</p></div>
 
   <h2>Configurable products</h2>
-  <p>If a product has <strong>options</strong> (a finish, a fabric, a colour), you configure it with <strong>swatches that repaint the model live</strong> and update the price as you pick — the price is always re-checked on the server, never guessed in the browser, and any invalid combination is blocked before it can be added. Because materials render from real <strong>AI-generated textures</strong> (not just a flat colour), a velvet and a linen in the same navy actually look different on screen. The merchant sets these options up on the product; see the embed <a href="api-embed.html">configurator</a> for the same engine on your own website.</p>
+  <p>If a product has <strong>options</strong> (a finish, a fabric, a colour), you configure it with <strong>swatches that repaint the model live</strong> and update the price as you pick — the price is always re-checked on the server, never guessed in the browser, and any invalid combination is blocked before it can be added. Because materials render from real <strong>AI-generated textures</strong> (not just a flat colour), a velvet and a linen in the same navy actually look different on screen. The merchant sets these options up on the product — see <a href="product-3d.html">3D, textures &amp; options on a product</a> — and the same engine powers the embed <a href="api-embed.html">configurator</a> on your own website.</p>
 
   <h2>Turning the plan into a quote</h2>
   <p>When the room has products or surfaces on it, <strong>Add to quote</strong> does the commercial part:</p>
@@ -56,6 +57,13 @@
     <li>You land on the <a href="quotes.html">quote</a> ready to send.</li>
   </ul>
   <div class="callout warn"><p><strong>“Call for price” lines.</strong> If a product has no price the resolver can use, it's still added — as a <strong>call-for-price</strong> line that contributes nothing to the total (rather than being dropped or erroring). The confirmation tells you how many lines came through that way, so a quote that looks finished but is missing prices doesn't slip out under-quoted. Fill those prices, or send them as an RFQ.</p></div>
+
+  <h2>Showing the plan to your client</h2>
+  <p><strong>What it is —</strong> a room plan can be <strong>attached to a project's <a href="projects-client-view.html">Client View</a></strong>, so the client sees the laid-out room (drawn from real footprints, with product thumbnails) alongside the rest of what you're presenting — sheets, an FF&amp;E list, a quote. <strong>Why it matters —</strong> before this the only way a client saw a plan was a screenshot; now it's part of the same client-facing page you already send.</p>
+  <ul class="feat">
+    <li>It rides the Client View's <strong>existing share link</strong> — one public token with its own expiry and view counter, one place to revoke. No second link to manage.</li>
+    <li><strong>Attaching and showing are separate.</strong> A plan can stay attached to the project while <strong>hidden</strong> from the client — flip its visibility on only when it's ready. A plan that's toggled off genuinely isn't reachable, even by someone holding the link.</li>
+  </ul>
 
   <h2>How it relates to Projects &amp; MoodBoards</h2>
   <p>The Room Planner is <strong>its own thing</strong>, deliberately separate from:</p>

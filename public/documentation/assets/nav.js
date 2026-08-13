@@ -43,7 +43,8 @@
         { file: "crm-users.html", title: "Users" },
         { file: "crm-contacts.html", title: "Contacts" },
         { file: "crm-companies.html", title: "Companies" },
-        { file: "crm-installed-base.html", title: "Equipment & Service" },
+        { file: "crm-deals.html", title: "Deals & Pipeline" },
+        { file: "crm-installed-base.html", title: "Warranties & Service" },
         { file: "crm-categories.html", title: "Categories" },
       ]},
       { file: "finance.html", title: "Finance & Invoicing", icon: "💶", children: [

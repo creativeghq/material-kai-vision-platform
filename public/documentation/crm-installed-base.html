@@ -8,36 +8,37 @@
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Equipment &amp; Service</div>
-  <h1>CRM · Equipment &amp; Service <span class="badge">Installed base</span></h1>
-  <div class="routes"><span class="badge route">/crm/companies/:id?tab=equipment</span> <span class="badge route">/crm/contacts/:id?tab=equipment</span> <span class="badge gated">crm.view</span></div>
-  <p class="lead">The <strong>Equipment</strong> tab tracks your <strong>installed base</strong> — the units you've sold and installed at a customer's site that keep needing service: an air-conditioner whose filters need cleaning, a boiler, a water heater. It answers "what have we got out there, is it still under warranty, and what's due next?" — and it does the scheduling for you, so the AC you sold two summers ago still gets its service booked. This is <em>recurring, planned</em> maintenance on a customer's own equipment, distinct from the internal <a href="company-assets.html">Company Assets</a> register (your own vehicles/tools) and from reactive repair tickets.</p>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Warranties &amp; Service</div>
+  <h1>CRM · Warranties &amp; Service <span class="badge">Installed base</span></h1>
+  <div class="routes"><span class="badge route">/crm/companies/:id?tab=warranties</span> <span class="badge route">/crm/contacts/:id?tab=warranties</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The <strong>Warranties</strong> tab tracks your <strong>installed base</strong> — the units you've sold and installed at a customer's site that carry a warranty and keep needing service: an air-conditioner whose filters need cleaning, a boiler, a water heater. It answers "what have we got out there, is it still under warranty, and what's due next?" — and it does the scheduling for you, so the AC you sold two summers ago still gets its service booked. This is <em>recurring, planned</em> maintenance and warranty cover on a customer's own equipment, distinct from the internal <a href="company-assets.html">Company Assets</a> register (your own vehicles/tools) and from reactive repair tickets.</p>
 
-  <div class="callout"><p><strong>Where:</strong> open a <a href="crm-companies.html">CRM company</a> or <a href="crm-contacts.html">contact</a> and pick the <strong>Equipment</strong> tab (the wrench icon). It's part of the CRM — no extra module or credits. Service-reminder notifications link straight to this tab.</p></div>
+  <div class="callout"><p><strong>Where:</strong> open a <a href="crm-companies.html">CRM company</a> or <a href="crm-contacts.html">contact</a> and pick the <strong>Warranties</strong> tab (the wrench icon — it was previously labelled <em>Equipment</em>, and old <code>?tab=equipment</code> links still work). It's part of the CRM — no extra module or credits. Service-reminder notifications link straight to this tab.</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/equipment-tab.png" alt="The Equipment & Service tab on a CRM customer">
-    <figcaption>The Equipment tab — a <strong>Service coming up</strong> worklist (only when something's due), the <strong>Equipment</strong> register of units, and the customer's whole <strong>Service history</strong>.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/warranties-tab.png" alt="The Warranties & Service tab on a CRM customer">
+    <figcaption>The Warranties tab — a <strong>Service coming up</strong> worklist (only when something's due), the <strong>Warranties</strong> register of units, and the customer's whole <strong>Service history</strong>.</figcaption>
   </figure>
 
   <h2>What's on the tab — three cards</h2>
   <ul class="feat">
     <li><strong>Service coming up</strong> — a worklist that appears only when something is due, with a count of what's <em>overdue</em> and what's <em>inside the reminder window</em>. Each row has one-click <strong>Done</strong> and <strong>Skip</strong> buttons.</li>
-    <li><strong>Equipment</strong> — the register of units (name, serial, installed date, next service, status), with an <strong>Add equipment</strong> button.</li>
+    <li><strong>Warranties</strong> — the register of units (name, serial, installed date, warranty end, next service, status), each with a <strong>Source</strong> that links back to the order it came off (or <em>manual</em>), and an <strong>Add unit</strong> button.</li>
     <li><strong>Service history</strong> — every visit across <em>all</em> this customer's units in one ledger (when, which unit, what service, outcome, who, cost) — so you can read the whole relationship at once, not one unit at a time.</li>
   </ul>
 
   <h2>Registering a unit</h2>
-  <p>A unit gets onto the register two ways:</p>
+  <p>A unit gets onto the register three ways, all landing in the same installed base:</p>
   <ul class="feat">
-    <li><strong>Automatically, when you deliver a serviceable product.</strong> If a product is marked <em>serviceable</em> (see below) and it's <strong>delivered on a sales <a href="finance-doc-orders.html">order</a></strong>, a unit is created for that customer automatically — inheriting the customer, project, purchase date and supplier from the order. This is how "the AC you sold" lands in the installed base without anyone re-typing it.</li>
-    <li><strong>Manually,</strong> with <strong>Add equipment</strong> — for a unit you didn't sell them, or one delivered before you started tracking. You fill in name, brand, model, serial, install date, location and notes.</li>
+    <li><strong>Automatically, when you deliver a serviceable product.</strong> If a product is marked <em>serviceable</em> (see below) and it's <strong>delivered on a sales <a href="finance-doc-orders.html">order</a></strong>, a unit is created for that customer automatically — inheriting the customer, project, purchase date and supplier from the order, and opening a manufacturer warranty from the product's default cover. This is how "the AC you sold" lands in the installed base without anyone re-typing it.</li>
+    <li><strong>From an order line.</strong> On a sales order, a line's <strong>⋮</strong> menu offers <strong>Register a warranty</strong> (or <em>Edit the warranty</em>): pick the warranty <strong>type</strong>, the <strong>cover in months</strong> (which fills the end date) or explicit start/end dates. It registers the unit the line represents — or updates the one it already created — so the sale, the unit and its cover stay tied together. The line's own detail then reads <em>“Under warranty until …”</em>. (Purchases have no customer to register against, so this is sales-only.)</li>
+    <li><strong>Manually,</strong> with <strong>Add unit</strong> — for a unit you didn't sell them, or one delivered before you started tracking. You fill in name, brand, model, serial, install date, location and notes, and can point it at the <strong>sale it came off</strong> (lines already registered are shown and disabled).</li>
   </ul>
   <p>Each unit carries a <strong>status</strong> — <em>Active</em>, <em>Removed</em>, <em>Replaced</em> or <em>Decommissioned</em> — and can be tied to a <a href="projects.html">project</a> and room (e.g. "the AC in the second-floor bedroom of the Kolonaki renovation").</p>
   <div class="callout warn"><p><strong>You retire a unit, you don't delete it.</strong> Once a unit has any service history, deleting it is <strong>blocked</strong> — erasing the unit would erase the record of what you did to it. Instead, set its status to <em>Removed</em> / <em>Replaced</em> / <em>Decommissioned</em>: the unit stops appearing as live, but its history stays intact.</p></div>
 
   <h2>Warranties &amp; certificates</h2>
-  <p>Each unit can carry one or more <strong>warranties</strong> — <em>manufacturer</em>, <em>extended</em>, <em>installer</em> or <em>insurance</em> — with the provider, policy number, start/end dates, coverage notes and reminder offsets. A product's default warranty length is copied onto the manufacturer warranty at registration, counted from the install date, so you don't set it each time. The tab shows each warranty's state (active / expiring / expired) computed from its end date.</p>
+  <p>Each unit can carry one or more <strong>warranties</strong> — <em>manufacturer</em>, <em>extended</em>, <em>installer</em> or <em>insurance</em> — with the provider, policy number, start/end dates, coverage notes and reminder offsets. A product's default warranty length is copied onto the manufacturer warranty at registration, counted from the install date, so you don't set it each time; you can also add or edit cover straight from a <a href="finance-doc-orders.html">sales order line</a> (above). The register shows each warranty's state — <strong>active</strong>, <strong>expiring</strong> (within 60 days of its end), or <strong>expired</strong> — and when a unit has both a lapsed year and a live extended cover, it reports the <strong>live one</strong>.</p>
   <div class="callout"><p><strong>The “certificate” is the document you attach.</strong> A warranty certificate here is the <strong>scan you upload</strong> (PDF or image, up to 5&nbsp;MB) — the platform doesn't generate one. It's stored <strong>privately</strong> and opened through a short-lived signed link, so the URL can't leak or rot. Attach it with the paperclip on the warranty row; view or detach it there too.</p></div>
 
   <h2>The service schedule — one thing due at a time</h2>
