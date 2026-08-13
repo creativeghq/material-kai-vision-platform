@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users, Wallet, Banknote,
+  Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users, Banknote,
   ChevronDown, Mail, Download, Copy, RotateCcw, ExternalLink, RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -342,7 +342,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const { toast } = useToast();
   const crmBase = financeBase === '/admin/finance' ? '/admin/crm' : '/crm';
   const crmHref = party ? `${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}` : '';
-  const [tab, setTab] = useState<'overview' | 'invoices' | 'bills' | 'payments' | 'ledger'>('overview');
+  const [tab, setTab] = useState<'invoices' | 'bills' | 'payments' | 'ledger'>('invoices');
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<SupplierBill[]>([]);
@@ -389,7 +389,13 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   useEffect(() => {
     if (!party) return;
     setLedgerSide(party.is_customer ? 'customer' : party.is_supplier ? 'supplier' : 'customer');
-    setTab('overview');
+    // Land on the first list this party actually has. Keyed off the party row alone, so it
+    // agrees with the triggers rendered on the very first frame, before the lists load.
+    setTab(party.is_customer || Number(party.invoiced_total) > 0 || Number(party.receivable_outstanding) > 0
+      ? 'invoices'
+      : party.is_supplier || Number(party.billed_total) > 0 || Number(party.payable_outstanding) > 0
+        ? 'bills'
+        : 'payments');
     setResearchParty(null);
     setInvPage(1); setBillPage(1); setPayPage(1); setLedgerPage(1);
   }, [party]);
@@ -646,267 +652,267 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         </DialogHeader>
 
         {!party ? null : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="space-y-4">
-            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Wallet className="h-4 w-4" /> Overview
-              </TabsTrigger>
-              {showCustomer && (
-                <TabsTrigger value="invoices" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <FileText className="h-4 w-4" /> Invoices{loading ? '' : ` (${invoices.length})`}
+          <div className="space-y-4">
+            {/* The money position stays ABOVE the tabs. It is three tiles, not a tab's worth of
+                content, and behind one it meant every list opened without the balance it is
+                supposed to be read against. */}
+            <PartyAccountSummary
+              customer={showCustomer
+                ? { invoiced: Number(party.invoiced_total || 0), paid: Number(party.receivable_paid_total || 0), outstanding: Number(party.receivable_outstanding || 0) }
+                : null}
+              supplier={showSupplier
+                ? { billed: Number(party.billed_total || 0), paid: Number(party.payable_paid_total || 0), outstanding: Number(party.payable_outstanding || 0) }
+                : null}
+              aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
+              credit={credit}
+              onReleaseCredit={() => setReleaseOpen(true)}
+            />
+
+            <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="space-y-4">
+              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+                {showCustomer && (
+                  <TabsTrigger value="invoices" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <FileText className="h-4 w-4" /> Invoices{loading ? '' : ` (${invoices.length})`}
+                  </TabsTrigger>
+                )}
+                {showSupplier && (
+                  <TabsTrigger value="bills" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Receipt className="h-4 w-4" /> Bills{loading ? '' : ` (${bills.length})`}
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="payments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Banknote className="h-4 w-4" /> Payments{loading ? '' : ` (${payments.length})`}
                 </TabsTrigger>
-              )}
-              {showSupplier && (
-                <TabsTrigger value="bills" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <Receipt className="h-4 w-4" /> Bills{loading ? '' : ` (${bills.length})`}
+                <TabsTrigger value="ledger" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <BookOpen className="h-4 w-4" /> Ledger
                 </TabsTrigger>
-              )}
-              <TabsTrigger value="payments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Banknote className="h-4 w-4" /> Payments{loading ? '' : ` (${payments.length})`}
-              </TabsTrigger>
-              <TabsTrigger value="ledger" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <BookOpen className="h-4 w-4" /> Ledger
-              </TabsTrigger>
-            </TabsList>
+              </TabsList>
 
-            <TabsContent value="overview" className="mt-0">
-              <PartyAccountSummary
-                customer={showCustomer
-                  ? { invoiced: Number(party.invoiced_total || 0), paid: Number(party.receivable_paid_total || 0), outstanding: Number(party.receivable_outstanding || 0) }
-                  : null}
-                supplier={showSupplier
-                  ? { billed: Number(party.billed_total || 0), paid: Number(party.payable_paid_total || 0), outstanding: Number(party.payable_outstanding || 0) }
-                  : null}
-                aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
-                credit={credit}
-                onReleaseCredit={() => setReleaseOpen(true)}
-              />
-            </TabsContent>
+              <TabsContent value="invoices" className="mt-0">
+                <DocTable
+                  title={<><FileText className="h-4 w-4" /> Invoices</>}
+                  subtitle="Issued to this customer — the number opens the invoice."
+                  loading={loading}
+                  empty="No invoices."
+                  colCount={7}
+                  head={<>
+                    <th className="px-4 py-2 text-left">Number</th>
+                    <th className="px-4 py-2 text-left">Issued</th>
+                    <th className="px-4 py-2 text-left">Due</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2 text-right">Settled</th>
+                    <th className="px-4 py-2 text-right">Outstanding</th>
+                  </>}
+                  rows={invoices.length}
+                  page={invPage}
+                  onPageChange={setInvPage}
+                  label="invoices"
+                >
+                  {paginate(invoices, invPage).map((i) => (
+                    <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30">
+                      <td className="px-4 py-2">
+                        <Link to={`${financeBase}/invoices/${i.id}`} className="font-mono text-xs text-primary hover:underline">
+                          {i.internal_number || i.id.slice(0, 8)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2 text-xs">{i.issued_at ? formatDate(i.issued_at) : '—'}</td>
+                      <td className="px-4 py-2 text-xs">{i.due_at ? formatDate(i.due_at) : '—'}</td>
+                      <td className={`px-4 py-2 text-xs ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(i.total), i.currency)}</td>
+                      {/* Cash AND credit notes settle an invoice — showing `amount_paid` alone makes
+                          a fully credit-noted invoice read as unpaid next to a zero balance. */}
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                        {formatMoney(Number(i.amount_paid || 0) + Number(i.amount_credited || 0), i.currency)}
+                      </td>
+                      <td className={`px-4 py-2 text-right tabular-nums ${Number(i.amount_due) > 0 ? 'font-medium text-destructive' : ''}`}>
+                        {formatMoney(Number(i.amount_due), i.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </DocTable>
+              </TabsContent>
 
-            <TabsContent value="invoices" className="mt-0">
-              <DocTable
-                title={<><FileText className="h-4 w-4" /> Invoices</>}
-                subtitle="Issued to this customer — the number opens the invoice."
-                loading={loading}
-                empty="No invoices."
-                colCount={7}
-                head={<>
-                  <th className="px-4 py-2 text-left">Number</th>
-                  <th className="px-4 py-2 text-left">Issued</th>
-                  <th className="px-4 py-2 text-left">Due</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-right">Total</th>
-                  <th className="px-4 py-2 text-right">Settled</th>
-                  <th className="px-4 py-2 text-right">Outstanding</th>
-                </>}
-                rows={invoices.length}
-                page={invPage}
-                onPageChange={setInvPage}
-                label="invoices"
-              >
-                {paginate(invoices, invPage).map((i) => (
-                  <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2">
-                      <Link to={`${financeBase}/invoices/${i.id}`} className="font-mono text-xs text-primary hover:underline">
-                        {i.internal_number || i.id.slice(0, 8)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2 text-xs">{i.issued_at ? formatDate(i.issued_at) : '—'}</td>
-                    <td className="px-4 py-2 text-xs">{i.due_at ? formatDate(i.due_at) : '—'}</td>
-                    <td className={`px-4 py-2 text-xs ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(i.total), i.currency)}</td>
-                    {/* Cash AND credit notes settle an invoice — showing `amount_paid` alone makes
-                        a fully credit-noted invoice read as unpaid next to a zero balance. */}
-                    <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                      {formatMoney(Number(i.amount_paid || 0) + Number(i.amount_credited || 0), i.currency)}
-                    </td>
-                    <td className={`px-4 py-2 text-right tabular-nums ${Number(i.amount_due) > 0 ? 'font-medium text-destructive' : ''}`}>
-                      {formatMoney(Number(i.amount_due), i.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </DocTable>
-            </TabsContent>
+              <TabsContent value="bills" className="mt-0">
+                <DocTable
+                  title={<><Receipt className="h-4 w-4" /> Supplier bills</>}
+                  subtitle="Received from this supplier — the number opens what has settled it."
+                  loading={loading}
+                  empty="No supplier bills."
+                  colCount={7}
+                  head={<>
+                    <th className="px-4 py-2 text-left">Bill #</th>
+                    <th className="px-4 py-2 text-left">Issued</th>
+                    <th className="px-4 py-2 text-left">Due</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2 text-right">Paid</th>
+                    <th className="px-4 py-2 text-right">Outstanding</th>
+                  </>}
+                  rows={bills.length}
+                  page={billPage}
+                  onPageChange={setBillPage}
+                  label="bills"
+                >
+                  {paginate(bills, billPage).map((b) => (
+                    <tr key={b.id} className="border-b border-border/30 hover:bg-muted/30">
+                      <td className="px-4 py-2">
+                        <button
+                          type="button"
+                          onClick={() => setOpenBillId(b.id)}
+                          className="rounded font-mono text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {b.supplier_bill_number || b.id.slice(0, 8)}
+                        </button>
+                      </td>
+                      <td className="px-4 py-2 text-xs">{b.issued_at ? formatDate(b.issued_at) : '—'}</td>
+                      <td className="px-4 py-2 text-xs">{b.due_at ? formatDate(b.due_at) : '—'}</td>
+                      <td className={`px-4 py-2 text-xs ${statusTone(b.status)}`}>{humanizeLabel(b.status)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(b.total), b.currency)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(Number(b.amount_paid || 0), b.currency)}</td>
+                      <td className={`px-4 py-2 text-right tabular-nums ${Number(b.amount_due) > 0 ? 'font-medium' : ''}`}>
+                        {formatMoney(Number(b.amount_due), b.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </DocTable>
+              </TabsContent>
 
-            <TabsContent value="bills" className="mt-0">
-              <DocTable
-                title={<><Receipt className="h-4 w-4" /> Supplier bills</>}
-                subtitle="Received from this supplier — the number opens what has settled it."
-                loading={loading}
-                empty="No supplier bills."
-                colCount={7}
-                head={<>
-                  <th className="px-4 py-2 text-left">Bill #</th>
-                  <th className="px-4 py-2 text-left">Issued</th>
-                  <th className="px-4 py-2 text-left">Due</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-right">Total</th>
-                  <th className="px-4 py-2 text-right">Paid</th>
-                  <th className="px-4 py-2 text-right">Outstanding</th>
-                </>}
-                rows={bills.length}
-                page={billPage}
-                onPageChange={setBillPage}
-                label="bills"
-              >
-                {paginate(bills, billPage).map((b) => (
-                  <tr key={b.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => setOpenBillId(b.id)}
-                        className="rounded font-mono text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {b.supplier_bill_number || b.id.slice(0, 8)}
-                      </button>
-                    </td>
-                    <td className="px-4 py-2 text-xs">{b.issued_at ? formatDate(b.issued_at) : '—'}</td>
-                    <td className="px-4 py-2 text-xs">{b.due_at ? formatDate(b.due_at) : '—'}</td>
-                    <td className={`px-4 py-2 text-xs ${statusTone(b.status)}`}>{humanizeLabel(b.status)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(b.total), b.currency)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(Number(b.amount_paid || 0), b.currency)}</td>
-                    <td className={`px-4 py-2 text-right tabular-nums ${Number(b.amount_due) > 0 ? 'font-medium' : ''}`}>
-                      {formatMoney(Number(b.amount_due), b.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </DocTable>
-            </TabsContent>
+              <TabsContent value="payments" className="mt-0">
+                <DocTable
+                  title={<><Banknote className="h-4 w-4" /> Payments</>}
+                  subtitle="Money that actually moved, both directions."
+                  loading={loading}
+                  empty="No payments recorded."
+                  colCount={5}
+                  head={<>
+                    <th className="px-4 py-2 text-left">Date</th>
+                    <th className="px-4 py-2 text-left">Direction</th>
+                    <th className="px-4 py-2 text-left">Method</th>
+                    <th className="px-4 py-2 text-left">Reference</th>
+                    <th className="px-4 py-2 text-right">Amount</th>
+                  </>}
+                  rows={payments.length}
+                  page={payPage}
+                  onPageChange={setPayPage}
+                  label="payments"
+                >
+                  {paginate(payments, payPage).map((p) => (
+                    <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
+                      <td className="px-4 py-2 text-xs">{formatDate(p.paid_at)}</td>
+                      <td className={`px-4 py-2 text-xs ${directionTone(p.direction)}`}>{p.direction === 'in' ? 'Received' : 'Paid out'}</td>
+                      <td className="px-4 py-2 text-xs">{p.method ? humanizeLabel(p.method) : '—'}</td>
+                      <td className="px-4 py-2 font-mono text-xs">{p.reference || '—'}</td>
+                      <td className={`px-4 py-2 text-right tabular-nums ${directionTone(p.direction)}`}>{formatMoney(Number(p.amount), p.currency)}</td>
+                    </tr>
+                  ))}
+                </DocTable>
+              </TabsContent>
 
-            <TabsContent value="payments" className="mt-0">
-              <DocTable
-                title={<><Banknote className="h-4 w-4" /> Payments</>}
-                subtitle="Money that actually moved, both directions."
-                loading={loading}
-                empty="No payments recorded."
-                colCount={5}
-                head={<>
-                  <th className="px-4 py-2 text-left">Date</th>
-                  <th className="px-4 py-2 text-left">Direction</th>
-                  <th className="px-4 py-2 text-left">Method</th>
-                  <th className="px-4 py-2 text-left">Reference</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                </>}
-                rows={payments.length}
-                page={payPage}
-                onPageChange={setPayPage}
-                label="payments"
-              >
-                {paginate(payments, payPage).map((p) => (
-                  <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2 text-xs">{formatDate(p.paid_at)}</td>
-                    <td className={`px-4 py-2 text-xs ${directionTone(p.direction)}`}>{p.direction === 'in' ? 'Received' : 'Paid out'}</td>
-                    <td className="px-4 py-2 text-xs">{p.method ? humanizeLabel(p.method) : '—'}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{p.reference || '—'}</td>
-                    <td className={`px-4 py-2 text-right tabular-nums ${directionTone(p.direction)}`}>{formatMoney(Number(p.amount), p.currency)}</td>
-                  </tr>
-                ))}
-              </DocTable>
-            </TabsContent>
-
-            <TabsContent value="ledger" className="mt-0">
-              {/* Running ledger (καρτέλα) — Print lives in the Actions menu with everything else. */}
-              <Card>
-                <CardHeader className="border-b border-border/60 px-4 py-2.5 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger</CardTitle>
-                    <p className="text-[11px] text-muted-foreground">Every movement in the period, with a running balance.</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)}
-                      className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
-                    <span className="text-xs text-muted-foreground">→</span>
-                    <input type="date" value={toDate} min={fromDate} onChange={(e) => setToDate(e.target.value)}
-                      className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
-                    {party.is_customer && party.is_supplier && (
-                      <Select value={ledgerSide} onValueChange={(v: any) => setLedgerSide(v)}>
-                        <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="customer">Customer</SelectItem>
-                          <SelectItem value="supplier">Supplier</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {ledgerLoading ? (
-                    <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="text-xs text-muted-foreground">
-                        <tr className="border-b border-border/60">
-                          <th className="px-3 py-2 text-left">Date</th>
-                          <th className="px-3 py-2 text-left">Type</th>
-                          <th className="px-3 py-2 text-left">Document</th>
-                          <th className="px-3 py-2 text-right">Debit</th>
-                          <th className="px-3 py-2 text-right">Credit</th>
-                          <th className="px-3 py-2 text-right">Cumulative debit</th>
-                          <th className="px-3 py-2 text-right">Cumulative credit</th>
-                          <th className="px-3 py-2 text-right">Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* Carry-forward only belongs above the FIRST entry of the period. */}
-                        {ledgerPage === 1 && (
-                          <tr className="border-b border-border/30 bg-muted/30">
-                            <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Opening balance</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(opening)}</td>
-                          </tr>
-                        )}
-                        {ledgerWithBalance.length === 0 ? (
-                          <tr><td colSpan={8} className="px-3 py-4 text-center text-xs text-muted-foreground">No activity in this period.</td></tr>
-                        ) : paginate(ledgerWithBalance, ledgerPage).map((r, idx) => {
-                          const href = ledgerHref(r);
-                          const billId = ledgerBillId(r);
-                          const docLabel = r.doc_number || '—';
-                          return (
-                          // Key on the ABSOLUTE row index — a per-page index collides across
-                          // pages and lets React reuse the previous page's rows.
-                          <tr key={(ledgerPage - 1) * TABLE_PAGE_SIZE + idx} className="border-b border-border/30">
-                            <td className="px-3 py-1.5">{r.entry_date ? formatDate(r.entry_date) : '—'}</td>
-                            <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
-                            <td className="px-3 py-1.5 font-mono">
-                              {href ? (
-                                <Link to={href} className="text-primary hover:underline">{docLabel}</Link>
-                              ) : billId ? (
-                                <button type="button" onClick={() => setOpenBillId(billId)}
-                                  className="rounded text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                  {docLabel}
-                                </button>
-                              ) : docLabel}
-                            </td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? m(Number(r.debit)) : ''}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? m(Number(r.credit)) : ''}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrDebit)}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrCredit)}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(r.balance)}</td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 border-border">
-                          <td colSpan={3} className="px-3 py-2 text-xs font-semibold">Totals</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(ledgerClosing)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
+              <TabsContent value="ledger" className="mt-0">
+                {/* Running ledger (καρτέλα) — Print lives in the Actions menu with everything else. */}
+                <Card>
+                  <CardHeader className="border-b border-border/60 px-4 py-2.5 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
+                    <div>
+                      <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger</CardTitle>
+                      <p className="text-[11px] text-muted-foreground">Every movement in the period, with a running balance.</p>
                     </div>
-                  )}
-                  {/* Totals above are period-wide, not per page — Print still emits every row. */}
-                  {!ledgerLoading && (
-                    <TablePagination page={ledgerPage} total={ledgerWithBalance.length} onPageChange={setLedgerPage} label="entries" />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)}
+                        className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
+                      <span className="text-xs text-muted-foreground">→</span>
+                      <input type="date" value={toDate} min={fromDate} onChange={(e) => setToDate(e.target.value)}
+                        className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
+                      {party.is_customer && party.is_supplier && (
+                        <Select value={ledgerSide} onValueChange={(v: any) => setLedgerSide(v)}>
+                          <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="customer">Customer</SelectItem>
+                            <SelectItem value="supplier">Supplier</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {ledgerLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="text-xs text-muted-foreground">
+                          <tr className="border-b border-border/60">
+                            <th className="px-3 py-2 text-left">Date</th>
+                            <th className="px-3 py-2 text-left">Type</th>
+                            <th className="px-3 py-2 text-left">Document</th>
+                            <th className="px-3 py-2 text-right">Debit</th>
+                            <th className="px-3 py-2 text-right">Credit</th>
+                            <th className="px-3 py-2 text-right">Cumulative debit</th>
+                            <th className="px-3 py-2 text-right">Cumulative credit</th>
+                            <th className="px-3 py-2 text-right">Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Carry-forward only belongs above the FIRST entry of the period. */}
+                          {ledgerPage === 1 && (
+                            <tr className="border-b border-border/30 bg-muted/30">
+                              <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Opening balance</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(opening)}</td>
+                            </tr>
+                          )}
+                          {ledgerWithBalance.length === 0 ? (
+                            <tr><td colSpan={8} className="px-3 py-4 text-center text-xs text-muted-foreground">No activity in this period.</td></tr>
+                          ) : paginate(ledgerWithBalance, ledgerPage).map((r, idx) => {
+                            const href = ledgerHref(r);
+                            const billId = ledgerBillId(r);
+                            const docLabel = r.doc_number || '—';
+                            return (
+                            // Key on the ABSOLUTE row index — a per-page index collides across
+                            // pages and lets React reuse the previous page's rows.
+                            <tr key={(ledgerPage - 1) * TABLE_PAGE_SIZE + idx} className="border-b border-border/30">
+                              <td className="px-3 py-1.5">{r.entry_date ? formatDate(r.entry_date) : '—'}</td>
+                              <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
+                              <td className="px-3 py-1.5 font-mono">
+                                {href ? (
+                                  <Link to={href} className="text-primary hover:underline">{docLabel}</Link>
+                                ) : billId ? (
+                                  <button type="button" onClick={() => setOpenBillId(billId)}
+                                    className="rounded text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    {docLabel}
+                                  </button>
+                                ) : docLabel}
+                              </td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? m(Number(r.debit)) : ''}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? m(Number(r.credit)) : ''}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrDebit)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrCredit)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(r.balance)}</td>
+                            </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-border">
+                            <td colSpan={3} className="px-3 py-2 text-xs font-semibold">Totals</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(ledgerClosing)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                      </div>
+                    )}
+                    {/* Totals above are period-wide, not per page — Print still emits every row. */}
+                    {!ledgerLoading && (
+                      <TablePagination page={ledgerPage} total={ledgerWithBalance.length} onPageChange={setLedgerPage} label="entries" />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
 
         {/* Stop holding their leftover money and keep it as income. Same action, same dialog, as
