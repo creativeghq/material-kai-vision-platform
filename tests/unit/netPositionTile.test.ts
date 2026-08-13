@@ -11,6 +11,8 @@
  * not a net" makes it visible, so that rule gets a test.
  */
 import { describe, it, expect } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import {
   netPositionDirection, netPositionTotal, netPositionVisible,
 } from '@/modules/finance/utils/netPosition';
@@ -117,6 +119,44 @@ describe('the balance direction reads neutrally', () => {
   it('never phrases the balance as someone owing', () => {
     for (const n of [5000, -5000, 0]) {
       expect(netPositionDirection(n)).not.toMatch(/\bowe\b/i);
+    }
+  });
+});
+
+/**
+ * …and neither may the two surfaces that hand-roll their own closing line.
+ *
+ * `netPositionDirection` being neutral protected the tiles and nothing else: the printed Καρτέλα
+ * and the emailed statement PDF each wrote their own label and both still read "Χρεωστικό υπόλοιπο
+ * (οφείλει) / owes us". Those are the artefacts that leave the building — printed, emailed, or
+ * opened on the public /statement/{token} page — so they are precisely the ones that must not
+ * accuse. The statement runs on Deno and cannot import the helper, so the wording is held in step
+ * here rather than by convention.
+ *
+ * Matched on the rendered LABEL STRINGS, not on prose: these files legitimately discuss owing in
+ * comments, and a test that fails on a comment gets deleted rather than obeyed.
+ */
+describe('the closing balance on artefacts that leave the building', () => {
+  const OWING = /\bowes?\b|\bowe\s+(us|them)\b|οφείλ/i;
+
+  it('the printed Καρτέλα states an account balance, not a debt claim', async () => {
+    const src = await readFile(resolve('src/modules/finance/tabs/PartiesTab.tsx'), 'utf8');
+    // The closing line the print emits, and the Greek/English pair feeding it.
+    const closing = src.match(/const closingEl =[\s\S]*?const closingLabel = .*/);
+    expect(closing, 'printLedger no longer builds a closingLabel — update this guard').not.toBeNull();
+    expect(closing![0]).not.toMatch(OWING);
+    expect(src).toMatch(/Account balance/);
+  });
+
+  it('the emailed / shared statement PDF says the same thing in both languages', async () => {
+    const src = await readFile(resolve('supabase/functions/finance-send-statement/index.ts'), 'utf8');
+    const labels = src.match(/const LABELS[\s\S]*?\n\};/);
+    expect(labels, 'LABELS block moved — update this guard').not.toBeNull();
+    // Strip comments: the block explains WHY the owing wording went, and saying so is not a relapse.
+    const strings = labels![0].replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(strings).not.toMatch(OWING);
+    for (const lang of ['closing: \'Υπόλοιπο λογαριασμού\'', 'closing: \'Account balance\'']) {
+      expect(strings).toContain(lang);
     }
   });
 });

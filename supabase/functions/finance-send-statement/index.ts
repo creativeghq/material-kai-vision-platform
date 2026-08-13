@@ -54,8 +54,13 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', phone: 'Τηλέφωνο', email: 'Email', currency: 'Νόμισμα',
     date: 'Ημ/νία', type: 'Τύπος', document: 'Παραστατικό',
     debit: 'Χρέωση', credit: 'Πίστωση', progrDebit: 'Προοδ. Χρέωση', progrCredit: 'Προοδ. Πίστωση', balance: 'Υπόλοιπο',
-    prevTotals: 'Προηγούμενα Σύνολα', totals: 'Σύνολα', closing: 'Υπόλοιπο',
-    owesUs: 'Χρεωστικό υπόλοιπο (οφείλει)', weOwe: 'Πιστωτικό υπόλοιπο (οφείλουμε)',
+    prevTotals: 'Προηγούμενα Σύνολα', totals: 'Σύνολα', closing: 'Υπόλοιπο λογαριασμού',
+    // An ACCOUNT BALANCE, not a debt claim — and this is the one artefact the counterparty
+    // actually receives, so it is written in the second person. The Greek accounting pair says the
+    // direction on its own; the '(οφείλει)' / '(οφείλουμε)' gloss that used to follow it was the
+    // accusatory half and is gone. Mirrors `netPositionDirection` on the frontend, which cannot be
+    // imported here (different runtime) and is held in step by the guard test instead.
+    owesUs: 'Χρεωστικό υπόλοιπο (προς εξόφληση)', weOwe: 'Πιστωτικό υπόλοιπο (υπέρ σας)',
     payByCard: 'Πληρωμή με κάρτα', noTx: 'Καμία κίνηση στην περίοδο.',
     kind_invoice: 'Τιμολόγιο', kind_credit_note: 'Πιστωτικό', kind_payment: 'Είσπραξη/Πληρωμή',
     kind_supplier_bill: 'Τιμολόγιο προμηθευτή', kind_supplier_credit_note: 'Πιστωτικό προμηθευτή',
@@ -68,8 +73,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     vatNo: 'VAT', taxOffice: 'Tax office', phone: 'Phone', email: 'Email', currency: 'Currency',
     date: 'Date', type: 'Type', document: 'Document',
     debit: 'Debit', credit: 'Credit', progrDebit: 'Progr. debit', progrCredit: 'Progr. credit', balance: 'Balance',
-    prevTotals: 'Opening balance', totals: 'Totals', closing: 'Closing balance',
-    owesUs: 'Outstanding (owes us)', weOwe: 'Credit balance (we owe)',
+    prevTotals: 'Opening balance', totals: 'Totals', closing: 'Account balance',
+    owesUs: 'Debit balance (due for settlement)', weOwe: 'Credit balance (in your favour)',
     payByCard: 'Pay by card', noTx: 'No transactions in this period.',
     kind_invoice: 'Invoice', kind_credit_note: 'Credit note', kind_payment: 'Payment',
     kind_supplier_bill: 'Supplier bill', kind_supplier_credit_note: 'Supplier credit note',
