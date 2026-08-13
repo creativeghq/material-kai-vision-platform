@@ -210,7 +210,12 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from('generation-images').getPublicUrl(path);
       set('business_logo_path', path);
-      await supabase.from('finance_settings').upsert({ workspace_id: workspaceId, business_logo_path: path }, { onConflict: 'workspace_id' });
+      // The upload succeeded; this row is what makes the logo the workspace's. Discarding the
+      // result meant "Logo uploaded" fired while invoices kept printing the old one — the catch
+      // cannot see it, because supabase-js resolves rather than throwing on a denial (#347).
+      const { error: logoErr } = await supabase.from('finance_settings')
+        .upsert({ workspace_id: workspaceId, business_logo_path: path }, { onConflict: 'workspace_id' });
+      if (logoErr) throw logoErr;
       set('_logo_url', `${pub.publicUrl}?t=${Date.now()}`);
       toast({ title: 'Logo uploaded' });
     } catch (err: any) {

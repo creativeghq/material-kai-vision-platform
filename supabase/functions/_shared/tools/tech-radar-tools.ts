@@ -534,7 +534,12 @@ export const createTrackTechRadarTool = (
         }).select('id').single();
         if (aErr) return JSON.stringify({ success: false, error: `monitor create failed: ${aErr.message}` });
 
-        await sb.from('tech_radar_subjects').update({ monitor_agent_id: agent.id, is_active: true }).eq('id', subject.id);
+        // This link is what makes the agent the subject's monitor. Discarding it meant the agent
+        // existed, the tool answered "Now watching …", and the subject was still unmonitored
+        // with an orphaned agent behind it — supabase-js resolves on a denial (#347 audit).
+        const { error: linkErr } = await sb.from('tech_radar_subjects')
+          .update({ monitor_agent_id: agent.id, is_active: true }).eq('id', subject.id);
+        if (linkErr) return JSON.stringify({ success: false, error: `monitor link failed: ${linkErr.message}` });
 
         onChunk?.({ type: 'tech_radar_monitor', action: 'created', subject_id: subject.id, title: subject.title, schedule: cronForInterval(intervalH), timestamp: Date.now() });
         return JSON.stringify({ success: true, subject_id: subject.id, monitor_agent_id: agent.id, schedule: cronForInterval(intervalH), message: `Now watching "${subject.title}". It runs on a ${intervalH <= 24 ? 'daily' : intervalH <= 168 ? 'weekly' : 'monthly'} cadence and only surfaces NEW ideas.` });
@@ -544,16 +549,31 @@ export const createTrackTechRadarTool = (
 
       if (action === 'pause' || action === 'resume') {
         const enabled = action === 'resume';
+        // Both writes checked: the tool answers "paused"/"resumed" straight after, and a
+        // rejected write meant the monitor kept running (or stayed off) while the user was told
+        // the opposite — the agent row and the subject row can also disagree with each other.
         if (subject.monitor_agent_id) {
-          await sb.from('background_agents').update({ enabled }).eq('id', subject.monitor_agent_id);
+          const { error: agentErr } = await sb.from('background_agents')
+            .update({ enabled }).eq('id', subject.monitor_agent_id);
+          if (agentErr) return JSON.stringify({ success: false, error: `monitor ${action} failed: ${agentErr.message}` });
         }
-        await sb.from('tech_radar_subjects').update({ is_active: enabled }).eq('id', subject.id);
+        const { error: subjErr } = await sb.from('tech_radar_subjects')
+          .update({ is_active: enabled }).eq('id', subject.id);
+        if (subjErr) return JSON.stringify({ success: false, error: `subject ${action} failed: ${subjErr.message}` });
         return JSON.stringify({ success: true, subject_id: subject.id, paused: !enabled });
       }
 
       if (action === 'delete') {
-        if (subject.monitor_agent_id) await sb.from('background_agents').delete().eq('id', subject.monitor_agent_id);
-        await sb.from('tech_radar_subjects').delete().eq('id', subject.id);
+        // Delete the agent first, then the subject. Both checked: reporting "deleted" on a
+        // rejected delete leaves a monitor that keeps running and spending against a subject
+        // the user believes is gone.
+        if (subject.monitor_agent_id) {
+          const { error: agentDelErr } = await sb.from('background_agents')
+            .delete().eq('id', subject.monitor_agent_id);
+          if (agentDelErr) return JSON.stringify({ success: false, error: `monitor delete failed: ${agentDelErr.message}` });
+        }
+        const { error: subjDelErr } = await sb.from('tech_radar_subjects').delete().eq('id', subject.id);
+        if (subjDelErr) return JSON.stringify({ success: false, error: `subject delete failed: ${subjDelErr.message}` });
         return JSON.stringify({ success: true, deleted: subject.id });
       }
 

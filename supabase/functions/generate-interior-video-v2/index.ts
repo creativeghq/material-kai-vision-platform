@@ -315,11 +315,18 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true, uploadCtx);
       await logVideoUsage(durationSeconds);
 
-      await supabase.from('generation_videos').update({
+      // This write is the ONLY record that the job finished, and the "your video is ready"
+      // notification fires immediately after it. Discarding the result meant an RLS denial or a
+      // transport blip left the row stuck on `processing` with a null video_url while the user
+      // was told it was ready — they click through to nothing, and the job never resolves.
+      // Throwing hands it to the catch below, which refunds and records a terminal `failed`:
+      // less pleasant, but true, and recoverable (#347 audit).
+      const { error: completeErr } = await supabase.from('generation_videos').update({
         status: 'completed',
         video_url: videoUrl,
         completed_at: new Date().toISOString(),
       }).eq('id', jobId);
+      if (completeErr) throw completeErr;
 
       emitFlowEvent('video_generation_completed', {
         user_id: userId,
@@ -356,11 +363,18 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true, uploadCtx);
       await logVideoUsage(klingDuration);
 
-      await supabase.from('generation_videos').update({
+      // This write is the ONLY record that the job finished, and the "your video is ready"
+      // notification fires immediately after it. Discarding the result meant an RLS denial or a
+      // transport blip left the row stuck on `processing` with a null video_url while the user
+      // was told it was ready — they click through to nothing, and the job never resolves.
+      // Throwing hands it to the catch below, which refunds and records a terminal `failed`:
+      // less pleasant, but true, and recoverable (#347 audit).
+      const { error: completeErr } = await supabase.from('generation_videos').update({
         status: 'completed',
         video_url: videoUrl,
         completed_at: new Date().toISOString(),
       }).eq('id', jobId);
+      if (completeErr) throw completeErr;
 
       emitFlowEvent('video_generation_completed', {
         user_id: userId,
@@ -417,11 +431,14 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         const videoUrl = await uploadVideoToStorage(supabase, rawUrl, jobId, false, uploadCtx);
         await logVideoUsage(durationSeconds);
 
-        await supabase.from('generation_videos').update({
+        // Same as the two branches above: the completion write is the only record the job
+        // finished, and the "ready" notification fires straight after it.
+        const { error: completeErr } = await supabase.from('generation_videos').update({
           status: 'completed',
           video_url: videoUrl,
           completed_at: new Date().toISOString(),
         }).eq('id', jobId);
+        if (completeErr) throw completeErr;
 
         emitFlowEvent('video_generation_completed', {
           user_id: userId,
@@ -471,10 +488,16 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       p_workspace_id: workspace_id ?? null,
     });
 
-    await supabase.from('generation_videos').update({
+    // The refund has already gone through, so this must not throw — but it must not vanish
+    // either: if the terminal write fails the row stays on `processing` forever, and a stuck
+    // row that was actually refunded is exactly the state nobody can reconstruct later.
+    const { error: failErr } = await supabase.from('generation_videos').update({
       status: 'failed',
       error_message: String(err),
     }).eq('id', jobId);
+    if (failErr) {
+      console.error(`[generate-interior-video-v2] job ${jobId} refunded but could NOT be marked failed`, failErr);
+    }
 
     emitFlowEvent('video_generation_failed', {
       user_id: userId,

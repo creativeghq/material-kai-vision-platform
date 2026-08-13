@@ -147,7 +147,14 @@ export const createManageCompanyAssetsTool = (userId: string, workspaceId: strin
       const who = await resolveAssignee(workspaceId, args.assignee_name);
       if (!who) return JSON.stringify({ success: false, error: `No employee or contact matching "${args.assignee_name}" in this workspace.` });
       // Release any current holder, then assign (one active holder — DB unique index enforces it too).
-      await sb.from('asset_assignments').update({ returned_at: new Date().toISOString() }).eq('asset_id', asset.id).is('returned_at', null);
+      // Checked so the failure is legible. The DB unique index does stop a genuine double-hold,
+      // but only by rejecting the INSERT below — which surfaced as a confusing unique-violation
+      // instead of "could not release the current holder" (#347 audit).
+      const { error: releaseErr } = await sb.from('asset_assignments')
+        .update({ returned_at: new Date().toISOString() }).eq('asset_id', asset.id).is('returned_at', null);
+      if (releaseErr) {
+        return JSON.stringify({ success: false, error: `could not release the current holder: ${releaseErr.message}` });
+      }
       const ins = await sb.from('asset_assignments').insert({
         workspace_id: workspaceId, asset_id: asset.id,
         assignee_employee_id: who.employeeId, assignee_contact_id: who.contactId, created_by: userId,

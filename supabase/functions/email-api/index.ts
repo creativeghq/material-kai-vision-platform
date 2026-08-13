@@ -814,9 +814,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           for (const k of ['delivered_at', 'opened_at', 'clicked_at', 'bounced_at', 'complained_at'] as const) {
             if ((recipPatch as any)[k] && (r as any)[k]) (recipPatch as any)[k] = (r as any)[k];
           }
-          await supabaseClient.from('campaign_recipients').update(recipPatch).eq('id', r.id);
+          // `updated++` and the per-status tally below report these as applied, so a discarded
+          // result meant the sync claimed work it never did (#347 audit).
+          const { error: recipErr } = await supabaseClient.from('campaign_recipients').update(recipPatch).eq('id', r.id);
+          if (recipErr) { console.error('[email-api] recipient status update failed', r.id, recipErr); continue; }
           // Mirror to email_logs so the admin analytics surface reflects it too.
-          await supabaseClient.from('email_logs').update(patch).eq('id', r.email_log_id);
+          const { error: logErr } = await supabaseClient.from('email_logs').update(patch).eq('id', r.email_log_id);
+          if (logErr) console.error('[email-api] email_logs mirror failed', r.email_log_id, logErr);
           updated++;
           byStatus[ev] = (byStatus[ev] ?? 0) + 1;
         }
@@ -902,10 +906,12 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         if (!isAdminAccess(auth)) {
           if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
         }
-        await supabaseClient.from('workspace_email_config').upsert(
+        const { error: cfgErr } = await supabaseClient.from('workspace_email_config').upsert(
           { workspace_id: wsId, contacts_auto_sync: requestBody.auto_sync, updated_at: new Date().toISOString() },
           { onConflict: 'workspace_id' },
         );
+        // The response below echoes the new value back as if it were stored (#347 audit).
+        if (cfgErr) throw new HttpError(500, `Could not save the auto-sync setting: ${cfgErr.message}`);
         return new Response(JSON.stringify({ success: true, auto_sync: requestBody.auto_sync }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 

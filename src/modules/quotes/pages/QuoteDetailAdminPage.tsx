@@ -472,7 +472,15 @@ export const QuoteDetailPage: React.FC = () => {
         };
       });
       // Persist the paid-upfront flag first so saveItemPrices applies the cash discount.
-      await supabase.from('quotes').update({ paid_upfront: paidUpfront }).eq('id', quote.id);
+      //
+      // This one is money. `saveItemPrices` reads the flag back off the row, so a silently
+      // rejected write meant the cash discount was NOT applied while the prices saved and the
+      // user was told "Prices saved" — a quote priced without a discount the operator had
+      // ticked. supabase-js resolves on an RLS denial instead of throwing, so the surrounding
+      // try/catch never saw it (#347 audit).
+      const { error: flagErr } = await supabase.from('quotes')
+        .update({ paid_upfront: paidUpfront }).eq('id', quote.id);
+      if (flagErr) throw flagErr;
       const result = await quotePDFService.saveItemPrices(quote.id, items, pricingVatRate);
       if (result.success) {
         toast({ title: 'Prices saved', description: 'Item prices and totals updated.' });
@@ -530,7 +538,7 @@ export const QuoteDetailPage: React.FC = () => {
       <div className="min-h-screen">
         <GlobalAdminHeader title="Quote Not Found" badge="Admin" />
         <div className="p-3 sm:p-6">
-          <Button onClick={() => navigate('/admin/quote-requests')}>
+          <Button onClick={() => navigate('/quotes/requests/manage')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to quotes
           </Button>
@@ -564,7 +572,7 @@ export const QuoteDetailPage: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         {/* Back Button & Status Row */}
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate('/admin/quote-requests')}>
+          <Button variant="outline" onClick={() => navigate('/quotes/requests/manage')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to quotes
           </Button>
@@ -618,7 +626,7 @@ export const QuoteDetailPage: React.FC = () => {
                   try {
                     const newQuote = await quotesService.issueRevision(quote.id);
                     toast({ title: `Revision ${newQuote.revision_number} created`, description: 'Opening the new draft...' });
-                    navigate(`/admin/quotes/${newQuote.id}`);
+                    navigate(`/quotes/manage/${newQuote.id}`);
                   } catch (err) {
                     toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                   }
@@ -646,7 +654,7 @@ export const QuoteDetailPage: React.FC = () => {
                   try {
                     const newId = await quotesService.generateClientQuote(quote.id, margin);
                     toast({ title: 'Client quote created', description: `+${margin}% margin · opening the draft…` });
-                    navigate(`/admin/quotes/${newId}`);
+                    navigate(`/quotes/manage/${newId}`);
                   } catch (err) {
                     toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                   }

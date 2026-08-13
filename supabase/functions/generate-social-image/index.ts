@@ -310,7 +310,11 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
           .eq('id', post_id);
       }
     } else if (workspace_id) {
-      await supabase.from('social_posts').insert({
+      // Reported, not thrown: the credits are debited and the image is already stored, and the
+      // response below hands the caller `image_url` either way — so failing here would take
+      // away something they have. But a discarded result meant the draft never appeared in the
+      // workspace's planner and nothing said why (#347 audit).
+      const { error: postErr } = await supabase.from('social_posts').insert({
         workspace_id,
         user_id: userId,
         platform: 'instagram',
@@ -322,6 +326,9 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         generation_model: resolvedModel,
         metadata: { prompt, image_type, aspect_ratio },
       });
+      if (postErr) {
+        console.error('[generate-social-image] image stored but the draft post row FAILED', postErr);
+      }
     }
 
     return jsonResponse({

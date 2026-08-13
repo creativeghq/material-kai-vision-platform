@@ -577,13 +577,17 @@ async function buildClientViewPdf(
       .from('pdf-documents')
       .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
-    await supabase.from('project_client_views').update({
+    // This is the row that says the PDF exists. Discarding the result meant the caller got a
+    // signed URL back while the view stayed on its previous generation status forever — the
+    // catch below cannot see it, since supabase-js resolves on a denial (#347 audit).
+    const { error: completeErr } = await supabase.from('project_client_views').update({
       pdf_storage_path: storagePath,
       pdf_generated_at: new Date().toISOString(),
       pdf_generation_status: 'completed',
       page_count: pageCount,
       error_message: null,
     }).eq('id', viewId);
+    if (completeErr) throw completeErr;
 
     return jsonResponse({ success: true, pdf_url: signed?.signedUrl, pdf_storage_path: storagePath, page_count: pageCount });
   } catch (err) {

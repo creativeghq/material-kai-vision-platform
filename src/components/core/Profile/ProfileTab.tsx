@@ -857,7 +857,12 @@ export const ProfileTab: React.FC = () => {
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('profile-avatars').getPublicUrl(path);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-      await supabase.from('user_profiles').update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+      // The file is already in storage; this row is what makes it the user's avatar. Discarding
+      // the result meant an RLS denial showed "Avatar updated" and reverted on next load — the
+      // catch below cannot see it, because supabase-js resolves rather than throwing (#347).
+      const { error: avatarErr } = await supabase.from('user_profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+      if (avatarErr) throw avatarErr;
       setPersonal((p) => ({ ...p, avatar_url: publicUrl }));
       setPersonalForm((p) => ({ ...p, avatar_url: publicUrl }));
       toast({ title: 'Avatar updated' });
@@ -1469,26 +1474,48 @@ function AvailabilitySettings() {
   const save = async () => {
     if (!user) return;
     setSaving(true);
-    await supabase.from('user_profiles').update({ booking_enabled: bookingEnabled }).eq('user_id', user.id);
-    const entries = Array.from(availability.entries());
-    if (entries.length > 0) {
-      await supabase.from('appointment_availability').upsert(
-        entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges })),
-        { onConflict: 'user_id,available_date' },
-      );
+    // Four writes, none of which used to be checked, followed by an unconditional "Availability
+    // saved". supabase-js RESOLVES on an RLS denial instead of throwing, so a rejected write
+    // left the user believing their calendar was published while clients either could not book
+    // at all or could still book slots that had been removed (#347 audit).
+    try {
+      const { error: flagErr } = await supabase.from('user_profiles')
+        .update({ booking_enabled: bookingEnabled }).eq('user_id', user.id);
+      if (flagErr) throw flagErr;
+
+      const entries = Array.from(availability.entries());
+      if (entries.length > 0) {
+        const { error: upsertErr } = await supabase.from('appointment_availability').upsert(
+          entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges })),
+          { onConflict: 'user_id,available_date' },
+        );
+        if (upsertErr) throw upsertErr;
+      }
+
+      // Delete removed dates (fetch existing and diff)
+      const { data: existing, error: readErr } = await supabase
+        .from('appointment_availability').select('available_date').eq('user_id', user.id);
+      if (readErr) throw readErr;
+      const toDelete = (existing ?? [])
+        .map((r: { available_date: string }) => r.available_date)
+        .filter((d) => !availability.has(d));
+      if (toDelete.length > 0) {
+        // A failure here is the dangerous direction: the slot stays bookable after the user
+        // removed it, so they get booked for a time they said they were unavailable.
+        const { error: delErr } = await supabase.from('appointment_availability')
+          .delete().eq('user_id', user.id).in('available_date', toDelete);
+        if (delErr) throw delErr;
+      }
+      toast({ title: 'Availability saved' });
+    } catch (err) {
+      toast({
+        title: 'Could not save availability',
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
-    // Delete removed dates (fetch existing and diff)
-    const { data: existing } = await supabase
-      .from('appointment_availability').select('available_date').eq('user_id', user.id);
-    const toDelete = (existing ?? [])
-      .map((r: { available_date: string }) => r.available_date)
-      .filter((d) => !availability.has(d));
-    if (toDelete.length > 0) {
-      await supabase.from('appointment_availability')
-        .delete().eq('user_id', user.id).in('available_date', toDelete);
-    }
-    setSaving(false);
-    toast({ title: 'Availability saved' });
   };
 
   if (!loaded) return null;

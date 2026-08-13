@@ -272,11 +272,15 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
         // The row exists but nothing upstream is watching. Mark it failed rather
         // than deleting: the operator sees WHY in the UI and can retry, instead
         // of clicking Add and watching the row vanish with no explanation.
-        await supabase.from('page_watches').update({
+        const { error: markErr } = await supabase.from('page_watches').update({
           cache_status: 'failed',
           is_active: false,
           last_error: `Firecrawl rejected the monitor (HTTP ${remote.status})`,
         }).eq('id', watch.id as string);
+        // The caller still gets a 502 either way, so this must not replace that error — but a
+        // lost marker is the whole point of the comment above: the operator opens the UI and
+        // sees no reason why (#347 audit).
+        if (markErr) console.error('[page-watches] could not mark the watch failed', markErr);
         throw new HttpError(502, `Firecrawl did not create the monitor (HTTP ${remote.status}).`);
       }
 
@@ -328,9 +332,13 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
           },
         });
         if (!remote.ok) {
-          await supabase.from('page_watches').update({
+          const { error: markErr } = await supabase.from('page_watches').update({
             last_error: `Firecrawl update failed (HTTP ${remote.status})`,
           }).eq('id', next.id as string);
+          // This branch already returns `success: true` below, so the recorded error is the
+          // only trace that the upstream update failed. Losing it silently leaves the watch
+          // looking healthy while Firecrawl is out of sync (#347 audit).
+          if (markErr) console.error('[page-watches] could not record the upstream update failure', markErr);
         }
       }
       return json({ success: true, data: next });
@@ -348,7 +356,11 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
           throw new HttpError(502, `Firecrawl would not delete the monitor (HTTP ${remote.status}); the watch was kept so it is not orphaned.`);
         }
       }
-      await supabase.from('page_watches').delete().eq('id', watch.id as string);
+      // The upstream monitor is already gone at this point (the branch above refuses to proceed
+      // otherwise). Reporting success on a rejected delete would leave a local watch whose
+      // Firecrawl monitor no longer exists — the exact orphan the guard above avoids (#347).
+      const { error: delErr } = await supabase.from('page_watches').delete().eq('id', watch.id as string);
+      if (delErr) throw new HttpError(500, `The upstream monitor was removed but the watch could not be deleted: ${delErr.message}`);
       return json({ success: true, data: { id: watch.id } });
     }
 

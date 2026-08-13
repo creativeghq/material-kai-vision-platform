@@ -327,8 +327,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         if (ins.error) throw ins.error;
         id = ins.data.id;
       } else {
-        // Ensure the person is flagged as a supplier so they lead future searches.
-        await supabase.from('crm_contacts').update({ is_supplier: true } as any).eq('id', id);
+        // Ensure the person is flagged as a supplier so they lead future searches. Checked
+        // rather than discarded: supabase-js resolves on an RLS denial, so a rejected write
+        // silently left them unflagged and buried in every later search (#347 audit).
+        const { error: flagErr } = await supabase.from('crm_contacts')
+          .update({ is_supplier: true } as any).eq('id', id);
+        if (flagErr) throw flagErr;
       }
       // Existing contacts can already belong to a company — run the same rollup as a picked one.
       await pickParty({ type: 'contact', id: id!, label: `${name} (person)`, isSupplier: true });

@@ -426,7 +426,11 @@ export async function handleCompanies(req: Request): Promise<Response> {
         try {
           const companyName = (companyRow as { name?: string } | null)?.name ?? 'Company';
           const workspaceId = (companyRow as { workspace_id?: string } | null)?.workspace_id ?? null;
-          await supabase.from('crm_activities').insert(
+          // Audit trail for a DELETE, and deliberately non-fatal — the company is already gone.
+          // But the catch below only sees a THROWN failure, and supabase-js resolves on an RLS
+          // denial, so a rejected insert produced neither the rows nor the warning it exists to
+          // print: the contacts silently lost any record of why the business vanished (#347).
+          const { error: actErr } = await supabase.from('crm_activities').insert(
             contactIds.map((contactId) => ({
               target_kind: 'contact',
               target_id: contactId,
@@ -438,6 +442,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
               workspace_id: workspaceId,
             })),
           );
+          if (actErr) throw actErr;
         } catch (e) {
           console.warn('[crm-companies-api] company_deleted activity log failed (non-fatal):', e);
         }

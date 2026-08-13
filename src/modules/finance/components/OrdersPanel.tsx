@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { FINANCE_BASE } from '@/modules/finance/routes';
+import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent } from 'lucide-react';
@@ -1645,6 +1646,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [match, setMatch] = useState<ThreeWayMatch | null>(null);
   // In-app handoff: whether this PO's supplier has a claimed platform identity to send to.
   const [handoff, setHandoff] = useState<{ available: boolean; supplierWorkspaceName?: string } | null>(null);
+  /**
+   * The customer's money we are holding that is settled against nothing — and whether it is
+   * theirs to keep. Read from `vw_finance_parties`, the same row the Parties list and the
+   * nightly sweep read, so all three agree about what "releasable" means.
+   *
+   * It belongs on the ORDER screen because that is where the fact becomes visible: you close a
+   * job, the customer has paid a round number, and the difference is sitting on their account
+   * with nothing left to apply it to. Finding that used to mean going to Finance and opening
+   * their record on the off-chance.
+   */
+  const [partyCredit, setPartyCredit] = useState<{ display_name: string; on_account_credit: number; credit_releasable: boolean } | null>(null);
+  const [releaseOpen, setReleaseOpen] = useState(false);
   // The order's own party (customer / supplier) name — the order row carries only the id, and the
   // header has to say WHO this order is with before it can offer to open their CRM record.
   const [partyName, setPartyName] = useState<string | null>(null);
@@ -1659,7 +1672,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       // Everything the panel needs, in ONE wave. `getThreeWayMatch` used to be awaited after this
       // block, so opening an order cost two sequential round-trips where one would do — the
       // straggler depended on nothing in here.
-      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay, handoffInfo, assetRows] = await Promise.all([
+      const [finance, lp, names, exposure, accounts, audit, buyer, credit, party, prodNames, threeWay, handoffInfo, assetRows] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
@@ -1674,6 +1687,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         financeService.getBuyerIdentity({
           companyId: res.order.customer_company_id, contactId: res.order.customer_contact_id,
         }).catch(() => null),
+        // Money of the CUSTOMER's we are holding. Sales only: a purchase order's counterparty is
+        // a supplier, and their "credit" is a different animal (money we overpaid THEM).
+        res.order.order_type === 'sales' && (res.order.customer_company_id || res.order.customer_contact_id)
+          ? financeService.getPartyCreditPosition(res.order.workspace_id, {
+              companyId: res.order.customer_company_id,
+              contactId: res.order.customer_company_id ? null : res.order.customer_contact_id,
+            }).catch(() => null)
+          : Promise.resolve(null),
         !partyRef ? Promise.resolve(null)
           : (partyRef.kind === 'company' ? ordersService.getCompanyNames([partyRef.id]) : ordersService.getContactNames([partyRef.id]))
               .then((m) => m.get(partyRef.id) ?? null).catch(() => null),
@@ -1708,6 +1729,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       setPayAudit(audit.rows);
       setPayAuditFailed(!audit.ok);
       setBuyerIdentity(buyer); setPartyName(party);
+      setPartyCredit(credit);
       setMatch(threeWay);
       setHandoff(handoffInfo);
     } catch (err: any) {
@@ -1716,7 +1738,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); setLineAssets(new Map()); setWarrantyPick(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); setPartyCredit(null); setLineAssets(new Map()); setWarrantyPick(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -2206,7 +2228,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         .filter((it) => Number(it.quantity_delivered) !== Number(it.quantity))
         .map((it) => ({ itemId: it.id, quantityDelivered: Number(it.quantity) }));
       if (pending.length > 0) await ordersService.setDelivery(order.id, pending);
+      // Delivering every line is what actually closes a sale — the status is DERIVED from the
+      // delivered quantities, so this path never goes through `setStatus` and would otherwise
+      // miss the one moment worth asking about the customer's leftover money.
+      const wasClosed = order.status === 'fulfilled';
       await load(order.id); onChanged();
+      if (!wasClosed) void ordersService.announceReleasableCredit(order);
       // #320: say what did NOT happen. This action used to empty the warehouse for the whole
       // order in one click, and a toast that only reports success reads as if it still does.
       toast({
@@ -2822,6 +2849,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     <DropdownMenuItem onClick={() => setLinkExpenseOpen(true)}>
                       <Link2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" /> Attach an existing expense
                     </DropdownMenuItem>
+                    {/* Their money, not this order's — but this is where you are standing when it
+                        becomes obvious there is nothing left to spend it on. Offered only when it
+                        is actually theirs to keep (`credit_releasable`): while an invoice is open
+                        the leftover belongs against that invoice, and booking it as income would
+                        turn a receivable into profit nobody earned. */}
+                    {partyCredit?.credit_releasable && (
+                      <DropdownMenuItem onClick={() => setReleaseOpen(true)}>
+                        <Coins className="h-3.5 w-3.5 mr-2 text-amber-500" />
+                        Release {formatMoney(partyCredit.on_account_credit, order.currency)} on account
+                      </DropdownMenuItem>
+                    )}
                     {/* "Pay from account credit" was here. Money received now lands on what is owed
                         by itself, so an order with the customer's cash available against it is
                         already settled by the time this menu opens — and asking the operator to
@@ -3286,6 +3324,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     <Button size="sm" onClick={saveItems} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save items'}</Button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* The prompt. Shown once the sale is CLOSED and the customer's money has nowhere left
+                to go — not while the order is live, when the cash may still be meant for it.
+                It states the choice rather than assuming the answer: keeping it is one of three
+                legitimate exits (apply it to the next order, refund it, keep it), and only the
+                operator knows which. The bell notification says the same thing for the times you
+                closed the order and moved on. */}
+            {isSalesOrder && order.status === 'fulfilled' && partyCredit?.credit_releasable && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                <Coins className="h-4 w-4 text-amber-500 shrink-0" />
+                <span className="text-xs">
+                  <span className="font-medium">{partyCredit.display_name}</span> is holding{' '}
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">{formatMoney(partyCredit.on_account_credit, order.currency)}</span>{' '}
+                  of theirs that is settled against nothing, and they owe you nothing.
+                </span>
+                <Button size="sm" variant="outline" className="ml-auto h-7 text-[11px]" onClick={() => setReleaseOpen(true)}>
+                  Keep it as income
+                </Button>
               </div>
             )}
 
@@ -3916,6 +3974,24 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         }}
       />
     )}
+    {/* Keeping the customer's leftover cash. The SAME dialog Finance -> Parties opens: the amount
+        it offers is re-derived from the party's real remainders, never from the figure this panel
+        happened to render, so a stale screen cannot release money that has since been applied. */}
+    {order && partyCredit && (
+      <ReleaseCreditDialog
+        workspaceId={order.workspace_id}
+        open={releaseOpen}
+        onOpenChange={setReleaseOpen}
+        party={{
+          companyId: order.customer_company_id,
+          contactId: order.customer_company_id ? null : order.customer_contact_id,
+          name: partyCredit.display_name,
+        }}
+        available={partyCredit.on_account_credit}
+        currency={order.currency}
+        onDone={() => { void load(order.id); onChanged(); }}
+      />
+    )}
     {/* The same link written against an expense that already exists, instead of a new one. */}
     {order && (
       <LinkExpenseToOrderDialog
@@ -4292,8 +4368,13 @@ const LineStockDialog: React.FC<{
         cost: unitCost != null && unitCost > 0 ? unitCost : null,
       });
       if (supplierCompanyId) {
-        await supabase.from('products').update({ supplier_company_id: supplierCompanyId })
+        // The success message below says "and linked" — so this write has to have happened.
+        // supabase-js resolves on an RLS denial instead of throwing, so discarding the result
+        // let the product be created with no supplier while the toast claimed otherwise (#347).
+        const { error: linkErr } = await supabase.from('products')
+          .update({ supplier_company_id: supplierCompanyId })
           .eq('id', productId).is('supplier_company_id', null);
+        if (linkErr) throw linkErr;
       }
       onApply({ productId, updateWarehouse: true }, `“${name}” added to the catalog and linked.`);
     } catch (err: any) {

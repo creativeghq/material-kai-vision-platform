@@ -108,8 +108,14 @@ function AppointmentDetailDrawer({
 
   const saveNotes = async () => {
     setSaving(true);
-    await supabase.from('appointments').update({ notes }).eq('id', appt.id);
+    // supabase-js RESOLVES on an RLS denial rather than throwing, so a discarded result meant
+    // "Notes saved" fired on a write that never landed (#347 audit).
+    const { error } = await supabase.from('appointments').update({ notes }).eq('id', appt.id);
     setSaving(false);
+    if (error) {
+      toast({ title: 'Could not save notes', description: error.message, variant: 'destructive' });
+      return;
+    }
     toast({ title: 'Notes saved' });
     onUpdated();
   };

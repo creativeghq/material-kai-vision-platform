@@ -292,7 +292,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           results.push({ to, ...result });
 
           if (result.success) {
-            await supabaseClient.from('messaging_logs').insert({
+            // The message is already sent, so this must not throw — but the row is the only
+            // billing and audit trace of it, and discarding the result made a lost one
+            // invisible (#347 audit).
+            const { error: logErr } = await supabaseClient.from('messaging_logs').insert({
               created_by: billingUserId,
               workspace_id: tenantWsId, // Tenant scope
               channel_id: channel.id,
@@ -306,6 +309,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               status: 'sent',
               sent_at: new Date().toISOString(),
             });
+            if (logErr) console.error('[messaging-api] message sent but messaging_logs row FAILED', to, logErr);
           } else {
             // Send returned a soft failure — refund the pre-charged credit (only if we debited).
             if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
@@ -395,7 +399,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           results.push({ to, ...result });
 
           if (result.success) {
-            await supabaseClient.from('messaging_logs').insert({
+            // The message is already sent, so this must not throw — but the row is the only
+            // billing and audit trace of it, and discarding the result made a lost one
+            // invisible (#347 audit).
+            const { error: logErr } = await supabaseClient.from('messaging_logs').insert({
               created_by: billingUserId,
               workspace_id: tenantWsId, // Tenant scope
               channel_id: channel.id,
@@ -409,6 +416,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               status: 'sent',
               sent_at: new Date().toISOString(),
             });
+            if (logErr) console.error('[messaging-api] message sent but messaging_logs row FAILED', to, logErr);
           } else {
             // Soft failure — refund the pre-charged credit for this recipient.
             await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
@@ -538,7 +546,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             const { count } = await supabaseClient
               .from('messaging_channels').select('*', { count: 'exact', head: true })
               .eq('channel_type', 'whatsapp');
-            await supabaseClient.from('messaging_channels').insert({
+            // `synced` drives the "Synced N WhatsApp account(s)" message below, so a discarded
+            // result meant the caller was told a channel was created that does not exist —
+            // supabase-js resolves on an RLS denial rather than throwing (#347 audit).
+            const { error: chanErr } = await supabaseClient.from('messaging_channels').insert({
               workspace_id: syncWsId, // Bind to the caller's workspace
               channel_type: 'whatsapp',
               provider: 'zernio',
@@ -551,6 +562,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               max_send_rate: 100,
               config: { zernio_account_id: accountId, display_phone_number: senderId },
             });
+            if (chanErr) {
+              console.error(`[messaging-api] could not create the channel for ${senderId}`, chanErr);
+              continue;
+            }
             synced.push({ action: 'created', senderId });
           }
         }

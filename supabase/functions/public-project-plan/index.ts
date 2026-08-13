@@ -134,9 +134,14 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     const computed = computeBlueprint((items ?? []) as any[], dims, null);
 
     // log success (counts toward the combined daily quota)
-    await supabase.from('public_lookup_log').insert({
+    // This row IS the quota counter, so `.then(() => {}, () => {})` meant a rejected insert
+    // silently handed the caller a free lookup — an anonymous endpoint whose rate limit stops
+    // counting is a bypass, not a lost log line. Reported, never thrown: the work is already
+    // done and the visitor should still get their answer (#347 audit).
+    const { error: quotaErr } = await supabase.from('public_lookup_log').insert({
       scan_type: 'project_plan', ip_address: ip, outcome: 'success', query_text: bp.title, cache_hit: false,
-    }).then(() => {}, () => {});
+    });
+    if (quotaErr) console.error('[public-project-plan] quota row NOT recorded — this lookup was free', quotaErr);
 
     return json({
       success: true,

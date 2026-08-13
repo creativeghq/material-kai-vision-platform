@@ -15,10 +15,24 @@
  * out, the `reminded_at` stamp write is unchecked, and an unstamped row re-sends on every tick.
  *
  * ── Why a ratchet and not a hard zero ──────────────────────────────────────────────────────
- * There are ~325 unchecked writes in the tree. Most are genuinely fire-and-forget (telemetry,
- * best-effort cache stamps) and converting them wholesale would be a large, risky change with no
- * user-visible benefit. Sample verification also puts the true-positive rate at roughly one in
- * four — this scanner has real signal but is not precise enough to auto-fix from.
+ * Every write this scanner flagged as ALSO reporting success was reviewed by hand and fixed, so
+ * `CLAIMS_SUCCESS` is now down from 38 to 7 — and those 7 are known FALSE POSITIVES, listed
+ * below. It is pinned at 7 rather than 0 because the scanner is a heuristic: `statementEnd`
+ * balances parens and misaligns on chained builders (`.update({...}).eq('id', id)`), so the
+ * window it searches for the error check can start past the check. Tightening it was tried and
+ * made precision worse, not better; a ratchet on a known number beats a zero that lies.
+ *
+ * Known false positives at this baseline — all of these DO check their error:
+ *   src/modules/email/pages/EmailTemplateBuilderPage.tsx  (if (error) throw error)
+ *   supabase/functions/catalog-send-to-customers/index.ts (.then(({ error }) => console.warn))
+ *   supabase/functions/email-api/index.ts                 (if (logErr) console.error)
+ *   supabase/functions/_shared/tools/crm-tools.ts         (if (error) return { success: false })
+ *   supabase/functions/_shared/tools/email-marketing-tools.ts (if (upErr) return …)
+ *   supabase/functions/_shared/tools/tech-radar-tools.ts  (if (subjDelErr) return …)
+ *
+ * `BASELINE_TOTAL` stays high on purpose: most of the remaining ~291 are genuinely
+ * fire-and-forget (telemetry, best-effort cache stamps) and report nothing to anybody, so a
+ * lost one is undiagnosable rather than a lie. Fix them opportunistically.
  *
  * So this test does what `.github/edge-typecheck-baseline.json` does for edge types: it pins the
  * current numbers and fails when they RISE. Fix sites opportunistically and ratchet the constants
@@ -37,8 +51,8 @@ const ROOTS = ['src', 'supabase/functions', 'api'];
 const SKIP = ['node_modules', 'integrations/supabase/types.ts', '_generated', '.deno'];
 
 /** Ratchet down as sites are fixed. NEVER raise these to make a build pass. */
-const BASELINE_TOTAL = 325;
-const BASELINE_CLAIMS_SUCCESS = 38;
+const BASELINE_TOTAL = 291;
+const BASELINE_CLAIMS_SUCCESS = 7;
 
 const WRITE = /\.(insert|update|upsert|delete)\s*\(/;
 /** The code goes on to tell someone it worked. */

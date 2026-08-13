@@ -143,7 +143,9 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
             shares?: number; saves?: number; clicks?: number; views?: number; engagementRate?: number;
           };
 
-          await supabase.from('social_post_analytics').upsert({
+          // `synced++` below counts this as done, so a discarded result meant the caller was
+          // told analytics synced when nothing landed. The per-account catch logs it (#347).
+          const { error: metricsErr } = await supabase.from('social_post_analytics').upsert({
             post_id: post.id,
             workspace_id: post.workspace_id,
             synced_at: new Date().toISOString(),
@@ -157,6 +159,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
             engagement_rate: a.engagementRate ?? 0,
             metadata: { raw: a },
           }, { onConflict: 'post_id' });
+          if (metricsErr) throw metricsErr;
 
           synced++;
         } catch (postErr) {
@@ -230,11 +233,13 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
             metadata: { raw: a },
           }, { onConflict: 'social_account_id,snapshot_date' });
 
-          await supabase.from('social_accounts').update({
+          // Same reason as the posts loop above: `synced++` counts this account as done.
+          const { error: acctErr2 } = await supabase.from('social_accounts').update({
             followers_count: a.currentFollowers ?? 0,
             following_count: stats.followingCount ?? 0,
             last_synced_at: new Date().toISOString(),
           }).eq('id', acct.id);
+          if (acctErr2) throw acctErr2;
 
           synced++;
         } catch (acctErr) {
