@@ -138,7 +138,7 @@ async function sendViaResend(apiKey: string, payload: {
   /** Custom SMTP headers (e.g. List-Unsubscribe for marketing compliance). */
   headers?: Record<string, string>;
 }): Promise<string> {
-  if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+  if (!apiKey) throw new HttpError(503, 'RESEND_API_KEY is not configured');
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -153,7 +153,10 @@ async function sendViaResend(apiKey: string, payload: {
 
   if (!res.ok) {
     console.error('Resend API error response:', JSON.stringify({ status: res.status, data }));
-    throw new Error(data.message || data.name || `Resend API error: ${res.status} - ${JSON.stringify(data)}`);
+    // 502: the upstream provider rejected or failed the send. Not a 500 — the fault is
+    // Resend's (or the payload it refused), and a real bug in THIS function should stay
+    // distinguishable from an upstream outage in api_usage_logs.
+    throw new HttpError(502, data.message || data.name || `Resend API error: ${res.status} - ${JSON.stringify(data)}`);
   }
 
   return data.id as string;
@@ -325,7 +328,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
     const auth = await authenticate(req);
     if (!auth.success) {
-      throw new Error(auth.error || 'Unauthorized');
+      throw new HttpError(401, auth.error || 'Unauthorized');
     }
 
     const user = auth.user;
@@ -337,7 +340,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
     switch (action) {
       case 'send': {
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
         // Gate freeform send: a regular authenticated user must NOT be able to send arbitrary
         // email (any to/subject/html) from the platform's verified domain — that's spam/phishing
@@ -577,12 +580,12 @@ Deno.serve(withApiLogging('email-api', async (req) => {
               textBody = renderTemplateWithVariables(template.text_template, variables);
             }
           } else {
-            throw new Error('Template has no content');
+            throw new HttpError(400, 'Template has no content');
           }
         }
 
         if (!htmlBody && !textBody) {
-          throw new Error('Either html or text body must be provided');
+          throw new HttpError(400, 'Either html or text body must be provided');
         }
 
         // Inbox preview (preheader): a hidden span at the very top of the HTML becomes the grey
@@ -600,7 +603,11 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // If neither the request nor the resolved config supplies a real sender, fail loudly.
         const fromEmail = body.from || sender.fromEmail;
         if (!fromEmail) {
-          throw new Error(
+          // 503, matching `workspace_sender_required` above: the platform is not configured
+          // to send, which is an operator problem to fix — not a malformed request and not a
+          // crash in this handler.
+          throw new HttpError(
+            503,
             'No sender address configured. Set a workspace sender (workspace_email_config) or ' +
             '`default_from_email` in email_settings, or pass `from` in the request.',
           );
@@ -755,7 +762,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // Pull delivery/open/click/bounce status for a workspace's campaign from its OWN
         // Resend account (GET /emails/{id}). Marketing sends go out under the tenant's Resend, so
         // their events never reach our webhook — this on-demand poll backfills the stats.
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
         const campaignId = String(requestBody.campaign_id ?? '');
         const wsId = String(requestBody.workspace_id ?? '');
         if (!campaignId || !wsId) throw new HttpError(400, 'campaign_id and workspace_id are required');
@@ -864,7 +871,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
       case 'resend-contacts': {
         // List the workspace's Resend audience contacts + sync settings. Ensures the audience exists.
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
         const wsId = String(requestBody.workspace_id ?? '');
         if (!wsId) throw new HttpError(400, 'workspace_id is required');
         if (!isAdminAccess(auth)) {
@@ -901,7 +908,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'sync-resend-contacts': {
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
         const wsId = String(requestBody.workspace_id ?? '');
         if (!wsId) throw new HttpError(400, 'workspace_id is required');
         if (!isAdminAccess(auth)) {
@@ -924,7 +931,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'set-resend-contact-sync': {
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
         const wsId = String(requestBody.workspace_id ?? '');
         if (!wsId) throw new HttpError(400, 'workspace_id is required');
         if (typeof requestBody.auto_sync !== 'boolean') throw new HttpError(400, 'auto_sync (boolean) is required');
@@ -941,7 +948,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'domains': {
-        if (req.method !== 'GET' && req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'GET' && req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
         const { data, error } = await supabaseClient
           .from('email_domains')
@@ -958,13 +965,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'add-domain': {
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
         const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-        if (!adminAuth.success) throw new Error('Unauthorized: Admin access required');
+        if (!adminAuth.success) throw new HttpError(403, 'Unauthorized: Admin access required');
 
         const { domain } = requestBody;
-        if (!domain) throw new Error('Domain is required');
+        if (!domain) throw new HttpError(400, 'Domain is required');
 
         const { data, error } = await supabaseClient
           .from('email_domains')
@@ -989,13 +996,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'mark-domain-verified': {
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
         const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-        if (!adminAuth.success) throw new Error('Unauthorized: Admin access required');
+        if (!adminAuth.success) throw new HttpError(403, 'Unauthorized: Admin access required');
 
         const { domain } = requestBody;
-        if (!domain) throw new Error('Domain is required');
+        if (!domain) throw new HttpError(400, 'Domain is required');
 
         const { error } = await supabaseClient
           .from('email_domains')
@@ -1134,13 +1141,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'sync-domains': {
-        if (req.method !== 'POST') throw new Error('Method not allowed');
+        if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
         const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-        if (!adminAuth.success) throw new Error('Unauthorized: Admin access required');
+        if (!adminAuth.success) throw new HttpError(403, 'Unauthorized: Admin access required');
 
         const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
-        if (!apiKey()) throw new Error('RESEND_API_KEY is not configured');
+        if (!apiKey()) throw new HttpError(503, 'RESEND_API_KEY is not configured');
 
         // Fetch domains from Resend
         const resendRes = await fetch('https://api.resend.com/domains', {
@@ -1149,7 +1156,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const resendData = await resendRes.json();
 
         if (!resendRes.ok) {
-          throw new Error(resendData.message || `Resend API error: ${resendRes.status}`);
+          // 502 for the same reason as the send path: an upstream failure is not a bug here.
+          throw new HttpError(502, resendData.message || `Resend API error: ${resendRes.status}`);
         }
 
         const resendDomains: Array<{ id: string; name: string; status: string }> = resendData.data || [];
@@ -1194,7 +1202,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       default:
-        throw new Error('Invalid endpoint');
+        throw new HttpError(404, 'Invalid endpoint');
     }
   } catch (error) {
     // Typed client errors carry their own status and skip Sentry via the wrapper.
