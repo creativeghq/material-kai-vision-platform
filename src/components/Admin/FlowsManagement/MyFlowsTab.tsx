@@ -67,6 +67,7 @@ import {
   Wrench,
   AlarmClock,
   ShieldCheck,
+  Coins,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -188,6 +189,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'hr.ergani_filing_failed': Landmark,
   order_created: ShoppingCart,
   order_status_changed: Package,
+  customer_credit_releasable: Coins,
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
   campaign_sent: Megaphone,
@@ -315,6 +317,7 @@ const triggerLabels: Record<TriggerType, string> = {
   'hr.ergani_filing_failed': 'HR — Ergani Filing Failed',
   order_created: 'Order Created',
   order_status_changed: 'Order Status Changed',
+  customer_credit_releasable: 'Customer Credit Can Be Released',
   document_published: 'Document Published',
   doc_suggestion_submitted: 'Doc Edit Proposed',
   campaign_sent: 'Campaign Sent',

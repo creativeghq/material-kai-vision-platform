@@ -32,7 +32,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 const ROOT = process.cwd();
 const FINANCE_DIRS = [
@@ -620,5 +620,110 @@ describe('asset book value has exactly one derivation', () => {
       'declining balance and stops at `disposed_on`. Read it; do not recompute it here.\n' +
       offenders.join('\n'),
     ).toEqual([]);
+  });
+});
+
+describe('the line sell price has exactly one derivation', () => {
+  /**
+   * #347 defect 18 — the fourth money derivation, and the one that hid longest.
+   *
+   * `get_product_price_for_workspace` is the single price resolver: cost -> retail -> the discount
+   * ladder -> quantity breaks. But the CATEGORY custom rules (`category_extra`, `volume_category`)
+   * were resolved in TypeScript, in `QuotesService._layerBFactor`, which read
+   * `pricing_custom_rules` from the client, sorted by category ancestry, and multiplied
+   * `1 - pct/100` onto whatever the resolver had already returned.
+   *
+   * It ran at two call sites in QuotesService and nowhere else. So the same product, for the same
+   * customer, at the same quantity, cost one thing on a quote and a different thing on an order —
+   * and the order was never told these rules existed. Nothing failed. Both numbers were valid.
+   *
+   * Phase 1.1 moved them into the resolver, preserving the multiply-on-top semantics exactly, so
+   * `suggested_sell` / `final_sell` is now the WHOLE answer. `cash_payment` deliberately stays
+   * document-level (it reduces the subtotal before VAT, not a line price) with its own single
+   * source, `get_workspace_cash_discount_pct`.
+   *
+   * SCOPE: same caveat as every block in this file — TypeScript only. The SQL half is the
+   * resolver itself, which is not committed as a file.
+   */
+  const files = FINANCE_DIRS.flatMap((d) => walk(join(ROOT, d)));
+  const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
+
+  /**
+   * The rules table has exactly two legitimate client-side uses, and both are AUTHORING: the
+   * admin card that edits rules, and the service methods behind it (list / upsert / delete).
+   * Neither asks "which rule applies to this product" — that question belongs to SQL.
+   */
+  const AUTHORING = [
+    'src/modules/finance/components/CustomPricingRulesCard.tsx',
+    'src/modules/finance/services/financeService.ts',
+  ];
+
+  it('finds finance and quote sources to scan', () => {
+    expect(files.length).toBeGreaterThan(20);
+  });
+
+  it('only the authoring surfaces touch pricing_custom_rules at all', () => {
+    const offenders = files
+      .filter((f) => !AUTHORING.includes(posix(f)))
+      .filter((f) => /pricing_custom_rules/.test(stripComments(readFileSync(f, 'utf8'))))
+      .map(posix);
+    expect(
+      offenders,
+      'pricing_custom_rules is APPLIED by get_product_price_for_workspace (line discounts) and ' +
+      'get_workspace_cash_discount_pct (the document cash discount). Touching it anywhere else ' +
+      'is a second answer to "what does this cost".' + offenders.join(', '),
+    ).toEqual([]);
+  });
+
+  it('nobody looks a rule up BY TYPE — that is policy, and policy lives in SQL', () => {
+    // The precise shape of both deleted copies: `.eq('rule_type', 'cash_payment')` in
+    // financeService and again, hand-written, in quote-tools.ts. Asking the table WHICH rule
+    // applies is applying policy; the CRUD above merely lists rows for an editor.
+    const LOOKUP = /\.eq\(\s*['"]rule_type['"]/;
+    const offenders = files
+      .filter((f) => LOOKUP.test(stripComments(readFileSync(f, 'utf8'))))
+      .map(posix);
+    expect(
+      offenders,
+      'Look the rule up in SQL — get_workspace_cash_discount_pct, or the resolver. ' +
+      offenders.join(', '),
+    ).toEqual([]);
+    // Guard the guard: a pattern that matches nothing real is a green tick that means nothing.
+    expect(LOOKUP.test(".eq('rule_type', 'cash_payment')")).toBe(true);
+    expect(LOOKUP.test(".eq('id', id)")).toBe(false);
+  });
+
+  it('does not reintroduce a Layer-B style factor', () => {
+    const offenders = files
+      .filter((f) => stripComments(readFileSync(f, 'utf8')).includes('layerBFactor'))
+      .map(posix);
+    expect(
+      offenders,
+      '_layerBFactor was deleted in #347 phase 1.2 — the category rules live in the resolver.',
+    ).toEqual([]);
+  });
+
+  it('never multiplies a resolver price by a locally computed factor', () => {
+    const SCALE = /\b(suggested_sell|final_sell|unitPrice|recomputed)\b[^\n;]*\*\s*factor\b/;
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        if (SCALE.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      }
+    }
+    expect(
+      offenders,
+      'The resolver returns the FINAL sell price — ladder, quantity break and category rules ' +
+      'included. Scaling it afterwards is a second derivation.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('the scanner would catch the code that was deleted', () => {
+    // Guard the guard: a pattern that matches nothing real is a green tick that means nothing.
+    const SCALE = /\b(suggested_sell|final_sell|unitPrice|recomputed)\b[^\n;]*\*\s*factor\b/;
+    expect(SCALE.test('recomputed = Math.round(recomputed * factor * 100) / 100;')).toBe(true);
+    expect(SCALE.test('if (factor < 1) unitPrice = Math.round(unitPrice * factor * 100) / 100;')).toBe(true);
+    expect(SCALE.test('const total = unitPrice * quantity;')).toBe(false);
   });
 });

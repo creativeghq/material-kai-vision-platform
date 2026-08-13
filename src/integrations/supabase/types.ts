@@ -37320,6 +37320,7 @@ export type Database = {
           p_company_id: string
           p_contact_id: string
           p_from: string
+          p_include_orders?: boolean
           p_side: string
           p_to: string
           p_workspace_id: string
@@ -37340,6 +37341,7 @@ export type Database = {
           p_before: string
           p_company_id: string
           p_contact_id: string
+          p_include_orders?: boolean
           p_side: string
           p_workspace_id: string
         }

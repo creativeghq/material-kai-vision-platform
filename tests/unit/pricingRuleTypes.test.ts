@@ -1,95 +1,129 @@
 /**
  * Guards `pricing_custom_rules.rule_type` against the inert-rule failure (#347, defect 21).
  *
- * A discount rule type an admin can CREATE but nothing RESOLVES is invisible: the rule is
- * listed in the UI, it looks active, and no price ever changes. That is this platform's
- * dominant failure shape, and `CustomPricingRulesCard`'s own header already states the policy —
- * "cash_payment is schema-ready but surfaced once a payment-context hook exists, to avoid an
- * inert rule". Nothing enforced it: the column was free text with no CHECK.
+ * A discount rule type an admin can CREATE but nothing RESOLVES is invisible: the rule is listed
+ * in the UI, it looks active, and no price ever changes. That is this platform's dominant failure
+ * shape, and `CustomPricingRulesCard`'s own header already stated the policy — "cash_payment is
+ * schema-ready but surfaced once a payment-context hook exists, to avoid an inert rule". Nothing
+ * enforced it: the column was free text with no CHECK. It has one now.
  *
- * There is now a CHECK constraint. This test keeps the three copies of the vocabulary honest —
- * the constraint, the resolvers, and the authoring UI — the same arrangement
- * [workspaceRoles.test.ts] uses for a role that was invitable but not storable.
+ * ── The invariant INVERTED in phase 1, deliberately ────────────────────────────────────────
+ * This test originally asserted that every allowed type was resolved by one of three TypeScript
+ * files. That was true, and it was the bug: `_layerBFactor` read the table from the client and
+ * multiplied a factor onto the resolver's answer, so a quote line and an order line for the same
+ * product priced differently. Phase 1.1 moved `category_extra` and `volume_category` into
+ * `get_product_price_for_workspace`, and phase 1.1b gave `cash_payment` its own single SQL source,
+ * `get_workspace_cash_discount_pct` — it stays document-level, because it reduces the subtotal
+ * before VAT rather than any line price, and folding it into the line resolver would apply it
+ * twice.
  *
- * SCOPE — the DB constraint is the real gate and lives in `pg_proc`/`pg_constraint`, which this
- * repo never commits. This test scans REPO FILES, so it cannot see the constraint itself; it
- * asserts the TS side matches what the constraint was written with. If you change the
- * constraint, change ALLOWED_RULE_TYPES here in the same migration.
+ * So the rule is now the opposite: **no TypeScript may resolve a rule type at all.** This file
+ * enforces that, plus the two directions of the authoring vocabulary.
  *
- * Phase 1 of #347 folds all three types into `get_product_price_for_workspace`, after which the
- * resolver list below collapses to one SQL function and this test should be updated to match —
- * the point is that it must be updated deliberately, not drift.
+ * SCOPE — the DB constraint and both resolvers live in `pg_constraint` / `pg_proc`, which this
+ * repo never commits (CLAUDE.md). This test scans REPO FILES, so it cannot see them; it keeps the
+ * TypeScript side honest and pins the list the constraint was written with. If you change the
+ * constraint, change `ALLOWED_RULE_TYPES` in the same migration.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
+const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
 
-/** Mirrors `pricing_custom_rules_rule_type_check`. Adding one here means adding a resolver. */
+/** Mirrors `pricing_custom_rules_rule_type_check`. */
 const ALLOWED_RULE_TYPES = ['category_extra', 'volume_category', 'cash_payment'] as const;
 
-/**
- * Where each type is actually turned into money. A type absent from every one of these files
- * is inert, however good the authoring form looks.
- */
-const RESOLVERS = [
-  'src/modules/quotes/services/QuotesService.ts',
-  'src/modules/finance/services/financeService.ts',
-  'supabase/functions/_shared/tools/quote-tools.ts',
-];
+/** Where each type is resolved — all SQL, none of it scannable from here. */
+const SQL_RESOLVERS: Record<(typeof ALLOWED_RULE_TYPES)[number], string> = {
+  category_extra: 'get_product_price_for_workspace',
+  volume_category: 'get_product_price_for_workspace',
+  cash_payment: 'get_workspace_cash_discount_pct',
+};
 
 /** The authoring surface. A type it cannot offer is unreachable from the other direction. */
 const AUTHORING_UI = 'src/modules/finance/components/CustomPricingRulesCard.tsx';
 
-/** Strip comments so prose naming a retired type doesn't count as a resolver branch. */
+const SCAN_DIRS = ['src', 'supabase/functions'];
+
+function walk(dir: string, out: string[] = []): string[] {
+  let entries: string[];
+  try { entries = readdirSync(dir); } catch { return out; }
+  for (const e of entries) {
+    if (e === 'node_modules' || e === '_generated') continue;
+    const p = join(dir, e);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.tsx?$/.test(e)) out.push(p);
+  }
+  return out;
+}
+
+/** Strip comments so prose about the retired design doesn't count as a resolver branch. */
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 }
 
-describe('pricing_custom_rules.rule_type — every allowed value resolves', () => {
-  const resolverSources = RESOLVERS.map((p) => ({ path: p, code: stripComments(read(p)) }));
+describe('pricing_custom_rules.rule_type', () => {
+  const files = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)))
+    .filter((f) => posix(f) !== 'src/integrations/supabase/types.ts');
 
-  it.each(ALLOWED_RULE_TYPES)('%s is resolved somewhere', (type) => {
-    const hits = resolverSources.filter((s) => s.code.includes(`'${type}'`)).map((s) => s.path);
-    expect(
-      hits.length,
-      `'${type}' is accepted by the CHECK constraint but no resolver reads it — ` +
-        `an admin can create the rule and it will never change a price. ` +
-        `Resolvers scanned: ${RESOLVERS.join(', ')}`,
-    ).toBeGreaterThan(0);
+  it('finds sources to scan', () => {
+    expect(files.length).toBeGreaterThan(200);
   });
 
   it.each(ALLOWED_RULE_TYPES)('%s can be authored in the UI', (type) => {
     const ui = stripComments(read(AUTHORING_UI));
     expect(
-      ui.includes(`'${type}'`) || ui.includes(`"${type}"`) || ui.includes(`value="${type}"`),
-      `'${type}' is allowed and resolved but ${AUTHORING_UI} cannot create it`,
+      ui.includes(`'${type}'`) || ui.includes(`"${type}"`),
+      `'${type}' is allowed by the CHECK constraint but ${AUTHORING_UI} cannot create it`,
     ).toBe(true);
   });
 
   it('the UI offers nothing the constraint would reject', () => {
-    // The reverse direction — the failure that broke every `sales` invite: creatable in one
-    // place, rejected by the CHECK in another. Here it would surface as a save that throws.
+    // The failure that broke every `sales` invite: creatable in one place, rejected by a CHECK in
+    // another. Here it would surface as a save that throws.
     const ui = stripComments(read(AUTHORING_UI));
-    const offered = [...ui.matchAll(/value="([a-z_]+)"/g)]
-      .map((m) => m[1])
-      .filter((v) => v.includes('_') || (ALLOWED_RULE_TYPES as readonly string[]).includes(v));
-    const rejected = offered.filter((v) => !(ALLOWED_RULE_TYPES as readonly string[]).includes(v));
+    const offered = [...ui.matchAll(/value="([a-z_]+)"/g)].map((m) => m[1]);
+    const rejected = offered.filter(
+      (v) => v.includes('_') && !(ALLOWED_RULE_TYPES as readonly string[]).includes(v),
+    );
     expect(rejected, 'the rule-type picker offers a value the CHECK constraint rejects').toEqual([]);
   });
 
-  it('no resolver reads a rule type the constraint would reject', () => {
-    // Catches the other drift: a resolver branch left behind for a type that was removed from
-    // the constraint. It cannot fire, so it is dead code that reads as coverage.
-    const known = new Set<string>(ALLOWED_RULE_TYPES);
-    for (const { path, code } of resolverSources) {
-      const referenced = [...code.matchAll(/rule_type['"]?\s*[,:)]?\s*['"]([a-z_]+)['"]/g)]
-        .map((m) => m[1])
-        .concat([...code.matchAll(/\.eq\(\s*['"]rule_type['"]\s*,\s*['"]([a-z_]+)['"]/g)].map((m) => m[1]));
-      const unknown = [...new Set(referenced)].filter((t) => !known.has(t));
-      expect(unknown, `${path} branches on a rule type the constraint rejects`).toEqual([]);
+  it('NO TypeScript resolves a rule type — resolution is SQL-only since phase 1', () => {
+    // `.eq('rule_type', …)` is the shape of asking the table which rule applies. That is policy,
+    // and policy has one home. Both deleted copies looked exactly like this.
+    const LOOKUP = /\.eq\(\s*['"]rule_type['"]/;
+    const offenders = files
+      .filter((f) => LOOKUP.test(stripComments(readFileSync(f, 'utf8'))))
+      .map(posix);
+    expect(
+      offenders,
+      'Resolve it in SQL: get_product_price_for_workspace, or get_workspace_cash_discount_pct. ' +
+      offenders.join(', '),
+    ).toEqual([]);
+    // Guard the guard — this must match the code that was actually removed.
+    expect(LOOKUP.test(".eq('rule_type', 'cash_payment')")).toBe(true);
+    expect(LOOKUP.test(".eq('id', id)")).toBe(false);
+  });
+
+  it('the client reaches each type through its SQL resolver', () => {
+    // Proves the replacement is wired, not merely that the old code is gone — the two halves of
+    // a real migration. A resolver nothing calls is as inert as a rule nothing resolves.
+    const all = files.map((f) => stripComments(readFileSync(f, 'utf8'))).join('\n');
+    for (const fn of new Set(Object.values(SQL_RESOLVERS))) {
+      expect(all.includes(fn), `nothing in the client calls ${fn}`).toBe(true);
     }
+  });
+
+  it('every allowed type names the SQL function that resolves it', () => {
+    // Bookkeeping, not behaviour: adding a type to the constraint without deciding where it
+    // resolves is exactly how an inert rule ships.
+    for (const type of ALLOWED_RULE_TYPES) {
+      expect(SQL_RESOLVERS[type], `${type} has no SQL resolver recorded`).toBeTruthy();
+    }
+    expect(Object.keys(SQL_RESOLVERS).sort()).toEqual([...ALLOWED_RULE_TYPES].sort());
   });
 });

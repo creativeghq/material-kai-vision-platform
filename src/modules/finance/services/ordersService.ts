@@ -1306,6 +1306,60 @@ export const ordersService = {
     if (error) throw error;
   },
 
+  /**
+   * An order closed — does its customer still hold money of theirs that nobody has a use for?
+   *
+   * Called on the CLOSING TRANSITION only, never on render: "I opened an old order and got a
+   * notification" is how a useful nudge trains people to ignore the bell. Whether anyone is
+   * actually told is `finance_claim_credit_prompt`'s decision, shared with the nightly sweep, so
+   * closing four orders for one customer in an afternoon raises one notification, not four.
+   *
+   * Fire-and-forget by design: nothing about closing an order should fail because a nudge did.
+   */
+  async announceReleasableCredit(order: {
+    id: string; workspace_id: string; order_type: OrderType;
+    customer_company_id?: string | null; customer_contact_id?: string | null;
+  }): Promise<void> {
+    try {
+      if (order.order_type !== 'sales') return;
+      const partyType: 'company' | 'contact' = order.customer_company_id ? 'company' : 'contact';
+      const partyId = order.customer_company_id ?? order.customer_contact_id;
+      if (!partyId) return;
+      // Dynamic, like `recordPayment` below: financeService imports this module, so a static
+      // import here closes the cycle.
+      const { financeService, formatMoney } = await import('@/modules/finance/services/financeService');
+
+      const pos = await financeService.getPartyCreditPosition(order.workspace_id, {
+        companyId: order.customer_company_id ?? null,
+        contactId: order.customer_company_id ? null : (order.customer_contact_id ?? null),
+      });
+      if (!pos?.credit_releasable) return;
+
+      const claimed = await financeService.claimCreditPrompt(order.workspace_id, { partyType, partyId }, pos.on_account_credit);
+      if (!claimed) return;
+
+      const money = formatMoney(pos.on_account_credit);
+      flowEventService.emitToWorkspaceRoles(order.workspace_id, ['owner', 'admin'], 'customer_credit_releasable',
+        (recipientUserId) => ({
+          user_id: recipientUserId,
+          type: 'customer_credit_releasable',
+          workspace_id: order.workspace_id,
+          party_type: partyType,
+          party_id: partyId,
+          party_name: pos.display_name,
+          amount: pos.on_account_credit,
+          order_id: order.id,
+          title: `${pos.display_name} is holding ${money}`,
+          body: `${money} of theirs is settled against nothing and they owe you nothing. Keep it as income, apply it to a new order, or refund it.`,
+          // The party's finance record, where the Release action lives. `party=` is the same deep
+          // link the CRM page's "View ledger in finance" button uses.
+          action_url: `/finance?tab=parties&party=${partyType}:${partyId}`,
+        }));
+    } catch {
+      /* a nudge is never worth failing an order close over */
+    }
+  },
+
   async setStatus(id: string, status: OrderStatus): Promise<void> {
     const { data, error } = await supabase.from('orders')
       .update({ status, updated_at: new Date().toISOString() })
@@ -1330,6 +1384,14 @@ export const ordersService = {
         body: `Order status changed to "${ORDER_STATUS_LABEL[status] ?? status}".`,
         action_url: `/finance/orders/${id}`,
       }));
+
+    // A sale that just closed is the moment to notice the customer's leftover cash.
+    if (status === 'fulfilled') {
+      const { data: full } = await supabase.from('orders')
+        .select('id, workspace_id, order_type, customer_company_id, customer_contact_id')
+        .eq('id', id).maybeSingle();
+      if (full) void ordersService.announceReleasableCredit(full as any);
+    }
   },
 
   /**

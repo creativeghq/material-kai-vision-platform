@@ -19,7 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
-  Wrench, AlarmClock, ShieldCheck,
+  Wrench, AlarmClock, ShieldCheck, Coins,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -112,6 +112,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'hr.ergani_filing_failed': Landmark,
   order_created: ShoppingCart,
   order_status_changed: Package,
+  customer_credit_releasable: Coins,
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
   campaign_sent: Megaphone,

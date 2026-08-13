@@ -122,6 +122,12 @@ export type TriggerType =
   // Finance — order lifecycle (sales/purchase orders)
   | 'order_created'
   | 'order_status_changed'
+  // Finance — a party is holding money of ours to no purpose: cash of theirs that is settled
+  // against nothing, with nothing outstanding on their side. Raised when an order closes and
+  // when the nightly sweep finds a quiet account. Until this existed, leftover money sat as a
+  // liability on the customer's account forever and the only way to find it was to open the
+  // record and notice.
+  | 'customer_credit_releasable'
   // Docs module: a workspace doc was published, or a member proposed an edit
   | 'document_published'
   | 'doc_suggestion_submitted'
@@ -204,6 +210,7 @@ export interface HrOvertimeRecordedTriggerConfig {}
 export interface HrErganiFilingFailedTriggerConfig {}
 export interface OrderCreatedTriggerConfig {}
 export interface OrderStatusChangedTriggerConfig {}
+export interface CustomerCreditReleasableTriggerConfig {}
 export interface DocumentPublishedTriggerConfig {}
 export interface DocSuggestionSubmittedTriggerConfig {}
 export interface CampaignSentTriggerConfig {}
@@ -468,6 +475,7 @@ export type TriggerConfigMap = {
   'hr.ergani_filing_failed': HrErganiFilingFailedTriggerConfig;
   order_created: OrderCreatedTriggerConfig;
   order_status_changed: OrderStatusChangedTriggerConfig;
+  customer_credit_releasable: CustomerCreditReleasableTriggerConfig;
   document_published: DocumentPublishedTriggerConfig;
   doc_suggestion_submitted: DocSuggestionSubmittedTriggerConfig;
   campaign_sent: CampaignSentTriggerConfig;

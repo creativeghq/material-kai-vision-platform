@@ -1286,17 +1286,22 @@ const _financeServiceCore = {
   },
 
   // The workspace's active paid-upfront (cash) discount %, applied at the order level.
+  /**
+   * The workspace's paid-upfront (cash) discount %, or 0.
+   *
+   * DOCUMENT-level: it reduces the subtotal before VAT, it is not a line price — which is why it
+   * is the one custom rule NOT folded into `get_product_price_for_workspace` (#347 phase 1.1).
+   * Discounting the lines AND the total would apply it twice.
+   *
+   * The query used to live here and again, hand-copied, inside `quote-tools.ts`. Both now call
+   * the one SQL source. Do not re-query `pricing_custom_rules` for this.
+   */
   async getActiveCashDiscountPct(workspaceId: string): Promise<number> {
-    const { data, error } = await supabase
-      .from('pricing_custom_rules')
-      .select('discount_pct')
-      .eq('workspace_id', workspaceId)
-      .eq('rule_type', 'cash_payment')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .limit(1);
+    const { data, error } = await supabase.rpc('get_workspace_cash_discount_pct', {
+      p_workspace_id: workspaceId,
+    });
     if (error) throw error;
-    return data && data[0] ? Number(data[0].discount_pct) || 0 : 0;
+    return Number(data) || 0;
   },
 
   // Customer discount/level change: applied directly for finance/admin, or routed to
@@ -1359,6 +1364,54 @@ const _financeServiceCore = {
     });
     if (error) throw error;
     return data as any;
+  },
+
+  /**
+   * One party's credit position — read straight off `vw_finance_parties`, so the order panel,
+   * the Parties list and the nightly sweep all answer "is there money to release here?" the same
+   * way. Returns null when the party has no row (nothing invoiced, nothing paid).
+   */
+  async getPartyCreditPosition(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<{
+    party_type: 'company' | 'contact'; party_id: string; display_name: string;
+    on_account_credit: number; credit_releasable: boolean; receivable_outstanding: number;
+  } | null> {
+    const partyType = party.companyId ? 'company' : 'contact';
+    const partyId = party.companyId ?? party.contactId;
+    if (!partyId) return null;
+    const { data, error } = await supabase.from('vw_finance_parties')
+      .select('party_type, party_id, display_name, on_account_credit, credit_releasable, receivable_outstanding')
+      .eq('workspace_id', workspaceId)
+      .eq('party_type', partyType)
+      .eq('party_id', partyId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const r = data as any;
+    return {
+      party_type: r.party_type, party_id: r.party_id, display_name: r.display_name,
+      on_account_credit: Number(r.on_account_credit ?? 0),
+      credit_releasable: !!r.credit_releasable,
+      receivable_outstanding: Number(r.receivable_outstanding ?? 0),
+    };
+  },
+
+  /**
+   * Claim the right to nudge somebody about this party's leftover credit.
+   *
+   * TRUE at most once per party per cooldown window, shared with the nightly sweep — closing four
+   * orders for the same customer in one afternoon must not produce four notifications about one
+   * €400. The RPC stamps the claim itself, so a caller that forgets to check cannot double-fire.
+   */
+  async claimCreditPrompt(workspaceId: string, party: { partyType: 'company' | 'contact'; partyId: string }, amount: number, cooldownDays = 30): Promise<boolean> {
+    const { data, error } = await supabase.rpc('finance_claim_credit_prompt', {
+      p_workspace_id: workspaceId,
+      p_party_type: party.partyType,
+      p_party_id: party.partyId,
+      p_amount: amount,
+      p_cooldown_days: cooldownDays,
+    });
+    if (error) throw error;
+    return data === true;
   },
 
   /**
@@ -2677,6 +2730,15 @@ export interface PartyRow {
   credit_limit: number | null;
   over_credit_limit: boolean;
   contact_group: string | null;
+  /** Unallocated money-in we are holding for this party — cash of theirs settled against nothing. */
+  on_account_credit: number;
+  /**
+   * Derived in `vw_finance_parties`, not here: there is money on account AND they owe nothing.
+   * While an invoice is still open that leftover belongs against THAT invoice, so offering to
+   * book it as income would turn a receivable into profit nobody earned. Every consumer — the
+   * Parties list, the order panel's prompt, the nightly sweep — reads this one boolean.
+   */
+  credit_releasable: boolean;
 }
 
 export interface FinanceSettings {
@@ -3086,28 +3148,41 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as MyDataReconRow[];
   },
-  /** customer/supplier running ledger (καρτέλα): chronological debit/credit entries. */
+  /**
+   * customer/supplier running ledger (καρτέλα): chronological debit/credit entries.
+   *
+   * `includeOrders` adds orders that have NOT become an invoice or a supplier bill, so the
+   * commercial position reads correctly: without it, cash taken on an un-invoiced order appears as
+   * a credit with nothing on the debit side and the balance claims we owe the customer. Invoiced
+   * orders are never included — their invoice is already the ledger entry.
+   *
+   * It MUST be passed identically to `getPartyOpeningBalance`, or orders placed before the period
+   * start drop out of the carry-forward while their payments stay in.
+   */
   async getPartyLedger(input: {
     workspaceId: string; side: 'customer' | 'supplier';
     companyId?: string | null; contactId?: string | null; from: string; to: string;
+    includeOrders?: boolean;
   }): Promise<PartyLedgerRow[]> {
     const { data, error } = await supabase.rpc('finance_party_ledger', {
       p_workspace_id: input.workspaceId, p_side: input.side,
       p_company_id: input.companyId ?? null, p_contact_id: input.contactId ?? null,
-      p_from: input.from, p_to: input.to,
+      p_from: input.from, p_to: input.to, p_include_orders: input.includeOrders ?? false,
     });
     if (error) throw error;
     return (data ?? []) as PartyLedgerRow[];
   },
-  /** carry-forward balance (Προηγούμενα Σύνολα): net debit-credit of all entries before `before`. */
+  /** carry-forward balance (Προηγούμενα Σύνολα): net debit-credit of all entries before `before`.
+   *  `includeOrders` has to match the `getPartyLedger` call it is summed with — see there. */
   async getPartyOpeningBalance(input: {
     workspaceId: string; side: 'customer' | 'supplier';
     companyId?: string | null; contactId?: string | null; before: string;
+    includeOrders?: boolean;
   }): Promise<number> {
     const { data, error } = await supabase.rpc('finance_party_opening_balance', {
       p_workspace_id: input.workspaceId, p_side: input.side,
       p_company_id: input.companyId ?? null, p_contact_id: input.contactId ?? null,
-      p_before: input.before,
+      p_before: input.before, p_include_orders: input.includeOrders ?? false,
     });
     if (error) throw error;
     return Number(data ?? 0);

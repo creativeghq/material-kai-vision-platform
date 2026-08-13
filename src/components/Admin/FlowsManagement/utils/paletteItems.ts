@@ -318,6 +318,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'order_status_changed', group: 'Finance',
     label: 'Order Status Changed', description: 'An order moved to a new status (confirmed / fulfilled / cancelled…)', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Order Status Changed', category: 'trigger', triggerType: 'order_status_changed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'customer_credit_releasable', group: 'Finance',
+    label: 'Customer Credit Can Be Released', description: 'A party holds unallocated money of theirs and owes nothing — it can be kept as income', icon: 'Coins', color: 'emerald',
+    defaultData: { label: 'Customer Credit Can Be Released', category: 'trigger', triggerType: 'customer_credit_releasable', config: {} } as TriggerNodeData },
   // Docs module
   { type: 'triggerNode', category: 'trigger', subType: 'document_published', group: 'Docs',
     label: 'Document Published', description: 'A workspace document was published', icon: 'BookOpen', color: 'emerald',

@@ -605,14 +605,11 @@ export class QuotesService {
     // Any catalog line we couldn't price is a call-for-price candidate.
     if (unitPrice == null) pricingStatus = 'call_for_price';
 
-    // Layer B: quote-time custom rules (volume per category, category extra) applied on
-    // top of the level discount, with category-tree inheritance (most-specific-wins).
-    if (unitPrice != null && quoteWorkspaceId && productCategory) {
-      try {
-        const factor = await this._layerBFactor(quoteWorkspaceId, productCategory, qtyNow);
-        if (factor < 1) unitPrice = Math.round(unitPrice * factor * 100) / 100;
-      } catch { /* non-fatal — Layer B is additive on top of the resolved price */ }
-    }
+    // The category custom rules (Layer B) used to be applied HERE, in TypeScript, on top of what
+    // the resolver returned — which meant a quote line and an order line for the same product and
+    // customer produced different money. They now live inside `get_product_price_for_workspace`
+    // and are already in `suggested_sell` above (#347 phase 1.1). Do not reintroduce a factor
+    // here; `tests/unit/moneyDerivation.test.ts` fails the build if you do.
 
     const { data: item, error } = await supabase
       .from('quote_items')
@@ -706,45 +703,6 @@ export class QuotesService {
   }
 
   /**
-   * Layer B — combined quote-time custom-rule factor for a product category, with tree
-   * inheritance + most-specific-wins. For each category-scoped rule type (category_extra,
-   * volume_category) the rule on the most-specific ancestor of the product's category applies
-   * (a subcategory rule beats its parent's; a global/null-category rule is least specific).
-   */
-  private async _layerBFactor(workspaceId: string, category: string | null, qty: number): Promise<number> {
-    if (!category) return 1;
-    let anc: string[] = [category];
-    try {
-      const { data } = await supabase.rpc('pricing_category_ancestry', { p_category_key: category });
-      if (Array.isArray(data) && data.length) anc = data as string[];
-    } catch { /* fall back to exact-category match */ }
-    const { data: cRules } = await supabase
-      .from('pricing_custom_rules')
-      .select('rule_type, category_key, params, discount_pct')
-      .eq('workspace_id', workspaceId)
-      .eq('is_active', true);
-    const ancIndex = (k: string | null) => {
-      if (k == null) return Number.MAX_SAFE_INTEGER;
-      const i = anc.indexOf(k);
-      return i < 0 ? Number.MAX_SAFE_INTEGER : i;
-    };
-    let factor = 1;
-    for (const type of ['category_extra', 'volume_category'] as const) {
-      const candidates = ((cRules ?? []) as any[])
-        .filter((r) => r.rule_type === type)
-        .filter((r) => r.category_key == null || anc.includes(r.category_key))
-        .filter((r) => (Number(r.discount_pct) || 0) > 0)
-        .filter((r) => type === 'volume_category'
-          ? (Number(r.params?.min_qty ?? 0) > 0 && qty >= Number(r.params?.min_qty ?? 0))
-          : true);
-      if (!candidates.length) continue;
-      candidates.sort((a, b) => ancIndex(a.category_key) - ancIndex(b.category_key));
-      factor *= 1 - (Number(candidates[0].discount_pct) || 0) / 100;
-    }
-    return factor;
-  }
-
-  /**
    * Update quote item
    */
   async updateItem(
@@ -791,12 +749,11 @@ export class QuotesService {
               .select('workspace_id, customer_company_id, customer_contact_id')
               .eq('id', current.quote_id).single();
             if (q?.workspace_id) {
-              // ONE read of the product metadata, before the resolver call, feeding both the
-              // break unit and the Layer-B category. It used to be fetched afterwards, which is
-              // precisely why this branch — the "quantity changed, reprice" path — could not tell
-              // the resolver what unit the new quantity was in, and so never fired a break.
+              // The product's own unit, so the resolver can convert the new quantity and match a
+              // break threshold. It used to be read AFTER the pricing call (for the Layer-B
+              // category, now gone), which is precisely why this branch — the "quantity changed,
+              // reprice" path — could never tell the resolver what unit the quantity was in.
               const { data: prod } = await supabase.from('products').select('metadata').eq('id', current.product_id).single();
-              const cat = prod?.metadata?.material_category ?? null;
               const unit: string | null = prod?.metadata?.unit ?? current.custom_unit ?? null;
               // Together or not at all — an unconvertible/absent unit makes the resolver read the
               // raw quantity as base units and match the wrong threshold.
@@ -808,12 +765,12 @@ export class QuotesService {
                 ...breakArgs,
               });
               const p: any = priced;
-              let recomputed = p?.suggested_sell != null ? Number(p.suggested_sell) : null;
+              // `suggested_sell` is the WHOLE answer — level discount, quantity break and the
+              // category custom rules are all inside it since #347 phase 1.1. Multiplying another
+              // factor onto it here is what made the same product cost different money on a quote
+              // than on an order.
+              const recomputed = p?.suggested_sell != null ? Number(p.suggested_sell) : null;
               if (recomputed != null) {
-                if (cat) {
-                  const factor = await this._layerBFactor(q.workspace_id, cat, qty);
-                  if (factor < 1) recomputed = Math.round(recomputed * factor * 100) / 100;
-                }
                 unitPrice = recomputed;
                 discountedPrice = null;       // engine price replaces any prior per-line discount
                 payload.unit_price = recomputed;

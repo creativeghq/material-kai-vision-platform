@@ -38,7 +38,16 @@ import { formatDate } from '@/utils/datetime';
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
   supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
-  manual_receivable: 'Receivable (un-invoiced)', manual_payable: 'Payable (un-invoiced)',
+  // Not a document — an expectation. Labelled so it can never be mistaken for one on a printed
+  // Καρτέλα. (`manual_receivable`/`manual_payable` used to sit here; nothing has ever emitted
+  // them, so they were two labels for rows that do not exist.)
+  order: 'Order (un-invoiced)',
+};
+/** Greek labels for the printed Καρτέλα — the print is the surface an accountant reads. */
+const LEDGER_KIND_LABEL_EL: Record<string, string> = {
+  invoice: 'Τιμολόγιο', credit_note: 'Πιστωτικό', payment: 'Πληρωμή', receipt: 'Απόδειξη',
+  supplier_bill: 'Τιμολόγιο προμηθευτή', supplier_credit_note: 'Πιστωτικό προμηθευτή',
+  order: 'Παραγγελία (χωρίς τιμολόγιο)',
 };
 
 const SEGMENT_LABELS: Record<string, string> = {
@@ -385,6 +394,16 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const [ledgerPage, setLedgerPage] = useState(1);
   // Running ledger (καρτέλα)
   const [ledgerSide, setLedgerSide] = useState<'customer' | 'supplier'>('customer');
+  /**
+   * Which BASIS the running balance is on.
+   *
+   * On (default): un-invoiced orders count as entries, so the balance answers "where does this
+   * relationship stand" — the €3,000 they ordered and the €3,000 they paid cancel out.
+   * Off: documents only, which is the AR/AP balance that `vw_finance_parties`, the aging buckets
+   * and the emailed statement report. Both are correct answers to different questions, so the
+   * basis is stated on screen and on the print rather than silently chosen.
+   */
+  const [includeOrders, setIncludeOrders] = useState(true);
   const [ledger, setLedger] = useState<PartyLedgerRow[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [opening, setOpening] = useState(0);
@@ -414,8 +433,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     setInvPage(1); setBillPage(1); setOrderPage(1); setPayPage(1); setLedgerPage(1);
   }, [party]);
 
-  // A new side/date range is a new ledger — don't land the user mid-way through it.
-  useEffect(() => { setLedgerPage(1); }, [ledgerSide, fromDate, toDate]);
+  // A new side/date range/basis is a new ledger — don't land the user mid-way through it.
+  useEffect(() => { setLedgerPage(1); }, [ledgerSide, fromDate, toDate, includeOrders]);
 
   useEffect(() => {
     if (!party) { setLedger([]); setOpening(0); return; }
@@ -427,9 +446,10 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
           companyId: party.party_type === 'company' ? party.party_id : null,
           contactId: party.party_type === 'contact' ? party.party_id : null,
         };
+        // Same basis on both halves — they are summed into one running balance.
         const [rows, open] = await Promise.all([
-          financeService.getPartyLedger({ ...common, from: fromDate, to: toDate }),
-          financeService.getPartyOpeningBalance({ ...common, before: fromDate }),
+          financeService.getPartyLedger({ ...common, from: fromDate, to: toDate, includeOrders }),
+          financeService.getPartyOpeningBalance({ ...common, before: fromDate, includeOrders }),
         ]);
         setLedger(rows); setOpening(open);
       } catch (err: any) {
@@ -437,7 +457,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         setLedger([]); setOpening(0);
       } finally { setLedgerLoading(false); }
     })();
-  }, [party, ledgerSide, fromDate, toDate, toast]);
+  }, [party, ledgerSide, fromDate, toDate, includeOrders, toast]);
 
   // Chronological entries with progressive debit/credit totals + a running balance
   // seeded from the opening (carry-forward) balance — full Καρτέλα shape.
@@ -463,6 +483,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const ledgerHref = (r: PartyLedgerRow): string | null => {
     if (r.doc_kind === 'invoice' && r.doc_id) return `${financeBase}/invoices/${r.doc_id}`;
     if (r.doc_kind === 'credit_note' && r.related_id) return `${financeBase}/invoices/${r.related_id}`;
+    if (r.doc_kind === 'order' && r.doc_id) return `${financeBase}/orders/${r.doc_id}`;
     return null;
   };
   const ledgerBillId = (r: PartyLedgerRow): string | null => {
@@ -482,7 +503,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     const rowsHtml = ledgerWithBalance.map((r) => `
       <tr>
         <td>${r.entry_date ? formatDate(r.entry_date) : ''}</td>
-        <td>${esc(LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind)}</td>
+        <td>${esc(LEDGER_KIND_LABEL_EL[r.doc_kind] ?? LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind)}</td>
         <td>${esc(r.doc_number)}</td>
         <td class="r">${Number(r.debit) ? m(Number(r.debit)) : ''}</td>
         <td class="r">${Number(r.credit) ? m(Number(r.credit)) : ''}</td>
@@ -504,6 +525,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
       .open td{font-weight:600;color:#555;background:#fafafa}.close{margin-top:10px;font-size:13px;text-align:right}</style></head>
       <body><h1>Καρτέλα ${ledgerSide === 'customer' ? 'Πελάτη' : 'Προμηθευτή'}</h1>
       <div class="sub">Από ${formatDate(fromDate)} Έως ${formatDate(toDate)} · ${sideLabel}</div>
+      <!-- The basis is printed, never assumed. A Καρτέλα that silently counts orders is not the
+           AR/AP balance an accountant expects to reconcile, so the sheet has to say which one it is. -->
+      <div class="sub">${includeOrders
+        ? 'Βάση: παραστατικά + παραγγελίες χωρίς τιμολόγιο / documents + un-invoiced orders'
+        : 'Βάση: μόνο παραστατικά / documents only'}</div>
       <div class="id">${esc(party.display_name)}${party.email ? ' · ' + esc(party.email) : ''} · printed ${formatDate(new Date())}</div>
       <table>
       <thead><tr><th>Ημ/νία</th><th>Τύπος</th><th>Παραστατικό</th><th class="r">Χρέωση</th><th class="r">Πίστωση</th><th class="r">Προοδ. Χρέωση</th><th class="r">Προοδ. Πίστωση</th><th class="r">Υπόλοιπο</th></tr></thead>
@@ -933,12 +959,20 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                           with nothing on the debit side, reading as "we owe them". Say which
                           documents it holds and where the missing half lives. */}
                       <p className="text-[11px] text-muted-foreground">
-                        Every financial DOCUMENT in the period — invoices, credit notes and payments — with a running
-                        balance. Positive means they owe us. An order is not a document and never appears here; see the
-                        Orders tab.
+                        Every movement in the period with a running balance — invoices, credit notes and payments, plus
+                        orders nobody has invoiced yet when that box is ticked. Positive means they owe us.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Which basis the balance is on. Untick for the documents-only Καρτέλα that
+                          reconciles with the aging buckets and the emailed statement. */}
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        title="Show orders that have not been invoiced yet as ledger entries — a sales order as a debit, a purchase order as a credit. Once an order is invoiced its INVOICE is the entry, so it is never counted twice. Untick for the documents-only balance that the emailed statement and the aging buckets report.">
+                        <input type="checkbox" checked={includeOrders}
+                          onChange={(e) => setIncludeOrders(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-border/60 accent-primary" />
+                        Include un-invoiced orders
+                      </label>
                       <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)}
                         className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
                       <span className="text-xs text-muted-foreground">→</span>

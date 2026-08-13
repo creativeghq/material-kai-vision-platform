@@ -339,17 +339,15 @@ export const createCreateQuoteTool = (
         const lineCount = payloads.length + configuredCount;
 
         // 3) Totals — replicate QuotePDFService.saveItemPrices (cash discount → VAT).
+        // One SQL source for the paid-upfront discount (#347 phase 1.1b). This used to be a
+        // hand-copy of the same query in `financeService.getActiveCashDiscountPct` — the agent
+        // and the UI asking the same question in two places, waiting to disagree.
         let cashPct = 0;
         if (input.paid_upfront) {
-          const { data: rule } = await sb
-            .from('pricing_custom_rules')
-            .select('discount_pct')
-            .eq('workspace_id', workspaceId)
-            .eq('rule_type', 'cash_payment')
-            .eq('is_active', true)
-            .order('sort_order', { ascending: true })
-            .limit(1);
-          cashPct = rule && rule[0] ? Number((rule[0] as any).discount_pct) || 0 : 0;
+          const { data: pct } = await sb.rpc('get_workspace_cash_discount_pct', {
+            p_workspace_id: workspaceId,
+          });
+          cashPct = Number(pct) || 0;
         }
         const netAfterCash = subtotal * (1 - cashPct / 100);
         const vatAmount = netAfterCash * (vatRate / 100);
