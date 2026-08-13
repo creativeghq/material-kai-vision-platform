@@ -2905,6 +2905,36 @@ const _financeServiceV2 = {
     return (data?.company_id as string | undefined) ?? null;
   },
 
+  /**
+   * THE billing party of a document, with the business rollup applied — call this, never
+   * `resolvePrimaryCompanyId` directly, wherever a document's party is written.
+   *
+   * Exactly ONE of the pair comes back set. `vw_customer_account_summary` /
+   * `vw_supplier_account_summary` UNION a per-contact branch with a per-company branch, so a
+   * document carrying both ids is counted twice in that party's totals — "company OR contact,
+   * never both" is a schema rule, not a style choice.
+   *
+   * The rule was already stated on `resolvePrimaryCompanyId` and five dialogs applied it, but two
+   * ORDER paths ("raise a customer order from this purchase", and OrderLinkPicker's "for this
+   * customer" branch) mapped `party_type` to ids inline and skipped it. An order raised against a
+   * company's contact was stored with a null customer_company_id and then showed up NOWHERE: the
+   * company's Account tab filters on customer_company_id, and the contact's Account tab is not
+   * rendered at all for a company-linked contact — it points back at the company. ORD-2026-0005
+   * sat invisible in both. `bind_party_company()` is the DB backstop that makes a third such site
+   * impossible; this keeps the browser's pricing, document-kind hint and toast agreeing with what
+   * the row will actually say.
+   */
+  async resolveBillingParty(party: {
+    companyId?: string | null;
+    contactId?: string | null;
+  }): Promise<{ companyId: string | null; contactId: string | null }> {
+    if (party.companyId) return { companyId: party.companyId, contactId: null };
+    if (!party.contactId) return { companyId: null, contactId: null };
+    const rolled = await financeService.resolvePrimaryCompanyId(party.contactId).catch(() => null);
+    // A standalone individual has no company and stays a contact party. Not a gap.
+    return rolled ? { companyId: rolled, contactId: null } : { companyId: null, contactId: party.contactId };
+  },
+
   async listParties(opts: {
     workspaceId: string;
     role?: 'customer' | 'supplier' | 'both' | 'all';

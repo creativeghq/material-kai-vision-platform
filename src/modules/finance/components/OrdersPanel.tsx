@@ -713,9 +713,36 @@ export const NewOrderModal: React.FC<{
         contactQ = contactQ.eq('is_supplier', true);
       }
       const [c, p] = await Promise.all([companyQ, contactQ]);
+      // A contact attached to a company is that company's person: the order will be booked to the
+      // COMPANY (financeService.resolveBillingParty). Say so on the option, because the picker
+      // otherwise offers "ΚΩΣΤΑΣ" and "ΚΑΡΕΛΗΣ" as two unrelated parties and the operator has no way
+      // to know the first one lands on the second one's account.
+      const contactRows = (p.data ?? []) as any[];
+      const rollup = new Map<string, string>();
+      if (contactRows.length) {
+        const { data: links } = await supabase.from('crm_company_contacts')
+          .select('contact_id, company_id, is_primary, created_at')
+          .in('contact_id', contactRows.map((r) => r.id))
+          .order('is_primary', { ascending: false }).order('created_at', { ascending: true });
+        const firstLink = new Map<string, string>();
+        for (const l of (links ?? []) as any[]) if (!firstLink.has(l.contact_id)) firstLink.set(l.contact_id, l.company_id);
+        if (firstLink.size) {
+          const { data: cos } = await supabase.from('crm_companies')
+            .select('id, name').in('id', [...new Set(firstLink.values())]);
+          const nameById = new Map(((cos ?? []) as any[]).map((r) => [r.id, r.name as string]));
+          for (const [contactId, companyId] of firstLink) {
+            const nm = nameById.get(companyId);
+            if (nm) rollup.set(contactId, nm);
+          }
+        }
+      }
       const opts: Party[] = [];
       for (const r of (c.data ?? []) as any[]) opts.push({ type: 'company', id: r.id, name: r.name, vat: r.vat_number, sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, 'Company'].filter(Boolean).join(' · ') });
-      for (const r of (p.data ?? []) as any[]) opts.push({ type: 'contact', id: r.id, name: r.name, vat: r.vat_number, sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, 'Contact'].filter(Boolean).join(' · ') });
+      for (const r of contactRows) {
+        const via = rollup.get(r.id);
+        opts.push({ type: 'contact', id: r.id, name: r.name, vat: r.vat_number,
+          sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, via ? `Contact → billed to ${via}` : 'Contact'].filter(Boolean).join(' · ') });
+      }
       setPartyOpts(opts);
     }, 200);
     return () => clearTimeout(t);
@@ -882,12 +909,13 @@ export const NewOrderModal: React.FC<{
     setBusy(true);
     try {
       // A contact who belongs to a business is attributed to the BUSINESS (same as quotes/invoices).
-      let coId: string | null = party.type === 'company' ? party.id : null;
-      let ctId: string | null = party.type === 'contact' ? party.id : null;
-      if (ctId) {
-        const rolled = await financeService.resolvePrimaryCompanyId(ctId).catch(() => null);
-        if (rolled) { coId = rolled; ctId = null; }
-      }
+      // Business rollup — see financeService.resolveBillingParty. A contact attached to a company
+      // is that company's person, so the order is booked to the COMPANY. Exactly one of the pair
+      // ends up set; a row holding both is double-counted by the party account views.
+      const { companyId: coId, contactId: ctId } = await financeService.resolveBillingParty({
+        companyId: party.type === 'company' ? party.id : null,
+        contactId: party.type === 'contact' ? party.id : null,
+      });
       const lineItems = clean.map((it) => ({
         product_id: it.product_id ?? null,
         description: it.description,
@@ -926,10 +954,17 @@ export const NewOrderModal: React.FC<{
       let coversOrderId: string | null = link.kind === 'sales_order' ? link.orderId : null;
       let linkNote: string | undefined;
       if (link.kind === 'customer') {
-        const mirrored = await ordersService.mirrorLinesForSale({
-          workspaceId, items: lineItems,
+        // Same rollup as the party above: the picker offers companies AND contacts side by side,
+        // and picking a company's person used to write a contact-only order that then appeared on
+        // neither that person's page nor their company's.
+        const buyer = await financeService.resolveBillingParty({
           companyId: link.party.party_type === 'company' ? link.party.id : null,
           contactId: link.party.party_type === 'contact' ? link.party.id : null,
+        });
+        const mirrored = await ordersService.mirrorLinesForSale({
+          workspaceId, items: lineItems,
+          companyId: buyer.companyId,
+          contactId: buyer.contactId,
           // We are recording the purchase in the same breath, so who supplies the customer's
           // lines is not a question anyone should have to answer again on the sale.
           supplierCompanyId: !isSales ? coId : null,
@@ -939,8 +974,8 @@ export const NewOrderModal: React.FC<{
           orderType: 'sales',
           status: 'draft',
           currency,
-          customerCompanyId: link.party.party_type === 'company' ? link.party.id : null,
-          customerContactId: link.party.party_type === 'contact' ? link.party.id : null,
+          customerCompanyId: buyer.companyId,
+          customerContactId: buyer.contactId,
           notes: `Raised alongside a purchase for ${party.name}.`,
           items: mirrored.items,
         });
@@ -1897,6 +1932,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     if (v.kind !== 'customer') return;
     setSaving(true);
     try {
+      // THE path that produced ORD-2026-0005: the picker offered the company's contact, this
+      // wrote `customerContactId` only, and the resulting order was visible on neither the
+      // contact's page (no Account tab for a company-linked contact) nor the company's (its
+      // Orders panel filters on customer_company_id). Roll up first — see resolveBillingParty.
+      const buyer = await financeService.resolveBillingParty({
+        companyId: v.party.party_type === 'company' ? v.party.id : null,
+        contactId: v.party.party_type === 'contact' ? v.party.id : null,
+      });
       const mirrored = await ordersService.mirrorLinesForSale({
         workspaceId: order.workspace_id,
         items: items.map((it) => ({
@@ -1911,8 +1954,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           supplier_company_id: it.supplier_company_id ?? null,
           update_warehouse: it.update_warehouse ?? true,
         })),
-        companyId: v.party.party_type === 'company' ? v.party.id : null,
-        contactId: v.party.party_type === 'contact' ? v.party.id : null,
+        companyId: buyer.companyId,
+        contactId: buyer.contactId,
         supplierCompanyId: order.supplier_company_id ?? null,
       });
       const salesOrderId = await ordersService.create({
@@ -1921,8 +1964,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         status: 'draft',
         currency: order.currency,
         projectId: order.project_id ?? null,
-        customerCompanyId: v.party.party_type === 'company' ? v.party.id : null,
-        customerContactId: v.party.party_type === 'contact' ? v.party.id : null,
+        customerCompanyId: buyer.companyId,
+        customerContactId: buyer.contactId,
         notes: `Raised from purchase ${order.order_number ?? order.id.slice(0, 8)}.`,
         items: mirrored.items,
       });
@@ -2663,108 +2706,131 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     const linePaidOnPo = lineSupplierOwed <= 0.005
                       ? coveredBy.find((c) => c.supplier_company_id === it.supplier_company_id) ?? null
                       : null;
+                    // What this line still needs from an operator. Every per-line control now lives
+                    // behind the row's ⋮ menu, so the ONE thing the collapsed row still has to say
+                    // is "there is something wrong in here" — otherwise a blocking gap (a 0% line
+                    // with no myDATA exemption cause refuses to invoice; a stock line with no
+                    // product is skipped by receive_order_into_warehouse) is discovered as a red
+                    // toast long after the operator moved on.
+                    const needsCatalogLink = !!it.update_warehouse && !it.product_id;
+                    const needsVatReason = isSalesOrder && Number(it.vat_percent ?? 0) === 0
+                      && it.vat_exemption_category == null && partyVatExemption == null;
+                    const lineNeedsAttention = needsCatalogLink || needsVatReason || (isSalesOrder && lineAssetsFailed);
+                    const warranty = isSalesOrder && !lineAssetsFailed ? lineWarranty(it) : null;
                     return (
                     <div key={it.id} className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
-                      <span className="min-w-0">
-                        <span className="block truncate">{it.description}</span>
-                        {/* #6/#7 — who supplies this line (and therefore who we owe). Only a SALES
-                            order mixes suppliers across lines; on a PURCHASE order every line comes
-                            from the order's own supplier, already chosen when the order was raised,
-                            so asking again per line is work with no possible second answer. */}
-                        <span className="inline-flex items-center gap-2">
-                          {/* What this line IS to the warehouse. A line flagged for stock but
-                              pointing at no product cannot be received — `receive_order_into_
-                              warehouse` skips it — so the gap is stated ON the line, next to the
-                              fix, rather than discovered as a red toast after the fact. Unlike the
-                              figures above, this stays editable once a bill exists: it is not a
-                              figure, and locking it is what made the skip unfixable. */}
-                          {it.update_warehouse && !it.product_id ? (
-                            <button type="button" className="text-[10px] text-amber-600 hover:underline inline-flex items-center gap-0.5"
-                              disabled={saving} onClick={() => setStockPick(it)}>
-                              <AlertTriangle className="h-2.5 w-2.5" /> not in catalog — won’t be stocked
+                      <span className="min-w-0 flex items-start gap-1.5">
+                        {/* Every per-line ACTION lives here rather than as a strip of chips under
+                            the description. Five of them rendered at once (catalog, supplier, VAT
+                            cause, warranty, supplier payment) turned a one-line row into a
+                            three-line paragraph and made the table unreadable at any real line
+                            count — they are actions taken occasionally, not facts read constantly.
+                            The dot on the trigger is what survives the collapse: it is the only
+                            thing the row still has to say without being opened. */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" title="Line actions"
+                              className="relative mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                              {lineNeedsAttention && (
+                                <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              )}
                             </button>
-                          ) : !it.update_warehouse ? (
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
-                              disabled={saving} onClick={() => setStockPick(it)}>
-                              <Unlink className="h-2.5 w-2.5" /> off-warehouse
-                            </button>
-                          ) : (
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
-                              disabled={saving} onClick={() => setStockPick(it)}>
-                              <Package className="h-2.5 w-2.5" /> {(it.product_id && productNames.get(it.product_id)) || 'in catalog'}
-                            </button>
-                          )}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-64">
+                            {/* What this line IS to the warehouse. A line flagged for stock but
+                                pointing at no product cannot be received — receive_order_into_
+                                warehouse skips it. Stays editable once a bill exists: it is not a
+                                figure, and locking it is what made the skip unfixable. */}
+                            {needsCatalogLink ? (
+                              <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)} className="text-amber-600">
+                                <AlertTriangle className="h-3.5 w-3.5 mr-2" /> Not in catalog — won’t be stocked
+                              </DropdownMenuItem>
+                            ) : !it.update_warehouse ? (
+                              <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)}>
+                                <Unlink className="h-3.5 w-3.5 mr-2" /> Off-warehouse
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)}>
+                                <Package className="h-3.5 w-3.5 mr-2" />
+                                <span className="truncate">{(it.product_id && productNames.get(it.product_id)) || 'In catalog'}</span>
+                              </DropdownMenuItem>
+                            )}
+                            {/* WHY this line is 0%. myDATA requires an exemption cause on every
+                                vatCategory 7/8 line and generate_invoice_from_order refuses
+                                without one, so the gap is stated beside its fix rather than
+                                surfacing as a rejected document. A line inherits the customer's
+                                standing reason when it has none. */}
+                            {isSalesOrder && Number(it.vat_percent ?? 0) === 0 && (
+                              it.vat_exemption_category != null ? (
+                                <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)}>
+                                  <Percent className="h-3.5 w-3.5 mr-2" />
+                                  <span className="truncate">0% VAT · cause {it.vat_exemption_category}</span>
+                                </DropdownMenuItem>
+                              ) : partyVatExemption != null ? (
+                                <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)}>
+                                  <Percent className="h-3.5 w-3.5 mr-2" />
+                                  <span className="truncate">0% VAT · cause {partyVatExemption} (customer)</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)} className="text-amber-600">
+                                  <AlertTriangle className="h-3.5 w-3.5 mr-2" /> 0% VAT — reason required to invoice
+                                </DropdownMenuItem>
+                              )
+                            )}
+                            {/* Under warranty? A sold unit the customer still owns is the installed
+                                base's whole subject, and THIS is where an operator knows it.
+                                Purchases are excluded — no customer to register against. */}
+                            {isSalesOrder && lineAssetsFailed && (
+                              <DropdownMenuItem disabled className="text-amber-600">
+                                <ShieldCheck className="h-3.5 w-3.5 mr-2" /> Warranty unknown — reload the order
+                              </DropdownMenuItem>
+                            )}
+                            {isSalesOrder && !lineAssetsFailed && (
+                              <DropdownMenuItem onClick={() => setWarrantyPick(it)} className={warranty ? 'text-emerald-500' : undefined}>
+                                <ShieldCheck className="h-3.5 w-3.5 mr-2" />
+                                <span className="truncate">
+                                  {warranty ? `Covered to ${warranty.ends_on}` : lineAssets.has(it.id) ? 'Registered — no cover' : 'Register warranty'}
+                                </span>
+                              </DropdownMenuItem>
+                            )}
+                            {/* Mark this line's cost as paid → records a supplier bill + payment on
+                                the order. Once the line's supplier is settled this becomes WHERE it
+                                was settled, because on a covered sale that is a different order. */}
+                            {lineCost != null && lineCost > 0.005 && order.order_type === 'sales' && (
+                              lineSupplierOwed > 0.005 ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => openLinePayment(it)}>
+                                    <Receipt className="h-3.5 w-3.5 mr-2" /> Mark supplier paid
+                                  </DropdownMenuItem>
+                                </>
+                              ) : linePaidOnPo ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem asChild className="text-emerald-500">
+                                    <Link to={`${financeBase}/orders/${linePaidOnPo.id}`}>
+                                      <Receipt className="h-3.5 w-3.5 mr-2" />
+                                      <span className="truncate">Paid on {linePaidOnPo.order_number ?? 'the purchase order'}</span>
+                                    </Link>
+                                  </DropdownMenuItem>
+                                </>
+                              ) : null
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <span className="min-w-0">
+                          <span className="block truncate">{it.description}</span>
+                          {/* #6/#7 — who supplies this line (and therefore who we owe). The one
+                              per-line control that stays on the row: it is a standing FACT about
+                              the line that the profit and "mark paid" figures beside it depend on,
+                              read far more often than it is changed. Only a SALES order mixes
+                              suppliers across lines; on a PURCHASE order every line comes from the
+                              order's own supplier, already chosen when the order was raised. */}
                           {order.order_type === 'sales' && (
                             <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
                               {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
                             </button>
-                          )}
-                          {/* WHY this line is 0%. myDATA requires an exemption cause on every
-                              vatCategory 7/8 line, and `generate_invoice_from_order` now refuses
-                              without one — so the gap is stated here, beside the fix, rather than
-                              surfacing as a rejected document after the operator has moved on.
-                              A line inherits the customer's standing reason when it has none, so
-                              this only turns amber when nothing anywhere justifies the zero. */}
-                          {order.order_type === 'sales' && Number(it.vat_percent ?? 0) === 0 && (
-                            it.vat_exemption_category != null ? (
-                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
-                                disabled={saving} onClick={() => setVatExemptPick(it)}
-                                title={mydataExemptionLabel(it.vat_exemption_category) ?? undefined}>
-                                <Percent className="h-2.5 w-2.5" /> 0% · cause {it.vat_exemption_category}
-                              </button>
-                            ) : partyVatExemption != null ? (
-                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
-                                disabled={saving} onClick={() => setVatExemptPick(it)}
-                                title={`From the customer's record: ${mydataExemptionLabel(partyVatExemption) ?? ''}`}>
-                                <Percent className="h-2.5 w-2.5" /> 0% · cause {partyVatExemption} (customer)
-                              </button>
-                            ) : (
-                              <button type="button" className="text-[10px] text-amber-600 hover:underline inline-flex items-center gap-0.5"
-                                disabled={saving} onClick={() => setVatExemptPick(it)}>
-                                <AlertTriangle className="h-2.5 w-2.5" /> 0% VAT — reason required to invoice
-                              </button>
-                            )
-                          )}
-                          {/* Under warranty? A sold unit the customer still owns is the installed
-                              base's whole subject, and THIS is where an operator knows it: at the
-                              moment they are looking at what was sold. Registering here writes the
-                              order + line onto the unit, so the customer's Warranties tab can say
-                              where it came from and the order can say it is covered. Purchases are
-                              excluded — a purchase order has no customer to register against. */}
-                          {isSalesOrder && lineAssetsFailed && (
-                            <span className="text-[10px] text-amber-600 inline-flex items-center gap-0.5"
-                              title="The installed-base read failed, so this line's warranty is unknown. Reload the order.">
-                              <ShieldCheck className="h-2.5 w-2.5" /> warranty unknown
-                            </span>
-                          )}
-                          {isSalesOrder && !lineAssetsFailed && lineWarranty(it) && (
-                            <button type="button" className="text-[10px] text-emerald-500 hover:underline inline-flex items-center gap-0.5"
-                              title={`Registered in the customer's installed base — covered to ${lineWarranty(it)!.ends_on}`}
-                              onClick={() => setWarrantyPick(it)}>
-                              <ShieldCheck className="h-2.5 w-2.5" /> covered to {lineWarranty(it)!.ends_on}
-                            </button>
-                          )}
-                          {isSalesOrder && !lineAssetsFailed && !lineWarranty(it) && (
-                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
-                              title="Register this line in the customer's installed base with a warranty period"
-                              onClick={() => setWarrantyPick(it)}>
-                              <ShieldCheck className="h-2.5 w-2.5" /> {lineAssets.has(it.id) ? 'registered — no cover' : 'warranty'}
-                            </button>
-                          )}
-                          {/* Mark this line's cost as paid → records a supplier bill + payment on the
-                              order. Once the line's supplier is settled this becomes WHERE it was
-                              settled, because on a covered sale that is a different order entirely. */}
-                          {lineCost != null && lineCost > 0.005 && order.order_type === 'sales' && (
-                            lineSupplierOwed > 0.005 ? (
-                              <button type="button" className="text-[10px] text-red-400 hover:text-foreground inline-flex items-center gap-0.5" title="Record a payment to this line's supplier" onClick={() => openLinePayment(it)}>
-                                <Receipt className="h-2.5 w-2.5" /> Mark paid
-                              </button>
-                            ) : linePaidOnPo ? (
-                              <Link to={`${financeBase}/orders/${linePaidOnPo.id}`} className="text-[10px] text-emerald-500 hover:underline inline-flex items-center gap-0.5"
-                                title="This line's cost is settled on the purchase order raised to cover this sale">
-                                <Receipt className="h-2.5 w-2.5" /> paid on {linePaidOnPo.order_number ?? 'the purchase order'}
-                              </Link>
-                            ) : null
                           )}
                         </span>
                       </span>
