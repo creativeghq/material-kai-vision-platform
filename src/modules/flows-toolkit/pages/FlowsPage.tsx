@@ -41,6 +41,9 @@ const TRIGGER_LABELS: Record<string, string> = {
   payment_received: 'Payment received',
   payment_reversed: 'Payment reversed',
   quote_approved: 'Quote approved',
+  deal_stage_changed: 'Deal moved stage',
+  deal_won: 'Deal won',
+  deal_lost: 'Deal lost',
   'inbox.message_received': 'Inbox message',
   appointment_booked: 'Appointment booked',
 };

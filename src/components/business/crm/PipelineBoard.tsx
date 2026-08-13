@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
-import { dealsService, type Deal, type DealStage, type DealTask, type DealType } from '@/services/dealsService';
+import { dealsService, getDealForecast, type Deal, type DealForecastRow, type DealStage, type DealTask, type DealType } from '@/services/dealsService';
 import { DealTypeManager } from '@/components/business/crm/DealTypeManager';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: '' });
@@ -58,6 +58,7 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
   const [typeId, setTypeId] = useState<string | null>(null);
   const [stages, setStages] = useState<DealStage[]>([]);
   const [deals, setDeals] = useState<Deal[] | null>(null);
+  const [forecast, setForecast] = useState<DealForecastRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [managingTypes, setManagingTypes] = useState(false);
   const [showLost, setShowLost] = useState(false);
@@ -83,12 +84,14 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
 
   const load = useCallback(async () => {
     if (!ws || !typeId) return;
-    const [s, d] = await Promise.all([
+    const [s, d, f] = await Promise.all([
       dealsService.listStages(typeId).catch(() => [] as DealStage[]),
       dealsService.listDeals(ws, typeId).catch(() => [] as Deal[]),
+      getDealForecast(ws, typeId).catch(() => [] as DealForecastRow[]),
     ]);
     setStages(s);
     setDeals(d);
+    setForecast(f);
   }, [ws, typeId]);
 
   useEffect(() => { setDeals(null); void load(); }, [load]);
@@ -129,6 +132,14 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
             {open.length} open deal{open.length === 1 ? '' : 's'}
             {lost.length > 0 && <> · <button className="hover:underline" onClick={() => setShowLost((v) => !v)}>{lost.length} lost</button></>}
           </div>
+          {/* Weighted pipeline, DERIVED in SQL by get_deal_forecast and only formatted here.
+              One row per currency: adding EUR to GBP would be a made-up number. */}
+          {forecast.map((f) => (
+            <div key={f.currency} className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{money(f.weighted_value, f.currency)}</span> weighted
+              <span className="opacity-70"> of {money(f.open_value, f.currency)} · avg {f.avg_probability}%</span>
+            </div>
+          ))}
         </div>
         <div className="flex items-center gap-2">
           {canManageTypes && !lockedTypeKey && (
@@ -155,7 +166,7 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
                   <DealCard
                     key={d.id} ws={ws!} deal={d} stages={stages} wonStage={wonStage} canManage={canManage}
                     onChanged={load}
-                    onOpen={() => { if (d.property_id) navigate(`/properties/${d.property_id}`); }}
+                    onOpen={() => navigate(`/crm/deals/${d.id}`)}
                   />
                 ))}
                 {col.length === 0 && <div className="rounded-lg border border-dashed border-border/50 py-6 text-center text-[11px] text-muted-foreground">—</div>}
@@ -171,17 +182,10 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {lost.map((d) => (
               <div key={d.id} className="dashboard-card flex items-center gap-2 p-2.5 opacity-70">
-                {d.property_id ? (
-                  <button onClick={() => navigate(`/properties/${d.property_id}`)} className="min-w-0 flex-1 text-left">
-                    <div className="truncate text-sm font-medium">{dealLabel(d)}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">{d.lost_reason || 'Lost'}</div>
-                  </button>
-                ) : (
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{dealLabel(d)}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">{d.lost_reason || 'Lost'}</div>
-                  </div>
-                )}
+                <button onClick={() => navigate(`/crm/deals/${d.id}`)} className="min-w-0 flex-1 text-left">
+                  <div className="truncate text-sm font-medium">{dealLabel(d)}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">{d.lost_reason || 'Lost'}</div>
+                </button>
                 {canManage && (
                   <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]"
                     onClick={async () => { await dealsService.updateDeal(d.id, { status: 'open' }); load(); }}>
@@ -223,9 +227,7 @@ const DealCard: React.FC<{
   return (
     <div className="dashboard-card p-2.5">
       <div className="flex items-start justify-between gap-1">
-        {/* Only a property deal has somewhere to go until the record page lands (#311 Phase 2).
-            Everything else opens its own editor rather than being a button that does nothing. */}
-        <button onClick={() => { if (deal.property_id) onOpen(); else setEditing(true); }} className="min-w-0 flex-1 text-left">
+        <button onClick={onOpen} className="min-w-0 flex-1 text-left">
           <div className="truncate text-sm font-medium hover:underline">{dealLabel(deal)}</div>
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle || 'No party linked'}</div>
         </button>
@@ -277,7 +279,7 @@ const DealCard: React.FC<{
       {losing && (
         <LostDialog
           onClose={() => setLosing(false)}
-          onConfirm={(reason) => { setLosing(false); void guard(() => dealsService.updateDeal(deal.id, { status: 'lost', lost_reason: reason })); }}
+          onConfirm={(reason) => { setLosing(false); void guard(() => dealsService.markLost(deal.id, reason)); }}
         />
       )}
     </div>

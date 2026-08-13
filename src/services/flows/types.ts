@@ -17,6 +17,10 @@ export type TriggerType =
   | 'quote_requested'
   | 'quote_approved'
   | 'quote_rejected'
+  // Deal pipeline (#311). Emitted by dealsService when a deal changes stage or closes.
+  | 'deal_stage_changed'
+  | 'deal_won'
+  | 'deal_lost'
   | 'contract_signed'
   | 'search_executed'
   | 'model_3d_created'
@@ -291,6 +295,10 @@ export interface QuoteRequestedTriggerConfig {
 }
 
 export interface QuoteApprovedTriggerConfig {}
+/** Narrow a deal trigger to one deal type, e.g. only fire for Real Estate. Empty = all. */
+export interface DealStageChangedTriggerConfig { deal_type_key?: string; to_stage?: string }
+export interface DealWonTriggerConfig { deal_type_key?: string }
+export interface DealLostTriggerConfig { deal_type_key?: string }
 export interface QuoteRejectedTriggerConfig {}
 export interface ContractSignedTriggerConfig {}
 
@@ -375,6 +383,9 @@ export type TriggerConfigMap = {
   quote_requested: QuoteRequestedTriggerConfig;
   quote_approved: QuoteApprovedTriggerConfig;
   quote_rejected: QuoteRejectedTriggerConfig;
+  deal_stage_changed: DealStageChangedTriggerConfig;
+  deal_won: DealWonTriggerConfig;
+  deal_lost: DealLostTriggerConfig;
   contract_signed: ContractSignedTriggerConfig;
   search_executed: SearchExecutedTriggerConfig;
   model_3d_created: Model3DCreatedTriggerConfig;

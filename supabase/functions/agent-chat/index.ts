@@ -730,7 +730,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
-      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm',
+      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -928,7 +928,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
-      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm',
+      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal',
     ],
   },
   marketing: {
@@ -1607,6 +1607,9 @@ async function executeAgent(
   }
   if (config.tools.includes('enrich_company_from_aade') && crmToolsMod?.createEnrichCompanyFromAadeTool) {
     tools.push(crmToolsMod.createEnrichCompanyFromAadeTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('manage_deal') && crmToolsMod?.createManageDealTool) {
+    tools.push(crmToolsMod.createManageDealTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('manage_crm') && crmToolsMod?.createManageCrmTool) {
     tools.push(crmToolsMod.createManageCrmTool(userId, workspaceId, userJwt, onChunk));

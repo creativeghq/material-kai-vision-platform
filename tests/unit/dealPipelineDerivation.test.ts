@@ -229,14 +229,16 @@ describe('the deal pipeline has one object and data-driven stages', () => {
   });
 
   it('a deal card never renders a control that does nothing', () => {
-    // Only a property deal has a destination until the record page lands, so the title used to be
-    // a <button> that silently did nothing for every other deal type.
+    // The title was once a <button> whose onClick was `if (deal.property_id) navigate(…)` — inert
+    // on every non-property deal. Now the record page exists, so EVERY deal has a destination and
+    // the card navigates unconditionally. A conditional inside the handler means some deal type
+    // has a clickable-looking title that does nothing again.
     const board = SOURCES.get(BOARD)!;
+    expect(board).toContain('/crm/deals/${d.id}');
     expect(
-      /onClick=\{\(\) => \{ if \(deal\.property_id\) onOpen\(\); else setEditing\(true\); \}\}/.test(board),
-      'The card title must always go somewhere — property deals to the listing, everything else to ' +
-      'its own editor. A button with a conditional no-op is inert UI.',
-    ).toBe(true);
+      /onOpen=\{\(\) => \{ if \(/.test(board) || /onClick=\{\(\) => \{ if \(d\.property_id\)/.test(board),
+      'The card open handler is conditional again — every deal must have somewhere to go.',
+    ).toBe(false);
   });
 
   it('the lifecycle filter is backed by the server, not just rendered', () => {

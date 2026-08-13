@@ -206,6 +206,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
 
   // ── CRM (workspace-scoped) ────────────────────────────────────────────
   {
+    id: 'manage_deal', name: 'Deal pipeline', category: 'CRM',
+    moduleSlug: 'deals',
+    desc: 'The deal pipeline for every deal type — list open deals, read the weighted forecast, create a deal for a contact, move one to a stage by name, or mark it lost. Stages differ per deal type and are read from the data.',
+    examples: [
+      'What is in the pipeline?',
+      "What's our weighted forecast?",
+      'Create a construction deal for Trendafil worth 24000',
+      'Move that deal to Estimate',
+    ],
+  },
+  {
     id: 'create_company_from_vat', name: 'Company from VAT', category: 'CRM',
     moduleSlug: 'crm',
     desc: 'Add a company to the CRM from a VAT / ΑΦΜ number — looks it up on ΑΑΔΕ (Greek) or VIES (EU) for the legal name + address, then creates it via crm-api.',
@@ -1709,9 +1720,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Add companies from a VAT/ΑΦΜ (ΑΑΔΕ/VIES) and refresh existing companies from ΑΑΔΕ.',
     icon: 'Building2',
     moduleSlug: 'crm',
-    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'],
+    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal'],
     quick_starts: [
       { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
+      {
+        label: 'Deal pipeline', description: 'Open deals and the weighted forecast', icon: 'FolderKanban',
+        prompt: 'Show me the deal pipeline.',
+        promptTemplate: 'Show me the deal pipeline.',
+        run: { tool: 'manage_deal' },
+        // autoFields derives the `action` select (list / forecast / create / move / lose) from the
+        // manifest. Hand-mirroring an enum into a form is how options end up as values no schema
+        // accepts — the tool file stays the source.
+        autoFields: true,
+      },
       { label: 'Refresh from ΑΑΔΕ', description: 'Update an existing company from ΑΑΔΕ', prompt: 'Refresh a company\'s details from ΑΑΔΕ — I\'ll tell you which one.', icon: 'RefreshCw' },
       {
         label: 'Add a contact', description: 'Add a person to the CRM', icon: 'UserPlus',

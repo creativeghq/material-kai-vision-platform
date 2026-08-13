@@ -1,6 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type CrmActivityTargetKind = 'contact' | 'company' | 'user';
+/**
+ * PAIRED with the CHECK on crm_activities.target_kind. Adding a value to one and not the
+ * other throws a CHECK violation at runtime while typechecking clean — the four-places
+ * shape. Guarded by tests/unit/dealPipelineDerivation.test.ts.
+ */
+export type CrmActivityTargetKind = 'contact' | 'company' | 'user' | 'deal';
 export interface CrmActivityTarget { kind: CrmActivityTargetKind; id: string }
 
 export interface CrmActivity {

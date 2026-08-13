@@ -12,6 +12,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 export interface DealType {
   id: string;
@@ -103,6 +104,47 @@ function withTaskCounts(row: any): Deal {
   return { ...rest, task_total: tasks.length, task_done: tasks.filter((t: any) => t.done).length } as Deal;
 }
 
+/**
+ * The payload every deal event carries. `action_url` points at the record page — a notification
+ * whose link goes nowhere is the shape `deepLinkTargets.test.ts` exists to catch.
+ */
+async function emitDealEvent(
+  type: 'deal_stage_changed' | 'deal_won' | 'deal_lost',
+  deal: Deal,
+  stageLabel?: string,
+): Promise<void> {
+  const name = deal.title?.trim() || deal.property?.title || deal.company?.name || deal.contact?.name || 'Deal';
+  const title = type === 'deal_won' ? `Deal won: ${name}`
+    : type === 'deal_lost' ? `Deal lost: ${name}`
+    : `${name} moved to ${stageLabel ?? deal.stage}`;
+  const payload = {
+    user_id: deal.owner_user_id,
+    workspace_id: deal.workspace_id,
+    title,
+    body: deal.value != null ? `${deal.value} ${deal.currency || 'EUR'}` : '',
+    action_url: `/crm/deals/${deal.id}`,
+    type,
+    deal_id: deal.id,
+    deal_type_id: deal.deal_type_id,
+    stage: deal.stage,
+    stage_label: stageLabel ?? deal.stage,
+    value: deal.value,
+    currency: deal.currency,
+    contact_id: deal.contact_id,
+    company_id: deal.company_id,
+  };
+  try {
+    // Emitted as STRING LITERALS on purpose. tests/unit/flowEventContract.test.ts can only check
+    // literals — `emit(type, …)` with a variable is invisible to it, so an event name that drifted
+    // out of the TriggerType union would emit into nothing with nobody reporting a problem.
+    if (type === 'deal_won') await flowEventService.emit('deal_won', payload);
+    else if (type === 'deal_lost') await flowEventService.emit('deal_lost', payload);
+    else await flowEventService.emit('deal_stage_changed', payload);
+  } catch {
+    // A flow-engine hiccup must never fail the stage move the user just made.
+  }
+}
+
 export const dealsService = {
   /** Platform defaults + this workspace's own types, in display order. */
   async listTypes(workspaceId: string): Promise<DealType[]> {
@@ -168,6 +210,13 @@ export const dealsService = {
     return withTaskCounts(data);
   },
 
+  /** Close a deal as lost, with its reason. Separate from updateDeal so the event fires once. */
+  async markLost(dealId: string, reason: string | null): Promise<Deal> {
+    const deal = await this.updateDeal(dealId, { status: 'lost', lost_reason: reason });
+    void emitDealEvent('deal_lost', deal);
+    return deal;
+  },
+
   async updateDeal(dealId: string, patch: Partial<DealInput>): Promise<Deal> {
     const payload: Record<string, unknown> = {};
     for (const k of ['stage', 'title', 'contact_id', 'company_id', 'property_id', 'project_id',
@@ -186,13 +235,19 @@ export const dealsService = {
    * Move a deal to a stage, and let a winning stage win the deal. Which stage wins is DATA
    * (`crm_deal_stages.is_won`) — the old board hardcoded `stage === 'completed'`, which is only
    * true for the property stage set.
+   *
+   * Emits a flow event rather than writing a notification: a seeded `system-default` flow
+   * delivers it, so an admin can retarget or pause "tell me when a deal is won" without a deploy
+   * (CLAUDE.md — never hardcode a user_notifications insert or an email-api call).
    */
   async moveToStage(dealId: string, stage: DealStage): Promise<Deal> {
-    return this.updateDeal(dealId, {
+    const deal = await this.updateDeal(dealId, {
       stage: stage.key,
       ...(stage.is_won ? { status: 'won' as const } : {}),
       ...(stage.is_lost ? { status: 'lost' as const } : {}),
     });
+    void emitDealEvent(stage.is_won ? 'deal_won' : stage.is_lost ? 'deal_lost' : 'deal_stage_changed', deal, stage.label);
+    return deal;
   },
 
   async deleteDeal(dealId: string): Promise<void> {
@@ -332,4 +387,93 @@ export async function listDealsForParty(
     type_label: r.type?.label ?? '',
     stage_label: label.get(`${r.deal_type_id}:${r.stage}`) ?? r.stage,
   })) as PartyDeal[];
+}
+
+// ── Forecast ──────────────────────────────────────────────────────────────────────────────────
+/** Already-derived weighted pipeline. Grouped BY CURRENCY: summing mixed currencies is a lie. */
+export interface DealForecastRow {
+  currency: string;
+  open_count: number;
+  open_value: number;
+  weighted_value: number;
+  won_count: number;
+  won_value: number;
+  lost_count: number;
+  avg_probability: number;
+}
+
+/**
+ * Read the forecast. TypeScript FORMATS this and never recomputes `value × probability` — one
+ * derivation per money quantity (tests/unit/moneyDerivation.test.ts). Deals with no probability
+ * fall back to their stage's position in its own type's ladder, in SQL.
+ */
+export async function getDealForecast(workspaceId: string, dealTypeId?: string | null): Promise<DealForecastRow[]> {
+  const { data, error } = await supabase.rpc('get_deal_forecast', {
+    p_workspace_id: workspaceId,
+    p_deal_type_id: dealTypeId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DealForecastRow[];
+}
+
+// ── Deal team ─────────────────────────────────────────────────────────────────────────────────
+/** A per-deal LABEL. Membership grants nothing — access lives in workspace_members.role. */
+export const DEAL_TEAM_ROLES = [
+  { value: 'account_executive', label: 'Account Executive' },
+  { value: 'bdr', label: 'BDR' },
+  { value: 'account_manager', label: 'Account Manager' },
+  { value: 'solutions', label: 'Solutions' },
+  { value: 'exec_sponsor', label: 'Exec Sponsor' },
+  { value: 'contributor', label: 'Contributor' },
+] as const;
+
+export interface DealMember {
+  id: string;
+  deal_id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+export const dealTeam = {
+  async list(dealId: string): Promise<DealMember[]> {
+    const { data, error } = await supabase
+      .from('crm_deal_members')
+      .select('id, deal_id, user_id, role, profile:user_profiles ( full_name, email )')
+      .eq('deal_id', dealId)
+      .order('created_at');
+    if (error) throw error;
+    return ((data ?? []) as any[]).map((r) => ({
+      id: r.id, deal_id: r.deal_id, user_id: r.user_id, role: r.role,
+      full_name: r.profile?.full_name ?? null, email: r.profile?.email ?? null,
+    }));
+  },
+
+  async add(dealId: string, userId: string, role = 'contributor'): Promise<void> {
+    const { error } = await supabase.from('crm_deal_members').insert({ deal_id: dealId, user_id: userId, role });
+    if (error) {
+      if (error.code === '23505') throw new Error('They are already on this deal.');
+      // The insert policy requires an ACTIVE member of the deal's workspace.
+      if (error.code === '42501') throw new Error('That person is not an active member of this workspace.');
+      throw error;
+    }
+  },
+
+  async setRole(memberId: string, role: string): Promise<void> {
+    const { error } = await supabase.from('crm_deal_members').update({ role }).eq('id', memberId);
+    if (error) throw error;
+  },
+
+  async remove(memberId: string): Promise<void> {
+    const { error } = await supabase.from('crm_deal_members').delete().eq('id', memberId);
+    if (error) throw error;
+  },
+};
+
+/** One deal by id, for the record page. Returns null when it is not visible to the caller. */
+export async function getDeal(dealId: string): Promise<Deal | null> {
+  const { data, error } = await supabase.from('crm_deals').select(DEAL_SELECT).eq('id', dealId).maybeSingle();
+  if (error) throw error;
+  return data ? withTaskCounts(data) : null;
 }

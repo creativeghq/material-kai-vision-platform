@@ -287,6 +287,7 @@ Full reference: `.claude/design-system.md`.
 | Units of measure / quantity pricing | [docs/units-and-quantity-pricing.md](docs/units-and-quantity-pricing.md) |
 | Customs / TARIC codes | [docs/taric-customs-classification.md](docs/taric-customs-classification.md) |
 | Finance / orders / quotes | [docs/finance-system.md](docs/finance-system.md), [docs/orders-system.md](docs/orders-system.md), [docs/quotes-system-architecture.md](docs/quotes-system-architecture.md) |
+| Deals & pipeline | [docs/deals-pipeline.md](docs/deals-pipeline.md) — **stages are per deal type**, enforced by a composite FK on `(deal_type_id, stage)`; a construction deal physically cannot sit in "Conveyancing". Weighted forecast is derived in SQL by `get_deal_forecast` |
 | Bank feed & reconciliation (Revolut Business) | [docs/banking-revolut.md](docs/banking-revolut.md) — the feed is **per-leg**: match a row in isolation and an internal pocket move settles a customer invoice |
 | CRM / HR / Projects / Real estate | [docs/crm-system.md](docs/crm-system.md), [docs/hr-system.md](docs/hr-system.md), [docs/projects.md](docs/projects.md), [docs/real-estate-system.md](docs/real-estate-system.md) |
 | Installed base — customer equipment, warranties, recurring service | [docs/installed-base.md](docs/installed-base.md) — there is **no `next_due_on`**: the next service date IS the plan's single open occurrence, and completing one is the only thing that opens the next |

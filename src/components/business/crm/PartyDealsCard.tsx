@@ -55,7 +55,7 @@ export const PartyDealsCard: React.FC<Props> = ({ workspaceId, contactId, compan
             <button
               key={d.id}
               type="button"
-              onClick={() => navigate('/crm?tab=pipeline')}
+              onClick={() => navigate(`/crm/deals/${d.id}`)}
               className="flex w-full items-center gap-2 rounded-md border border-border/60 px-2.5 py-1.5 text-left hover:bg-muted/50"
             >
               <span className="min-w-0 flex-1 truncate text-sm">

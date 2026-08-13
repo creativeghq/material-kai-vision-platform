@@ -25,6 +25,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // deno-lint-ignore no-explicit-any
@@ -266,6 +267,149 @@ export const createManageCrmTool = (
         kind: z.enum(['note', 'call', 'email', 'meeting']).optional().describe('log_activity: activity kind (default note).'),
         title: z.string().optional().describe('log_activity: short title.'),
         note: z.string().optional().describe('log_activity: the detail/body.'),
+      }),
+    },
+  );
+};
+
+
+/**
+ * The deal pipeline for the agent, for EVERY deal type (#311).
+ *
+ * `manage_real_estate`'s manage_deal action only ever spoke about property deals and hardcoded the
+ * real_estate type, so a construction or project deal was invisible to the agent layer entirely.
+ * This one resolves the type by name, reads the stage set from the DATA, and refuses a stage the
+ * chosen type does not define — the composite FK on (deal_type_id, stage) would reject it anyway,
+ * and a named error beats a constraint violation.
+ *
+ * Uses the caller's JWT so RLS on crm_deals applies: the agent sees exactly the deals the person
+ * asking would see on the board, including the property agent-scoping.
+ */
+export const createManageDealTool = (
+  userId: string,
+  workspaceId: string,
+  jwt: string | undefined,
+  onChunk?: (chunk: AnyRow) => void,
+) => {
+  const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwt ?? ''}` } },
+    auth: { persistSession: false },
+  });
+
+  return tool(
+    async ({ action, deal_type, deal_id, title, contact_query, value, stage, lost_reason }: AnyRow) => {
+      const db = sb();
+
+      /** Resolve a deal type by fuzzy label/key, or the workspace default when unspecified. */
+      const resolveType = async () => {
+        const { data } = await db.from('crm_deal_types')
+          .select('id, key, label, subject_kind')
+          .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+          .eq('is_active', true).order('sort');
+        const all = (data ?? []) as AnyRow[];
+        if (!deal_type) return { list: all, hit: all.find((t) => t.key === 'general') ?? all[0] ?? null };
+        const q = String(deal_type).toLowerCase();
+        return { list: all, hit: all.find((t) => String(t.key).toLowerCase() === q || String(t.label).toLowerCase() === q)
+          ?? all.find((t) => String(t.label).toLowerCase().includes(q)) ?? null };
+      };
+
+      if (action === 'list') {
+        const { data, error } = await db.from('crm_deals')
+          .select('id, title, stage, status, value, currency, expected_close_date, type:crm_deal_types ( label ), contact:crm_contacts!crm_deals_contact_id_fkey ( name )')
+          .eq('workspace_id', workspaceId).neq('status', 'lost').order('updated_at', { ascending: false }).limit(50);
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const deals = (data ?? []) as AnyRow[];
+        onChunk?.({ type: 'crm_deals_list', count: deals.length, deals, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: deals.length, deals });
+      }
+
+      if (action === 'forecast') {
+        // Weighted pipeline is DERIVED in SQL; this never multiplies value by probability.
+        const { data, error } = await db.rpc('get_deal_forecast', { p_workspace_id: workspaceId, p_deal_type_id: null });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'crm_deal_forecast', rows: data ?? [], timestamp: Date.now() });
+        return JSON.stringify({ success: true, forecast: data ?? [] });
+      }
+
+      if (action === 'create') {
+        if (!contact_query) return JSON.stringify({ success: false, error: 'create needs contact_query — every deal is attached to a party.' });
+        const { list, hit: type } = await resolveType();
+        if (!type) return JSON.stringify({ success: false, error: `unknown deal type. Available: ${list.map((t: AnyRow) => t.label).join(', ')}` });
+        if (type.subject_kind !== 'none') {
+          return JSON.stringify({ success: false, error: `"${type.label}" deals must be attached to a ${type.subject_kind} — create it on the pipeline board instead.` });
+        }
+        const { data: contacts } = await db.from('crm_contacts').select('id, name')
+          .eq('workspace_id', workspaceId).ilike('name', `%${contact_query}%`).limit(5);
+        if (!contacts?.length) return JSON.stringify({ success: false, error: `no contact matches "${contact_query}"` });
+        if (contacts.length > 1) return JSON.stringify({ success: false, error: `Multiple contacts match "${contact_query}". Ask which one.`, candidates: contacts });
+
+        const { data: stages } = await db.from('crm_deal_stages').select('key, label, sort').eq('deal_type_id', type.id).order('sort');
+        const first = (stages ?? [])[0];
+        if (!first) return JSON.stringify({ success: false, error: `${type.label} has no stages configured.` });
+
+        const { data, error } = await db.from('crm_deals').insert({
+          workspace_id: workspaceId, deal_type_id: type.id, contact_id: contacts[0].id,
+          stage: first.key, status: 'open', title: title ? String(title).trim() : null,
+          value: value != null ? Number(value) : null, currency: 'EUR',
+          owner_user_id: userId, created_by: userId,
+        }).select('id, title, stage, status, value, currency').single();
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'crm_deal_saved', deal: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, deal: data, message: `Created a ${type.label} deal at "${first.label}".` });
+      }
+
+      if (action === 'move' || action === 'lose') {
+        if (!deal_id) return JSON.stringify({ success: false, error: `${action} needs a deal_id (call list first).` });
+        const { data: existing } = await db.from('crm_deals')
+          .select('id, deal_type_id, title').eq('id', deal_id).eq('workspace_id', workspaceId).maybeSingle();
+        if (!existing) return JSON.stringify({ success: false, error: 'deal not found' });
+
+        if (action === 'lose') {
+          const { data, error } = await db.from('crm_deals')
+            .update({ status: 'lost', lost_reason: lost_reason ? String(lost_reason) : null })
+            .eq('id', deal_id).select('id, title, status, lost_reason').single();
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          onChunk?.({ type: 'crm_deal_saved', deal: data, timestamp: Date.now() });
+          return JSON.stringify({ success: true, deal: data });
+        }
+
+        const { data: stages } = await db.from('crm_deal_stages')
+          .select('key, label, is_won, is_lost').eq('deal_type_id', existing.deal_type_id).order('sort');
+        const target = (stages ?? []).find((x: AnyRow) => String(x.key).toLowerCase() === String(stage ?? '').toLowerCase()
+          || String(x.label).toLowerCase() === String(stage ?? '').toLowerCase());
+        if (!target) {
+          return JSON.stringify({ success: false, error: `unknown stage "${stage}". This deal's pipeline uses: ${(stages ?? []).map((x: AnyRow) => x.label).join(' → ')}` });
+        }
+        const { data, error } = await db.from('crm_deals').update({
+          stage: target.key,
+          ...(target.is_won ? { status: 'won' } : {}),
+          ...(target.is_lost ? { status: 'lost' } : {}),
+        }).eq('id', deal_id).select('id, title, stage, status').single();
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'crm_deal_saved', deal: data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, deal: data, message: `Moved to ${target.label}.` });
+      }
+
+      return JSON.stringify({ success: false, error: `unknown action: ${action}` });
+    },
+    {
+      name: 'manage_deal',
+      description:
+        'The deal pipeline, for every kind of deal (real estate, project, construction, or a type this '
+        + 'workspace defined). list — open deals. forecast — weighted pipeline, already derived. '
+        + 'create — a new deal for a contact (needs contact_query; deal_type defaults to General). '
+        + 'move — advance a deal to a stage BY NAME (stages differ per deal type; the error lists the '
+        + 'valid ones). lose — mark it lost with a reason. Property and project deals are created on '
+        + 'the board, because they must be attached to a listing or project.',
+      schema: z.object({
+        action: z.enum(['list', 'forecast', 'create', 'move', 'lose']).default('list'),
+        deal_type: z.string().optional().describe('create: the deal type by name, e.g. "Construction". Defaults to General.'),
+        deal_id: z.string().optional().describe('move/lose: the deal UUID from list.'),
+        title: z.string().optional().describe('create: what the deal is called.'),
+        contact_query: z.string().optional().describe('create: the contact name to attach (required).'),
+        value: z.number().optional().describe('create: deal value.'),
+        stage: z.string().optional().describe('move: the target stage name. Stages are per deal type.'),
+        lost_reason: z.string().optional().describe('lose: why it was lost.'),
       }),
     },
   );

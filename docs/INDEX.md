@@ -526,6 +526,11 @@ Complete documentation for Material Kai Vision Platform.
 - Accepted quote → order + draft pre-invoice; POS sale → order; payment_status + profit per order
 - First Finance → Documents tab; replaces the per-doc tabs on the CRM company page
 
+**[deals-pipeline.md](deals-pipeline.md)** - Deals & pipeline ✨ NEW (2026-08)
+- One deal object across CRM and Real Estate; tenant-defined deal types, each owning its own stage set
+- A composite FK on `(deal_type_id, stage)` makes "a construction deal cannot sit in Conveyancing" a database guarantee
+- `get_deal_forecast` derives the weighted pipeline in SQL, grouped by currency; TypeScript only formats it
+
 **[sourcing-fulfillment.md](sourcing-fulfillment.md)** - Sourcing & Fulfillment spine ✨ NEW (2026-06)
 - `stock_allocations` lifecycle ledger (demand → warehouse|PO → reserved-to-customer); `supplier_products` cost tier; `warehouse_coverage` ship-from routing
 - resolve → commit (draft POs) → send-to-supplier (PDF+email) → receive (reserve) → Finance Sourcing board; `purchase_order.sent/.received` Flows triggers

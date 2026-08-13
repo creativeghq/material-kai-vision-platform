@@ -273,6 +273,11 @@ const AGENTS: AgentDefinition[] = [
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
+  // Deal pipeline (#311). Every onChunk type a tool emits MUST be here or the output is dropped
+  // and the user sees "Done" with no data.
+  crm_deals_list: 'Deal pipeline',
+  crm_deal_forecast: 'Weighted forecast',
+  crm_deal_saved: 'Deal updated',
   // My HR (employee self-service). These MUST be registered: a quick-start with `run` is a
   // deterministic direct tool call that skips the LLM, so there is no narration fallback — an
   // unregistered chunk is dropped and the user just sees "Done — ran manage_my_hr" with no data.

@@ -860,6 +860,22 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'manage_deal',
+    file: 'supabase/functions/_shared/tools/crm-tools.ts',
+    factory: 'createManageDealTool',
+    description: 'The deal pipeline, for every kind of deal (real estate, project, construction, or a type this workspace defined).',
+    params: [
+      { name: 'action', type: 'enum', enum: ['list', 'forecast', 'create', 'move', 'lose'], optional: true },
+      { name: 'deal_type', type: 'string', optional: true, description: 'create: the deal type by name, e.g. "Construction". Defaults to General.' },
+      { name: 'deal_id', type: 'string', optional: true, description: 'move/lose: the deal UUID from list.' },
+      { name: 'title', type: 'string', optional: true, description: 'create: what the deal is called.' },
+      { name: 'contact_query', type: 'string', optional: true, description: 'create: the contact name to attach (required).' },
+      { name: 'value', type: 'number', optional: true, description: 'create: deal value.' },
+      { name: 'stage', type: 'string', optional: true, description: 'move: the target stage name. Stages are per deal type.' },
+      { name: 'lost_reason', type: 'string', optional: true, description: 'lose: why it was lost.' },
+    ],
+  },
+  {
     name: 'manage_docs',
     file: 'supabase/functions/_shared/tools/docs-tools.ts',
     factory: 'createManageDocsTool',
