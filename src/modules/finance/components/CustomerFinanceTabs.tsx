@@ -13,7 +13,7 @@ import {
   type CustomerTopProductRow,
   type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
-import { ordersService } from '@/modules/finance/services/ordersService';
+import { ordersService, type PartyOrderPosition } from '@/modules/finance/services/ordersService';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
@@ -58,9 +58,11 @@ export const PartyAccountSummary: React.FC<{
   supplier?: { billed: number; paid: number; outstanding: number; ordered?: number } | null;
   /** Per-customer AR aging breakdown (exclusive buckets, by days past due). */
   aging?: { not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null;
-  /** Orders roll-up. `owedNet` is cash on un-invoiced orders, SIGNED by direction (sales
-   *  positive, purchase negative) — it is a term of the account balance, not a tile of its own. */
-  orders?: { count: number; ordered: number; owedNet: number } | null;
+  /** Orders roll-up, straight from `ordersService.partyOrderPosition`. `owedNet` is cash on
+   *  un-invoiced orders, SIGNED by direction (sales positive, purchase negative) — it is a term of
+   *  the account balance, not a tile of its own. `settledUninvoiced` IS a tile: it is the money
+   *  the invoice figures below structurally cannot account for. */
+  orders?: { count: number; ordered: number; owedNet: number; settledUninvoiced: number } | null;
   /** Cash of theirs we're holding that isn't settled against anything yet (unallocated money-in). */
   credit?: number | null;
   /**
@@ -93,8 +95,8 @@ export const PartyAccountSummary: React.FC<{
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
   const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
 
-  const cell = (label: string, value: React.ReactNode, danger = false) => (
-    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`}>
+  const cell = (label: string, value: React.ReactNode, danger = false, title?: string) => (
+    <Card className={`dashboard-card border-0 ${danger ? 'ring-1 ring-destructive/40' : ''}`} title={title}>
       <CardContent className="p-3">
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
         <div className={`text-lg font-semibold ${danger ? 'text-destructive' : ''}`}>{value}</div>
@@ -157,13 +159,21 @@ export const PartyAccountSummary: React.FC<{
   const showBalance = netPositionVisible(netTerms);
   const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
   /**
-   * How many tiles the strip will ACTUALLY render. Never guess the column count: the contents
-   * are four independent conditions — orders contributes three tiles, balance / credit / meta one
-   * each — so any guess leaves a hole at the end of the row for the parties it does not match.
-   * Counting what is about to render fills the width at 3, 4, 5 or 6 tiles alike.
+   * Cash that moved on orders nobody has invoiced yet. Rendered only when there IS some, because
+   * it exists to answer a question that only arises then: "we received money and every invoice
+   * figure on this page says zero — where did it go?". Excluded once the order is invoiced, or the
+   * same euro would print here AND as "Paid" (see `partyOrderPosition`).
    */
-  const topTiles = (orders ? 2 : 0) + (showCredit ? 1 : 0) + (showBalance ? 1 : 0)
-    + (meta && meta.length > 0 ? 1 : 0);
+  const showOrderCash = !!orders && Math.abs(orders.settledUninvoiced) > 0.005;
+  /**
+   * How many tiles the strip will ACTUALLY render. Never guess the column count: the contents
+   * are five independent conditions — orders contributes two tiles plus a third when cash has
+   * moved on un-invoiced ones, balance / credit / meta one each — so any guess leaves a hole at
+   * the end of the row for the parties it does not match. Counting what is about to render fills
+   * the width at 3, 4, 5 or 6 tiles alike.
+   */
+  const topTiles = (orders ? 2 : 0) + (showOrderCash ? 1 : 0) + (showCredit ? 1 : 0)
+    + (showBalance ? 1 : 0) + (meta && meta.length > 0 ? 1 : 0);
   const balanceInCustomer = showBalance && !showTopStrip && !!customer;
   const balanceInSupplier = showBalance && !showTopStrip && !customer && !!supplier;
   /** The orders roll-up already shows what we ordered — don't print it again per role. */
@@ -183,6 +193,13 @@ export const PartyAccountSummary: React.FC<{
         <div className={`grid grid-cols-2 gap-3 ${TOP_STRIP_SM[topTiles]} ${TOP_STRIP_LG[topTiles]}`}>
           {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
           {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
+          {orders && showOrderCash && stat(
+            <Coins className="h-3.5 w-3.5" />, 'Paid on orders', formatMoney(orders.settledUninvoiced),
+            { title: 'Money that has actually moved on orders which have NOT been invoiced yet.'
+              + ' An order is not a financial document, so this cash settles no invoice and appears'
+              + ' in none of the invoice figures below — open the Orders list to see which order it'
+              + ' went against.' },
+          )}
           {showCredit && (
             <Card className="dashboard-card border-0" title="Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, refund it — or keep it as income.">
               <CardContent className="p-3">
@@ -223,12 +240,20 @@ export const PartyAccountSummary: React.FC<{
           {bothRoles && <div className="text-[11px] font-medium text-muted-foreground">As customer</div>}
           <div className={`grid gap-3 ${balanceInCustomer ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
             {balanceInCustomer && balanceStat}
-            {cell('Invoiced', formatMoney(customer.invoiced))}
-            {cell('Paid', formatMoney(customer.paid))}
+            {/* All three are INVOICE figures — they say nothing about an order that was never
+                invoiced. Left unlabelled, a customer who ordered, paid and was never invoiced read
+                "Invoiced €0 · Paid €0 · Outstanding €0" beside a payment of theirs on the same
+                screen. The orders tiles above carry that cash; these titles say so. */}
+            {cell('Invoiced', formatMoney(customer.invoiced), false,
+              'Total of the invoices issued to this customer. Orders not yet invoiced are not in here.')}
+            {cell('Paid', formatMoney(customer.paid), false,
+              'Cash allocated to those invoices. Money received against an order that has not been'
+              + ' invoiced yet settles no invoice, so it is reported by the orders tiles instead.')}
             {/* Reads as the third term of Invoiced − Paid, which is what it is. The old wording
                 ("They owe us") stated the same number as an accusation on a page account managers
                 open in front of the customer. */}
-            {cell('Outstanding', formatMoney(customer.outstanding), customer.outstanding > 0)}
+            {cell('Outstanding', formatMoney(customer.outstanding), customer.outstanding > 0,
+              'Still due on issued invoices. What is owed on un-invoiced orders is in the account balance, not here.')}
           </div>
           {aging && (aging.not_due + aging.due_0_30 + aging.due_31_90 + aging.due_90_plus) > 0 && (
             <div className="grid grid-cols-4 gap-2 pt-0.5">
@@ -277,9 +302,13 @@ export const PartyAccountSummary: React.FC<{
           {bothRoles && <div className="text-[11px] font-medium text-muted-foreground">As supplier</div>}
           <div className={`grid gap-3 grid-cols-2 ${gridCols[supplierCols] ?? 'md:grid-cols-4'}`}>
             {balanceInSupplier && balanceStat}
-            {cell('Billed to us', formatMoney(supplier.billed))}
-            {cell('Paid to them', formatMoney(supplier.paid))}
-            {cell('Outstanding', formatMoney(supplier.outstanding), supplier.outstanding > 0)}
+            {cell('Billed to us', formatMoney(supplier.billed), false,
+              'Total of the supplier bills received. Purchase orders not yet billed are not in here.')}
+            {cell('Paid to them', formatMoney(supplier.paid), false,
+              'Cash allocated to those bills. Money paid against a purchase order that has not been'
+              + ' billed yet settles no bill, so it is reported by the orders tiles instead.')}
+            {cell('Outstanding', formatMoney(supplier.outstanding), supplier.outstanding > 0,
+              'Still due on received bills. What is owed on un-billed purchase orders is in the account balance, not here.')}
             {showRoleOrdered && cell('Ordered', formatMoney(supplier.ordered ?? 0))}
           </div>
         </div>
@@ -304,7 +333,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [aging, setAging] = useState<{ not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null>(null);
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
   // not as a separate party-level section.
-  const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedNet: number } | null>(null);
+  const [orderStats, setOrderStats] = useState<PartyOrderPosition['stats'] | null>(null);
   // Their cash we hold that isn't settled against anything (overpayment / deposit on account).
   const [credit, setCredit] = useState(0);
   const [releaseOpen, setReleaseOpen] = useState(false);
@@ -326,25 +355,15 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
       const p = payments[0];
       setLastPayment(p ? { paid_at: p.paid_at, amount: p.amount, currency: p.currency } : null);
 
-      // Orders roll-up — count, total ordered value, and the still-owed amount on orders that
-      // haven't been invoiced yet. This drives the KPI strip ("Orders" + "Owed on orders").
+      // Orders roll-up — count, total ordered value, the still-owed amount on orders that haven't
+      // been invoiced yet, and the cash already taken on them. Assembled by
+      // `partyOrderPosition` so this KPI strip and the Finance → Parties drill-down report the
+      // same position; it used to be rolled up here by hand and existed on this page only.
       if (activeWorkspaceId) {
         try {
-          const ordersList = await ordersService.list({ workspaceId: activeWorkspaceId, companyId, contactId });
-          const active = ordersList.filter((o) => o.status !== 'cancelled');
-          const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: activeWorkspaceId, companyId, contactId });
-          setOrderStats({
-            count: active.length,
-            ordered: active.reduce((a, o) => a + Number(o.total), 0),
-            // SIGNED by order type before it is summed. `listUninvoicedOutstanding` returns both
-            // sides of the trade for a party that buys AND sells, and `outstanding` is a magnitude
-            // in each row's own direction — so adding them raw reported a supplier's unpaid bill
-            // as the customer owing us more. A sales order they still owe on is due to us; a
-            // purchase order we still owe on is due to them.
-            owedNet: uninvoiced.reduce(
-              (a, o) => a + (o.order_type === 'purchase' ? -o.outstanding : o.outstanding), 0),
-          });
-          setOpenOrders(active.filter((o) => o.status !== 'fulfilled').length);
+          const pos = await ordersService.partyOrderPosition({ workspaceId: activeWorkspaceId, companyId, contactId });
+          setOrderStats(pos.stats);
+          setOpenOrders(pos.rows.filter((o) => o.status !== 'fulfilled').length);
         } catch { setOrderStats(null); }
 
         // Per-customer AR aging breakdown (skip for supplier-only views).

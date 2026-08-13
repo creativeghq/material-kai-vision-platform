@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users, Banknote,
-  ChevronDown, Mail, Download, Copy, RotateCcw, ExternalLink, RefreshCw,
+  ChevronDown, Mail, Download, Copy, RotateCcw, ExternalLink, RefreshCw, ShoppingCart,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -18,8 +18,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
 import {
-  financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill, type Payment, type PartyLedgerRow, type CustomerAgingBuckets,
+  financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill,
+  type PaymentWithAllocation, type PartyLedgerRow, type CustomerAgingBuckets,
 } from '@/modules/finance/services/financeService';
+import {
+  ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL, type PartyOrderPosition,
+} from '@/modules/finance/services/ordersService';
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
 import { usePartyStatementActions } from '@/modules/finance/components/StatementActions';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
@@ -239,7 +243,6 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                   <th className="px-4 py-2 text-right">Receivable</th>
                   <th className="px-4 py-2 text-right">Payable</th>
                   <th className="px-4 py-2 text-right">Net</th>
-                  <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -288,10 +291,11 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right">{formatMoney(Number(r.payable_outstanding || 0))}</td>
+                    {/* No "Open" column: the whole row opens the party, and the name in the first
+                        cell is a real <button> — so the trailing one was a third way to do the same
+                        thing, and the only one that cost a column. Keyboard/AT reach the party
+                        through that name button, which is why this can go. */}
                     <td className={`px-4 py-2 text-right font-medium ${Number(r.net_position) < 0 ? 'text-destructive' : ''}`}>{formatMoney(Number(r.net_position || 0))}</td>
-                    <td className="px-4 py-2 text-right">
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>Open</Button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -322,7 +326,7 @@ interface DetailProps {
   open: boolean;
   onClose: () => void;
   statementsEnabled: boolean;
-  /** '/finance' | '/admin/finance' — every in-app document link is built off it. */
+  /** Always `FINANCE_BASE` — every in-app document link is built off it. */
   financeBase: string;
 }
 
@@ -340,13 +344,22 @@ interface DetailProps {
  */
 const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, financeBase }) => {
   const { toast } = useToast();
-  const crmBase = financeBase === '/admin/finance' ? '/admin/crm' : '/crm';
+  // `/crm/companies/:id` — the workspace-facing CRM record, which every finance operator can
+  // reach. The admin twin (`/admin/crm/*`, AdminGuard) exists but is not where a party opened from
+  // Finance belongs, and the branch that chose it keyed off a finance base that never existed.
+  const crmBase = '/crm';
   const crmHref = party ? `${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}` : '';
-  const [tab, setTab] = useState<'invoices' | 'bills' | 'payments' | 'ledger'>('invoices');
+  const [tab, setTab] = useState<'invoices' | 'bills' | 'orders' | 'payments' | 'ledger'>('invoices');
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<SupplierBill[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
+  /**
+   * The party's orders + their settlement position. An order is not a financial document, so it is
+   * absent from the ledger and from `vw_finance_parties` by design — which left the money taken on
+   * an un-invoiced order visible NOWHERE on this page except as an unexplained payment.
+   */
+  const [orderPos, setOrderPos] = useState<PartyOrderPosition | null>(null);
   /** Their cash we hold that isn't settled against anything yet (unallocated money-in). */
   const [credit, setCredit] = useState(0);
   const [releaseOpen, setReleaseOpen] = useState(false);
@@ -367,6 +380,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   // older invoice/bill/payment with no way to reach it.
   const [invPage, setInvPage] = useState(1);
   const [billPage, setBillPage] = useState(1);
+  const [orderPage, setOrderPage] = useState(1);
   const [payPage, setPayPage] = useState(1);
   const [ledgerPage, setLedgerPage] = useState(1);
   // Running ledger (καρτέλα)
@@ -397,7 +411,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         ? 'bills'
         : 'payments');
     setResearchParty(null);
-    setInvPage(1); setBillPage(1); setPayPage(1); setLedgerPage(1);
+    setInvPage(1); setBillPage(1); setOrderPage(1); setPayPage(1); setLedgerPage(1);
   }, [party]);
 
   // A new side/date range is a new ledger — don't land the user mid-way through it.
@@ -509,11 +523,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const reload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
-    if (!party) { setInvoices([]); setBills([]); setPayments([]); setCredit(0); return; }
+    if (!party) { setInvoices([]); setBills([]); setPayments([]); setOrderPos(null); setCredit(0); return; }
     void (async () => {
       try {
         setLoading(true);
-        const [res, bal] = await Promise.all([
+        const [res, bal, orders] = await Promise.all([
           financeService.getPartyDetail({
             workspaceId: party.workspace_id, partyType: party.party_type, partyId: party.party_id,
           }),
@@ -523,8 +537,15 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
             companyId: party.party_type === 'company' ? party.party_id : null,
             contactId: party.party_type === 'contact' ? party.party_id : null,
           }).catch(() => null),
+          // Same assembly the CRM Account tab uses, so the two surfaces report one position.
+          ordersService.partyOrderPosition({
+            workspaceId: party.workspace_id,
+            companyId: party.party_type === 'company' ? party.party_id : null,
+            contactId: party.party_type === 'contact' ? party.party_id : null,
+          }).catch(() => null),
         ]);
         setInvoices(res.invoices); setBills(res.bills); setPayments(res.payments);
+        setOrderPos(orders);
         setCredit(Number(bal?.customer_credit ?? 0));
       } catch (err: any) {
         toast({ title: 'Failed to load detail', description: err?.message, variant: 'destructive' });
@@ -664,6 +685,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                 ? { billed: Number(party.billed_total || 0), paid: Number(party.payable_paid_total || 0), outstanding: Number(party.payable_outstanding || 0) }
                 : null}
               aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
+              // The fourth term of the account balance — un-invoiced order cash — and the two
+              // tiles that name it. Passing null here (which this surface did) does not merely
+              // hide the tiles: it drops the term from the balance, so a party whose only money is
+              // on orders reported a €0 position across the board.
+              orders={orderPos?.stats ?? null}
               credit={credit}
               onReleaseCredit={() => setReleaseOpen(true)}
             />
@@ -680,6 +706,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                     <Receipt className="h-4 w-4" /> Bills{loading ? '' : ` (${bills.length})`}
                   </TabsTrigger>
                 )}
+                {/* Not gated on role: orders run in BOTH directions, and this is the only tab that
+                    can account for money taken before anyone issued a document. */}
+                <TabsTrigger value="orders" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <ShoppingCart className="h-4 w-4" /> Orders{loading ? '' : ` (${orderPos?.rows.length ?? 0})`}
+                </TabsTrigger>
                 <TabsTrigger value="payments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Banknote className="h-4 w-4" /> Payments{loading ? '' : ` (${payments.length})`}
                 </TabsTrigger>
@@ -778,18 +809,68 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                 </DocTable>
               </TabsContent>
 
+              <TabsContent value="orders" className="mt-0">
+                <DocTable
+                  title={<><ShoppingCart className="h-4 w-4" /> Orders</>}
+                  subtitle="What was ordered and what has settled against it. An order is not a legal document — until it is invoiced its money appears in no invoice figure."
+                  loading={loading}
+                  empty="No orders."
+                  colCount={7}
+                  head={<>
+                    <th className="px-4 py-2 text-left">Order #</th>
+                    <th className="px-4 py-2 text-left">Date</th>
+                    <th className="px-4 py-2 text-left">Type</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2 text-right">Settled</th>
+                    <th className="px-4 py-2 text-right">Outstanding</th>
+                  </>}
+                  rows={orderPos?.rows.length ?? 0}
+                  page={orderPage}
+                  onPageChange={setOrderPage}
+                  label="orders"
+                >
+                  {paginate(orderPos?.rows ?? [], orderPage).map((o) => (
+                    <tr key={o.id} className="border-b border-border/30 hover:bg-muted/30">
+                      <td className="px-4 py-2">
+                        <Link to={`${financeBase}/orders/${o.id}`} className="font-mono text-xs text-primary hover:underline">
+                          {o.order_number || o.id.slice(0, 8)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2 text-xs">{formatDate(o.created_at)}</td>
+                      <td className="px-4 py-2 text-xs">{o.order_type === 'purchase' ? 'Purchase' : 'Sales'}</td>
+                      <td className="px-4 py-2 text-xs">
+                        <span className={statusTone(o.status)}>{ORDER_STATUS_LABEL[o.status]}</span>
+                        {/* The whole point of this tab. "Not invoiced" is why the money on this row
+                            is missing from Invoiced / Paid / Outstanding above — say it on the row
+                            rather than leaving the reader to work out which figures exclude it. */}
+                        <span className="text-muted-foreground">
+                          {' · '}{o.invoiced ? 'Invoiced' : 'Not invoiced'}{' · '}{ORDER_PAYMENT_LABEL[o.payment_status_derived]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(o.total), o.currency)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(o.settled, o.currency)}</td>
+                      <td className={`px-4 py-2 text-right tabular-nums ${o.outstanding > 0 ? 'font-medium' : ''}`}>
+                        {formatMoney(o.outstanding, o.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </DocTable>
+              </TabsContent>
+
               <TabsContent value="payments" className="mt-0">
                 <DocTable
                   title={<><Banknote className="h-4 w-4" /> Payments</>}
-                  subtitle="Money that actually moved, both directions."
+                  subtitle="Money that actually moved, both directions — and what each payment was applied to."
                   loading={loading}
                   empty="No payments recorded."
-                  colCount={5}
+                  colCount={6}
                   head={<>
                     <th className="px-4 py-2 text-left">Date</th>
                     <th className="px-4 py-2 text-left">Direction</th>
                     <th className="px-4 py-2 text-left">Method</th>
                     <th className="px-4 py-2 text-left">Reference</th>
+                    <th className="px-4 py-2 text-left">Applied to</th>
                     <th className="px-4 py-2 text-right">Amount</th>
                   </>}
                   rows={payments.length}
@@ -803,6 +884,38 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                       <td className={`px-4 py-2 text-xs ${directionTone(p.direction)}`}>{p.direction === 'in' ? 'Received' : 'Paid out'}</td>
                       <td className="px-4 py-2 text-xs">{p.method ? humanizeLabel(p.method) : '—'}</td>
                       <td className="px-4 py-2 font-mono text-xs">{p.reference || '—'}</td>
+                      {/* What this cash settled. Without it a deposit taken on an order was an
+                          amount with no subject: it moves no invoice figure, so the page showed
+                          money in and €0 everywhere else with nothing to connect them. */}
+                      <td className="px-4 py-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                          {(p.settled ?? []).map((s) => (
+                            <span key={`${s.kind}:${s.id}`}>
+                              {s.kind === 'invoice' ? (
+                                <Link to={`${financeBase}/invoices/${s.id}`} className="text-primary hover:underline">{s.label}</Link>
+                              ) : s.kind === 'order' ? (
+                                <Link to={`${financeBase}/orders/${s.id}`} className="text-primary hover:underline">{s.label}</Link>
+                              ) : (
+                                <button type="button" onClick={() => setOpenBillId(s.id)}
+                                  className="rounded text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                  {s.label}
+                                </button>
+                              )}
+                              <span className="text-muted-foreground"> {formatMoney(s.amount, p.currency)}</span>
+                            </span>
+                          ))}
+                          {/* DERIVED by `get_payment_remainders` and carried on the row — never
+                              re-summed from the allocations here. */}
+                          {Number(p.unallocated ?? 0) > 0.005 && (
+                            <span className="text-amber-500" title="Not settled against anything yet — it sits on account.">
+                              On account {formatMoney(Number(p.unallocated), p.currency)}
+                            </span>
+                          )}
+                          {(p.settled ?? []).length === 0 && Number(p.unallocated ?? 0) <= 0.005 && (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </td>
                       <td className={`px-4 py-2 text-right tabular-nums ${directionTone(p.direction)}`}>{formatMoney(Number(p.amount), p.currency)}</td>
                     </tr>
                   ))}
@@ -814,8 +927,16 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                 <Card>
                   <CardHeader className="border-b border-border/60 px-4 py-2.5 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
                     <div>
-                      <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger</CardTitle>
-                      <p className="text-[11px] text-muted-foreground">Every movement in the period, with a running balance.</p>
+                      <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger (Καρτέλα)</CardTitle>
+                      {/* What this list contains is not self-evident, and the omission is the part
+                          that confuses: cash on an un-invoiced order shows up here as a credit
+                          with nothing on the debit side, reading as "we owe them". Say which
+                          documents it holds and where the missing half lives. */}
+                      <p className="text-[11px] text-muted-foreground">
+                        Every financial DOCUMENT in the period — invoices, credit notes and payments — with a running
+                        balance. Positive means they owe us. An order is not a document and never appears here; see the
+                        Orders tab.
+                      </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)}

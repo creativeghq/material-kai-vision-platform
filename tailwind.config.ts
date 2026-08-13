@@ -17,7 +17,10 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: ['Averta', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
-				display: ['Aleo', 'Georgia', 'Times New Roman', 'serif'],
+				// 'Averta' before Georgia: Aleo has no Greek and only partial latin-ext,
+				// so Greek names in headings fell through to a system serif. Must stay in
+				// sync with --font-display in src/index.css.
+				display: ['Aleo', 'Averta', 'Georgia', 'Times New Roman', 'serif'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',

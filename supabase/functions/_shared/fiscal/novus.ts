@@ -12,7 +12,7 @@ import type {
   FiscalInvoiceInput,
   FiscalSubmissionResult,
 } from './types.ts';
-import { isUnnamedLineName } from './types.ts';
+import { isUncodedMydataUnit, isUnnamedLineName } from './types.ts';
 
 export const NOVUS_SANDBOX_BASE = 'https://provider-dev.timologisi.online';
 export const NOVUS_PRODUCTION_BASE = 'https://provider.timologisi.online';
@@ -36,6 +36,23 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     throw new Error(
       `Refusing to transmit to myDATA: line(s) ${unnamed.join(', ')} have no product name ` +
         `(placeholder). Set a real description on each line before transmitting.`,
+    );
+  }
+
+  // Refuse to transmit a packaging or labour unit as the line's measurement unit. AADE codes
+  // exactly six (pieces, kg, litres, metres, m², m³); 'box' / 'pallet' / 'hour' have no code, and
+  // the platform's own UoM ladder exists to restate them — `convert_to_base_unit(product, qty,
+  // unit)` is the one conversion entry point. Sending the label verbatim would file a legal
+  // document whose stated unit AADE does not recognise. Blocking is recoverable; a wrong unit on
+  // a registered document is not.
+  const uncoded = lines
+    .filter((l) => isUncodedMydataUnit(l.measurementUnitLabel))
+    .map((l) => `${l.lineNumber} (${l.measurementUnitLabel})`);
+  if (uncoded.length) {
+    throw new Error(
+      `Refusing to transmit to myDATA: line(s) ${uncoded.join(', ')} use a unit with no AADE ` +
+        `measurement_unit code. Restate the quantity in pieces, kg, litres, metres, m² or m³ ` +
+        `before transmitting.`,
     );
   }
 

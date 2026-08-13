@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -20,7 +21,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 const OrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   const { activeWorkspaceId } = useWorkspace();
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
 

@@ -85,7 +85,9 @@ Deno.serve(withApiLogging('stripe-connect', async (req) => {
     });
   }
 
-  const returnUrl = body.return_url || `${Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr'}/admin/finance`;
+  // Where Stripe sends the operator back after onboarding. `/admin/finance` is not a route and
+  // never has been, so an onboarding that completed landed on the 404 page.
+  const returnUrl = body.return_url || `${Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr'}/finance`;
   const link = await stripe.accountLinks.create({
     account: accountId,
     refresh_url: returnUrl,

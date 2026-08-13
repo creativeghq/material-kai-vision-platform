@@ -145,6 +145,40 @@ export interface OrderListRow extends Order {
   party_name: string | null;
 }
 
+/**
+ * One of a party's orders with its settlement position attached — the shape behind the Orders
+ * list on the CRM Account tab and the Finance → Parties drill-down. See `partyOrderPosition`.
+ */
+export interface PartyOrderRow extends OrderListRow {
+  /** From `get_order_settlements`: the direction-correct half this order type settles on. */
+  settled: number;
+  /** From `get_order_settlements`: `total − settled`. Never recomputed from the two. */
+  outstanding: number;
+  /**
+   * What the ledger says the payment status is, kept SEPARATE from the stored `payment_status`
+   * column rather than overwriting it — `finance.order_payment_status_drift` exists precisely
+   * because those two can disagree, and a surface that silently replaces one with the other
+   * hides the disagreement it should be showing.
+   */
+  payment_status_derived: OrderPaymentStatus;
+  /** Has this order already become an invoice (sales) or a supplier bill (purchase)? */
+  invoiced: boolean;
+}
+
+export interface PartyOrderPosition {
+  rows: PartyOrderRow[];
+  stats: {
+    /** Non-cancelled orders for this party, either direction. */
+    count: number;
+    /** Their total value, incl. VAT. */
+    ordered: number;
+    /** Still-owed cash on orders nobody has invoiced yet, SIGNED (sales +, purchase −). */
+    owedNet: number;
+    /** Cash that has actually moved on those un-invoiced orders. */
+    settledUninvoiced: number;
+  };
+}
+
 export interface NewOrderItem {
   product_id?: string | null;
   description: string;
@@ -166,6 +200,13 @@ export interface LinePricing {
   measurement_unit_code: string | null;
   available: number | null;   // qty on hand across the workspace's warehouses (null = not stocked)
   supplier_company_id: string | null;  // product's default supplier, to seed the line
+  /**
+   * Which rung of the resolver's discount ladder actually won — `customer_override`,
+   * `level_category`, `quantity_break`, `quantity_break_price`, `none`, … Surfaced so the line
+   * can SAY why its price is what it is. A number that silently moves when you change the
+   * quantity reads as a bug; "pallet price applied" reads as the feature it is.
+   */
+  discount_source: string | null;
 }
 
 export type OrderDiscountType = 'percent' | 'amount';
@@ -458,15 +499,12 @@ export const ordersService = {
     // Batch the finance lookups (3 queries total, not 3 per order). We only need presence of an
     // invoice/bill plus the canonical settlement position — not the full getOrderFinance payload.
     // Settlement comes from `orderBalances` (the shared SQL definition), NOT from re-summing
-    // allocations here.
-    const [inv, bills, balances, settings] = await Promise.all([
-      supabase.from('invoices').select('order_id').in('order_id', ids),
-      supabase.from('supplier_bills').select('order_id').in('order_id', ids),
+    // allocations here; "has it been invoiced" comes from `invoicedOrderIds` for the same reason.
+    const [invoiced, balances, settings] = await Promise.all([
+      this.invoicedOrderIds(ids),
       this.orderBalances(ids),
       supabase.from('finance_settings').select('default_payment_terms_days').eq('workspace_id', opts.workspaceId).maybeSingle(),
     ]);
-    const invoiced = new Set<string>((inv.data ?? []).map((r: any) => r.order_id));
-    (bills.data ?? []).forEach((r: any) => invoiced.add(r.order_id));
 
     // Resolve category display names in one batch (orders now carry a finance category).
     const catIds = [...new Set(candidates.map((o) => o.category_id).filter(Boolean))] as string[];
@@ -544,6 +582,92 @@ export const ordersService = {
       });
     }
     return out;
+  },
+
+  /**
+   * Which of these orders have already become an invoice or a supplier bill — PRESENCE only.
+   *
+   * "Invoiced" decides whether an order's money is reported by the invoice/bill tiles or is still
+   * the order's own to report, so it must mean the same thing everywhere it is asked. Both
+   * `listUninvoicedOutstanding` (which drops invoiced orders out of AR/AP) and
+   * `partyOrderPosition` (which decides whose cash the party summary is allowed to count) read it
+   * from here. The money itself never comes from this function — that is `orderBalances`.
+   */
+  async invoicedOrderIds(orderIds: string[]): Promise<Set<string>> {
+    const out = new Set<string>();
+    if (orderIds.length === 0) return out;
+    const [inv, bills] = await Promise.all([
+      supabase.from('invoices').select('order_id').in('order_id', orderIds),
+      supabase.from('supplier_bills').select('order_id').in('order_id', orderIds),
+    ]);
+    for (const r of [...(inv.data ?? []), ...(bills.data ?? [])] as Array<{ order_id: string | null }>) {
+      if (r.order_id) out.add(r.order_id);
+    }
+    return out;
+  },
+
+  /**
+   * A party's whole ORDER position — the rows and the roll-up — in one call, so the CRM Account
+   * tab and the Finance → Parties drill-down cannot disagree about it.
+   *
+   * Why this exists: an order is not a financial document, so it is (correctly) absent from the
+   * party ledger and from `vw_finance_parties`. A customer who ordered €3,000, paid €3,000 and was
+   * never invoiced therefore read as "Invoiced €0 · Paid €0 · Outstanding €0" with a lone €3,000
+   * credit in the ledger — the money had moved and no tile could say what for.
+   *
+   * Every number here is DERIVED elsewhere and only assembled here:
+   *  • `settled` / `outstanding` / payment status ← `get_order_settlements` (`orderBalances`)
+   *  • `invoiced` ← `invoicedOrderIds`
+   *  • `owedNet` ← `listUninvoicedOutstanding`, signed by direction (a sales order they still owe
+   *    on is due to us; a purchase order we still owe on is due to them). Never sum those raw.
+   *
+   * `settledUninvoiced` is the number the invoice tiles structurally CANNOT show: cash that moved
+   * on orders which never became an invoice or a bill. Orders that HAVE been invoiced are excluded
+   * on purpose — `get_order_settlements` counts allocations made against the order's invoice too,
+   * so including them would print the same euro twice, once here and once as "Paid".
+   */
+  async partyOrderPosition(opts: {
+    workspaceId: string;
+    companyId?: string | null;
+    contactId?: string | null;
+  }): Promise<PartyOrderPosition> {
+    const empty: PartyOrderPosition = { rows: [], stats: { count: 0, ordered: 0, owedNet: 0, settledUninvoiced: 0 } };
+    if (!opts.companyId && !opts.contactId) return empty;
+    const party = { companyId: opts.companyId ?? undefined, contactId: opts.contactId ?? undefined };
+
+    const list = await this.list({ workspaceId: opts.workspaceId, ...party });
+    // Cancelled orders are not a position — they are a record that there isn't one.
+    const active = list.filter((o) => o.status !== 'cancelled');
+    if (active.length === 0) return empty;
+    const ids = active.map((o) => o.id);
+
+    const [balances, invoiced, uninvoiced] = await Promise.all([
+      this.orderBalances(ids),
+      this.invoicedOrderIds(ids),
+      this.listUninvoicedOutstanding({ workspaceId: opts.workspaceId, ...party }),
+    ]);
+
+    const rows: PartyOrderRow[] = active.map((o) => {
+      const b = balances.get(o.id);
+      return {
+        ...o,
+        settled: b?.settled ?? 0,
+        outstanding: b?.outstanding ?? Number(o.total),
+        payment_status_derived: b?.payment_status ?? o.payment_status,
+        invoiced: invoiced.has(o.id),
+      };
+    });
+
+    return {
+      rows,
+      stats: {
+        count: active.length,
+        ordered: active.reduce((a, o) => a + Number(o.total), 0),
+        owedNet: uninvoiced.reduce(
+          (a, o) => a + (o.order_type === 'purchase' ? -o.outstanding : o.outstanding), 0),
+        settledUninvoiced: rows.filter((r) => !r.invoiced).reduce((a, r) => a + r.settled, 0),
+      },
+    };
   },
 
   async get(id: string): Promise<{ order: Order; items: OrderItem[] }> {
@@ -1267,6 +1391,19 @@ export const ordersService = {
   async resolveLinePricing(opts: {
     workspaceId: string; productId: string; orderType: OrderType;
     companyId?: string | null; contactId?: string | null;
+    /**
+     * The line's quantity and unit, so `product_price_breaks` can fire (#347 defect 16).
+     *
+     * These were never passed, so a configured break — "from 5 pallets, 15% off" — could not
+     * apply to a human-entered order line, while the agent path (`quote-tools.ts`) passed them
+     * and got the discount. Same product, same customer, two prices.
+     *
+     * Pass them TOGETHER or not at all. `get_product_price_break` does
+     * `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity with the wrong
+     * or missing unit is silently treated as already being in base units and can match the
+     * wrong threshold — the exact 1:1 assumption the UoM ladder exists to prevent.
+     */
+    quantity?: number | null; unit?: string | null;
   }): Promise<LinePricing> {
     const [{ data: prod }, available] = await Promise.all([
       supabase.from('products').select('cost, supplier_company_id').eq('id', opts.productId).maybeSingle(),
@@ -1278,22 +1415,32 @@ export const ordersService = {
     const cost = prod?.cost != null ? Number(prod.cost) : null;
     const supplier = (prod?.supplier_company_id as string | null) ?? null;
     if (opts.orderType === 'purchase') {
-      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier };
+      // A purchase line pays cost, and `product_price_breaks` is sell-side by construction
+      // (`level_key` = the CUSTOMER's tier). Supplier-side quantity tiers do not exist yet —
+      // #347 phase 7.3 — so this deliberately does not consult the resolver at all.
+      return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: null };
     }
     try {
+      // Quantity + unit travel together or not at all — see the note on `opts.quantity`.
+      const hasQty = opts.quantity != null && Number.isFinite(Number(opts.quantity)) && Number(opts.quantity) > 0;
+      const qtyArgs = hasQty && opts.unit
+        ? { p_quantity: Number(opts.quantity), p_unit: opts.unit }
+        : {};
       const { data } = await supabase.rpc('get_product_price_for_workspace', {
         p_workspace_id: opts.workspaceId, p_product_id: opts.productId,
         p_company_id: opts.companyId ?? null, p_contact_id: opts.contactId ?? null, p_audience: 'seller',
+        ...qtyArgs,
       });
-      const r = (data ?? {}) as { final_sell?: number; retail?: number; cost_basis?: number; discount_pct?: number };
+      const r = (data ?? {}) as { final_sell?: number; retail?: number; cost_basis?: number; discount_pct?: number; discount_source?: string };
       return {
         unit_price: r.final_sell != null ? Number(r.final_sell) : (r.retail != null ? Number(r.retail) : null),
         unit_cost: r.cost_basis != null ? Number(r.cost_basis) : cost,
         discount_pct: r.discount_pct != null ? Number(r.discount_pct) : null,
         measurement_unit_code: unit, available, supplier_company_id: supplier,
+        discount_source: r.discount_source ?? null,
       };
     } catch {
-      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier };
+      return { unit_price: null, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: null };
     }
   },
 

@@ -569,12 +569,21 @@ export class QuotesService {
         quoteWorkspaceId = quote.workspace_id;
         // Pass the quote's customer so the resolver applies their pricing-level discount.
         // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
+        // Quantity + unit so `product_price_breaks` can fire (#347 defect 16). They travel
+        // together or not at all: `get_product_price_break` does
+        // `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity sent without
+        // its unit is silently read as already being in base units and can match the wrong
+        // threshold — "5 pallets" firing at 5 pieces is exactly what the UoM ladder prevents.
+        const breakArgs = customUnit && qtyNow > 0
+          ? { p_quantity: qtyNow, p_unit: customUnit }
+          : {};
         const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
           p_workspace_id: quote.workspace_id,
           p_product_id: data.product_id,
           p_company_id: quote.customer_company_id ?? null,
           p_contact_id: quote.customer_contact_id ?? null,
           p_audience: 'seller',
+          ...breakArgs,
         });
         const p: any = priced;
         if (p && typeof p === 'object') {
@@ -764,7 +773,7 @@ export class QuotesService {
     if (data.unit_price !== undefined || data.discounted_price !== undefined || data.quantity !== undefined) {
       const { data: current } = await supabase
         .from('quote_items')
-        .select('unit_price, discounted_price, quantity, quote_id, product_id')
+        .select('unit_price, discounted_price, quantity, quote_id, product_id, custom_unit')
         .eq('id', itemId)
         .single();
       if (current) {
@@ -782,16 +791,25 @@ export class QuotesService {
               .select('workspace_id, customer_company_id, customer_contact_id')
               .eq('id', current.quote_id).single();
             if (q?.workspace_id) {
+              // ONE read of the product metadata, before the resolver call, feeding both the
+              // break unit and the Layer-B category. It used to be fetched afterwards, which is
+              // precisely why this branch — the "quantity changed, reprice" path — could not tell
+              // the resolver what unit the new quantity was in, and so never fired a break.
+              const { data: prod } = await supabase.from('products').select('metadata').eq('id', current.product_id).single();
+              const cat = prod?.metadata?.material_category ?? null;
+              const unit: string | null = prod?.metadata?.unit ?? current.custom_unit ?? null;
+              // Together or not at all — an unconvertible/absent unit makes the resolver read the
+              // raw quantity as base units and match the wrong threshold.
+              const breakArgs = unit && qty > 0 ? { p_quantity: qty, p_unit: unit } : {};
               const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
                 p_workspace_id: q.workspace_id, p_product_id: current.product_id,
                 p_company_id: q.customer_company_id ?? null, p_contact_id: q.customer_contact_id ?? null,
                 p_audience: 'seller',
+                ...breakArgs,
               });
               const p: any = priced;
               let recomputed = p?.suggested_sell != null ? Number(p.suggested_sell) : null;
               if (recomputed != null) {
-                const { data: prod } = await supabase.from('products').select('metadata').eq('id', current.product_id).single();
-                const cat = prod?.metadata?.material_category ?? null;
                 if (cat) {
                   const factor = await this._layerBFactor(q.workspace_id, cat, qty);
                   if (factor < 1) recomputed = Math.round(recomputed * factor * 100) / 100;

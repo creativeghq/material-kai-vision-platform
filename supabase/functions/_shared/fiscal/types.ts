@@ -46,6 +46,35 @@ export function isUnnamedLineName(desc: string | null | undefined): boolean {
   return UNNAMED_LINE_SENTINELS.has(String(desc ?? '').trim().toLowerCase());
 }
 
+/**
+ * Units that exist in our catalogue but have NO AADE `measurement_unit` code.
+ *
+ * `mydata_reference` category `measurement_unit` holds exactly six codes (pieces, kg, litres,
+ * metres, m², m³). Everything below is a packaging or labour unit we let operators pick because
+ * it is how the trade actually talks — a tile order is placed in boxes and pallets — and it must
+ * be converted to a coded unit before a line reaches myDATA. `src/lib/units.ts` says so in the
+ * comment on `mydataCode: null`; nothing enforced it, so 'pallet' could be transmitted verbatim
+ * as the measurement unit of an AADE-registered legal document.
+ *
+ * **Twin of the `mydataCode === null` entries in [src/lib/units.ts](../../../../src/lib/units.ts).**
+ * An edge function cannot import from `src/`, so the set is restated here and held equal by
+ * [tests/unit/fiscalUnitParity.test.ts](../../../../tests/unit/fiscalUnitParity.test.ts) — the same
+ * arrangement `escapeHtml` uses across its three runtimes, and for the same reason: the last time
+ * a value like this was hand-copied without a test, the copies drifted.
+ *
+ * Deliberately an explicit set rather than "anything not in the coded six": historical rows carry
+ * aliases ('sqm', 'm²', 'τεμ', 'item') that normalise to a coded unit, and blocking those would
+ * refuse transmissions that are perfectly valid today.
+ */
+export const UNCODED_MYDATA_UNITS = new Set([
+  'box', 'pallet', 'set', 'hour', 'day', 'job', 'point', 'room', 'bath',
+]);
+
+/** True when this unit cannot be transmitted to myDATA as-is and needs converting first. */
+export function isUncodedMydataUnit(unit: string | null | undefined): boolean {
+  return UNCODED_MYDATA_UNITS.has(String(unit ?? '').trim().toLowerCase());
+}
+
 export interface FiscalLine {
   lineNumber: number;
   code?: string;

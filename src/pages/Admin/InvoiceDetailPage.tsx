@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import {
   Loader2,
   FileText,
@@ -41,7 +42,7 @@ const MOVE_PURPOSE_LABELS: Record<string, string> = {
 
 const InvoiceDetailPage: React.FC = () => {
   const { invoiceId } = useParams<{ invoiceId: string }>();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   const { toast } = useToast();
   const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null);
   const [loading, setLoading] = useState(true);

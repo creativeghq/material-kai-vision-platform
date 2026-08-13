@@ -228,6 +228,35 @@ describe('the route table itself', () => {
     // five action_urls pointed there and it has never been a route.
     expect(routeExists('/admin/finance')).toBe(false);
   });
+
+  /**
+   * The other half of the same prefix, and the half a URL-literal scan cannot see.
+   *
+   * Six components built their finance links off
+   *     useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance'
+   * to mirror a mount point Finance does not have (CRM does — `/admin/crm/*` is real). Every link
+   * they produced from an admin page resolved to the `path="*"` catch-all: an order opened from a
+   * CRM timeline, a covering purchase order opened from a sale, an invoice opened right after it
+   * was created. The scans below never saw it, because the URL is only a URL at runtime — in the
+   * source it is a template hole.
+   *
+   * So the assertion is on the PREFIX, not on the assembled path: nothing in `src` may name
+   * `/admin/finance` at all. `FINANCE_BASE` (src/modules/finance/routes.ts) is the one answer.
+   */
+  it('never names the /admin/finance prefix in source — it has never been a route', () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles) {
+      blankComments(read(file)).split('\n').forEach((line, i) => {
+        if (line.includes('/admin/finance')) offenders.push(`${rel(file)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      });
+    }
+    expect(
+      offenders,
+      'Finance is mounted at /finance and nowhere else (src/modules/finance/index.ts registers no ' +
+      'routes). Import FINANCE_BASE from @/modules/finance/routes instead of building an ' +
+      '/admin-prefixed one.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
 });
 
 describe('notification action_url', () => {

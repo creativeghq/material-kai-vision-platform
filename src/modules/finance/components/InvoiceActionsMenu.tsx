@@ -34,7 +34,7 @@ import { formatDate } from '@/utils/datetime';
 
 interface Props {
   invoiceId: string;
-  financeBase: string;          // '/finance' | '/admin/finance'
+  financeBase: string;          // always FINANCE_BASE — '/finance'
   fiscalStatus?: string | null; // when known by the caller (skips a fetch)
   fiscalMark?: string | null;
   status?: string | null;

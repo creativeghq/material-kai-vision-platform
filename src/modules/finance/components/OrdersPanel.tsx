@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent } from 'lucide-react';
@@ -176,7 +177,7 @@ export const OrdersPanel: React.FC<{
   const embedded = !!(companyId || contactId);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -484,7 +485,22 @@ export const OrdersPanel: React.FC<{
 
 // ---------------------------------------------------------------------------
 
-export type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null; supplier_company_id?: string | null };
+export type Line = {
+  product_id?: string | null; description: string; quantity: number; unit_price: number;
+  unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null;
+  supplier_company_id?: string | null;
+  /**
+   * True while the price is the RESOLVER's answer, false once a human has typed over it.
+   *
+   * Quantity-break repricing has to update the price when the quantity or unit changes — that is
+   * the whole point of "5 pallets is cheaper per m²" — but it must never overwrite a figure the
+   * operator entered deliberately. Without this flag those two requirements are in direct
+   * conflict and one of them loses silently.
+   */
+  price_auto?: boolean;
+  /** Which ladder rung the resolver applied, so the line can say why the price moved. */
+  price_source?: string | null;
+};
 const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null, supplier_company_id: null });
 
 
@@ -819,26 +835,75 @@ export const NewOrderModal: React.FC<{
       return;
     }
     setItem(i, { product_id: p.id, description: p.name });
+    setLinkedNames((m) => ({ ...m, [i]: p.name }));
     setActiveLine(null); setLineProdOpts([]);
     // Customer-aware pricing: the resolver applies this customer's level/discount off retail
     // (sales) → unit price + cost + unit; purchase → cost as both. So the order reflects the
     // catalog and the customer's deal out of the box. All still editable.
     try {
+      const line = items[i];
       const pr = await ordersService.resolveLinePricing({
         workspaceId, productId: p.id, orderType,
         companyId: party?.type === 'company' ? party.id : null,
         contactId: party?.type === 'contact' ? party.id : null,
+        quantity: line?.quantity ?? 1, unit: line?.unit_code ?? DEFAULT_UNIT,
       });
       setItems((ls) => ls.map((l, idx) => {
         if (idx !== i) return l;
-        const next: Line = { ...l, available: pr.available, supplier_company_id: pr.supplier_company_id };
+        const next: Line = { ...l, available: pr.available, supplier_company_id: pr.supplier_company_id, price_source: pr.discount_source };
         if (pr.unit_cost != null) next.unit_cost = pr.unit_cost;
         if (pr.measurement_unit_code) next.unit_code = pr.measurement_unit_code;
-        if (pr.unit_price != null && (!l.unit_price || l.unit_price === 0)) next.unit_price = pr.unit_price;
+        if (pr.unit_price != null && (!l.unit_price || l.unit_price === 0)) {
+          next.unit_price = pr.unit_price;
+          next.price_auto = true;
+        }
         return next;
       }));
     } catch { /* pricing is best-effort — line still works with manual cost/price */ }
   };
+
+  /**
+   * Reprice catalog lines when the QUANTITY or UNIT changes — not only when a product is picked.
+   *
+   * `product_price_breaks` is unit-aware and threshold-based ("from 5 pallets, 15% off"), so the
+   * price is a function of quantity. Resolving once at pick time meant a break could only ever
+   * fire if the operator happened to type the quantity first, which nobody does. Debounced so it
+   * settles on a committed value instead of firing per keystroke, and restricted to lines whose
+   * price we filled — `price_auto` — so a figure someone typed is never overwritten underneath
+   * them. Purchase lines are skipped: their price is cost, and there is no buy-side break model.
+   */
+  const repriceKey = items.map((l) => `${l.product_id ?? ''}:${l.quantity}:${l.unit_code}:${l.price_auto ? 1 : 0}`).join('|');
+  useEffect(() => {
+    if (locked || orderType === 'purchase') return;
+    const targets = items
+      .map((l, idx) => ({ l, idx }))
+      .filter(({ l }) => l.product_id && l.price_auto && (Number(l.quantity) || 0) > 0);
+    if (targets.length === 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      for (const { l, idx } of targets) {
+        try {
+          const pr = await ordersService.resolveLinePricing({
+            workspaceId, productId: l.product_id as string, orderType,
+            companyId: party?.type === 'company' ? party.id : null,
+            contactId: party?.type === 'contact' ? party.id : null,
+            quantity: Number(l.quantity), unit: l.unit_code,
+          });
+          if (cancelled || pr.unit_price == null) continue;
+          setItems((ls) => ls.map((row, j) => (
+            // Re-check price_auto against CURRENT state: the operator may have typed into the
+            // line while the request was in flight, and the resolver's answer is stale the
+            // moment they do.
+            j === idx && row.price_auto && row.product_id === l.product_id
+              ? { ...row, unit_price: pr.unit_price as number, price_source: pr.discount_source }
+              : row
+          )));
+        } catch { /* best-effort — the line keeps its current price */ }
+      }
+    }, 500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repriceKey, locked, orderType, workspaceId, party?.id, party?.type]);
 
   const calc = items.map((l) => {
     const net = (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
@@ -1248,10 +1313,24 @@ export const NewOrderModal: React.FC<{
                         )}
                       </div>
                     ) : (
+                    <>
                     <Input className="h-8 text-sm" value={l.description}
-                      onChange={(e) => { setItem(i, { description: e.target.value, product_id: null }); setActiveLine(i); }}
+                      onChange={(e) => { setItem(i, { description: e.target.value }); setActiveLine(i); }}
                       onFocus={() => setActiveLine(i)}
                       placeholder="Search a product or type a new one…" />
+                    {/* Editing the text RENAMES the line; it does not detach it from the catalog.
+                        Nulling product_id on every keystroke meant typing a size into a line's
+                        wording silently cost it the warehouse link — and without a product_id
+                        neither `receive_order_into_warehouse` nor `_deliver_order_line_core` can
+                        move stock for it, with no error anywhere. So the link is stated, and
+                        breaking it is a choice someone makes on purpose. */}
+                    {l.product_id && (
+                      <button type="button" className="mt-0.5 text-[10px] text-emerald-600 hover:underline"
+                        onClick={() => { setItem(i, { product_id: null }); setLinkedNames((m) => { const n = { ...m }; delete n[i]; return n; }); }}>
+                        → {linkedNames[i] ?? 'linked to catalog'} · unlink
+                      </button>
+                    )}
+                    </>
                     )}
                     {activeLine === i && lineProdOpts.length > 0 && (
                       <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
@@ -1288,7 +1367,8 @@ export const NewOrderModal: React.FC<{
                   )}
                   {/* Sales: unit price. Purchase: this IS the cost (mirror into unit_cost on save). */}
                   {locked ? <span className="text-right text-sm tabular-nums">{formatMoney(l.unit_price)}</span> : (
-                    <MoneyInput className="h-8 text-right text-sm px-1" value={l.unit_price} onValueChange={(v) => setItem(i, { unit_price: v ?? 0 })} />
+                    <MoneyInput className="h-8 text-right text-sm px-1" value={l.unit_price}
+                      onValueChange={(v) => setItem(i, { unit_price: v ?? 0, price_auto: false, price_source: null })} />
                   )}
                   {isSales && (
                     <MoneyInput className="h-8 text-right text-sm px-1" placeholder="—" value={l.unit_cost} onValueChange={(v) => setItem(i, { unit_cost: v })} title="What this costs us — auto-filled from the catalog, editable" />
@@ -1307,6 +1387,15 @@ export const NewOrderModal: React.FC<{
                 {short && (
                   <div className="px-2 pb-1.5 -mt-0.5 text-[11px] text-amber-600 flex items-center gap-1 min-w-[640px]">
                     <PackageCheck className="h-3 w-3" /> Only {l.available} in stock — ordering {Number(l.quantity)}. You can still proceed (back-order); a purchase order restocks it.
+                  </div>
+                )}
+                {/* Say WHY the price moved. A unit price that changes on its own when the
+                    quantity is edited reads as a glitch unless the line names the rule that
+                    did it — `discount_source` is what the resolver already returns for exactly
+                    this question. */}
+                {(l.price_source === 'quantity_break' || l.price_source === 'quantity_break_price') && (
+                  <div className="px-2 pb-1.5 -mt-0.5 text-[11px] text-emerald-600 min-w-[640px]">
+                    Quantity price applied at {Number(l.quantity)} {UNIT_OPTIONS.find((u) => u.code === l.unit_code)?.label ?? l.unit_code}.
                   </div>
                 )}
                 </React.Fragment>
@@ -1478,14 +1567,20 @@ export const orderPartyRef = (o: Pick<Order, 'order_type' | 'customer_company_id
   return null;
 };
 
+/** A heading inside the order's Actions menu. That menu spans four kinds of work — money, fiscal
+ *  documents, fulfilment, editing — and read as one flat list of thirteen verbs it was scanned end
+ *  to end every time. Headings ONLY: no entry carries a second explanatory line, because a menu is
+ *  a list of verbs and what an action means belongs in the panel it opens (or its tooltip). */
+const MenuGroup: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">{children}</DropdownMenuLabel>
+);
+
 /** Exported so the dedicated order page (`/finance/orders/:orderId`) renders the SAME detail
  *  surface as the list's row click — one order form, two entry points, no second copy. */
 export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  // Mirror the mount point. Hardcoded '/finance/...' links threw an admin-shell user out of the
-  // shell the moment they created an invoice or followed a covered-by link.
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
@@ -2395,11 +2490,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // the SHARED rule — never from `customer_company_id`, which calls a sole trader (a contact
   // carrying an ΑΦΜ) retail and proposes an ΑΛΠ to a business.
   const salesDocKind: SalesDocumentKind = salesDocumentKindFor(buyerIdentity);
-  /** The payment "Payment receipt" issues against — the most recent money-in on this order. */
-  const latestMoneyIn = useMemo(() => {
-    const ins = (fin?.payments ?? []).filter((p) => p.direction === 'in');
-    return ins.length ? [...ins].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1))[0] : null;
-  }, [fin]);
+  /**
+   * Every money-in on this order, newest first.
+   *
+   * A payment receipt is issued against ONE PAYMENT — the PDF renders that payment's amount and
+   * date — so on an order that has taken several there is no "the" receipt for a menu to offer.
+   * Printing an amount on the entry was worse than saying nothing: it named one payment as if it
+   * were the answer while more money could still land on the same order, and the operator sets
+   * what a receipt is for from their side, not from whichever row happens to be newest. So the
+   * entry carries no figure, and with more than one money-in it hands the choice to the Payments
+   * tab, where every row issues its own receipt.
+   */
+  const moneyIns = useMemo(
+    () => [...(fin?.payments ?? []).filter((p) => p.direction === 'in')].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)),
+    [fin],
+  );
+  const latestMoneyIn = moneyIns[0] ?? null;
 
   /**
    * The documents an order can produce, offered as a choice rather than as one derived button.
@@ -2415,13 +2521,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    *    and an order can produce as many as it has payments — hence its own group below the line.
    */
   const invoiceBlocked = salesDocKind === 'receipt';
+  const canIssueSalesDoc = order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
   const salesDocumentItems = (
     <>
-      {order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+      {canIssueSalesDoc && (
         <>
-          <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Fiscal document · myDATA
-          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <MenuGroup>Fiscal document · myDATA</MenuGroup>
           <DropdownMenuItem
             disabled={saving || invoiceBlocked}
             onClick={() => void createSalesDocument('invoice')}
@@ -2446,23 +2552,33 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       )}
       {latestMoneyIn && (
         <>
-          {order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && <DropdownMenuSeparator />}
+          <DropdownMenuSeparator />
+          <MenuGroup>Proof of payment</MenuGroup>
           <DropdownMenuItem
             disabled={saving}
-            onClick={() => void createPaymentReceipt()}
-            title="Proof that the money was received. Not a sales document and never transmitted to myDATA.">
+            onClick={() => { if (moneyIns.length > 1) { setActiveTab('payments'); return; } void createPaymentReceipt(); }}
+            title={moneyIns.length > 1
+              ? 'Proof that money was received. It is issued against ONE payment and this order has taken several — pick the one it covers on the Payments tab.'
+              : 'Proof that the money was received. Not a sales document and never transmitted to myDATA.'}>
             <Banknote className="h-3.5 w-3.5 mr-2 text-emerald-500" />
-            <span className="flex-1">
-              Payment receipt <span className="text-muted-foreground">· εισπράξεως</span>
-              <span className="block text-[10px] text-muted-foreground">
-                {formatMoney(latestMoneyIn.amount, latestMoneyIn.currency)} · {formatDate(latestMoneyIn.paid_at)}
-              </span>
-            </span>
+            <span className="flex-1">Payment receipt <span className="text-muted-foreground">· εισπράξεως</span></span>
           </DropdownMenuItem>
         </>
       )}
     </>
   );
+  // The Actions menu's fulfilment band. Hoisted out of the JSX so the band's HEADING can be
+  // suppressed when every entry under it is hidden — a purchase order that is already handed off,
+  // fulfilled and paired leaves it empty, and a heading over nothing reads as a broken menu.
+  const canSendInApp = order?.order_type === 'purchase' && !!handoff?.available && !order.paired_order_id;
+  const canEmailSupplier = order?.order_type === 'purchase' && !order.paired_order_id;
+  const canReceiveIntoWarehouse = order?.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled';
+  const canCoverShortfall = order?.order_type === 'sales' && (order.status === 'confirmed' || order.status === 'partially_fulfilled');
+  const canOpenDispatch = order?.order_type === 'sales';
+  const canMarkCompleted = !!order && order.status !== 'fulfilled' && order.status !== 'cancelled';
+  const hasFulfilmentActions = canSendInApp || canEmailSupplier || canReceiveIntoWarehouse
+    || canCoverShortfall || canOpenDispatch || canMarkCompleted;
+
   // Remaining owed per supplier → drives per-line "Mark paid" visibility: once a line's supplier is
   // fully settled, its "Mark paid" button hides (nothing left to pay).
   //
@@ -2473,6 +2589,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // "Mark paid" — and pressing it books a SECOND payable for one delivery, the precise mistake the
   // rollup's own Pay button was already fixed to stop making.
   const supplierOwedById = new Map(supExposure.map((s) => [s.supplier_company_id, supplierOwedAfterCover(s).owed]));
+
+  /**
+   * Cash paid to suppliers FOR this sale that is tagged to the purchase order raised to cover it.
+   *
+   * The same deferral `supplierOwedAfterCover` makes for what is still owed, applied to what has
+   * already gone out. `fin.paid_out` only sees payments whose `payments.order_id` is this order,
+   * and a covering PO's bill and payment both carry the PURCHASE's id — so a sale whose supplier
+   * had been paid in full showed "Paid to suppliers €0.00" directly under a "Covered by" block
+   * that said the purchase was paid. Two answers to one question, on the same screen.
+   *
+   * `settled` comes from `get_order_settlements` already direction-resolved (a purchase settles on
+   * money OUT). This only ADDS UP answers the derivation gave; it does not re-derive one, and it
+   * cannot double-count — a payment carries a single `order_id`.
+   */
+  const coverPaid = coveredBy.reduce((a, c) => a + c.settled, 0);
 
   // The CRM record this order is with — same derivation the name fetch used.
   const party = order ? orderPartyRef(order) : null;
@@ -2650,12 +2781,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
+                    {/* Grouped by the KIND of work, in the order an order moves through them:
+                        money → the documents it produces → getting the goods there → editing and
+                        reuse. One line per item, no explanatory second line: a menu is a list of
+                        verbs. What the action means belongs in the panel it opens, or in its
+                        tooltip — the direction here, for instance, is already carried by the arrow
+                        and its colour. */}
+                    <MenuGroup>Money</MenuGroup>
                     {/* The order's own settlement: a sale is settled by the customer paying us, a
                         purchase by us paying the supplier. Same action, opposite direction — the
                         label followed the sales case on both and so read as a lie on a purchase. */}
-                    {/* One line per item, no explanatory second line: a menu is a list of verbs.
-                        What the action means belongs in the panel it opens — the direction here,
-                        for instance, is already carried by the arrow and its colour. */}
                     <DropdownMenuItem onClick={() => setPayInOpen({ amount: outstanding > 0.005 ? outstanding : undefined })}>
                       {order.order_type === 'purchase'
                         ? <ArrowUpRight className="h-3.5 w-3.5 mr-2 text-red-400" />
@@ -2691,35 +2826,55 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         by itself, so an order with the customer's cash available against it is
                         already settled by the time this menu opens — and asking the operator to
                         apply it by hand was the whole complication we removed. */}
-                    <DropdownMenuSeparator />
                     {salesDocumentItems}
-                    {/* In-app first when the supplier is on the platform (claimed identity); the
-                        email PDF stays as the universal fallback. Once handed off, neither shows —
-                        the round-trip status in the header is the record. */}
-                    {order.order_type === 'purchase' && handoff?.available && !order.paired_order_id && (
-                      <DropdownMenuItem onClick={sendToSupplierInApp}>
-                        <Send className="h-3.5 w-3.5 mr-2 text-primary" />
-                        Send in-app{handoff.supplierWorkspaceName ? ` to ${handoff.supplierWorkspaceName}` : ''}
-                      </DropdownMenuItem>
+                    {hasFulfilmentActions && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <MenuGroup>Fulfilment</MenuGroup>
+                        {/* In-app first when the supplier is on the platform (claimed identity); the
+                            email PDF stays as the universal fallback. Once handed off, neither shows —
+                            the round-trip status in the header is the record. */}
+                        {canSendInApp && (
+                          <DropdownMenuItem onClick={sendToSupplierInApp}>
+                            <Send className="h-3.5 w-3.5 mr-2 text-primary" />
+                            Send in-app{handoff?.supplierWorkspaceName ? ` to ${handoff.supplierWorkspaceName}` : ''}
+                          </DropdownMenuItem>
+                        )}
+                        {canEmailSupplier && (
+                          <DropdownMenuItem onClick={sendToSupplier}>
+                            <Send className="h-3.5 w-3.5 mr-2" /> {handoff?.available ? 'Email to supplier (PDF)' : 'Send to supplier'}
+                          </DropdownMenuItem>
+                        )}
+                        {canReceiveIntoWarehouse && (
+                          <DropdownMenuItem onClick={receiveWarehouse}>
+                            <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive into warehouse
+                          </DropdownMenuItem>
+                        )}
+                        {canCoverShortfall && (
+                          <DropdownMenuItem onClick={coverShortfall}>
+                            <PackagePlus className="h-3.5 w-3.5 mr-2 text-amber-500" /> Cover shortfall from suppliers
+                          </DropdownMenuItem>
+                        )}
+                        {canOpenDispatch && (
+                          <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
+                            <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
+                          </DropdownMenuItem>
+                        )}
+                        {/* Derived from the delivered quantities; setting it here is reverted by
+                            the next delivery edit. Marks every line delivered instead, which is
+                            what 'completed' actually means and what the derivation reads. */}
+                        {canMarkCompleted && (
+                          <DropdownMenuItem onClick={() => void markAllDelivered()}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
+                          </DropdownMenuItem>
+                        )}
+                      </>
                     )}
-                    {order.order_type === 'purchase' && !order.paired_order_id && (
-                      <DropdownMenuItem onClick={sendToSupplier}>
-                        <Send className="h-3.5 w-3.5 mr-2" /> {handoff?.available ? 'Email to supplier (PDF)' : 'Send to supplier'}
-                      </DropdownMenuItem>
-                    )}
-                    {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
-                      <DropdownMenuItem onClick={receiveWarehouse}>
-                        <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive into warehouse
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuSeparator />
+                    <MenuGroup>Edit &amp; reuse</MenuGroup>
                     {editable && !editing && (
                       <DropdownMenuItem onClick={startEdit}>
                         <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
-                      </DropdownMenuItem>
-                    )}
-                    {order.order_type === 'sales' && (order.status === 'confirmed' || order.status === 'partially_fulfilled') && (
-                      <DropdownMenuItem onClick={coverShortfall}>
-                        <PackagePlus className="h-3.5 w-3.5 mr-2 text-amber-500" /> Cover shortfall from suppliers
                       </DropdownMenuItem>
                     )}
                     {/* One action, not two. "Re-order" and "Duplicate order" differed only in which
@@ -2735,22 +2890,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     <DropdownMenuItem onClick={() => setSaveTemplateOpen(true)}>
                       <Layers className="h-3.5 w-3.5 mr-2" /> Save as template
                     </DropdownMenuItem>
-                    {order.order_type === 'sales' && (
-                      <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
-                        <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
-                      </DropdownMenuItem>
-                    )}
-                    {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
-                      <>
-                        <DropdownMenuSeparator />
-                        {/* Derived from the delivered quantities; setting it here is reverted by
-                            the next delivery edit. Marks every line delivered instead, which is
-                            what 'completed' actually means and what the derivation reads. */}
-                        <DropdownMenuItem onClick={() => void markAllDelivered()}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
-                        </DropdownMenuItem>
-                      </>
-                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -3105,7 +3244,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   return (
                   <React.Fragment key={i}>
                   <div className={`grid ${order.order_type === 'sales' ? 'grid-cols-[1fr_52px_60px_80px_80px_84px_24px]' : 'grid-cols-[1fr_52px_60px_80px_84px_24px]'} items-center gap-2 border-t border-border/40 px-2 py-1.5`}>
-                    <Input className="h-8 text-sm" value={l.description} onChange={(e) => setEditItem(i, { description: e.target.value, product_id: null })} placeholder="Product…" />
+                    {/* Same rule as the new-order form: editing the wording renames the line, it
+                        does not unlink the catalog product. A line with no product_id cannot be
+                        received or dispatched, and losing it to a keystroke was invisible. */}
+                    <div>
+                      <Input className="h-8 text-sm" value={l.description} onChange={(e) => setEditItem(i, { description: e.target.value })} placeholder="Product…" />
+                      {l.product_id && (
+                        <button type="button" className="mt-0.5 text-[10px] text-emerald-600 hover:underline"
+                          onClick={() => setEditItem(i, { product_id: null, available: null })}>
+                          → {productNames.get(l.product_id) ?? 'linked to catalog'} · unlink
+                        </button>
+                      )}
+                    </div>
                     <MoneyInput className="h-8 text-right text-sm px-1" displayDecimals={null} value={l.quantity} onValueChange={(v) => setEditItem(i, { quantity: v ?? 0 })} />
                     <Select value={l.unit_code} onValueChange={(v) => setEditItem(i, { unit_code: v })}>
                       <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
@@ -3156,7 +3306,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 )}
                 <div className="rounded-md border border-border/60 p-2">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{isSalesOrder ? 'Paid to suppliers' : 'Paid to supplier'}</div>
-                  <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out, order.currency)}</div>
+                  <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out + coverPaid, order.currency)}</div>
+                  {/* Named, not folded in silently: the cash left on a different order and the
+                      operator has to be able to find it. */}
+                  {coverPaid > 0.005 && (
+                    <div className="text-[10px] text-muted-foreground">
+                      {fin.paid_out > 0.005 ? `${formatMoney(coverPaid, order.currency)} of it on ` : 'on '}
+                      {coveredBy.length === 1 ? (coveredBy[0].order_number ?? 'the covering purchase order') : `${coveredBy.length} covering purchase orders`}
+                    </div>
+                  )}
                 </div>
                 {isSalesOrder && (
                   <div className="rounded-md border border-border/60 p-2">
@@ -3164,7 +3322,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       Net cash (in − out)
                       <span title="Cash in the bank now. It differs from Profit because part of the profit is still unpaid (customer / suppliers) and because VAT you've collected sits here until you remit it to the tax office.">ⓘ</span>
                     </div>
-                    <div className={`text-sm font-semibold ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</div>
+                    {/* `fin.profit` is received − paid_out and so misses the covering order's cash
+                        exactly as the tile beside it did. Netting the two figures SHOWN here keeps
+                        the row internally consistent — a net cash that disagrees with the two
+                        halves printed next to it is how the last settlement bug read. */}
+                    <div className={`text-sm font-semibold ${fin.received - fin.paid_out - coverPaid >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.received - fin.paid_out - coverPaid, order.currency)}</div>
                   </div>
                 )}
               </div>

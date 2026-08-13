@@ -2957,11 +2957,19 @@ const _financeServiceV2 = {
     return (data ?? []) as PartyRow[];
   },
 
+  /**
+   * One party's documents for the Finance drill-down.
+   *
+   * Payments come through `listPayments` rather than a bare `select('*')` so each row carries what
+   * it was APPLIED to (`settled`) and what is still on account (`unallocated`). Without that, a
+   * deposit taken against an order showed up as an unexplained amount: it counts towards no
+   * invoice, so every tile on the page reads €0 next to it.
+   */
   async getPartyDetail(opts: { workspaceId: string; partyType: 'company'|'contact'; partyId: string }): Promise<{
     party: PartyRow | null;
     invoices: Invoice[];
     bills: SupplierBill[];
-    payments: Payment[];
+    payments: PaymentWithAllocation[];
   }> {
     const partyP = supabase.from('vw_finance_parties').select('*')
       .eq('workspace_id', opts.workspaceId)
@@ -2977,20 +2985,21 @@ const _financeServiceV2 = {
       ? supabase.from('supplier_bills').select('*').eq('supplier_company_id', opts.partyId).order('issued_at', { ascending: false, nullsFirst: false })
       : supabase.from('supplier_bills').select('*').eq('supplier_contact_id', opts.partyId).order('issued_at', { ascending: false, nullsFirst: false });
 
-    const paymentsP = opts.partyType === 'company'
-      ? supabase.from('payments').select('*').eq('counterparty_company_id', opts.partyId).order('paid_at', { ascending: false })
-      : supabase.from('payments').select('*').eq('counterparty_contact_id', opts.partyId).order('paid_at', { ascending: false });
+    const paymentsP = financeService.listPayments({
+      workspaceId: opts.workspaceId,
+      counterpartyCompanyId: opts.partyType === 'company' ? opts.partyId : undefined,
+      counterpartyContactId: opts.partyType === 'contact' ? opts.partyId : undefined,
+    });
 
     const [party, invs, bills, payments] = await Promise.all([partyP, invoicesP, billsP, paymentsP]);
     if (party.error) throw party.error;
     if (invs.error) throw invs.error;
     if (bills.error) throw bills.error;
-    if (payments.error) throw payments.error;
     return {
       party: (party.data ?? null) as PartyRow | null,
       invoices: (invs.data ?? []) as Invoice[],
       bills: (bills.data ?? []) as SupplierBill[],
-      payments: (payments.data ?? []) as Payment[],
+      payments,
     };
   },
 

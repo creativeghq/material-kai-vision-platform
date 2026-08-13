@@ -6,7 +6,8 @@
  * have no document — notes go to crm_notes, calls/meetings to crm_activities. No modal.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import {
   Activity,
   FileText,
@@ -190,7 +191,7 @@ const relativeTime = (iso: string): string => {
 export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail, people, onMeetingLogged }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);

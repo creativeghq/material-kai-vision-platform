@@ -6,7 +6,7 @@
  * Expenses inbox (`inbound_documents`) are fully wired surfaces alongside invoices.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
@@ -18,6 +18,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { financeService, formatMoney, type Invoice, type CreditNote, type SupplierCreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
@@ -115,7 +116,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant, canOperateFinance } = usePermissions();
 
@@ -740,7 +741,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
 const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   const [busy, setBusy] = React.useState<string | null>(null);
   const issue = async (id: string) => {
     setBusy(id);

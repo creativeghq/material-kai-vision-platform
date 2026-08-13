@@ -225,12 +225,13 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
             internal_number: inv.internal_number,
           },
         },
-        // Customer-self mode has no token; fall back to the admin invoice page or
-        // a generic success page. Frontend should override with a sensible URL.
+        // Customer-self mode has no token; fall back to the invoice page. `/admin/finance` was
+        // the fallback here and has never been a route — a card payment made without a share
+        // token returned the payer to the catch-all 404, with the charge already taken.
         success_url: (body as AdminBody).success_url
-          || (token ? `${publicAppUrl()}/pay/${token}?status=success` : `${publicAppUrl()}/admin/finance/invoices/${inv.id}?status=success`),
+          || (token ? `${publicAppUrl()}/pay/${token}?status=success` : `${publicAppUrl()}/finance/invoices/${inv.id}?status=success`),
         cancel_url: (body as AdminBody).cancel_url
-          || (token ? `${publicAppUrl()}/pay/${token}?status=cancelled` : `${publicAppUrl()}/admin/finance/invoices/${inv.id}?status=cancelled`),
+          || (token ? `${publicAppUrl()}/pay/${token}?status=cancelled` : `${publicAppUrl()}/finance/invoices/${inv.id}?status=cancelled`),
       });
 
       await supabase

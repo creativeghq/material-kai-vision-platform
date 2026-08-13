@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   TrendingUp,
   ArrowDownCircle,
@@ -28,6 +28,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { BankFeedTab } from '@/modules/finance/tabs/BankFeedTab';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import { PayViaRevolutDialog } from '@/modules/banking-revolut/components/PayViaRevolutDialog';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { CardsExpensesCard } from '@/modules/banking-revolut/components/CardsExpensesCard';
@@ -143,8 +144,7 @@ function dashRange(p: 'this_month' | 'last_month' | 'last_quarter' | 'ytd'): { f
 const FinancePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  // Same page is mounted at /admin/finance (operator) and /finance (business owner).
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
+  const financeBase = FINANCE_BASE;
   // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
   // oldest-membership query so Finance follows the workspace switcher.
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();

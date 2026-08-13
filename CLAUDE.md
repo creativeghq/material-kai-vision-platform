@@ -262,7 +262,8 @@ prefix — do not widen retention.**
 ## Design System Summary
 Full reference: `.claude/design-system.md`.
 - **Dark** = plum-black command center (`--background: 258 22% 5%`), flat **magenta** primary (`--primary: 335 74% 60%`). **Light** = warm olive/cream (`--background: 42 27% 93%`), muted **khaki-olive** primary, terracotta destructive.
-- **Headings** use **Bricolage Grotesque** (`font-display`); Open Sans for body/UI.
+- **Headings** use **Aleo** (`font-display`); **Averta** for body/UI. Both self-hosted from `public/fonts/`.
+- **`--font-display` is `'Aleo', 'Averta', Georgia, ...` — do NOT drop Averta.** Aleo has ZERO Greek glyphs and only 24/128 latin-ext, so Greek party names in headings silently fell back to Georgia (absent on Linux). Font matching is per-character, so latin headings still get Aleo. Check any new display face's cmap for U+0370–U+03FF before adopting it.
 - **The brand gradient is reserved for IDENTITY surfaces** (PageHeader, logo, hero). Primary fills are flat accent — the old global "`bg-primary` → brand-gradient" rule was removed.
 - **Glass cards**: use the `.dashboard-card` class. Never recreate inline.
 - **Buttons** are pill-shaped (`rounded-full`). **NEVER add `rounded-full` to a TabsTrigger** — that is Buttons only.
