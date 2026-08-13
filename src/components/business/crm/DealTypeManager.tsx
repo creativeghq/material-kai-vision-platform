@@ -13,7 +13,7 @@
  * stages failed to write renders a board with no columns and no way to add a deal.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Trophy, Loader2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { Plus, Trash2, Trophy, XCircle, Loader2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -39,6 +39,7 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
   const [newLabel, setNewLabel] = useState('');
   const [newSubject, setNewSubject] = useState<DealType['subject_kind']>('none');
   const [newStage, setNewStage] = useState('');
+  const [renaming, setRenaming] = useState<string | null>(null);   // draft label while editing
 
   const selected = types?.find((t) => t.id === selectedId) ?? null;
   const isOwnType = !!selected && selected.workspace_id !== null;
@@ -131,9 +132,24 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
           {/* Stages of the selected type */}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-xs text-muted-foreground">
-                Stages{selected ? ` · ${selected.label}` : ''}
-              </Label>
+              {isOwnType ? (
+                <Input
+                  value={renaming ?? selected!.label}
+                  onChange={(e) => setRenaming(e.target.value)}
+                  onBlur={() => {
+                    const next = (renaming ?? '').trim();
+                    setRenaming(null);
+                    if (next && next !== selected!.label) void guard(() => dealTypesAdmin.rename(selected!.id, next));
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  aria-label="Deal type name"
+                  className="h-7 max-w-[220px] text-sm font-medium"
+                />
+              ) : (
+                <Label className="text-xs text-muted-foreground">
+                  Stages{selected ? ` · ${selected.label}` : ''}
+                </Label>
+              )}
               {isOwnType && (
                 <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px] text-red-500"
                   onClick={() => guard(() => dealTypesAdmin.remove(selected!.id))} disabled={busy}>
@@ -154,11 +170,14 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
                     <div key={s.id} className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5">
                       <span className="min-w-0 flex-1 truncate text-sm">{s.label}</span>
                       {s.is_won && <Trophy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Winning stage" />}
+                      {s.is_lost && <XCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Losing stage" />}
                       {isOwnType && (
                         <>
                           <button type="button" onClick={() => move(s, -1)} disabled={busy || i === 0} aria-label={`Move ${s.label} earlier`} className="text-muted-foreground disabled:opacity-30 hover:text-foreground"><ChevronUp className="h-3.5 w-3.5" /></button>
                           <button type="button" onClick={() => move(s, 1)} disabled={busy || i === stages.length - 1} aria-label={`Move ${s.label} later`} className="text-muted-foreground disabled:opacity-30 hover:text-foreground"><ChevronDown className="h-3.5 w-3.5" /></button>
-                          <button type="button" onClick={() => guard(() => dealTypesAdmin.updateStage(s.id, { is_won: !s.is_won }))} disabled={busy} aria-label={`Toggle ${s.label} as the winning stage`} className="text-muted-foreground hover:text-foreground"><Trophy className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => guard(() => dealTypesAdmin.updateStage(s.id, { is_won: !s.is_won, is_lost: false }))} disabled={busy} aria-label={`Toggle ${s.label} as the winning stage`} className={`hover:text-foreground ${s.is_won ? 'text-foreground' : 'text-muted-foreground'}`}><Trophy className="h-3.5 w-3.5" /></button>
+                          {/* is_lost was settable only from SQL, while moveToStage already acted on it. */}
+                          <button type="button" onClick={() => guard(() => dealTypesAdmin.updateStage(s.id, { is_lost: !s.is_lost, is_won: false }))} disabled={busy} aria-label={`Toggle ${s.label} as a losing stage`} className={`hover:text-foreground ${s.is_lost ? 'text-foreground' : 'text-muted-foreground'}`}><XCircle className="h-3.5 w-3.5" /></button>
                           <button type="button" onClick={() => guard(() => dealTypesAdmin.removeStage(s.id))} disabled={busy} aria-label={`Delete ${s.label}`} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
                         </>
                       )}

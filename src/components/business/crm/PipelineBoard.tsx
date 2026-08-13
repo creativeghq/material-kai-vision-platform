@@ -20,6 +20,7 @@ import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -170,10 +171,17 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {lost.map((d) => (
               <div key={d.id} className="dashboard-card flex items-center gap-2 p-2.5 opacity-70">
-                <button onClick={() => { if (d.property_id) navigate(`/properties/${d.property_id}`); }} className="min-w-0 flex-1 text-left">
-                  <div className="truncate text-sm font-medium">{dealLabel(d)}</div>
-                  <div className="truncate text-[11px] text-muted-foreground">{d.lost_reason || 'Lost'}</div>
-                </button>
+                {d.property_id ? (
+                  <button onClick={() => navigate(`/properties/${d.property_id}`)} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-sm font-medium">{dealLabel(d)}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">{d.lost_reason || 'Lost'}</div>
+                  </button>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{dealLabel(d)}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">{d.lost_reason || 'Lost'}</div>
+                  </div>
+                )}
                 {canManage && (
                   <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]"
                     onClick={async () => { await dealsService.updateDeal(d.id, { status: 'open' }); load(); }}>
@@ -203,6 +211,7 @@ const DealCard: React.FC<{
 }> = ({ ws, deal, stages, wonStage, canManage, onChanged, onOpen }) => {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
+  const [losing, setLosing] = useState(false);
   const guard = async (fn: () => Promise<unknown>) => {
     try { await fn(); onChanged(); }
     catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -214,7 +223,9 @@ const DealCard: React.FC<{
   return (
     <div className="dashboard-card p-2.5">
       <div className="flex items-start justify-between gap-1">
-        <button onClick={onOpen} className="min-w-0 flex-1 text-left">
+        {/* Only a property deal has somewhere to go until the record page lands (#311 Phase 2).
+            Everything else opens its own editor rather than being a button that does nothing. */}
+        <button onClick={() => { if (deal.property_id) onOpen(); else setEditing(true); }} className="min-w-0 flex-1 text-left">
           <div className="truncate text-sm font-medium hover:underline">{dealLabel(deal)}</div>
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle || 'No party linked'}</div>
         </button>
@@ -229,7 +240,7 @@ const DealCard: React.FC<{
                   <Trophy className="mr-2 h-3.5 w-3.5" /> Mark won
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => guard(() => dealsService.updateDeal(deal.id, { status: 'lost' }))}>
+              <DropdownMenuItem onClick={() => setLosing(true)}>
                 <XCircle className="mr-2 h-3.5 w-3.5" /> Mark lost
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => guard(() => dealsService.deleteDeal(deal.id))} className="text-red-500">
@@ -263,7 +274,39 @@ const DealCard: React.FC<{
       </div>
       {deal.expected_close_date && <div className="mt-1.5 text-[10px] text-muted-foreground">Close ~ {formatDate(deal.expected_close_date)}</div>}
       {editing && <DealDialog ws={ws} deal={deal} stages={stages} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />}
+      {losing && (
+        <LostDialog
+          onClose={() => setLosing(false)}
+          onConfirm={(reason) => { setLosing(false); void guard(() => dealsService.updateDeal(deal.id, { status: 'lost', lost_reason: reason })); }}
+        />
+      )}
     </div>
+  );
+};
+
+/** Why a deal was lost is the only thing a lost deal is worth reading later, and the board
+ *  rendered `lost_reason` from the first day while nothing ever wrote it. */
+const LostDialog: React.FC<{ onClose: () => void; onConfirm: (reason: string | null) => void }> = ({ onClose, onConfirm }) => {
+  const [reason, setReason] = useState('');
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Mark this deal lost</DialogTitle></DialogHeader>
+        <div>
+          <Label className="text-xs" htmlFor="lost-reason">Reason</Label>
+          <Input
+            id="lost-reason" value={reason} autoFocus
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onConfirm(reason.trim() || null); }}
+            placeholder="Price, timing, went elsewhere…"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" className="rounded-full" onClick={onClose}>Cancel</Button>
+          <Button className="rounded-full" onClick={() => onConfirm(reason.trim() || null)}>Mark lost</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -301,7 +344,7 @@ const DealTasks: React.FC<{ ws: string; dealId: string; canManage: boolean; onCh
   );
 };
 
-interface PropertyOption { id: string; title: string | null; reference_code: string | null }
+interface SubjectOption { id: string; label: string }
 
 /**
  * Create or edit a deal. The subject picker is driven by the TYPE's `subject_kind` — a property
@@ -312,27 +355,39 @@ const DealDialog: React.FC<{
   ws: string; type?: DealType; deal?: Deal; stages: DealStage[]; onClose: () => void; onSaved: () => void;
 }> = ({ ws, type, deal, stages, onClose, onSaved }) => {
   const { toast } = useToast();
-  const [properties, setProperties] = useState<PropertyOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [busy, setBusy] = useState(false);
   const subjectKind = type?.subject_kind ?? (deal?.property_id ? 'property' : 'none');
   const [f, setF] = useState<Record<string, any>>(deal
     ? {
-        title: deal.title ?? '', property_id: deal.property_id ?? '', contact_id: deal.contact_id ?? '',
-        company_id: deal.company_id ?? '', stage: deal.stage, value: deal.value ?? '',
-        currency: deal.currency ?? 'EUR', expected_close_date: deal.expected_close_date ?? '',
+        title: deal.title ?? '', property_id: deal.property_id ?? '', project_id: deal.project_id ?? '',
+        contact_id: deal.contact_id ?? '', company_id: deal.company_id ?? '', stage: deal.stage,
+        value: deal.value ?? '', currency: deal.currency ?? 'EUR',
+        expected_close_date: deal.expected_close_date ?? '',
+        probability: deal.probability ?? '', notes: deal.notes ?? '',
       }
-    : { title: '', currency: 'EUR', stage: stages[0]?.key ?? '', contact_id: '', company_id: '', property_id: '' });
+    : { title: '', currency: 'EUR', stage: stages[0]?.key ?? '', contact_id: '', company_id: '',
+        property_id: '', project_id: '', probability: '', notes: '' });
 
+  // The subject list follows the TYPE. A 'project' type had no picker at all, so a Project deal
+  // could never actually link its project — the column was reachable only from SQL.
   useEffect(() => {
-    if (subjectKind !== 'property') return;
-    supabase.from('properties').select('id, title, reference_code').eq('workspace_id', ws).order('title').limit(500)
-      .then(({ data }) => setProperties((data ?? []) as PropertyOption[]));
+    if (subjectKind === 'none') { setSubjects([]); return; }
+    const q = subjectKind === 'property'
+      ? supabase.from('properties').select('id, title, reference_code').eq('workspace_id', ws).order('title').limit(500)
+      : supabase.from('projects').select('id, name').eq('workspace_id', ws).order('name').limit(500);
+    q.then(({ data }) => setSubjects(((data ?? []) as any[]).map((r) => ({
+      id: r.id, label: r.title || r.name || r.reference_code || 'Untitled',
+    }))));
   }, [ws, subjectKind]);
 
   const save = async () => {
     // A deal is always attached to a party — the DB enforces it too (crm_deals_party_check).
     if (!f.contact_id && !f.company_id) { toast({ title: 'Link a contact or a company', variant: 'destructive' }); return; }
-    if (subjectKind === 'property' && !f.property_id && !deal) { toast({ title: 'Pick a property', variant: 'destructive' }); return; }
+    if (subjectKind !== 'none' && !deal && !(subjectKind === 'property' ? f.property_id : f.project_id)) {
+      toast({ title: subjectKind === 'property' ? 'Pick a property' : 'Pick a project', variant: 'destructive' });
+      return;
+    }
     setBusy(true);
     try {
       const patch = {
@@ -340,9 +395,12 @@ const DealDialog: React.FC<{
         contact_id: f.contact_id || null,
         company_id: f.company_id || null,
         property_id: subjectKind === 'property' ? (f.property_id || null) : null,
+        project_id: subjectKind === 'project' ? (f.project_id || null) : null,
         stage: f.stage,
         value: f.value ? Number(f.value) : null,
         currency: f.currency,
+        probability: f.probability === '' || f.probability === null ? null : Number(f.probability),
+        notes: f.notes?.trim() || null,
         expected_close_date: f.expected_close_date || null,
       };
       if (deal) await dealsService.updateDeal(deal.id, patch);
@@ -363,12 +421,16 @@ const DealDialog: React.FC<{
             <Label className="text-xs" htmlFor="deal-title">Title</Label>
             <Input id="deal-title" value={f.title ?? ''} onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} placeholder="What is this deal?" />
           </div>
-          {subjectKind === 'property' && (
+          {subjectKind !== 'none' && (
             <div>
-              <Label className="text-xs">Property</Label>
-              <Select value={f.property_id} onValueChange={(v) => setF((p) => ({ ...p, property_id: v }))} disabled={!!deal}>
-                <SelectTrigger><SelectValue placeholder="Select a listing…" /></SelectTrigger>
-                <SelectContent>{properties.map((l) => <SelectItem key={l.id} value={l.id}>{l.title || l.reference_code || 'Listing'}</SelectItem>)}</SelectContent>
+              <Label className="text-xs">{subjectKind === 'property' ? 'Property' : 'Project'}</Label>
+              <Select
+                value={subjectKind === 'property' ? f.property_id : f.project_id}
+                onValueChange={(v) => setF((p) => ({ ...p, [subjectKind === 'property' ? 'property_id' : 'project_id']: v }))}
+                disabled={!!deal}
+              >
+                <SelectTrigger><SelectValue placeholder={subjectKind === 'property' ? 'Select a listing…' : 'Select a project…'} /></SelectTrigger>
+                <SelectContent>{subjects.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           )}
@@ -389,6 +451,18 @@ const DealDialog: React.FC<{
               <Label className="text-xs" htmlFor="deal-close">Expected close</Label>
               <Input id="deal-close" type="date" value={f.expected_close_date ?? ''} onChange={(e) => setF((p) => ({ ...p, expected_close_date: e.target.value }))} />
             </div>
+          </div>
+          <div>
+            <Label className="text-xs" htmlFor="deal-probability">Probability %</Label>
+            <Input
+              id="deal-probability" type="number" min={0} max={100} value={f.probability ?? ''}
+              onChange={(e) => setF((p) => ({ ...p, probability: e.target.value }))}
+              placeholder="Feeds the weighted forecast"
+            />
+          </div>
+          <div>
+            <Label className="text-xs" htmlFor="deal-notes">Notes</Label>
+            <Textarea id="deal-notes" rows={3} value={f.notes ?? ''} onChange={(e) => setF((p) => ({ ...p, notes: e.target.value }))} />
           </div>
         </div>
         <DialogFooter>

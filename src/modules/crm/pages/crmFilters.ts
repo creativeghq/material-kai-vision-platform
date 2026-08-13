@@ -18,6 +18,7 @@ import { Building2, Tags, User } from 'lucide-react';
 import type { FilterGroupDef, FilterOption } from '@/components/core/filters';
 import type { CrmCategoryKind } from '@/services/crmCategoriesService';
 import { humanizeLabel } from '@/utils/humanize';
+import { LIFECYCLE_STAGE_OPTIONS } from '@/modules/crm/crmConstants';
 import { CLIENT_SUPPLIER_OPTIONS, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS } from '../crmConstants';
 
 const professionOptions = PROFESSIONAL_TYPE_OPTIONS as FilterOption[];
@@ -130,6 +131,13 @@ export function buildContactFilters(ctx: {
         // is_supplier. Filtering contacts BY activity wants a free-text server-side ilike,
         // which the list endpoint does not offer yet — better absent than inert.
         { key: 'status', type: 'select', label: 'Status', options: statusOptions },
+        // Server-backed (crm-api applies .eq on lifecycle_stage) — the rule in this file is
+        // that a filter with no server support is worse than absent.
+        {
+          key: 'lifecycle_stage', type: 'select', label: 'Lifecycle stage',
+          description: 'Funnel position: subscriber → lead → MQL → SQL → opportunity → customer.',
+          options: LIFECYCLE_STAGE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+        },
         { key: 'kind', type: 'select', label: 'Relationship', options: kindOptions },
       ],
     },

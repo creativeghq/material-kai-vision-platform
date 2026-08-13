@@ -258,10 +258,11 @@ export const CRMManagement: React.FC = () => {
   const contactQuery: CrmListFilters = useMemo(() => ({
     search: contactSearch,
     status: str(contactValues.status),
+    lifecycleStage: str(contactValues.lifecycle_stage),
     kind: str(contactValues.kind) as CrmListFilters['kind'],
     companyName: str(contactValues.company),
     ids: contactIdsFilter,
-  }), [contactSearch, contactValues.status, contactValues.kind,
+  }), [contactSearch, contactValues.status, contactValues.lifecycle_stage, contactValues.kind,
        contactValues.company, contactIdsFilter]);
 
   const companyQuery: CrmListFilters = useMemo(() => ({

@@ -190,4 +190,65 @@ describe('the deal pipeline has one object and data-driven stages', () => {
       'columns and no way to add a deal.',
     ).toContain("rpc('crm_create_deal_type'");
   });
+  /**
+   * Every writable deal field needs a way in, and every service method needs a caller.
+   *
+   * This is the audit that found six inert things at once: `probability` and `notes` were columns
+   * no input wrote; `project_id` had no picker, so the seeded "Project" type could not attach a
+   * project; `lost_reason` was RENDERED on every lost card and captured nowhere; `is_lost` was
+   * acted on by moveToStage and settable only from SQL; and `dealTypesAdmin.rename` had no caller.
+   * None of it fails a typecheck — an unreachable field is perfectly valid code.
+   */
+  it('every writable deal field has an input, and no service method is dead', () => {
+    const board = SOURCES.get(BOARD)!;
+    const missing = ['probability', 'notes', 'project_id', 'lost_reason']
+      .filter((field) => !board.includes(field));
+    expect(
+      missing,
+      'These crm_deals columns are writable but nothing in the board writes them. A column no ' +
+      'surface fills reads NULL forever — build the input or drop the column.',
+    ).toEqual([]);
+
+    // Both stage outcomes are configurable. is_lost drives moveToStage, so a stage set that cannot
+    // express "lost" makes that branch unreachable.
+    const mgr = SOURCES.get('src/components/business/crm/DealTypeManager.tsx')!;
+    for (const flag of ['is_won', 'is_lost']) {
+      expect(mgr, `DealTypeManager cannot set ${flag}`).toContain(flag);
+    }
+
+    // A service method nothing calls is a feature nobody can reach.
+    const service = SOURCES.get(SERVICE)!;
+    const exported = [...service.matchAll(/^\s{2}async (\w+)\(/gm)].map((m) => m[1]);
+    const callers = [...SOURCES.entries()].filter(([path]) => path !== SERVICE).map(([, src]) => src).join('\n');
+    const orphans = exported.filter((fn) => !callers.includes(`.${fn}(`));
+    expect(
+      orphans,
+      'These dealsService/dealTypesAdmin methods have no caller anywhere in src/. Wire them to a ' +
+      'surface or delete them.',
+    ).toEqual([]);
+  });
+
+  it('a deal card never renders a control that does nothing', () => {
+    // Only a property deal has a destination until the record page lands, so the title used to be
+    // a <button> that silently did nothing for every other deal type.
+    const board = SOURCES.get(BOARD)!;
+    expect(
+      /onClick=\{\(\) => \{ if \(deal\.property_id\) onOpen\(\); else setEditing\(true\); \}\}/.test(board),
+      'The card title must always go somewhere — property deals to the listing, everything else to ' +
+      'its own editor. A button with a conditional no-op is inert UI.',
+    ).toBe(true);
+  });
+
+  it('the lifecycle filter is backed by the server, not just rendered', () => {
+    // crmFilters.ts is explicit that a filter with no server support is worse than absent: it
+    // returns the unfiltered list and looks like it worked.
+    expect(SOURCES.get('src/modules/crm/pages/crmFilters.ts')!).toContain('lifecycle_stage');
+    expect(SOURCES.get('src/modules/crm/pages/CRMPage.tsx')!).toContain('lifecycleStage');
+    expect(SOURCES.get('src/services/crm.service.ts')!).toContain("params.set('lifecycle_stage'");
+    const handler = readFileSync(join(ROOT, 'supabase/functions/crm-api/handlers/contacts-api-handler.ts'), 'utf8');
+    expect(
+      handler.includes(".eq('lifecycle_stage'"),
+      'crm-api never applies the lifecycle_stage filter, so the UI control returns the full list.',
+    ).toBe(true);
+  });
 });

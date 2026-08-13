@@ -217,6 +217,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       const search = (url.searchParams.get('search') || '').trim();
       const profession = url.searchParams.get('profession') || '';
       const status = url.searchParams.get('status') || '';
+      const lifecycleStage = url.searchParams.get('lifecycle_stage') || '';
       const kind = url.searchParams.get('kind') || ''; // client | supplier | neither
       // Attached-company filter, sent as a NAME. Resolved here rather than client-side because a
       // contact can carry its company two ways: the crm_company_contacts junction, or the legacy
@@ -330,6 +331,7 @@ export async function handleContacts(req: Request): Promise<Response> {
       }
       if (profession) listQuery = listQuery.eq('profession', profession);
       if (status) listQuery = listQuery.eq('status', status);
+      if (lifecycleStage) listQuery = listQuery.eq('lifecycle_stage', lifecycleStage);
       // `neither` uses IS NOT TRUE so NULL (never set) counts as "not a client/supplier",
       // matching the client-side `!c.is_client && !c.is_supplier` this replaces.
       if (kind === 'client') listQuery = listQuery.eq('is_client', true);

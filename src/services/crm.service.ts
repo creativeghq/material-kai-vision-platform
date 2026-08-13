@@ -220,6 +220,8 @@ export interface CrmListFilters {
   profession?: string;
   /** Contacts only — crm_companies has no status column. */
   status?: string;
+  /** Contacts only — funnel position (crm_contacts.lifecycle_stage). */
+  lifecycleStage?: string;
   /** contacts: is_client/is_supplier · companies: is_customer/is_supplier. */
   kind?: 'client' | 'supplier' | 'neither';
   /**
@@ -244,6 +246,7 @@ function appendCrmFilters(params: URLSearchParams, filters?: CrmListFilters) {
   if (!filters) return;
   if (filters.search) params.set('search', filters.search);
   if (filters.profession) params.set('profession', filters.profession);
+  if (filters.lifecycleStage) params.set('lifecycle_stage', filters.lifecycleStage);
   if (filters.status) params.set('status', filters.status);
   if (filters.kind) params.set('kind', filters.kind);
   if (filters.companyName) params.set('company_name', filters.companyName);
