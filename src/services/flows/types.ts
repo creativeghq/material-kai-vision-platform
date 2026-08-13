@@ -296,7 +296,12 @@ export interface QuoteRequestedTriggerConfig {
 
 export interface QuoteApprovedTriggerConfig {}
 /** Narrow a deal trigger to one deal type, e.g. only fire for Real Estate. Empty = all. */
-export interface DealStageChangedTriggerConfig { deal_type_key?: string; to_stage?: string }
+/**
+ * Narrow a deal trigger to a subset of its events. Every key here is matched by EQUALITY
+ * against the same-named key in the event payload (flow-engine), so these names are not
+ * decorative — `stage` filters on `trigger.data.stage`. Blank means "any".
+ */
+export interface DealStageChangedTriggerConfig { deal_type_key?: string; stage?: string }
 export interface DealWonTriggerConfig { deal_type_key?: string }
 export interface DealLostTriggerConfig { deal_type_key?: string }
 export interface QuoteRejectedTriggerConfig {}

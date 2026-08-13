@@ -1812,14 +1812,43 @@ async function handleTriggerEvent(
   // own non-global flows. Never another tenant's rows.
   let query = supabase
     .from('flows')
-    .select('id, workspace_id, is_global')
+    .select('id, workspace_id, is_global, trigger_config')
     .eq('trigger_type', event_type)
     .eq('status', 'active');
   query = workspaceId
     ? query.or(`is_global.eq.true,and(is_global.eq.false,workspace_id.eq.${workspaceId})`)
     : query.eq('is_global', true);
 
-  const { data: flows, error } = await query;
+  const { data: allFlows, error } = await query;
+
+  /**
+   * `trigger_config` narrows an event flow to a subset of its events — "only when the deal reaches
+   * Estimate", not "on every stage move". Until this existed the column was decorative: matching
+   * was trigger_type + active only, so a stage-triggered email fired on EVERY move.
+   *
+   * The rule is generic on purpose, so it works for any trigger type without the engine learning
+   * anyone's domain: every key in trigger_config must EQUAL the same-named key in the event data.
+   * A blank value means "any", and scheduling keys are not filters. Compared as strings because
+   * the config comes from a form and the payload from code, so 5 and "5" must agree.
+   */
+  const SCHEDULING_KEYS = new Set(['cron', 'timezone']);
+  const matchesConfig = (cfg: Record<string, unknown> | null | undefined): boolean => {
+    if (!cfg) return true;
+    for (const [key, want] of Object.entries(cfg)) {
+      if (SCHEDULING_KEYS.has(key)) continue;
+      if (want === null || want === undefined || want === '') continue;
+      if (Array.isArray(want)) {
+        if (want.length === 0) continue;
+        if (!want.map(String).includes(String((data as Record<string, unknown>)?.[key]))) return false;
+        continue;
+      }
+      if (String((data as Record<string, unknown>)?.[key] ?? '') !== String(want)) return false;
+    }
+    return true;
+  };
+
+  const flows = (allFlows ?? []).filter((f) =>
+    matchesConfig((f as { trigger_config?: Record<string, unknown> }).trigger_config));
 
   if (error) {
     return jsonResponse({ success: false, error: error.message }, 500);

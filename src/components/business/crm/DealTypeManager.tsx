@@ -13,14 +13,15 @@
  * stages failed to write renders a board with no columns and no way to add a deal.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Trophy, XCircle, Loader2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { Plus, Trash2, Trophy, XCircle, Loader2, ChevronUp, ChevronDown, Lock, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { dealsService, dealTypesAdmin, type DealStage, type DealType } from '@/services/dealsService';
+import { Textarea } from '@/components/core/ui/textarea';
+import { dealsService, dealTypesAdmin, stageEmail, type DealStage, type DealType, type StageEmailRule } from '@/services/dealsService';
 
 interface Props {
   ws: string;
@@ -40,6 +41,8 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
   const [newSubject, setNewSubject] = useState<DealType['subject_kind']>('none');
   const [newStage, setNewStage] = useState('');
   const [renaming, setRenaming] = useState<string | null>(null);   // draft label while editing
+  const [rules, setRules] = useState<StageEmailRule[]>([]);
+  const [emailFor, setEmailFor] = useState<DealStage | null>(null);
 
   const selected = types?.find((t) => t.id === selectedId) ?? null;
   const isOwnType = !!selected && selected.workspace_id !== null;
@@ -53,13 +56,17 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
   useEffect(() => { void loadTypes(); }, [loadTypes]);
 
   useEffect(() => {
-    if (!selectedId) { setStages([]); return; }
+    if (!selectedId) { setStages([]); setRules([]); return; }
     dealsService.listStages(selectedId).then(setStages).catch(() => setStages([]));
-  }, [selectedId]);
+    const key = types?.find((t) => t.id === selectedId)?.key;
+    if (key) stageEmail.list(ws, key).then(setRules).catch(() => setRules([]));
+    else setRules([]);
+  }, [selectedId, types, ws]);
 
   const refresh = async () => {
     await loadTypes();
     if (selectedId) setStages(await dealsService.listStages(selectedId).catch(() => []));
+    if (selected?.key) setRules(await stageEmail.list(ws, selected.key).catch(() => []));
     onChanged();
   };
 
@@ -171,6 +178,16 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
                       <span className="min-w-0 flex-1 truncate text-sm">{s.label}</span>
                       {s.is_won && <Trophy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Winning stage" />}
                       {s.is_lost && <XCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Losing stage" />}
+                      {/* Automatic email when a deal reaches this stage. Writes an ordinary
+                          workspace flow, so it stays visible and pausable under Flows. */}
+                      <button
+                        type="button" onClick={() => setEmailFor(s)} disabled={busy}
+                        aria-label={`Email when a deal reaches ${s.label}`}
+                        title={rules.find((r) => r.stage_key === s.key)?.active ? 'Emails the contact on this stage' : 'No email on this stage'}
+                        className={`hover:text-foreground ${rules.find((r) => r.stage_key === s.key)?.active ? 'text-primary' : 'text-muted-foreground'}`}
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                      </button>
                       {isOwnType && (
                         <>
                           <button type="button" onClick={() => move(s, -1)} disabled={busy || i === 0} aria-label={`Move ${s.label} earlier`} className="text-muted-foreground disabled:opacity-30 hover:text-foreground"><ChevronUp className="h-3.5 w-3.5" /></button>
@@ -205,6 +222,95 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
         </div>
 
         <DialogFooter><Button variant="ghost" className="rounded-full" onClick={onClose}>Done</Button></DialogFooter>
+      </DialogContent>
+
+      {emailFor && selected && (
+        <StageEmailDialog
+          ws={ws}
+          dealType={{ key: selected.key, label: selected.label }}
+          stage={emailFor}
+          rule={rules.find((r) => r.stage_key === emailFor.key) ?? null}
+          onClose={() => setEmailFor(null)}
+          onSaved={() => { setEmailFor(null); void refresh(); }}
+        />
+      )}
+    </Dialog>
+  );
+};
+
+/**
+ * Configure "email the contact when a deal reaches this stage".
+ *
+ * Saves a workspace-scoped flow rather than a bespoke setting: the automation then shows up under
+ * Flows with its run history, and can be paused or rewritten there like any other. Targeting is
+ * `trigger_config = { deal_type_key, stage }`, which the engine matches by equality against the
+ * event payload — without that filter it would fire on every stage move.
+ */
+const StageEmailDialog: React.FC<{
+  ws: string;
+  dealType: { key: string; label: string };
+  stage: DealStage;
+  rule: StageEmailRule | null;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ ws, dealType, stage, rule, onClose, onSaved }) => {
+  const { toast } = useToast();
+  const [subject, setSubject] = useState(rule?.subject ?? `Your ${dealType.label.toLowerCase()} — ${stage.label}`);
+  const [body, setBody] = useState(
+    'Hi {{contact_name}},\n\nA quick update: {{deal_title}} is now at {{stage}}.\n\nWe will be in touch shortly.',
+  );
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!subject.trim()) { toast({ title: 'Give the email a subject', variant: 'destructive' }); return; }
+    setBusy(true);
+    try {
+      await stageEmail.upsert(ws, dealType, { key: stage.key, label: stage.label },
+        { subject: subject.trim(), body }, rule?.flow_id ?? null);
+      toast({
+        title: 'Automation saved',
+        description: `Contacts will be emailed when a ${dealType.label} deal reaches ${stage.label}. Manage it under Flows.`,
+      });
+      onSaved();
+    } catch (e) {
+      toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    if (!rule) return;
+    setBusy(true);
+    try { await stageEmail.remove(rule.flow_id); onSaved(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Email on “{stage.label}”</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Sent to the deal’s contact when it reaches this stage, from your workspace’s own sender.
+            A deal whose contact has no email is skipped, not failed.
+          </p>
+          <div>
+            <Label className="text-xs" htmlFor="se-subject">Subject</Label>
+            <Input id="se-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs" htmlFor="se-body">Message</Label>
+            <Textarea id="se-body" rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {'{{contact_name}}'} · {'{{deal_title}}'} · {'{{stage}}'} · {'{{value}}'} · {'{{currency}}'}
+            </p>
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          {rule && <Button variant="ghost" className="mr-auto rounded-full text-red-500" onClick={remove} disabled={busy}>Remove</Button>}
+          <Button variant="ghost" className="rounded-full" onClick={onClose}>Cancel</Button>
+          <Button className="rounded-full" onClick={save} disabled={busy}>{rule ? 'Save' : 'Turn on'}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

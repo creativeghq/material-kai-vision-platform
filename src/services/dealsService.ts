@@ -113,6 +113,22 @@ async function emitDealEvent(
   deal: Deal,
   stageLabel?: string,
 ): Promise<void> {
+  // The type KEY, not its id: a flow filters on a readable value a person picked in a form, and
+  // ids are not portable between workspaces.
+  let dealTypeKey: string | null = null;
+  let contactEmail: string | null = null;
+  try {
+    const [{ data: t }, { data: c }] = await Promise.all([
+      supabase.from('crm_deal_types').select('key').eq('id', deal.deal_type_id).maybeSingle(),
+      deal.contact_id
+        ? supabase.from('crm_contacts').select('email').eq('id', deal.contact_id).maybeSingle()
+        : Promise.resolve({ data: null } as { data: { email: string | null } | null }),
+    ]);
+    dealTypeKey = (t as { key?: string } | null)?.key ?? null;
+    contactEmail = (c as { email?: string | null } | null)?.email ?? null;
+  } catch {
+    // Enrichment is best-effort: a flow that filters on deal_type_key simply will not match.
+  }
   const name = deal.title?.trim() || deal.property?.title || deal.company?.name || deal.contact?.name || 'Deal';
   const title = type === 'deal_won' ? `Deal won: ${name}`
     : type === 'deal_lost' ? `Deal lost: ${name}`
@@ -126,6 +142,13 @@ async function emitDealEvent(
     type,
     deal_id: deal.id,
     deal_type_id: deal.deal_type_id,
+    deal_type_key: dealTypeKey,
+    // What a send_email action needs to address the mail without a second lookup.
+    contact_email: contactEmail,
+    contact_name: deal.contact?.name ?? null,
+    company_name: deal.company?.name ?? null,
+    deal_title: deal.title?.trim() || null,
+    deal_url: `/crm/deals/${deal.id}`,
     stage: deal.stage,
     stage_label: stageLabel ?? deal.stage,
     value: deal.value,
@@ -494,3 +517,128 @@ export async function getDeal(dealId: string): Promise<Deal | null> {
   if (error) throw error;
   return data ? withTaskCounts(data) : null;
 }
+
+// ── Stage-triggered email ─────────────────────────────────────────────────────────────────────
+/**
+ * "Email the contact when a deal reaches this stage" (#311).
+ *
+ * This is NOT a new delivery path — it writes an ordinary workspace-scoped FLOW, so the automation
+ * is visible, editable and pausable under Flows like everything else, and the send goes through
+ * the engine's `send_email` action with the workspace's own BYOK sender.
+ *
+ * Targeting relies on `flows.trigger_config`, which the engine now matches by equality against the
+ * event payload — `{ deal_type_key, stage }` means "only this type, only this stage". Before that
+ * filter existed a stage-triggered flow fired on EVERY move.
+ *
+ * `is_global: false` + `workspace_id` is what makes it per-workspace: the engine matches global
+ * flows plus this workspace's own, never another tenant's.
+ */
+const STAGE_EMAIL_TAG = 'deal-stage-email';
+
+export interface StageEmailRule {
+  flow_id: string;
+  stage_key: string;
+  template_slug: string | null;
+  subject: string | null;
+  active: boolean;
+}
+
+export const stageEmail = {
+  /** Existing rules for one deal type, keyed by stage. */
+  async list(workspaceId: string, dealTypeKey: string): Promise<StageEmailRule[]> {
+    const { data, error } = await supabase
+      .from('flows')
+      .select('id, status, trigger_config, graph_definition')
+      .eq('workspace_id', workspaceId)
+      .eq('trigger_type', 'deal_stage_changed')
+      .contains('tags', [STAGE_EMAIL_TAG]);
+    if (error) throw error;
+    return ((data ?? []) as any[])
+      .filter((f) => f.trigger_config?.deal_type_key === dealTypeKey)
+      .map((f) => {
+        const action = (f.graph_definition?.nodes ?? []).find((n: any) => n.id === 'email');
+        return {
+          flow_id: f.id,
+          stage_key: String(f.trigger_config?.stage ?? ''),
+          template_slug: action?.data?.config?.template_slug ?? null,
+          subject: action?.data?.config?.subject ?? null,
+          active: f.status === 'active',
+        };
+      });
+  },
+
+  /** Create or update the rule for one stage. */
+  async upsert(
+    workspaceId: string,
+    dealType: { key: string; label: string },
+    stage: { key: string; label: string },
+    email: { subject: string; body: string; templateSlug?: string | null },
+    existingFlowId?: string | null,
+  ): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser();
+    const graph = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      edges: [{ id: 'e_trigger_email', source: 'trigger', target: 'email' }],
+      nodes: [
+        {
+          id: 'trigger', type: 'triggerNode', position: { x: 0, y: 0 },
+          data: {
+            label: `Deal reaches ${stage.label}`, category: 'trigger', triggerType: 'deal_stage_changed',
+            config: { deal_type_key: dealType.key, stage: stage.key },
+          },
+        },
+        {
+          id: 'email', type: 'actionNode', position: { x: 340, y: 0 },
+          data: {
+            label: 'Send Email', category: 'action', actionType: 'send_email',
+            config: {
+              // The engine skips a `to` that resolves to null or stays unresolved, and says why in
+              // the run output — a deal whose contact has no email is a no-op, not a failed send.
+              to: '{{trigger.data.contact_email}}',
+              subject: email.subject,
+              body: email.body,
+              ...(email.templateSlug ? { template_slug: email.templateSlug } : {}),
+              variables: {
+                contact_name: '{{trigger.data.contact_name}}',
+                deal_title: '{{trigger.data.deal_title}}',
+                stage: '{{trigger.data.stage_label}}',
+                value: '{{trigger.data.value}}',
+                currency: '{{trigger.data.currency}}',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const row = {
+      name: `${dealType.label}: email on ${stage.label}`,
+      description: `Emails the deal's contact when it reaches ${stage.label}.`,
+      trigger_type: 'deal_stage_changed',
+      trigger_config: { deal_type_key: dealType.key, stage: stage.key },
+      graph_definition: graph as unknown as Json,
+      workspace_id: workspaceId,
+      is_global: false,
+      status: 'active',
+      tags: [STAGE_EMAIL_TAG],
+      updated_by: user?.id ?? null,
+    };
+
+    if (existingFlowId) {
+      const { error } = await supabase.from('flows').update(row).eq('id', existingFlowId);
+      if (error) throw error;
+      return existingFlowId;
+    }
+    const { data, error } = await supabase
+      .from('flows').insert({ ...row, created_by: user?.id ?? null }).select('id').single();
+    if (error) throw error;
+    return data.id as string;
+  },
+
+  /** Pausing deliberately lives on the Flows page, which owns run history and status for every
+   *  automation — a second pause control here would be a second place to look. */
+  async remove(flowId: string): Promise<void> {
+    const { error } = await supabase.from('flows').delete().eq('id', flowId);
+    if (error) throw error;
+  },
+};

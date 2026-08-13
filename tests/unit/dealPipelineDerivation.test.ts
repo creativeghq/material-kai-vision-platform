@@ -267,4 +267,35 @@ describe('the deal pipeline has one object and data-driven stages', () => {
       'migration in the same change.',
     ).toEqual(['company', 'contact', 'deal', 'user']);
   });
+  it('a deal trigger config can only filter on keys the emitter actually sends', () => {
+    // flow-engine matches trigger_config by EQUALITY against the event payload. A config key the
+    // payload never carries can therefore never match, so the flow silently never fires — the
+    // stage-email automation would look configured and send nothing. The two are a pair.
+    const types = SOURCES.get('src/services/flows/types.ts')!;
+    const service = SOURCES.get(SERVICE)!;
+    const payload = service.slice(service.indexOf('const payload = {'), service.indexOf('try {', service.indexOf('const payload = {')));
+
+    for (const iface of ['DealStageChangedTriggerConfig', 'DealWonTriggerConfig', 'DealLostTriggerConfig']) {
+      const m = types.match(new RegExp(`interface ${iface} \{([^}]*)\}`));
+      expect(m, `${iface} is gone`).toBeTruthy();
+      const keys = [...m![1].matchAll(/(\w+)\??\s*:/g)].map((x) => x[1]);
+      for (const key of keys) {
+        expect(
+          payload.includes(`${key}:`),
+          `${iface}.${key} is not in the deal event payload, so a flow filtering on it can never ` +
+          'match and would silently never fire.',
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('deal history renders with its own icons, not the generic fallback', () => {
+    // The crm_deals trigger writes these activity types onto the timeline. An unmapped type
+    // degrades silently to the fallback icon, which is how a whole class of events became
+    // visually indistinguishable elsewhere in this file's history.
+    const timeline = SOURCES.get('src/components/business/crm/CrmActivityTimeline.tsx')!;
+    for (const t of ['deal_stage_changed', 'deal_won', 'deal_lost', 'deal_reopened']) {
+      expect(timeline, `${t} has no icon in CrmActivityTimeline ICONS`).toContain(`${t}:`);
+    }
+  });
 });

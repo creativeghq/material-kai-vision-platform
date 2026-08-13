@@ -90,6 +90,34 @@ admin can retarget or pause them without a deploy. They are emitted as **string 
 `dealsService` on purpose — `tests/unit/flowEventContract.test.ts` can only check literals, and an
 event name that drifted out of the `TriggerType` union would emit into nothing silently.
 
+## History and stage-triggered email
+
+**The timeline shows the pipeline itself.** A trigger on `crm_deals` writes a `crm_activities` row
+(`target_kind='deal'`) on every stage or status change — "Moved to Tender from Estimate", "Deal won
+at Handover", "Deal lost — price". A TRIGGER, not a service call: the board, the record page, the
+agent tool and any future writer all move stages, and a rule kept in one of them is a rule the
+others forget.
+
+Note that extending `crm_activities.target_kind` was necessary and **not sufficient** — the read
+path (`crm_record_timeline`) kept its own list of kinds and returned empty for deals until it was
+taught about them.
+
+**Email when a deal reaches a stage** is configured per stage in the deal-type manager (the ✉ on
+each stage row) and stored as an ordinary **workspace-scoped flow** — `is_global=false`, tagged
+`deal-stage-email`. It therefore appears under Flows with its run history and can be paused or
+rewritten there like any other automation; there is no second delivery path and no bespoke setting
+table.
+
+Targeting relies on `flows.trigger_config`, which the engine matches by **equality against the
+event payload**: `{ deal_type_key, stage }` means "only this type, only this stage". That matching
+did not exist before — flows were selected on `trigger_type` + `active` alone, so a stage-triggered
+flow fired on *every* stage move. The rule is generic (every config key must equal the same-named
+payload key; blank means any; `cron`/`timezone` are not filters), so it upgrades every trigger type
+rather than teaching the engine about deals.
+
+Consequence worth knowing: **a config key the payload does not carry can never match**, so the flow
+would silently never fire. The two are a pair, guarded by `dealPipelineDerivation.test.ts`.
+
 ## Guards
 
 - [tests/unit/dealPipelineDerivation.test.ts](../tests/unit/dealPipelineDerivation.test.ts) — stages stay data, the object stays single, `subject_kind` stays closed, every writable column has an input, every service method has a caller, and the lifecycle filter reaches the server.

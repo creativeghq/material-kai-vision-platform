@@ -40,6 +40,10 @@ import {
   MailOpen,
   MousePointerClick,
   MailWarning,
+  ArrowRight,
+  Trophy,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -92,6 +96,12 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   company_detached: Unlink,
   company_deleted: Trash2,
   lead_status_changed: Tag,
+  // Deal pipeline history, written by the crm_deals stage trigger (#311). Without these the
+  // whole story of a deal renders with the generic fallback icon.
+  deal_stage_changed: ArrowRight,
+  deal_won: Trophy,
+  deal_lost: XCircle,
+  deal_reopened: RotateCcw,
   quote_created: ScrollText,
   quote_accepted: CheckCircle2,
   order_created: ShoppingCart,
