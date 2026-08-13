@@ -128,6 +128,9 @@ export interface OrderItem {
   measurement_unit_code: string | null;  // unit of measure (item, m2, kg…)
   vat_percent?: number | null;
   vat_category?: number | null;
+  /** myDATA exemption cause (1–31) justifying a 0% line. Required before this line can be
+   *  invoiced, unless the customer carries a standing `vat_exemption_reason`. */
+  vat_exemption_category?: number | null;
   net_value: number;
   vat_amount: number;
   line_total: number;
@@ -1371,6 +1374,24 @@ export const ordersService = {
    * and a past order must keep the code it was cleared under. That is why this writes the line and
    * not the product — and why the Customs card reads the line rather than re-reading the catalog.
    */
+  /**
+   * WHY a sales line is 0% VAT — the myDATA exemption cause (ΑΑΔΕ 1–31).
+   *
+   * An order may sit at 0% indefinitely: it is a commercial document and declares nothing. The
+   * cause is required only at the moment that rate becomes a fiscal claim, which is why
+   * `generate_invoice_from_order` raises `vat_exemption_required` rather than this write refusing.
+   * A line that leaves it null falls back to the customer's standing `vat_exemption_reason`.
+   *
+   * Not part of `updateItems` — same reasoning as the stock and customs fields: it is not a
+   * figure, so it must stay settable on an order whose numbers are already locked by a document.
+   */
+  async setOrderItemVatExemption(itemId: string, exemptionCategory: number | null): Promise<void> {
+    const { error } = await supabase.from('order_items')
+      .update({ vat_exemption_category: exemptionCategory })
+      .eq('id', itemId);
+    if (error) throw error;
+  },
+
   async setOrderItemCustoms(itemId: string, patch: { taricCode?: string | null; netMassKg?: number | null }): Promise<void> {
     const upd: Record<string, unknown> = {};
     if ('taricCode' in patch) upd.taric_code = patch.taricCode || null;

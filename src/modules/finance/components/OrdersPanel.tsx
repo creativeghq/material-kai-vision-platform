@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck } from 'lucide-react';
+import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
+import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -61,6 +63,7 @@ import {
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
   type ThreeWayMatch, type ThreeWayMatchStatus, type OrderLinkTarget, type OrderBalance,
 } from '@/modules/finance/services/ordersService';
+import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
 
 /**
  * Orders filter every dimension in SQL (`search_orders` RPC), so NO field carries an accessor —
@@ -1476,6 +1479,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [supplierPick, setSupplierPick] = useState<{ itemId: string; productId: string | null; label: string; currentId: string | null } | null>(null);
   // Per-LINE warehouse identity (which catalog product / is it stock at all) — see LineStockDialog.
   const [stockPick, setStockPick] = useState<OrderItem | null>(null);
+  // Per-LINE myDATA exemption cause. Only meaningful on a 0%-VAT sales line — see VatExemptionDialog.
+  const [vatExemptPick, setVatExemptPick] = useState<OrderItem | null>(null);
+  /** The customer's STANDING exemption cause, if they carry one. A line with none inherits it, so
+   *  the gate must not nag about a line that is already justified by the party. Same fallback
+   *  `generate_invoice_from_order` applies — read here only so the UI can say which is in force. */
+  const [buyerVat, setBuyerVat] = useState<{
+    exemption: number | null; country: string | null; vatNumber: string | null; validated: boolean | null;
+  }>({ exemption: null, country: null, vatNumber: null, validated: null });
+  const partyVatExemption = buyerVat.exemption;
+  /** Our own country — the suggester applies Greek articles and must not do so for another issuer. */
+  const [sellerCountry, setSellerCountry] = useState<string | null>(null);
+  /** order_item_id → what the catalog says it is. Absent = no linked product, so unknowable here. */
+  const [lineItemTypes, setLineItemTypes] = useState<Map<string, SupplyKind>>(new Map());
   // Per-LINE warranty: which lines of this order already have a registered unit in the customer's
   // installed base, keyed by order_item_id. The link has always been stored (`source_order_item_id`)
   // and never read, so a sold-and-covered line looked identical to one nobody had registered.
@@ -1766,6 +1782,84 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     return { po, owed: Math.max(0, po ? po.outstanding : s.owed) };
   }, [coveredBy]);
 
+  // The customer's standing exemption cause. Read from whichever party the sale is with, in the
+  // same order `generate_invoice_from_order` reads it — company first, then contact.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order || order.order_type !== 'sales') {
+        setBuyerVat({ exemption: null, country: null, vatNumber: null, validated: null });
+        return;
+      }
+      let reason: string | null = null;
+      let country: string | null = null;
+      let vatNumber: string | null = null;
+      // Only crm_companies records a VIES verdict. A contact's VAT number is therefore never
+      // treated as proof of business status — the safe direction: it declines to claim an
+      // intra-community supply rather than claiming one that cannot be evidenced.
+      let validated: boolean | null = null;
+      if (order.customer_company_id) {
+        const { data } = await supabase.from('crm_companies')
+          .select('vat_exemption_reason, country_code, billing_country_code, vat_number, vat_validated')
+          .eq('id', order.customer_company_id).maybeSingle();
+        reason = (data?.vat_exemption_reason as string | null) ?? null;
+        // Billing address wins: it is where the invoice is addressed, which is what decides VAT.
+        country = (data?.billing_country_code as string | null) ?? (data?.country_code as string | null) ?? null;
+        vatNumber = (data?.vat_number as string | null) ?? null;
+        validated = (data?.vat_validated as boolean | null) ?? null;
+      } else if (order.customer_contact_id) {
+        const { data } = await supabase.from('crm_contacts')
+          .select('vat_exemption_reason, country_code, billing_country_code, vat_number')
+          .eq('id', order.customer_contact_id).maybeSingle();
+        reason = (data?.vat_exemption_reason as string | null) ?? null;
+        country = (data?.billing_country_code as string | null) ?? (data?.country_code as string | null) ?? null;
+        vatNumber = (data?.vat_number as string | null) ?? null;
+      }
+      const n = reason != null && /^\d+$/.test(reason.trim()) ? parseInt(reason.trim(), 10) : NaN;
+      if (!cancelled) {
+        setBuyerVat({
+          exemption: Number.isFinite(n) && n >= 1 && n <= 31 ? n : null,
+          country, vatNumber, validated,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.order_type, order?.customer_company_id, order?.customer_contact_id]);
+
+  // Goods or services, per line, from the catalog. Only lines WITH a product can answer; the rest
+  // fall back to the line's own off-warehouse flag at the call site.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ids = [...new Set(items.map((it) => it.product_id).filter(Boolean) as string[])];
+      if (ids.length === 0) { setLineItemTypes(new Map()); return; }
+      const { data } = await supabase.from('products').select('id, item_type').in('id', ids);
+      const byProduct = new Map<string, SupplyKind>();
+      for (const r of (data ?? []) as Array<{ id: string; item_type: string | null }>) {
+        byProduct.set(r.id, r.item_type === 'service' ? 'services' : 'goods');
+      }
+      if (cancelled) return;
+      const byLine = new Map<string, SupplyKind>();
+      for (const it of items) {
+        const k = it.product_id ? byProduct.get(it.product_id) : undefined;
+        if (k) byLine.set(it.id, k);
+      }
+      setLineItemTypes(byLine);
+    })();
+    return () => { cancelled = true; };
+  }, [items]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order) { setSellerCountry(null); return; }
+      const { data } = await supabase.from('finance_settings')
+        .select('business_country_code').eq('workspace_id', order.workspace_id).maybeSingle();
+      if (!cancelled) setSellerCountry((data?.business_country_code as string | null) ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [order?.workspace_id, order?.id]);
+
   /** The picker's value — derived from `covers`, so it can never disagree with the block below it. */
   const coversValue: OrderLinkTarget = covers
     ? { kind: 'sales_order', orderId: covers.id, projectId: null, label: covers.order_number ?? covers.id.slice(0, 8) }
@@ -1872,6 +1966,24 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   /** Apply the line's warehouse identity (catalog product / off-warehouse) — see LineStockDialog. */
+  /** Set / clear the myDATA exemption cause on a 0%-VAT sales line. */
+  const setLineVatExemption = async (itemId: string, code: number | null) => {
+    setSaving(true);
+    try {
+      await ordersService.setOrderItemVatExemption(itemId, code);
+      setVatExemptPick(null);
+      if (order) await load(order.id);
+      toast({
+        title: code == null ? 'Exemption reason cleared' : 'Exemption reason set',
+        description: code == null
+          ? 'This line can no longer be invoiced at 0% until a reason is given.'
+          : mydataExemptionLabel(code) ?? undefined,
+      });
+    } catch (err: any) {
+      toast({ title: 'Failed to set the exemption reason', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   const setLineStock = async (itemId: string, patch: { productId?: string | null; updateWarehouse?: boolean }, note: string) => {
     setSaving(true);
     try {
@@ -2006,7 +2118,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       toast({ title: `Draft ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} created`, description: 'Review it, then issue & transmit to myDATA.' });
       if (data) navigate(`${financeBase}/invoices/${data}`);
     } catch (err: any) {
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+      // The 0%-VAT gate refuses BY NAME so this can name the lines instead of leaking raw SQL.
+      toast({ title: 'Failed', description: invoiceGenerationErrorMessage(err), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -2585,6 +2698,32 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                             <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
                               {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
                             </button>
+                          )}
+                          {/* WHY this line is 0%. myDATA requires an exemption cause on every
+                              vatCategory 7/8 line, and `generate_invoice_from_order` now refuses
+                              without one — so the gap is stated here, beside the fix, rather than
+                              surfacing as a rejected document after the operator has moved on.
+                              A line inherits the customer's standing reason when it has none, so
+                              this only turns amber when nothing anywhere justifies the zero. */}
+                          {order.order_type === 'sales' && Number(it.vat_percent ?? 0) === 0 && (
+                            it.vat_exemption_category != null ? (
+                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                                disabled={saving} onClick={() => setVatExemptPick(it)}
+                                title={mydataExemptionLabel(it.vat_exemption_category) ?? undefined}>
+                                <Percent className="h-2.5 w-2.5" /> 0% · cause {it.vat_exemption_category}
+                              </button>
+                            ) : partyVatExemption != null ? (
+                              <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                                disabled={saving} onClick={() => setVatExemptPick(it)}
+                                title={`From the customer's record: ${mydataExemptionLabel(partyVatExemption) ?? ''}`}>
+                                <Percent className="h-2.5 w-2.5" /> 0% · cause {partyVatExemption} (customer)
+                              </button>
+                            ) : (
+                              <button type="button" className="text-[10px] text-amber-600 hover:underline inline-flex items-center gap-0.5"
+                                disabled={saving} onClick={() => setVatExemptPick(it)}>
+                                <AlertTriangle className="h-2.5 w-2.5" /> 0% VAT — reason required to invoice
+                              </button>
+                            )
                           )}
                           {/* Under warranty? A sold unit the customer still owns is the installed
                               base's whole subject, and THIS is where an operator knows it: at the
@@ -3279,6 +3418,28 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           onSaved={() => { setWarrantyPick(null); void load(order.id); }}
         />
       )}
+      {vatExemptPick && order && (
+        <VatExemptionDialog
+          label={vatExemptPick.description}
+          current={vatExemptPick.vat_exemption_category ?? null}
+          inheritedFromParty={partyVatExemption}
+          suggestion={suggestVatExemption({
+            sellerCountry,
+            buyerCountry: buyerVat.country,
+            buyerVatNumber: buyerVat.vatNumber,
+            buyerVatValidated: buyerVat.validated,
+            // A line explicitly OFF the warehouse is hire, labour or transport — a service. One
+            // that is stocked is goods. Anything else stays 'unknown', which the suggester
+            // reports at low confidence rather than resolving by assumption.
+            supply: lineItemTypes.get(vatExemptPick.id)
+              ?? (vatExemptPick.update_warehouse === false ? 'services' : 'unknown'),
+          })}
+          busy={saving}
+          onClose={() => setVatExemptPick(null)}
+          onApply={(code) => void setLineVatExemption(vatExemptPick.id, code)}
+        />
+      )}
+
       {stockPick && order && (
         <LineStockDialog
           workspaceId={order.workspace_id}
@@ -3579,6 +3740,103 @@ const LineWarrantyDialog: React.FC<{
  * creating a product for every unlinked line would fill the catalog with `Delivery`, `Discount`
  * and typos, each carrying a phantom stock quantity that is far harder to unwind than this dialog.
  */
+/**
+ * WHY a line is 0% VAT.
+ *
+ * An order may carry 0% for as long as it stays an order — it declares nothing. The cause becomes
+ * mandatory at the moment the rate turns into a fiscal claim, so `generate_invoice_from_order`
+ * refuses without one and this is where that refusal is answered. Codes are the ΑΑΔΕ catalog, not
+ * free text: the number is what myDATA receives, and a wrong one is rejected at submission.
+ */
+const VatExemptionDialog: React.FC<{
+  label: string;
+  current: number | null;
+  /** The customer's standing cause, which this line inherits when it states none. */
+  inheritedFromParty: number | null;
+  busy?: boolean;
+  onClose: () => void;
+  onApply: (code: number | null) => void;
+  /** What the rules infer from the buyer + the line. A DEFAULT, never an auto-apply. */
+  suggestion?: ExemptionSuggestion;
+}> = ({ label, current, inheritedFromParty, suggestion, busy, onClose, onApply }) => {
+  // Pre-select the suggestion only when nothing is set yet and it is confident. A low-confidence
+  // guess sitting pre-filled in the box is the same as deciding for the operator, which is the one
+  // thing neither Novus nor AADE will do for us either — the cause is the issuer's own claim.
+  const [code, setCode] = useState<string>(
+    current != null ? String(current)
+      : suggestion?.code != null && suggestion.confidence === 'high' ? String(suggestion.code)
+      : '',
+  );
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-display">Why is “{label}” 0% VAT?</DialogTitle>
+          <DialogDescription>
+            myDATA requires an exemption cause on every 0% line. The order is fine without one —
+            this is only needed before it can become an invoice.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {suggestion && (
+            <div className={`rounded-md border px-3 py-2 text-xs ${
+              suggestion.confidence === 'high'
+                ? 'border-border/60 bg-muted/20'
+                : 'border-amber-500/40 bg-amber-500/5'}`}>
+              <div className="flex items-center gap-1.5 font-medium">
+                {suggestion.confidence === 'high'
+                  ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  : <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                {suggestion.code != null
+                  ? <span>Suggested: cause {suggestion.code}</span>
+                  : <span>No exemption suggested</span>}
+                {suggestion.confidence === 'low' && (
+                  <span className="text-muted-foreground">· check before accepting</span>
+                )}
+              </div>
+              {suggestion.label && <p className="mt-0.5 text-muted-foreground">{suggestion.label}</p>}
+              <p className="mt-1 text-muted-foreground">{suggestion.rationale}</p>
+              {suggestion.caveat && <p className="mt-1 text-amber-600 dark:text-amber-400">{suggestion.caveat}</p>}
+              {suggestion.code != null && String(suggestion.code) !== code && (
+                <Button size="sm" variant="outline" className="mt-2 h-7 text-[11px]" disabled={busy}
+                  onClick={() => setCode(String(suggestion.code))}>
+                  Use cause {suggestion.code}
+                </Button>
+              )}
+            </div>
+          )}
+          {inheritedFromParty != null && current == null && (
+            <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              This line already inherits <span className="font-medium text-foreground">cause {inheritedFromParty}</span> from
+              the customer’s record. Set one here only to override it for this line.
+            </p>
+          )}
+          <div className="space-y-1">
+            <Label className="text-xs">Exemption cause</Label>
+            <Select value={code} onValueChange={setCode} disabled={busy}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Pick the governing article…" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {MYDATA_EXEMPTION_CATEGORIES.map((c) => (
+                  <SelectItem key={c.code} value={String(c.code)}>{c.code} · {c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          {current != null && (
+            <Button variant="ghost" disabled={busy} onClick={() => onApply(null)}>Clear</Button>
+          )}
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button disabled={busy || !code} onClick={() => onApply(parseInt(code, 10))}>
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Set reason
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const LineStockDialog: React.FC<{
   workspaceId: string;
   label: string;

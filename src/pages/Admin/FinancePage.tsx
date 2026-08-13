@@ -65,6 +65,7 @@ import {
   type OrderListRow,
   type OrderBalance,
 } from '@/modules/finance/services/ordersService';
+import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
 import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingInlineEditor';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
@@ -275,7 +276,7 @@ const FinancePage: React.FC = () => {
       if (workspaceId) void loadAll(workspaceId);
       if (data) navigate(`${financeBase}/invoices/${data}`);
     } catch (err: any) {
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+      toast({ title: 'Failed', description: invoiceGenerationErrorMessage(err), variant: 'destructive' });
     }
   };
 

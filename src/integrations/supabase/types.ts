@@ -17403,6 +17403,7 @@ export type Database = {
           update_warehouse: boolean
           vat_amount: number
           vat_category: number | null
+          vat_exemption_category: number | null
           vat_percent: number | null
           warehouse_id: string | null
           workspace_id: string
@@ -17430,6 +17431,7 @@ export type Database = {
           update_warehouse?: boolean
           vat_amount?: number
           vat_category?: number | null
+          vat_exemption_category?: number | null
           vat_percent?: number | null
           warehouse_id?: string | null
           workspace_id: string
@@ -17457,6 +17459,7 @@ export type Database = {
           update_warehouse?: boolean
           vat_amount?: number
           vat_category?: number | null
+          vat_exemption_category?: number | null
           vat_percent?: number | null
           warehouse_id?: string | null
           workspace_id?: string
