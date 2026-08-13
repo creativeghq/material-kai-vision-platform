@@ -353,17 +353,6 @@ export interface CmaReport {
   generated_at: string;
 }
 
-// ── Deal pipeline ──
-export type DealStage = 'lead' | 'viewing' | 'offer' | 'under_offer' | 'conveyancing' | 'exchanged' | 'completed';
-export interface PropertyDeal {
-  id: string; property_id: string; buyer_contact_id: string | null; stage: DealStage;
-  status: 'open' | 'won' | 'lost'; value: number | null; currency: string;
-  expected_close_date: string | null; lost_reason: string | null; notes: string | null;
-  task_total: number; task_done: number;
-  property?: { id: string; title: string | null; reference_code: string | null; town: string | null } | null;
-  buyer?: { id: string; name: string | null } | null;
-}
-export interface DealTask { id: string; deal_id: string; title: string; done: boolean; due_date: string | null; created_at: string }
 
 export const realEstateService = {
   dashboard: (ws: string) => call<RealEstateDashboard>(ws, 'dashboard'),
@@ -443,15 +432,6 @@ export const realEstateService = {
   cmaReport: (ws: string, params: { property_id?: string; property_type?: string; town?: string; area?: number }) =>
     call<CmaReport>(ws, 'cma-report', params),
 
-  // Deal pipeline
-  listDeals: (ws: string) => call<{ deals: PropertyDeal[] }>(ws, 'list-deals').then((r) => r.deals),
-  upsertDeal: (ws: string, fields: { deal_id?: string; property_id?: string; buyer_contact_id?: string | null; stage?: DealStage; status?: string; value?: number | null; currency?: string; expected_close_date?: string | null; notes?: string; lost_reason?: string }) =>
-    call<{ deal: PropertyDeal }>(ws, 'upsert-deal', fields).then((r) => r.deal),
-  deleteDeal: (ws: string, dealId: string) => call<{ ok: true }>(ws, 'delete-deal', { deal_id: dealId }),
-  listDealTasks: (ws: string, dealId: string) => call<{ tasks: DealTask[] }>(ws, 'list-deal-tasks', { deal_id: dealId }).then((r) => r.tasks),
-  addDealTask: (ws: string, dealId: string, title: string, dueDate?: string) => call<{ task: DealTask }>(ws, 'add-deal-task', { deal_id: dealId, title, due_date: dueDate }).then((r) => r.task),
-  toggleDealTask: (ws: string, taskId: string, done: boolean) => call<{ task: DealTask }>(ws, 'toggle-deal-task', { task_id: taskId, done }).then((r) => r.task),
-  deleteDealTask: (ws: string, taskId: string) => call<{ ok: true }>(ws, 'delete-deal-task', { task_id: taskId }),
   listInquiries: (ws: string, filters: { status?: string; property_id?: string } = {}) =>
     call<{ inquiries: PropertyInquiry[] }>(ws, 'list-inquiries', filters).then((r) => r.inquiries),
   updateInquiry: (ws: string, inquiryId: string, status: string) =>

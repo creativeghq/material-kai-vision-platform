@@ -1028,7 +1028,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'sale_price', type: 'number', optional: true, description: 'Agreed final sale price for complete_sale.' },
       { name: 'commission_pct', type: 'number', optional: true, description: 'Commission percent for complete_sale (defaults to the listing’s stored rate).' },
       { name: 'deal_id', type: 'string', optional: true, description: 'Target a pipeline deal for manage_deal (update/move/win/lose).' },
-      { name: 'stage', type: 'string', optional: true, description: 'Pipeline stage for manage_deal: lead/viewing/offer/under_offer/conveyancing/exchanged/completed.' },
+      { name: 'stage', type: 'string', optional: true, description: 'Pipeline stage key for manage_deal. Stages are configured per deal type — call list_deals first to see which are in use.' },
       { name: 'deal_value', type: 'number', optional: true, description: 'Deal value for manage_deal.' },
       { name: 'buyer_contact_id', type: 'string', optional: true, description: 'CRM contact id of the buyer for manage_deal.' },
       { name: 'area', type: 'number', optional: true, description: 'Floor area (m²) for an ad-hoc cma_report.' },

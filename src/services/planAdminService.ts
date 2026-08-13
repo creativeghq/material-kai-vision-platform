@@ -28,6 +28,9 @@ export interface AdminPlan {
  *  free-baseline module must never depend on a paid one. The grid warns on violations. */
 export const MODULE_DEPENDENCIES: Record<string, string[]> = {
   'sales-finance': ['crm'],
+  // Offered from BOTH the CRM and Real Estate surfaces, but it depends on CRM only —
+  // requiring real-estate too would lock the pipeline away from every non-RE tenant.
+  deals: ['crm'],
   quotes: ['crm'],
   projects: ['crm'],
   'mention-monitoring-notifications': ['mention-monitoring'],

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Building2, Trash2, Mail, CreditCard, Key, ExternalLink, Tags, Plus } from 'lucide-react';
+import { Users, Building2, Trash2, Mail, CreditCard, Key, ExternalLink, Tags, Plus, Kanban } from 'lucide-react';
 
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -36,12 +36,15 @@ import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterOption, type FilterValues } from '@/components/core/filters';
 import { buildCompanyFilters, buildContactFilters, buildUserFilters, categoryFacetOptions } from './crmFilters';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
+import { PipelineBoard } from '@/components/business/crm/PipelineBoard';
 import {
   PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
 
-const TAB_VALUES = ['users', 'contacts', 'companies', 'categories'] as const;
+const TAB_VALUES = ['pipeline', 'users', 'contacts', 'companies', 'categories'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
 interface UserWithAuth {
@@ -114,18 +117,21 @@ export const CRMManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  // Reps move their own cards; RLS on crm_deals is what actually decides (admin OR deal owner).
+  const canManageDeals = !!activeWorkspaceId;
 
   const initialTab: TabValue = (() => {
     const t = searchParams.get('tab');
-    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'users';
+    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'pipeline';
   })();
   const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
   const handleTabChange = (val: string) => {
-    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'users';
+    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'pipeline';
     setActiveTab(next);
     setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
-    if (next === 'users') params.delete('tab'); else params.set('tab', next);
+    if (next === 'pipeline') params.delete('tab'); else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
 
@@ -583,11 +589,29 @@ export const CRMManagement: React.FC = () => {
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+            <TabsTrigger value="pipeline"><Kanban className="h-4 w-4 mr-2" />Pipeline</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>
             <TabsTrigger value="contacts"><Building2 className="h-4 w-4 mr-2" />Contacts</TabsTrigger>
             <TabsTrigger value="companies"><Building2 className="h-4 w-4 mr-2" />Companies</TabsTrigger>
             <TabsTrigger value="categories"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
           </TabsList>
+
+          {/* Pipeline — the deal board. One object across CRM and Real Estate, segmented by deal
+              type; the gate is UX only, RLS on crm_deals is the boundary. */}
+          <TabsContent value="pipeline" className="space-y-4 mt-6">
+            <ModuleTabGate moduleSlug="deals" moduleName="Deals & Pipeline"
+              blurb="Track opportunities from first contact to won — across real estate, projects, construction or your own deal types.">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pipeline</CardTitle>
+                  <CardDescription>Deals in flight, by stage. Stages follow each deal type.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PipelineBoard ws={activeWorkspaceId} canManage={canManageDeals} />
+                </CardContent>
+              </Card>
+            </ModuleTabGate>
+          </TabsContent>
 
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-4 mt-6">

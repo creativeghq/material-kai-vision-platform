@@ -2219,82 +2219,9 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       // ── Deal pipeline — stage board + per-deal tasks ────────────────
-      case 'list-deals': {
-        const { data, error } = await supabase.from('property_deals')
-          .select('*, property:properties!property_deals_property_id_fkey ( id, title, reference_code, town, listing_agent_id, created_by, open_for_all ), buyer:crm_contacts!property_deals_buyer_contact_id_fkey ( id, name ), tasks:property_deal_tasks ( id, done )')
-          .eq('workspace_id', workspaceId).order('updated_at', { ascending: false });
-        if (error) throw new HttpError(400, error.message);
-        const rows = (data ?? []).filter((d: any) => access.isBroker || canViewProperty(d.property ?? {}))
-          .map((d: any) => { const tasks = d.tasks ?? []; return { ...d, tasks: undefined, task_total: tasks.length, task_done: tasks.filter((t: any) => t.done).length }; });
-        return json({ deals: rows });
-      }
-      case 'upsert-deal': {
-        requireManage();
-        const propertyId = String(body.property_id ?? '');
-        const dealId = String(body.deal_id ?? '');
-        if (!dealId && !propertyId) return json({ error: 'property_id is required' }, 400);
-        const DEAL_WRITABLE = ['buyer_contact_id', 'stage', 'value', 'currency', 'expected_close_date', 'notes', 'status', 'lost_reason'];
-        const payload: Record<string, unknown> = {};
-        for (const k of DEAL_WRITABLE) if (body[k] !== undefined) payload[k] = body[k];
-        if (payload.stage === 'completed' && payload.status === undefined) payload.status = 'won'; // reaching the last stage wins
-        if (dealId) {
-          const { data: ex } = await supabase.from('property_deals').select('property_id').eq('id', dealId).eq('workspace_id', workspaceId).maybeSingle();
-          if (!ex) return json({ error: 'not found' }, 404);
-          await loadEditable(ex.property_id);
-          const { data, error } = await supabase.from('property_deals').update(payload).eq('id', dealId).eq('workspace_id', workspaceId).select('*').single();
-          if (error) throw new HttpError(400, error.message);
-          return json({ deal: data });
-        }
-        await loadEditable(propertyId);
-        const { data, error } = await supabase.from('property_deals').insert({ ...payload, workspace_id: workspaceId, property_id: propertyId, agent_id: userId, created_by: userId }).select('*').single();
-        if (error) throw new HttpError(400, error.message);
-        return json({ deal: data });
-      }
-      case 'delete-deal': {
-        requireManage();
-        const dealId = String(body.deal_id ?? '');
-        if (!dealId) return json({ error: 'deal_id is required' }, 400);
-        const { data: ex } = await supabase.from('property_deals').select('property_id').eq('id', dealId).eq('workspace_id', workspaceId).maybeSingle();
-        if (!ex) return json({ error: 'not found' }, 404);
-        await loadEditable(ex.property_id);
-        const { error } = await supabase.from('property_deals').delete().eq('id', dealId).eq('workspace_id', workspaceId);
-        if (error) throw new HttpError(400, error.message);
-        return json({ ok: true });
-      }
-      case 'list-deal-tasks': {
-        const dealId = String(body.deal_id ?? '');
-        if (!dealId) return json({ error: 'deal_id is required' }, 400);
-        const { data, error } = await supabase.from('property_deal_tasks').select('*').eq('deal_id', dealId).eq('workspace_id', workspaceId).order('created_at');
-        if (error) throw new HttpError(400, error.message);
-        return json({ tasks: data ?? [] });
-      }
-      case 'add-deal-task': {
-        requireManage();
-        const dealId = String(body.deal_id ?? '');
-        if (!dealId || !body.title) return json({ error: 'deal_id and title are required' }, 400);
-        const { data: ex } = await supabase.from('property_deals').select('property_id').eq('id', dealId).eq('workspace_id', workspaceId).maybeSingle();
-        if (!ex) return json({ error: 'not found' }, 404);
-        await loadEditable(ex.property_id);
-        const { data, error } = await supabase.from('property_deal_tasks').insert({ workspace_id: workspaceId, deal_id: dealId, title: String(body.title), due_date: body.due_date ?? null }).select('*').single();
-        if (error) throw new HttpError(400, error.message);
-        return json({ task: data });
-      }
-      case 'toggle-deal-task': {
-        requireManage();
-        const taskId = String(body.task_id ?? '');
-        if (!taskId) return json({ error: 'task_id is required' }, 400);
-        const { data, error } = await supabase.from('property_deal_tasks').update({ done: !!body.done }).eq('id', taskId).eq('workspace_id', workspaceId).select('*').single();
-        if (error) throw new HttpError(400, error.message);
-        return json({ task: data });
-      }
-      case 'delete-deal-task': {
-        requireManage();
-        const taskId = String(body.task_id ?? '');
-        if (!taskId) return json({ error: 'task_id is required' }, 400);
-        const { error } = await supabase.from('property_deal_tasks').delete().eq('id', taskId).eq('workspace_id', workspaceId);
-        if (error) throw new HttpError(400, error.message);
-        return json({ ok: true });
-      }
+      // Deal endpoints removed (#311): the pipeline is now a CRM object (`crm_deals`) read
+      // through dealsService with RLS carrying the property agent-scoping, so there is one
+      // visibility rule instead of this function's private copy.
 
       default:
         return json({ error: `Unknown action: ${action}` }, 400);

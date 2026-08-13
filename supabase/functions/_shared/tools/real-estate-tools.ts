@@ -32,6 +32,15 @@ async function moduleEnabled(): Promise<boolean> {
   } catch { return false; }
 }
 
+/** RLS-scoped client for the caller — deals are read through the table, not a private
+ *  endpoint, so the agent sees exactly what the CRM board would show this user (#311). */
+function dealsClient(jwt: string) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { persistSession: false },
+  });
+}
+
 async function callApi(jwt: string, workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<any> {
   try {
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/real-estate-api`, {
@@ -148,27 +157,56 @@ export const createManageRealEstateTool = (
           return JSON.stringify({ success: true, sale: s, commission_net: s?.commission_base, currency: s?.currency, note: 'Listing marked sold and commission calculated. Issue the commission invoice from the listing Offers tab in Finance when ready.' });
         }
         case 'list_deals': {
-          const res = await callApi(jwt, workspaceId, 'list-deals');
-          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
-          const deals = (res.data?.deals ?? []).filter((d: any) => d.status !== 'lost');
+          // Real-estate deals are crm_deals of the real_estate type. Stage names come from the
+          // rows, never a list in this file — each type owns its own stages.
+          const sb = dealsClient(jwt);
+          const { data, error } = await sb
+            .from('crm_deals')
+            .select('id, stage, status, value, title, property:properties ( title ), contact:crm_contacts!crm_deals_contact_id_fkey ( name ), type:crm_deal_types!inner ( key )')
+            .eq('workspace_id', workspaceId)
+            .eq('crm_deal_types.key', 'real_estate')
+            .neq('status', 'lost');
+          if (error) return JSON.stringify({ success: false, error: error.message });
+          const deals = (data ?? []) as any[];
           const byStage: Record<string, any[]> = {};
-          for (const d of deals) (byStage[d.stage] ??= []).push({ id: d.id, property: d.property?.title, buyer: d.buyer?.name, value: d.value, tasks: `${d.task_done}/${d.task_total}` });
+          for (const d of deals) (byStage[d.stage] ??= []).push({ id: d.id, property: d.property?.title ?? d.title, buyer: d.contact?.name, value: d.value });
           onChunk?.({ type: 'real_estate_deals', open_count: deals.length, by_stage: byStage, timestamp: Date.now() });
           return JSON.stringify({ success: true, open_count: deals.length, by_stage: byStage });
         }
         case 'manage_deal': {
           if (!property_id && !deal_id) return JSON.stringify({ success: false, error: 'property_id (to create) or deal_id (to update) is required' });
+          const sb = dealsClient(jwt);
+          const { data: dealType } = await sb.from('crm_deal_types').select('id').is('workspace_id', null).eq('key', 'real_estate').maybeSingle();
+          if (!dealType) return JSON.stringify({ success: false, error: 'the real_estate deal type is missing' });
+          const { data: stageRows } = await sb.from('crm_deal_stages').select('key, sort').eq('deal_type_id', dealType.id).order('sort');
+          const stages = (stageRows ?? []) as { key: string }[];
+          // Validate against the TYPE's stages, not a hardcoded list. The composite FK would
+          // reject a bad one anyway; a named error beats a constraint violation.
+          if (stage && !stages.some((x) => x.key === stage)) {
+            return JSON.stringify({ success: false, error: `unknown stage "${stage}" — this pipeline uses: ${stages.map((x) => x.key).join(', ')}` });
+          }
           const fields: Record<string, unknown> = {};
-          if (deal_id) fields.deal_id = deal_id;
-          if (property_id) fields.property_id = property_id;
           if (stage) fields.stage = stage;
           if (deal_value !== undefined) fields.value = deal_value;
-          if (buyer_contact_id) fields.buyer_contact_id = buyer_contact_id;
+          if (buyer_contact_id) fields.contact_id = buyer_contact_id;
           if (status === 'won' || status === 'lost' || status === 'open') fields.status = status;
-          const res = await callApi(jwt, workspaceId, 'upsert-deal', fields);
-          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
-          onChunk?.({ type: 'real_estate_deal', deal: res.data?.deal, timestamp: Date.now() });
-          return JSON.stringify({ success: true, deal: res.data?.deal });
+          let deal: any = null;
+          if (deal_id) {
+            const { data, error } = await sb.from('crm_deals').update(fields).eq('id', deal_id).eq('workspace_id', workspaceId).select('*').maybeSingle();
+            if (error) return JSON.stringify({ success: false, error: error.message });
+            if (!data) return JSON.stringify({ success: false, error: 'deal not found' });
+            deal = data;
+          } else {
+            if (!buyer_contact_id) return JSON.stringify({ success: false, error: 'a new deal needs buyer_contact_id — every deal is attached to a party' });
+            const { data, error } = await sb.from('crm_deals').insert({
+              workspace_id: workspaceId, deal_type_id: dealType.id, property_id,
+              stage: (stage as string) || stages[0]?.key, status: 'open', ...fields,
+            }).select('*').single();
+            if (error) return JSON.stringify({ success: false, error: error.message });
+            deal = data;
+          }
+          onChunk?.({ type: 'real_estate_deal', deal, timestamp: Date.now() });
+          return JSON.stringify({ success: true, deal });
         }
         case 'cma_report': {
           if (!property_id && !property_type) return JSON.stringify({ success: false, error: 'property_id or property_type is required' });
@@ -208,7 +246,7 @@ export const createManageRealEstateTool = (
         '  • get_property     — one listing with photo/inquiry counts (needs property_id).',
         '  • find_leads       — inquiries/leads; optional status/property_id. An invited agent sees only their own.',
         '  • list_lettings    — active tenancies + open maintenance work orders (optional property_id).',
-        '  • list_deals       — the deal pipeline, grouped by stage (lead→viewing→offer→under_offer→conveyancing→exchanged→completed).',
+        '  • list_deals       — the real-estate deal pipeline, grouped by stage (stages are configured per deal type).',
         '  • list_investments — investment portfolio roll-up + per-property yield/cash-flow (needs the Investments add-on).',
         '  • cma_report       — comparative market analysis: suggested price + comps stats (property_id, or property_type+town+area).',
         '  • buyer_portal_link— the shareable portal URL(s) for registered buyers (optional crm_contact_id).',
@@ -236,7 +274,7 @@ export const createManageRealEstateTool = (
         sale_price: z.number().optional().describe('Agreed final sale price for complete_sale.'),
         commission_pct: z.number().optional().describe('Commission percent for complete_sale (defaults to the listing’s stored rate).'),
         deal_id: z.string().optional().describe('Target a pipeline deal for manage_deal (update/move/win/lose).'),
-        stage: z.string().optional().describe('Pipeline stage for manage_deal: lead/viewing/offer/under_offer/conveyancing/exchanged/completed.'),
+        stage: z.string().optional().describe('Pipeline stage key for manage_deal. Stages are configured per deal type — call list_deals first to see which are in use.'),
         deal_value: z.number().optional().describe('Deal value for manage_deal.'),
         buyer_contact_id: z.string().optional().describe('CRM contact id of the buyer for manage_deal.'),
         area: z.number().optional().describe('Floor area (m²) for an ad-hoc cma_report.'),

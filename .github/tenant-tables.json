@@ -13,7 +13,7 @@
     "if the list shrinks."
   ],
   "generated_from": "information_schema.columns where column_name = 'workspace_id'",
-  "generated_at": "2026-08-09T09:53:04.481Z",
+  "generated_at": "2026-08-13T00:00:00.000Z",
   "tables": [
     "aade_lookup_log",
     "agent_memories",
@@ -46,6 +46,9 @@
     "crm_bank_accounts",
     "crm_companies",
     "crm_contacts",
+    "crm_deal_tasks",
+    "crm_deal_types",
+    "crm_deals",
     "crm_meetings",
     "crm_notes",
     "crm_phones",
@@ -172,8 +175,6 @@
     "property_buyer_favorites",
     "property_buyer_requirements",
     "property_contacts_ext",
-    "property_deal_tasks",
-    "property_deals",
     "property_documents",
     "property_inquiries",
     "property_interests",

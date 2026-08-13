@@ -5241,6 +5241,7 @@ export type Database = {
           lead_score: number | null
           lead_source: string | null
           lead_status: string | null
+          lifecycle_stage: string | null
           linked_at: string | null
           linked_by: string | null
           linkedin: string | null
@@ -5312,6 +5313,7 @@ export type Database = {
           lead_score?: number | null
           lead_source?: string | null
           lead_status?: string | null
+          lifecycle_stage?: string | null
           linked_at?: string | null
           linked_by?: string | null
           linkedin?: string | null
@@ -5383,6 +5385,7 @@ export type Database = {
           lead_score?: number | null
           lead_source?: string | null
           lead_status?: string | null
+          lifecycle_stage?: string | null
           linked_at?: string | null
           linked_by?: string | null
           linkedin?: string | null
@@ -5425,6 +5428,261 @@ export type Database = {
           },
           {
             foreignKeyName: "crm_contacts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_deal_stages: {
+        Row: {
+          created_at: string
+          deal_type_id: string
+          id: string
+          is_lost: boolean
+          is_won: boolean
+          key: string
+          label: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deal_type_id: string
+          id?: string
+          is_lost?: boolean
+          is_won?: boolean
+          key: string
+          label: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deal_type_id?: string
+          id?: string
+          is_lost?: boolean
+          is_won?: boolean
+          key?: string
+          label?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_stages_deal_type_id_fkey"
+            columns: ["deal_type_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deal_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_deal_tasks: {
+        Row: {
+          created_at: string
+          deal_id: string
+          done: boolean
+          due_date: string | null
+          id: string
+          title: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          deal_id: string
+          done?: boolean
+          due_date?: string | null
+          id?: string
+          title: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          deal_id?: string
+          done?: boolean
+          due_date?: string | null
+          id?: string
+          title?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_tasks_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deal_tasks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_deal_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          key: string
+          label: string
+          sort: number
+          subject_kind: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          label: string
+          sort?: number
+          subject_kind?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          label?: string
+          sort?: number
+          subject_kind?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_types_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_deals: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          deal_type_id: string
+          expected_close_date: string | null
+          id: string
+          lost_reason: string | null
+          notes: string | null
+          owner_user_id: string | null
+          probability: number | null
+          project_id: string | null
+          property_id: string | null
+          stage: string
+          status: string
+          title: string | null
+          updated_at: string
+          value: number | null
+          workspace_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deal_type_id: string
+          expected_close_date?: string | null
+          id?: string
+          lost_reason?: string | null
+          notes?: string | null
+          owner_user_id?: string | null
+          probability?: number | null
+          project_id?: string | null
+          property_id?: string | null
+          stage: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          value?: number | null
+          workspace_id: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deal_type_id?: string
+          expected_close_date?: string | null
+          id?: string
+          lost_reason?: string | null
+          notes?: string | null
+          owner_user_id?: string | null
+          probability?: number | null
+          project_id?: string | null
+          property_id?: string | null
+          stage?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          value?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_deal_type_id_fkey"
+            columns: ["deal_type_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deal_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_stage_fkey"
+            columns: ["deal_type_id", "stage"]
+            isOneToOne: false
+            referencedRelation: "crm_deal_stages"
+            referencedColumns: ["deal_type_id", "key"]
+          },
+          {
+            foreignKeyName: "crm_deals_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -10347,6 +10605,9 @@ export type Database = {
           id: string
           input_mapping: Json
           input_requirements: Json
+          last_probe_at: string | null
+          last_probe_error: string | null
+          last_probe_status: string | null
           last_verified_at: string | null
           notes: string | null
           pricing_key: string | null
@@ -10368,6 +10629,9 @@ export type Database = {
           id: string
           input_mapping?: Json
           input_requirements?: Json
+          last_probe_at?: string | null
+          last_probe_error?: string | null
+          last_probe_status?: string | null
           last_verified_at?: string | null
           notes?: string | null
           pricing_key?: string | null
@@ -10389,6 +10653,9 @@ export type Database = {
           id?: string
           input_mapping?: Json
           input_requirements?: Json
+          last_probe_at?: string | null
+          last_probe_error?: string | null
+          last_probe_status?: string | null
           last_verified_at?: string | null
           notes?: string | null
           pricing_key?: string | null
@@ -24111,127 +24378,6 @@ export type Database = {
           },
         ]
       }
-      property_deal_tasks: {
-        Row: {
-          created_at: string
-          deal_id: string
-          done: boolean
-          due_date: string | null
-          id: string
-          title: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          deal_id: string
-          done?: boolean
-          due_date?: string | null
-          id?: string
-          title: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          deal_id?: string
-          done?: boolean
-          due_date?: string | null
-          id?: string
-          title?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "property_deal_tasks_deal_id_fkey"
-            columns: ["deal_id"]
-            isOneToOne: false
-            referencedRelation: "property_deals"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "property_deal_tasks_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      property_deals: {
-        Row: {
-          agent_id: string | null
-          buyer_contact_id: string | null
-          created_at: string
-          created_by: string | null
-          currency: string
-          expected_close_date: string | null
-          id: string
-          lost_reason: string | null
-          notes: string | null
-          property_id: string
-          stage: string
-          status: string
-          updated_at: string
-          value: number | null
-          workspace_id: string
-        }
-        Insert: {
-          agent_id?: string | null
-          buyer_contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          expected_close_date?: string | null
-          id?: string
-          lost_reason?: string | null
-          notes?: string | null
-          property_id: string
-          stage?: string
-          status?: string
-          updated_at?: string
-          value?: number | null
-          workspace_id: string
-        }
-        Update: {
-          agent_id?: string | null
-          buyer_contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          expected_close_date?: string | null
-          id?: string
-          lost_reason?: string | null
-          notes?: string | null
-          property_id?: string
-          stage?: string
-          status?: string
-          updated_at?: string
-          value?: number | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "property_deals_buyer_contact_id_fkey"
-            columns: ["buyer_contact_id"]
-            isOneToOne: false
-            referencedRelation: "crm_contacts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "property_deals_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "property_deals_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       property_documents: {
         Row: {
           created_at: string
@@ -36854,6 +37000,15 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__ops_provider_credit_exhausted: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__ops_revolut_feed_stalled: {
         Args: never
         Returns: {
@@ -39035,6 +39190,7 @@ export type Database = {
         }
         Returns: string
       }
+      person_merge_vars: { Args: { p_display_name: string }; Returns: Json }
       plpgsql_check_function:
         | {
             Args: {
@@ -39163,7 +39319,6 @@ export type Database = {
               statement: string
             }[]
           }
-      person_merge_vars: { Args: { p_display_name: string }; Returns: Json }
       plpgsql_check_pragma: { Args: { name: string[] }; Returns: number }
       plpgsql_check_profiler: { Args: { enable?: boolean }; Returns: boolean }
       plpgsql_check_tracer: {

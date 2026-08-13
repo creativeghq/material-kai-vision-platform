@@ -64,7 +64,7 @@ A `realestate_agent` also gets a **reduced nav**: only Dashboard and Real Estate
 | `property_buyer_requirements` | Saved buyer search profile + `portal_token` + digest opt-in. |
 | `property_buyer_favorites` | Favourites toggled from the buyer portal. |
 | `property_contacts_ext` | Real-estate extension fields on a `crm_contacts` row. |
-| `property_deals` / `property_deal_tasks` | The module's own pipeline board and per-deal checklist. |
+| `crm_deals` / `crm_deal_tasks` | The pipeline board and per-deal checklist. **Not owned by this module** (#311): the deal object is CRM's, and Real Estate is a consumer that pins the board to the `real_estate` deal type. Stages live in `crm_deal_stages` per `crm_deal_types` row, so the property flow (lead → viewing → offer → under_offer → conveyancing → exchanged → completed) is data, not a constant. Read/written through `src/services/dealsService.ts`; `real-estate-api` no longer has deal endpoints. |
 | `property_tenancies` / `property_rent_charges` | Lettings: term, rent, deposit, and the materialised rent schedule. |
 | `property_maintenance` | Maintenance jobs, contractor, cost. |
 | `property_investments` | Investment cases: purchase, costs, financing, projected yield. |

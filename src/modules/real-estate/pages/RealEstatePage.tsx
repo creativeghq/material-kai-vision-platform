@@ -6,7 +6,7 @@ import { ImportListingsDialog } from '../components/ImportListingsDialog';
 import { LeadRoutingCard } from '../components/LeadRoutingCard';
 import { CalendarConnectCard } from '../components/CalendarConnectCard';
 import { CommissionSplitsCard } from '../components/CommissionSplitsCard';
-import { PipelineBoard } from '../components/PipelineBoard';
+import { PipelineBoard } from '@/components/business/crm/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
@@ -110,7 +110,8 @@ export default function RealEstatePage() {
             {canManage && <TabsTrigger value="syndication" className={RE_TAB}><Rss className="h-4 w-4" /> Syndication</TabsTrigger>}
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
-          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} /></TabsContent>
+          {/* The board is a CRM object; Real Estate is one consumer of it, pinned to its own deal type. */}
+          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} lockedTypeKey="real_estate" /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
