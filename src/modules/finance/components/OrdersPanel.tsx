@@ -4,7 +4,7 @@ import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -2817,105 +2817,122 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       && it.vat_exemption_category == null && partyVatExemption == null;
                     const lineNeedsAttention = needsCatalogLink || needsVatReason || (isSalesOrder && lineAssetsFailed);
                     const warranty = isSalesOrder && !lineAssetsFailed ? lineWarranty(it) : null;
+                    const hasVatCause = it.vat_exemption_category != null || partyVatExemption != null;
+                    /**
+                     * What is TRUE about this line, as opposed to what can be DONE to it. These
+                     * used to be menu items, which made every fact look like a button and buried
+                     * the four real actions among eight rows of state. They render as plain text
+                     * under a heading instead — nothing to click, and the ones that need attention
+                     * carry the same amber the trigger's dot does.
+                     */
+                    const lineDetails: Array<{ text: string; warn?: boolean }> = [];
+                    if (needsCatalogLink) {
+                      lineDetails.push({ text: 'Not in the catalog — this line will not be stocked when the order is received.', warn: true });
+                    } else if (!it.update_warehouse) {
+                      lineDetails.push({ text: 'Off-warehouse — this line does not move stock.' });
+                    } else if (it.product_id) {
+                      lineDetails.push({ text: `In the catalog as ${productNames.get(it.product_id) ?? 'a linked product'}.` });
+                    }
+                    if (isSalesOrder && Number(it.vat_percent ?? 0) === 0) {
+                      if (it.vat_exemption_category != null) {
+                        lineDetails.push({ text: `0% VAT · myDATA cause ${it.vat_exemption_category}${mydataExemptionLabel(it.vat_exemption_category) ? ` — ${mydataExemptionLabel(it.vat_exemption_category)}` : ''}.` });
+                      } else if (partyVatExemption != null) {
+                        lineDetails.push({ text: `0% VAT · myDATA cause ${partyVatExemption}, inherited from the customer's record.` });
+                      } else {
+                        lineDetails.push({ text: '0% VAT with no exemption cause — myDATA requires one, so this order cannot be invoiced yet.', warn: true });
+                      }
+                    }
+                    if (isSalesOrder && lineAssetsFailed) {
+                      lineDetails.push({ text: 'Warranty unknown — the installed-base read failed. Reload the order.', warn: true });
+                    } else if (warranty) {
+                      lineDetails.push({ text: `Under warranty until ${warranty.ends_on}.` });
+                    } else if (isSalesOrder && lineAssets.has(it.id)) {
+                      lineDetails.push({ text: 'Registered in the customer\u2019s installed base, with no warranty cover.' });
+                    }
+                    if (linePaidOnPo) {
+                      lineDetails.push({ text: `Supplier cost settled on ${linePaidOnPo.order_number ?? 'the covering purchase order'}.` });
+                    }
                     return (
                     <div key={it.id} className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
                       <span className="min-w-0 flex items-start gap-1.5">
-                        {/* Every per-line ACTION lives here rather than as a strip of chips under
-                            the description. Five of them rendered at once (catalog, supplier, VAT
+                        {/* Everything the line used to say in a strip of chips under its
+                            description. Five of them rendered at once (catalog, supplier, VAT
                             cause, warranty, supplier payment) turned a one-line row into a
                             three-line paragraph and made the table unreadable at any real line
-                            count — they are actions taken occasionally, not facts read constantly.
-                            The dot on the trigger is what survives the collapse: it is the only
-                            thing the row still has to say without being opened. */}
+                            count.
+
+                            Split in two inside, because they were never the same kind of thing:
+                            ACTIONS at the top, as verbs, and the line's STATE below a Details
+                            heading as plain text. As chips every fact looked like a button — the
+                            product name, the VAT cause and "paid on ORD-…" were all rendered as
+                            clickable, which is what buried the four things you can actually do.
+
+                            The amber dot on the trigger is what survives the collapse: the Details
+                            block is where a line says what is wrong with it, and the dot is that
+                            same signal at one pixel, so a blocking gap is visible on a closed row. */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button type="button" title="Line actions"
                               className="relative mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                              <MoreHorizontal className="h-3.5 w-3.5" />
+                              <MoreVertical className="h-3.5 w-3.5" />
                               {lineNeedsAttention && (
                                 <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-amber-500" />
                               )}
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-64">
-                            {/* What this line IS to the warehouse. A line flagged for stock but
-                                pointing at no product cannot be received — receive_order_into_
-                                warehouse skips it. Stays editable once a bill exists: it is not a
-                                figure, and locking it is what made the skip unfixable. */}
-                            {needsCatalogLink ? (
-                              <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)} className="text-amber-600">
-                                <AlertTriangle className="h-3.5 w-3.5 mr-2" /> Not in catalog — won’t be stocked
-                              </DropdownMenuItem>
-                            ) : !it.update_warehouse ? (
-                              <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)}>
-                                <Unlink className="h-3.5 w-3.5 mr-2" /> Off-warehouse
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)}>
-                                <Package className="h-3.5 w-3.5 mr-2" />
-                                <span className="truncate">{(it.product_id && productNames.get(it.product_id)) || 'In catalog'}</span>
-                              </DropdownMenuItem>
-                            )}
-                            {/* WHY this line is 0%. myDATA requires an exemption cause on every
-                                vatCategory 7/8 line and generate_invoice_from_order refuses
-                                without one, so the gap is stated beside its fix rather than
-                                surfacing as a rejected document. A line inherits the customer's
-                                standing reason when it has none. */}
+                          <DropdownMenuContent align="start" className="w-72">
+                            {/* ACTIONS — verbs only, and always the same four rows in the same
+                                order regardless of the line's state. The label changes with the
+                                state ("Link a catalog product" vs "Stock handling"); the row does
+                                not move, so the menu is navigable by muscle memory. */}
+                            <DropdownMenuItem disabled={saving} onClick={() => setStockPick(it)}>
+                              <Package className="h-3.5 w-3.5 mr-2" />
+                              {needsCatalogLink ? 'Link a catalog product' : 'Stock handling'}
+                            </DropdownMenuItem>
+                            {/* myDATA requires an exemption cause on every vatCategory 7/8 line and
+                                generate_invoice_from_order refuses without one, so the fix sits
+                                beside the fact rather than surfacing as a rejected document. */}
                             {isSalesOrder && Number(it.vat_percent ?? 0) === 0 && (
-                              it.vat_exemption_category != null ? (
-                                <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)}>
-                                  <Percent className="h-3.5 w-3.5 mr-2" />
-                                  <span className="truncate">0% VAT · cause {it.vat_exemption_category}</span>
-                                </DropdownMenuItem>
-                              ) : partyVatExemption != null ? (
-                                <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)}>
-                                  <Percent className="h-3.5 w-3.5 mr-2" />
-                                  <span className="truncate">0% VAT · cause {partyVatExemption} (customer)</span>
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)} className="text-amber-600">
-                                  <AlertTriangle className="h-3.5 w-3.5 mr-2" /> 0% VAT — reason required to invoice
-                                </DropdownMenuItem>
-                              )
-                            )}
-                            {/* Under warranty? A sold unit the customer still owns is the installed
-                                base's whole subject, and THIS is where an operator knows it.
-                                Purchases are excluded — no customer to register against. */}
-                            {isSalesOrder && lineAssetsFailed && (
-                              <DropdownMenuItem disabled className="text-amber-600">
-                                <ShieldCheck className="h-3.5 w-3.5 mr-2" /> Warranty unknown — reload the order
+                              <DropdownMenuItem disabled={saving} onClick={() => setVatExemptPick(it)}>
+                                <Percent className="h-3.5 w-3.5 mr-2" />
+                                {hasVatCause ? 'Change the VAT exemption cause' : 'Set the VAT exemption cause'}
                               </DropdownMenuItem>
                             )}
+                            {/* A sold unit the customer still owns is the installed base's whole
+                                subject, and THIS is where an operator knows it. Purchases are
+                                excluded — a purchase has no customer to register against. */}
                             {isSalesOrder && !lineAssetsFailed && (
-                              <DropdownMenuItem onClick={() => setWarrantyPick(it)} className={warranty ? 'text-emerald-500' : undefined}>
+                              <DropdownMenuItem disabled={saving} onClick={() => setWarrantyPick(it)}>
                                 <ShieldCheck className="h-3.5 w-3.5 mr-2" />
-                                <span className="truncate">
-                                  {warranty ? `Covered to ${warranty.ends_on}` : lineAssets.has(it.id) ? 'Registered — no cover' : 'Register warranty'}
-                                </span>
+                                {warranty ? 'Edit the warranty' : 'Register a warranty'}
                               </DropdownMenuItem>
                             )}
-                            {/* Mark this line's cost as paid → records a supplier bill + payment on
-                                the order. Once the line's supplier is settled this becomes WHERE it
-                                was settled, because on a covered sale that is a different order. */}
-                            {lineCost != null && lineCost > 0.005 && order.order_type === 'sales' && (
-                              lineSupplierOwed > 0.005 ? (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => openLinePayment(it)}>
-                                    <Receipt className="h-3.5 w-3.5 mr-2" /> Mark supplier paid
-                                  </DropdownMenuItem>
-                                </>
-                              ) : linePaidOnPo ? (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem asChild className="text-emerald-500">
-                                    <Link to={`${financeBase}/orders/${linePaidOnPo.id}`}>
-                                      <Receipt className="h-3.5 w-3.5 mr-2" />
-                                      <span className="truncate">Paid on {linePaidOnPo.order_number ?? 'the purchase order'}</span>
-                                    </Link>
-                                  </DropdownMenuItem>
-                                </>
-                              ) : null
+                            {/* Records a supplier bill + payment on the order. Offered only while
+                                this line's supplier is actually owed — once settled, WHERE it was
+                                settled is a detail below, not an action to repeat. */}
+                            {lineCost != null && lineCost > 0.005 && order.order_type === 'sales'
+                              && lineSupplierOwed > 0.005 && (
+                              <DropdownMenuItem disabled={saving} onClick={() => openLinePayment(it)}>
+                                <Receipt className="h-3.5 w-3.5 mr-2" /> Mark the supplier paid
+                              </DropdownMenuItem>
+                            )}
+                            {/* DETAILS — read-only. Amber heading because this is where the line
+                                says what is wrong with it; the trigger's dot is the same signal
+                                collapsed to one pixel. */}
+                            {lineDetails.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-amber-500">
+                                  Details
+                                </DropdownMenuLabel>
+                                <div className="px-2 pb-1.5 space-y-1">
+                                  {lineDetails.map((d, di) => (
+                                    <p key={di} className={`text-[11px] leading-snug ${d.warn ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                      {d.text}
+                                    </p>
+                                  ))}
+                                </div>
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
