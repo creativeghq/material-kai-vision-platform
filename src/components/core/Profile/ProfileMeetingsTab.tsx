@@ -51,7 +51,7 @@ export const ProfileMeetingsTab: React.FC = () => {
 
   const openParty = (m: CrmMeeting) => {
     if (!m.target_kind || !m.target_id) return;
-    navigate(`/admin/crm/${m.target_kind === 'contact' ? 'contacts' : 'companies'}/${m.target_id}`);
+    navigate(`/crm/${m.target_kind === 'contact' ? 'contacts' : 'companies'}/${m.target_id}`);
   };
 
   const Row: React.FC<{ m: CrmMeeting; done?: boolean }> = ({ m, done }) => (

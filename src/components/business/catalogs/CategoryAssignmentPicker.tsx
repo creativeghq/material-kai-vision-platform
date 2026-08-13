@@ -123,7 +123,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
         ) : !hasAssignable ? (
           <div className="text-xs text-muted-foreground">
             No categories yet.{' '}
-            <a href="/admin/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
+            <a href="/crm?tab=categories" className="text-primary hover:underline">Create some →</a>
           </div>
         ) : (
           GROUPS.map(({ key, label }) => {

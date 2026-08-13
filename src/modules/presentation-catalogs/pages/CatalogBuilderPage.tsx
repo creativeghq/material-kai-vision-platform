@@ -250,7 +250,7 @@ export const CatalogBuilderPage: React.FC = () => {
         actions={
           <div className="flex gap-2 flex-wrap items-center">
             <Badge variant={STATUS_VARIANT[catalog.status]}>{catalog.status}</Badge>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/catalogs')}>
+            <Button variant="outline" size="sm" onClick={() => navigate('/catalogs')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Button>
             <Button variant="outline" size="sm" onClick={handleOpenAgent}>

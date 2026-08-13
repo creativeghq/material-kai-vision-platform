@@ -14,7 +14,7 @@ import { computeTotalsBreakdown, totalsRows } from '@/modules/quotes/utils/quote
  * `quote-public-share` edge function, which validates the token, enforces
  * `public_share_enabled`, and logs the view (and downloads) as
  * `quote_analytics_events` rows with view_context='public' so admins see
- * external engagement on /admin/quotes/:id → Analytics.
+ * external engagement on /quotes/manage/:id → Analytics.
  */
 
 interface PublicQuoteItem {

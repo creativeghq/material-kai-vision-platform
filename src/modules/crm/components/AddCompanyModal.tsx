@@ -74,7 +74,7 @@ export const AddCompanyModal: React.FC<{
     onOpenChange(false);
     clearDraft();
     reset();
-    navigate('/admin/crm/companies/new', { state: { prefill: finalPrefill } });
+    navigate('/crm/companies/new', { state: { prefill: finalPrefill } });
   };
 
   return (

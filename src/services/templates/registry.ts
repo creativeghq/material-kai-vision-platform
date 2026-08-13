@@ -100,7 +100,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
     label: 'Transactional emails',
     description: 'The email bodies your workspace sends automatically.',
     icon: Mail,
-    route: '/admin/emails?tab=templates',
+    route: '/emails?tab=templates',
     moduleSlug: 'email',
   },
   {
@@ -116,7 +116,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
     label: 'WhatsApp messages',
     description: 'Approved WhatsApp / SMS message templates.',
     icon: MessageCircle,
-    route: '/admin/messaging?tab=templates',
+    route: '/messaging?tab=templates',
     moduleSlug: 'messaging',
   },
   {
@@ -124,7 +124,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
     label: 'Catalog designs',
     description: 'Cover, background and accent styling for product catalogs.',
     icon: BookOpen,
-    route: '/admin/catalogs',
+    route: '/catalogs',
     moduleSlug: 'presentation-catalogs',
   },
   {

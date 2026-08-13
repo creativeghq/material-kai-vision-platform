@@ -164,7 +164,7 @@ const CompetitorsCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, company
               {crmMatches.map((m) => (
                 <Link
                   key={m.id}
-                  to={`/admin/crm/companies/${m.id}`}
+                  to={`/crm/companies/${m.id}`}
                   className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/40 transition-colors"
                 >
                   <div className="min-w-0">

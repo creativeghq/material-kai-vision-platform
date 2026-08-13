@@ -36,7 +36,7 @@ const CATALOG_BUILD: WorkflowDefinition = {
       ],
     },
     { id: 'attach',     order: 2, title: 'Attach source PDFs', icon: 'FileText', tool_id: 'attach_catalog_pdfs',
-      description: 'Link manufacturer PDFs uploaded at /admin/catalogs/sources.',
+      description: 'Link manufacturer PDFs uploaded at /catalogs/sources.',
       awaits_user_input: true,
       input_schema: [
         { name: 'source_pdf_ids', label: 'Source PDFs', type: 'pdf_picker', source: 'catalog_source_pdfs', required: true,
@@ -114,7 +114,7 @@ const CATALOG_TRANSLATE: WorkflowDefinition = {
         {
           name: 'source_pdf_id', label: 'Source PDF', type: 'pdf_picker', source: 'catalog_source_pdfs',
           required: true, multi: false,
-          hint: 'Pick a PDF you uploaded at /admin/catalogs/sources. If the list is empty, upload one there first.',
+          hint: 'Pick a PDF you uploaded at /catalogs/sources. If the list is empty, upload one there first.',
         },
         {
           name: 'new_catalog_title', label: 'New catalog title', required: true,
@@ -222,7 +222,7 @@ const CATALOG_SEND: WorkflowDefinition = {
         {
           name: 'category_ids', label: 'Send to which CRM categories?', type: 'category_picker',
           source: 'crm_categories', required: true, multi: true,
-          hint: 'Manage at /admin/crm?tab=categories. Recipients are the unique emails across all selected lists.',
+          hint: 'Manage at /crm?tab=categories. Recipients are the unique emails across all selected lists.',
         },
         { name: 'subject',      label: 'Subject (optional)' },
         { name: 'message_body', label: 'Personal note (optional)', type: 'textarea' },

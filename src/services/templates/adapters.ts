@@ -765,7 +765,7 @@ export const crmCompanyAdapter: TemplateAdapter<CrmCompanyTemplatePayload> = {
     return {
       kind: 'applied',
       id: companyId,
-      route: `/admin/crm/companies/${companyId}`,
+      route: `/crm/companies/${companyId}`,
       message: 'Terms applied to this company.',
     };
   },

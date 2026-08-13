@@ -82,7 +82,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
       });
 
       // Redirect to template builder
-      window.location.href = `/admin/email-templates/${template.id}/edit`;
+      window.location.href = `/emails/templates/${template.id}/edit`;
 
       onSuccess();
     } catch (error: any) {

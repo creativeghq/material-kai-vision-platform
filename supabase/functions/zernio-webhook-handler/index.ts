@@ -501,7 +501,7 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
               partial: event === 'post.partial',
               title: `Post published${(sp as any).platform ? ` on ${(sp as any).platform}` : ''}`,
               body: `${(sp as any).caption ? `"${String((sp as any).caption).slice(0, 80)}"` : 'Your scheduled post'} is now live.`,
-              action_url: '/admin/social-media/accounts',
+              action_url: '/social-media/accounts',
             });
           } catch { /* best-effort */ }
         }
@@ -529,7 +529,7 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
               reason,
               title: `Post failed${(sp as any).platform ? ` on ${(sp as any).platform}` : ''}`,
               body: `A scheduled post failed to publish: ${reason}`,
-              action_url: '/admin/social-media/accounts',
+              action_url: '/social-media/accounts',
             });
           } catch { /* best-effort */ }
         }

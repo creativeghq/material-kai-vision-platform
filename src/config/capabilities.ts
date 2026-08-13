@@ -55,7 +55,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'presentation-sheet', label: 'Presentation Sheet', hub: 'studio', agentId: 'interior-designer', agentTool: 'generate_presentation_sheet', toolkitId: 'presentation-sheets', recordTable: 'moodboard_presentation_sheets', canvasKind: 'sheet' },
   { id: 'moodboard', label: 'MoodBoards', hub: 'studio', pageRoute: '/moodboard', recordTable: 'moodboards' },
   { id: 'project', label: 'Projects', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'create_project', toolkitId: 'projects', recordTable: 'projects' },
-  { id: 'catalog', label: 'Catalogs', hub: 'studio', pageRoute: '/admin/catalogs', agentId: 'product-business', agentTool: 'create_catalog', toolkitId: 'catalogs', recordTable: 'presentation_catalogs', canvasKind: 'catalog', moduleSlug: 'presentation-catalogs' },
+  { id: 'catalog', label: 'Catalogs', hub: 'studio', pageRoute: '/catalogs', agentId: 'product-business', agentTool: 'create_catalog', toolkitId: 'catalogs', recordTable: 'presentation_catalogs', canvasKind: 'catalog', moduleSlug: 'presentation-catalogs' },
   // Image Studio — agent-only (no page). Shares the `generation` engine with Interior Design; the
   // nav path adds &generation_mode=image-edit to prime the image pipeline. No distinct agentTool
   // exists yet (the toolkit's quick-starts are the surface) — that's a real fabric gap, not a stub.
@@ -67,9 +67,9 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'flow', label: 'Automations', hub: 'marketing', pageRoute: '/automations', agentId: 'kai', agentTool: 'manage_flows', toolkitId: 'flows-toolkit', recordTable: 'flows', moduleSlug: 'flows-toolkit' },
   { id: 'seo-article', label: 'SEO Article', hub: 'marketing', agentId: 'marketing', agentTool: 'create_seo_article', toolkitId: 'seo-article', canvasKind: 'seo' },
   { id: 'seo-research', label: 'SEO Research', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_research_keyword', toolkitId: 'seo-research', canvasKind: 'seo' },
-  { id: 'mention-monitoring', label: 'Mention Monitoring', hub: 'marketing', pageRoute: '/admin/mention-monitoring', agentId: 'kai', agentTool: 'track_product_mentions', toolkitId: 'mentions', recordTable: 'tracked_mentions', canvasKind: 'mentions', moduleSlug: 'mention-monitoring' },
+  { id: 'mention-monitoring', label: 'Mention Monitoring', hub: 'marketing', pageRoute: '/mention-monitoring', agentId: 'kai', agentTool: 'track_product_mentions', toolkitId: 'mentions', recordTable: 'tracked_mentions', canvasKind: 'mentions', moduleSlug: 'mention-monitoring' },
   { id: 'price-monitoring', label: 'Price Monitoring', hub: 'sales', pageRoute: '/admin/monitoring', agentId: 'kai', agentTool: 'track_product_prices', toolkitId: 'price-monitoring', recordTable: 'tracked_queries', canvasKind: 'result', moduleSlug: 'price-monitoring' },
-  { id: 'messaging', label: 'WhatsApp', hub: 'service', pageRoute: '/admin/messaging', agentId: 'social-media', agentTool: 'manage_messaging', toolkitId: 'messaging', recordTable: 'messaging_channels', moduleSlug: 'messaging' },
+  { id: 'messaging', label: 'WhatsApp', hub: 'service', pageRoute: '/messaging', agentId: 'social-media', agentTool: 'manage_messaging', toolkitId: 'messaging', recordTable: 'messaging_channels', moduleSlug: 'messaging' },
   { id: 'inbox', label: 'Inbox', hub: 'service', pageRoute: '/inbox', agentId: 'social-media', agentTool: 'manage_inbox', toolkitId: 'inbox', quickStartLabel: 'Open conversations', recordTable: 'inbox_threads', moduleSlug: 'inbox' },
   { id: 'reviews', label: 'Reviews', hub: 'service', agentId: 'social-media', agentTool: 'manage_reviews', toolkitId: 'reviews', quickStartLabel: 'Unanswered reviews', recordTable: 'profile_reviews', moduleSlug: 'reviews' },
 

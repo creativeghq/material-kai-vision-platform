@@ -80,7 +80,7 @@ export function buildQuoteFilters(rows: QuoteWithItems[]): FilterGroupDef[] {
   ];
 }
 
-/** Admin /admin/quote-requests list. Status tags come from the DB table, not an enum. */
+/** Admin /quotes/requests/manage list. Status tags come from the DB table, not an enum. */
 export function buildQuoteRequestFilters(
   rows: QuoteWithItems[],
   ctx: { statusTags: StatusTag[]; requesterName: (userId: string) => string },

@@ -204,7 +204,7 @@ export const CRMManagement: React.FC = () => {
     const params = new URLSearchParams(searchParams);
     params.delete('new');
     setSearchParams(params, { replace: true });
-    if (n === 'contact') navigate('/admin/crm/contacts/new');
+    if (n === 'contact') navigate('/crm/contacts/new');
     else setShowAddCompany(true);
   }, [searchParams, setSearchParams, navigate]);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -274,7 +274,7 @@ export const CRMManagement: React.FC = () => {
 
   // Load through the crm-api edge function (same path as users/companies) rather than a
   // direct supabase query. The direct query is bound by the `is_workspace_member` RLS on
-  // crm_contacts, so a global operator on the /admin/crm surface who isn't an active
+  // crm_contacts, so a global operator on the /crm surface who isn't an active
   // member of the tenant workspace that owns the contacts sees an empty table. The API
   // also flattens the attached-company junction into the `companies` array the table
   // renders, and applies the filters + exact count server-side so this fetches ONE page.
@@ -725,7 +725,7 @@ export const CRMManagement: React.FC = () => {
                     groups={contactGroups} values={contactValues} onChange={onContactFilters}
                     title="Filter contacts" searchPlaceholder="Search contacts…" className="flex-1"
                   />
-                  <Button size="sm" onClick={() => navigate('/admin/crm/contacts/new')}>
+                  <Button size="sm" onClick={() => navigate('/crm/contacts/new')}>
                     <Plus className="h-4 w-4 mr-2" /> Add contact
                   </Button>
                 </div>

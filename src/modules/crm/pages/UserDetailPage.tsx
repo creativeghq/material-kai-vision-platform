@@ -464,7 +464,7 @@ export const UserDetailPage: React.FC = () => {
           badge="CRM"
         />
         <div className="p-6">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
@@ -483,7 +483,7 @@ export const UserDetailPage: React.FC = () => {
           badge="CRM"
         />
         <div className="p-6">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
@@ -510,7 +510,7 @@ export const UserDetailPage: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
@@ -692,7 +692,7 @@ export const UserDetailPage: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => navigate(`/admin/crm/contacts/${linkedContact.id}`)}
+                      onClick={() => navigate(`/crm/contacts/${linkedContact.id}`)}
                     >
                       View Contact
                     </Button>

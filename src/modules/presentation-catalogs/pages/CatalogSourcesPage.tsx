@@ -80,7 +80,7 @@ export const CatalogSourcesPage: React.FC = () => {
         subtitle="Upload manufacturer catalogs that the KAI agent can extract from."
         icon={FileText}
         actions={
-          <Button variant="outline" onClick={() => navigate('/admin/catalogs')}>
+          <Button variant="outline" onClick={() => navigate('/catalogs')}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to catalogs
           </Button>
         }

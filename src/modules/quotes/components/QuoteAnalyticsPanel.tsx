@@ -12,7 +12,7 @@ import { formatDate } from '@/utils/datetime';
 /**
  * QuoteAnalyticsPanel — admin-only view/download analytics for a single quote,
  * plus the public share-link manager. Mounted as the "Analytics" tab on
- * /admin/quotes/:id. Reads `quote_analytics_events` (admin RLS) directly.
+ * /quotes/manage/:id. Reads `quote_analytics_events` (admin RLS) directly.
  */
 
 interface QuoteAnalyticsEventRow {

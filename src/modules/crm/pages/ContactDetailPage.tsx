@@ -282,7 +282,7 @@ export const ContactDetailPage: React.FC = () => {
         await companiesAPI.attachContact(pendingCompanyId, response.data.id, undefined, true, '').catch(() => {});
       }
       toast({ title: 'Success', description: 'Contact created successfully' });
-      navigate(`/admin/crm/contacts/${response.data.id}`, { replace: true });
+      navigate(`/crm/contacts/${response.data.id}`, { replace: true });
     } catch (error) {
       console.error('Error creating contact:', error);
       toast({ title: 'Error', description: 'Failed to create contact', variant: 'destructive' });
@@ -647,7 +647,7 @@ export const ContactDetailPage: React.FC = () => {
           badge="CRM"
         />
         <div className="p-6">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
@@ -678,7 +678,7 @@ export const ContactDetailPage: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-5">
         {/* Header Actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to CRM
           </Button>
@@ -686,7 +686,7 @@ export const ContactDetailPage: React.FC = () => {
               flow needs an explicit Create/Cancel. */}
           {isNew ? (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/admin/crm')}>Cancel</Button>
+              <Button variant="outline" onClick={() => navigate('/crm')}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Create Contact'}
@@ -763,7 +763,7 @@ export const ContactDetailPage: React.FC = () => {
 
             {/* When attached to a business, financials live there — surface the company. */}
             {hasCompany && primaryCompany?.id && (
-              <button type="button" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}
+              <button type="button" onClick={() => navigate(`/crm/companies/${primaryCompany.id}`)}
                 className="w-full flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/50">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Building2 className="h-4.5 w-4.5" /></span>
                 <span className="min-w-0 flex-1">
@@ -866,7 +866,7 @@ export const ContactDetailPage: React.FC = () => {
                               <div className="flex flex-wrap gap-1.5">
                                 {(contact.companies ?? []).map((c: any) => (
                                   <Badge key={c.relationship_id} variant="secondary" className="gap-1.5 py-1 pl-2.5 pr-1.5">
-                                    <button type="button" onClick={() => navigate(`/admin/crm/companies/${c.company_id}`)} className="hover:underline">
+                                    <button type="button" onClick={() => navigate(`/crm/companies/${c.company_id}`)} className="hover:underline">
                                       {c.company_name}
                                     </button>
                                     {c.is_primary && <span className="text-[9px] uppercase opacity-70">primary</span>}
@@ -1132,7 +1132,7 @@ export const ContactDetailPage: React.FC = () => {
                             <p className="mt-1 text-xs text-muted-foreground truncate">{companyMeta.join(' · ')}</p>
                           )}
                         </div>
-                        <Button className="w-full shrink-0 sm:w-auto" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>
+                        <Button className="w-full shrink-0 sm:w-auto" onClick={() => navigate(`/crm/companies/${primaryCompany.id}`)}>
                           Open company
                           <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                         </Button>
@@ -1148,7 +1148,7 @@ export const ContactDetailPage: React.FC = () => {
                             <button
                               key={link.tab}
                               type="button"
-                              onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}?tab=${link.tab}`)}
+                              onClick={() => navigate(`/crm/companies/${primaryCompany.id}?tab=${link.tab}`)}
                               className="group flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/50"
                             >
                               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

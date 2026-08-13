@@ -1,3 +1,4 @@
+import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Megaphone } from 'lucide-react';
 import manifest from './manifest.json';
@@ -11,15 +12,17 @@ const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
     {
-      path: '/admin/mention-monitoring',
+      // `tracked_mentions` is workspace-scoped: what a tenant watches is theirs.
+      path: '/mention-monitoring',
       component: MentionMonitoringDashboard as any,
-      requireAdmin: true,
+      requireWorkspaceAdmin: true,
     },
+    { path: '/admin/mention-monitoring', component: legacyAdminRedirect('/mention-monitoring') },
   ],
   navItems: [
     {
       label: manifest.name,
-      path: '/admin/mention-monitoring',
+      path: '/mention-monitoring',
       icon: Megaphone,
       location: 'admin-dashboard',
       adminCategory: 'Modules',

@@ -290,7 +290,7 @@ export const EmailTemplatesTab: React.FC = () => {
                       <Eye className="mr-2 h-4 w-4" />
                       Preview
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/admin/email-templates/${template.id}/edit`)}>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/emails/templates/${template.id}/edit`)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
                     </Button>

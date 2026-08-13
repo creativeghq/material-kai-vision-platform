@@ -678,11 +678,11 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
               Per-workspace recipients, frequency, hour and on/off live here.
             </p>
             <div className="mt-2 flex gap-2">
-              <Link to="/admin/flows" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <Link to="/flows" className="inline-flex items-center gap-1 text-primary hover:underline">
                 Open flow editor <ExternalLink className="h-3 w-3" />
               </Link>
               <span className="text-muted-foreground">·</span>
-              <Link to="/admin/emails" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <Link to="/emails" className="inline-flex items-center gap-1 text-primary hover:underline">
                 Edit template design <ExternalLink className="h-3 w-3" />
               </Link>
             </div>

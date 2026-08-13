@@ -257,6 +257,89 @@ describe('the route table itself', () => {
       '/admin-prefixed one.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
+
+  /**
+   * The same rule for CRM, which had the opposite problem: `/admin/crm/*` WAS real, rendering the
+   * very same pages as `/crm/*` but behind AdminGuard instead of the `crm.view` capability. So the
+   * link worked — for admins. A sales, accountant or hr user following any of the ~30 in-app links
+   * into that prefix was bounced off a customer record they can open one URL over, and nothing
+   * anywhere reported it: the route resolved, the guard did its job, the page simply refused.
+   *
+   * `/admin/crm/*` is now redirects into `/crm/*`. The exception is `users/:id` — `public.roles` is
+   * the GLOBAL account tier, one value true in every workspace at once, and `crm-api` refuses to
+   * mutate it for anyone who is not a global operator. That is operator tooling and keeps its
+   * address.
+   */
+  it('links CRM at /crm — the /admin/crm twin is redirects only (except operator users/:id)', () => {
+    // The redirect registry and the redirect component must name the old prefix; that is their job.
+    const ALLOWED = ['src/modules/crm/index.ts', 'src/modules/crm/pages/CrmLegacyRedirect.tsx'];
+    const offenders: string[] = [];
+    for (const file of sourceFiles) {
+      if (ALLOWED.includes(rel(file))) continue;
+      blankComments(read(file)).split('\n').forEach((line, i) => {
+        // `/admin/crm/users` is the one surface that legitimately stays under /admin.
+        const hits = line.split('/admin/crm').length - 1;
+        const users = line.split('/admin/crm/users').length - 1;
+        if (hits > users) offenders.push(`${rel(file)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      });
+    }
+    expect(
+      offenders,
+      'CRM record pages live at /crm/... (capability crm.view). Link there directly — the ' +
+      '/admin/crm paths are redirects kept for links that outlived the move, not addresses to ' +
+      'write new links against.' + '\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  /**
+   * The seven tenant surfaces that were mounted under /admin, and why the prefix mattered.
+   *
+   * `AdminGuard` does not mean "an admin". It is `isPlatformOperator` — owner/admin of the ROOT
+   * workspace — and its own comment says so. Behind it sat pages that configure things belonging
+   * to a WORKSPACE: its messaging channels, its email domain, its catalogs, its connected social
+   * accounts, its tracked mentions, its automations, its quote vocabulary. Every table behind them
+   * carries a workspace_id. So a customer who BOUGHT one of those modules could not open the page
+   * that sets it up — not their owner, not anyone. The module was sold and unusable, and nothing
+   * reported it: the route resolved and the guard did exactly what it says on the tin.
+   *
+   * They now live at their own addresses behind `EntitlementGuard + WorkspaceAdminGuard` (the
+   * workspace owns the module AND you run that workspace), with the old paths kept as redirects
+   * for links that outlived the move. Writing a NEW link to the old prefix would quietly put a
+   * tenant back in front of the operator console, so it fails here instead.
+   */
+  it('never links the moved tenant surfaces under /admin', () => {
+    const MOVED = [
+      '/admin/messaging', '/admin/emails', '/admin/email-templates', '/admin/catalogs',
+      '/admin/social-media', '/admin/mention-monitoring', '/admin/flows', '/admin/quote-requests',
+      '/admin/quote-settings', '/admin/status-tags', '/admin/upsells', '/admin/timeline-steps',
+      '/admin/catalog-master',
+    ];
+    // The redirect helper and the module registries that declare the redirect ROUTES must name
+    // the old paths — that is the whole job of those entries.
+    const ALLOWED = (f: string) => f === 'src/modules/_core/legacyAdminRedirect.tsx'
+      || (f.startsWith('src/modules/') && f.endsWith('/index.ts'));
+    const offenders: string[] = [];
+    for (const file of sourceFiles) {
+      if (ALLOWED(rel(file))) continue;
+      blankComments(read(file)).split('\n').forEach((line, i) => {
+        // A redirect DECLARATION has to name the address it retires; everything else is a link.
+        if (line.includes('<Navigate to=')) return;
+        for (const prefix of MOVED) {
+          if (line.includes(prefix)) {
+            offenders.push(`${rel(file)}:${i + 1}: ${prefix}`);
+            break;
+          }
+        }
+      });
+    }
+    expect(
+      offenders,
+      'These surfaces moved off /admin because AdminGuard is the PLATFORM OPERATOR, not a ' +
+      'workspace admin — behind it a tenant cannot configure a module they own. Link to the new ' +
+      'path; the /admin one is a redirect for old links, not an address to write.' + '\n'
+      + offenders.join('\n'),
+    ).toEqual([]);
+  });
 });
 
 describe('notification action_url', () => {

@@ -247,7 +247,7 @@ export const WorkspaceKeysTab: React.FC = () => {
                   icon={MessageCircle}
                   title="WhatsApp"
                   description="Send & receive WhatsApp messages (via Zernio)."
-                  to="/admin/messaging"
+                  to="/messaging"
                   status={<Badge variant="secondary">Via Zernio</Badge>}
                 />
               </CardContent>

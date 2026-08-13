@@ -5,7 +5,7 @@
  * clobbers the company's other manual category memberships), and mirrors a
  * denormalized comma-joined label onto `crm_companies.industry` so existing
  * list/table readers keep rendering. Operators can add a new industry inline;
- * full management lives at /admin/crm → Categories.
+ * full management lives at /crm → Categories.
  *
  * Presentation is delegated to InlineMultiSelect so the field behaves like the
  * InlineText/InlineSelect rows beside it — the chips are the trigger, rather than a

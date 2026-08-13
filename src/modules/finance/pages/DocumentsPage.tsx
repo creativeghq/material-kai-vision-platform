@@ -935,9 +935,9 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] }> = ({ row
   </table>
 );
 const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string }> = ({ rows, categoryName, financeBase }) => {
-  // Deep-link the party name to its CRM record. Mirror the finance mount point:
-  // operator surfaces are under /admin/*, business-owner surfaces at the root.
-  const crmBase = financeBase.startsWith('/admin') ? '/admin/crm' : '/crm';
+  // Deep-link the party name to its CRM record. One address — CRM is workspace work and lives
+  // at /crm; the `/admin/crm` twin this used to branch on is now only a redirect.
+  const crmBase = '/crm';
   return (
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">

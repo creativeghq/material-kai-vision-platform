@@ -3,6 +3,7 @@ import { Route } from 'react-router-dom';
 
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from '@/components/core/AdminGuard';
+import { WorkspaceAdminGuard } from '@/components/core/WorkspaceAdminGuard';
 import { EntitlementGuard } from '@/components/core/EntitlementGuard';
 import { Layout } from '@/components/core/Layout';
 import { PageErrorBoundary } from '@/components/core/ErrorBoundary';
@@ -37,6 +38,7 @@ export function buildModuleRoutes(): React.ReactElement[] {
     for (const route of mod.routes) {
       const Component = route.component;
       const requireAdmin = route.requireAdmin ?? false;
+      const requireWorkspaceAdmin = route.requireWorkspaceAdmin ?? false;
 
       // Admin routes are operator platform-management surfaces → gated by AdminGuard only.
       // Tenant-facing module routes additionally require the ACTIVE workspace to OWN the module
@@ -53,9 +55,21 @@ export function buildModuleRoutes(): React.ReactElement[] {
               </AdminGuard>
             ) : (
               <EntitlementGuard moduleSlug={mod.manifest.slug} moduleName={mod.manifest.name}>
-                <Layout>
-                  <Component />
-                </Layout>
+                {/* A module's CONFIGURATION pages add the workspace-admin rung. Entitlement alone
+                    answers "does this workspace own the module?", which lets every member rewire
+                    the company's channels; AdminGuard answers "are you the platform operator?",
+                    which lets nobody outside this building in at all. */}
+                {requireWorkspaceAdmin ? (
+                  <WorkspaceAdminGuard>
+                    <Layout>
+                      <Component />
+                    </Layout>
+                  </WorkspaceAdminGuard>
+                ) : (
+                  <Layout>
+                    <Component />
+                  </Layout>
+                )}
               </EntitlementGuard>
             )}
           </ModuleGate>

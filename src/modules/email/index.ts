@@ -1,3 +1,4 @@
+import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Mail, AtSign } from 'lucide-react';
 import manifest from './manifest.json';
@@ -16,13 +17,17 @@ const EmailSettingsPanel = lazy(() =>
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
-    { path: '/admin/emails', component: EmailManagementPage, requireAdmin: true },
-    { path: '/admin/email-templates/:id/edit', component: EmailTemplateBuilderPage, requireAdmin: true },
+    // `workspace_email_config` + `email_logs` are per workspace — this is where a tenant verifies
+    // its own sending domain, which the operator cannot do on their behalf.
+    { path: '/emails', component: EmailManagementPage, requireWorkspaceAdmin: true },
+    { path: '/emails/templates/:id/edit', component: EmailTemplateBuilderPage, requireWorkspaceAdmin: true },
+    { path: '/admin/emails', component: legacyAdminRedirect('/emails') },
+    { path: '/admin/email-templates/:id/edit', component: legacyAdminRedirect('/emails/templates/:id/edit') },
   ],
   navItems: [
     {
       label: 'Email Management',
-      path: '/admin/emails',
+      path: '/emails',
       icon: Mail,
       location: 'admin-dashboard',
       adminCategory: 'Communications',

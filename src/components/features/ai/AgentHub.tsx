@@ -3228,7 +3228,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   | 'material_added' | 'image_candidates' | 'pdf_ready' | 'published' | 'unpublished';
                 let line = '';
                 if (event === 'created') {
-                  line = `Catalog created — "${chunk.title}" (id: ${chunk.catalog_id}). Open it at /admin/catalogs/${chunk.catalog_id} or keep building from chat.`;
+                  line = `Catalog created — "${chunk.title}" (id: ${chunk.catalog_id}). Open it at /catalogs/${chunk.catalog_id} or keep building from chat.`;
                 } else if (event === 'pdfs_attached') {
                   line = `Attached ${chunk.pdf_ids?.length ?? 0} source PDF${chunk.pdf_ids?.length === 1 ? '' : 's'} to the catalog.`;
                 } else if (event === 'extraction_candidates') {

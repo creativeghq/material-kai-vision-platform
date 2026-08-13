@@ -1,3 +1,4 @@
+import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { FileText, Image as ImageIcon } from 'lucide-react';
 import manifest from './manifest.json';
@@ -39,17 +40,27 @@ const definition: ModuleDefinition = {
     { path: '/quotes/:id', component: QuoteDetailCustomerPage },
     { path: '/quotes/:id/preview', component: QuotePreviewPage },
     { path: '/quotes/requests', component: QuoteRequestsPage },
-    { path: '/admin/quote-requests', component: QuoteRequestsAdminPage, requireAdmin: true },
-    { path: '/admin/quotes/:id', component: QuoteDetailAdminPage, requireAdmin: true },
-    { path: '/admin/status-tags', component: StatusTagsManagementPage, requireAdmin: true },
-    { path: '/admin/upsells', component: UpsellsManagementPage, requireAdmin: true },
-    { path: '/admin/timeline-steps', component: TimelineStepsManagementPage, requireAdmin: true },
-    { path: '/admin/quote-settings', component: QuoteSettingsPage, requireAdmin: true },
+    // The BACK-OFFICE half of the same module: the seller's queue and the vocabulary their quotes
+    // are built from (status tags, upsells, timeline steps, defaults). All of it is the tenant's
+    // own configuration, so it sits beside /quotes rather than in the operator console — behind
+    // AdminGuard the workspace that sells the quotes could not edit its own status tags.
+    { path: '/quotes/requests/manage', component: QuoteRequestsAdminPage, requireWorkspaceAdmin: true },
+    { path: '/quotes/manage/:id', component: QuoteDetailAdminPage, requireWorkspaceAdmin: true },
+    { path: '/quotes/settings', component: QuoteSettingsPage, requireWorkspaceAdmin: true },
+    { path: '/quotes/settings/status-tags', component: StatusTagsManagementPage, requireWorkspaceAdmin: true },
+    { path: '/quotes/settings/upsells', component: UpsellsManagementPage, requireWorkspaceAdmin: true },
+    { path: '/quotes/settings/timeline-steps', component: TimelineStepsManagementPage, requireWorkspaceAdmin: true },
+    { path: '/admin/quote-requests', component: legacyAdminRedirect('/quotes/requests/manage') },
+    { path: '/admin/quotes/:id', component: legacyAdminRedirect('/quotes/manage/:id') },
+    { path: '/admin/status-tags', component: legacyAdminRedirect('/quotes/settings/status-tags') },
+    { path: '/admin/upsells', component: legacyAdminRedirect('/quotes/settings/upsells') },
+    { path: '/admin/timeline-steps', component: legacyAdminRedirect('/quotes/settings/timeline-steps') },
+    { path: '/admin/quote-settings', component: legacyAdminRedirect('/quotes/settings') },
   ],
   navItems: [
     {
       label: 'Quote Requests',
-      path: '/admin/quote-requests',
+      path: '/quotes/requests/manage',
       icon: FileText,
       location: 'admin-dashboard',
       adminCategory: 'CRM & User Management',

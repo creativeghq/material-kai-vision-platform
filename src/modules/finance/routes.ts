@@ -8,8 +8,9 @@
  *
  * Six call sites nonetheless computed the base as
  *     useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance'
- * to "mirror the mount point" — the mirror CRM genuinely has (`/admin/crm/*` is real). Finance has
- * no such twin, so every one of those links resolved to the `path="*"` catch-all the moment it was
+ * to "mirror the mount point" — a mirror CRM once had and no longer does (`/admin/crm/*` is now
+ * only a redirect into `/crm/*`). Finance never had one at all, so every one of those links
+ * resolved to the `path="*"` catch-all the moment it was
  * followed from an admin page: an order opened from a CRM timeline, a covering purchase order
  * opened from a sale's Suppliers tab, an invoice opened right after being created. Nothing threw —
  * React Router simply rendered NotFound, which is why it survived. `deepLinkTargets.test.ts`

@@ -807,7 +807,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
     id: 'attach_catalog_pdfs', name: 'Attach Source PDFs', category: 'Catalogs',
     adminOnly: true, moduleSlug: 'presentation-catalogs',
     workflowOf: 'catalog', workflowStep: 2,
-    desc: 'Step 2 of 8 — link manufacturer PDFs (uploaded at /admin/catalogs/sources) to the catalog. Required before Extract or Translate.',
+    desc: 'Step 2 of 8 — link manufacturer PDFs (uploaded at /catalogs/sources) to the catalog. Required before Extract or Translate.',
     examples: [
       'Attach these source PDFs to my catalog: <pdf_id_1>, <pdf_id_2>',
     ],
@@ -876,7 +876,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
     id: 'publish_catalog', name: 'Publish Catalog', category: 'Catalogs',
     adminOnly: true, moduleSlug: 'presentation-catalogs',
     workflowOf: 'catalog', workflowStep: 8,
-    desc: 'Step 8 of 8 — mint a public slug and flip status to published. Returns app.materialshub.gr/c/<slug> for email-gated visitor access. Once published, use the "Send to Customers" button on /admin/catalogs/:id to email it via CRM categories.',
+    desc: 'Step 8 of 8 — mint a public slug and flip status to published. Returns app.materialshub.gr/c/<slug> for email-gated visitor access. Once published, use the "Send to Customers" button on /catalogs/:id to email it via CRM categories.',
     examples: [
       'Publish catalog <catalog_id> with slug "spring-2026-porcelain"',
     ],

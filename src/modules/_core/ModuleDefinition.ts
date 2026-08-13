@@ -22,7 +22,18 @@ export interface ModuleNavItem {
 export interface ModuleRoute {
   path: string;
   component: LazyExoticComponent<ComponentType<unknown>>;
+  /**
+   * PLATFORM OPERATOR only (`AdminGuard` = owner/admin of the ROOT workspace). Reserve it for
+   * genuine operator tooling — review queues, platform config. It is NOT "an admin": a customer
+   * workspace's own owner does not pass it, so a tenant surface behind this flag is a module
+   * that cannot be used by the people who bought it.
+   */
   requireAdmin?: boolean;
+  /**
+   * Owner/admin OF THE ACTIVE WORKSPACE (`WorkspaceAdminGuard`), on top of the module
+   * entitlement. This is the flag for a module's own configuration pages.
+   */
+  requireWorkspaceAdmin?: boolean;
 }
 
 export interface ModuleManifest {

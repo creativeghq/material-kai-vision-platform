@@ -299,7 +299,7 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
         failed_count: failed,
         title: `Catalog sent: ${catalog.title}`,
         body: `"${catalog.title}" was emailed to ${sent} customer${sent === 1 ? '' : 's'}${failed ? ` (${failed} failed)` : ''}.`,
-        action_url: `/admin/catalogs/${catalog.id}`,
+        action_url: `/catalogs/${catalog.id}`,
       });
     } catch { /* best-effort */ }
 

@@ -207,7 +207,7 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
         </div>
       ) : (
         <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground">
-          ✓ Added to catalog. Review at <button className="underline text-primary" onClick={() => window.open(`/admin/catalogs/${catalogId}`, '_blank')}>/admin/catalogs/{catalogId.slice(0, 8)}…</button>
+          ✓ Added to catalog. Review at <button className="underline text-primary" onClick={() => window.open(`/catalogs/${catalogId}`, '_blank')}>/catalogs/{catalogId.slice(0, 8)}…</button>
         </div>
       )}
 

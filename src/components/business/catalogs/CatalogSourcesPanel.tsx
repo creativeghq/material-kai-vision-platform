@@ -31,7 +31,7 @@ interface ExtractCandidate {
 /**
  * Inline source-PDF management for the catalog builder. Mirrors the agent's
  * upload → attach → extract/translate flow so admins never have to detour to
- * the standalone /admin/catalogs/sources library page to get going.
+ * the standalone /catalogs/sources library page to get going.
  *
  * Uploaded PDFs are NOT digested into the platform product DB — they only feed
  * on-demand Vision extraction for this catalog.

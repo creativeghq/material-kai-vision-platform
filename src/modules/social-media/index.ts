@@ -1,3 +1,4 @@
+import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Share2 } from 'lucide-react';
 import manifest from './manifest.json';
@@ -10,12 +11,14 @@ const SocialMediaAccountsPage = lazy(() =>
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
-    { path: '/admin/social-media/accounts', component: SocialMediaAccountsPage, requireAdmin: true },
+    // `social_accounts` is workspace-scoped — these are the tenant's own connected accounts.
+    { path: '/social-media/accounts', component: SocialMediaAccountsPage, requireWorkspaceAdmin: true },
+    { path: '/admin/social-media/accounts', component: legacyAdminRedirect('/social-media/accounts') },
   ],
   navItems: [
     {
       label: 'Social Media Accounts',
-      path: '/admin/social-media/accounts',
+      path: '/social-media/accounts',
       icon: Share2,
       location: 'admin-dashboard',
       adminCategory: 'Communications',

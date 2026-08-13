@@ -260,7 +260,7 @@ export const CompanyDetailPage: React.FC = () => {
       setSaving(true);
       const response = await companiesAPI.createCompany(company);
       toast({ title: 'Success', description: 'Company created successfully' });
-      navigate(`/admin/crm/companies/${response.data.id}`, { replace: true });
+      navigate(`/crm/companies/${response.data.id}`, { replace: true });
     } catch (error) {
       console.error('Error creating company:', error);
       toast({ title: 'Error', description: 'Failed to create company', variant: 'destructive' });
@@ -599,7 +599,7 @@ export const CompanyDetailPage: React.FC = () => {
           badge="CRM"
 />
         <div className="p-6">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2"/>
             Back to CRM
           </Button>
@@ -629,14 +629,14 @@ export const CompanyDetailPage: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-5">
         {/* Header Actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => navigate('/admin/crm')}>
+          <Button variant="ghost" onClick={() => navigate('/crm')}>
             <ArrowLeft className="h-4 w-4 mr-2"/>
             Back to CRM
           </Button>
           {/* View-first: existing companies save per field inline. Only create needs Create/Cancel. */}
           {isNew ? (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/admin/crm')}>Cancel</Button>
+              <Button variant="outline" onClick={() => navigate('/crm')}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-2"/>
                 {saving ? 'Saving...' : 'Create Company'}
@@ -1054,7 +1054,7 @@ export const CompanyDetailPage: React.FC = () => {
                         <TableRow key={contact.relationship_id}>
                           <TableCell className="font-medium">
                             <button
-                              onClick={() => navigate(`/admin/crm/contacts/${contact.contact_id}`)}
+                              onClick={() => navigate(`/crm/contacts/${contact.contact_id}`)}
                               className="text-primary hover:underline text-left"
 >
                               {contact.contact_name || '—'}

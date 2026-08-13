@@ -144,7 +144,7 @@ export const CatalogOperationsTab: React.FC = () => {
           Email-gated catalog access events, page views, and PDF downloads.
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/admin/catalogs')}>
+          <Button variant="outline" size="sm" onClick={() => navigate('/catalogs')}>
             <BookOpen className="mr-2 h-4 w-4" /> Open catalogs
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -211,7 +211,7 @@ export const CatalogOperationsTab: React.FC = () => {
                         <td className="px-3 py-2 text-right">{s.unique_email_count}</td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{s.last_event_at ? formatDate(s.last_event_at, { withTime: true }) : '—'}</td>
                         <td className="px-3 py-2 flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/catalogs/${s.id}`)}>Open</Button>
+                          <Button size="sm" variant="ghost" onClick={() => navigate(`/catalogs/${s.id}`)}>Open</Button>
                           {s.slug && (
                             <Button size="sm" variant="ghost" onClick={() => window.open(`/c/${s.slug}`, '_blank')}>
                               <ExternalLink className="h-3 w-3" />
@@ -258,7 +258,7 @@ export const CatalogOperationsTab: React.FC = () => {
                         <td className="px-3 py-2 font-medium">{e.email || '—'}</td>
                         <td className="px-3 py-2"><span className="text-xs text-muted-foreground capitalize">{e.matched_kind || '—'}</span></td>
                         <td className="px-3 py-2 text-xs">
-                          <button className="hover:underline text-primary" onClick={() => navigate(`/admin/catalogs/${e.catalog_id}`)}>
+                          <button className="hover:underline text-primary" onClick={() => navigate(`/catalogs/${e.catalog_id}`)}>
                             {e.catalog_title || e.catalog_id.slice(0, 8)}
                           </button>
                         </td>
@@ -310,7 +310,7 @@ export const CatalogOperationsTab: React.FC = () => {
                         </td>
                         <td className="px-3 py-2"><span className="text-xs text-muted-foreground capitalize">{row.matched_kind}</span></td>
                         <td className="px-3 py-2 text-xs">
-                          <button className="hover:underline text-primary" onClick={() => navigate(`/admin/catalogs/${row.catalog_id}`)}>
+                          <button className="hover:underline text-primary" onClick={() => navigate(`/catalogs/${row.catalog_id}`)}>
                             {row.catalog_title || row.catalog_id.slice(0, 8)}
                           </button>
                         </td>

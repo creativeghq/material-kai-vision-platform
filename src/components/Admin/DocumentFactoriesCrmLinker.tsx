@@ -319,7 +319,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/admin/crm/companies/${match.id}`)}
+                          onClick={() => navigate(`/crm/companies/${match.id}`)}
                         >
                           <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open in CRM
                         </Button>

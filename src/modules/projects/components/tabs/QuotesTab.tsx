@@ -122,7 +122,7 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
                 {chain.revisions.map(q => (
                   <button
                     key={q.id}
-                    onClick={() => navigate(`/admin/quotes/${q.id}`)}
+                    onClick={() => navigate(`/quotes/manage/${q.id}`)}
                     className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-center gap-3"
                   >
                     <FileText className="h-4 w-4 text-primary shrink-0" />

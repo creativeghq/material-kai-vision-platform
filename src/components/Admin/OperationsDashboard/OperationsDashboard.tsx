@@ -1798,7 +1798,7 @@ const OperationsDashboardInner: React.FC = () => {
           </TabsContent>
 
           {/* Catalog Operations Tab — email-gated catalog access events,
-              page views, and PDF downloads. Pulled out of /admin/catalogs/operations
+              page views, and PDF downloads. Pulled out of /catalogs/operations
               and integrated into the central operations dashboard. */}
           <TabsContent value="catalogs" className="space-y-4">
             <CatalogOperationsTab />

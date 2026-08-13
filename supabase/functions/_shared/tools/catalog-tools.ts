@@ -316,7 +316,7 @@ export const createAttachCatalogPdfsTool = (userId: string, onChunk: ChunkSink) 
       name: 'attach_catalog_pdfs',
       description:
         'Attach one or more uploaded source PDFs to a catalog. The user uploads PDFs first — either via the admin ' +
-        'UI (Sources tab / /admin/catalogs/sources) or by attaching a PDF directly in chat — which creates rows in ' +
+        'UI (Sources tab / /catalogs/sources) or by attaching a PDF directly in chat — which creates rows in ' +
         'catalog_source_pdfs and gives you a source_pdf_id. This tool links those ids to the catalog being built. ' +
         'When the user says they uploaded a PDF and gives a source_pdf_id, pass it here. Required before ' +
         'extract_from_catalog_pdfs / translate_pdf_to_catalog can run.',
@@ -1204,7 +1204,7 @@ export const createPublishCatalogTool = (userId: string, onChunk: ChunkSink) => 
           type: 'workflow_finished',
           run_id: input.catalog_id,
           status: 'done',
-          summary: `Published as ${publicUrl}. Use "Send to Customers" on /admin/catalogs/${input.catalog_id} to email it via CRM categories.`,
+          summary: `Published as ${publicUrl}. Use "Send to Customers" on /catalogs/${input.catalog_id} to email it via CRM categories.`,
         });
 
         return JSON.stringify({

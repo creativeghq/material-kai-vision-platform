@@ -2,7 +2,7 @@
  * Quote Analytics Service
  *
  * Tracks how quotes are viewed and downloaded so admins can see engagement
- * per quote (QuoteAnalyticsPanel on /admin/quotes/:id).
+ * per quote (QuoteAnalyticsPanel on /quotes/manage/:id).
  *
  * Mirrors manufacturerAnalyticsService: batched (flush every 5s or at 20
  * events), fire-and-forget, never blocks the UI, silently re-queues on

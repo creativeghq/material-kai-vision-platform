@@ -59,7 +59,7 @@ export const CatalogsListPage: React.FC = () => {
             <Button variant="outline" onClick={() => navigate('/admin/operations?tab=catalogs')}>
               <Eye className="mr-2 h-4 w-4" /> Operations
             </Button>
-            <Button variant="outline" onClick={() => navigate('/admin/catalogs/sources')}>
+            <Button variant="outline" onClick={() => navigate('/catalogs/sources')}>
               <Upload className="mr-2 h-4 w-4" /> Source PDFs
             </Button>
             <Button onClick={() => setShowCreate(true)}>
@@ -81,7 +81,7 @@ export const CatalogsListPage: React.FC = () => {
             <div className="font-medium text-foreground">No catalogs yet</div>
             <p className="text-sm">Upload manufacturer PDFs first, then start a new catalog and let the KAI agent build it for you.</p>
             <div className="flex gap-2 justify-center pt-2">
-              <Button variant="outline" onClick={() => navigate('/admin/catalogs/sources')}>Upload source PDFs</Button>
+              <Button variant="outline" onClick={() => navigate('/catalogs/sources')}>Upload source PDFs</Button>
               <Button onClick={() => setShowCreate(true)}>New Catalog</Button>
             </div>
           </CardContent>
@@ -112,7 +112,7 @@ export const CatalogsListPage: React.FC = () => {
                     <Button size="sm" variant="ghost" onClick={() => handleOpenAgent(c)} title="Open in KAI agent">
                       <MessageSquare className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/admin/catalogs/${c.id}`)}>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/catalogs/${c.id}`)}>
                       <Eye className="mr-1 h-4 w-4" /> Open
                     </Button>
                     {c.status === 'published' && c.slug && (
@@ -137,7 +137,7 @@ export const CatalogsListPage: React.FC = () => {
           onClose={() => setShowCreate(false)}
           onCreated={(catalog) => {
             setShowCreate(false);
-            navigate(`/admin/catalogs/${catalog.id}`);
+            navigate(`/catalogs/${catalog.id}`);
           }}
         />
       )}

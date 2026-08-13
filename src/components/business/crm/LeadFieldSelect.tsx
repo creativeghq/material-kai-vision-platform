@@ -2,7 +2,7 @@
  * LeadFieldSelect — pick-one dropdown for a contact's Lead Status / Lead Source,
  * backed by the CRM Categories system (`kind='lead_status' | 'lead_source'`).
  *
- * Dropdown only. The option list is managed exclusively at /admin/crm →
+ * Dropdown only. The option list is managed exclusively at /crm →
  * Categories — there is no inline free-text entry and no free-text fallback.
  * The chosen option's NAME is stored as a string on `crm_contacts.lead_status`
  * / `.lead_source` via the supplied `onSave` ("Not set" clears to null).

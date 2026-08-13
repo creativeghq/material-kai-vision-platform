@@ -91,7 +91,7 @@ export const SupplierIdentityClaimCard: React.FC = () => {
                 they are not an admin, so the operator dashboard is not theirs to browse. */}
             {status.is_confirmed_contact && (
               <Button size="sm" variant="outline" className="rounded-full h-8" asChild>
-                <Link to="/admin/catalog-master">
+                <Link to="/catalog-master">
                   <Boxes className="h-3.5 w-3.5 mr-1" /> Manage your catalog
                 </Link>
               </Button>

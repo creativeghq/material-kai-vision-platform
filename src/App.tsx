@@ -12,6 +12,7 @@ import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
+import { WorkspaceAdminGuard } from '@/components/core/WorkspaceAdminGuard';
 import { CapabilityGuard } from './components/core/CapabilityGuard';
 import { PRODUCT_BROWSE_ANY } from './auth/capabilities';
 import { EntitlementGuard } from './components/core/EntitlementGuard';
@@ -88,8 +89,8 @@ const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueue
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 // Quote Settings page lives in `src/modules/quotes/pages/QuoteSettingsPage.tsx` —
-// registered through buildModuleRoutes() at /admin/quote-settings, plus
-// embedded in /admin/quote-requests via a Sheet panel. (Previously here as a
+// registered through buildModuleRoutes() at /quotes/settings, plus
+// embedded in /quotes/requests/manage via a Sheet panel. (Previously here as a
 // SystemSettingsPage lazy import.)
 // QuoteRequestsAdmin + QuoteDetailPage live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
 // StatusTagsManagement, UpsellsManagement, TimelineStepsManagement live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
@@ -102,7 +103,7 @@ const MasterCatalogPage = lazy(() => import('./pages/Admin/MasterCatalogPage'));
 const PageWatchesPage = lazy(() => import('./pages/PageWatchesPage'));
 const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
-// Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
+// Social Media route (/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
@@ -341,9 +342,10 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Non-admin CRM customer detail — capability-gated (crm.view) so sales reps
-                    and staff can open a customer + its Account overview. The admin dashboard
-                    keeps its own /admin/crm/* deep-links (AdminGuard). */}
+                {/* CRM record pages — capability-gated (crm.view) so sales reps and staff can
+                    open a customer and its Account overview. THE only address for them: the old
+                    `/admin/crm/*` twin rendered these same components behind AdminGuard, which
+                    bounced exactly those users, and now only redirects here. */}
                 <Route
                   path="/crm/deals/:id"
                   element={
@@ -703,8 +705,9 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-                {/* CRM routes (/admin/crm, /contacts/:id, /companies/:id, /users/:id)
-                    are registered by the `crm` module via buildModuleRoutes(). */}
+                {/* The `crm` module registers the legacy `/admin/crm/*` redirects into these
+                    routes, plus `/admin/crm/users/:id` — the global account tier, which is
+                    operator tooling and stays admin-gated. See src/modules/crm/index.ts. */}
                 <Route
                   path="/billing/subscriptions"
                   element={
@@ -768,25 +771,32 @@ const App = () => (
                   }
                 />
                 {/* Quote routes (/quotes, /quotes/:id, /quotes/:id/preview,
-                    /quotes/requests, /admin/quote-requests, /admin/quotes/:id,
-                    /admin/status-tags, /admin/upsells, /admin/timeline-steps)
+                    /quotes/requests, /quotes/requests/manage, /quotes/manage/:id,
+                    /quotes/settings/status-tags, /quotes/settings/upsells, /quotes/settings/timeline-steps)
                     are registered by the `quotes` module via buildModuleRoutes(). */}
-                {/* Email routes (/admin/emails, /admin/email-templates/:id/edit)
+                {/* Email routes (/emails, /emails/templates/:id/edit)
                     are registered by the `email` module via buildModuleRoutes().
-                    Messaging route (/admin/messaging) is registered by the
+                    Messaging route (/messaging) is registered by the
                     `messaging` module via buildModuleRoutes(). */}
+                {/* Automations belong to the workspace that runs them: `flows` carries a
+                    workspace_id and its RLS already scopes a tenant to their OWN non-global,
+                    non-locked rows, so the seeded `system-default` flows stay invisible to them
+                    and editable only by a global admin. Behind AdminGuard the page was operator-
+                    only, which meant a tenant could neither see nor pause an automation that was
+                    emailing their customers. */}
                 <Route
-                  path="/admin/flows"
+                  path="/flows"
                   element={
                     <AuthGuard>
-                      <AdminGuard>
+                      <WorkspaceAdminGuard>
                         <Layout>
                           <FlowsManagement />
                         </Layout>
-                      </AdminGuard>
+                      </WorkspaceAdminGuard>
                     </AuthGuard>
                   }
                 />
+                <Route path="/admin/flows" element={<Navigate to="/flows" replace />} />
                 {/* Relocated into AI Configurations → Background Agents tab. */}
                 <Route path="/admin/background-agents" element={<Navigate to="/admin/ai-configs?tab=background-agents" replace />} />
                 {/* Unified monitoring (Price / Mention / Job) */}
@@ -815,12 +825,17 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Master catalog (#324). Deliberately NOT behind AdminGuard: a confirmed
-                    manufacturer publishes their own products here. Both audiences are gated
-                    server-side — publishing by `supplier_publishing_allowed`, accepting a price
-                    by `is_platform_operator()` — so the page shows only what the caller may do. */}
+                {/* Master catalog (#324). NOT behind AdminGuard: a confirmed manufacturer
+                    publishes their own products here. Both audiences are gated server-side —
+                    publishing by `supplier_publishing_allowed`, accepting a price by
+                    `is_platform_operator()` — so the page shows only what the caller may do.
+
+                    It lived at `/admin/catalog-master`, which was the one thing about it that
+                    WAS admin. The Profile card that sends a manufacturer here even said so:
+                    "they are not an admin, so the operator dashboard is not theirs to browse" —
+                    and then handed them an /admin URL. The address now matches the guard. */}
                 <Route
-                  path="/admin/catalog-master"
+                  path="/catalog-master"
                   element={
                     <AuthGuard>
                       <Layout>
@@ -829,6 +844,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
+                <Route path="/admin/catalog-master" element={<Navigate to="/catalog-master" replace />} />
                 {/* Page monitoring (#331). Workspace-scoped, not admin-only: watching a
                     supplier's terms page is the job of whoever deals with that supplier.
                     Every action is workspace-verified server-side in `page-watches`. */}

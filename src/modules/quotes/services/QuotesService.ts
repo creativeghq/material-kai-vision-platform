@@ -484,7 +484,7 @@ export class QuotesService {
           type: accepted ? 'quote_accepted' : 'quote_rejected',
           title: accepted ? `Quote ${quoteRef} accepted` : `Quote ${quoteRef} declined`,
           body: accepted ? 'A client has accepted the quote.' : 'A client has declined the quote.',
-          action_url: `/admin/quotes/${quote.id}`,
+          action_url: `/quotes/manage/${quote.id}`,
         });
       if (quote.workspace_id) {
         supabase

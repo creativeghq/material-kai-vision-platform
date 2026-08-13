@@ -164,7 +164,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   };
 
   const handleViewQuote = (quoteId: string) => {
-    navigate(`/admin/quotes/${quoteId}`);
+    navigate(`/quotes/manage/${quoteId}`);
   };
 
   const handleDeleteQuote = async (quoteId: string) => {

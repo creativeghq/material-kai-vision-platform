@@ -179,7 +179,7 @@ export const RequestsInboxPanel: React.FC = () => {
                         </div>
                         <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {formatDate(r.created_at)}</div>
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/quotes/${r.quote_id}`)} title="Open quote"><ArrowRight className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/quotes/manage/${r.quote_id}`)} title="Open quote"><ArrowRight className="h-4 w-4" /></Button>
                       {(r.status === 'new' || r.status === 'in_review') && (
                         <>
                           <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => returnPriced(r)}>
