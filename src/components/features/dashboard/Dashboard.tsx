@@ -13,7 +13,7 @@ export const Dashboard: React.FC = () => {
     <div className="p-3 sm:p-6 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
       <div className="grid grid-cols-12 gap-6 items-stretch">
         {/* Search-first work surface */}
-        <div className="col-span-12 lg:col-span-8 overflow-hidden">
+        <div className="col-span-12 lg:col-span-7 overflow-hidden">
           <HeroSection onNavigate={navigate} />
         </div>
 

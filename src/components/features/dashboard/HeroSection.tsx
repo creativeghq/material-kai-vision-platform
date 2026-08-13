@@ -40,7 +40,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
         </h1>
 
         {/* Search — the primary job of this surface */}
-        <form onSubmit={submitSearch} className="max-w-2xl">
+        <form onSubmit={submitSearch}>
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-background/70 backdrop-blur-sm p-1.5 pl-4 focus-within:border-primary/50 transition-colors">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
@@ -60,7 +60,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
         </form>
 
         {/* Task tiles — one click to the four things people actually come here to do */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {heroTasks.map((task: HeroTask) => (
             <button
               key={task.path}

@@ -15,7 +15,8 @@ interface StatBlockProps {
   title: string;
   /** Headline figure, already formatted. Money is formatted upstream. */
   value: React.ReactNode;
-  /** One-line caption under the figure. */
+  /** One-line caption under the figure — Title Case: it labels the number, it is
+   *  not a sentence about it (design system, Heading Pattern). */
   caption?: string;
   /** Always render the SAME number of rows — see the note on height below. */
   rows?: StatBreakdownRow[];

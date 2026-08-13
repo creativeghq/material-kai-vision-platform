@@ -229,7 +229,7 @@ const MyOfficeImpl: React.FC = () => {
 
   return (
     <div
-      className="col-span-12 lg:col-span-4 rounded-2xl border border-primary/15 bg-card p-5 flex flex-col gap-4 relative overflow-hidden"
+      className="col-span-12 lg:col-span-5 rounded-2xl border border-primary/15 bg-card p-5 flex flex-col gap-4 relative overflow-hidden"
       style={{ backgroundImage: 'radial-gradient(420px 200px at 90% -20%, hsl(var(--primary) / 0.10), transparent 70%)' }}
     >
       {/* Greeting */}
@@ -252,7 +252,7 @@ const MyOfficeImpl: React.FC = () => {
           title="Orders"
           loading={pipelineLoading}
           value={pipeline.ordersOpen}
-          caption={pipeline.ordersOpen === 1 ? 'open order' : 'open orders'}
+          caption={pipeline.ordersOpen === 1 ? 'Open Order' : 'Open Orders'}
           rows={[
             { label: 'Draft', value: pipeline.orders.draft ?? 0 },
             { label: 'Confirmed', value: pipeline.orders.confirmed ?? 0 },
@@ -265,7 +265,7 @@ const MyOfficeImpl: React.FC = () => {
           title="Quotes"
           loading={pipelineLoading}
           value={pipeline.quotesActive}
-          caption={pipeline.quotesActive === 1 ? 'in play' : 'in play'}
+          caption="In Play"
           rows={[
             { label: 'Draft', value: pipeline.quotes.draft ?? 0 },
             { label: 'Submitted', value: pipeline.quotes.submitted ?? 0 },
@@ -278,7 +278,7 @@ const MyOfficeImpl: React.FC = () => {
           title="Finance"
           loading={statsLoading}
           value={stats.finance.count === 0 ? '—' : money(stats.finance.total, stats.finance.currency)}
-          caption={stats.finance.count === 0 ? 'All settled' : 'outstanding'}
+          caption={stats.finance.count === 0 ? 'All Settled' : 'Outstanding'}
           rows={[
             { label: 'Open invoices', value: stats.finance.count },
             { label: 'Overdue', value: stats.finance.overdue, alert: stats.finance.overdue > 0 },
@@ -291,7 +291,7 @@ const MyOfficeImpl: React.FC = () => {
           title="Customers"
           loading={crmLoading}
           value={crm.total}
-          caption={crm.total === 1 ? 'company' : 'companies'}
+          caption={crm.total === 1 ? 'Company' : 'Companies'}
           rows={[
             { label: 'Customers', value: crm.customers },
             { label: 'Suppliers', value: crm.suppliers },
