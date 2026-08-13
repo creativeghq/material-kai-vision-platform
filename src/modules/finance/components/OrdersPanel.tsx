@@ -2481,21 +2481,35 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="space-y-1.5 pr-8">
           <DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle>
           <DialogDescription className="sr-only">Order form.</DialogDescription>
-          {/* Who the order is with, one click from their CRM record — the order header named a
-              number and nothing else, so answering "who is this for?" meant leaving the order. */}
-          {party && (
-            <p className="text-xs text-muted-foreground">
-              {party.role === 'customer' ? 'Customer' : 'Supplier'}{' · '}
-              <Link
-                to={`/crm/${party.kind === 'company' ? 'companies' : 'contacts'}/${party.id}`}
-                className="font-medium text-primary hover:underline"
-              >
-                {partyName ?? 'Open CRM record'}
-              </Link>
-            </p>
+          {/* The order's IDENTITY, in the order the list row states it: which direction of trade
+              this is, who it is with (one click from their CRM record — the header named a number
+              and nothing else, so answering "who is this for?" meant leaving the order), and when
+              it was raised. What it is WORTH and how much of it is settled is the money strip
+              below; a header that mixes the two ends up saying "Sales · Paid" with no figure
+              anywhere near it. */}
+          {order && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              <span className={`font-medium ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                {order.order_type === 'sales' ? 'Sales order' : 'Purchase order'}
+              </span>
+              {party && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{party.role === 'customer' ? 'Customer' : 'Supplier'}</span>
+                  <Link
+                    to={`/crm/${party.kind === 'company' ? 'companies' : 'contacts'}/${party.id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {partyName ?? 'Open CRM record'}
+                  </Link>
+                </>
+              )}
+              <span aria-hidden>·</span>
+              <span>{formatDate(order.created_at)}</span>
+            </div>
           )}
         </DialogHeader>
         {loading || !order ? (
@@ -2503,18 +2517,49 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         ) : (
           <div className="space-y-4">
             {/* Status + actions sit ON TOP of the products (then the document + totals below). */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-sm font-semibold capitalize ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>{order.order_type}</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+              {/* What the order is worth, said once and plainly. The type + payment status used to
+                  sit here as two bare words ("Sales  Paid") with no figure anywhere near them —
+                  the number they describe was four sections down in the totals table. Both values
+                  are READ, never recomputed: `order.total` is the stored order total and
+                  `outstanding` comes straight off `get_order_settlements` (see the const above). */}
+              <span className="text-base font-semibold tabular-nums">{formatMoney(Number(order.total), order.currency)}</span>
+              <span className="text-xs text-muted-foreground">total</span>
+              <span className="text-muted-foreground/40" aria-hidden>·</span>
               {/* DERIVED, not the cached `orders.payment_status` column. The list one click up has
                   read the derivation since the "Paid beside a non-zero Outstanding" fix; this header
                   kept reading the cache, which is the same bug one screen deeper — and it sits
                   directly above an Outstanding figure that comes from `get_order_settlements`. Same
                   row, so the two cannot disagree. */}
-              <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[fin?.payment_status ?? order.payment_status]}</span>
+              <span className={`text-xs font-medium ${statusTone(fin?.payment_status ?? order.payment_status)}`}>
+                {ORDER_PAYMENT_LABEL[fin?.payment_status ?? order.payment_status]}
+              </span>
+              {/* The money still moving, in the same vocabulary and the same tones the list uses:
+                  a cancelled order is not debt, an over-settled one is not a balance, and a sales
+                  shortfall is money to COLLECT where a purchase shortfall is money to PAY. Gated on
+                  `fin` so a settlement that never arrived stays silent instead of printing a
+                  confident zero. */}
+              {fin && order.status !== 'cancelled' && (outstanding < -0.005 ? (
+                <>
+                  <span className="text-muted-foreground/40" aria-hidden>·</span>
+                  <span className="text-xs font-medium text-purple-600 dark:text-purple-400" title="More has been settled than this order is worth">
+                    Overpaid {formatMoney(Math.abs(outstanding), order.currency)}
+                  </span>
+                </>
+              ) : outstanding > 0.005 ? (
+                <>
+                  <span className="text-muted-foreground/40" aria-hidden>·</span>
+                  <span className={`text-xs font-medium tabular-nums ${order.order_type === 'sales' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
+                    {formatMoney(outstanding, order.currency)}
+                    <span className="ml-1 font-normal">{order.order_type === 'sales' ? 'still to collect' : 'still to pay'}</span>
+                  </span>
+                </>
+              ) : null)}
               {/* Supplier round-trip on a PO: paired = sent in-app; supplier_status comes back from
                   their portal ack/ship or their mirror order's progress. Plain colored words. */}
               {order.order_type === 'purchase' && (order.paired_order_id || order.supplier_status) && (
                 <span className="text-xs" title={order.supplier_eta ? `Supplier ETA ${order.supplier_eta}` : undefined}>
+                  <span className="mr-2 text-muted-foreground/40" aria-hidden>·</span>
                   {order.supplier_status === 'shipped'
                     ? <span className="font-medium text-emerald-600 dark:text-emerald-400">Supplier shipped</span>
                     : order.supplier_status === 'acknowledged'
