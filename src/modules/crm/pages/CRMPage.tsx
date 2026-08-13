@@ -125,6 +125,9 @@ export const CRMManagement: React.FC = () => {
   // boundary (admin OR the deal's owner) — this only decides whether to offer the controls,
   // and offering them to someone RLS will reject is a worse experience than hiding them.
   const canManageDeals = !!activeWorkspaceId && workspaceRole !== 'client';
+  // Deal types are workspace configuration, not day-to-day work — owner/admin only, matching
+  // the RLS on crm_deal_types.
+  const isWsAdmin = workspaceRole === 'owner' || workspaceRole === 'admin';
 
   const initialTab: TabValue = (() => {
     const t = searchParams.get('tab');
@@ -612,7 +615,7 @@ export const CRMManagement: React.FC = () => {
                   <CardDescription>Deals in flight, by stage. Stages follow each deal type.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <PipelineBoard ws={activeWorkspaceId} canManage={canManageDeals} />
+                  <PipelineBoard ws={activeWorkspaceId} canManage={canManageDeals} canManageTypes={isWsAdmin} />
                 </CardContent>
               </Card>
             </ModuleTabGate>

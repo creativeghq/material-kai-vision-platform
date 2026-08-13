@@ -15,7 +15,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MoreVertical, Trophy, XCircle, Trash2, ListChecks, Loader2, RotateCcw, Pencil } from 'lucide-react';
+import { Plus, MoreVertical, Trophy, XCircle, Trash2, ListChecks, Loader2, RotateCcw, Pencil, Settings2 } from 'lucide-react';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 import { Button } from '@/components/core/ui/button';
@@ -32,6 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
 import { dealsService, type Deal, type DealStage, type DealTask, type DealType } from '@/services/dealsService';
+import { DealTypeManager } from '@/components/business/crm/DealTypeManager';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: '' });
 
@@ -45,9 +46,11 @@ interface Props {
   canManage: boolean;
   /** Pin to one deal type (by key) and hide the switcher — Real Estate passes 'real_estate'. */
   lockedTypeKey?: string;
+  /** Workspace admins can define their own deal types and stages. */
+  canManageTypes?: boolean;
 }
 
-export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey }) => {
+export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, canManageTypes }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [types, setTypes] = useState<DealType[] | null>(null);
@@ -55,27 +58,27 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey })
   const [stages, setStages] = useState<DealStage[]>([]);
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [creating, setCreating] = useState(false);
+  const [managingTypes, setManagingTypes] = useState(false);
   const [showLost, setShowLost] = useState(false);
 
   const activeType = useMemo(() => types?.find((t) => t.id === typeId) ?? null, [types, typeId]);
 
-  useEffect(() => {
+  const reloadTypes = useCallback(async () => {
     if (!ws) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const all = await dealsService.listTypes(ws);
-        if (cancelled) return;
-        const visible = lockedTypeKey ? all.filter((t) => t.key === lockedTypeKey) : all;
-        setTypes(visible);
-        setTypeId((prev) => prev ?? visible[0]?.id ?? null);
-      } catch (e) {
-        if (!cancelled) { setTypes([]); toast({ title: 'Could not load deal types', description: (e as Error).message, variant: 'destructive' }); }
-      }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const all = await dealsService.listTypes(ws);
+      const visible = lockedTypeKey ? all.filter((t) => t.key === lockedTypeKey) : all;
+      setTypes(visible);
+      // Keep the current selection unless it just disappeared (type deleted).
+      setTypeId((prev) => (prev && visible.some((t) => t.id === prev) ? prev : visible[0]?.id ?? null));
+    } catch (e) {
+      setTypes([]);
+      toast({ title: 'Could not load deal types', description: (e as Error).message, variant: 'destructive' });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws, lockedTypeKey]);
+
+  useEffect(() => { void reloadTypes(); }, [reloadTypes]);
 
   const load = useCallback(async () => {
     if (!ws || !typeId) return;
@@ -126,7 +129,14 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey })
             {lost.length > 0 && <> · <button className="hover:underline" onClick={() => setShowLost((v) => !v)}>{lost.length} lost</button></>}
           </div>
         </div>
-        {canManage && <Button size="sm" className="rounded-full" onClick={() => setCreating(true)}><Plus className="mr-1.5 h-4 w-4" /> New deal</Button>}
+        <div className="flex items-center gap-2">
+          {canManageTypes && !lockedTypeKey && (
+            <Button size="sm" variant="ghost" className="rounded-full text-xs" onClick={() => setManagingTypes(true)}>
+              <Settings2 className="mr-1.5 h-3.5 w-3.5" /> Types
+            </Button>
+          )}
+          {canManage && <Button size="sm" className="rounded-full" onClick={() => setCreating(true)}><Plus className="mr-1.5 h-4 w-4" /> New deal</Button>}
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2">
@@ -178,6 +188,10 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey })
 
       {creating && ws && (
         <DealDialog ws={ws} type={activeType} stages={stages} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />
+      )}
+
+      {managingTypes && ws && (
+        <DealTypeManager ws={ws} onClose={() => setManagingTypes(false)} onChanged={() => { void reloadTypes(); void load(); }} />
       )}
     </div>
   );

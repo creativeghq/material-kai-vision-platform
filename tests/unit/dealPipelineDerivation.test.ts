@@ -136,4 +136,58 @@ describe('the deal pipeline has one object and data-driven stages', () => {
       'that has to remember the deal-type filter and the embed hints.',
     ).toEqual([]);
   });
+  it('lifecycle_stage is reachable: option list matches the DB CHECK, and the API may write it', () => {
+    // Two halves that fail differently and silently.
+    //
+    // 1. The option list and the CHECK on crm_contacts.lifecycle_stage are a pair. Adding a value
+    //    to one only fails at runtime, on save, with a CHECK violation.
+    // 2. crm-api keeps an ALLOWLIST of writable contact columns. A field the UI renders but the
+    //    allowlist omits saves nothing and reports success — the comment on that list names
+    //    lead_status and department as the two it already hid.
+    const consts = readFileSync(join(ROOT, 'src/modules/crm/crmConstants.ts'), 'utf8');
+    const m = consts.match(/LIFECYCLE_STAGE_OPTIONS[\s\S]*?\];/);
+    expect(m, 'LIFECYCLE_STAGE_OPTIONS is gone').toBeTruthy();
+    const values = [...m![0].matchAll(/value:\s*'([a-z_]+)'/g)].map((x) => x[1]).sort();
+    expect(
+      values,
+      'LIFECYCLE_STAGE_OPTIONS must match the CHECK on crm_contacts.lifecycle_stage exactly.',
+    ).toEqual(['customer', 'evangelist', 'lead', 'mql', 'opportunity', 'other', 'sql', 'subscriber']);
+
+    const handler = readFileSync(join(ROOT, 'supabase/functions/crm-api/handlers/contacts-api-handler.ts'), 'utf8');
+    const allowlist = handler.match(/CONTACT_WRITABLE_COLUMNS[\s\S]*?\] as const;/);
+    expect(allowlist, 'CONTACT_WRITABLE_COLUMNS is gone').toBeTruthy();
+    expect(
+      allowlist![0].includes("'lifecycle_stage'"),
+      'lifecycle_stage is missing from CONTACT_WRITABLE_COLUMNS, so the funnel field on the contact ' +
+      'page saves nothing and still reports success.',
+    ).toBe(true);
+  });
+
+  it('a deal is reachable from the party it is attached to', () => {
+    // crm_deals carries contact_id/company_id. Until the record pages rendered them, that link
+    // worked one way only — attachable, then invisible from the contact. A one-way link is
+    // indistinguishable from no link for anyone working from the record.
+    for (const page of [
+      'src/modules/crm/pages/ContactDetailPage.tsx',
+      'src/modules/crm/pages/CompanyDetailPage.tsx',
+    ]) {
+      expect(SOURCES.get(page), `${page} no longer shows the deals on this record`).toContain('PartyDealsCard');
+    }
+  });
+
+  it('tenants can define their own deal types', () => {
+    // The tables and RLS supported tenant-defined types from the start; without this screen nobody
+    // could reach that, which is the same as not having built it.
+    const board = SOURCES.get(BOARD)!;
+    expect(board).toContain('DealTypeManager');
+    const mgr = SOURCES.get('src/components/business/crm/DealTypeManager.tsx');
+    expect(mgr, 'DealTypeManager is gone').toBeTruthy();
+    // Creation must stay atomic: a type whose stages failed to write renders an empty board.
+    expect(
+      SOURCES.get(SERVICE)!,
+      'Deal types must be created through crm_create_deal_type, which writes the type and its ' +
+      'stages in one transaction. Two inserts can leave a type with no stages — a board with no ' +
+      'columns and no way to add a deal.',
+    ).toContain("rpc('crm_create_deal_type'");
+  });
 });

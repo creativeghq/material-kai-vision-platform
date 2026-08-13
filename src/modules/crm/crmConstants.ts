@@ -16,6 +16,26 @@ export const PROFESSIONAL_TYPE_OPTIONS: Option[] = [
   { value: 'other', label: 'Other' },
 ];
 
+/**
+ * Funnel position on crm_contacts (#311). Mirrors the CHECK on `crm_contacts.lifecycle_stage`
+ * EXACTLY — the two are a pair, and adding a value here without the migration fails at runtime
+ * with a CHECK violation while typechecking clean. Guarded by
+ * tests/unit/dealPipelineDerivation.test.ts.
+ *
+ * Distinct from `lead_status`, which is a tenant-editable CRM Category ("Contacted", "Nurturing").
+ * Lifecycle stage is the platform-fixed funnel; lead status is how this tenant talks about it.
+ */
+export const LIFECYCLE_STAGE_OPTIONS: Option[] = [
+  { value: 'subscriber', label: 'Subscriber' },
+  { value: 'lead', label: 'Lead' },
+  { value: 'mql', label: 'Marketing qualified' },
+  { value: 'sql', label: 'Sales qualified' },
+  { value: 'opportunity', label: 'Opportunity' },
+  { value: 'customer', label: 'Customer' },
+  { value: 'evangelist', label: 'Evangelist' },
+  { value: 'other', label: 'Other' },
+];
+
 export const STATUS_OPTIONS: Option[] = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },

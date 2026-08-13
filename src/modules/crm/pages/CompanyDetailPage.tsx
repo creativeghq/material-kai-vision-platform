@@ -28,6 +28,7 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { PartyDealsCard } from '@/components/business/crm/PartyDealsCard';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
@@ -998,6 +999,13 @@ export const CompanyDetailPage: React.FC = () => {
 
           {/* Contacts Tab */}
           <TabsContent value="contacts" className="space-y-4">
+            {/* Deals on this account — the reverse side of crm_deals.company_id, which was
+                otherwise a one-way link (#311). */}
+            {company?.id && activeWorkspaceId && (
+              <Card><CardContent className="p-4">
+                <PartyDealsCard workspaceId={activeWorkspaceId} companyId={company.id} />
+              </CardContent></Card>
+            )}
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <div>

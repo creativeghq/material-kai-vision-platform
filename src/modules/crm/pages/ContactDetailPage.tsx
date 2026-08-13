@@ -57,6 +57,11 @@ import { financeService } from '@/modules/finance/services/financeService';
 import { researchCompany, summarizeResearch, greekAfm } from '@/modules/crm/services/companyResearch';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { formatDate } from '@/utils/datetime';
+import { LIFECYCLE_STAGE_OPTIONS } from '@/modules/crm/crmConstants';
+import { PartyDealsCard } from '@/components/business/crm/PartyDealsCard';
+
+/** Radix <Select> forbids an empty-string item value, so "not set" needs a sentinel. */
+const UNSET = '__unset__';
 
 /**
  * The Company tab is a signpost, not a second copy of the company record: a
@@ -92,6 +97,7 @@ interface Contact {
   lead_source?: string | null;
   lead_status?: string | null;
   lead_score?: number | null;
+  lifecycle_stage?: string | null;
   health_score?: number | null;
   marketing_consent?: boolean;
   industry?: string;
@@ -907,9 +913,33 @@ export const ContactDetailPage: React.FC = () => {
                           </label>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Lifecycle Stage</Label>
+                            <Select
+                              value={contact.lifecycle_stage ?? UNSET}
+                              onValueChange={(v) => {
+                                const next = v === UNSET ? null : v;
+                                patchInline({ lifecycle_stage: next });
+                                if (next) logActivity('lifecycle_stage_changed', `Lifecycle stage set to "${next}"`);
+                              }}
+                            >
+                              <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue placeholder="Not set" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={UNSET} className="text-sm">Not set</SelectItem>
+                                {LIFECYCLE_STAGE_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <LeadFieldSelect alwaysEdit={isNew} kind="lead_status" label="Lead Status" value={contact.lead_status} onSave={(v) => { patchInline({ lead_status: v }); if (v) logActivity('lead_status_changed', `Lead status set to "${v}"`); }} placeholder="Not set" />
                           <LeadFieldSelect alwaysEdit={isNew} kind="lead_source" label="Lead Source" value={contact.lead_source} onSave={(v) => patchInline({ lead_source: v })} placeholder="Not set" />
                         </div>
+                        {!isNew && contact.id && activeWorkspaceId && (
+                          <div className="border-t border-border/60 pt-3">
+                            <PartyDealsCard workspaceId={activeWorkspaceId} contactId={contact.id} />
+                          </div>
+                        )}
                       </CardContent></Card>
                     </TabsContent>
 

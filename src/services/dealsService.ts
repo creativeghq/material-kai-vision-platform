@@ -11,6 +11,7 @@
  * physically cannot sit in "Conveyancing". Never hardcode a stage list in a component.
  */
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface DealType {
   id: string;
@@ -226,3 +227,109 @@ export const dealsService = {
     if (error) throw error;
   },
 };
+
+/**
+ * Tenant-defined deal types (#311). Platform defaults (`workspace_id IS NULL`) are read-only;
+ * a workspace admin manages its own. Creation goes through an RPC because a type and its stages
+ * must land together — a type with no stages renders a board with no columns and no way in.
+ */
+export const dealTypesAdmin = {
+  async create(
+    workspaceId: string,
+    label: string,
+    subjectKind: DealType['subject_kind'],
+    stages?: { key: string; label: string; is_won?: boolean; is_lost?: boolean }[],
+  ): Promise<string> {
+    const { data, error } = await supabase.rpc('crm_create_deal_type', {
+      p_workspace_id: workspaceId,
+      p_label: label,
+      p_subject_kind: subjectKind,
+      p_stages: (stages && stages.length ? stages : null) as unknown as Json,
+    });
+    if (error) throw error;
+    return data as string;
+  },
+
+  async rename(typeId: string, label: string): Promise<void> {
+    const { error } = await supabase.from('crm_deal_types')
+      .update({ label: label.trim(), updated_at: new Date().toISOString() }).eq('id', typeId);
+    if (error) throw error;
+  },
+
+  /** Deleting a type in use is refused by the FK from crm_deals — surfaced as a readable message. */
+  async remove(typeId: string): Promise<void> {
+    const { error } = await supabase.from('crm_deal_types').delete().eq('id', typeId);
+    if (error) {
+      if (error.code === '23503') throw new Error('This type still has deals. Move or delete them first.');
+      throw error;
+    }
+  },
+
+  async addStage(dealTypeId: string, label: string, sort: number): Promise<void> {
+    const key = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '') || `stage_${sort}`;
+    const { error } = await supabase.from('crm_deal_stages')
+      .insert({ deal_type_id: dealTypeId, key, label: label.trim(), sort });
+    if (error) throw error;
+  },
+
+  async updateStage(stageId: string, patch: { label?: string; sort?: number; is_won?: boolean; is_lost?: boolean }): Promise<void> {
+    const { error } = await supabase.from('crm_deal_stages')
+      .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', stageId);
+    if (error) throw error;
+  },
+
+  /** A stage holding deals is refused by the composite FK — the deals would have nowhere to sit. */
+  async removeStage(stageId: string): Promise<void> {
+    const { error } = await supabase.from('crm_deal_stages').delete().eq('id', stageId);
+    if (error) {
+      if (error.code === '23503') throw new Error('This stage still holds deals. Move them to another stage first.');
+      throw error;
+    }
+  },
+};
+
+/**
+ * Deals attached to one party, for the contact/company record pages. Without this a deal could be
+ * linked to a contact and then be invisible from that contact — the link existed in one direction
+ * only, which is the same as not having it.
+ *
+ * Stage LABELS are resolved from each deal's own type (stages are per type), not from a constant.
+ */
+export interface PartyDeal extends Deal {
+  type_label: string;
+  stage_label: string;
+}
+
+export async function listDealsForParty(
+  workspaceId: string,
+  party: { contactId?: string | null; companyId?: string | null },
+): Promise<PartyDeal[]> {
+  const filters = [
+    party.contactId ? `contact_id.eq.${party.contactId}` : null,
+    party.companyId ? `company_id.eq.${party.companyId}` : null,
+  ].filter(Boolean) as string[];
+  if (!filters.length) return [];
+
+  const { data, error } = await supabase
+    .from('crm_deals')
+    .select('id, workspace_id, deal_type_id, title, stage, status, value, currency, expected_close_date, property_id, contact_id, company_id, updated_at, type:crm_deal_types ( label )')
+    .eq('workspace_id', workspaceId)
+    .or(filters.join(','))
+    .order('updated_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  const rows = (data ?? []) as any[];
+  if (!rows.length) return [];
+
+  // One stage lookup per distinct type — the label lives with the type that owns the stage.
+  const typeIds = [...new Set(rows.map((r) => r.deal_type_id))];
+  const { data: stageRows } = await supabase
+    .from('crm_deal_stages').select('deal_type_id, key, label').in('deal_type_id', typeIds);
+  const label = new Map((stageRows ?? []).map((s: any) => [`${s.deal_type_id}:${s.key}`, s.label as string]));
+
+  return rows.map((r) => ({
+    ...r,
+    type_label: r.type?.label ?? '',
+    stage_label: label.get(`${r.deal_type_id}:${r.stage}`) ?? r.stage,
+  })) as PartyDeal[];
+}
