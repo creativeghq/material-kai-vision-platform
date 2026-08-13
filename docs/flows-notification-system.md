@@ -151,6 +151,15 @@ emitter is not shipped):
   was told the filing never reached the ministry.
 - **Finance** (`ordersService`): `order_created` (order create), `order_status_changed`
   (status transition) — alongside the existing invoice/receipt/payment/expense/PO events.
+- **Finance — leftover customer money**: `customer_credit_releasable`, raised from TWO places
+  that share one cooldown: `ordersService.announceReleasableCredit` (frontend) on a sale's closing
+  transition, and the SQL function `finance_sweep_releasable_credit()` nightly, straight from
+  pg_cron, for parties with money on account and no open order. The sweep emits through
+  `net.http_post` → `flow-engine` like `_notify_low_stock` and the other SQL-side emitters — no
+  edge function, because the only step that ever needed a runtime was the HTTP call. The rule itself is neither caller's — it is
+  `vw_finance_parties.credit_releasable` (money unallocated AND nothing outstanding), so the
+  Parties list, the order prompt and the sweep cannot disagree about what is releasable. The
+  claim stamps BEFORE the emit: a lost nudge costs nothing, a doubled one gets the bell muted.
 - **Docs** (`docsService`): `document_published` (draft→published transition, fires once),
   `doc_suggestion_submitted` (a member proposes an edit).
 - **Email Marketing** (#255): `campaign_sent` (`campaign-processor` completion, once per

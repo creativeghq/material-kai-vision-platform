@@ -20,6 +20,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
+import { CreditReleasesCard } from '@/modules/finance/components/CreditReleasesCard';
 import { netPositionDirection, netPositionTotal, netPositionVisible } from '@/modules/finance/utils/netPosition';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -70,13 +71,21 @@ export const PartyAccountSummary: React.FC<{
    * Omitted on read-only surfaces — the tile then just reports the balance as before.
    */
   onReleaseCredit?: () => void;
+  /**
+   * Whether that credit is actually theirs to keep. DERIVED IN SQL
+   * (`vw_finance_parties.credit_releasable`) and passed in — never re-decided here. Money on
+   * account while an invoice is still open is that invoice's payment arriving early, not a
+   * windfall, and the two states have to read differently or the operator books a receivable
+   * as profit.
+   */
+  creditReleasable?: boolean;
   /** Gross margin earned on this customer, from the invoice lines' cost snapshots. */
   profitability?: {
     revenue_net: number; cogs: number; gross_margin: number;
     gross_margin_pct: number | null; cost_coverage_pct: number | null;
   } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, aging, orders, credit, onReleaseCredit, profitability, meta }) => {
+}> = ({ customer, supplier, aging, orders, credit, onReleaseCredit, creditReleasable, profitability, meta }) => {
   // Unallocated cash of theirs is a liability — we're holding money that isn't settled against
   // anything yet — so it pushes the net position into THEIR favour, exactly like a supplier
   // balance does. Leaving it out was why a customer who had overpaid still read "settled · €0".
@@ -139,6 +148,19 @@ export const PartyAccountSummary: React.FC<{
   );
   const showCredit = heldCredit > 0.005;
   /**
+   * The tile renders for every CUSTOMER, including at zero.
+   *
+   * Hiding it when empty made "there is nothing of theirs to release" and "this feature does not
+   * exist on this screen" look identical, and a customer with €420 of gross margin and €0 on
+   * account reads as the second. They are opposite facts: margin is profit you have ALREADY
+   * earned and the P&L already counts it; on-account is cash of theirs you are still holding.
+   * One €0.00 tile settles that question permanently; guessing cost more than the tile does.
+   *
+   * It still does not force the strip on by itself — that is the rule `showBalance` documents
+   * above, and breaking it reprints the same number twice.
+   */
+  const showCreditTile = !!customer;
+  /**
    * Two rows ("As customer" / "As supplier") only earn their keep when the party IS both and the
    * sides net off. With one role the split labels a distinction that doesn't exist, and the top
    * strip ends up restating the role row: Balance == that role's outstanding, and `Ordered`
@@ -172,7 +194,7 @@ export const PartyAccountSummary: React.FC<{
    * the end of the row for the parties it does not match. Counting what is about to render fills
    * the width at 3, 4, 5 or 6 tiles alike.
    */
-  const topTiles = (orders ? 2 : 0) + (showOrderCash ? 1 : 0) + (showCredit ? 1 : 0)
+  const topTiles = (orders ? 2 : 0) + (showOrderCash ? 1 : 0) + (showCreditTile ? 1 : 0)
     + (showBalance ? 1 : 0) + (meta && meta.length > 0 ? 1 : 0);
   const balanceInCustomer = showBalance && !showTopStrip && !!customer;
   const balanceInSupplier = showBalance && !showTopStrip && !customer && !!supplier;
@@ -200,19 +222,31 @@ export const PartyAccountSummary: React.FC<{
               + ' in none of the invoice figures below — open the Orders list to see which order it'
               + ' went against.' },
           )}
-          {showCredit && (
-            <Card className="dashboard-card border-0" title="Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, refund it — or keep it as income.">
+          {showCreditTile && (
+            <Card
+              className="dashboard-card border-0"
+              title={'Money of THEIRS we are holding that is not settled against any order, invoice or bill yet.'
+                + ' It is a liability, not earnings — gross margin is what you made on the sale and needs no'
+                + ' action, while this is their cash sitting with you. Apply it to an order, refund it — or'
+                + ' keep it as income.'}
+            >
               <CardContent className="p-3">
                 <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Wallet className="h-3.5 w-3.5" />On account</div>
-                <div className="text-lg font-semibold text-amber-500">{formatMoney(heldCredit)}</div>
-                {/* The way to stop holding it. Without this the balance had no exit other than
-                    refunding the customer, so leftover money sat as a liability forever. */}
-                {onReleaseCredit && (
+                <div className={`text-lg font-semibold ${showCredit ? 'text-amber-500' : 'text-muted-foreground'}`}>{formatMoney(heldCredit)}</div>
+                {/* Three states, and the empty one is the point: it says WHY there is nothing to do
+                    here, instead of leaving a blank where an action might have been. */}
+                {!showCredit ? (
+                  <div className="mt-1 text-[10px] text-muted-foreground">Nothing held — every euro of theirs is matched</div>
+                ) : creditReleasable === false ? (
+                  <div className="mt-1 text-[10px] text-muted-foreground">Held against their open invoices</div>
+                ) : onReleaseCredit ? (
+                  /* The way to stop holding it. Without this the balance had no exit other than
+                     refunding the customer, so leftover money sat as a liability forever. */
                   <button type="button" onClick={onReleaseCredit}
                     className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
                     <Coins className="h-3 w-3" /> Release to Income
                   </button>
-                )}
+                ) : null}
               </CardContent>
             </Card>
           )}
@@ -336,6 +370,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [orderStats, setOrderStats] = useState<PartyOrderPosition['stats'] | null>(null);
   // Their cash we hold that isn't settled against anything (overpayment / deposit on account).
   const [credit, setCredit] = useState(0);
+  const [creditReleasable, setCreditReleasable] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [profitability, setProfitability] = useState<Awaited<ReturnType<typeof financeService.getCustomerProfitability>> | null>(null);
 
@@ -390,10 +425,15 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
 
         // Unallocated money-in — cash of theirs sitting on account. Invisible before, so a
         // customer who had paid ahead of the paperwork showed a €0 "settled" balance.
-        const bal = await financeService
-          .getCustomerBalance(activeWorkspaceId, { companyId, contactId })
+        //
+        // Read from `vw_finance_parties`, the same row the Parties list column, the order-close
+        // prompt and the nightly sweep read — so the four surfaces cannot show four different
+        // answers to "how much of theirs are we holding, and may we keep it?".
+        const pos = await financeService
+          .getPartyCreditPosition(activeWorkspaceId, { companyId, contactId })
           .catch(() => null);
-        setCredit(Number(bal?.customer_credit ?? 0));
+        setCredit(Number(pos?.on_account_credit ?? 0));
+        setCreditReleasable(!!pos?.credit_releasable);
       }
     } catch (e) {
       console.error('account overview load failed', e);
@@ -431,6 +471,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         aging={aging}
         orders={orderStats}
         credit={credit}
+        creditReleasable={creditReleasable}
         onReleaseCredit={activeWorkspaceId ? () => setReleaseOpen(true) : undefined}
         profitability={profitability}
         meta={[
@@ -438,6 +479,19 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           { label: 'Last payment', value: lastPayment ? formatDate(lastPayment.paid_at) : '—' },
         ]}
       />
+
+      {/* What has already been kept off this party's account, with an Undo. Hides itself when
+          there is nothing — the common case — so it costs a record with no releases one query.
+          Deliberately on the CRM page too, not only in Finance: a release moves money out of a
+          customer's account with no document issued to them, and the person looking at the
+          customer is the one who needs to see that it happened. */}
+      {activeWorkspaceId && (
+        <CreditReleasesCard
+          workspaceId={activeWorkspaceId}
+          party={{ companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null) }}
+          onChanged={() => void load()}
+        />
+      )}
 
       {activeWorkspaceId && (
         <ReleaseCreditDialog

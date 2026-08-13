@@ -25,8 +25,10 @@ import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL, type PartyOrderPosition,
 } from '@/modules/finance/services/ordersService';
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
+import { netPositionDirection } from '@/modules/finance/utils/netPosition';
 import { usePartyStatementActions } from '@/modules/finance/components/StatementActions';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
+import { CreditReleasesCard } from '@/modules/finance/components/CreditReleasesCard';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone, directionTone } from '@/utils/statusTone';
@@ -68,6 +70,7 @@ function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
   };
   const receivable = bound((r) => r.receivable_outstanding);
   const payable = bound((r) => r.payable_outstanding);
+  const onAccount = bound((r) => r.on_account_credit);
 
   return [
     {
@@ -100,6 +103,14 @@ function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
           trueLabel: 'Over credit limit', falseLabel: 'Within credit limit',
           accessor: (r: PartyRow) => r.over_credit_limit,
         },
+        {
+          // The whole point of surfacing `credit_releasable`: "who is holding money we could
+          // simply keep?" was a question with no answer short of opening every party in turn.
+          key: 'credit_releasable', type: 'bool', label: 'Money on account',
+          description: 'Cash of theirs settled against nothing, with nothing outstanding on their side — it can be released to income.',
+          trueLabel: 'Releasable credit', falseLabel: 'Nothing to release',
+          accessor: (r: PartyRow) => r.credit_releasable,
+        },
       ],
     },
     {
@@ -112,6 +123,10 @@ function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
         {
           key: 'payable_outstanding', type: 'range', label: 'Payable',
           min: payable.min, max: payable.max, accessor: (r: PartyRow) => r.payable_outstanding,
+        },
+        {
+          key: 'on_account_credit', type: 'range', label: 'On account',
+          min: onAccount.min, max: onAccount.max, accessor: (r: PartyRow) => r.on_account_credit,
         },
       ],
     },
@@ -251,6 +266,10 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       side by side, so they also need to stay distinguishable. */}
                   <th className="px-4 py-2 text-right">Receivable</th>
                   <th className="px-4 py-2 text-right">Payable</th>
+                  {/* Their money we are sitting on. It is not a receivable and not a payable —
+                      it is a liability with no document, which is exactly why it never appeared
+                      on this table and could sit for a year without anyone noticing. */}
+                  <th className="px-4 py-2 text-right">On account</th>
                   <th className="px-4 py-2 text-right">Net</th>
                 </tr>
               </thead>
@@ -300,6 +319,16 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right">{formatMoney(Number(r.payable_outstanding || 0))}</td>
+                    {/* Amber only when it is actually releasable: money on account while an
+                        invoice is still open is not a windfall, it is the payment for that
+                        invoice arriving early, and colouring it as an opportunity would push the
+                        operator to book a receivable as profit. */}
+                    <td className={`px-4 py-2 text-right ${r.credit_releasable ? 'text-amber-500 font-medium' : Number(r.on_account_credit) > 0.005 ? '' : 'text-muted-foreground'}`}>
+                      {Number(r.on_account_credit) > 0.005 ? formatMoney(Number(r.on_account_credit)) : '—'}
+                      {r.credit_releasable && (
+                        <div className="text-[9px] font-normal text-muted-foreground">can be released</div>
+                      )}
+                    </td>
                     {/* No "Open" column: the whole row opens the party, and the name in the first
                         cell is a real <button> — so the trailing one was a third way to do the same
                         thing, and the only one that cost a column. Keyboard/AT reach the party
@@ -353,9 +382,9 @@ interface DetailProps {
  */
 const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, financeBase }) => {
   const { toast } = useToast();
-  // `/crm/companies/:id` — the workspace-facing CRM record, which every finance operator can
-  // reach. The admin twin (`/admin/crm/*`, AdminGuard) exists but is not where a party opened from
-  // Finance belongs, and the branch that chose it keyed off a finance base that never existed.
+  // `/crm/companies/:id` — the one CRM address, reachable by anyone with crm.view. The branch
+  // that used to pick an `/admin/crm` twin here keyed off a finance base that never existed, and
+  // the twin itself is now a redirect.
   const crmBase = '/crm';
   const crmHref = party ? `${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}` : '';
   const [tab, setTab] = useState<'invoices' | 'bills' | 'orders' | 'payments' | 'ledger'>('invoices');
@@ -473,6 +502,9 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const ledgerClosing = opening + totalDebit - totalCredit;
   const ledgerCurrency = ledger.find((r) => r.currency)?.currency ?? undefined;
   const m = (n: number) => formatMoney(n, ledgerCurrency);
+  /** Same tone rule as the account-balance tile above, so one position never reads two ways. */
+  const closingTone = ledgerClosing > 0 ? 'text-emerald-600 dark:text-emerald-400'
+    : ledgerClosing < 0 ? 'text-destructive' : 'text-muted-foreground';
 
   /**
    * Where a ledger line leads. `doc_id` is the row's own record; `related_id` is what it settles
@@ -511,10 +543,22 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         <td class="r g">${m(r.progrCredit)}</td>
         <td class="r b">${m(r.balance)}</td>
       </tr>`).join('');
-    const owes = ledgerSide === 'customer' ? ledgerClosing > 0 : ledgerClosing < 0;
-    const closingLabel = owes
-      ? (ledgerSide === 'customer' ? 'Χρεωστικό υπόλοιπο (οφείλει) / owes us' : 'Πιστωτικό υπόλοιπο (οφείλουμε) / we owe')
-      : (ledgerSide === 'customer' ? 'Πιστωτικό υπόλοιπο / credit' : 'Χρεωστικό υπόλοιπο / debit');
+    /**
+     * The closing line is an ACCOUNT BALANCE, not an accusation.
+     *
+     * It used to read "Χρεωστικό υπόλοιπο (οφείλει) / owes us" — the same number the neutral tiles
+     * print, restated as a debt claim, on the one artefact that gets handed to the counterparty.
+     * The direction word comes from `netPositionDirection`, the same helper the on-screen balance
+     * uses, so the two cannot drift apart again. Greek keeps the accounting pair
+     * (Χρεωστικό/Πιστωτικό υπόλοιπο) minus the οφείλει/οφείλουμε gloss, which was the accusatory
+     * half.
+     *
+     * The sign convention is uniform across both sides: positive is due to us (a customer who has
+     * not paid, or a supplier we have overpaid), negative sits in their favour.
+     */
+    const closingEl = ledgerClosing > 0 ? 'Χρεωστικό υπόλοιπο'
+      : ledgerClosing < 0 ? 'Πιστωτικό υπόλοιπο' : 'Μηδενικό υπόλοιπο';
+    const closingLabel = `${closingEl} / ${netPositionDirection(ledgerClosing)}`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Καρτέλα — ${esc(party.display_name)}</title>
       <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
       <style>body{font-family:'Open Sans',Arial,Helvetica,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 2px}
@@ -539,7 +583,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
       </tbody>
       <tfoot><tr><td colspan="3">Σύνολα</td><td class="r">${m(totalDebit)}</td><td class="r">${m(totalCredit)}</td><td class="r">${m(totalDebit)}</td><td class="r">${m(totalCredit)}</td><td class="r">${m(ledgerClosing)}</td></tr></tfoot>
       </table>
-      <div class="close">${closingLabel}: <strong>${m(Math.abs(ledgerClosing))}</strong></div>
+      <div class="close">Υπόλοιπο λογαριασμού / Account balance · ${closingLabel}: <strong>${m(Math.abs(ledgerClosing))}</strong></div>
       </body></html>`;
     const w = window.open('', '_blank');
     if (!w) { toast({ title: 'Pop-up blocked', description: 'Allow pop-ups to print the ledger.', variant: 'destructive' }); return; }
@@ -717,7 +761,20 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               // on orders reported a €0 position across the board.
               orders={orderPos?.stats ?? null}
               credit={credit}
+              creditReleasable={party.credit_releasable}
               onReleaseCredit={() => setReleaseOpen(true)}
+            />
+
+            {/* Renders itself away when nothing has been released, so it costs a party who has
+                never had any exactly one query and no screen space. */}
+            <CreditReleasesCard
+              workspaceId={party.workspace_id}
+              party={{
+                companyId: party.party_type === 'company' ? party.party_id : null,
+                contactId: party.party_type === 'contact' ? party.party_id : null,
+              }}
+              refreshKey={reloadKey}
+              onChanged={reload}
             />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="space-y-4">
@@ -960,7 +1017,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                           documents it holds and where the missing half lives. */}
                       <p className="text-[11px] text-muted-foreground">
                         Every movement in the period with a running balance — invoices, credit notes and payments, plus
-                        orders nobody has invoiced yet when that box is ticked. Positive means they owe us.
+                        orders nobody has invoiced yet when that box is ticked. Positive is due to us; negative sits in
+                        their favour.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1057,6 +1115,29 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                           </tr>
                         </tfoot>
                       </table>
+                      </div>
+                    )}
+                    {/*
+                      The period's closing position, NAMED — the same callout the printed Καρτέλα
+                      ends with, which until now existed only on the print. The Totals row above
+                      finishes with a bare signed number, so −€3,000.00 only read as "in their
+                      favour" if you already knew the sign convention.
+
+                      The direction word comes from `netPositionDirection`, shared with the account
+                      tiles and the print, so all three phrase one position identically — and none
+                      of them can drift back to "owes us" without the guard test failing. English
+                      only here: the print stays bilingual because a Καρτέλα is read by an
+                      accountant, but the app is English-default.
+                    */}
+                    {!ledgerLoading && (
+                      <div className="flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5 border-t border-border/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">
+                          Account balance · {netPositionDirection(ledgerClosing)}
+                          {' · '}{includeOrders ? 'incl. un-invoiced orders' : 'documents only'}
+                        </span>
+                        <span className={`text-base font-semibold tabular-nums ${closingTone}`}>
+                          {m(Math.abs(ledgerClosing))}
+                        </span>
                       </div>
                     )}
                     {/* Totals above are period-wide, not per page — Print still emits every row. */}
