@@ -8,6 +8,13 @@
  *
  * Self-contained (no Layout / no workspace machinery) so it renders for
  * anonymous visitors and search-engine / verification crawlers.
+ *
+ * KEEPING IT HONEST: every entry below names something that is actually shipped
+ * and reachable. FEATURES is the core platform, APPS mirrors the module catalog
+ * (`modules` table + each module's manifest.json), and TOOLS mirrors the public
+ * grid in `src/pages/Tools/ToolsHubPage.tsx`. When a module ships or a public
+ * tool is added, update the matching array here — a landing page that lags the
+ * product is how prospects end up asking for things that already exist.
  */
 
 import { Link } from 'react-router-dom';
@@ -15,28 +22,39 @@ import { Helmet } from 'react-helmet-async';
 import {
   ArrowRight,
   Bot,
+  BookOpen,
   Boxes,
   Building2,
   Calculator,
+  CodeXml,
+  Contact,
   CreditCard,
   FileText,
+  HardHat,
   Image as ImageIcon,
   KeyRound,
+  Landmark,
   LineChart,
   LogIn,
   Megaphone,
+  MessageCircle,
   MessagesSquare,
   Package,
   PenLine,
   PiggyBank,
   Receipt,
+  Ruler,
   ScanSearch,
+  Share2,
+  SlidersHorizontal,
   Sparkles,
+  Star,
   Store,
+  Target,
   TrendingUp,
   Users,
-  Wand2,
   Workflow,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,73 +74,91 @@ const FEATURES: Feature[] = [
     icon: Bot,
     title: 'AI assistants',
     description:
-      'Chat-driven assistants that search your catalog, draft quotes, build moodboards, run market research and automate everyday work — grounded in your own data.',
+      'Chat-driven assistants with real tools — they search your catalog, price a spec, draft quotes, build moodboards, run market research and carry out work in your workspace, grounded in your own data.',
   },
   {
     icon: ScanSearch,
     title: 'Visual material search',
     description:
-      'Snap or upload a photo of a tile, wood, light or surface and find the closest matches across your catalog with multi-vector AI vision search.',
+      'Snap or upload a photo of a tile, wood, stone or light fitting and find the closest matches in your catalog — AI vision that compares colour, texture, style and material, not filenames.',
   },
   {
     icon: FileText,
     title: 'Catalog extraction',
     description:
-      'Import supplier PDF and XML catalogs. The pipeline reads layout, tables and images, extracts products, prices and specs, and files them into a searchable knowledge base.',
+      'Import supplier PDF and XML catalogs. The pipeline reads layout, tables and images, extracts products, variants, prices and specs, and files them into a searchable knowledge base.',
   },
   {
     icon: ImageIcon,
-    title: 'Moodboards & presentation sheets',
+    title: 'Moodboards & client sheets',
     description:
-      'Assemble moodboards and generate client-ready presentation sheets — material boards, colour palettes, lighting plans, FF&E schedules and full decks — as polished PDFs.',
+      'Assemble moodboards and generate client-ready presentation sheets — material boards, colour palettes, lighting plans, FF&E schedules and full decks — as polished PDFs or a shareable client view.',
+  },
+  {
+    icon: Ruler,
+    title: 'Room planner',
+    description:
+      'Draw a room to scale, place real catalog products at their true size in 2D or 3D, then turn the plan straight into a quote — or send it to the client as a page they can open.',
+  },
+  {
+    icon: SlidersHorizontal,
+    title: 'Product configurator',
+    description:
+      'Let a customer configure finish, size, edge and mechanism, with variant rules deciding what is actually buildable and one price derivation behind it. The configuration becomes a quote line.',
+  },
+  {
+    icon: Boxes,
+    title: '3D, AR & visualisation',
+    description:
+      'Product models measured at upload, AI-generated material textures and surface relief, shared lighting presets, AR preview in the real room, and virtual-staging renders.',
   },
   {
     icon: Receipt,
-    title: 'Quotes, orders & finance',
+    title: 'Quotes, orders & invoicing',
     description:
-      'Turn selections into branded quotes, orders and invoices with FF&E specification, payments and Greek myDATA e-invoicing built in.',
+      'Selections become branded quotes, then orders, delivery notes and invoices — with payments, customs codes, units of measure and Greek myDATA e-invoicing built in. A filed MARK makes the document immutable.',
   },
   {
-    icon: Building2,
-    title: 'CRM & projects',
+    icon: Contact,
+    title: 'CRM, parties & accounts',
     description:
-      'Customers, suppliers and projects end to end. One research chain enriches a company from the Greek registries (ΑΑΔΕ → ΓΕΜΗ) and the open web, with multiple named addresses and phone numbers per party.',
+      'Customers, suppliers and contacts with several named addresses and phone numbers each. One research chain enriches a company from the Greek registries (ΑΑΔΕ → ΓΕΜΗ) and the open web, and every party carries an account balance you can drill into.',
   },
   {
-    icon: LineChart,
-    title: 'Price & market monitoring',
+    icon: HardHat,
+    title: 'Projects & job costing',
     description:
-      'Track competitor prices, brand mentions and market coverage across the web, with alerts when prices drop or new retailers and mentions appear.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'SEO & content',
-    description:
-      'Connect your website once, then pull Search Console performance, run site-health and backlink audits, research keywords and publish SEO articles with internal links written in.',
+      'Run the whole engagement: rooms, budget against actual, labour and job costing, a schedule with dependencies and a critical path, snags and a site log, a revisioned drawing register and threaded client requests.',
   },
   {
     icon: MessagesSquare,
-    title: 'Shared inbox & WhatsApp',
+    title: 'Shared inbox',
     description:
-      'Team, customer and WhatsApp conversations in one inbox. A reply assigns itself to the person who started the thread, so nothing sits unowned.',
-  },
-  {
-    icon: Wand2,
-    title: 'AR, 3D & staging',
-    description:
-      'Preview materials in AR, simulate lighting, generate 3D and virtual-staging renders, and explore rooms as immersive walkthroughs.',
+      'Team, customer and WhatsApp conversations in one inbox. A reply assigns itself to the person who started the thread, and an incoming order can be turned into a real order without leaving it.',
   },
   {
     icon: Store,
-    title: 'Marketplace & storefronts',
+    title: 'Storefront & marketplace',
     description:
-      'Publish an online storefront, share catalogs, run a counter with point of sale, and connect with brands and buyers through the materials marketplace.',
+      'Publish an online storefront, share catalogs, run a counter with point of sale, and meet brands and buyers through the materials marketplace and public brand pages.',
+  },
+  {
+    icon: CodeXml,
+    title: 'Sell from your own site',
+    description:
+      'Drop the MaterialsHub web component — or the Shopify app block — onto your own website. Visitors view the product in 3D, configure it, place it on a room plan and get a price, or a quote request when nothing matches.',
   },
   {
     icon: Workflow,
     title: 'Automations & flows',
     description:
-      'Automate notifications, emails and workflows with a visual flow builder — no code. Every alert on the platform runs through it, so you can retarget or pause any of them.',
+      'Automate notifications, emails and workflows in a visual builder — no code. Every alert on the platform runs through it, so you can retarget or pause any of them, and outbound webhooks push the same events to your own systems.',
+  },
+  {
+    icon: Wrench,
+    title: 'Service & installed base',
+    description:
+      'What you sold is still the customer’s. Track installed equipment, warranty cover and recurring service plans, issue warranty certificates, and open the next visit only when the last one is signed off.',
   },
 ];
 
@@ -138,37 +174,55 @@ const APPS: App[] = [
     icon: Building2,
     title: 'Real Estate',
     description:
-      'Listings, leads, viewings, offers and sales, with public listing pages, a buyer portal that matches saved requirements automatically, and syndication to property portals.',
+      'Listings, leads routed by territory, viewings, offers behind an AML/KYC gate, commission splits and vendor reports — plus public listing pages, a buyer portal and portal syndication in both directions.',
   },
   {
     icon: KeyRound,
     title: 'Property Management',
     description:
-      'Tenancies, rent schedules, maintenance jobs and landlord statements. Rent due becomes a draft invoice for you to review — never an automatic filing.',
+      'Tenancies, rent schedules, maintenance work orders, landlord statements and short-let operations with changeover and channel sync. Rent due becomes a draft invoice for you to review — never an automatic filing.',
   },
   {
     icon: PiggyBank,
     title: 'Investments',
     description:
-      'Model a property as an investment case: purchase, costs, financing and projected yield and ROI.',
+      'Model a property as an investment case — purchase, costs, financing and rent turned into gross and net yield, cap rate, cash-on-cash return and a portfolio roll-up.',
   },
   {
     icon: Users,
     title: 'HR & payroll',
     description:
-      'Employees, absences, attendance and clock-in, payroll runs, document OCR, Greek Εργάνη filing, and a branded public careers page with its own job board.',
+      'Employees, absences, attendance and clock-in, payroll runs, document OCR, the full Greek Εργάνη E-document set, and a branded careers page with its own job board.',
   },
   {
     icon: Package,
     title: 'Stock & warehouse',
     description:
-      'Multi-warehouse inventory, transfers, stocktakes, inbound shipments and reorder points — wired straight into order fulfilment and delivery notes.',
+      'Multi-warehouse inventory, transfers, stocktakes, inbound shipments, dispatch and reorder points — with stock leaving the warehouse only against a fiscal document.',
   },
   {
     icon: PenLine,
     title: 'Contracts & e-signature',
     description:
-      'Draft, send and countersign contracts. The counterparty signs from a link with no account, and the signed PDF is archived against the record it came from.',
+      'Draft, send and countersign contracts across HR, finance and projects. The counterparty signs from a link with no account, and the signed PDF is archived against the record it came from.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Payments',
+    description:
+      'Take card payments through Stripe, Viva.com or Revolut Checkout, send pay-by-link invoices, and reconcile settlements back against the invoice automatically.',
+  },
+  {
+    icon: Landmark,
+    title: 'Business banking',
+    description:
+      'Connect the workspace’s own Revolut Business account: live balances, a per-leg transaction feed into Finance and webhook-driven reconciliation. Your keys and your account, never the operator’s.',
+  },
+  {
+    icon: Target,
+    title: 'Deals & pipeline',
+    description:
+      'One pipeline across the platform, with stage sets that belong to a deal type — a construction deal cannot land in a conveyancing stage. Weighted forecast, deal team and a full stage history.',
   },
   {
     icon: Megaphone,
@@ -177,21 +231,70 @@ const APPS: App[] = [
       'Campaigns built on a visual editor, sent through your own provider account, with working one-click unsubscribe and suppression handled for you.',
   },
   {
-    icon: CreditCard,
-    title: 'Payments',
+    icon: MessageCircle,
+    title: 'WhatsApp & push',
     description:
-      'Take card payments through Stripe or Viva, send pay-by-link invoices, and reconcile settlements back against the invoice automatically.',
+      'WhatsApp and web-push as first-class channels — templates, campaigns, reply capture, opt-outs and delivery analytics.',
+  },
+  {
+    icon: Share2,
+    title: 'Social media',
+    description:
+      'Connect Instagram, Facebook, LinkedIn, X and TikTok. Generate posts, images and video, schedule them, and sync analytics and audience insights.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'SEO toolkit',
+    description:
+      'Keyword research, SERP and URL audits, backlinks, OnPage crawls and Search Console performance per connected site — then publish SEO articles with internal links drawn from your real pages.',
+  },
+  {
+    icon: LineChart,
+    title: 'Price & mention monitoring',
+    description:
+      'Track competitor prices across Greek and EU marketplaces, watch any page for changes, and follow brand mentions across news, blogs, Reddit, YouTube and LLM answers — with alerts when something moves.',
+  },
+  {
+    icon: Star,
+    title: 'Reviews & ratings',
+    description:
+      'Product and professional-profile reviews with verified-purchase badges, owner replies and AI review summaries, surfaced on product and brand pages.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Presentation catalogs',
+    description:
+      'Turn manufacturer PDFs into editable, branded catalogs with email-gated public landing pages.',
   },
 ];
 
-/** Free, no-login public tools already live on the platform. */
+/** Free, no-login public tools already live on the platform. Mirrors /tools. */
 const TOOLS: { label: string; to: string }[] = [
   { label: 'Material search', to: '/tools/product-search' },
+  { label: 'Heat-pump sizer', to: '/tools/heat-pump' },
+  { label: 'Heating cost comparison', to: '/tools/heating-cost' },
+  { label: 'Kitchen cost calculator', to: '/tools/kitchen-cost' },
   { label: 'Price scan', to: '/tools/price-scan' },
   { label: 'Mention scan', to: '/tools/mention-scan' },
   { label: 'Project plan estimator', to: '/tools/project-plan' },
-  { label: 'Heat-pump sizer', to: '/tools/heat-pump' },
-  { label: 'Heating cost comparison', to: '/tools/heating-cost' },
+];
+
+/** Systems the platform talks to — each one is a live integration, not a roadmap item. */
+const INTEGRATIONS: string[] = [
+  'myDATA (ΑΑΔΕ)',
+  'ΓΕΜΗ',
+  'Εργάνη',
+  'TARIC customs',
+  'Revolut Business',
+  'Stripe',
+  'Viva.com',
+  'Shopify',
+  'WhatsApp',
+  'Google Search Console',
+  'Google Calendar',
+  'Skroutz & BestPrice',
+  'Outbound webhooks',
+  'Public API',
 ];
 
 function BrandMark() {
@@ -211,7 +314,7 @@ export default function HomePage() {
         <title>MaterialsHub — Materials sourcing, catalog & business platform</title>
         <meta
           name="description"
-          content="MaterialsHub is an AI-powered platform for materials sourcing, catalog management, visual search, quoting, moodboards and business management for design and construction professionals."
+          content="MaterialsHub is an AI-powered platform for materials sourcing, catalog management, visual search, room planning, quoting and moodboards — plus the business behind them: CRM, projects, finance, HR and real estate."
         />
       </Helmet>
 
@@ -274,9 +377,9 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            MaterialsHub helps design and construction professionals source, catalog and specify
-            materials — with AI visual search, catalog extraction, moodboards, quoting, CRM and
-            finance in one place.
+            For design, construction and materials businesses: AI visual search and catalog
+            extraction at the front, room planning, configuration and quoting in the middle, and
+            CRM, projects, warehouse and finance behind it — one platform, start to finish.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -303,8 +406,8 @@ export default function HomePage() {
             Everything from a photo to a paid invoice
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            One platform for the whole materials workflow — discovery, specification and the business
-            around it.
+            One platform for the whole materials workflow — discovery, specification, the sale, and
+            the business around it.
           </p>
         </div>
 
@@ -353,6 +456,24 @@ export default function HomePage() {
               </Card>
             );
           })}
+        </div>
+      </section>
+
+      {/* Integrations */}
+      <section className="container mx-auto max-w-4xl px-4 pb-16 text-center">
+        <h2 className="font-display text-2xl font-semibold tracking-tight mb-3">
+          Connected to the systems you already use
+        </h2>
+        <p className="text-muted-foreground text-sm max-w-xl mx-auto mb-6">
+          Greek fiscal and registry services, payments, banking, storefronts and messaging — each
+          running on your own credentials, held per workspace.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {INTEGRATIONS.map((name) => (
+            <Badge key={name} variant="outline" className="rounded-full font-normal">
+              {name}
+            </Badge>
+          ))}
         </div>
       </section>
 
