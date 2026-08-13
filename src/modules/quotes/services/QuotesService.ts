@@ -531,9 +531,8 @@ export class QuotesService {
     installation_requirements?: string;
     delivery_date?: string;
   }): Promise<QuoteItem> {
-    // Resolve default unit + category from product metadata
+    // Resolve default unit from product metadata
     let customUnit: string | null = null;
-    let productCategory: string | null = null;
     try {
       const { data: product } = await supabase
         .from('products')
@@ -543,7 +542,6 @@ export class QuotesService {
       if (product?.metadata?.unit) {
         customUnit = product.metadata.unit;
       }
-      productCategory = product?.metadata?.material_category ?? null;
     } catch { /* non-fatal — falls back to null (displays as pcs) */ }
 
     // pre-fill the line from the cascade resolver so catalog lines aren't blank.
@@ -554,7 +552,6 @@ export class QuotesService {
     let unitPrice: number | null = null;
     let costSnapshot: number | null = null;
     let retailPrice: number | null = null;
-    let quoteWorkspaceId: string | null = null;
     // Line pricing state. Unpriced operator-catalog lines become
     // "call for price" (rendered as such, excluded from totals, RFQ-able upstream)
     // instead of a silently-broken NULL-priced line.
@@ -566,7 +563,6 @@ export class QuotesService {
         .eq('id', data.quote_id)
         .single();
       if (quote?.workspace_id) {
-        quoteWorkspaceId = quote.workspace_id;
         // Pass the quote's customer so the resolver applies their pricing-level discount.
         // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
         // Quantity + unit so `product_price_breaks` can fire (#347 defect 16). They travel
