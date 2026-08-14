@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
@@ -282,7 +282,54 @@ export const MarketTrendsTab: React.FC = () => {
     setIsDemoData(true);
   };
 
-  useEffect(() => { loadDemoData(); load(); }, [timeRange, selectedCategory]);
+  /*
+    Loading follows the tabs. The core fetch — the four platform queries behind the KPI row, the
+    demanded-materials table and the discovery-channel breakdown — always runs, because the KPIs sit
+    above the rail and are on screen whichever sub-area you are in. Everything else is a PANE
+    loader that fires the first time you open its sub-area: 3D scenes and quote baskets for
+    Activity, the funnel for Buyers, unmatched search terms for Discovery, week-over-week growth and
+    two years of seasonality for Demand.
+
+    That is nine queries deferred, several of them 1,000–5,000 rows, on a page where the reader
+    only ever looks at one sub-area at a time.
+
+    `panesLoaded` keys on the FILTERS as well as the tab, so switching back to a pane you have
+    already opened costs nothing, while changing the category or the time range correctly reloads
+    it. A pane that throws is removed from the set so it can be retried by revisiting it, rather
+    than being remembered as done.
+
+    Panes wait for `coreReady`: the Buyers funnel needs two totals the core fetch produces, and
+    landing directly on ?tab=buyers would otherwise race it and draw a funnel out of zeroes.
+    Demo data is seeded up-front for every pane, so a sub-area is never empty while its real query
+    is still in flight.
+  */
+  const coreTotals = useRef({ saves: 0, quoted: 0 });
+  const panesLoaded = useRef(new Set<string>());
+  const [coreReady, setCoreReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCoreReady(false);
+    panesLoaded.current.clear();
+    loadDemoData();
+    load().finally(() => { if (!cancelled) setCoreReady(true); });
+    return () => { cancelled = true; };
+  }, [timeRange, selectedCategory]);
+
+  useEffect(() => {
+    if (!coreReady) return;
+    const key = `${tab}|${timeRange}|${selectedCategory}`;
+    if (panesLoaded.current.has(key)) return;
+    panesLoaded.current.add(key);
+    const run = tab === 'demand' ? loadDemandPane
+      : tab === 'discovery' ? loadDiscoveryPane
+      : tab === 'buyers' ? loadBuyersPane
+      : loadActivityPane;
+    run().catch((e) => {
+      panesLoaded.current.delete(key);
+      console.error(`Market trends "${tab}" pane failed:`, e);
+    });
+  }, [coreReady, tab, timeRange, selectedCategory]);
 
   // ── Data loading ───────────────────────────────────────────
   const load = async () => {
@@ -407,106 +454,6 @@ export const MarketTrendsTab: React.FC = () => {
           }
         } catch (e) { console.error('Buyer type join failed:', e); }
 
-        // VR/3D usage data
-        try {
-          const { data: vrData } = await supabase
-            .from('generation_3d')
-            .select('material_ids, materials_used, room_type, created_at')
-            .eq('generation_status', 'completed')
-            .gte('created_at', ago.toISOString())
-            .limit(500);
-          const matCount = new Map<string, { count: number; roomType: string }>();
-          (vrData ?? []).forEach((gen: any) => {
-            const mats: string[] = (gen.materials_used ?? []).map(String);
-            mats.forEach((m) => {
-              const entry = matCount.get(m) ?? { count: 0, roomType: String(gen.room_type ?? 'Other') };
-              entry.count++;
-              matCount.set(m, entry);
-            });
-          });
-          const vrArr = Array.from(matCount.entries())
-            .sort((a, b) => b[1].count - a[1].count)
-            .slice(0, 10)
-            .map(([name, d]) => ({ name: name.slice(0, 40), count: d.count, roomType: d.roomType }));
-          setVrUsageData(vrArr);
-          const uniqueMats = matCount.size;
-          const roomTypes = new Map<string, number>();
-          (vrData ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'Other'); roomTypes.set(r, (roomTypes.get(r) ?? 0) + 1); });
-          const topRoom = Array.from(roomTypes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
-          setVrKpis({ totalGenerations: (vrData ?? []).length, uniqueMaterials: uniqueMats, topRoomType: topRoom });
-        } catch (e) { console.error('VR data load failed:', e); }
-
-        // Zero-result demand signals
-        try {
-          const { data: unmatchedData } = await supabase
-            .from('unmatched_term_frequency')
-            .select('term, frequency_count, last_seen_at')
-            .order('frequency_count', { ascending: false })
-            .limit(15);
-          setZeroResultDemands((unmatchedData ?? []).map((d: any) => ({
-            term: String(d.term ?? '').slice(0, 50),
-            count: d.frequency_count ?? 0,
-            lastSeen: d.last_seen_at ? formatDate(d.last_seen_at) : '—',
-          })));
-        } catch (e) { console.error('Zero-result data load failed:', e); }
-
-        // Quote basket analysis (co-quoted products)
-        try {
-          const { data: basketItems } = await supabase
-            .from('quote_items')
-            .select('quote_id, products(name)')
-            .gte('created_at', ago.toISOString())
-            .limit(1000);
-          {
-            const quoteMap = new Map<string, string[]>();
-            (basketItems ?? []).forEach((qi: any) => {
-              const name = String((qi.products as any)?.name ?? '').slice(0, 40);
-              if (!name) return;
-              const existing = quoteMap.get(qi.quote_id) ?? [];
-              existing.push(name);
-              quoteMap.set(qi.quote_id, existing);
-            });
-            const pairCount = new Map<string, number>();
-            quoteMap.forEach((names) => {
-              for (let i = 0; i < names.length; i++) {
-                for (let j = i + 1; j < names.length; j++) {
-                  const key = [names[i], names[j]].sort().join(' || ');
-                  pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
-                }
-              }
-            });
-            const pairs = Array.from(pairCount.entries())
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 8)
-              .map(([key, count]) => {
-                const [p1, p2] = key.split(' || ');
-                return { product1: p1 ?? '', product2: p2 ?? '', count };
-              });
-            setQuoteBasketsData(pairs);
-          }
-        } catch (e) { console.error('Basket analysis failed:', e); }
-
-        // ── Engagement funnel (platform) ──────────────────────
-        try {
-          const [{ data: miData }, { data: funnelQuotes }] = await Promise.all([
-            supabase.from('user_material_interactions').select('interaction_type').gte('created_at', ago.toISOString()).limit(5000),
-            supabase.from('quotes').select('status').gte('created_at', ago.toISOString()).limit(1000),
-          ]);
-          const viewCount = (miData ?? []).filter((r: any) => r.interaction_type === 'view').length;
-          const funnelSaves = (mbItems ?? []).length;
-          const funnelQuoted = (qItems ?? []).length;
-          const funnelAccepted = (funnelQuotes ?? []).filter((q: any) => q.status === 'accepted').length;
-          const funnelTop = Math.max(viewCount, funnelSaves, 1);
-          const pct = (n: number) => `${Math.round((n / funnelTop) * 100)}%`;
-          const funnelArr = [
-            ...(viewCount > 0 ? [{ stage: 'Material Views', count: viewCount, rate: '100%', color: 'bg-violet-500' }] : []),
-            { stage: 'Moodboard Saves', count: funnelSaves, rate: viewCount > 0 ? pct(funnelSaves) : '—', color: 'bg-blue-500' },
-            { stage: 'Quote Requests', count: funnelQuoted, rate: viewCount > 0 ? pct(funnelQuoted) : '—', color: 'bg-cyan-500' },
-            { stage: 'Quotes Accepted', count: funnelAccepted, rate: viewCount > 0 ? pct(funnelAccepted) : '—', color: 'bg-green-500' },
-          ];
-          setEngagementFunnel(funnelArr.filter(f => f.count > 0));
-        } catch (e) { console.error('Engagement funnel load failed:', e); }
-
         // ── Discovery channel per product (platform) ──────────
         const channelPerProduct = new Map<string, { name: string; search: number; agent: number; threeD: number; manual: number; page: number }>();
         [...(filteredMbItems ?? []), ...(filteredQItems ?? [])].forEach((item: any) => {
@@ -529,46 +476,10 @@ export const MarketTrendsTab: React.FC = () => {
           .map(({ total: _, ...rest }) => rest);
         setDiscoveryByProduct(discArr);
 
-        // ── Market Direction: WoW growth ─────────────────────
-        try {
-          const cut4w = weeksAgo(4);
-          const cut8w = weeksAgo(8);
-          const [{ data: recentMb }, { data: priorMb }, { data: recentGen }, { data: priorGen }, { data: recentProf }, { data: priorProf }] = await Promise.all([
-            supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut4w.toISOString()).limit(2000),
-            supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(2000),
-            supabase.from('generation_3d').select('room_type').gte('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
-            supabase.from('generation_3d').select('room_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
-            supabase.from('user_profiles').select('professional_type').gte('created_at', cut4w.toISOString()).limit(500),
-            supabase.from('user_profiles').select('professional_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(500),
-          ]);
-          // Material growth
-          const rMat = new Map<string, { name: string; count: number }>();
-          (recentMb ?? []).forEach((i: any) => { const id = String(i.material_id); const n = String((i.products as any)?.name ?? '').slice(0, 35); if (n) rMat.set(id, { name: n, count: (rMat.get(id)?.count ?? 0) + 1 }); });
-          const pMat = new Map<string, number>();
-          (priorMb ?? []).forEach((i: any) => { const id = String(i.material_id); pMat.set(id, (pMat.get(id) ?? 0) + 1); });
-          const growthArr = Array.from(rMat.entries())
-            .map(([id, { name, count: tw }]) => { const pw = pMat.get(id) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { name, thisWeek: tw, priorWeek: pw, growthPct: g, lifecycle: getLifecycle(null, null, tw, g) }; })
-            .sort((a, b) => b.growthPct - a.growthPct).slice(0, 12);
-          setMaterialGrowthRates(growthArr);
-          const rRoom = new Map<string, number>(); (recentGen ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'other'); rRoom.set(r, (rRoom.get(r) ?? 0) + 1); });
-          const pRoom = new Map<string, number>(); (priorGen ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'other'); pRoom.set(r, (pRoom.get(r) ?? 0) + 1); });
-          const roomArr = Array.from(rRoom.entries()).map(([rt, tw]) => { const pw = pRoom.get(rt) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { roomType: rt.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
-          setRoomTypeTrends(roomArr);
-          const rSeg = new Map<string, number>(); (recentProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); rSeg.set(t, (rSeg.get(t) ?? 0) + 1); });
-          const pSeg = new Map<string, number>(); (priorProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); pSeg.set(t, (pSeg.get(t) ?? 0) + 1); });
-          const segArr = Array.from(rSeg.entries()).map(([type, tw]) => { const pw = pSeg.get(type) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { type, thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
-          setSegmentGrowth(segArr);
-        } catch (e) { console.error('Market direction load failed:', e); }
 
-        // ── Seasonal trend: moodboard saves by month (24 months)
-        try {
-          const twoYearsAgo = new Date(); twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-          const { data: monthData } = await supabase
-            .from('moodboard_items').select('created_at')
-            .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
-          setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
-        } catch (e) { console.error('Seasonal load failed:', e); }
-
+        // The funnel pane loads later and needs these two totals; the arrays themselves are
+        // not worth holding in state, and re-fetching them per pane would undo the point.
+        coreTotals.current = { saves: (mbItems ?? []).length, quoted: (qItems ?? []).length };
         setIsDemoData(false);
         setKpis({
           activeDemandSignals: (demandData ?? []).length,
@@ -582,6 +493,156 @@ export const MarketTrendsTab: React.FC = () => {
     } catch (err) {
       console.error('MarketTrendsTab load error:', err);
     }
+  };
+
+  const loadDemandPane = async () => {
+    // ── Market Direction: WoW growth ─────────────────────
+    try {
+      const cut4w = weeksAgo(4);
+      const cut8w = weeksAgo(8);
+      const [{ data: recentMb }, { data: priorMb }, { data: recentGen }, { data: priorGen }, { data: recentProf }, { data: priorProf }] = await Promise.all([
+        supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut4w.toISOString()).limit(2000),
+        supabase.from('moodboard_items').select('material_id, products(name)').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(2000),
+        supabase.from('generation_3d').select('room_type').gte('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
+        supabase.from('generation_3d').select('room_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).eq('generation_status', 'completed').limit(500),
+        supabase.from('user_profiles').select('professional_type').gte('created_at', cut4w.toISOString()).limit(500),
+        supabase.from('user_profiles').select('professional_type').gte('created_at', cut8w.toISOString()).lt('created_at', cut4w.toISOString()).limit(500),
+      ]);
+      // Material growth
+      const rMat = new Map<string, { name: string; count: number }>();
+      (recentMb ?? []).forEach((i: any) => { const id = String(i.material_id); const n = String((i.products as any)?.name ?? '').slice(0, 35); if (n) rMat.set(id, { name: n, count: (rMat.get(id)?.count ?? 0) + 1 }); });
+      const pMat = new Map<string, number>();
+      (priorMb ?? []).forEach((i: any) => { const id = String(i.material_id); pMat.set(id, (pMat.get(id) ?? 0) + 1); });
+      const growthArr = Array.from(rMat.entries())
+        .map(([id, { name, count: tw }]) => { const pw = pMat.get(id) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { name, thisWeek: tw, priorWeek: pw, growthPct: g, lifecycle: getLifecycle(null, null, tw, g) }; })
+        .sort((a, b) => b.growthPct - a.growthPct).slice(0, 12);
+      setMaterialGrowthRates(growthArr);
+      const rRoom = new Map<string, number>(); (recentGen ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'other'); rRoom.set(r, (rRoom.get(r) ?? 0) + 1); });
+      const pRoom = new Map<string, number>(); (priorGen ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'other'); pRoom.set(r, (pRoom.get(r) ?? 0) + 1); });
+      const roomArr = Array.from(rRoom.entries()).map(([rt, tw]) => { const pw = pRoom.get(rt) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { roomType: rt.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
+      setRoomTypeTrends(roomArr);
+      const rSeg = new Map<string, number>(); (recentProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); rSeg.set(t, (rSeg.get(t) ?? 0) + 1); });
+      const pSeg = new Map<string, number>(); (priorProf ?? []).forEach((p: any) => { const t = String(p.professional_type ?? 'other'); pSeg.set(t, (pSeg.get(t) ?? 0) + 1); });
+      const segArr = Array.from(rSeg.entries()).map(([type, tw]) => { const pw = pSeg.get(type) ?? 0; const g = pw > 0 ? Math.round(((tw - pw) / pw) * 100) : 100; return { type, thisWeek: tw, priorWeek: pw, growthPct: g }; }).sort((a, b) => b.growthPct - a.growthPct);
+      setSegmentGrowth(segArr);
+    } catch (e) { console.error('Market direction load failed:', e); }
+
+    // ── Seasonal trend: moodboard saves by month (24 months)
+    try {
+      const twoYearsAgo = new Date(); twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+      const { data: monthData } = await supabase
+        .from('moodboard_items').select('created_at')
+        .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
+      setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
+    } catch (e) { console.error('Seasonal load failed:', e); }
+  };
+
+  const loadDiscoveryPane = async () => {
+    // Zero-result demand signals
+    try {
+      const { data: unmatchedData } = await supabase
+        .from('unmatched_term_frequency')
+        .select('term, frequency_count, last_seen_at')
+        .order('frequency_count', { ascending: false })
+        .limit(15);
+      setZeroResultDemands((unmatchedData ?? []).map((d: any) => ({
+        term: String(d.term ?? '').slice(0, 50),
+        count: d.frequency_count ?? 0,
+        lastSeen: d.last_seen_at ? formatDate(d.last_seen_at) : '—',
+      })));
+    } catch (e) { console.error('Zero-result data load failed:', e); }
+  };
+
+  const loadBuyersPane = async () => {
+    const ago = weeksAgo(timeRange);
+    // ── Engagement funnel (platform) ──────────────────────
+    try {
+      const [{ data: miData }, { data: funnelQuotes }] = await Promise.all([
+        supabase.from('user_material_interactions').select('interaction_type').gte('created_at', ago.toISOString()).limit(5000),
+        supabase.from('quotes').select('status').gte('created_at', ago.toISOString()).limit(1000),
+      ]);
+      const viewCount = (miData ?? []).filter((r: any) => r.interaction_type === 'view').length;
+      const funnelSaves = coreTotals.current.saves;
+      const funnelQuoted = coreTotals.current.quoted;
+      const funnelAccepted = (funnelQuotes ?? []).filter((q: any) => q.status === 'accepted').length;
+      const funnelTop = Math.max(viewCount, funnelSaves, 1);
+      const pct = (n: number) => `${Math.round((n / funnelTop) * 100)}%`;
+      const funnelArr = [
+        ...(viewCount > 0 ? [{ stage: 'Material Views', count: viewCount, rate: '100%', color: 'bg-violet-500' }] : []),
+        { stage: 'Moodboard Saves', count: funnelSaves, rate: viewCount > 0 ? pct(funnelSaves) : '—', color: 'bg-blue-500' },
+        { stage: 'Quote Requests', count: funnelQuoted, rate: viewCount > 0 ? pct(funnelQuoted) : '—', color: 'bg-cyan-500' },
+        { stage: 'Quotes Accepted', count: funnelAccepted, rate: viewCount > 0 ? pct(funnelAccepted) : '—', color: 'bg-green-500' },
+      ];
+      setEngagementFunnel(funnelArr.filter(f => f.count > 0));
+    } catch (e) { console.error('Engagement funnel load failed:', e); }
+  };
+
+  const loadActivityPane = async () => {
+    const ago = weeksAgo(timeRange);
+    // VR/3D usage data
+    try {
+      const { data: vrData } = await supabase
+        .from('generation_3d')
+        .select('material_ids, materials_used, room_type, created_at')
+        .eq('generation_status', 'completed')
+        .gte('created_at', ago.toISOString())
+        .limit(500);
+      const matCount = new Map<string, { count: number; roomType: string }>();
+      (vrData ?? []).forEach((gen: any) => {
+        const mats: string[] = (gen.materials_used ?? []).map(String);
+        mats.forEach((m) => {
+          const entry = matCount.get(m) ?? { count: 0, roomType: String(gen.room_type ?? 'Other') };
+          entry.count++;
+          matCount.set(m, entry);
+        });
+      });
+      const vrArr = Array.from(matCount.entries())
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([name, d]) => ({ name: name.slice(0, 40), count: d.count, roomType: d.roomType }));
+      setVrUsageData(vrArr);
+      const uniqueMats = matCount.size;
+      const roomTypes = new Map<string, number>();
+      (vrData ?? []).forEach((g: any) => { const r = String(g.room_type ?? 'Other'); roomTypes.set(r, (roomTypes.get(r) ?? 0) + 1); });
+      const topRoom = Array.from(roomTypes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
+      setVrKpis({ totalGenerations: (vrData ?? []).length, uniqueMaterials: uniqueMats, topRoomType: topRoom });
+    } catch (e) { console.error('VR data load failed:', e); }
+
+    // Quote basket analysis (co-quoted products)
+    try {
+      const { data: basketItems } = await supabase
+        .from('quote_items')
+        .select('quote_id, products(name)')
+        .gte('created_at', ago.toISOString())
+        .limit(1000);
+      {
+        const quoteMap = new Map<string, string[]>();
+        (basketItems ?? []).forEach((qi: any) => {
+          const name = String((qi.products as any)?.name ?? '').slice(0, 40);
+          if (!name) return;
+          const existing = quoteMap.get(qi.quote_id) ?? [];
+          existing.push(name);
+          quoteMap.set(qi.quote_id, existing);
+        });
+        const pairCount = new Map<string, number>();
+        quoteMap.forEach((names) => {
+          for (let i = 0; i < names.length; i++) {
+            for (let j = i + 1; j < names.length; j++) {
+              const key = [names[i], names[j]].sort().join(' || ');
+              pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
+            }
+          }
+        });
+        const pairs = Array.from(pairCount.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([key, count]) => {
+            const [p1, p2] = key.split(' || ');
+            return { product1: p1 ?? '', product2: p2 ?? '', count };
+          });
+        setQuoteBasketsData(pairs);
+      }
+    } catch (e) { console.error('Basket analysis failed:', e); }
   };
 
   // ── JSX ────────────────────────────────────────────────────
