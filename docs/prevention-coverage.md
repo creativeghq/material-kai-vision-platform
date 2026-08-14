@@ -497,3 +497,40 @@ real stock — and this probe watches exactly that remaining tolerance.
   factor of ten, which would have introduced the very defect the filter exists to remove. Bare
   numbers (`25`), weights (`20kg`, 29 rows) and imperial pipe sizes (`1/2"`) still refuse to parse,
   deliberately: a wrong parse ships the wrong variant, an absent one merely falls back.
+
+### `ops.field_role_mismatch` — a field classified against the evidence
+"Identity" means a product can be more than one of these at once, so a buyer must pick. A field
+marked identity that **no product ever offers twice** is a property, not an axis: it splits stock
+into duplicate rows. A field marked descriptive that products **do** offer several of is the
+dangerous direction — it merges stock that should be separate, invisibly, which is the defect
+phase 6 closed at the dispatch end.
+
+- **Proven to fire:** 2026-08-14 — on a synthetic product with a scalar `color` and an array
+  `room`, it reports over-splitting and under-splitting respectively. Silent on the empty corpus,
+  so it will not cry wolf before there is anything to measure.
+- **Blind spot:** it can only judge fields products actually carry. With 0 documents ingested it
+  is watching nothing today; its first real verdicts arrive with the first catalogue — which is
+  also when phase 4's plurality and SKU-correlation thresholds get tested for the first time.
+
+### `ops.messaging_processor_disabled` — an accepted send with nothing to send it
+`messaging-api` accepts a send and returns success whether or not
+`messaging-processor-every-minute` is running, and that cron sits at `active=false`. Harmless
+while every messaging table is empty; the moment a channel is connected, sends queue into a
+processor that never runs and nothing says so.
+
+- **Proven to fire:** 2026-08-14 — silent with zero channels, reports the moment one exists.
+- **Why a probe rather than enabling the cron:** turning it on would burn a call a minute for a
+  module nobody uses, and turning the module off is a product decision. The probe stays quiet
+  until the combination actually matters.
+
+---
+
+## Not defects — checked, and deliberately left alone
+
+Recording these so they are not re-raised every time an advisor runs.
+
+| Looks wrong | Why it is not |
+|---|---|
+| `marketplace_public_listings` is a SECURITY DEFINER view (Supabase lint 0010, invariant 3) | It is cross-tenant BY DESIGN — a member of workspace A must see workspace B's listings, which RLS would correctly forbid. It self-guards with a caller-tied `WHERE` on `auth.uid()` plus approved marketplace participation on both sides, so `anon` (uid null) sees nothing. `check_security_invariants()` already exempts exactly this shape: *"a definer view WITH an explicit caller-tied WHERE is permitted"*. Turning `security_invoker` on would break the marketplace. |
+| 87 of 106 active flows have never run | They are seeded defaults whose trigger events have not occurred on a platform holding 1 product — appointments, warranty expiry, card-spend thresholds. 12+ default flows HAVE fired, so the delivery mechanism is proven end to end. `flowEventContract.test.ts` already tracks emitter coverage informationally. |
+| `agent_memory_never_promoted` fires | The `runInBackground` repair shipped 2026-08-12 and **no agent chat has happened since 2026-08-08**. The probe is reporting pre-fix turns still inside its 30-day window. It cannot clear, or be validated, until someone sends one message. |
