@@ -1,0 +1,68 @@
+[
+  {
+    "file": "supabase/functions/_shared/tools/b2b-tools.ts",
+    "line": 191,
+    "chars": 275,
+    "fn": "<anonymous>",
+    "isAsync": true,
+    "via": "content",
+    "exprs": [
+      "category",
+      "scope",
+      "limit"
+    ],
+    "preview": "Find B2B manufacturers of . I need actual production companies (not dist"
+  },
+  {
+    "file": "supabase/functions/crm-lead-score/index.ts",
+    "line": 109,
+    "chars": 204,
+    "fn": "<anonymous>",
+    "isAsync": true,
+    "via": "content",
+    "exprs": [
+      "JSON.stringify(signals, null, 2)"
+    ],
+    "preview": "Score this sales lead. Higher lead_score = more likely to transact soon "
+  },
+  {
+    "file": "supabase/functions/generate-interior-gemini/index.ts",
+    "line": 88,
+    "chars": 2149,
+    "fn": "extractDesignSpec",
+    "isAsync": true,
+    "via": "text",
+    "exprs": [
+      "style ? `\\nDESIGN STYLE: ${style}` : ''"
+    ],
+    "preview": "You are an interior design aesthetic analyst. Study this photo and produ"
+  },
+  {
+    "file": "supabase/functions/seo-api/handlers/analyze.ts",
+    "line": 942,
+    "chars": 1230,
+    "fn": "applyFixes",
+    "isAsync": true,
+    "via": "positional",
+    "exprs": [
+      "baseFixPrompt",
+      "voiceInstructions",
+      "fixList",
+      "content"
+    ],
+    "preview": " === STRUCTURE TO PRESERVE (DO NOT REMOVE OR REWRITE) === The article us"
+  },
+  {
+    "file": "supabase/functions/xml-import-orchestrator/index.ts",
+    "line": 390,
+    "chars": 281,
+    "fn": "suggestFieldMappings",
+    "isAsync": true,
+    "via": "content",
+    "exprs": [
+      "systemPrompt",
+      "JSON.stringify(fieldsInfo, null, 2)"
+    ],
+    "preview": " XML Fields Found (residual after dictionary lookup — only fields the di"
+  }
+]

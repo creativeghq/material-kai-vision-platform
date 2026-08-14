@@ -190,6 +190,18 @@ export interface NewOrderItem {
   vat_percent?: number;       // per-line VAT %
   vat_category?: number;      // myDATA VAT category code (1=24%, …)
   update_warehouse?: boolean;
+  /**
+   * Which variant this line is (#347 phase 5). Mirrors `quote_items` exactly so quote → order
+   * is a column copy; `selected_attributes` is the registry-keyed map (fields whose
+   * `material_metadata_fields.role` is 'identity'), and size/colour are the two the schema
+   * gives dedicated columns because the documents render them.
+   *
+   * This is the answer that decides WHICH physical thing leaves the warehouse, so it belongs
+   * on the order, not only on the quote it came from.
+   */
+  selected_attributes?: Record<string, string> | null;
+  selected_size?: string | null;
+  selected_color?: string | null;
 }
 
 /** Customer-aware pricing for an order line (from the pricing resolver / catalog cost). */
@@ -1418,6 +1430,13 @@ export const ordersService = {
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
         net_value: l.net, vat_amount: l.vat, line_total: l.net, discount_pct: l.discountPct,
         update_warehouse: l.it.update_warehouse ?? true, sort_order: i,
+        // #347 phase 5: updateItems deletes and re-inserts every line, so anything not listed
+        // here is DESTROYED on save. The identity of the line is not a figure to recompute —
+        // it is the operator's answer to "which one", and dropping it silently on an unrelated
+        // edit is how the order stopped knowing what it was for in the first place.
+        selected_attributes: l.it.selected_attributes ?? {},
+        selected_size: l.it.selected_size ?? null,
+        selected_color: l.it.selected_color ?? null,
       })));
       if (itErr) throw itErr;
     }
