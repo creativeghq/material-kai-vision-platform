@@ -1131,11 +1131,22 @@ export interface ToolkitQuickStartGeneration {
 }
 
 export interface ToolkitQuickStart {
-  /** Short button label, 1–4 words. */
+  /**
+   * Short button label, 1–4 words. A BUTTON CAPTION, read next to its toolkit —
+   * it is never what the chat says. "This week" is a fine caption on the
+   * Appointments card and a meaningless chat bubble on its own; `prompt` below
+   * is what the conversation shows in both the LLM and the direct-run path.
+   */
   label: string;
   /** One-line explanation shown under the label. */
   description: string;
-  /** Prompt injected into the chat input + auto-sent when the user clicks the button. */
+  /**
+   * The sentence this quick-start stands for, written as the user would type it.
+   * Injected into the composer + auto-sent for a prompt quick-start; for a `run`
+   * quick-start (deterministic, no LLM turn) it is not sent anywhere but still
+   * becomes the user's chat bubble — so it must read as a request on its own,
+   * never as a fragment that only makes sense under the toolkit heading.
+   */
   prompt: string;
   /** Lucide icon name. */
   icon?: string;

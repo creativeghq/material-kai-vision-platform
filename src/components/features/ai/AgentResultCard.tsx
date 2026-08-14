@@ -25,6 +25,29 @@ const ARRAY_INLINE_CAP = 8;
 const URL_RE = /^https?:\/\//i;
 const IMG_URL_RE = /^https?:\/\/\S+\.(png|jpe?g|webp|gif)(\?\S*)?$/i;
 
+// Plumbing the payload carries for the CLIENT's benefit, never the reader's.
+// ~20 tools echo `workspace_id` back in their chunk (it is how they scoped the
+// query), and this card renders whatever it is handed — so every one of them
+// printed a raw tenant UUID as the first row of the canvas. Tenancy/identity is
+// ambient here: the user is *in* that workspace, signed in as that user. Filtered
+// at EVERY depth, since nested rows echo the same fields.
+const HIDDEN_KEYS = new Set([
+  'timestamp', 'type',
+  'workspace_id', 'user_id', 'tenant_id', 'org_id', 'organization_id', 'account_id',
+  'created_by', 'updated_by', 'owner_id',
+  'session_id', 'request_id', 'correlation_id', 'trace_id',
+  'jwt', 'access_token', 'refresh_token', 'api_key',
+]);
+
+// A raw UUID under an id-shaped key is a join key, not information — the row it
+// points at is already rendered, and the "Open in {Hub}" handoff below reads the
+// payload directly, so nothing here depends on it being visible. Deliberately
+// narrow: an id-shaped key holding a HUMAN identifier ("INV-2026-014", a slug)
+// still renders, because that one the reader can actually use.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isPlumbing = (k: string, v: unknown) =>
+  HIDDEN_KEYS.has(k) || ((k === 'id' || k.endsWith('_id')) && typeof v === 'string' && UUID_RE.test(v));
+
 function Scalar({ v }: { v: any }) {
   if (v == null || v === '') return <span className="text-muted-foreground">—</span>;
   if (typeof v === 'boolean') return <span>{v ? 'Yes' : 'No'}</span>;
@@ -107,7 +130,7 @@ function Value({ v, depth = 0 }: { v: any; depth?: number }) {
 
 function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: number; inline?: boolean }) {
   if (obj == null || typeof obj !== 'object') return <Scalar v={obj} />;
-  const entries = Object.entries(obj).filter(([k]) => !['timestamp', 'type'].includes(k));
+  const entries = Object.entries(obj).filter(([k, v]) => !isPlumbing(k, v));
   if (entries.length === 0) return <span className="text-muted-foreground">Nothing to show</span>;
   return (
     <div className={inline ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'space-y-1.5'}>

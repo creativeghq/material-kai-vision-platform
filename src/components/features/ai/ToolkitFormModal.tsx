@@ -52,6 +52,13 @@ interface Props {
   onRunTool?: (args: {
     toolName: string;
     toolInput: Record<string, unknown>;
+    /**
+     * The quick-start's prompt with the collected values filled in — what the
+     * user would have typed. A direct run never sends it to a model, but the
+     * chat still needs a human sentence for the user's own bubble; the UI label
+     * ("Check an item") is a button caption, not a sentence.
+     */
+    renderedPrompt: string;
     toolkit: ToolkitDefinition;
     quickStart: ToolkitQuickStart;
   }) => void;
@@ -151,12 +158,19 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenera
     // parent didn't provide onRunTool.
     if (state.quickStart.run && onRunTool) {
       const run = state.quickStart.run;
+      // Image fields hold data URLs — never let one leak into the sentence.
+      const textValues: Record<string, string> = { ...values };
+      for (const k of imageFieldKeys) delete textValues[k];
       onRunTool({
         toolName: run.tool,
         // Coercions derive from the schema (number / boolean / array) so a derived
         // field never hands a z.number() the string "8". The quick-start's own
         // `coerce` still wins per-arg.
         toolInput: buildToolInput({ ...run, coerce: deriveCoercions(run) }, values),
+        renderedPrompt: renderPromptTemplate(
+          state.quickStart.promptTemplate || state.quickStart.prompt,
+          textValues,
+        ),
         toolkit: state.toolkit,
         quickStart: state.quickStart,
       });

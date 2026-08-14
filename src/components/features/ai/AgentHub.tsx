@@ -88,7 +88,7 @@ import { InspirationUrlModal } from './InspirationUrlModal';
 import { ToolkitPickerModal } from './ToolkitPickerModal';
 import { ActionConfirmationCard } from './ActionConfirmationCard';
 import {
-  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, buildToolInput,
+  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, buildToolInput, renderPromptTemplate,
   type ToolkitDefinition, type ToolkitQuickStart,
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
@@ -835,7 +835,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const pendingDirectRunRef = useRef<{
     toolName: string;
     toolInput: Record<string, unknown>;
-    label: string;
+    /**
+     * What the USER's chat bubble says — a sentence, not the button caption that
+     * launched it. Every quick-start already carries the sentence in `prompt` /
+     * `promptTemplate`; a direct run just never sends it to a model, so it is
+     * free to show. Passing `qs.label` here is what produced bubbles like
+     * "▶ This week" — fine as a chip under the Appointments card in the App
+     * menu, meaningless on its own in a conversation.
+     */
+    say: string;
     toolkitId: string;
   } | null>(null);
   // Toolkit IDs to force-include in the NEXT send's selected_toolkits, regardless
@@ -943,7 +951,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     pendingDirectRunRef.current = {
       toolName: qs.run.tool,
       toolInput: buildToolInput(qs.run, {}),
-      label: qs.label,
+      // Formless run → no collected values, so any `{{placeholder}}` in the prompt
+      // is dropped rather than printed raw ("List my {{context}} contracts and
+      // their status." → "List my contracts and their status.").
+      say: renderPromptTemplate(qs.prompt, {}) || qs.label,
       toolkitId: tk.id,
     };
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
@@ -974,7 +985,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     pendingDirectRunRef.current = {
       toolName: data.tool,
       toolInput: { ...data.input, confirm: true },
-      label: data.title,
+      // Approving a confirmation card: the card's own title IS the sentence
+      // ("Send the quote to Maria?"), so it needs no rewrite.
+      say: data.title,
       toolkitId: data.toolkitId || '',
     };
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
@@ -2001,7 +2014,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       return;
     }
 
-    // For a direct run the chat shows a compact "▶ <label>" chip instead of typed text.
+    // A direct run has no typed text: the bubble shows the sentence the quick-start
+    // stands for, marked with ▶ to keep "I clicked this" distinct from "I typed this".
     const userAttachedImages = directRun ? [] : [...attachedImages];
     const userAttachedCatalogPdfs = directRun ? [] : [...attachedCatalogPdfs];
     // Readable PDFs (quotes/invoices/specs) — sent as base64 data URLs so Opus reads them natively.
@@ -2010,7 +2024,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // What the user sees in their chat bubble — their own text, or a friendly
     // default when they attached a catalog PDF and typed nothing.
     const userInput = directRun
-      ? `▶ ${directRun.label}`
+      ? `▶ ${directRun.say}`
       : (input.trim()
           || (userAttachedCatalogPdfs.length > 0 ? 'Extract the products from this catalog.' : '')
           || (userAttachedDocuments.length > 0 ? 'Read the attached document.' : input));
@@ -4698,6 +4712,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Single-pane below `md`: the canvas is mounted only when it's the active pane.
   const canvasPaneVisible = canvasShown && (!isMobile || chatCollapsed);
   const chatPaneHidden = canvasShown && chatCollapsed;
+  // The chat is a fixed 400px rail whenever the canvas is docked beside it. Its
+  // header must be sized against THAT, not the viewport: `sm:`/`md:` are viewport
+  // queries, so on a 1900px screen they happily showed "Canvas" + "Conversations"
+  // + "⌘K" + "New" — ~508px of controls inside a 400px rail. The overflow ran off
+  // the right of the rail and got sheared off by Layout's `overflow-x-hidden` at
+  // the screen edge (⌘K cut in half, New invisible). Compact = icon-only controls.
+  const railMode = canvasShown && !isMobile;
 
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
@@ -4757,7 +4778,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         )}
       >
         {/* Studio header — agent identity + conversation manager launcher */}
-        <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0">
+        <div className={cn(
+          'flex items-center px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0',
+          railMode ? 'gap-1.5' : 'gap-3',
+        )}>
           <AgentAvatar agentId={currentAgent?.id} className={cn('w-9 h-9 flex-shrink-0', currentAgent?.color)} />
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold tracking-tight leading-tight truncate">{currentAgent?.name}</h3>
@@ -4767,7 +4791,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           </div>
           <Button
             variant={canvasShown && !isMobile ? 'default' : 'ghost'}
-            size={isMobile ? 'icon' : 'sm'}
+            size={isMobile || railMode ? 'icon' : 'sm'}
             onClick={() => {
               // Mobile: swap to the canvas pane. Desktop: dock/undock it.
               if (isMobile) {
@@ -4777,18 +4801,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 setCanvasHidden((v) => !v);
               }
             }}
-            className={cn('rounded-full relative', !isMobile && 'gap-2')}
+            className={cn('rounded-full relative shrink-0', !isMobile && !railMode && 'gap-2')}
             title={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
+            aria-label={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
           >
             <LayoutTemplate className="h-4 w-4" />
-            <span className="hidden sm:inline">Canvas</span>
+            <span className={cn('hidden', !railMode && 'sm:inline')}>Canvas</span>
             {canvasArtifacts.length > 0 && (
               <span
                 className={cn(
                   'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold',
-                  // Icon-only on mobile — the count rides the corner instead of
-                  // widening a fixed-size button.
-                  isMobile
+                  // Icon-only (mobile, or the docked rail) — the count rides the
+                  // corner instead of widening a fixed-size button.
+                  isMobile || railMode
                     ? 'absolute -right-0.5 -top-0.5 bg-primary text-primary-foreground'
                     : 'bg-primary/20',
                 )}
@@ -4802,33 +4827,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => setChatCollapsed(true)}
-              className="rounded-full"
+              className="rounded-full shrink-0"
               title="Collapse chat"
+              aria-label="Collapse chat"
             >
               <PanelRightClose className="h-4 w-4" />
             </Button>
           )}
           <Button
             variant="ghost"
-            size="sm"
+            size={railMode ? 'icon' : 'sm'}
             onClick={() => setConvManagerOpen(true)}
-            className="gap-2 rounded-full"
+            className={cn('rounded-full shrink-0', !railMode && 'gap-2')}
             title="Conversations (⌘K)"
+            aria-label="Conversations"
           >
             <MessageSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">Conversations</span>
-            <kbd className="hidden md:inline rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+            <span className={cn('hidden', !railMode && 'sm:inline')}>Conversations</span>
+            <kbd className={cn('hidden rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground', !railMode && 'md:inline')}>⌘K</kbd>
           </Button>
           <Button
             variant="outline"
-            size="sm"
+            size={railMode ? 'icon' : 'sm'}
             onClick={handleNewConversation}
-            className="gap-1.5 rounded-full"
+            className={cn('rounded-full shrink-0', !railMode && 'gap-1.5')}
             style={{ borderColor: 'var(--glass-border)' }}
             title="New conversation"
+            aria-label="New conversation"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New</span>
+            <span className={cn('hidden', !railMode && 'sm:inline')}>New</span>
           </Button>
         </div>
         {/* Active moodboard context — products added from the agent land here */}
@@ -6600,11 +6628,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           setToolkitFormState(null);
           setTimeout(() => { handleSendMessageRef.current(); }, 0);
         }}
-        onRunTool={({ toolName, toolInput, toolkit, quickStart }) => {
+        onRunTool={({ toolName, toolInput, renderedPrompt, toolkit, quickStart }) => {
           // Deterministic run — stash the payload and fire the same send pipeline
           // in mode:'direct_tool'. The agent switch (if any) already happened when
           // the quick-start opened the form, so selectedAgent is correct here.
-          pendingDirectRunRef.current = { toolName, toolInput, label: quickStart.label, toolkitId: toolkit.id };
+          // The bubble says what was collected ("How many "oak 20mm" do we have
+          // in stock?"), not the form's title.
+          pendingDirectRunRef.current = {
+            toolName,
+            toolInput,
+            say: renderedPrompt || quickStart.prompt || quickStart.label,
+            toolkitId: toolkit.id,
+          };
           setToolkitFormState(null);
           setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
         }}

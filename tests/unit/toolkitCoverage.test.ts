@@ -50,9 +50,10 @@
  * stale — so a tool added in the backend cannot quietly skip every check below.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { TOOLKITS, renderPromptTemplate } from '@/components/features/ai/agentToolsCatalog';
+import { CAPABILITIES } from '@/config/capabilities';
 import { deriveAutoFields } from '@/components/features/ai/toolAutoFields';
 import { TOOL_MANIFEST } from '@/components/features/ai/toolManifest.generated';
 // @ts-expect-error — plain ESM script, no types; tests/ is outside tsconfig anyway.
@@ -569,6 +570,125 @@ describe('toolkit cluster projection (agent-chat ← TOOLKITS)', () => {
       missing,
       `Icon(s) referenced by a quick-start but absent from ToolkitOnboardingCard's ` +
         `ICON_MAP (they render as a generic Sparkles): ${missing.join(', ')}.`,
+    ).toEqual([]);
+  });
+});
+
+/**
+ * What the CHAT says when a quick-start fires, and whether a hand-written
+ * deep-link still points at one.
+ *
+ * A `run` quick-start is deterministic: it invokes the tool directly, no LLM turn.
+ * So its `prompt` is never sent anywhere — which is exactly why it rotted. The chat
+ * bubble was built from `qs.label` instead, and a label is a BUTTON CAPTION sized to
+ * sit under its toolkit ("This week" under Appointments, "My templates" under Email
+ * Marketing). Alone in a conversation it says nothing: the user clicked "This week"
+ * in the App menu and their own message read "▶ This week". Every quick-start already
+ * carries the sentence — `prompt` / `promptTemplate`, authored, reviewed, and free to
+ * show since a direct run spends no tokens on it.
+ *
+ * The deep-link check is the other half: `?quickstart=<toolkitId>:<label>` matches a
+ * quick-start by its label STRING, and AgentHub's miss branch is a console.warn. So a
+ * renamed label turns every hand-written launcher link into a click that opens the
+ * agent and does nothing at all — no error, no toast, no clue.
+ */
+describe('quick-start → chat sentence', () => {
+  const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
+
+  /** Every .ts/.tsx under a directory. */
+  function sourceFiles(dir: string, out: string[] = []): string[] {
+    for (const e of readdirSync(dir)) {
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) sourceFiles(p, out);
+      else if (p.endsWith('.ts') || p.endsWith('.tsx')) out.push(p);
+    }
+    return out;
+  }
+
+  /** Comments describe the FORMAT ("?quickstart=<toolkit>:<label>"); they are not links. */
+  const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('every deterministic quick-start renders a sentence, not a button caption', () => {
+    const bad: string[] = [];
+    for (const { toolkit, qs, fields } of runQuickStarts) {
+      const template = qs.promptTemplate || qs.prompt;
+      // Fill each placeholder the way the form would, so the assertion is about the
+      // sentence's shape rather than about having no fields.
+      const values: Record<string, string> = {};
+      for (const m of template.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)) values[m[1]] = 'X';
+      const sentence = renderPromptTemplate(template, values);
+
+      if (sentence.includes('{{')) bad.push(`${toolkit}/"${qs.label}": unrendered placeholder → ${sentence}`);
+      if (words(sentence) < 3) bad.push(`${toolkit}/"${qs.label}": too short to read as a request → "${sentence}"`);
+      if (sentence.toLowerCase() === qs.label.toLowerCase()) {
+        bad.push(`${toolkit}/"${qs.label}": prompt is just the label again`);
+      }
+      // A FORMLESS run has nothing to fill in, so its bubble is `prompt` rendered with
+      // no values — that one has to stand on its own with every placeholder stripped.
+      if (fields.length === 0) {
+        const bare = renderPromptTemplate(qs.prompt, {});
+        if (words(bare) < 3) bad.push(`${toolkit}/"${qs.label}": formless run, bubble collapses to "${bare}"`);
+      }
+    }
+    expect(runQuickStarts.length, 'no run quick-starts parsed — the catalog moved').toBeGreaterThan(50);
+    expect(
+      bad,
+      'A `run` quick-start puts its PROMPT in the user\'s chat bubble (the label is a ' +
+        'button caption and reads as nothing on its own). These would show badly:\n' + bad.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('the bubble is built from the prompt, never from the label', () => {
+    const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
+    expect(
+      hub.includes('`▶ ${directRun.say}`'),
+      'AgentHub no longer builds the direct-run bubble from `directRun.say`.',
+    ).toBe(true);
+    const captions = [...hub.matchAll(/say:\s*(?:qs|quickStart)\.label\b/g)].map((m) => m[0]);
+    expect(
+      captions,
+      'A direct run is being announced with the quick-start LABEL. That is the button ' +
+        'caption ("This week"); the bubble wants the sentence (`prompt` / the rendered ' +
+        '`promptTemplate`). Keep .label only as the last-resort fallback in a `||` chain.',
+    ).toEqual([]);
+  });
+
+  it('every hand-written quickstart deep-link resolves to a real quick-start', () => {
+    const byLabel = (toolkitId: string, label: string) =>
+      TOOLKITS.find((t) => t.id === toolkitId)?.quick_starts?.some((q) => q.label === label) ?? false;
+
+    const misses: string[] = [];
+    let literals = 0;
+    // `?quickstart=<toolkitId>:<label>` written out by hand (launcher tiles, nav links).
+    // Interpolated ones (`${cap.toolkitId}:${encodeURIComponent(qs.label)}` in
+    // AppLauncher) come FROM the catalog and cannot drift, so they are skipped.
+    for (const file of sourceFiles(join(ROOT, 'src'))) {
+      const src = stripComments(read(file));
+      for (const m of src.matchAll(/quickstart=([^&'"`\s)]+)/g)) {
+        const raw = decodeURIComponent(m[1]);
+        if (raw.includes('$') || raw.includes('<')) continue; // interpolated / doc placeholder
+        literals++;
+        const rel = relative(ROOT, file).replace(/\\/g, '/');
+        const i = raw.indexOf(':');
+        if (i < 0) { misses.push(`${rel}: malformed quickstart param "${raw}"`); continue; }
+        const [tk, label] = [raw.slice(0, i), raw.slice(i + 1)];
+        if (!byLabel(tk, label)) misses.push(`${rel}: ${tk}:"${label}"`);
+      }
+    }
+    expect(literals, 'no hand-written quickstart deep-links found — the scan broke').toBeGreaterThan(3);
+    // The capability registry's default action, used by every `?capability=` handoff.
+    for (const cap of CAPABILITIES) {
+      if (!cap.quickStartLabel) continue;
+      if (!cap.toolkitId) { misses.push(`capability "${cap.id}": quickStartLabel with no toolkitId`); continue; }
+      if (!byLabel(cap.toolkitId, cap.quickStartLabel)) {
+        misses.push(`capability "${cap.id}": ${cap.toolkitId}:"${cap.quickStartLabel}"`);
+      }
+    }
+    expect(
+      misses,
+      'These point at a quick-start label that no longer exists. AgentHub logs a ' +
+        'console.warn and does nothing, so the link opens an empty agent instead of ' +
+        'running anything:\n' + misses.join('\n'),
     ).toEqual([]);
   });
 });
