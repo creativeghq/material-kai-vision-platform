@@ -16,7 +16,7 @@ Two independent producers write to it, and they never see each other:
 
 | Producer | Events | Auth |
 |---|---|---|
-| [manufacturerAnalyticsService.ts](../src/services/manufacturerAnalyticsService.ts) | `product_view`, `product_save`, `product_quote`, `product_search_impression`, `product_search_click`, `product_compare` | the signed-in user |
+| [manufacturerAnalyticsService.ts](../src/services/manufacturerAnalyticsService.ts) | `product_view`, `product_save`, `product_quote`, `product_compare` | the signed-in user |
 | [products-3d-api](../supabase/functions/products-3d-api/index.ts) (`EMBED_EVENT_TYPES`) | `embed_view`, `embed_model_load`, `embed_ar_launch`, `embed_add_to_cart`, `embed_configure`, `embed_plan_room` | service role, per embed key |
 
 `event_type` is CHECK-constrained to the union of both lists. **Adding an event to either producer
@@ -24,10 +24,18 @@ without a migration means every one of those events is rejected at insert and re
 forever** — [tests/unit/manufacturerEventContract.test.ts](../tests/unit/manufacturerEventContract.test.ts)
 fails the build instead. Keep the producer, the CHECK, and that test's `DB_EVENT_TYPES` in step.
 
-Currently emitted from the app: `product_view` ([ProductCard](../src/components/features/products/ProductCard.tsx)),
+Every declared product event has a live call site, and the guard test asserts it:
+`product_view` ([ProductCard](../src/components/features/products/ProductCard.tsx), on 50% visibility),
 `product_save` ([AddToMoodboardButton](../src/components/business/moodboard/AddToMoodboardButton.tsx)),
-`product_quote` ([AddToQuoteButton](../src/modules/quotes/components/AddToQuoteButton.tsx)). The
-other three are declared but not yet wired.
+`product_quote` ([AddToQuoteButton](../src/modules/quotes/components/AddToQuoteButton.tsx)),
+`product_compare` ([MaterialComparePage](../src/pages/MaterialComparePage.tsx), once a shortlist of
+2–4 actually loads).
+
+`product_search_impression` and `product_search_click` were **removed**, not wired. There is no
+surface that could emit them: the only search UI ([UnifiedSearchInterface](../src/components/features/search/UnifiedSearchInterface.tsx))
+returns PDF chunks, whose ids are `chunk_id`s rather than product ids, and products in Discover are
+browsed with facets and already emit `product_view` — an "impression" there would be the same event
+under a second name.
 
 The service batches: flush every 5s or at 20 events, fire-and-forget, and it never blocks the UI.
 A batch rejected for a permanent reason (bad `event_type`, RLS refusal, dangling `product_id`) is

@@ -22,18 +22,39 @@
  * three in step.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
+
+/** The exported helper each product event is emitted through. */
+const PRODUCT_EVENT_EMITTERS: Record<string, string> = {
+  product_view: 'trackProductView',
+  product_save: 'trackProductSave',
+  product_quote: 'trackProductQuote',
+  product_compare: 'trackProductCompare',
+};
+
+const SERVICE = 'src/services/manufacturerAnalyticsService.ts';
+
+/** Every .ts/.tsx under src/ except the service that declares the helpers. */
+function appSources(dir = join(ROOT, 'src')): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) { out.push(...appSources(full)); continue; }
+    if (!/\.tsx?$/.test(entry.name)) continue;
+    if (full.endsWith(join(...SERVICE.split('/')))) continue;
+    out.push(full);
+  }
+  return out;
+}
 
 /** The live `manufacturer_analytics_events_event_type_check` allowlist, verbatim. */
 const DB_EVENT_TYPES = [
   'product_view',
   'product_save',
   'product_quote',
-  'product_search_impression',
-  'product_search_click',
   'product_compare',
   'embed_view',
   'embed_model_load',
@@ -79,10 +100,6 @@ describe('manufacturer_analytics_events event_type contract', () => {
     ).toEqual([]);
   });
 
-  // Scope note: this checks the DECLARED producers (the type union / the allowlist), not call
-  // sites. Three product events — search_impression, search_click, compare — are declared and
-  // reachable but nothing invokes them yet; wiring them is tracked in #350 increment 3. A
-  // call-site assertion would fail the build for work that is deliberately still queued.
   it('the CHECK has no entry that no producer can emit', () => {
     const produced = new Set([...frontendEventTypes(), ...embedEventTypes()]);
     const orphans = DB_EVENT_TYPES.filter((t) => !produced.has(t));
@@ -91,6 +108,24 @@ describe('manufacturer_analytics_events event_type contract', () => {
       `The CHECK permits event types nothing writes. Either wire a producer or drop them from the `
       + `constraint — a value only the schema believes in is how the last set of dead event types `
       + `survived: ${orphans.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  // Declaring a type is not producing one. `product_search_impression` and `product_search_click`
+  // were declared for months, permitted by nothing, and called by nobody — they read as a working
+  // funnel that was structurally incapable of recording anything. This asserts a real call site,
+  // which is the property that was actually missing.
+  it('every declared product event is invoked somewhere in the app', () => {
+    const sources = appSources().map((f) => readFileSync(f, 'utf8')).join('\n');
+    const uncalled = frontendEventTypes().filter((t) => {
+      const emitter = PRODUCT_EVENT_EMITTERS[t];
+      return !emitter || !new RegExp(`\\b${emitter}\\s*\\(`).test(sources);
+    });
+    expect(
+      uncalled,
+      `Declared in ManufacturerEventType with no call site outside the service. Either wire the `
+      + `emitter or delete the type — an event nothing emits is a funnel stage that silently reads `
+      + `as zero: ${uncalled.join(', ')}`,
     ).toEqual([]);
   });
 

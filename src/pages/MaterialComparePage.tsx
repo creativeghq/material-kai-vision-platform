@@ -4,7 +4,7 @@
  * URL: /compare?ids=id1,id2,...
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { formatLabel } from '@/lib/labelUtils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
+import { getManufacturer } from '@/utils/productMetadata';
+import { resolveUploadCategory } from '@/lib/categoryFieldRegistry';
+import { trackProductCompare } from '@/services/manufacturerAnalyticsService';
 import {
   X,
   Plus,
@@ -99,6 +102,10 @@ export default function MaterialComparePage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  // Which products have already been counted as compared this visit. Comparison is a URL-driven
+  // set, so the effect re-runs on every add/remove — without this, removing one product would
+  // re-count the two that stayed.
+  const comparedRef = useRef<Set<string>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -123,6 +130,26 @@ export default function MaterialComparePage() {
       // Preserve order from ids array
       const ordered = productIds.map((id) => data.find((p) => p.id === id)).filter(Boolean) as Product[];
       setProducts(ordered);
+
+      // A side-by-side comparison is the strongest pre-purchase signal a supplier can see: the
+      // buyer has narrowed to a shortlist and is choosing. Only counted once the product is
+      // actually loaded and rendered — an id in the URL that resolves to nothing is not a
+      // comparison, and the events table would reject it anyway.
+      if (ordered.length >= MIN_COMPARE) {
+        ordered.forEach((p) => {
+          if (comparedRef.current.has(p.id)) return;
+          comparedRef.current.add(p.id);
+          const matCat = typeof p.metadata?.material_category === 'string' ? p.metadata.material_category : undefined;
+          trackProductCompare(
+            p.id,
+            getManufacturer(p.metadata ?? undefined) || '',
+            window.location.pathname,
+            { compared_with: ordered.length },
+            resolveUploadCategory(matCat),
+            matCat,
+          );
+        });
+      }
     }
     setLoading(false);
   }, [toast]);

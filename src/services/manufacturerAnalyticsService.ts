@@ -10,7 +10,7 @@
  * silently became a two-family bus when the 3D embed widget started writing `embed_*` rows) and
  * described an RLS shape ("admins read") that was never applied. The live contract is now:
  *
- * - `event_type` is CHECK-constrained to BOTH families — the six product events below and the six
+ * - `event_type` is CHECK-constrained to BOTH families — the four product events below and the six
  *   `embed_*` events in `products-3d-api`. A typo fails the insert instead of reading as zero.
  * - `workspace_id` is DERIVED from the product by a BEFORE INSERT trigger, never sent by this
  *   service. That is deliberate: a client that could assert its own workspace_id could attribute
@@ -30,12 +30,18 @@ import { supabase } from '@/integrations/supabase/client';
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * `product_search_impression` and `product_search_click` were removed with #350. They were declared
+ * here for months with no caller, and there is no surface that could supply one: the only search UI
+ * (UnifiedSearchInterface) returns PDF chunks, whose ids are chunk_ids, not product ids — sending
+ * one would be rejected by the events table. Products in Discover are browsed with facets and
+ * already emit `product_view`, so an "impression" there would be the same event under a second
+ * name. If a real product search ships, add the type here AND to the event_type CHECK.
+ */
 export type ManufacturerEventType =
   | 'product_view'
   | 'product_save'
   | 'product_quote'
-  | 'product_search_impression'
-  | 'product_search_click'
   | 'product_compare';
 
 export interface ManufacturerAnalyticsEvent {
@@ -290,14 +296,6 @@ class ManufacturerAnalyticsService {
     this.track('product_quote', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
 
-  trackSearchImpression(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
-    this.track('product_search_impression', productId, manufacturerId, sourcePage, metadata, category, materialType);
-  }
-
-  trackSearchClick(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
-    this.track('product_search_click', productId, manufacturerId, sourcePage, metadata, category, materialType);
-  }
-
   trackProductCompare(productId: string, manufacturerId?: string, sourcePage?: string, metadata?: Record<string, unknown>, category?: string, materialType?: string): void {
     this.track('product_compare', productId, manufacturerId, sourcePage, metadata, category, materialType);
   }
@@ -313,7 +311,5 @@ export const manufacturerAnalytics = new ManufacturerAnalyticsService();
 export const trackProductView = manufacturerAnalytics.trackProductView.bind(manufacturerAnalytics);
 export const trackProductSave = manufacturerAnalytics.trackProductSave.bind(manufacturerAnalytics);
 export const trackProductQuote = manufacturerAnalytics.trackProductQuote.bind(manufacturerAnalytics);
-export const trackSearchImpression = manufacturerAnalytics.trackSearchImpression.bind(manufacturerAnalytics);
-export const trackSearchClick = manufacturerAnalytics.trackSearchClick.bind(manufacturerAnalytics);
 export const trackProductCompare = manufacturerAnalytics.trackProductCompare.bind(manufacturerAnalytics);
 export const getSessionId = manufacturerAnalytics.getSessionId.bind(manufacturerAnalytics);
