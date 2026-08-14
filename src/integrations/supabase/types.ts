@@ -17620,6 +17620,9 @@ export type Database = {
           quantity: number
           quantity_delivered: number
           quantity_shipped: number
+          selected_attributes: Json
+          selected_color: string | null
+          selected_size: string | null
           sort_order: number
           supplier_company_id: string | null
           taric_code: string | null
@@ -17648,6 +17651,9 @@ export type Database = {
           quantity?: number
           quantity_delivered?: number
           quantity_shipped?: number
+          selected_attributes?: Json
+          selected_color?: string | null
+          selected_size?: string | null
           sort_order?: number
           supplier_company_id?: string | null
           taric_code?: string | null
@@ -17676,6 +17682,9 @@ export type Database = {
           quantity?: number
           quantity_delivered?: number
           quantity_shipped?: number
+          selected_attributes?: Json
+          selected_color?: string | null
+          selected_size?: string | null
           sort_order?: number
           supplier_company_id?: string | null
           taric_code?: string | null
