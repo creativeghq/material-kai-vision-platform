@@ -19,7 +19,7 @@ import {
   FileText, Banknote, BarChart3, Plane, CalendarDays, Clock, Briefcase, Wallet,
   FolderOpen, Send, Settings, UserPlus, Receipt, FilePlus, FolderPlus,
   MessageSquarePlus, Megaphone, LayoutTemplate, Store, Landmark, BellRing,
-  CalendarClock, Timer, ClipboardCheck, DraftingCompass,
+  CalendarClock, Timer, ClipboardCheck,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool,
@@ -132,10 +132,6 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // (agent) and the three estimators (real pages under /tools). Surface them here.
   projects: [
     { label: 'Purchase sheet', to: '/agent-hub?capability=project', icon: ClipboardList },
-    // Blueprints are declared to "live under Projects" in nav-items.ts, but the only way in was a
-    // button on the Projects list page — the launcher card linked three /tools estimators and not
-    // the surface the nav comment names.
-    { label: 'Blueprints', to: '/blueprints', icon: DraftingCompass },
     { label: 'Project estimator', to: '/tools/project-plan', icon: Calculator },
     { label: 'Heat-pump sizer', to: '/tools/heat-pump', icon: Flame },
     { label: 'Heating cost compare', to: '/tools/heating-cost', icon: Thermometer },
@@ -152,9 +148,11 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   quotes: [
     { label: 'Price monitoring', to: '/agent-hub?capability=price-monitoring', icon: TrendingUp },
   ],
-  // Social Media (agent app). Mention Monitoring is nested here (folded in from a standalone tile).
-  social: [
-    { label: 'Mention monitoring', to: '/agent-hub?capability=mention-monitoring', icon: Radar },
+  // Mention Monitoring now has its own Marketing tile pointing at the DASHBOARD; this is the agent
+  // side of the same capability, so it hangs off that tile rather than off Social Media, where it
+  // was the only way in and pointed away from the page.
+  'mention-monitoring': [
+    { label: 'Ask the agent', to: '/agent-hub?capability=mention-monitoring', icon: Radar },
   ],
   // SEO & Content (agent app, seo-toolkit). One tile for both research and article writing —
   // Content Writer merged in here as a section instead of a separate tile.

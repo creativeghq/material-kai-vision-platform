@@ -27,6 +27,11 @@ import {
   Building2,
   Layers,
   Ruler,
+  DraftingCompass,
+  FileSearch,
+  Radar,
+  ScanLine,
+  Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -133,6 +138,11 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // MoodBoards (no module, no extra capability): it draws the workspace's own catalogue on a plan,
   // and `room_layouts` is workspace-scoped by RLS.
   { id: 'room-planner', label: 'Room Planner', path: '/room-planner', icon: Ruler, surface: 'app', hub: 'studio', description: 'Arrange catalog products on a floor plan, at their real size.' },
+  // Blueprints. Previously reachable ONLY from a button on the Projects list page — the nav comment
+  // claimed they "live under Projects", which was true of the page and not of any menu. Gated like
+  // MoodBoards and Room Planner (no module, no extra capability): `blueprints` is workspace-scoped
+  // by RLS and the editor draws the workspace's own catalogue.
+  { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', hub: 'studio', description: 'Reusable room and scope templates that price a project in one click.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
@@ -157,6 +167,15 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
   { id: 'stock', label: 'Warehouse', path: '/warehouse', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', hub: 'finance', description: 'Inventory, dispatch, movements & stocktake.' },
+  // Cloud POS (Ταμειακή Online) — issues myDATA retail receipts. Only linked from inside Finance's
+  // Documents view until now. Gated to MATCH ITS ROUTE, which is CapabilityGuard 'invoice.issue',
+  // plus the sales-finance module it is built on: a tile looser than its own guard just sends people
+  // to a permission wall.
+  { id: 'pos', label: 'POS', path: '/pos', icon: ScanLine, requireCapability: 'invoice.issue', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Cash register — issue retail receipts, take payment and print.' },
+  // Supplier portal. The RPCs enforce the operator-approved supplier claim, and an unclaimed
+  // workspace gets an explanatory empty state rather than an error — but that is still a dead end
+  // for most members, so the tile is admin-only: claiming a supplier identity is an admin's job.
+  { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Store, requireRole: 'admin', surface: 'app', hub: 'finance', description: 'Purchase orders sent to you as a claimed supplier — confirm and mark shipped.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
   // HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
@@ -180,6 +199,18 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // article writing as sections (Content Writer merged in here, no longer a separate tile). Mention
   // Monitoring is nested under Social Media (see LAUNCHER_SECTIONS) to keep the Marketing list lean.
   { id: 'seo', label: 'SEO & Content', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & SEO article writing — in the AI studio.' },
+  // Mention Monitoring. The dashboard has always existed; the launcher only ever offered the AGENT
+  // deep-link, nested under Social Media, so the page itself was unreachable from the menu.
+  // `requireRole: 'admin'` mirrors the route's own `requireWorkspaceAdmin`. Deliberately NO
+  // moduleSlug: the `mention-monitoring` row in `modules` is `enabled = false`, and
+  // get_workspace_module_access only returns published modules — gating on it would hide the tile
+  // from everyone, root workspace included. Add the slug here the day the module is published.
+  { id: 'mention-monitoring', label: 'Mention Monitoring', path: '/mention-monitoring', icon: Radar, requireRole: 'admin', surface: 'app', hub: 'marketing', description: 'Track where your brand is mentioned across the web.' },
+  // Page Monitoring (#331) — watch a non-product page and report the diff. Shipped with NO surface
+  // linking it at all; the route existed and the only way in was typing the URL. Carries no module
+  // and no capability of its own, so it is gated like the other workspace-scoped tools: nesting it
+  // under a paid tile would hide it behind an add-on it does not need.
+  { id: 'page-monitoring', label: 'Page Monitoring', path: '/monitoring/pages', icon: FileSearch, surface: 'app', hub: 'marketing', description: 'Watch any page — a supplier price list, a competitor spec — and see what changed.' },
   // Platform-wide buyer demand. Per-supplier analytics are NOT here — they live on the CRM
   // company's Market tab, keyed on brand_company_id (#350). The old 'factory' role gate went with
   // them: it resolved from user_profiles.factory_verified, which no account has ever held, so this
@@ -272,6 +303,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'crm',
   'inbox',
   'finance',
+  'pos',
   'sales',
   // Scheduling & operations
   'appointments',
@@ -281,6 +313,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'moodboard',
   'interior',
   'room-planner',
+  'blueprints',
   'catalogs',
   'image-studio',
   // Vertical modules
@@ -297,8 +330,11 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'social',
   'seo',
   'automations',
+  'mention-monitoring',
+  'page-monitoring',
   // Cross-cutting
   'templates',
   // Niche / role-specific
   'market-trends',
+  'supplier-portal',
 ];
