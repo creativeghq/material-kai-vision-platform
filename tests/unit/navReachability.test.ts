@@ -14,8 +14,9 @@ import { PERSONA_CAPABILITIES, personaCan, type Persona } from '@/auth/capabilit
 const PERSONAS = Object.keys(PERSONA_CAPABILITIES) as Persona[];
 
 /** Mirrors how usePermissions derives the nav flags from the resolved persona. */
-function ctxFor(persona: Persona): NavGateContext {
+function ctxFor(persona: Persona, opts: { isSupplierWorkspace?: boolean } = {}): NavGateContext {
   return {
+    isSupplierWorkspace: opts.isSupplierWorkspace ?? false,
     isAdmin: persona === 'operator',
     isPlatformOperator: persona === 'operator',
     isAccountant: persona === 'accountant',
@@ -34,7 +35,17 @@ function ctxFor(persona: Persona): NavGateContext {
  * no account has ever held, so the only tile it gated rendered for nobody and both it and the flag
  * went with #350. `NavRoleRequirement` is now just 'admin'.
  */
-const ALL_CONTEXTS: NavGateContext[] = PERSONAS.map((p) => ctxFor(p));
+const ALL_CONTEXTS: NavGateContext[] = [
+  ...PERSONAS.map((p) => ctxFor(p)),
+  // Supplier-workspace variants, for `requireSupplierWorkspace` entries. Note the contrast with the
+  // `isFactory` contexts described above, which were deleted: that flag lived on `user_profiles`,
+  // had never been set on any account, and had no working path to ever be set — the registration
+  // flow behind it was abandoned. `workspaces.can_supply_products` is set on a live workspace today
+  // and the supplier-claim flow that grants it runs end to end (Profile → Business files the claim,
+  // /admin/supplier-claims approves it). A zero-holder flag is dead UI; this one is not.
+  ctxFor('dealer', { isSupplierWorkspace: true }),
+  ctxFor('operator', { isSupplierWorkspace: true }),
+];
 
 describe('sidebar nav reachability', () => {
   it('every nav item is visible to at least one persona', () => {

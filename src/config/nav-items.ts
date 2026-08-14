@@ -83,6 +83,13 @@ export interface SidebarNavItem {
   requireAnyCapability?: Capability[];
   /** Optional module gate. When set, item is only shown if the referenced module is enabled. */
   moduleSlug?: string;
+  /**
+   * Supplier-workspace gate — hide unless the ACTIVE workspace is one that supplies products
+   * (`workspaces.can_supply_products`). This is about what the workspace IS, not what the member is
+   * allowed to do, so it is neither a role nor a capability: every member of a supplier workspace
+   * sees a supplier surface, and no member of a buyer workspace does.
+   */
+  requireSupplierWorkspace?: boolean;
   /** One-line description shown on the App Launcher / Profile → Modules cards (surface:'app'). */
   description?: string;
   /**
@@ -172,10 +179,15 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // plus the sales-finance module it is built on: a tile looser than its own guard just sends people
   // to a permission wall.
   { id: 'pos', label: 'POS', path: '/pos', icon: ScanLine, requireCapability: 'invoice.issue', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Cash register — issue retail receipts, take payment and print.' },
-  // Supplier portal. The RPCs enforce the operator-approved supplier claim, and an unclaimed
-  // workspace gets an explanatory empty state rather than an error — but that is still a dead end
-  // for most members, so the tile is admin-only: claiming a supplier identity is an admin's job.
-  { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Store, requireRole: 'admin', surface: 'app', hub: 'finance', description: 'Purchase orders sent to you as a claimed supplier — confirm and mark shipped.' },
+  // Supplier portal — the POs sent to this workspace's supplier identity, across every buyer.
+  // Gated on the workspace SUPPLYING products, not on being its admin: "am I a supplier" is the
+  // question this surface answers, and a supplier's order desk is rarely the workspace owner. An
+  // admin gate would have hidden it from the staff who actually confirm and ship, while showing it
+  // to the admin of every buyer-only workspace on the platform — wrong on both sides.
+  //
+  // A supplier workspace that has not finished its claim lands on the page's own "claim your
+  // identity" empty state, which is the correct next step for them rather than a dead end.
+  { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Store, requireSupplierWorkspace: true, surface: 'app', hub: 'finance', description: 'Purchase orders sent to you as a claimed supplier — confirm and mark shipped.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
   // HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
@@ -245,6 +257,8 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
 /** Context the nav gates resolve against. Computed from hooks by the consuming component. */
 export interface NavGateContext {
   isAdmin: boolean;
+  /** Active workspace supplies products (`workspaces.can_supply_products`). */
+  isSupplierWorkspace: boolean;
   isPlatformOperator: boolean;
   isAccountant: boolean;
   isSalesRep: boolean;
@@ -275,6 +289,7 @@ export function filterNavItems(
     if (ctx.isRealEstateAgent && item.id !== 'dashboard' && item.id !== 'real-estate') return false;
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
+    if (item.requireSupplierWorkspace && !ctx.isSupplierWorkspace) return false;
     // Capability gate (the unified persona model — drives end-user restriction).
     if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
     // OR-gate — visible if the persona holds ANY of the listed capabilities.

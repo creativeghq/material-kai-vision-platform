@@ -48,7 +48,7 @@ interface GlobalSearchProps {
 
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) => {
   const navigate = useNavigate();
-  const { isAdmin, isPlatformOperator } = useFactoryRole();
+  const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
   const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
 
@@ -122,6 +122,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
     const gated = filterNavItems(SIDEBAR_NAV_ITEMS, {
       isAdmin,
       isPlatformOperator,
+      isSupplierWorkspace,
       isAccountant,
       isSalesRep,
       isRealEstateAgent,
@@ -129,7 +130,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
       can,
     });
     return [...gated, { id: 'profile', label: 'Profile', path: '/profile', icon: User }];
-  }, [isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can]);
+  }, [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can]);
 
   const navMatches = useMemo(() => {
     const q = query.trim().toLowerCase();

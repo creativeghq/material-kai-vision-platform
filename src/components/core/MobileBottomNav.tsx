@@ -29,7 +29,7 @@ const BAR_SLOTS = 4;
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
-  const { isAdmin, isPlatformOperator } = useFactoryRole();
+  const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
   const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -48,13 +48,14 @@ export const MobileBottomNav: React.FC = () => {
       filterNavItems(SIDEBAR_NAV_ITEMS, {
         isAdmin,
         isPlatformOperator,
+        isSupplierWorkspace,
         isAccountant,
         isSalesRep,
         isRealEstateAgent,
         isModuleAvailable,
         can,
       }),
-    [isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
+    [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
   );
 
   // Order the visible items by bottom-nav priority, then split into bar + overflow.
