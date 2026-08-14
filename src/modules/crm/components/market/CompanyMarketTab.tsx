@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { formatMoney, formatNumber } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import {
   Users, Sparkles, Loader2, ExternalLink, Wallet, Inbox, ArrowRight, Building2, Search,
-  Package, BarChart3, MapPin, Gauge, LineChart, Bell, BellOff,
+  Package, BarChart3, MapPin, Gauge, LineChart, Bell, BellOff, Star, Layers, Tags,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
@@ -44,13 +46,27 @@ const hostOf = (url?: string | null): string | null => {
  * price intel + re-scoped market-position analytics land in 1b.
  */
 export const CompanyMarketTab: React.FC<CompanyMarketTabProps> = ({ workspaceId, companyId, company }) => {
+  const pass = { workspaceId, companyId, company };
+  // Sub-tabs rather than one scroll: the four questions here are asked one at a time, and three of
+  // them cost money or a round-trip to answer. Mirrors the Details tab's section nav.
   return (
-    <div className="space-y-4">
-      <CompetitorsCard workspaceId={workspaceId} companyId={companyId} company={company} />
-      <MarketPositionCard workspaceId={workspaceId} companyId={companyId} company={company} />
-      <ProductPriceIntelCard workspaceId={workspaceId} companyId={companyId} company={company} />
-      <FinancialSnapshotCard workspaceId={workspaceId} companyId={companyId} company={company} />
-    </div>
+    <Tabs defaultValue="demand" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
+      <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+        <TabsTrigger value="demand" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><BarChart3 className="h-4 w-4 mr-2" />Demand</TabsTrigger>
+        <TabsTrigger value="pricing" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Gauge className="h-4 w-4 mr-2" />Pricing</TabsTrigger>
+        <TabsTrigger value="competitors" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2" />Competitors</TabsTrigger>
+        <TabsTrigger value="financial" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2" />Financial</TabsTrigger>
+      </TabsList>
+
+      <div className="min-w-0 w-full flex-1 space-y-4">
+        <TabsContent value="demand" className="mt-0 space-y-4">
+          <DemandTab {...pass} />
+        </TabsContent>
+        <TabsContent value="pricing" className="mt-0"><ProductPriceIntelCard {...pass} /></TabsContent>
+        <TabsContent value="competitors" className="mt-0"><CompetitorsCard {...pass} /></TabsContent>
+        <TabsContent value="financial" className="mt-0"><FinancialSnapshotCard {...pass} /></TabsContent>
+      </div>
+    </Tabs>
   );
 };
 
@@ -344,14 +360,34 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
 // Market position analytics (re-scoped Factory Analytics via brand_company_id)
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface EngagedProduct { product_id: string; saves: number; quotes: number }
+
 interface MarketAnalytics {
   product_count: number;
+  /** Event-stream counts, keyed by event_type. Views only — saves/quotes come from the records. */
   totals: Record<string, number>;
+  /** Moodboard rows in the window. The record, not the telemetry. */
+  saves: number;
+  /** Quote lines in the window. The record, not the telemetry. */
+  quotes: number;
+  /** The same two counts across the whole workspace — "vs your other suppliers". */
+  benchmark: { saves: number; quotes: number };
   geo: Array<{ country: string | null; city: string | null; count: number }>;
-  top_products: Array<{ product_id: string; name: string | null; count: number }>;
+  top_products: Array<{ product_id: string; name: string | null; saves: number; quotes: number; count: number }>;
+  category_mix: Array<{ category: string; products: number; saves: number; quotes: number }>;
+  quote_pipeline: Array<{ status: string; count: number }>;
+  ratings: { avg: number | null; count: number; dist: Array<{ rating: number; count: number }> };
+  product_engagement: EngagedProduct[];
+  product_engagement_truncated: boolean;
 }
 
-const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
+const WINDOW_DAYS = 90;
+
+/** saves → quotes, as a percentage. Null when there is nothing to divide by. */
+const convRate = (saves: number, quotes: number): string | null =>
+  saves > 0 ? `${Math.round((quotes / saves) * 100)}%` : null;
+
+const useMarketAnalytics = (companyId: string) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<MarketAnalytics | null>(null);
   // A failed RPC must stay distinguishable from an empty result. Collapse the two and the
@@ -365,45 +401,82 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
     (async () => {
       setLoading(true);
       // RPC is not in the generated types yet → cast the call.
-      const { data, error } = await (supabase.rpc as any)('company_market_analytics', { p_company_id: companyId, p_days: 90 });
+      const { data: res, error } = await (supabase.rpc as any)(
+        'company_market_analytics', { p_company_id: companyId, p_days: WINDOW_DAYS });
       if (cancelled) return;
       setLoadError(!!error);
-      setData(error ? null : (data as unknown as MarketAnalytics));
+      setData(error ? null : (res as unknown as MarketAnalytics));
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [companyId]);
 
-  const t = data?.totals ?? {};
-  const views = t.product_view ?? 0;
-  const saves = t.product_save ?? 0;
-  const quotes = t.product_quote ?? 0;
-  const hasSignal = data && (data.product_count > 0) && (views || saves || quotes || data.geo.length);
+  return { loading, data, loadError };
+};
+
+const NoLink: React.FC = () => (
+  <p className="text-sm text-muted-foreground italic">
+    No catalog products are linked to this company yet (via the Factory link on the Details tab), so
+    there is no engagement to report.
+  </p>
+);
+
+const LoadFailed: React.FC = () => (
+  <p className="text-sm text-destructive italic">
+    Could not load market analytics. This is a query failure, not a statement about your
+    data — try again, and report it if it persists.
+  </p>
+);
+
+/**
+ * Both Demand cards read the same RPC result, so it is fetched ONCE here and passed down. Calling
+ * the hook in each card would issue two identical round-trips per visit to the tab.
+ */
+const DemandTab: React.FC<CompanyMarketTabProps> = ({ companyId, workspaceId, company }) => {
+  const stats = useMarketAnalytics(companyId);
+  return (
+    <>
+      <MarketPositionCard stats={stats} />
+      <AttributeExplorerCard stats={stats} companyId={companyId} workspaceId={workspaceId} company={company} />
+    </>
+  );
+};
+
+type MarketStatsResult = ReturnType<typeof useMarketAnalytics>;
+
+const MarketPositionCard: React.FC<{ stats: MarketStatsResult }> = ({ stats }) => {
+  const { loading, data, loadError } = stats;
+
+  const views = data?.totals?.product_view ?? 0;
+  const embedViews = data?.totals?.embed_view ?? 0;
+  const saves = data?.saves ?? 0;
+  const quotes = data?.quotes ?? 0;
+  const ours = convRate(saves, quotes);
+  const theirs = convRate(data?.benchmark?.saves ?? 0, data?.benchmark?.quotes ?? 0);
+  const hasSignal = !!data && data.product_count > 0
+    && (views || embedViews || saves || quotes || data.geo.length || data.ratings.count);
 
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" />Market position</CardTitle>
+          <CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" />Demand</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            How our users engage with this supplier's catalog products — demand and geography over the last 90 days.
+            How our users engage with this supplier's catalog products, over the last {WINDOW_DAYS} days.
+            Saves and quote adds are counted from the moodboard and quote records themselves; views come
+            from the engagement event stream.
           </p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
         ) : loadError ? (
-          <p className="text-sm text-destructive italic">
-            Could not load market analytics. This is a query failure, not a statement about your
-            data — try again, and report it if it persists.
-          </p>
+          <LoadFailed />
         ) : !hasSignal ? (
-          <p className="text-sm text-muted-foreground italic">
-            {(!data || data.product_count === 0)
-              ? 'No catalog products are linked to this company yet (via the Factory link on the Details tab), so there is no engagement to report.'
-              : 'No user engagement recorded for this company’s products in the last 90 days.'}
-          </p>
+          (!data || data.product_count === 0)
+            ? <NoLink />
+            : <p className="text-sm text-muted-foreground italic">No user engagement recorded for this company's products in the last {WINDOW_DAYS} days.</p>
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -413,37 +486,193 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
               <StatCell label="Quote adds" value={formatNumber(quotes)} />
             </div>
 
-            {data!.geo.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />Where demand comes from</p>
-                <div className="divide-y divide-border rounded-lg border border-border">
-                  {data!.geo.map((g, i) => (
-                    <div key={i} className="flex items-center justify-between px-3 py-1.5 text-sm">
-                      <span>{[g.city, g.country].filter(Boolean).join(', ') || 'Unknown'}</span>
-                      <span className="text-muted-foreground">{formatNumber(g.count)}</span>
-                    </div>
-                  ))}
-                </div>
+            {(ours || embedViews > 0) && (
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                {ours && (
+                  <span>
+                    Save → quote: <span className="text-foreground font-medium">{ours}</span>
+                    {theirs && <span> · workspace average {theirs}</span>}
+                  </span>
+                )}
+                {embedViews > 0 && (
+                  <span>Embedded 3D widget views: <span className="text-foreground font-medium">{formatNumber(embedViews)}</span></span>
+                )}
               </div>
             )}
 
+            {data!.geo.length > 0 && (
+              <Panel icon={MapPin} title="Where demand comes from">
+                {data!.geo.map((g, i) => (
+                  <Row key={i} left={[g.city, g.country].filter(Boolean).join(', ') || 'Unknown'} right={formatNumber(g.count)} />
+                ))}
+              </Panel>
+            )}
+
             {data!.top_products.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><LineChart className="h-3.5 w-3.5" />Most-engaged products</p>
-                <div className="divide-y divide-border rounded-lg border border-border">
-                  {data!.top_products.map((p) => (
-                    <div key={p.product_id} className="flex items-center justify-between px-3 py-1.5 text-sm">
-                      <span className="truncate">{p.name || p.product_id}</span>
-                      <span className="text-muted-foreground shrink-0">{formatNumber(p.count)} saves/quotes</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <Panel icon={LineChart} title="Most-engaged products">
+                {data!.top_products.map((p) => (
+                  <Row
+                    key={p.product_id}
+                    left={p.name || p.product_id}
+                    right={`${formatNumber(p.saves)} saved · ${formatNumber(p.quotes)} quoted`}
+                  />
+                ))}
+              </Panel>
+            )}
+
+            {data!.category_mix.length > 0 && (
+              <Panel icon={Layers} title="Category mix">
+                {data!.category_mix.map((c) => (
+                  <Row
+                    key={c.category}
+                    left={c.category}
+                    right={`${formatNumber(c.products)} product${c.products === 1 ? '' : 's'} · ${formatNumber(c.saves + c.quotes)} engagements`}
+                  />
+                ))}
+              </Panel>
+            )}
+
+            {data!.quote_pipeline.length > 0 && (
+              <Panel icon={Package} title="Quote pipeline">
+                {data!.quote_pipeline.map((q) => (
+                  <Row key={q.status} left={q.status} right={formatNumber(q.count)} />
+                ))}
+              </Panel>
+            )}
+
+            {data!.ratings.count > 0 && (
+              <Panel
+                icon={Star}
+                title={`Reviews — ${data!.ratings.avg ?? '—'} average across ${formatNumber(data!.ratings.count)} (all time)`}
+              >
+                {data!.ratings.dist.map((d) => (
+                  <Row key={d.rating} left={`${d.rating}★`} right={formatNumber(d.count)} />
+                ))}
+              </Panel>
             )}
 
             <p className="text-[11px] text-muted-foreground">
               Follower, hire-request and profile-view metrics are not shown — those belong to a platform supplier account, which a CRM company record doesn't have.
             </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attribute explorer — engagement rolled up by any metadata key on the catalog
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Keys that describe the row rather than the material, so they make useless rollup buckets. */
+const SKIP_ATTRIBUTE_KEYS = new Set([
+  'factory_name', 'created_at', 'updated_at', 'id', 'image_url', 'url', 'description',
+]);
+
+const AttributeExplorerCard: React.FC<CompanyMarketTabProps & { stats: MarketStatsResult }> = ({ companyId, workspaceId, stats }) => {
+  const { loading: statsLoading, data, loadError } = stats;
+  const [products, setProducts] = useState<Array<{ id: string; metadata: Record<string, unknown> }>>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [attributeKey, setAttributeKey] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setProductsLoading(true);
+      let q = supabase.from('products').select('id, metadata').eq('brand_company_id', companyId);
+      if (workspaceId) q = q.eq('workspace_id', workspaceId);
+      const { data: rows, error } = await q.limit(500);
+      if (cancelled) return;
+      if (error) console.error('[CompanyMarketTab] attribute explorer product load failed:', error.message);
+      setProducts(((error ? [] : rows) ?? []).map((r: any) => ({ id: r.id, metadata: (r.metadata ?? {}) as Record<string, unknown> })));
+      setProductsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [companyId, workspaceId]);
+
+  const availableKeys = useMemo(() => {
+    const keys = new Set<string>();
+    products.forEach(({ metadata }) => Object.keys(metadata).forEach((k) => { if (!SKIP_ATTRIBUTE_KEYS.has(k)) keys.add(k); }));
+    return Array.from(keys).sort();
+  }, [products]);
+
+  useEffect(() => {
+    if (!attributeKey && availableKeys.length > 0) setAttributeKey(availableKeys[0]);
+  }, [availableKeys, attributeKey]);
+
+  const rows = useMemo(() => {
+    if (!attributeKey || !data) return [];
+    const engagement = new Map(data.product_engagement.map((e) => [e.product_id, e]));
+    const byValue = new Map<string, { saves: number; quotes: number }>();
+    products.forEach(({ id, metadata }) => {
+      const raw = metadata?.[attributeKey];
+      if (raw == null || raw === '') return;
+      const e = engagement.get(id);
+      const values: string[] = Array.isArray(raw) ? raw.map(String) : [String(raw)];
+      values.forEach((v) => {
+        const key = v.slice(0, 40);
+        const entry = byValue.get(key) ?? { saves: 0, quotes: 0 };
+        entry.saves += e?.saves ?? 0;
+        entry.quotes += e?.quotes ?? 0;
+        byValue.set(key, entry);
+      });
+    });
+    return Array.from(byValue.entries())
+      .map(([value, d]) => ({ value, ...d }))
+      .filter((r) => r.saves + r.quotes > 0)
+      .sort((a, b) => (b.saves + b.quotes) - (a.saves + a.quotes))
+      .slice(0, 20);
+  }, [attributeKey, products, data]);
+
+  const loading = statsLoading || productsLoading;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4 text-primary" />Attribute explorer</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Which material attributes buyers actually engage with, rolled up from this supplier's catalog metadata.
+            </p>
+          </div>
+          {availableKeys.length > 0 && (
+            <Select value={attributeKey} onValueChange={setAttributeKey}>
+              <SelectTrigger className="h-8 w-[200px] text-xs"><SelectValue placeholder="Select attribute…" /></SelectTrigger>
+              <SelectContent>
+                {availableKeys.map((k) => <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        ) : loadError ? (
+          <LoadFailed />
+        ) : products.length === 0 ? (
+          <NoLink />
+        ) : availableKeys.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">This supplier's products carry no metadata attributes to explore.</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            No engagement recorded against “{attributeKey}” in the last {WINDOW_DAYS} days.
+          </p>
+        ) : (
+          <>
+            <div className="divide-y divide-border rounded-lg border border-border">
+              {rows.map((r) => (
+                <Row key={r.value} left={r.value} right={`${formatNumber(r.saves)} saved · ${formatNumber(r.quotes)} quoted`} />
+              ))}
+            </div>
+            {data?.product_engagement_truncated && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Rolled up over this supplier's 500 most-engaged products — the catalog has more, so
+                the long tail is not represented here.
+              </p>
+            )}
           </>
         )}
       </CardContent>
@@ -609,6 +838,20 @@ const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId, wor
     </Card>
   );
 };
+
+const Panel: React.FC<{ icon: React.ElementType; title: string; children: React.ReactNode }> = ({ icon: Icon, title, children }) => (
+  <div>
+    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{title}</p>
+    <div className="divide-y divide-border rounded-lg border border-border">{children}</div>
+  </div>
+);
+
+const Row: React.FC<{ left: string; right: string }> = ({ left, right }) => (
+  <div className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
+    <span className="truncate">{left}</span>
+    <span className="text-muted-foreground shrink-0">{right}</span>
+  </div>
+);
 
 const StatCell: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
   <div className="rounded-lg border border-border p-3">
