@@ -259,8 +259,20 @@ class ManufacturerAnalyticsService {
         // the 200-event cap silently eats the queue — the loudest symptom of a broken contract
         // reduced to a console line nobody reads. Retry the first kind, report the second.
         if (PERMANENT_INSERT_CODES.has(error.code ?? '')) {
+          // The insert is all-or-nothing, so ONE bad row rejects the other 19 — and a full batch
+          // is routine now that search impressions fire per result. Dropping all of them would
+          // discard valid engagement to punish a single malformed event. Re-send individually so
+          // only the genuinely-invalid rows are lost, and say how many.
+          if (batch.length > 1) {
+            console.warn(
+              `[ManufacturerAnalytics] batch rejected (${error.code}: ${error.message}) — `
+              + `re-sending ${batch.length} events individually to isolate the bad row(s).`,
+            );
+            batch.forEach((event) => this.insertOne(event));
+            return;
+          }
           console.error(
-            `[ManufacturerAnalytics] dropped ${batch.length} event(s) — the insert is invalid, not delayed `
+            '[ManufacturerAnalytics] dropped 1 event — the insert is invalid, not delayed '
             + `(${error.code}: ${error.message}). This is a contract break, not a network blip.`,
           );
           return;
@@ -273,6 +285,32 @@ class ManufacturerAnalyticsService {
       })
       .catch(() => {
         // Silently discard on network failure
+      });
+  }
+
+  /**
+   * Single-row retry used only after a batch was rejected for a permanent reason. A row that fails
+   * here really is invalid on its own, so it is reported and dropped — never re-queued, which is
+   * what turned a broken contract into an endless 5-second retry loop before.
+   */
+  private insertOne(event: ManufacturerAnalyticsEvent): void {
+    supabase
+      .from('manufacturer_analytics_events')
+      .insert([event] as never[])
+      .then(({ error }) => {
+        if (!error) return;
+        if (PERMANENT_INSERT_CODES.has(error.code ?? '')) {
+          console.error(
+            `[ManufacturerAnalytics] dropped 1 invalid event (${event.event_type}, product `
+            + `${event.product_id}) — ${error.code}: ${error.message}`,
+          );
+          return;
+        }
+        // Transient on the retry — put it back in the normal queue.
+        if (this.queue.length < 200) this.queue.push(event);
+      })
+      .catch(() => {
+        // Silently discard on network failure — analytics must never break the app.
       });
   }
 

@@ -570,26 +570,47 @@ const SKIP_ATTRIBUTE_KEYS = new Set([
   'factory_name', 'created_at', 'updated_at', 'id', 'image_url', 'url', 'description',
 ]);
 
-const AttributeExplorerCard: React.FC<CompanyMarketTabProps & { stats: MarketStatsResult }> = ({ companyId, workspaceId, stats }) => {
+const AttributeExplorerCard: React.FC<CompanyMarketTabProps & { stats: MarketStatsResult }> = ({ workspaceId, stats }) => {
   const { loading: statsLoading, data, loadError } = stats;
   const [products, setProducts] = useState<Array<{ id: string; metadata: Record<string, unknown> }>>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [attributeKey, setAttributeKey] = useState<string>('');
 
+  const engagedIds = useMemo(
+    () => (data?.product_engagement ?? []).map((e) => e.product_id),
+    [data],
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setProductsLoading(true);
-      let q = supabase.from('products').select('id, metadata').eq('brand_company_id', companyId);
-      if (workspaceId) q = q.eq('workspace_id', workspaceId);
-      const { data: rows, error } = await q.limit(500);
+      // Fetch exactly the ENGAGED products, not "the first 500 of this brand". The rollup discards
+      // products with no engagement anyway, and `.limit(500)` with no ORDER BY picked an arbitrary
+      // 500 while the footnote claimed they were the most-engaged — a cap that silently changed the
+      // answer. This set is already ordered and capped by the RPC, which reports its own truncation.
+      // Chunked because 500 uuids in one `in()` makes a URL long enough for a gateway to reject.
+      if (engagedIds.length === 0) { setProducts([]); setProductsLoading(false); return; }
+      const chunks: string[][] = [];
+      for (let i = 0; i < engagedIds.length; i += 100) chunks.push(engagedIds.slice(i, i + 100));
+      const rows: Array<{ id: string; metadata: Record<string, unknown> }> = [];
+      for (const chunk of chunks) {
+        let q = supabase.from('products').select('id, metadata').in('id', chunk);
+        if (workspaceId) q = q.eq('workspace_id', workspaceId);
+        const { data: got, error } = await q;
+        if (cancelled) return;
+        if (error) {
+          console.error('[CompanyMarketTab] attribute explorer product load failed:', error.message);
+          break;
+        }
+        rows.push(...(got ?? []).map((r: any) => ({ id: r.id, metadata: (r.metadata ?? {}) as Record<string, unknown> })));
+      }
       if (cancelled) return;
-      if (error) console.error('[CompanyMarketTab] attribute explorer product load failed:', error.message);
-      setProducts(((error ? [] : rows) ?? []).map((r: any) => ({ id: r.id, metadata: (r.metadata ?? {}) as Record<string, unknown> })));
+      setProducts(rows);
       setProductsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [companyId, workspaceId]);
+  }, [engagedIds, workspaceId]);
 
   const availableKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -652,10 +673,15 @@ const AttributeExplorerCard: React.FC<CompanyMarketTabProps & { stats: MarketSta
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
         ) : loadError ? (
           <LoadFailed />
-        ) : products.length === 0 ? (
+        ) : !data || data.product_count === 0 ? (
           <NoLink />
+        ) : engagedIds.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            No engagement recorded on this supplier's products in the last {WINDOW_DAYS} days, so
+            there is nothing to roll up by attribute yet.
+          </p>
         ) : availableKeys.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic">This supplier's products carry no metadata attributes to explore.</p>
+          <p className="text-sm text-muted-foreground italic">The engaged products carry no metadata attributes to explore.</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground italic">
             No engagement recorded against “{attributeKey}” in the last {WINDOW_DAYS} days.
@@ -669,8 +695,8 @@ const AttributeExplorerCard: React.FC<CompanyMarketTabProps & { stats: MarketSta
             </div>
             {data?.product_engagement_truncated && (
               <p className="text-[11px] text-muted-foreground mt-2">
-                Rolled up over this supplier's 500 most-engaged products — the catalog has more, so
-                the long tail is not represented here.
+                Rolled up over this supplier's 500 most-engaged products. More were engaged in the
+                period, so the long tail is not represented here.
               </p>
             )}
           </>
