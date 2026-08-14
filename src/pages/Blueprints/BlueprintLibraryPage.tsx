@@ -18,6 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { blueprintsService, type Blueprint, type BlueprintItem } from '@/services/blueprintsService';
+import { blueprintIcon } from '@/components/features/blueprint/blueprintIcon';
+import { BlueprintScope } from '@/components/features/blueprint/BlueprintScope';
 
 /**
  * Rail values. The axis is the blueprint's SOURCE — yours vs the platform's — because that is the
@@ -29,31 +31,17 @@ import { blueprintsService, type Blueprint, type BlueprintItem } from '@/service
  * is a hard delete — so the tab would be permanently empty, which is the inert-UI shape the nav
  * guard exists to prevent elsewhere. Give it a tab when something can actually archive.
  */
-const ALL_TAB = 'all';
 const MINE_TAB = 'mine';
-const STARTERS_TAB = 'starters';
 
 /**
- * The rail, as a catalog rather than three hand-written triggers. Order here is the order rendered.
- * The literal `value:` strings also let deepLinkTargets.test.ts resolve `/blueprints?tab=mine`
- * against this page — it reads panes out of the source, and a value it can only reach through a
- * `const` is a value it reports as "renders no tabs at all".
- */
-type BlueprintTab = typeof MINE_TAB | typeof ALL_TAB | typeof STARTERS_TAB;
-
-/**
- * The two FIXED rail entries. Everything below them in the rail is one starter blueprint by name —
- * with five starters, a single "Starters" bucket hid every one of them behind a second click and
- * told you nothing about what was in there. Naming them makes the rail the index it should have
- * been, and selecting one previews it on the right.
- *
- * `all` stays as the value the two named entries fall back to, and as what "Open" reaches.
+ * The rail is "My Blueprints", then every starter BY NAME. There is deliberately no "All" or
+ * "Starters" bucket above them: with the starters named individually, a bucket collecting the same
+ * five rows was a click that led to a grid of what the rail already showed. The named entry IS the
+ * way in.
  */
 const BLUEPRINT_TABS = [
   { value: 'mine', label: 'My Blueprints', icon: LayoutTemplate },
-  { value: 'all', label: 'All Starters', icon: Sparkles },
-  { value: 'starters', label: 'Starters', icon: Sparkles },
-] as const satisfies readonly { value: BlueprintTab; label: string; icon: LucideIcon }[];
+] as const satisfies readonly { value: typeof MINE_TAB; label: string; icon: LucideIcon }[];
 
 const TAB_VALUES: string[] = BLUEPRINT_TABS.map((t) => t.value);
 
@@ -121,12 +109,12 @@ export const BlueprintLibraryPage: React.FC = () => {
   // Rail selection is URL-driven so the App Launcher can deep-link a sub-area, and so an unknown
   // value falls back to All rather than selecting no tab and painting an empty body.
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab');
-  const activeTab = TAB_VALUES.includes(tabParam ?? '') ? tabParam! : ALL_TAB;
-  const setTab = (v: string) => {
+  const activeTab = MINE_TAB;
+  const setTab = () => {
+    // Selecting the only rail tab just clears any previewed blueprint.
     const p = new URLSearchParams(searchParams);
-    if (v === ALL_TAB) p.delete('tab'); else p.set('tab', v);
     p.delete('bp');
+    p.delete('tab');
     setSearchParams(p, { replace: true });
   };
 
@@ -197,7 +185,7 @@ export const BlueprintLibraryPage: React.FC = () => {
     <Card className="dashboard-card">
       <CardContent className="p-4 flex flex-col gap-2 h-full">
         <div className="flex items-start gap-2">
-          <LayoutTemplate className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+          {React.createElement(blueprintIcon(b), { className: 'h-4 w-4 mt-0.5 text-muted-foreground shrink-0' })}
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium flex items-center gap-2">
               <span className="truncate">{b.title}</span>
@@ -242,11 +230,6 @@ export const BlueprintLibraryPage: React.FC = () => {
     </CardContent></Card>
   );
 
-  const previewSections = useMemo(
-    () => preview.filter((i) => i.kind === 'section').sort((a, b) => a.sort_order - b.sort_order),
-    [preview],
-  );
-
   const grid = (list: Blueprint[]) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{list.map((b) => <Tile key={b.id} b={b} />)}</div>
   );
@@ -281,39 +264,11 @@ export const BlueprintLibraryPage: React.FC = () => {
 
       {previewLoading ? (
         <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : previewSections.length === 0 ? (
-        <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
-          This blueprint has no sections yet.
-        </CardContent></Card>
       ) : (
-        <div className="space-y-3">
-          {previewSections.map((sec) => {
-            const tasks = preview.filter((i) => i.kind === 'task' && i.parent_id === sec.id);
-            return (
-              <Card key={sec.id} className="dashboard-card">
-                <CardContent className="p-4">
-                  <div className="text-sm font-medium">{sec.label}</div>
-                  {tasks.length === 0 ? (
-                    <div className="mt-1 text-xs text-muted-foreground">No tasks in this section.</div>
-                  ) : (
-                    <ul className="mt-2 space-y-1">
-                      {tasks.map((t) => (
-                        <li key={t.id} className="flex items-baseline justify-between gap-3 text-xs">
-                          <span className="min-w-0 truncate text-muted-foreground">{t.label}</span>
-                          {t.unit && (
-                            <span className="shrink-0 tabular-nums text-muted-foreground/70">
-                              {t.default_quantity ?? 1} {t.unit}
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        /* The editor's own screen, disabled — same component, `readOnly`. A preview that showed
+           only section names and quantities hid the formulas, rates, margin and options, which are
+           exactly what you weigh before copying a starter. */
+        <BlueprintScope schema={selected.dimensions_schema ?? []} items={preview} readOnly />
       )}
     </>
   );
@@ -323,18 +278,11 @@ export const BlueprintLibraryPage: React.FC = () => {
   ) : (
     <>
       <SectionHeader
-        icon={activeTab === MINE_TAB ? LayoutTemplate : Sparkles}
-        title={activeTab === MINE_TAB ? 'My blueprints' : 'Starter blueprints'}
-        subtitle={activeTab === MINE_TAB
-          ? 'Everything this workspace built or copied.'
-          : 'Platform-built scopes — pick one from the rail to preview it, or copy it into your library.'}
+        icon={LayoutTemplate}
+        title="My blueprints"
+        subtitle="Everything this workspace built or copied. Pick a starter from the rail to preview and copy one."
       />
-      {/* Your own blueprints render under My Blueprints and nowhere else. They used to head the
-          All view as well, so the same card was on screen twice and the starters — the half you
-          cannot get anywhere else — sat below them. */}
-      {activeTab === MINE_TAB
-        ? (own.length === 0 ? emptyOwn : grid(own))
-        : grid(starters)}
+      {own.length === 0 ? emptyOwn : grid(own)}
     </>
   );
 
@@ -365,31 +313,26 @@ export const BlueprintLibraryPage: React.FC = () => {
             </Button>
 
             <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
-              {BLUEPRINT_TABS.filter((t) => t.value !== STARTERS_TAB).map((t) => {
-                const count = t.value === MINE_TAB ? own.length : blueprints.length;
-                return (
-                  <React.Fragment key={t.value}>
-                    {t.value === ALL_TAB && (
-                      /* A plain <div> child: `.finance-tabs-list > div` hides it below lg, where a
-                         rule inside a horizontal chip strip would just be noise. */
-                      <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
-                    )}
-                    <TabsTrigger value={t.value} className="w-full justify-start">
-                      <t.icon className="h-4 w-4 mr-2 shrink-0" />
-                      <span className="truncate">{t.label}</span>
-                      {count > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{count}</span>}
-                    </TabsTrigger>
-                  </React.Fragment>
-                );
-              })}
+              {BLUEPRINT_TABS.map((t) => (
+                <TabsTrigger key={t.value} value={t.value} className="w-full justify-start">
+                  <t.icon className="h-4 w-4 mr-2 shrink-0" />
+                  <span className="truncate">{t.label}</span>
+                  {own.length > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{own.length}</span>}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             {/* Starters by NAME. Deliberately plain buttons rather than TabsTriggers: the rail
                 selection they drive is `?bp=<id>`, not a tab pane, and a TabsTrigger whose value
                 matched no TabsContent would leave Radix with nothing selected. */}
             {starters.length > 0 && (
-              <div className="space-y-1">
-                {starters.map((b) => (
+              <div className="space-y-1 pt-1">
+                <div className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Starters
+                </div>
+                {starters.map((b) => {
+                  const Icon = blueprintIcon(b);
+                  return (
                   <button
                     key={b.id}
                     type="button"
@@ -401,10 +344,11 @@ export const BlueprintLibraryPage: React.FC = () => {
                         : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
                     ].join(' ')}
                   >
-                    <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                    <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
                     <span className="min-w-0 truncate">{b.title}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

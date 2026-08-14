@@ -23,7 +23,7 @@ import {
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool, Activity,
-  Wand2, Lightbulb, ListChecks, PauseCircle, Workflow, Sparkles,
+  Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -193,7 +193,6 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // listed by hand, so a card gains chips and leaves the rail in one move.
   blueprints: [
     { label: 'My blueprints', to: '/blueprints?tab=mine', icon: LayoutTemplate },
-    { label: 'Starters', to: '/blueprints?tab=starters', icon: Sparkles },
   ],
   // Market Trends — the four sub-areas of MarketTrendsTab (its MARKET_TABS array).
   'market-trends': [
