@@ -28,18 +28,10 @@ const MAX_MATERIALS = 200;
 // Admin-editable at /admin/ai-configs (prompt_type='generation'). Two rows, one
 // per mode. These literals are the fallbacks used only if the DB row is missing.
 // Variables: {{filename}}, {{max}}.
-const TRANSLATE_PRESERVE_FALLBACK =
-  `Source PDF: {{filename}}.\n\n` +
-  `Mirror this catalog page-by-page. Create one section per PDF page. ` +
-  `Section title format: "Page N — <heading on the page>". List every distinct material visible on each page ` +
-  `with its name, short description, visible price + currency, and visible specs. Cap at {{max}} materials total.`;
+// Prompts: generation/catalog_translate_preserve and .../catalog_translate_restructure.
 
-const TRANSLATE_RESTRUCTURE_FALLBACK =
-  `Source PDF: {{filename}}.\n\n` +
-  `Translate this manufacturer catalog into a clean editable catalog body. ` +
-  `Group materials into sensible category-based sections (e.g. "Porcelain Tiles", "Wood Flooring", "Metallic Finishes"). ` +
-  `Each material: name, short description, visible price + currency, visible specs. Set page_no per material. ` +
-  `Cap at {{max}} materials total. Skip filler / non-product pages (covers, contents, contact pages).`;
+
+
 
 interface TranslateRequest {
   source_pdf_id: string;
@@ -164,8 +156,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
     const base64 = base64Encode(bytes);
 
     const promptCategory = body.preserve_original_layout ? 'catalog_translate_preserve' : 'catalog_translate_restructure';
-    const promptFallback = body.preserve_original_layout ? TRANSLATE_PRESERVE_FALLBACK : TRANSLATE_RESTRUCTURE_FALLBACK;
-    const promptTemplate = await getGenerationPrompt(supabase, promptCategory, promptFallback);
+    const promptTemplate = await getGenerationPrompt(supabase, promptCategory);
     const userText = renderPromptTemplate(promptTemplate, {
       filename: pdf.original_filename,
       max: MAX_MATERIALS,

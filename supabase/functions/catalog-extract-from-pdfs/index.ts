@@ -22,14 +22,8 @@ const MODEL = 'claude-sonnet-4-6';
 // Admin-editable at /admin/ai-configs (prompt_type='generation', category='catalog_extract').
 // This literal is the fallback used only if the DB row is missing. Variables:
 // {{filename}}, {{manufacturer}} (pre-formatted suffix or empty), {{query}}, {{max}}.
-const EXTRACT_PROMPT_FALLBACK =
-  `Source PDF: {{filename}}{{manufacturer}}.\n\n` +
-  `User query: "{{query}}"\n\n` +
-  `Identify up to {{max}} materials in this PDF that match the query. ` +
-  `For each, return its name (as printed), a short description (1-2 sentences from the page), ` +
-  `and any visible price + currency + specs (size, finish, color, SKU). ` +
-  `Set page_no to the 1-based page where the material appears. ` +
-  `If the query does not match anything in this PDF, return an empty candidates array.`;
+// Prompt: generation/catalog_extract.
+
 
 interface ExtractRequest {
   catalog_id: string;
@@ -197,7 +191,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
         const perPdfBudget = Math.max(2, Math.floor(maxResults / pdfs.length));
 
-        const promptTemplate = await getGenerationPrompt(supabase, 'catalog_extract', EXTRACT_PROMPT_FALLBACK);
+        const promptTemplate = await getGenerationPrompt(supabase, 'catalog_extract');
         const userText = renderPromptTemplate(promptTemplate, {
           filename: pdf.original_filename,
           manufacturer: pdf.manufacturer_name ? ` (manufacturer: ${pdf.manufacturer_name})` : '',

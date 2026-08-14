@@ -39,7 +39,7 @@
  */
 import { generateStructuredWithClaude } from './ai-client.ts';
 import { z, type ZodType } from 'npm:zod@3';
-import { getGenerationPrompt } from './prompt-utils.ts';
+import { loadPrompt } from './prompt-utils.ts';
 import type { DbClient } from './supabase-client.ts';
 
 /**
@@ -99,18 +99,9 @@ const RERANK_SCHEMA = z.object({
   })),
 });
 
-const FALLBACK_PROMPT = `You rank search results for a materials and interior-design platform.
-
-You will be given a user's query and a numbered list of candidate results. Order the candidates
-by how well each one answers THAT query, best first.
-
-Judge on:
-- direct match to what the user asked for, including implied constraints
-- the specificity of the match (an exact material/finish beats a generic mention)
-- the supplied signal scores, as evidence rather than as the answer — they come from separate
-  embedding aspects (colour, texture, style, material) and disagreeing scores are normal
-
-Do not invent candidates. Do not drop candidates you were given. Return every id exactly once.`;
+// The rerank system prompt lives in `prompts` (prompt_type='tool', category='ai_rerank').
+// A byte-identical FALLBACK_PROMPT used to live here and was what actually ran, because
+// the lookup asked for the wrong prompt_type (#347 phase 3P).
 
 /**
  * Rerank a list of already-retrieved results.
@@ -201,14 +192,23 @@ export async function rerankResults<T>(
     })
     .join('\n');
 
-  let systemPrompt = FALLBACK_PROMPT;
-  if (opts.supabase) {
-    try {
-      systemPrompt = await getGenerationPrompt(opts.supabase, 'ai_rerank', FALLBACK_PROMPT);
-    } catch {
-      // getGenerationPrompt is documented as never throwing, but a prompt lookup must not be
-      // able to take down search even if that ever changes.
-    }
+  // The prompt is prompt_type='tool', not 'generation'. This asked getGenerationPrompt for
+  // generation/ai_rerank, which matched zero rows on EVERY call — so re-ranking ran on a
+  // hardcoded FALLBACK_PROMPT 100% of the time while "AI Search Re-ranker" sat in the table,
+  // editable and unread (#347 phase 3P). The two texts were byte-identical, so this is a
+  // no-op for ranking behaviour and admin edits now actually take effect.
+  //
+  // Without the prompt we DECLINE to rerank rather than invent one. Returning the source order
+  // is a documented outcome of this function; a rerank driven by a guessed prompt is not.
+  if (!opts.supabase) {
+    return { items, reranked: false, reason: 'no supabase client to load the rerank prompt' };
+  }
+  let systemPrompt: string;
+  try {
+    systemPrompt = await loadPrompt(opts.supabase, 'tool', 'ai_rerank');
+  } catch (err) {
+    console.error('rerank: could not load tool/ai_rerank —', (err as Error).message);
+    return { items, reranked: false, reason: 'rerank prompt unavailable' };
   }
 
   const prompt = [

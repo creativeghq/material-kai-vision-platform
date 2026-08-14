@@ -8,7 +8,7 @@
  * - trigger-event: Auto-dispatch from DB triggers (Phase 4)
  */
 
-import { loadPrompt, render } from '../_shared/prompt-registry.ts';
+import { loadPrompt, renderPromptTemplate, getToolPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -790,13 +790,11 @@ async function executeAction(
         : 'across Europe and major global manufacturing hubs';
 
       // Same row b2b-tools reads. This copy had drifted from it (#347 phase 3P).
-      const query = render(
-        await loadPrompt({ promptType: 'tool', category: 'b2b_manufacturer_query' }),
+      const query = renderPromptTemplate(
+        await loadPrompt(supabase, 'tool', 'b2b_manufacturer_query'),
         { category, scope: geoScope, limit },
       );
-      const systemPrompt = await loadPrompt({
-        promptType: 'tool', category: 'b2b_manufacturer_search',
-      });
+      const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
 
       let textContent = '';
       try {

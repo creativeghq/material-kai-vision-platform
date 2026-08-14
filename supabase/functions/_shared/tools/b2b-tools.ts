@@ -36,10 +36,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type B2BChunkSink = ((chunk: any) => void) | undefined;
 
-import { loadPrompt, render } from '../prompt-registry.ts';
 import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
-import { getToolPrompt } from '../prompt-utils.ts';
+import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -192,14 +191,12 @@ export const createB2BManufacturerSearchTool = (
         // Both this and flow-engine used to carry their own copy of this query, and the two
         // had already drifted — flow-engine's dropped "or retailers" and stopped asking for
         // manufacturing indicators. One row, two readers (#347 phase 3P).
-        const query = render(
-          await loadPrompt({ promptType: 'tool', category: 'b2b_manufacturer_query' }),
+        const query = renderPromptTemplate(
+          await loadPrompt(supabase, 'tool', 'b2b_manufacturer_query'),
           { category, scope, limit },
         );
         // The system prompt has existed in the table all along with nothing reading it.
-        const systemPrompt = await loadPrompt({
-          promptType: 'tool', category: 'b2b_manufacturer_search',
-        });
+        const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
 
         onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${B2B_REGIONS[region.toLowerCase()]?.label ?? region}` : ''}...`);
 

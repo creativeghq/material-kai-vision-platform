@@ -1,7 +1,19 @@
 /**
- * Shared prompt loading utilities.
+ * Shared prompt loading utilities — THE loader for edge functions (#347 phase 3P).
  * Loads prompts from the `prompts` table so all prompts are DB-driven
  * and editable via /admin/ai-configs.
+ *
+ * NO CODE FALLBACK. `getGenerationPrompt` used to take a required `fallback` argument and was
+ * documented as "never throws"; every caller therefore carried a hardcoded copy of its prompt.
+ * That is invisible when it fires — and it fired constantly: `getGenerationPrompt(supabase,
+ * 'ai_rerank', ...)` queries prompt_type='generation', but the re-ranker prompt is filed under
+ * prompt_type='tool'. The lookup matched zero rows on every call, so search re-ranking ran on
+ * the hardcoded string 100% of the time while "AI Search Re-ranker" sat in the table, editable
+ * and unread.
+ *
+ * Missing and unreachable are separate errors on purpose: "add the row" and "the database is
+ * down" need different reactions, and collapsing them is how an outage looks like a
+ * misconfiguration for as long as nobody looks.
  *
  * Includes an in-memory cache with 5-minute TTL to avoid repeated DB
  * queries for prompts that rarely change. The Deno isolate keeps the
@@ -9,6 +21,16 @@
  */
 import type { DbClient } from './supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+/** The store answered and has no such prompt. Add it; retrying will not help. */
+export class PromptNotConfigured extends Error {
+  constructor(message: string) { super(message); this.name = 'PromptNotConfigured'; }
+}
+
+/** The store could not be read. The prompt may be fine; the database is not. */
+export class PromptStoreUnavailable extends Error {
+  constructor(message: string) { super(message); this.name = 'PromptStoreUnavailable'; }
+}
 
 // ── Prompt cache (module-level, survives across requests in same isolate) ──
 const PROMPT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -104,50 +126,63 @@ export async function getToolPrompt(
 }
 
 /**
- * Load a generation prompt from the database with a hardcoded fallback.
- * prompt_type = 'generation', category = promptName
- * Never throws — returns fallback if DB row is missing.
+ * Load a prompt by (type, category). Reads `prompt_text` first — that is the column
+ * /admin/ai-configs writes — then `system_prompt` for legacy rows. Reading system_prompt only
+ * is what previously made admin edits to generation prompts inert.
+ *
+ * @throws PromptNotConfigured    no active row matches
+ * @throws PromptStoreUnavailable the prompts table could not be read
+ */
+export async function loadPrompt(
+  supabase: DbClient,
+  promptType: string,
+  category: string,
+): Promise<string> {
+  const cacheKey = `${promptType}:${category}`;
+  const cached = getCachedPrompt(cacheKey);
+  if (cached) return cached;
+
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('prompt_text, system_prompt')
+    .eq('prompt_type', promptType)
+    .eq('category', category)
+    .eq('is_active', true)
+    .eq('status', 'active')
+    .order('version', { ascending: false })
+    .limit(1);
+
+  // PGRST116 is "no rows" from .single(); we use .limit(1) so any error here is a real
+  // reachability failure, never an empty result. supabase-js RESOLVES on an RLS denial rather
+  // than throwing, so this check is what stands between a denied read and "prompt not found".
+  if (error) {
+    throw new PromptStoreUnavailable(
+      `Could not read prompts for ${promptType}/${category}: ${error.message}`,
+    );
+  }
+
+  const text = data?.[0]?.prompt_text || data?.[0]?.system_prompt;
+  if (!text) {
+    throw new PromptNotConfigured(
+      `No active prompt for prompt_type='${promptType}', category='${category}'. ` +
+      `Add it in /admin/ai-configs. There is no hardcoded fallback by design.`,
+    );
+  }
+
+  setCachedPrompt(cacheKey, text);
+  return text;
+}
+
+/**
+ * Load a generation prompt. prompt_type = 'generation', category = promptName.
+ *
+ * The `fallback` parameter is GONE. It made every caller carry a copy of its own prompt, and
+ * the copy won silently whenever the lookup missed — which for 'ai_rerank' was every single
+ * call, because that prompt is filed under prompt_type='tool'.
  */
 export async function getGenerationPrompt(
   supabase: DbClient,
   promptName: string,
-  fallback: string,
 ): Promise<string> {
-  const cacheKey = `generation:${promptName}`;
-  const cached = getCachedPrompt(cacheKey);
-  if (cached) return cached;
-
-  // Read prompt_text FIRST — that's the column the canonical admin editor
-  // (/admin/ai-configs) writes for generation prompts. system_prompt is kept as
-  // a fallback for legacy rows. Reading system_prompt-only here is what made
-  // admin edits to generation prompts inert.
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('prompt_text, system_prompt')
-    .eq('prompt_type', 'generation')
-    .eq('category', promptName)
-    .eq('is_active', true)
-    .eq('status', 'active')
-    .single();
-
-  const dbText = data?.prompt_text || data?.system_prompt;
-
-  // Distinguish "row genuinely missing" from "transient fetch failure".
-  // A real error other than PGRST116 (0-rows from .single()) means the DB was unreachable
-  // — return the fallback for THIS call but do NOT cache it, so the next call retries the
-  // DB instead of being stuck on the fallback for the full TTL after the DB recovers.
-  const isTransientError = !!error && (error as { code?: string }).code !== 'PGRST116';
-  if (isTransientError) {
-    console.warn(`⚠️ Transient DB error loading prompt '${promptName}' (not caching fallback):`, error.message);
-    return fallback;
-  }
-
-  if (!dbText) {
-    console.warn(`⚠️ No DB prompt for '${promptName}', using hardcoded fallback`);
-    setCachedPrompt(cacheKey, fallback);
-    return fallback;
-  }
-
-  setCachedPrompt(cacheKey, dbText);
-  return dbText;
+  return loadPrompt(supabase, 'generation', promptName);
 }

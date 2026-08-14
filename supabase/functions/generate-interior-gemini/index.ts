@@ -33,7 +33,7 @@ import {
   buildFloorPlanDiagramPrompt,
   buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
-import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
+import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { resolveGenerationRouting } from '../_shared/generation-routing.ts';
 import {
   buildProductShotPrompt,
@@ -517,43 +517,9 @@ async function refundCredits(
   if (error) console.warn(`[generate-interior-gemini] refund failed: ${error.message}`);
 }
 
-function buildMaterialsBoardPrompt(boardMode: BoardMode, roomType?: string, style?: string, extraPrompt?: string): string {
-  const room = roomType ?? 'interior space';
-  const designStyle = style ?? 'contemporary';
-
-  if (boardMode === 'presentation-board') {
-    return `Architectural design presentation board for a ${designStyle} ${room} proposal. Strict vertical layout on a clean white background.
-
-Top section titled "FITMENT SELECTION": Display a curated row of key fixtures and furniture pieces for this ${room}, each shown as a clean product render against white. Below each item include a short block of technical specifications (dimensions, material, finish, model reference).
-
-Bottom section titled "DRAWINGS": Feature a detailed isometric 3D architectural drawing of the ${room} layout. The drawing uses thin technical annotation lines pointing to the main design elements. To the right of the drawing is a vertical "MATERIAL SELECTION" column showing square material swatches (stone, wood, metal, fabric as appropriate) with material name and finish label beneath each swatch.
-
-Overall aesthetic: clean architectural presentation style, minimal sans-serif typography, precise linework, professional design studio quality. ${extraPrompt ?? ''}`;
-  }
-
-  if (boardMode === 'selection-board') {
-    return `A professional interior design presentation sheet for a ${designStyle} ${room}. Clean white background with faint pencil architectural sketch outlines.
-
-Central element: high-quality photorealistic 3D isometric cutaway render of the ${room} showing furniture, materials, and lighting in full detail.
-
-Surrounding the central render: circular close-up material swatch callouts (wood veneer, stone, fabric, metal finishes) connected to specific elements inside the room by thin precise leader lines. Each swatch has a descriptive text label (material name, finish, supplier reference).
-
-Bottom strip: three small vignette detail renders highlighting key material moments — a close-up of a surface texture, a joinery detail, and a lighting effect.
-
-Style: 8K resolution, soft natural lighting, architectural visualization quality, professional interior design studio presentation. ${extraPrompt ?? ''}`;
-  }
-
-  // photorealistic-render
-  return `Ultra-photorealistic luxury ${designStyle} ${room} in a warm minimal style with premium materials. Natural sunlight entering from an extra-large floor-to-ceiling side window, soft daylight and gentle realistic shadows, high-end interior magazine photography quality.
-
-Wide corner perspective at eye level (150–160 cm) using an 18mm lens. Corrected perspective with straight vertical lines, no fisheye, stepped back to show more floor, ceiling, and architectural volume without enlarging any objects. Strict true-to-life scale throughout.
-
-Premium materials: ceiling-height cabinetry with richer wood grain, flawless alignment, shadow-gap details and integrated handles. Back wall features a warm stone slab surface with subtle veining in a continuous slab look. Complemented by a warm under-cabinet LED strip. Large stone/ceramic surfaces matching the same material family throughout.
-
-Photorealistic micro-textures, natural imperfections, and realistic reflections; no CGI or plastic look.
-
-Negative prompt: oversized props, exaggerated scale, distorted proportions, fisheye, warped lines, CGI, 3D render, plastic texture, fake materials, blurry details, label artifacts, duplicated objects, watermark, text artifacts. ${extraPrompt ?? ''}`;
-}
+// buildMaterialsBoardPrompt lived here. The DB rows (generation/materials_board_*) always
+// won over it, and those rows used single-brace {style}/{room_type} that nothing substituted
+// — so the model received the literal braces while this correct builder never ran (#347 3P).
 
 // Studio product shot for a made-to-order door/window on a purchase spec sheet. NOT a room
 // scene — a single isolated item on seamless white, front elevation, true-to-spec proportions,
@@ -973,11 +939,15 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       }
 
       const boardMode: BoardMode = body.board_mode ?? 'selection-board';
-      const hardcodedPrompt = buildMaterialsBoardPrompt(boardMode, body.room_type, body.style, body.prompt);
-      const boardPrompt = await getGenerationPrompt(
-        supabase,
-        `materials_board_${boardMode}`,
-        hardcodedPrompt,
+      // Defaults match the builder this replaced — an empty {{room_type}} would render
+      // "a  presentation sheet for a  ", which is how the single-brace bug looked to the model.
+      const boardPrompt = renderPromptTemplate(
+        await getGenerationPrompt(supabase, `materials_board_${boardMode}`),
+        {
+          room_type: body.room_type ?? 'interior space',
+          style: body.style ?? 'contemporary',
+          user_prompt: body.prompt ?? '',
+        },
       );
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
       const result = await generateImageWithGemini(
