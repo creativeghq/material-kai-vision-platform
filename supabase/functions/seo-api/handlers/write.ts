@@ -8,12 +8,13 @@
  * Credit cost: 20 credits
  */
 
+import type { DbClient } from '../../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
-import { getToolPrompt } from '../../_shared/prompt-utils.ts';
+import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../../_shared/ai-client.ts';
 import type {
   SEOWriteRequest,
@@ -94,8 +95,8 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_writer');
-    const systemPrompt = buildWritingSystemPrompt(baseSystemPrompt, plan, brief, research);
-    const userPrompt = buildWritingUserPrompt(plan, brief, research);
+    const systemPrompt = await buildWritingSystemPrompt(supabase, baseSystemPrompt, plan, brief, research);
+    const userPrompt = await buildWritingUserPrompt(supabase, plan, brief, research);
 
     // Call Claude Opus for writing (auto-tracked)
     const result = await generateWithClaude(userPrompt, {
@@ -163,85 +164,19 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
 // PROMPT BUILDERS
 // ════════════════════════════════════════════════════════════════
 
-function buildWritingSystemPrompt(
+async function buildWritingSystemPrompt(
+  supabase: DbClient,
   basePrompt: string,
   plan: ArticlePlan,
   brief?: ContentBrief,
   research?: Partial<KeywordResearchResult>,
-): string {
+): Promise<string> {
   let prompt = basePrompt;
 
   // Modern SEO + AEO (Answer Engine Optimization) scaffolding rules — required for every article.
   // The frontend reads these conventions to render custom blocks (TL;DR card, Key Takeaways, definitions,
   // FAQ accordion). Stay strict on these markers — drift breaks the rendering.
-  prompt += `
-
-=== ARTICLE STRUCTURE (REQUIRED — DO NOT SKIP ANY OF THESE) ===
-Every article MUST follow this structure in this exact order:
-
-1. **H1 title** — \`# {plan.title}\` (one line only)
-
-2. **Lead paragraph** — exactly 2–3 sentences (40–70 words). Primary keyword in first 8 words. Hook the reader with the problem or stake. Plain paragraph, no heading.
-
-3. **TL;DR block** — write it as:
-   > [!tldr]
-   > One-sentence answer to the core question (≤ 30 words, primary keyword in this sentence).
-   > Then 2–3 bullet sub-points starting with "- ".
-   This is the AEO / Featured Snippet target — be tight and quotable.
-
-4. **Key Takeaways block** — write it as:
-   > [!key]
-   > - Bullet 1 (≤ 18 words, action-oriented)
-   > - Bullet 2
-   > - Bullet 3
-   > - Bullet 4
-   > - Bullet 5
-   Five bullets, each one a standalone insight.
-
-5. **Body sections** — H2/H3 from the outline.
-   For EVERY H2 section:
-   - First sentence directly answers a question implied by the heading (AEO).
-   - Include either a comparison **table** OR a **bulleted list** somewhere in the section.
-   - Use \`> [!definition]\` blockquote for the first mention of any jargon term, formatted as:
-     > [!definition] Term Name
-     > Plain-language one-sentence definition.
-   - Use \`> [!info]\` for asides, \`> [!warning]\` for risks/pitfalls. Use sparingly (≤ 3 per article each).
-
-6. **Examples / Case Studies** — at least one concrete example block (real product, real number, real scenario) somewhere mid-article. Tag it with \`> [!example]\` blockquote and a 1-line label.
-
-7. **FAQ section** — REQUIRED. H2 heading exactly: "Frequently Asked Questions"
-   Then for each FAQ question (use exactly the questions provided in DYNAMIC CONTEXT):
-   - H3 with the literal question (no markdown styling, no quotes)
-   - Answer immediately following: 40–80 words, plain paragraphs only (no nested lists).
-   The answer's first sentence MUST be a complete, self-contained answer (AEO requirement).
-
-8. **Conclusion** — H2 heading "Conclusion" or "Next Steps".
-   - 2–3 sentence recap that mentions the primary keyword once.
-   - Final paragraph with a single, specific call-to-action (no fluff like "thanks for reading").
-
-=== SEO / AEO RULES ===
-- **Primary keyword density**: appear in title (H1), lead paragraph, TL;DR sentence, ≥1 H2, conclusion. Do NOT keyword-stuff — natural placement only.
-- **Semantic richness**: use 4–6 of the listed LSI terms naturally across the body.
-- **Answer-first paragraphs**: every section opens with the answer, then explains. Inverted pyramid.
-- **Statistics with sources**: when citing a number, attribute it inline like "(Source: Company Name, 2024)".
-- **NEVER invent a source, a URL, a statistic, a quote or a person.** A fabricated citation is the fastest possible route to the "easily verified factual error" Google's helpful-content guidance penalizes, and it is worse than having no citation at all. If you do not have a real, verifiable source for a claim, write the claim without a citation and without a number — or leave it out. Do NOT emit a \`[SOURCE:]\` marker you cannot stand behind.
-- **Calibrated confidence**: state what is well-established plainly, and keep the qualifier when something genuinely varies by case ("in most installations", "depending on substrate"). Do not flatten real uncertainty into false certainty to sound authoritative.
-- **Self-contained paragraphs**: each paragraph stands alone — search engines can quote it without surrounding context.
-- **Active voice, second person** ("you / your") for instructional/how-to sections.
-- **Sentence length**: vary. Mix short punchy sentences with longer explanatory ones. Avg 14–20 words.
-- **No filler**: skip "in today's world", "in the modern era", "let's dive in", "without further ado". Get to the point.
-- **No em-dashes for asides** — use commas or parens. (Em-dashes ARE fine for direct contrast.)
-
-=== CALLOUT BLOCK REFERENCE (use these exact tags) ===
-> [!tldr]      — TL;DR / direct answer (one per article, after lead)
-> [!key]       — Key Takeaways (one per article, after TL;DR)
-> [!definition] Term Name — first-mention jargon (use as needed)
-> [!example]   — Concrete example or case study (≥1 per article)
-> [!info]      — Side note / clarifying aside
-> [!warning]   — Risk, pitfall, common mistake
-> [!quote]     — Direct quote from a named source (with attribution on the next line)
-
-These blockquote tags are rendered as custom UI components on the frontend — keep formatting tight or they'll break.`;
+  prompt += await getToolPrompt(supabase, 'seo_writer_article_structure');
 
   if (brief) {
     prompt += `
@@ -267,7 +202,7 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
   }
 
   // E-E-A-T: the only input carrying information the SERP does not already have.
-  prompt += buildFirsthandExperienceBlock(brief);
+  prompt += await buildFirsthandExperienceBlock(supabase, brief);
 
   // Dynamic context from the article plan
   prompt += `
@@ -286,7 +221,7 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
 
   // Phase 3 — append mention-monitoring SERP signals so the writer optimizes
   // direct-answer paragraphs against the actual current SERP state.
-  prompt += buildSerpSignalsWriterBlock(research?.serpSignals);
+  prompt += await buildSerpSignalsWriterBlock(supabase, research?.serpSignals);
 
   return prompt;
 }
@@ -305,7 +240,7 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
  * Returns '' when the brief carries none — the analyzer raises a `firsthand_experience`
  * fix in that case rather than the writer inventing experience it does not have.
  */
-function buildFirsthandExperienceBlock(brief?: ContentBrief): string {
+async function buildFirsthandExperienceBlock(supabase: DbClient, brief?: ContentBrief): Promise<string> {
   const fx = brief?.firsthandExperience;
   if (!fx) return '';
 
@@ -313,12 +248,7 @@ function buildFirsthandExperienceBlock(brief?: ContentBrief): string {
   const examples = fx.ownedExamples?.filter(Boolean) ?? [];
   if (!data.length && !examples.length && !fx.methodology && !fx.credentials) return '';
 
-  let block = `
-
-=== FIRST-HAND EXPERIENCE (E-E-A-T — USE THIS, IT IS WHY THIS ARTICLE EXISTS) ===
-Everything else in this prompt was derived from pages already ranking for this query.
-The material below is ours and appears nowhere else on the SERP. Weave it through the
-body — it is the article's reason to outrank the incumbents, not a decorative extra.`;
+  let block = await getToolPrompt(supabase, 'seo_writer_firsthand_header');
 
   if (fx.credentials) {
     block += `\n\n**Our standing to write this**: ${fx.credentials}
@@ -342,9 +272,7 @@ Use at least one as the concrete example required by the ARTICLE STRUCTURE rules
 State this explicitly wherever our data is cited — one clause is enough ("measured across 40 samples over six months"). Unexplained proprietary numbers read as invented.`;
   }
 
-  block += `\n\nHARD RULE: do not extend, round up, or extrapolate beyond the facts listed above, and do not
-invent additional first-hand experience to match. If the material does not cover a section, write that
-section from general knowledge without claiming we experienced it.`;
+  block += await getToolPrompt(supabase, 'seo_writer_firsthand_hardrule');
 
   return block;
 }
@@ -355,7 +283,7 @@ section from general knowledge without claiming we experienced it.`;
  * snippet capture, and PAA matching. The system block already covers
  * structural rules — this layer is content-specific.
  */
-function buildSerpSignalsWriterBlock(signals?: SerpSignalBlob): string {
+async function buildSerpSignalsWriterBlock(supabase: DbClient, signals?: SerpSignalBlob): Promise<string> {
   if (!signals) return '';
   let block = '\n\n=== SERP-AWARE WRITING TARGETS ===';
 
@@ -388,50 +316,26 @@ function buildSerpSignalsWriterBlock(signals?: SerpSignalBlob): string {
   }
 
   if (signals.knowledgeGraphPresent === false) {
-    block += `\n\n**No Knowledge Panel** — when first introducing the brand or primary entity, write a one-sentence Wikipedia-style structured definition (e.g. "Brand X is a [category] founded in [year] specializing in [domain]."). This kind of sentence is what AI Overviews and knowledge layers index for entity recognition.`;
+    block += await getToolPrompt(supabase, 'seo_writer_no_knowledge_panel');
   }
 
   return block;
 }
 
-function buildWritingUserPrompt(
+async function buildWritingUserPrompt(
+  supabase: DbClient,
   plan: ArticlePlan,
   brief?: ContentBrief,
   research?: Partial<KeywordResearchResult>,
-): string {
+): Promise<string> {
   const outline = buildOutlineText(plan.sections, 0);
   const faqList = plan.faqQuestions.length
     ? plan.faqQuestions.map((q, i) => `   ${i + 1}. ${q}`).join('\n')
     : '   (no FAQs provided — generate 4–6 reasonable questions matching search intent)';
 
-  return `Write the complete article following the ARTICLE STRUCTURE rules from the system prompt.
-
-REMEMBER — every article must contain, in this order:
-  1. H1 title
-  2. Lead paragraph (2–3 sentences, 40–70 words)
-  3. \`> [!tldr]\` block (one quotable sentence + 2–3 sub-bullets)
-  4. \`> [!key]\` block with 5 takeaway bullets
-  5. Body sections (matching the outline below)
-  6. At least one \`> [!example]\` block somewhere in the body
-  7. H2 "Frequently Asked Questions" with each question as an H3
-  8. H2 "Conclusion" or "Next Steps" with a CTA
-
-Outline (match these H2/H3 headings exactly, but ADD the structure blocks above):
-${outline}
-
-${(plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description)
+  return renderPromptTemplate(await getGenerationPrompt(supabase, 'seo_writer_user'), { outline: outline, featured_snippet_target: (plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description)
   ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description}"\n`
-  : ''}
-
-FAQ QUESTIONS to include verbatim as H3 under "Frequently Asked Questions":
-${faqList}
-
-Primary keyword: ${plan.primaryKeyword}
-Secondary keywords: ${plan.secondaryKeywords.join(', ')}
-LSI terms: ${plan.lsiKeywords.join(', ')}
-Target word count: ${plan.targetWordCount} words (±10%)
-
-Write the full article now in Markdown. Use the callout blockquote syntax (\`> [!tldr]\`, \`> [!key]\`, \`> [!definition] Term\`, \`> [!example]\`, \`> [!info]\`, \`> [!warning]\`) exactly as specified — these become custom UI cards on the frontend.`;
+  : '', faq_list: faqList, primary_keyword: plan.primaryKeyword, secondary_keywords: plan.secondaryKeywords.join(', '), lsi_keywords: plan.lsiKeywords.join(', '), target_word_count: plan.targetWordCount });
 }
 
 function buildOutlineText(sections: ArticlePlan['sections'], depth: number): string {

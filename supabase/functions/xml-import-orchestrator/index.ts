@@ -4,7 +4,7 @@ import { captureException } from '../_shared/sentry.ts';
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
-import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import {
   classifyFields,
@@ -387,12 +387,7 @@ async function suggestFieldMappings(
   }));
 
   const systemPrompt = await getToolPrompt(supabase, 'xml_field_mapper');
-  const prompt = `${systemPrompt}
-
-XML Fields Found (residual after dictionary lookup — only fields the dictionary couldn't confidently match):
-${JSON.stringify(fieldsInfo, null, 2)}
-
-For each xml_field, return its best target mapping with a confidence score 0.0-1.0. If a dictionary_hint is provided, it's a low-confidence guess — confirm or override.`;
+  const prompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'xml_field_mapper_user'), { system_prompt: systemPrompt, json: JSON.stringify(fieldsInfo, null, 2) });
 
   // ── Credit metering: only reached when the dictionary left residual fields
   // AND an API key exists → Haiku is about to run. Charge the caller; refund on

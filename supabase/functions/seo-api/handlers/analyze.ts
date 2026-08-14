@@ -13,7 +13,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
-import { getToolPrompt } from '../../_shared/prompt-utils.ts';
+import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
 import type {
   SEOAnalyzeRequest,
@@ -936,35 +936,7 @@ async function applyFixes(
   // seo_fixer edits would appear to save while changing nothing (#347 phase 3P).
   const baseFixPrompt = await getToolPrompt(supabase, 'seo_fixer');
 
-  const prompt = `${baseFixPrompt}
-${voiceInstructions}
-
-=== STRUCTURE TO PRESERVE (DO NOT REMOVE OR REWRITE) ===
-The article uses these custom callout blocks rendered as UI components on the frontend.
-Keep them EXACTLY as they appear — same tag, same position. Do NOT collapse them into plain
-paragraphs or strip the leading marker. Only edit text inside if a fix targets that section.
-
-  > [!tldr]      — TL;DR / direct answer block (one per article, after lead paragraph)
-  > [!key]       — Key Takeaways block (one per article, after TL;DR)
-  > [!definition] Term Name — first-mention jargon definition
-  > [!example]   — Concrete example or case study
-  > [!info]      — Side note
-  > [!warning]   — Risk / pitfall
-  > [!quote]     — Direct quote with attribution
-
-The article ALSO has these required sections — do not remove or rename them:
-  - H1 title (the very first \`# \` line)
-  - Lead paragraph (between H1 and the [!tldr] block)
-  - H2 "Frequently Asked Questions" with each FAQ as an H3
-  - H2 "Conclusion" or "Next Steps" near the end
-
-=== FIXES TO APPLY ===
-${fixList}
-
-=== CURRENT ARTICLE ===
-${content}
-
-Return the revised article in Markdown. Only changed sections should differ from input. Preserve every callout block and required section verbatim unless a fix explicitly targets one.`;
+  const prompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'seo_fixer_user'), { base_fix_prompt: baseFixPrompt, voice_instructions: voiceInstructions, fix_list: fixList, content: content });
 
   const result = await generateWithGemini(prompt, {
     task: 'seo_analyze_revise',
