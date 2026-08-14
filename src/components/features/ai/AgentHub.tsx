@@ -442,6 +442,15 @@ interface Message {
   model?: string;
   images?: string[]; // uploaded images attached to user messages
   insufficientCredits?: boolean; // true when generation failed due to credit exhaustion
+  /**
+   * Set on the reply to a quick-start `run`. A direct run has no model turn, so
+   * nothing offers the obvious next step ("…want me to schedule one?"); the
+   * toolkit's OTHER quick-starts already are that list, declared and launchable,
+   * so the reply offers them instead of ending in a dead stop. Stored as the
+   * toolkit + what just ran, so the chips are re-derived from the catalog on
+   * reload rather than frozen into the row.
+   */
+  followUps?: { toolkitId: string; ranLabel?: string };
   demoData?: any; // Structured demo data for DemoAgent responses
   materialData?: {
     products: any[];
@@ -844,7 +853,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
      * menu, meaningless on its own in a conversation.
      */
     say: string;
+    /**
+     * What the AGENT says back, first person and past tense — the quick-start's
+     * `done` copy. Empty for a run with no quick-start behind it (approving a
+     * confirmation card), which falls back to a neutral confirmation.
+     */
+    done: string;
     toolkitId: string;
+    /** Which quick-start ran, so the reply can offer its siblings and not itself. */
+    quickStartLabel?: string;
   } | null>(null);
   // Toolkit IDs to force-include in the NEXT send's selected_toolkits, regardless
   // of whether the activeToolkits state update has committed yet. Set by quick-start
@@ -880,6 +897,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
+  // First name for the agent's confirmations ("Done, Maria!"). Empty when the
+  // profile has no name — the greeting drops the comma rather than addressing
+  // anyone as "there". `user_profiles.full_name` can be null (the owner account
+  // has NULL email there too), so auth metadata is the fallback.
+  const [firstName, setFirstName] = useState('');
   // showPromptLibrary removed — Interior-only legacy duplicate. Prompts now in PromptBuilderModal "Prompt Library" tab.
   const [showInspirationModal, setShowInspirationModal] = useState(false);
   const [showNewDesignModal, setShowNewDesignModal] = useState(false);
@@ -955,7 +977,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // is dropped rather than printed raw ("List my {{context}} contracts and
       // their status." → "List my contracts and their status.").
       say: renderPromptTemplate(qs.prompt, {}) || qs.label,
+      done: qs.done ?? '',
       toolkitId: tk.id,
+      quickStartLabel: qs.label,
     };
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
     return true;
@@ -986,8 +1010,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       toolName: data.tool,
       toolInput: { ...data.input, confirm: true },
       // Approving a confirmation card: the card's own title IS the sentence
-      // ("Send the quote to Maria?"), so it needs no rewrite.
+      // ("Send the quote to Maria?"), so it needs no rewrite. No quick-start
+      // behind it, so the tool's own message carries the reply.
       say: data.title,
+      done: '',
       toolkitId: data.toolkitId || '',
     };
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
@@ -1414,6 +1440,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           .limit(1)
           .maybeSingle();
         setWorkspaceId(memberRow?.workspace_id ?? user.user_metadata?.workspace_id);
+        const { data: profileRow } = await supabase
+          .from('user_profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        const full = (profileRow?.full_name ?? user.user_metadata?.full_name ?? '').trim();
+        setFirstName(full.split(/\s+/)[0] ?? '');
       }
     };
     fetchUserId();
@@ -3400,6 +3433,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
       }
 
+      // ── The reply to a deterministic run ────────────────────────────────────
+      // Nothing narrates a direct run: there is no model turn, so agent-chat falls
+      // through to a placeholder and the chat said "Done — ran manage_appointments."
+      // — an internal tool id, shown to a customer. The quick-start's own `done`
+      // copy replaces it. A tool that wrote its OWN message (the mutating ones:
+      // "Invoice INV-2026-014 created") keeps it; the placeholder is recognised by
+      // the one thing a tool's own message never does — naming the tool.
+      if (directRun) {
+        const toolResult = Array.isArray(data.tool_results) ? data.tool_results[0]?.result : undefined;
+        const failed = toolResult && toolResult.success === false;
+        const toolMessage = (cleanedText || '').trim();
+        // Two shapes of placeholder: the current bare 'Done.', and the old
+        // `Done — ran <tool>.`. Both are matched because the edge function and this
+        // bundle do not deploy at the same instant — during that window an old
+        // function is talking to a new Studio, and the tool id must not slip
+        // through. A tool's OWN message never names the tool.
+        const isPlaceholder = !toolMessage
+          || toolMessage === 'Done.'
+          || toolMessage.includes(directRun.toolName);
+        if (failed) {
+          // Never announce a failure as "Done!". The tool's own error is the message.
+          cleanedText = isPlaceholder
+            ? `That didn't go through${toolResult?.error ? ` — ${toolResult.error}` : '.'}`
+            : toolMessage;
+        } else {
+          const body = isPlaceholder ? (directRun.done || 'That\'s taken care of.') : toolMessage;
+          // `count: 0` is the shared convention for "ran clean, found nothing" —
+          // worth saying out loud, or the card below reads as a failure.
+          const emptyResult = toolResult && typeof toolResult.count === 'number' && toolResult.count === 0;
+          cleanedText = `Done${firstName ? `, ${firstName}` : ''}! ${body}`
+            + (emptyResult && isPlaceholder ? ' Nothing came back — it\'s empty right now.' : '');
+        }
+      }
+
       // Parse material data from agent responses (for Search Agent, etc.)
       const materialData = data.materialResults ? {
         products: data.materialResults.products || [],
@@ -3426,6 +3493,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         generation_job: data.generation_job, // Async 3D generation job info
         geminiImageData: pendingGeminiData ?? undefined,
         searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec from material_search
+        followUps: directRun?.toolkitId
+          ? { toolkitId: directRun.toolkitId, ranLabel: directRun.quickStartLabel }
+          : undefined,
       };
 
       // Track active generation job if present
@@ -3461,6 +3531,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             generation_job: data.generation_job, // Save generation job info for async 3D generation
             geminiImageData: pendingGeminiData ?? undefined, // Gemini single-image result merged into this message
             searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec
+            followUps: assistantMessage.followUps, // next-step chips, re-derived from the catalog on reload
           },
         });
       }
@@ -3720,6 +3791,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           heatingCostData: msg.metadata?.heatingCostData as any | undefined,
           kitchenCostData: msg.metadata?.kitchenCostData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
+          followUps: msg.metadata?.followUps as any | undefined,
           mentionSummaryData: msg.metadata?.mentionSummaryData as any | undefined,
           sourcingOptionsData: msg.metadata?.sourcingOptionsData as any | undefined,
           purchaseOrderCreatedData: msg.metadata?.purchaseOrderCreatedData as any | undefined,
@@ -4705,6 +4777,44 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     );
   };
 
+  /**
+   * "…and now?" — the next steps offered under the reply to a deterministic run.
+   *
+   * A direct run ends the turn cold: no model, so nothing proposes what to do with
+   * what just landed. The toolkit's OTHER quick-starts are already exactly that
+   * list — declared, labelled, and launchable through the same dispatcher the rest
+   * of the UI uses — so they are offered here rather than a hand-written "next
+   * steps" table that would need an entry per tool and rot the day one is added.
+   * The one that just ran is excluded; three is the cap so the reply stays a reply.
+   */
+  const renderFollowUps = (message: Message): React.ReactNode => {
+    if (!message.followUps) return null;
+    const tk = TOOLKITS.find((t) => t.id === message.followUps!.toolkitId);
+    const next = (tk?.quick_starts ?? [])
+      .filter((q) => q.label !== message.followUps!.ranLabel)
+      .slice(0, 3);
+    if (!tk || next.length === 0) return null;
+    return (
+      <div className="mt-3 border-t border-white/10 pt-3">
+        <p className="mb-1.5 text-xs text-white/60">Want me to do any of these next?</p>
+        <div className="flex flex-wrap gap-1.5">
+          {next.map((qs) => (
+            <button
+              key={qs.label}
+              type="button"
+              title={qs.description}
+              onClick={() => handleQuickStart(qs, tk)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/90 transition-colors hover:bg-white/15"
+            >
+              <Sparkles className="h-3 w-3 text-primary" />
+              {qs.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
   // The canvas is the permanent middle workspace for every agent; the chat is a
   // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
@@ -5555,6 +5665,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                       </div>
                     )}
+                    {message.role === 'assistant' && renderFollowUps(message)}
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-xs text-white/60">
                         {formatTime(message.timestamp)}
@@ -6638,7 +6749,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             toolName,
             toolInput,
             say: renderedPrompt || quickStart.prompt || quickStart.label,
+            done: quickStart.done ?? '',
             toolkitId: toolkit.id,
+            quickStartLabel: quickStart.label,
           };
           setToolkitFormState(null);
           setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);

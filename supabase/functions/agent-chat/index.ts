@@ -2320,11 +2320,18 @@ async function executeAgent(
     } catch { /* stream may be closed */ }
 
     // Prefer the tool's own human-readable message for the transcript line;
-    // fall back to a generic confirmation. The visual result comes from the
-    // tool's mid-stream display chunk, not from this text.
+    // fall back to a bare confirmation. The visual result comes from the tool's
+    // mid-stream display chunk, not from this text.
+    //
+    // The fallback used to be `Done — ran ${directTool.name}.` — the internal tool
+    // id, in the customer's transcript ("Done — ran manage_appointments."). Nothing
+    // was ever going to narrate a direct run: there is no model turn. The Studio
+    // now writes the reply from the quick-start's own `done` copy and treats this
+    // line as a placeholder to discard, so keep it SHORT and safe to show: it is
+    // what a client that doesn't do that substitution will display verbatim.
     const summary = (parsed && typeof parsed.message === 'string' && parsed.message.trim())
       ? parsed.message.trim()
-      : `Done — ran ${directTool.name}.`;
+      : 'Done.';
 
     return {
       text: summary,

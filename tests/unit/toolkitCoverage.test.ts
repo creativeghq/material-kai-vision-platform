@@ -638,6 +638,31 @@ describe('quick-start → chat sentence', () => {
     ).toEqual([]);
   });
 
+  it('every deterministic quick-start says what it did, in words a customer can read', () => {
+    // The reply to a direct run comes from `done` — there is no model turn to write
+    // one. Without it the chat falls through to agent-chat's placeholder, which is
+    // how "Done — ran manage_appointments." reached a customer's transcript.
+    const toolNames = new Set(runQuickStarts.map((x) => x.qs.run!.tool));
+    const bad: string[] = [];
+    for (const { toolkit, qs } of runQuickStarts) {
+      const done = (qs.done ?? '').trim();
+      const at = `${toolkit}/"${qs.label}"`;
+      if (!done) { bad.push(`${at}: no \`done\` copy — the reply falls back to a placeholder`); continue; }
+      if (done.includes('{{')) bad.push(`${at}: \`done\` is shown verbatim, so it cannot carry {{placeholders}}`);
+      if (words(done) < 3) bad.push(`${at}: \`done\` is too terse to read as a reply → "${done}"`);
+      // The whole point: no internal identifiers in the customer's transcript.
+      for (const t of toolNames) if (done.includes(t)) bad.push(`${at}: \`done\` names the tool "${t}"`);
+      if (/_[a-z]/.test(done)) bad.push(`${at}: \`done\` contains a snake_case identifier → "${done}"`);
+      if (done.toLowerCase().startsWith('done')) {
+        bad.push(`${at}: the "Done, <name>!" opener is added by the Studio — don't repeat it here`);
+      }
+    }
+    expect(
+      bad,
+      'A `run` quick-start needs a first-person, past-tense confirmation:\n' + bad.join('\n'),
+    ).toEqual([]);
+  });
+
   it('the bubble is built from the prompt, never from the label', () => {
     const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
     expect(

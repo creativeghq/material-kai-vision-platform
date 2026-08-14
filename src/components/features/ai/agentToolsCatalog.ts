@@ -1148,6 +1148,22 @@ export interface ToolkitQuickStart {
    * never as a fragment that only makes sense under the toolkit heading.
    */
   prompt: string;
+  /**
+   * What the AGENT says back after a `run` quick-start finishes — first person,
+   * past tense, no tool names ("I've pulled up your appointments for the next 7
+   * days."). REQUIRED on every `run` quick-start and checked by
+   * tests/unit/toolkitCoverage.test.ts.
+   *
+   * A direct run has no model turn, so nobody was ever going to narrate it: the
+   * reply fell through to the edge function's placeholder and the chat read
+   * "Done — ran manage_appointments." — the internal tool id, shown to a customer.
+   * Written here rather than derived because `description` is a noun phrase for a
+   * list quick-start ("Upcoming appointments") and a verb phrase for an action one
+   * ("Book a new appointment"); no single template survives both.
+   *
+   * Placeholder-free: it is shown verbatim, never rendered against form values.
+   */
+  done?: string;
   /** Lucide icon name. */
   icon?: string;
   /** Optional workflow_id this quick-start kicks off — used by the WorkflowTracker. */
@@ -1254,6 +1270,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Find materials', description: 'Search the catalog by description', icon: 'Search',
         prompt: 'Find me 5 cement-based grey tiles for a modern bathroom',
+        done: 'I\'ve searched the catalog — here\'s what matched.',
         promptTemplate: 'Find me {{count}} {{description}}.',
         run: { tool: 'material_search', argMap: { description: 'query', count: 'limit' }, coerce: { limit: 'number' } },
         // autoFields keeps the two hand-written fields (they override `query` and
@@ -1268,6 +1285,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Search the KB', description: 'Look up platform docs', icon: 'Compass',
         prompt: 'How does the 7-vector fusion search work?',
+        done: 'I\'ve searched the knowledge base for you.',
         promptTemplate: 'Search the knowledge base: {{query}}',
         run: { tool: 'knowledge_base_search' },
         form: [
@@ -1280,6 +1298,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // one and had never been reachable from the UI.
         label: 'Analyze inspiration', description: 'Pull design tokens from any page', icon: 'Link',
         prompt: 'Analyze a design inspiration URL.',
+        done: 'I\'ve analysed that page and pulled out its design tokens.',
         run: { tool: 'analyze_inspiration_url' },
         autoFields: true,
         form: [
@@ -1309,6 +1328,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         description: 'Required kW from area, insulation, climate zone and emitter',
         icon: 'Calculator',
         prompt: 'How big a heat pump do I need for a 120 m² apartment, post-1980 insulation, zone C, with fan coils?',
+        done: 'I\'ve sized the heat pump for that dwelling.',
         run: { tool: 'calculate_heat_pump_sizing' },
         autoFields: true,
         form: [
@@ -1320,6 +1340,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         description: 'Annual running cost of six heating methods for one dwelling',
         icon: 'Flame',
         prompt: 'Compare heating costs for a 200 m² home at 132 kWh/m²·yr — which is cheapest to run?',
+        done: 'I\'ve compared what each heating method would cost you to run.',
         run: { tool: 'calculate_heating_cost_comparison' },
         autoFields: true,
         form: [
@@ -1335,6 +1356,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         description: 'Cost of a fitted kitchen from its running metres, off the live price list',
         icon: 'Calculator',
         prompt: 'What would a 6 metre kitchen cost? Show me the finishes and worktops available.',
+        done: 'I\'ve priced that kitchen off the live price list.',
         run: { tool: 'calculate_kitchen_cost' },
         autoFields: true,
         form: [
@@ -1486,6 +1508,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My contracts', description: 'List recent contracts', icon: 'ListChecks',
         prompt: 'List my recent contracts and their status.',
+        done: 'I\'ve pulled up your contracts and where each one stands.',
         promptTemplate: 'List my {{context}} contracts and their status.',
         run: { tool: 'manage_contracts', fixedArgs: { action: 'list' } },
         form: [
@@ -1513,6 +1536,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Open conversations', description: 'List recent customer threads', icon: 'ListChecks',
         prompt: 'Show my open customer conversations.',
+        done: 'I\'ve pulled up your open customer conversations.',
         run: { tool: 'manage_inbox', fixedArgs: { action: 'list' } },
       },
       // Replying needs a thread_id only the list above can supply.
@@ -1530,6 +1554,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Unanswered reviews', description: 'Reviews you have not replied to', icon: 'ListChecks',
         prompt: 'Show the reviews about me that I haven\'t replied to yet.',
+        done: 'I\'ve pulled up the reviews still waiting on a reply.',
         run: { tool: 'manage_reviews', fixedArgs: { action: 'list', only_unanswered: true } },
       },
       // Replying needs a review_id only the list above can supply.
@@ -1547,11 +1572,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'This week', description: 'Upcoming appointments', icon: 'CalendarDays',
         prompt: 'What appointments do I have coming up this week?',
+        done: 'I\'ve pulled up your appointments for the next 7 days.',
         run: { tool: 'manage_appointments', fixedArgs: { action: 'list', days: 7 } },
       },
       {
         label: 'Schedule one', description: 'Book a new appointment', icon: 'CalendarPlus',
         prompt: 'Schedule an appointment for me — I\'ll give you the details.',
+        done: 'I\'ve booked that appointment for you.',
         promptTemplate: 'Schedule "{{subject}}" with {{party_name}} at {{meeting_at}}.',
         run: { tool: 'manage_appointments', fixedArgs: { action: 'schedule' } },
         form: [
@@ -1575,11 +1602,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My listings', description: 'List active properties', icon: 'ListChecks',
         prompt: 'Show my real-estate listings.',
+        done: 'I\'ve pulled up your property listings.',
         run: { tool: 'manage_real_estate', fixedArgs: { action: 'list_properties' } },
       },
       {
         label: 'New listing', description: 'Create a property listing', icon: 'Plus',
         prompt: 'Create a new property listing — I\'ll give you the details.',
+        done: 'I\'ve created that property listing.',
         promptTemplate: 'Create a property listing "{{title}}" in {{town}} at {{price}}.',
         run: { tool: 'manage_real_estate', fixedArgs: { action: 'create_listing' }, coerce: { price: 'number', area: 'number' } },
         form: [
@@ -1596,6 +1625,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Find leads', description: 'Buyers matching your listings', icon: 'Users',
         prompt: 'Find buyer leads for my listings.',
+        done: 'I\'ve matched buyer leads against your listings.',
         run: { tool: 'manage_real_estate', fixedArgs: { action: 'find_leads' } },
       },
     ],
@@ -1644,6 +1674,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'List assets', description: 'Company assets & holders', icon: 'ListChecks',
         prompt: 'List our company assets and who holds each one.',
+        done: 'I\'ve pulled up the company assets and who holds each one.',
         promptTemplate: 'List our {{category}} assets and who holds each one.',
         run: { tool: 'manage_company_assets', fixedArgs: { action: 'list' } },
         // autoFields would derive every `add`-only field too; the category filter is
@@ -1662,6 +1693,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Add an asset', description: 'Register a company asset', icon: 'Plus',
         prompt: 'Add a company asset — I\'ll give you the details.',
+        done: 'I\'ve registered that asset.',
         promptTemplate: 'Register a {{category}} asset "{{name}}".',
         run: { tool: 'manage_company_assets', fixedArgs: { action: 'add' }, coerce: { cost: 'number' } },
         form: [
@@ -1697,6 +1729,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Write a doc', description: 'Draft a new internal doc', icon: 'Plus',
         prompt: 'Write a workspace doc about…',
+        done: 'I\'ve drafted that doc for you.',
         promptTemplate: 'Write a workspace doc titled "{{title}}".',
         run: { tool: 'manage_docs', fixedArgs: { action: 'create' } },
         // Hand-written rather than autoFields: the schema's proposed_content / reason /
@@ -1725,11 +1758,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My channels', description: 'List connected WhatsApp numbers', icon: 'ListChecks',
         prompt: 'List my connected WhatsApp channels.',
+        done: 'I\'ve pulled up your connected WhatsApp numbers.',
         run: { tool: 'manage_messaging', fixedArgs: { action: 'list_channels' } },
       },
       {
         label: 'Send a message', description: 'Send a WhatsApp to a customer', icon: 'Send',
         prompt: 'Send a WhatsApp message — ask me for the number and the text.',
+        done: 'I\'ve sent that WhatsApp message.',
         promptTemplate: 'Send a WhatsApp to {{to}}: {{content}}',
         // `confirm` is deliberately absent — the tool previews and the Approve/Decline
         // card supplies it (invariant 9). A quick-start must never pre-approve a send.
@@ -1753,6 +1788,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Deal pipeline', description: 'Open deals and the weighted forecast', icon: 'FolderKanban',
         prompt: 'Show me the deal pipeline.',
+        done: 'I\'ve pulled up your deal pipeline with the weighted forecast.',
         promptTemplate: 'Show me the deal pipeline.',
         run: { tool: 'manage_deal' },
         // autoFields derives the `action` select (list / forecast / create / move / lose) from the
@@ -1764,6 +1800,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Add a contact', description: 'Add a person to the CRM', icon: 'UserPlus',
         prompt: 'Add a new contact to the CRM — I\'ll give you their details.',
+        done: 'I\'ve added that person to your CRM.',
         promptTemplate: 'Add {{name}} to the CRM.',
         run: { tool: 'manage_crm', fixedArgs: { action: 'create_contact' } },
         form: [
@@ -1776,6 +1813,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Log an activity', description: 'Record a note/call on a contact', icon: 'Pencil',
         prompt: 'Log an activity on a contact — e.g. that I called them.',
+        done: 'I\'ve logged that activity against the contact.',
         promptTemplate: 'Log a {{kind}} on {{contact_query}}: {{note}}',
         run: { tool: 'manage_crm', fixedArgs: { action: 'log_activity' } },
         form: [
@@ -1804,6 +1842,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Unpaid invoices', description: 'List invoices still owed', icon: 'FileText',
         prompt: 'Show me all unpaid invoices.',
+        done: 'I\'ve pulled up the invoices still owed.',
         promptTemplate: 'Show me unpaid {{direction}} invoices.',
         run: { tool: 'manage_finance', fixedArgs: { action: 'list_invoices', unpaid_only: true } },
         form: [
@@ -1819,6 +1858,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Customer balance', description: 'What does a customer owe?', icon: 'Wallet',
         prompt: 'What is the open balance for a customer? Help me pick which one.',
+        done: 'I\'ve worked out what that customer owes.',
         promptTemplate: 'What is the open balance for {{customer_name}}?',
         run: { tool: 'manage_finance', fixedArgs: { action: 'customer_balance' } },
         form: [
@@ -1828,6 +1868,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Recent orders', description: 'List orders across the workspace', icon: 'ShoppingCart',
         prompt: 'List our recent orders.',
+        done: 'I\'ve pulled up your recent orders.',
         run: { tool: 'manage_finance', fixedArgs: { action: 'list_orders' } },
       },
     ],
@@ -1846,11 +1887,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My campaigns', description: 'List recent email campaigns', icon: 'ListChecks',
         prompt: 'List my recent email campaigns and their status.',
+        done: 'I\'ve pulled up your recent campaigns and where each one stands.',
         run: { tool: 'manage_email_campaign', fixedArgs: { action: 'list' } },
       },
       {
         label: 'My templates', description: 'List available email templates', icon: 'Palette',
         prompt: 'List my email templates.',
+        done: 'I\'ve pulled up your email templates.',
         run: { tool: 'manage_email_campaign', fixedArgs: { action: 'list_templates' } },
       },
     ],
@@ -1878,16 +1921,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My job searches', description: 'List your active searches', icon: 'ListChecks',
         prompt: 'List my job searches.',
+        done: 'I\'ve pulled up your active job searches.',
         run: { tool: 'list_my_job_searches' },
       },
       {
         label: 'Preview digest', description: "Today's consolidated digest", icon: 'Newspaper',
         prompt: "Preview today's job digest.",
+        done: 'I\'ve built today\'s digest — here\'s the preview.',
         run: { tool: 'get_job_digest_preview' },
       },
       {
         label: 'Which job boards?', description: 'List the searched job sites', icon: 'Globe',
         prompt: 'Which job boards do you search?',
+        done: 'Here are the job boards I search for you.',
         run: { tool: 'manage_job_sites', fixedArgs: { action: 'list' } },
       },
     ],
@@ -1906,16 +1952,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My leave balance', description: 'Allowance, taken and remaining days', icon: 'CalendarOff',
         prompt: 'How much leave do I have left?',
+        done: 'I\'ve worked out your leave balance.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_profile' } },
       },
       {
         label: 'My time off', description: 'Your absences and their approval status', icon: 'ListChecks',
         prompt: 'Show my time off and the status of each request.',
+        done: 'I\'ve pulled up your absences and where each request stands.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_timeoff' } },
       },
       {
         label: 'Request time off', description: 'Submit a leave request for approval', icon: 'CalendarPlus',
         prompt: 'Request time off.',
+        done: 'I\'ve submitted your time-off request for approval.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'request_timeoff' } },
         form: [
           { key: 'absence_type', label: 'Type', kind: 'select', default: 'vacation', options: [
@@ -1932,6 +1981,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My documents', description: 'Your HR documents', icon: 'FolderKanban',
         prompt: 'List my HR documents.',
+        done: 'I\'ve pulled up your HR documents.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_documents' } },
       },
     ],
@@ -1948,21 +1998,25 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: "Who's on leave", description: 'Approved absences this week', icon: 'CalendarOff',
         prompt: "Who's on leave this week?",
+        done: "I've pulled up who's away this week.",
         run: { tool: 'manage_hr', fixedArgs: { action: 'who_is_on_leave' } },
       },
       {
         label: 'HR overview', description: 'Headcount, on-leave-today, pending requests', icon: 'LayoutDashboard',
         prompt: 'Give me an HR overview.',
+        done: 'I\'ve pulled together the HR overview.',
         run: { tool: 'manage_hr', fixedArgs: { action: 'overview' } },
       },
       {
         label: 'List employees', description: 'The team roster with absence totals', icon: 'ListChecks',
         prompt: 'List my employees.',
+        done: 'I\'ve pulled up the team roster.',
         run: { tool: 'manage_hr', fixedArgs: { action: 'list_employees' } },
       },
       {
         label: 'Record absence', description: 'Log a sick/vacation day (pending approval)', icon: 'CalendarPlus',
         prompt: 'Record an absence for an employee.',
+        done: 'I\'ve recorded that absence — it\'s pending approval.',
         promptTemplate: 'Record a {{absence_type}} day for {{employee}} from {{start_date}} to {{end_date}}.',
         run: {
           tool: 'manage_hr',
@@ -1995,16 +2049,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Low stock', description: 'Items at/below reorder point', icon: 'AlertTriangle',
         prompt: "What's low on stock?",
+        done: 'I\'ve pulled up everything at or below its reorder point.',
         run: { tool: 'manage_stock', fixedArgs: { action: 'list_low_stock' } },
       },
       {
         label: 'Stock overview', description: 'Items, warehouses, low/out-of-stock', icon: 'LayoutDashboard',
         prompt: 'Give me a stock overview.',
+        done: 'I\'ve pulled together your stock overview.',
         run: { tool: 'manage_stock', fixedArgs: { action: 'overview' } },
       },
       {
         label: 'Check an item', description: 'On-hand & available for a product', icon: 'Search',
         prompt: 'Check stock for an item.',
+        done: 'I\'ve checked what\'s on hand for that item.',
         promptTemplate: 'How many "{{item}}" do we have in stock?',
         run: { tool: 'manage_stock', fixedArgs: { action: 'check_stock' }, argMap: { item: 'item_query' } },
         form: [
@@ -2014,6 +2071,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Receive stock', description: 'Add received units to an item', icon: 'PackagePlus',
         prompt: 'Receive stock for an item.',
+        done: 'I\'ve booked those units into stock.',
         promptTemplate: 'Receive {{quantity}} units of "{{item}}" into stock.',
         run: {
           tool: 'manage_stock',
@@ -2039,6 +2097,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Ready for my site?', description: 'What a product still needs to be embeddable', icon: 'Code2',
         prompt: 'Is one of my products ready to show on my own website?',
+        done: 'I\'ve checked what that product still needs to be embeddable.',
         promptTemplate: 'Is "{{product_name}}" ready to show on my own website? Give me the snippet if it is.',
         run: { tool: 'embed_readiness', argMap: { product_name: 'product_name' } },
         form: [
@@ -2051,6 +2110,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // step with the schema that accepts it.
         label: 'Is my embed live?', description: 'Keys, activity and what it costs', icon: 'Globe',
         prompt: 'Is my website embed live, what is it doing, and what is it costing me?',
+        done: 'I\'ve checked your embed — the keys, the activity and what it costs.',
         run: { tool: 'embed_overview' },
         autoFields: true,
       },
@@ -2075,6 +2135,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Product provenance', description: 'Where a product came from', icon: 'Network',
         prompt: 'Show the provenance of a product.',
+        done: 'I\'ve traced where that product came from.',
         promptTemplate: 'Where did "{{product}}" come from? Show its provenance.',
         run: { tool: 'product_provenance', argMap: { product: 'sku' } },
         form: [
@@ -2084,6 +2145,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Brand overview', description: 'Everything about one brand', icon: 'Building2',
         prompt: 'Give me an overview of a brand.',
+        done: 'I\'ve pulled together everything on that brand.',
         promptTemplate: 'Give me a brand overview for "{{brand}}".',
         run: { tool: 'brand_overview', argMap: { brand: 'brand_name' } },
         form: [
@@ -2121,6 +2183,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // parameter, and it had no UI at all.
         label: 'Search by ΚΑΔ', description: 'CRM companies with an activity code', icon: 'Search',
         prompt: 'Which companies in our CRM have a given ΚΑΔ activity code?',
+        done: 'I\'ve found the CRM companies carrying that activity code.',
         run: { tool: 'search_crm_by_kad' },
         autoFields: true,
         form: [
@@ -2141,6 +2204,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My flows', description: 'List automations in this workspace', icon: 'ListChecks',
         prompt: 'List my flows.',
+        done: 'I\'ve pulled up the automations running in this workspace.',
         run: { tool: 'manage_flows', fixedArgs: { action: 'list' } },
       },
       {
@@ -2185,11 +2249,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My accounts', description: 'Connected social accounts', icon: 'Users',
         prompt: 'List my connected social accounts.',
+        done: 'I\'ve pulled up your connected social accounts.',
         run: { tool: 'manage_social', fixedArgs: { action: 'list_accounts' } },
       },
       {
         label: 'Publish a post', description: 'Post now to a connected account', icon: 'Megaphone',
         prompt: 'Publish a social post.',
+        done: 'I\'ve published that post.',
         promptTemplate: 'Publish this post: {{content}}',
         // `manage_social` wants `caption`, plus `account_id` OR `platform` to resolve the
         // target. The form collected `content` and nothing else, and because `run` is present
@@ -2210,6 +2276,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Best time to post', description: 'When your audience is active', icon: 'CalendarPlus',
         prompt: 'When is the best time to post?',
+        done: 'I\'ve worked out when your audience is most active.',
         run: { tool: 'manage_social', fixedArgs: { action: 'best_time' } },
       },
     ],
@@ -2226,6 +2293,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Browse the radar', description: 'Current tracked findings', icon: 'Radar',
         prompt: 'Show me the tech radar.',
+        done: 'I\'ve pulled up what\'s currently on the radar.',
         run: { tool: 'list_tech_radar' },
         // Every field is optional, so this is still one click through — but the `ring`
         // filter (adopt / trial / assess / hold) is now reachable instead of living
@@ -2235,6 +2303,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Review a solution', description: 'Assess it against our stack', icon: 'BadgeCheck',
         prompt: 'Review a solution against our stack.',
+        done: 'I\'ve assessed it against our current stack.',
         promptTemplate: 'Review "{{solution}}" against our current stack and tell me if we should adopt it.',
         run: { tool: 'review_solution', argMap: { solution: 'title' } },
         form: [
@@ -2246,6 +2315,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Track an entry', description: 'Add something to the radar', icon: 'Plus',
         prompt: 'Track something on the tech radar.',
+        done: 'I\'ve added it to the tech radar.',
         promptTemplate: 'Track "{{solution}}" on the tech radar.',
         // `action` is REQUIRED on track_tech_radar — without the fixedArg this call
         // failed zod validation every single time it was clicked.
@@ -2276,6 +2346,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'New project', description: 'Create a project', icon: 'Plus',
         prompt: 'Create a new project.',
+        done: 'I\'ve created that project.',
         promptTemplate: 'Create a project called "{{name}}".',
         run: { tool: 'create_project' },
         form: [
@@ -2286,11 +2357,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My projects', description: 'List your projects', icon: 'ListChecks',
         prompt: 'List my projects.',
+        done: 'I\'ve pulled up your projects.',
         run: { tool: 'list_my_projects' },
       },
       {
         label: 'Find a project', description: 'Look up a project by name', icon: 'Search',
         prompt: 'Find a project.',
+        done: 'I\'ve found that project.',
         promptTemplate: 'Find the "{{query}}" project.',
         run: { tool: 'find_project' },
         form: [
@@ -2303,6 +2376,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // here — and stays right if the enum ever gains a third value.
         label: 'Add a task', description: 'Add a task to a project', icon: 'ListPlus',
         prompt: 'Add a task to one of my projects.',
+        done: 'I\'ve added that task to the project.',
         run: { tool: 'add_task' },
         autoFields: true,
         form: [
@@ -2313,6 +2387,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Purchase sheet', description: 'PDF of the doors/windows spec', icon: 'FileText',
         prompt: 'Generate the purchase sheet for one of my projects.',
+        done: 'I\'ve generated the purchase sheet.',
         run: { tool: 'generate_purchase_sheet' },
         autoFields: true,
         form: [
@@ -2331,6 +2406,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'New quote', description: 'Create a quote from products', icon: 'Plus',
         prompt: 'Create a quote.',
+        done: 'I\'ve created that quote.',
         promptTemplate: 'Create a quote named "{{name}}" with these items: {{items}}',
         run: { tool: 'create_quote' },
         form: [
@@ -2341,6 +2417,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'My quotes', description: 'List recent quotes', icon: 'ListChecks',
         prompt: 'Show my recent quotes.',
+        done: 'I\'ve pulled up your recent quotes.',
         run: { tool: 'list_my_quotes' },
       },
       {
@@ -2571,6 +2648,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Research a keyword', description: 'Full SERP + AI Overview snapshot', icon: 'Search',
         prompt: 'Research the keyword "porcelain tile installation" in the UK. Walk me through the SERP findings.',
+        done: 'I\'ve captured the SERP and AI Overview for that keyword.',
         promptTemplate: 'Research the keyword "{{keyword}}" in {{country}}. Walk me through the SERP findings.',
         run: { tool: 'seo_research_keyword', argMap: { country: 'country_code' } },
         form: [
@@ -2581,6 +2659,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Audit a URL', description: 'Lighthouse + on-page issues', icon: 'BadgeCheck',
         prompt: 'Audit a public URL.',
+        done: 'I\'ve audited that page.',
         promptTemplate: 'Audit this URL: {{url}}',
         run: { tool: 'seo_audit_url' },
         form: [
@@ -2590,6 +2669,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Suggest keywords', description: 'Phrase-match expansion with volume', icon: 'ListChecks',
         prompt: 'Expand a seed phrase into 30 keyword suggestions with volume + competition.',
+        done: 'I\'ve expanded that seed into keyword suggestions with volume.',
         promptTemplate: 'Expand the seed phrase "{{seed}}" into {{count}} keyword suggestions with volume + competition.',
         run: { tool: 'seo_keyword_suggestions', argMap: { seed: 'keyword', count: 'limit' }, coerce: { limit: 'number' } },
         form: [
@@ -2614,6 +2694,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Snapshot a domain', description: 'Rank, keyword count, traffic, backlinks', icon: 'Globe',
         prompt: 'Give me an SEO snapshot for a domain.',
+        done: 'I\'ve taken an SEO snapshot of that domain.',
         promptTemplate: 'Give me an SEO snapshot for {{domain}}.',
         run: { tool: 'seo_domain_snapshot' },
         form: [
@@ -2623,6 +2704,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Find content gaps', description: 'Keywords competitor ranks for that we don\'t', icon: 'Search',
         prompt: 'Find SEO keyword gaps between two domains.',
+        done: 'I\'ve found the keywords they rank for and you don\'t.',
         promptTemplate: 'Find SEO keyword gaps where {{competitor}} ranks but {{your_domain}} does not.',
         run: { tool: 'seo_keyword_gap', argMap: { competitor: 'competitor_domain' } },
         form: [
@@ -2633,6 +2715,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'List ranked keywords', description: 'What does a domain rank for', icon: 'ListChecks',
         prompt: 'List every keyword a domain currently ranks for, with positions + traffic share.',
+        done: 'I\'ve listed what that domain currently ranks for.',
         promptTemplate: 'List every keyword {{domain}} currently ranks for in {{country}}, with positions + traffic share.',
         run: { tool: 'seo_ranked_keywords', argMap: { country: 'country_code' } },
         form: [
@@ -2655,6 +2738,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Backlinks summary', description: 'Total backlinks + referring domains + spam score', icon: 'Link2',
         prompt: 'Pull a backlinks summary for a domain.',
+        done: 'I\'ve pulled the backlink profile for that domain.',
         promptTemplate: 'Pull a backlinks summary for {{domain}}.',
         run: { tool: 'seo_backlinks_summary', argMap: { domain: 'target' } },
         form: [
@@ -2664,6 +2748,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Anchor texts', description: 'Top anchor patterns', icon: 'Link2',
         prompt: 'List the top anchor texts pointing to a domain.',
+        done: 'I\'ve pulled the top anchor texts pointing at that domain.',
         promptTemplate: 'List the top anchor texts pointing to {{domain}}.',
         run: { tool: 'seo_backlinks_anchors', argMap: { domain: 'target' } },
         form: [
@@ -2686,6 +2771,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Crawl a site', description: 'OnPage crawl up to 1000 pages', icon: 'FileSearch',
         prompt: 'Kick off a full OnPage crawl for a domain.',
+        done: 'I\'ve started the crawl — findings land as it works through the pages.',
         promptTemplate: 'Kick off a full OnPage crawl for {{domain}} (up to {{max_pages}} pages).',
         run: { tool: 'seo_site_crawl_start', argMap: { domain: 'target' }, coerce: { max_pages: 'number' } },
         form: [
@@ -2696,6 +2782,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Tech stack', description: 'Detect CMS, analytics, frameworks', icon: 'FileSearch',
         prompt: 'Identify the tech stack of a domain.',
+        done: 'I\'ve detected what that site is built on.',
         promptTemplate: 'Identify the tech stack of {{domain}}.',
         run: { tool: 'seo_domain_technologies' },
         form: [
@@ -2705,6 +2792,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'LLM mentions', description: 'What LLMs cite for a keyword', icon: 'Bot',
         prompt: 'Find what pages LLMs cite when answering questions about a keyword.',
+        done: 'I\'ve found what the LLMs cite on that topic.',
         promptTemplate: 'Find what pages LLMs cite when answering questions about "{{keyword}}".',
         run: { tool: 'seo_llm_mentions_search' },
         form: [
@@ -2728,6 +2816,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'YouTube search', description: 'Top YouTube videos for a keyword', icon: 'Layers',
         prompt: 'Search YouTube for "porcelain tile installation" — show top videos with view counts.',
+        done: 'I\'ve pulled the top YouTube videos for that keyword.',
         promptTemplate: 'Search YouTube for "{{keyword}}" — show the top videos with view counts.',
         run: { tool: 'seo_youtube_search' },
         form: [
@@ -2737,6 +2826,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Google Trends', description: 'Interest-over-time + regional', icon: 'Layers',
         prompt: 'Run Google Trends for up to 5 keywords.',
+        done: 'I\'ve pulled the interest over time and the regional split.',
         promptTemplate: 'Run Google Trends for these keywords: {{keywords}}.',
         run: { tool: 'seo_google_trends', coerce: { keywords: 'lines' } },
         form: [
@@ -2749,6 +2839,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // only possible by naming it in chat.
         label: 'App-store keywords', description: 'Keywords a mobile app ranks for', icon: 'Layers',
         prompt: 'Which keywords does a mobile app rank for?',
+        done: 'I\'ve pulled the keywords that app ranks for.',
         run: { tool: 'seo_app_keywords' },
         autoFields: true,
         form: [
@@ -2758,6 +2849,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Reddit threads', description: 'Real user discussion + pain points', icon: 'Layers',
         prompt: 'Find Reddit threads discussing a topic.',
+        done: 'I\'ve found the Reddit discussion on that topic.',
         promptTemplate: 'Find Reddit threads discussing "{{topic}}".',
         run: { tool: 'seo_reddit_search', argMap: { topic: 'keyword' } },
         form: [
@@ -2776,6 +2868,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Full site review', description: 'Rank + keywords + competitors + backlinks in one call', icon: 'BadgeCheck',
         prompt: 'Run a full site review of a domain.',
+        done: 'I\'ve run the full site review.',
         promptTemplate: 'Run a full site review of {{domain}}.',
         run: { tool: 'seo_site_review' },
         form: [
@@ -2785,6 +2878,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Brand SERP audit', description: 'Knowledge Panel + AI Overview brand mention', icon: 'BadgeCheck',
         prompt: 'Run a brand-search audit for a brand.',
+        done: 'I\'ve audited how that brand shows up in search.',
         promptTemplate: 'Run a brand-search audit for "{{brand}}".',
         run: { tool: 'seo_brand_search_audit', argMap: { brand: 'brand_name' } },
         form: [
@@ -2819,6 +2913,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Just research', description: 'Stop at research stage', icon: 'Search',
         prompt: 'Run only Stage 1 (keyword research).',
+        done: 'I\'ve finished the keyword research stage and stopped there.',
         promptTemplate: 'Run only Stage 1 (keyword research) for the seed keyword "{{keyword}}".',
         // `topic` AND `target_keyword` are both required. Mapping the one seed field
         // to `topic` left target_keyword unset, so the call never validated.
@@ -2846,6 +2941,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Scrape materials from a page', description: 'Pull products off a supplier URL',
         icon: 'Globe',
         prompt: 'Scrape the materials from https://example-supplier.com/collections/porcelain',
+        done: 'I\'ve scraped the products off that page.',
         promptTemplate: 'Scrape the materials from {{url}}',
         run: { tool: 'scrape_materials_from_url' },
         // autoFields derives the `detail` select (quick / full) from the tool's own z.enum, so
@@ -2871,6 +2967,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Enrich a company', description: 'Apollo data for a known domain', icon: 'Building2',
         prompt: 'Pull Apollo enrichment for a single company.',
+        done: 'I\'ve pulled the Apollo enrichment for that domain.',
         promptTemplate: 'Pull Apollo enrichment for {{domain}}.',
         // company_name is REQUIRED by the schema; collecting only the domain made
         // every click fail validation before it reached Apollo.
@@ -2884,6 +2981,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Find contacts', description: 'Decision-maker emails for a company', icon: 'Mail',
         prompt: 'Find decision-maker emails at a company.',
+        done: 'I\'ve found decision-maker contacts there.',
         promptTemplate: 'Find decision-maker contacts ({{titles}}) at {{domain}}.',
         run: { tool: 'contact_discovery', argMap: { titles: 'roles' }, coerce: { roles: 'csv' } },
         form: [
@@ -2906,6 +3004,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Deep research', description: 'Multi-step open-ended research', icon: 'Bot',
         prompt: 'Run a deep research analysis.',
+        done: 'I\'ve finished the research and written it up.',
         promptTemplate: 'Run a deep research analysis on: {{topic}}',
         run: { tool: 'research_analysis', argMap: { topic: 'query' } },
         form: [
@@ -2915,6 +3014,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Platform analytics', description: 'Usage / metric breakdowns', icon: 'Bot',
         prompt: 'Run an analytics question against the platform.',
+        done: 'I\'ve run that analytics breakdown.',
         promptTemplate: 'Run a platform analytics question: {{question}}',
         run: { tool: 'analytics_analysis', argMap: { question: 'query' } },
         form: [
@@ -2924,6 +3024,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Business breakdown', description: 'Revenue / customer / GMV', icon: 'Bot',
         prompt: 'Run a business-side analysis.',
+        done: 'I\'ve run that business breakdown.',
         promptTemplate: 'Run a business-side analysis: {{question}}',
         run: { tool: 'business_analysis', argMap: { question: 'query' } },
         form: [
@@ -2943,6 +3044,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         label: 'Pricing KB lookup', description: 'Admin-curated price data', icon: 'Wrench',
         prompt: 'Pull a pricing-KB entry.',
+        done: 'I\'ve pulled the pricing-KB entry.',
         promptTemplate: 'Pull the pricing-KB entry for "{{query}}".',
         run: { tool: 'price_lookup', argMap: { query: 'product_name' } },
         form: [
