@@ -437,3 +437,52 @@ to desynchronise the two halves deliberately. Its clean run still means nothing.
   the check now reports the attribution gap itself as a second branch. Open finding; the remedy is
   threading workspace_id through the email-api callers (Flows send_email, send-quote-email, the
   price/mention alerts).
+
+---
+
+## Probes added 2026-08-13/14 — each watched to fire before being trusted
+
+Four new mechanisms. Per the rule at the top of this file, none is listed as a guard on the
+strength of a passing run: each was fed the defect it exists for and confirmed to fail.
+
+### `ops.email_stranded_queued` — a send that failed and left no failure marker
+`email_logs` rows are written `queued` and flipped to `sent` after the Resend call in the SAME
+request. Nothing drains, retries or reaps the table, so a row still `queued` an hour later did not
+wait — its send threw and the error was discarded. Two *"Your order DN-2026-000x has shipped"*
+mails had sat that way since 2026-07-28 with `error_message` NULL: the customer was never told and
+nothing anywhere said so.
+
+- **Guarded by:** the probe, plus the `try/catch` in `email-api` that now marks the row `failed`.
+- **Proven to fire:** 2026-08-13 — reproduced all five stranded rows before the backfill; reads 0 after.
+- **Blind spot:** a send that Resend accepts and then drops. That is the delivery-rate check above, not this one.
+
+### `ops.provider_webhook_rejected` — money we were told about and refused
+435 genuine Stripe deliveries were answered 400 across July, and 12 more in a three-hour window on
+2026-08-01. A provider retries for a limited period and then drops the event for good.
+
+- **Proven to fire:** 2026-08-13 — replaying its logic over 2026-08-01 returns exactly the 12-rejection finding, while the live 7-day window is clean.
+- **Why the existing checks could not see it:** `ops.silent_zero`'s endpoint branch needs a sub-5% success rate over a long window; `stripe-webhooks` sits at 12.5% lifetime and a three-hour outage cannot move a 30-day rate. A burst needs a burst probe.
+- **Blind spot:** scoped to the providers' own user-agents on purpose, so a provider that changes its UA goes unwatched.
+
+### `ops.registry_field_unreachable` — a registry field no consumer can reach
+`material_metadata_fields` rows are reached via `is_global` or a non-empty `applies_to_categories`.
+16 rows had neither. Not inert: `dealerProductsService` read an empty scope as *"applies to all"*,
+so sanitary's `bowl_shape` and `flush_type` were offered on tiles products and `wood_type` /
+`weave` / `upholstery` on lighting. Nine were `role='identity'` — what phases 5/6 key stock on.
+
+- **Proven to fire:** 2026-08-13, and it earned its place immediately. The migration written to fix the 16 used `is_global = false`, which is NULL-blind, and its verification query used the same predicate — so the fix reported success while 11 rows were still broken. The probe uses `coalesce(is_global,false)` and found all 11.
+- **Paired with:** [tests/unit/categoryFieldRegistry.test.ts](../tests/unit/categoryFieldRegistry.test.ts) for the TypeScript half.
+
+### `ops.warehouse_identity_less_movement` — the right count on the wrong shelf
+Dispatch picked the warehouse row with the most stock for a product, across every variant of it:
+`order by … wi.qty_on_hand desc limit 1`. Shipping 300x300 decremented the 600x600 row *because*
+that row was better stocked — the ordering actively preferred the wrong one. Receiving had the same
+shape with `limit 1`.
+
+Variant equality is now a FILTER in both (`_variant_dims`), so a contradicting row cannot be chosen
+at any stock level; `qty_on_hand desc` survives only to break ties among rows that are this variant.
+Dimensionless rows are still accepted — they predate variant tracking and refusing them would strand
+real stock — and this probe watches exactly that remaining tolerance.
+
+- **Proven to fire:** 2026-08-14 — with a 999-unit `600x600` row beside a 5-unit `300x300`, a line naming `300x300` now selects the 5-unit row; before the fix the ordering chose the 999. A line naming nothing still falls back to best-stocked, so existing behaviour is unchanged.
+- **Blind spot:** identity beyond dimensions. A finish or colour mismatch is not yet a filter — that arrives with the per-variant SKU in phase 7.
