@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import {
-  TrendingUp, Search, Target, Zap, Award, Globe, Layers, Activity, Building2,
+  TrendingUp, Search, Target, Award, Globe, Layers, Activity,
   Download, Calendar, ChevronUp, ChevronDown, Minus, Package, Star, Eye, Users,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -913,7 +913,7 @@ export const MarketTrendsTab: React.FC = () => {
                 </thead>
                 <tbody>
                   {topMoodboardItems.map((row, i) => (
-                    <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors `}>
+                    <tr key={i} className={'border-b border-border/30 hover:bg-muted/30 transition-colors '}>
                       <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2 font-medium">
                         <div className="flex items-center gap-1.5">
@@ -969,7 +969,7 @@ export const MarketTrendsTab: React.FC = () => {
                   </thead>
                   <tbody>
                     {topQuotedItems.map((row, i) => (
-                      <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors `}>
+                      <tr key={i} className={'border-b border-border/30 hover:bg-muted/30 transition-colors '}>
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2 font-medium">
                           <div className="flex items-center gap-1.5">
