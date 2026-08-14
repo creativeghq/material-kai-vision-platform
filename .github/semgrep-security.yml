@@ -243,3 +243,70 @@ rules:
       - pattern: 'try { ... } catch ($E) { return {..., allowed: true}; }'
       - pattern: 'try { ... } catch ($E) { return {..., success: true}; }'
       - pattern: 'try { ... } catch ($E) { return {..., ok: true}; }'
+
+  # ── K · Prompts come from the database (#347 phase 3P) ──────────────────────
+  # A hardcoded prompt fallback is invisible when it fires. segmentation_service read the DB,
+  # caught every exception, logged at DEBUG and used a 9,119-char constant: an admin editing that
+  # prompt saw it save and changed nothing, forever, while every health signal stayed green.
+  #
+  # The Python side is guarded by tests/unit/test_prompts_come_from_the_database.py. The
+  # TypeScript/edge side had NO guard at all until this rule, and that is where 22 of the 29
+  # migrated prompts live.
+  #
+  # SPLIT BY LANGUAGE ON PURPOSE. A single rule declaring [typescript, python] threw
+  # "Invalid pattern for TypeScript: Stdlib.Parsing.Parse_error" on the Python `or` form and
+  # semgrep rejected the WHOLE rule — it loaded and matched nothing. Same failure as
+  # no-fail-open-in-gate. Verified against a probe carrying 7 bad and 2 good shapes: 7/7 matched,
+  # 0 false positives, 0 rule errors. Both shapes occur ZERO times in the tree today.
+  - id: no-prompt-code-fallback
+    languages: [typescript]
+    severity: ERROR
+    message: >
+      Prompt fallback (#347 phase 3P): a prompt loader's result is OR'd with a literal, so a
+      missing row silently substitutes a hardcoded prompt and the model gets a different document
+      than the one in /admin/ai-configs. A missing prompt is a hard failure. Use
+      loadPrompt/getToolPrompt (which throw), or tryLoadPrompt when absence is genuinely expected
+      — it returns null only for PromptNotConfigured and still throws when the store is
+      unreachable, so an outage can never look like "not configured".
+    # `await` is not optional here: every real call site awaits, and a bare-call pattern matched
+    # NOTHING against the probe.
+    pattern-either:
+      - pattern: await getToolPrompt(...) || "..."
+      - pattern: await getToolPrompt(...) ?? "..."
+      - pattern: await getAgentSystemPrompt(...) || "..."
+      - pattern: await getAgentSystemPrompt(...) ?? "..."
+      - pattern: await getGenerationPrompt(...) || "..."
+      - pattern: await getGenerationPrompt(...) ?? "..."
+      - pattern: await loadPrompt(...) || "..."
+      - pattern: await loadPrompt(...) ?? "..."
+      - pattern: await tryLoadPrompt(...) || "..."
+      - pattern: await tryLoadPrompt(...) ?? "..."
+      - pattern: getToolPrompt(...) || "..."
+      - pattern: getGenerationPrompt(...) || "..."
+
+  - id: no-prompt-code-fallback-python
+    languages: [python]
+    severity: ERROR
+    message: >
+      Prompt fallback (#347 phase 3P): `load_prompt(...) or "literal"` substitutes a hardcoded
+      prompt when the row is missing. This is the shape that made
+      `self._db_prompt or EXTRACTION_SYSTEM_PROMPT` run platform defaults for any workspace whose
+      prompt failed to load, silently. A missing prompt must raise.
+    pattern-either:
+      - pattern: await load_prompt(...) or "..."
+      - pattern: load_prompt(...) or "..."
+      - pattern: get_cached(...) or "..."
+
+  # `getGenerationPrompt` took a REQUIRED third `fallback` argument until #347 phase 3P. That is
+  # what made every caller carry a copy of its own prompt, and the copy won silently whenever the
+  # lookup missed — which for 'ai_rerank' was every single call, because that prompt is filed
+  # under prompt_type='tool' and the loader queried 'generation'. Re-adding the parameter would
+  # reintroduce the whole class, so the arity is pinned here.
+  - id: no-generation-prompt-fallback-arg
+    languages: [typescript]
+    severity: ERROR
+    message: >
+      Prompt fallback (#347 phase 3P): getGenerationPrompt takes (supabase, promptName) only.
+      A third argument is the removed `fallback` parameter, which made a missed lookup
+      indistinguishable from a configured prompt.
+    pattern: getGenerationPrompt($A, $B, $C)

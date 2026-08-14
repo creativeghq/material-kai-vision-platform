@@ -119,6 +119,38 @@ describe('semgrep security ruleset', () => {
     ).toContain('catch');
   });
 
+  /**
+   * The prompt rules are split by LANGUAGE. A single rule declaring [typescript, python] threw
+   * "Invalid pattern for TypeScript" on the Python `or` form and semgrep rejected the WHOLE
+   * rule — it loaded and matched nothing, which is the failure this whole file exists to
+   * prevent. Merging them back would look like a tidy-up and silently disarm both.
+   */
+  it('keeps the prompt-fallback rules split by language', () => {
+    const doc = parse(raw) as { rules: Array<{ id: string; languages: string[] }> };
+    const ts = doc.rules.find((r) => r.id === 'no-prompt-code-fallback');
+    const py = doc.rules.find((r) => r.id === 'no-prompt-code-fallback-python');
+    expect(ts, 'the TypeScript prompt-fallback rule is gone (#347 phase 3P)').toBeTruthy();
+    expect(py, 'the Python prompt-fallback rule is gone (#347 phase 3P)').toBeTruthy();
+    expect(ts!.languages, 'no-prompt-code-fallback must be typescript-only').toEqual(['typescript']);
+    expect(py!.languages, 'no-prompt-code-fallback-python must be python-only').toEqual(['python']);
+  });
+
+  /**
+   * Every real call site awaits its loader. A bare-call pattern parses fine and matches NOTHING,
+   * so this pins the `await` form that was verified against a probe.
+   */
+  it('the TypeScript prompt-fallback patterns are anchored to `await`', () => {
+    const doc = parse(raw) as { rules: Array<{ id: string; 'pattern-either'?: Array<{ pattern: string }> }> };
+    const rule = doc.rules.find((r) => r.id === 'no-prompt-code-fallback');
+    const patterns = (rule?.['pattern-either'] ?? []).map((p) => p.pattern);
+    expect(patterns.length, 'the rule lost its patterns').toBeGreaterThan(5);
+    expect(
+      patterns.filter((p) => p.startsWith('await ')).length,
+      'no-prompt-code-fallback lost its `await` forms — a bare-call pattern matches nothing, ' +
+      'because every real prompt call site awaits.',
+    ).toBeGreaterThanOrEqual(8);
+  });
+
   it('defines rules, each with the fields semgrep requires', () => {
     const doc = parse(raw) as { rules?: Array<Record<string, unknown>> };
     expect(Array.isArray(doc.rules), 'no `rules:` array').toBe(true);

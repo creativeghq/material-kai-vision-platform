@@ -278,6 +278,33 @@ await check('db.data-integrity.registry', ['DB_KEY'], async () => {
   return 'framework wired';
 });
 
+// 7b. Every prompt a call site depends on is still switched on (#347 phase 3P.6).
+//
+//   Prompts have NO code fallback by design (3P.4): a deactivated or empty row does not
+//   degrade the output, it raises and the work stops. That is correct — and it is exactly why
+//   the discovery moment matters. The nightly probe
+//   (`ops.prompt_required_but_inactive`) would find it tomorrow; this finds it at DEPLOY,
+//   which is what the plan asks for: "not at 2am mid-catalog".
+//
+//   `used_in` is the claim that a call site reads a row, and all 153 active prompts carry it.
+//   So "claimed AND (inactive OR empty)" is answerable from data alone, with no list of
+//   required keys to keep in sync here — a list that would itself be a second copy.
+await check('db.prompts.required-are-live', ['DB_KEY'], async () => {
+  const { res, json } = await http(
+    `${SUPABASE_URL}/rest/v1/prompts?select=name,prompt_type,category,stage,is_active,used_in&used_in=not.is.null`,
+    { headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}` } },
+  );
+  assert(res.ok, `GET prompts → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'prompts did not return an array');
+  const claimed = json.filter((p) => Array.isArray(p.used_in) && p.used_in.length > 0);
+  skipIf(claimed.length === 0, 'no prompt records a call site yet');
+  const broken = claimed
+    .filter((p) => !p.is_active)
+    .map((p) => `${p.prompt_type}/${p.stage ?? '-'}/${p.category}`);
+  assert(broken.length === 0, `prompt(s) a call site depends on are switched off: ${broken.join(', ')}`);
+  return `${claimed.length} claimed prompts, all live`;
+});
+
 // 8. Business-expenses agent tool — is the schema the
 //   `list_recent_expenses` / `record_expense` tools depend on actually live? We read
 //   supplier_bills with the EXACT column list the list tool selects, including the
