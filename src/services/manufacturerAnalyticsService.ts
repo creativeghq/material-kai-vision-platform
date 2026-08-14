@@ -5,44 +5,23 @@
  * Uses batching (flush every 5s or at 20 events) and fire-and-forget patterns
  * to avoid blocking the UI.
  *
- * SQL Migration (run via mcp__supabase__apply_migration):
+ * The schema this file used to paste inline had drifted from the live table and was worse than
+ * no documentation: it claimed a CHECK constraint on event_type that did not exist (so the table
+ * silently became a two-family bus when the 3D embed widget started writing `embed_*` rows) and
+ * described an RLS shape ("admins read") that was never applied. The live contract is now:
  *
- * CREATE TABLE IF NOT EXISTS manufacturer_analytics_events (
- *   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- *   event_type text NOT NULL CHECK (event_type IN (
- *     'product_view', 'product_save', 'product_quote',
- *     'product_search_impression', 'product_search_click', 'product_compare'
- *   )),
- *   product_id uuid NOT NULL,
- *   manufacturer_id text,
- *   user_id uuid,
- *   user_city text,
- *   user_country text,
- *   session_id uuid NOT NULL,
- *   source_page text,
- *   metadata jsonb DEFAULT '{}',
- *   created_at timestamptz NOT NULL DEFAULT now()
- * );
+ * - `event_type` is CHECK-constrained to BOTH families — the six product events below and the six
+ *   `embed_*` events in `products-3d-api`. A typo fails the insert instead of reading as zero.
+ * - `workspace_id` is DERIVED from the product by a BEFORE INSERT trigger, never sent by this
+ *   service. That is deliberate: a client that could assert its own workspace_id could attribute
+ *   engagement to a tenant it does not belong to (security invariant 1).
+ * - INSERT requires `user_id = auth.uid()` and membership of the derived workspace, so an
+ *   unauthenticated view cannot be recorded — see the guard in `track()`.
+ * - SELECT is workspace-scoped, and there is exactly one read policy. Consumers must go through a
+ *   SECURITY DEFINER RPC (`company_market_analytics`) rather than reading this table directly;
+ *   a direct read returns only what the caller's own workspace generated.
  *
- * CREATE INDEX idx_mfg_analytics_event_type ON manufacturer_analytics_events (event_type);
- * CREATE INDEX idx_mfg_analytics_product_id ON manufacturer_analytics_events (product_id);
- * CREATE INDEX idx_mfg_analytics_manufacturer_id ON manufacturer_analytics_events (manufacturer_id);
- * CREATE INDEX idx_mfg_analytics_user_id ON manufacturer_analytics_events (user_id);
- * CREATE INDEX idx_mfg_analytics_created_at ON manufacturer_analytics_events (created_at DESC);
- * CREATE INDEX idx_mfg_analytics_session_id ON manufacturer_analytics_events (session_id);
- *
- * ALTER TABLE manufacturer_analytics_events ENABLE ROW LEVEL SECURITY;
- *
- * CREATE POLICY "Allow authenticated inserts" ON manufacturer_analytics_events
- *   FOR INSERT TO authenticated WITH CHECK (true);
- *
- * CREATE POLICY "Allow admins to read" ON manufacturer_analytics_events
- *   FOR SELECT TO authenticated
- *   USING (
- *     auth.uid() IN (
- *       SELECT id FROM user_profiles WHERE role IN ('admin', 'owner')
- *     )
- *   );
+ * Migration: `manufacturer_analytics_event_bus_foundation` (issue #350).
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -63,7 +42,8 @@ export interface ManufacturerAnalyticsEvent {
   event_type: ManufacturerEventType;
   product_id: string;
   manufacturer_id?: string;
-  user_id?: string;
+  /** Always set — `track()` drops anonymous events, which the INSERT policy would reject anyway. */
+  user_id: string;
   user_city?: string;
   user_country?: string;
   session_id: string;
@@ -89,6 +69,13 @@ interface UserLocationCache {
 const BATCH_SIZE = 20;
 const FLUSH_INTERVAL_MS = 5_000;
 const LOCATION_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Postgres SQLSTATEs that mean "this row will never be accepted" — retrying is pointless.
+ * 23514 check_violation (unknown event_type) · 42501 insufficient_privilege (RLS refused, e.g. the
+ * product's workspace isn't ours) · 23503 foreign_key_violation · 23502 not_null_violation.
+ */
+const PERMANENT_INSERT_CODES = new Set(['23514', '42501', '23503', '23502']);
 
 class ManufacturerAnalyticsService {
   private queue: ManufacturerAnalyticsEvent[] = [];
@@ -201,11 +188,16 @@ class ManufacturerAnalyticsService {
       this.getUserLocation(),
     ])
       .then(([{ data: { user } }, location]) => {
+        // The INSERT policy is `user_id = auth.uid()`, so an anonymous event can only ever be
+        // rejected. Queuing it anyway would burn a flush, log a warning and re-queue a batch that
+        // can never succeed. Drop it at the door instead.
+        if (!user?.id) return;
+
         const event: ManufacturerAnalyticsEvent = {
           event_type: eventType,
           product_id: productId,
           manufacturer_id: manufacturerId,
-          user_id: user?.id,
+          user_id: user.id,
           user_city: location?.city,
           user_country: location?.country,
           session_id: this.sessionId,
@@ -251,12 +243,22 @@ class ManufacturerAnalyticsService {
       .from('manufacturer_analytics_events')
       .insert(batch as never[])
       .then(({ error }) => {
-        if (error) {
-          console.warn('[ManufacturerAnalytics] flush failed:', error.message);
-          // Re-queue failed events (cap to prevent memory leak)
-          if (this.queue.length < 200) {
-            this.queue.unshift(...batch);
-          }
+        if (!error) return;
+        // A rejected batch is either transient (offline, 5xx) or permanent (CHECK violation, RLS
+        // refusal, dangling product_id). Re-queuing a permanent failure retries it every 5s until
+        // the 200-event cap silently eats the queue — the loudest symptom of a broken contract
+        // reduced to a console line nobody reads. Retry the first kind, report the second.
+        if (PERMANENT_INSERT_CODES.has(error.code ?? '')) {
+          console.error(
+            `[ManufacturerAnalytics] dropped ${batch.length} event(s) — the insert is invalid, not delayed `
+            + `(${error.code}: ${error.message}). This is a contract break, not a network blip.`,
+          );
+          return;
+        }
+        console.warn('[ManufacturerAnalytics] flush failed, will retry:', error.message);
+        // Re-queue failed events (cap to prevent memory leak)
+        if (this.queue.length < 200) {
+          this.queue.unshift(...batch);
         }
       })
       .catch(() => {
