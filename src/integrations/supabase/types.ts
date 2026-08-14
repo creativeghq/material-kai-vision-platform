@@ -37679,6 +37679,10 @@ export type Database = {
           output_price: number
         }[]
       }
+      get_payment_terms_discount_pct: {
+        Args: { p_terms: string; p_workspace_id: string }
+        Returns: number
+      }
       get_supplier_price_break: {
         Args: {
           p_product_id: string
@@ -37689,6 +37693,14 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      get_bundle_discount_pct: {
+        Args: { p_category_keys: string[]; p_workspace_id: string }
+        Returns: number
+      }
+      get_first_order_discount_pct: {
+        Args: { p_company_id?: string; p_contact_id?: string; p_workspace_id: string }
+        Returns: number
       }
       get_line_identity_options: {
         Args: { p_product_id: string }

@@ -1304,6 +1304,55 @@ const _financeServiceCore = {
     return Number(data) || 0;
   },
 
+  /**
+   * The other three DOCUMENT-level discounts (#347 phase 8).
+   *
+   * Same rule as the cash discount above and for the same reason: each reduces the order
+   * subtotal, so none may be folded into `get_product_price_for_workspace` — discounting the
+   * lines AND the total applies it twice.
+   *
+   * Each is resolved in SQL. Do not re-query `pricing_custom_rules` from TypeScript: that is
+   * policy, policy has one home, and pricingRuleTypes.test.ts fails the build on a
+   * `.eq('rule_type', …)` anywhere in the client.
+   */
+  async getPaymentTermsDiscountPct(workspaceId: string, terms: string): Promise<number> {
+    const { data, error } = await supabase.rpc('get_payment_terms_discount_pct', {
+      p_workspace_id: workspaceId, p_terms: terms,
+    });
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
+  /**
+   * Whether this customer has ever bought before is derived IN SQL from their order history —
+   * never passed in. A caller-supplied "this is their first order" flag is a caller-supplied
+   * discount.
+   */
+  async getFirstOrderDiscountPct(
+    workspaceId: string, companyId?: string | null, contactId?: string | null,
+  ): Promise<number> {
+    const { data, error } = await supabase.rpc('get_first_order_discount_pct', {
+      p_workspace_id: workspaceId,
+      p_company_id: companyId ?? null,
+      p_contact_id: contactId ?? null,
+    });
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
+  /**
+   * Bundle discounts need the WHOLE basket, which is why they cannot live in the per-line
+   * resolver: it sees one product at a time. Pass every category present on the order.
+   */
+  async getBundleDiscountPct(workspaceId: string, categoryKeys: string[]): Promise<number> {
+    const { data, error } = await supabase.rpc('get_bundle_discount_pct', {
+      p_workspace_id: workspaceId,
+      p_category_keys: categoryKeys,
+    });
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
   // Customer discount/level change: applied directly for finance/admin, or routed to
   // a pending approval request for the 'sales' persona (enforced server-side in the RPC).
   async proposeOrApplyCustomerPricing(input: {

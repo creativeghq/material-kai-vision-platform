@@ -42,15 +42,23 @@ const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
  * correct one: it resolves thresholds through `convert_to_base_unit`, while the rule compared
  * `p_quantity` RAW and so matched "5 pallets" and "5 pieces" at the same threshold.
  */
-const ALLOWED_RULE_TYPES = ['category_extra', 'cash_payment'] as const;
+const ALLOWED_RULE_TYPES = ['category_extra', 'date_window', 'cash_payment', 'payment_terms', 'first_order', 'bundle'] as const;
 
 /** A retired type must not come back without a resolver — that is what this list is for. */
 const RETIRED_RULE_TYPES = ['volume_category'] as const;
 
 /** Where each type is resolved — all SQL, none of it scannable from here. */
 const SQL_RESOLVERS: Record<(typeof ALLOWED_RULE_TYPES)[number], string> = {
+  // Line-level: multiplied into each matching line by the one resolver.
   category_extra: 'get_product_price_for_workspace',
+  date_window: 'get_product_price_for_workspace',
+  // Document-level: taken off the order subtotal. Never folded into the line resolver, or the
+  // discount would apply twice — the reason cash_payment stayed out of it in phase 1.1.
   cash_payment: 'get_workspace_cash_discount_pct',
+  payment_terms: 'get_payment_terms_discount_pct',
+  first_order: 'get_first_order_discount_pct',
+  // The only one needing the whole basket; the line resolver sees one product at a time.
+  bundle: 'get_bundle_discount_pct',
 };
 
 /** The authoring surface. A type it cannot offer is unreachable from the other direction. */

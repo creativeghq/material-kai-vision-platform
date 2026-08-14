@@ -28,8 +28,22 @@ interface Rule {
 
 const TYPE_LABELS: Record<string, string> = {
   category_extra: 'Category extra discount',
+  date_window: 'Seasonal window (per category)',
   cash_payment: 'Paid upfront (cash)',
+  payment_terms: 'Agreed payment terms',
+  first_order: "Customer's first order",
+  bundle: 'Bought together (bundle)',
 };
+
+/**
+ * Which rules apply to a LINE and which to the whole DOCUMENT.
+ *
+ * A line-level rule multiplies into the price of each matching line; a document-level one comes
+ * off the order subtotal. Applying one at both levels would take it twice — the reason
+ * `cash_payment` was never folded into the line resolver in phase 1.1.
+ */
+const LINE_LEVEL = new Set(['category_extra', 'date_window']);
+const NEEDS_CATEGORY = LINE_LEVEL;
 
 export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -37,7 +51,11 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
   const [categories, setCategories] = useState<Array<{ key: string; label: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [type, setType] = useState<'category_extra' | 'cash_payment'>('category_extra');
+  const [type, setType] = useState<'category_extra' | 'date_window' | 'cash_payment' | 'payment_terms' | 'first_order' | 'bundle'>('category_extra');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [terms, setTerms] = useState('');
+  const [bundleCats, setBundleCats] = useState<string[]>([]);
   const [cat, setCat] = useState('');
   const [pct, setPct] = useState('');
 
@@ -48,7 +66,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
         financeService.listCustomRules(workspaceId),
         financeService.listMaterialCategoryTree(workspaceId).catch(() => []),
       ]);
-      setRules(rs.filter((r) => r.rule_type === 'category_extra' || r.rule_type === 'cash_payment'));
+      setRules(rs.filter((r) => r.rule_type in TYPE_LABELS));
       setCategories(cats);
     } catch (err: any) {
       toast({ title: 'Failed to load rules', description: err?.message, variant: 'destructive' });
@@ -58,14 +76,33 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
 
   const add = async () => {
     const p = parseDecimalOr(pct, NaN);
-    const isCash = type === 'cash_payment';
-    if (!isCash && !cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
+    const needsCategory = NEEDS_CATEGORY.has(type);
+    if (needsCategory && !cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(p) || p < 0) { toast({ title: 'Enter a discount %', variant: 'destructive' }); return; }
+
     const params: any = {};
+    if (type === 'date_window') {
+      // A window with neither bound is category_extra wearing a different name — the resolver
+      // refuses it, so the form refuses it here rather than saving a rule that never fires.
+      if (!from && !to) { toast({ title: 'Give the window a start or an end', variant: 'destructive' }); return; }
+      if (from) params.from = from;
+      if (to) params.to = to;
+    }
+    if (type === 'payment_terms') {
+      if (!terms.trim()) { toast({ title: 'Name the payment terms', variant: 'destructive' }); return; }
+      params.terms = terms.trim();
+    }
+    if (type === 'bundle') {
+      const required = bundleCats.filter(Boolean);
+      // One category is not a bundle; it is a category discount, which already exists.
+      if (required.length < 2) { toast({ title: 'A bundle needs at least two categories', variant: 'destructive' }); return; }
+      params.required = required;
+    }
+
     setBusy(true);
     try {
-      await financeService.upsertCustomRule({ workspaceId, ruleType: type, categoryKey: isCash ? null : cat, params, discountPct: p, sortOrder: rules.length });
-      setCat(''); setPct(''); await load();
+      await financeService.upsertCustomRule({ workspaceId, ruleType: type, categoryKey: needsCategory ? cat : null, params, discountPct: p, sortOrder: rules.length });
+      setCat(''); setPct(''); setFrom(''); setTo(''); setTerms(''); setBundleCats([]); await load();
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
@@ -78,6 +115,14 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
 
   const describe = (r: Rule) => {
     if (r.rule_type === 'cash_payment') return `Paid upfront → ${r.discount_pct}% off the whole order`;
+    if (r.rule_type === 'payment_terms') return `Terms ${r.params?.terms ?? 'any'} → ${r.discount_pct}% off the whole order`;
+    if (r.rule_type === 'first_order') return `A customer's first order → ${r.discount_pct}% off the whole order`;
+    if (r.rule_type === 'bundle') return `${(r.params?.required ?? []).join(' + ') || '?'} bought together → ${r.discount_pct}% off the whole order`;
+    if (r.rule_type === 'date_window') {
+      const c = String(r.category_key ?? '').replace(/_/g, ' ');
+      const window = [r.params?.from, r.params?.to].filter(Boolean).join(' → ') || 'no window';
+      return `${c}: ${r.discount_pct}% off (${window})`;
+    }
     const c = String(r.category_key ?? '').replace(/_/g, ' ');
     return `${c}: ${r.discount_pct}% off (all customers)`;
   };
@@ -119,16 +164,51 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="category_extra">Category extra</SelectItem>
+                <SelectItem value="date_window">Seasonal window</SelectItem>
+                <SelectItem value="payment_terms">Payment terms</SelectItem>
+                <SelectItem value="first_order">First order</SelectItem>
+                <SelectItem value="bundle">Bought together</SelectItem>
                 <SelectItem value="cash_payment">Paid upfront (cash)</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {type !== 'cash_payment' && (
+          {NEEDS_CATEGORY.has(type) && (
             <div className="space-y-1">
               <Label className="text-xs">Category</Label>
               <Select value={cat} onValueChange={setCat} disabled={categories.length === 0}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue placeholder={categories.length === 0 ? 'No categories' : 'Category'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => <SelectItem key={c.key} value={c.key} className="capitalize whitespace-pre">{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {type === 'date_window' && (
+            <>
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input className="h-8 w-36 text-xs" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input className="h-8 w-36 text-xs" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              </div>
+            </>
+          )}
+          {type === 'payment_terms' && (
+            <div className="space-y-1">
+              <Label className="text-xs">Terms</Label>
+              <Input className="h-8 w-32 text-xs" value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="net_7" />
+            </div>
+          )}
+          {type === 'bundle' && (
+            <div className="space-y-1">
+              <Label className="text-xs">Bought together</Label>
+              <Select value="" onValueChange={(v) => setBundleCats((prev) => (prev.includes(v) ? prev : [...prev, v]))}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue placeholder={bundleCats.length ? bundleCats.join(' + ') : 'Add categories'} />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => <SelectItem key={c.key} value={c.key} className="capitalize whitespace-pre">{c.label}</SelectItem>)}
