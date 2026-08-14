@@ -18,6 +18,7 @@ import { Database, Link2, Copy, Tags } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { MetadataManagement } from '@/components/Admin/MetadataManagement';
+import { FieldRoleAudit } from '@/components/Admin/FieldRoleAudit';
 import { RelevancyManagement } from '@/components/Admin/RelevancyManagement';
 import { DuplicateDetectionPage } from './DuplicateDetectionPage';
 import { BatchCategorizationPage } from './BatchCategorizationPage';
@@ -76,6 +77,9 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false }) => {
             <TabsTrigger value="categorization" className="flex items-center gap-2">
               <Tags className="h-4 w-4" /> Categorization
             </TabsTrigger>
+            <TabsTrigger value="field-roles" className="flex items-center gap-2">
+              <Database className="h-4 w-4" /> Field roles
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="metadata" className="mt-6">
@@ -90,6 +94,10 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false }) => {
           {/* Bulk AI categorization — relocated from /admin/batch-categorization */}
           <TabsContent value="categorization" className="mt-6">
             <BatchCategorizationPage embedded />
+          </TabsContent>
+          {/* #347 phase 4.5 — audit and override, never a gate. */}
+          <TabsContent value="field-roles" className="mt-6">
+            <FieldRoleAudit />
           </TabsContent>
         </Tabs>
       </div>
