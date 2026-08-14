@@ -12,6 +12,8 @@
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+import { categoryKeyForVocab } from './categoryVocab.generated';
+
 export type UploadCategory =
   | 'tiles'
   | 'wood'
@@ -44,12 +46,6 @@ export interface CategoryDisplayConfig {
   themeColor: string;
   /** Sections to render in the Details tab, in order. */
   sections: DisplaySection[];
-  /**
-   * Fine-grained material_category slugs that map to this upload category.
-   * Used by `resolveUploadCategory()` to map the AI-extracted
-   * `material_category` value back to one of our 10 DB categories.
-   */
-  controlledVocab: string[];
 }
 
 // ─── Registry ───────────────────────────────────────────────────────────────
@@ -60,10 +56,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   tiles: {
     displayName: 'Tiles',
     themeColor: '#3b82f6',
-    controlledVocab: [
-      'floor_tile', 'wall_tile', 'bathroom_tile', 'shower_tile',
-      'porcelain_tile', 'ceramic_tile', 'tile', 'porcelain', 'ceramic',
-    ],
     sections: [
       {
         key: 'appearance',
@@ -96,7 +88,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'application',
-        label: 'Application & Installation',
+        label: 'Application',
         fields: [
           { key: 'recommended_use', label: 'Recommended Use' },
           { key: 'applications', label: 'Applications' },
@@ -139,7 +131,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'certifications',
-        label: 'Certifications & Compliance',
+        label: 'Certifications',
         fields: [
           { key: 'certifications', label: 'Certifications' },
           { key: 'eco_friendly', label: 'Eco Friendly' },
@@ -149,7 +141,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'care',
-        label: 'Care & Maintenance',
+        label: 'Care',
         fields: [
           { key: 'care_instructions', label: 'Care Instructions' },
           { key: 'maintenance', label: 'Maintenance' },
@@ -158,7 +150,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'design',
-        label: 'Design & Style',
+        label: 'Design',
         fields: [
           { key: 'designers', label: 'Designer' },
           { key: 'studio', label: 'Studio' },
@@ -175,10 +167,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   wood: {
     displayName: 'Wood',
     themeColor: '#92400e',
-    controlledVocab: [
-      'wood_flooring', 'laminate', 'vinyl_flooring', 'hardwood',
-      'engineered_wood', 'parquet', 'wood', 'bamboo',
-    ],
     sections: [
       {
         key: 'appearance',
@@ -193,7 +181,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'material_specs',
-        label: 'Material Specifications',
+        label: 'Material',
         fields: [
           { key: 'species', label: 'Wood Species' },
           { key: 'grade', label: 'Grade' },
@@ -258,7 +246,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'care',
-        label: 'Care & Maintenance',
+        label: 'Care',
         fields: [
           { key: 'care_instructions', label: 'Care Instructions' },
           { key: 'maintenance', label: 'Maintenance' },
@@ -267,7 +255,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'design',
-        label: 'Design & Style',
+        label: 'Design',
         fields: [
           { key: 'collection', label: 'Collection' },
           { key: 'design_style', label: 'Design Style' },
@@ -281,10 +269,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   decor: {
     displayName: 'Decor',
     themeColor: '#8b5cf6',
-    controlledVocab: [
-      'rug', 'curtain', 'cushion', 'vase', 'mirror',
-      'wall_art', 'sculpture', 'candle_holder', 'planter', 'decor',
-    ],
     sections: [
       {
         key: 'appearance',
@@ -353,12 +337,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   furniture: {
     displayName: 'Furniture',
     themeColor: '#d97706',
-    controlledVocab: [
-      'sofa', 'armchair', 'dining_chair', 'accent_chair',
-      'dining_table', 'coffee_table', 'side_table',
-      'cabinet', 'shelving', 'sideboard', 'bed', 'desk',
-      'outdoor_furniture', 'furniture',
-    ],
     sections: [
       {
         key: 'appearance',
@@ -372,7 +350,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'material_specs',
-        label: 'Materials',
+        label: 'Material',
         fields: [
           { key: 'frame_material', label: 'Frame' },
           { key: 'upholstery_material', label: 'Upholstery' },
@@ -443,12 +421,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   general_materials: {
     displayName: 'General Materials',
     themeColor: '#6b7280',
-    controlledVocab: [
-      'stone_slab', 'metal_panel', 'glass_panel',
-      'countertop', 'kitchen_worktop', 'cladding',
-      'concrete', 'terrazzo', 'quartz', 'composite',
-      'marble', 'granite', 'stone',
-    ],
     sections: [
       {
         key: 'appearance',
@@ -463,7 +435,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'material_specs',
-        label: 'Material Specifications',
+        label: 'Material',
         fields: [
           { key: 'material_type', label: 'Material Type' },
           { key: 'composition', label: 'Composition' },
@@ -522,10 +494,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   paint_wall_decor: {
     displayName: 'Paint / Wall Decors',
     themeColor: '#10b981',
-    controlledVocab: [
-      'wall_paint', 'wallpaper', 'wall_coating',
-      'decorative_plaster', 'wall_panel', 'paint',
-    ],
     sections: [
       {
         key: 'appearance',
@@ -555,7 +523,7 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
       },
       {
         key: 'coverage',
-        label: 'Coverage & Dimensions',
+        label: 'Dimensions',
         fields: [
           { key: 'coverage_per_litre_m2', label: 'Coverage / Litre (m²)' },
           { key: 'coverage_per_roll_m2', label: 'Coverage / Roll (m²)' },
@@ -615,10 +583,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   heating: {
     displayName: 'Heating',
     themeColor: '#ef4444',
-    controlledVocab: [
-      'radiator', 'towel_rail', 'underfloor_heating',
-      'heat_pump', 'boiler', 'fireplace', 'convector', 'heating',
-    ],
     sections: [
       {
         key: 'thermal_performance',
@@ -695,11 +659,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   sanitary: {
     displayName: 'Sanitary',
     themeColor: '#06b6d4',
-    controlledVocab: [
-      'toilet', 'basin', 'bathtub', 'shower_tray',
-      'bidet', 'urinal', 'vanity_unit', 'shower_enclosure',
-      'tap', 'faucet', 'mixer', 'shower_head', 'sanitary',
-    ],
     sections: [
       {
         key: 'water_performance',
@@ -782,11 +741,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   kitchen: {
     displayName: 'Kitchen',
     themeColor: '#f59e0b',
-    controlledVocab: [
-      'kitchen_cabinet', 'kitchen_worktop', 'kitchen_sink',
-      'kitchen_tap', 'kitchen_hood', 'kitchen_appliance',
-      'kitchen_handle', 'kitchen_organiser', 'kitchen',
-    ],
     sections: [
       {
         key: 'material_specs',
@@ -867,11 +821,6 @@ export const CATEGORY_DISPLAY_REGISTRY: Record<UploadCategory, CategoryDisplayCo
   lighting: {
     displayName: 'Lighting',
     themeColor: '#eab308',
-    controlledVocab: [
-      'lighting', 'pendant_light', 'ceiling_light', 'wall_light',
-      'floor_lamp', 'table_lamp', 'spotlight', 'track_light',
-      'recessed_light', 'outdoor_light', 'chandelier',
-    ],
     sections: [
       {
         key: 'electrical_specs',
@@ -980,10 +929,13 @@ export function resolveUploadCategory(materialCategory: unknown): UploadCategory
   // Direct match
   if (lower in CATEGORY_DISPLAY_REGISTRY) return lower as UploadCategory;
 
-  // Check controlled vocab
-  for (const [catKey, config] of Object.entries(CATEGORY_DISPLAY_REGISTRY)) {
-    if (config.controlledVocab.includes(lower)) return catKey as UploadCategory;
-  }
+  // Canonical vocabulary and aliases, from the DB projection (#347 phase 3.4). The hand-written
+  // `controlledVocab` this replaced was a FIFTH copy and had drifted both ways: it was missing
+  // carpet / door / window / fabric_swatch / leather_swatch entirely, so a product the extractor
+  // classified as one of those could not be resolved here and fell through to the default
+  // display config.
+  const fromVocab = categoryKeyForVocab(lower);
+  if (fromVocab && fromVocab in CATEGORY_DISPLAY_REGISTRY) return fromVocab as UploadCategory;
 
   // Fuzzy fallback
   if (lower.includes('tile') || lower.includes('ceramic') || lower.includes('porcelain')) return 'tiles';

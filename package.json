@@ -25,7 +25,8 @@
     "skills:sync": "node scripts/gen-skill-ts.mjs",
     "gen:all": "npm run tools:manifest && npm run skills:sync",
     "build:embed": "vite build --config vite.embed.config.ts",
-    "models:generate": "node scripts/gen-generation-models.mjs"
+    "models:generate": "node scripts/gen-generation-models.mjs",
+    "categories:generate": "node scripts/gen-category-vocab.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",
