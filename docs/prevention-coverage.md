@@ -485,4 +485,15 @@ Dimensionless rows are still accepted — they predate variant tracking and refu
 real stock — and this probe watches exactly that remaining tolerance.
 
 - **Proven to fire:** 2026-08-14 — with a 999-unit `600x600` row beside a 5-unit `300x300`, a line naming `300x300` now selects the 5-unit row; before the fix the ordering chose the 999. A line naming nothing still falls back to best-stocked, so existing behaviour is unchanged.
-- **Blind spot:** identity beyond dimensions. A finish or colour mismatch is not yet a filter — that arrives with the per-variant SKU in phase 7.
+- **Blind spot:** identity beyond dimensions. A finish or colour mismatch is still not a filter; only width/length/thickness are.
+
+  **Measured, not assumed (2026-08-14).** The filter only engages when the line's size actually
+  parses, so the parser's real-world coverage IS the guard's coverage. Against 266 sized rows in
+  `warehouse_pending_items` — live inbound supplier lines — it parsed **86**. The dominant miss was
+  a unit suffix (`2800x2070x18mm`, `23x0.8mm`), so those rows were silently falling back to
+  matching on product alone: the pre-fix behaviour, for exactly the input a supplier document
+  produces. Widening it to convert `mm`/`cm`/`m` took coverage to **119**. The suffix is CONVERTED,
+  not stripped — `60x60cm` stripped to `60x60` would compare against `width_mm` and be wrong by a
+  factor of ten, which would have introduced the very defect the filter exists to remove. Bare
+  numbers (`25`), weights (`20kg`, 29 rows) and imperial pipe sizes (`1/2"`) still refuse to parse,
+  deliberately: a wrong parse ships the wrong variant, an absent one merely falls back.
