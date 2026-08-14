@@ -710,6 +710,22 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'scrape_materials_from_url', name: 'Scrape Materials from URL', category: 'B2B Research',
+    adminOnly: true,
+    desc: 'Scrape a supplier page and extract the materials on it (name, price, properties).',
+    examples: [
+      'Scrape the materials from https://example-supplier.com/collections/porcelain',
+    ],
+  },
+  {
+    id: 'suggest_extraction_fields', name: 'Suggest Extraction Fields', category: 'B2B Research',
+    adminOnly: true,
+    desc: 'Inspect a page and suggest which fields are worth extracting from it.',
+    examples: [
+      'What fields should we extract from https://example-supplier.com/product/123 ?',
+    ],
+  },
+  {
     id: 'company_enrichment', name: 'Company Enrichment', category: 'B2B Research',
     adminOnly: true,
     desc: 'Apollo.io company data — employees, revenue, funding, tech.',
@@ -2812,8 +2828,22 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: [
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
       'contact_discovery', 'email_validate', 'save_to_crm',
+      'scrape_materials_from_url', 'suggest_extraction_fields',
     ],
     quick_starts: [
+      {
+        label: 'Scrape materials from a page', description: 'Pull products off a supplier URL',
+        icon: 'Globe',
+        prompt: 'Scrape the materials from https://example-supplier.com/collections/porcelain',
+        promptTemplate: 'Scrape the materials from {{url}}',
+        run: { tool: 'scrape_materials_from_url' },
+        // autoFields derives the `detail` select (quick / full) from the tool's own z.enum, so
+        // the options cannot drift from the schema the way hand-written ones did.
+        autoFields: true,
+        form: [
+          { key: 'url', label: 'Page URL', kind: 'text', required: true, placeholder: 'https://example-supplier.com/collections/porcelain' },
+        ],
+      },
       {
         label: 'Find manufacturers',
         description: 'Discover → scrape → enrich → save qualified ones to CRM',

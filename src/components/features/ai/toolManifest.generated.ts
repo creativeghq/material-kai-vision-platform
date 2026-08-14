@@ -1342,6 +1342,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'scrape_materials_from_url',
+    file: 'supabase/functions/_shared/tools/material-scrape-tools.ts',
+    factory: 'createMaterialScrapeTool',
+    description: 'Scrape a supplier or manufacturer web page and extract the materials/products listed on it (name, price, description, images, properties, category, supplier).',
+    params: [
+      { name: 'url', type: 'string', optional: false, description: 'The https URL of the page to scrape.' },
+      { name: 'detail', type: 'enum', enum: ['quick', 'full'], optional: true, description: 'full (default) extracts every field; quick returns just the materials found.' },
+    ],
+  },
+  {
     name: 'search_crm_by_kad',
     file: 'supabase/functions/_shared/tools/crm-tools.ts',
     factory: 'createCrmKadSearchTool',
@@ -2004,6 +2014,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'card_id', type: 'string', optional: true },
       { name: 'card_title', type: 'string', optional: true },
+    ],
+  },
+  {
+    name: 'suggest_extraction_fields',
+    file: 'supabase/functions/_shared/tools/material-scrape-tools.ts',
+    factory: 'createFieldSuggestTool',
+    description: 'Look at a web page and suggest which fields would be worth extracting from it (name, type, description, required).',
+    params: [
+      { name: 'url', type: 'string', optional: false, description: 'The https URL of the page to inspect.' },
     ],
   },
   {

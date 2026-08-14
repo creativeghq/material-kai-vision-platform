@@ -736,6 +736,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // B2B Research (admin/owner only)
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
       'contact_discovery', 'email_validate', 'save_to_crm',
+      // Material scraping — pull products off a supplier page (#347)
+      'scrape_materials_from_url', 'suggest_extraction_fields',
       // SEO research card (all users — 0 user credits, internal cron-secret call)
       'seo_research_keyword',
       // SEO toolkit — Wave 1B+ (all users; 0 user credits, internal DataForSEO routing)
@@ -922,6 +924,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery',
       'email_validate', 'save_to_crm',
+      'scrape_materials_from_url', 'suggest_extraction_fields',
       'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
       'related_products', 'find_products_by_spec', 'products_in_project', 'projects_using_product',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
@@ -1305,6 +1308,7 @@ async function executeAgent(
   const needsDb = config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
+  const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   // SEO agent toolkit (conversational research surface — separate from the article pipeline)
   const SEO_AGENT_TOOL_NAMES = [
@@ -1364,13 +1368,14 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
     needsDb           ? import('../_shared/tools/database-tools.ts') : null,
     needsSub          ? import('../_shared/tools/sub-agent-tools.ts') : null,
     needsB2b          ? import('../_shared/tools/b2b-tools.ts') : null,
+    needsMatScrape    ? import('../_shared/tools/material-scrape-tools.ts') : null,
     needsSeo          ? import('../_shared/tools/seo-tools.ts') : null,
     needsSeoAgent     ? import('../_shared/tools/seo-agent-tools.ts') : null,
     needsBg           ? import('../_shared/tools/background-tools.ts') : null,
@@ -1423,6 +1428,8 @@ async function executeAgent(
   const createProductAnalysisTool = subAgentMod?.createProductAnalysisTool;
   const createB2BManufacturerSearchTool = b2bMod?.createB2BManufacturerSearchTool;
   const createCompanyWebsiteScrapeTool = b2bMod?.createCompanyWebsiteScrapeTool;
+  const createMaterialScrapeTool = matScrapeMod?.createMaterialScrapeTool;
+  const createFieldSuggestTool = matScrapeMod?.createFieldSuggestTool;
   const createCompanyEnrichmentTool = b2bMod?.createCompanyEnrichmentTool;
   const createContactDiscoveryTool = b2bMod?.createContactDiscoveryTool;
   const createEmailValidateTool = b2bMod?.createEmailValidateTool;
@@ -2121,6 +2128,12 @@ async function executeAgent(
     }
     if (config.tools.includes('company_website_scrape')) {
       tools.push(createCompanyWebsiteScrapeTool(userId, workspaceId ?? null, sendProgress));
+    }
+    if (config.tools.includes('scrape_materials_from_url')) {
+      tools.push(createMaterialScrapeTool(userId, workspaceId ?? null, sendProgress));
+    }
+    if (config.tools.includes('suggest_extraction_fields')) {
+      tools.push(createFieldSuggestTool(userId, workspaceId ?? null, sendProgress));
     }
     if (config.tools.includes('company_enrichment')) {
       tools.push(createCompanyEnrichmentTool(userId, sendProgress));
