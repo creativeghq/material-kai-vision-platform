@@ -14,9 +14,8 @@ import { PERSONA_CAPABILITIES, personaCan, type Persona } from '@/auth/capabilit
 const PERSONAS = Object.keys(PERSONA_CAPABILITIES) as Persona[];
 
 /** Mirrors how usePermissions derives the nav flags from the resolved persona. */
-function ctxFor(persona: Persona, opts: { isFactory?: boolean } = {}): NavGateContext {
+function ctxFor(persona: Persona): NavGateContext {
   return {
-    isFactory: opts.isFactory ?? false,
     isAdmin: persona === 'operator',
     isPlatformOperator: persona === 'operator',
     isAccountant: persona === 'accountant',
@@ -29,12 +28,13 @@ function ctxFor(persona: Persona, opts: { isFactory?: boolean } = {}): NavGateCo
   };
 }
 
-/** Every persona, plus a factory-flagged variant for the `requireRole: 'factory'` entries. */
-const ALL_CONTEXTS: NavGateContext[] = [
-  ...PERSONAS.map((p) => ctxFor(p)),
-  ctxFor('dealer', { isFactory: true }),
-  ctxFor('operator', { isFactory: true }),
-];
+/**
+ * Every persona. There used to be two extra factory-flagged contexts here for the
+ * `requireRole: 'factory'` entries; that role resolved from `user_profiles.factory_verified`, which
+ * no account has ever held, so the only tile it gated rendered for nobody and both it and the flag
+ * went with #350. `NavRoleRequirement` is now just 'admin'.
+ */
+const ALL_CONTEXTS: NavGateContext[] = PERSONAS.map((p) => ctxFor(p));
 
 describe('sidebar nav reachability', () => {
   it('every nav item is visible to at least one persona', () => {

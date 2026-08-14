@@ -145,9 +145,16 @@ export function useLauncherApps(): LauncherApi {
 
     const activeFromNav = activeItems.map((i) => enrich(i, true));
     const navPaths = new Set(activeFromNav.map((a) => a.path));
+    // Dedupe on the MODULE, not just the path. A module can declare a `location:'workspace'` nav
+    // item AND have a hand-written SIDEBAR_NAV_ITEMS tile pointing somewhere else — Contracts did
+    // exactly that (`/contracts` from the registry, `/agent-hub?capability=contract` from the nav
+    // config), so the launcher rendered TWO "Contracts" cards: one in the Finance hub and an
+    // unhubbed twin in "More". Path equality could never catch it, because the two paths differ on
+    // purpose. The SIDEBAR_NAV_ITEMS tile wins: it is the one carrying the hub + capability gate.
+    const navSlugs = new Set(activeFromNav.map((a) => a.moduleSlug).filter(Boolean));
     // Registry modules that expose a workspace nav item but aren't in SIDEBAR_NAV_ITEMS.
     const activeFromModules: LauncherApp[] = moduleEntries
-      .filter((e) => !navPaths.has(e.path))
+      .filter((e) => !navPaths.has(e.path) && !navSlugs.has(e.slug))
       .map((e) => ({
         id: e.slug, moduleSlug: e.slug, label: e.label, icon: e.icon, path: e.path,
         description: e.description || catalog.get(e.slug)?.summary || undefined, active: true,

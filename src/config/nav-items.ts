@@ -53,7 +53,10 @@ export interface Hub {
 /** Order here is the order Hubs render in the launcher rail and Profile → Modules. */
 export const HUBS: readonly Hub[] = [
   { id: 'marketing', label: 'Marketing Hub', icon: Megaphone, description: 'Campaigns, automations, social & SEO — powered by the Agent.' },
-  { id: 'sales', label: 'Sales Hub', icon: Briefcase, description: 'CRM, quotes, orders, services & supplier analytics.' },
+  // "supplier analytics" left this description with #350: that app was /factory-analytics, which is
+  // gone, and per-supplier analytics now live on the CRM company record — inside CRM, not as a tile.
+  // "services" never had an app at all. Describe the tiles this hub actually holds.
+  { id: 'sales', label: 'Sales Hub', icon: Briefcase, description: 'CRM, quotes, appointments, properties & market demand.' },
   { id: 'finance', label: 'Finance Hub', icon: Wallet, description: 'Invoices, payments, reporting & warehouse.' },
   { id: 'service', label: 'Service Hub', icon: Headset, description: 'Customer conversations, reviews & knowledge base.' },
   { id: 'studio', label: 'Studio Hub', icon: Palette, description: 'Projects, moodboards & client presentations.' },

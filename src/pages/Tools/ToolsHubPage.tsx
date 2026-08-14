@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Columns3,
   CookingPot,
+  FileSearch,
   Flame,
   MessageSquareText,
   ScanSearch,
@@ -125,6 +126,20 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
       'Put 2–4 catalog products side by side with property-level diff highlighting. Search and add products right in the tool.',
     icon: Columns3,
     badge: 'Signed in · catalog',
+  },
+  // Page monitoring (#331) shipped with NO surface linking it — the route existed and the only way
+  // in was typing the URL, the same state Room Planner was in. It belongs here rather than nested
+  // under a module card: it carries no module or capability gate, so hanging it off Quotes (like
+  // price monitoring) or Social (like mention monitoring) would hide it behind an add-on it does
+  // not need.
+  {
+    slug: 'page-watches',
+    to: '/monitoring/pages',
+    title: 'Page monitoring',
+    description:
+      'Watch any non-product page — a supplier price list, a competitor spec sheet — and see exactly what changed between checks.',
+    icon: FileSearch,
+    badge: 'Signed in · workspace',
   },
 ];
 

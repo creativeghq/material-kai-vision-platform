@@ -1,14 +1,25 @@
 // App Launcher (three-pane) — the center "inner links" per module + the right-column
 // quick-CREATE triggers + jump-to shortcuts. EVERY path is a real route or a ?tab= value copied
-// DIRECTLY from the target page's own <TabsTrigger> list (verified 2026-07-18) — never guessed.
-// Only ALWAYS-available tabs are listed; role/BYOK-gated tabs are omitted so a link never lands on
-// a blank tab. Modules with no URL-backed tabs (Projects, Sales, Inbox, Automations) intentionally
-// have no sections → the center shows an "Open" card only.
+// DIRECTLY from the target page's own <TabsTrigger> list — never guessed.
+// Only ALWAYS-available tabs are listed; role-, module- and BYOK-gated tabs are omitted so a link
+// never lands on a blank tab or an upsell. Sales and Inbox have no URL-backed tabs and no nested
+// surface → the center shows an "Open" card only.
+//
+// A ?tab= key here that names NO pane is caught — tests/unit/deepLinkTargets.test.ts resolves every
+// one against the target page. Two failure modes it cannot see, because both produce a link that
+// resolves perfectly:
+//   • a tab that EXISTS but is listed nowhere here — a gap, not a break. Finance's bank feed and HR's
+//     schedules/overtime/onboarding each shipped a month before anything in the launcher named them.
+//   • a link to a tab that renders behind a padlock. It resolves, so the guard passes; the click
+//     just lands the user on an upsell (see the real-estate and CRM notes below).
+// Neither is machine-checkable cheaply, so re-read the target page's TabsTrigger list by hand
+// whenever you touch its tabs.
 import {
   Users, Contact, Building2, Tags, ArrowDownCircle, ArrowUpCircle, ShoppingCart,
   FileText, Banknote, BarChart3, Plane, CalendarDays, Clock, Briefcase, Wallet,
   FolderOpen, Send, Settings, UserPlus, Receipt, FilePlus, FolderPlus,
-  MessageSquarePlus, Megaphone, LayoutTemplate,
+  MessageSquarePlus, Megaphone, LayoutTemplate, Store, Landmark, BellRing,
+  CalendarClock, Timer, ClipboardCheck, DraftingCompass,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool,
@@ -34,15 +45,18 @@ export interface LauncherSection {
  *   Email    (src/modules/email-marketing/pages/…Page.tsx) → campaigns | templates | contacts | setup
  */
 export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
+  // Property Mgmt (`lettings`) and Investments are NOT here: both render with a padlock unless the
+  // workspace owns the real-estate-management / real-estate-investments add-on, so linking them
+  // sends a click to an upsell — the same reason CRM's Pipeline is omitted below. Syndication is
+  // `canManage`-gated. Overview is the landing tab, which "Open" already reaches.
   'real-estate': [
     { label: 'Listings', to: '/properties?tab=listings', icon: Building2 },
     { label: 'Pipeline', to: '/properties?tab=pipeline', icon: ClipboardList },
     { label: 'Leads', to: '/properties?tab=leads', icon: Contact },
     { label: 'Buyers', to: '/properties?tab=buyers', icon: Users },
+    { label: 'Sellers', to: '/properties?tab=sellers', icon: Store },
     { label: 'Viewings', to: '/properties?tab=viewings', icon: CalendarDays },
     { label: 'Sales', to: '/properties?tab=sales', icon: Banknote },
-    { label: 'Property Mgmt', to: '/properties?tab=lettings', icon: FolderOpen },
-    { label: 'Investments', to: '/properties?tab=investments', icon: BarChart3 },
   ],
   // No Pipeline entry on purpose: that tab is gated on the `deals` add-on, and this file lists
   // only always-available tabs so a launcher link never lands on an upsell.
@@ -55,9 +69,14 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   finance: [
     { label: 'Receivables', to: '/finance?tab=ar', icon: ArrowDownCircle },
     { label: 'Payables', to: '/finance?tab=ap', icon: ArrowUpCircle },
+    // The Revolut bank feed shipped with no launcher presence at all — reconciliation is a daily
+    // surface and the only way in was the Finance sidebar. `bank_feed` is ungated (the BYOK
+    // connection prompt lives inside the tab, so it is never blank).
+    { label: 'Bank feed', to: '/finance?tab=bank_feed', icon: Landmark },
     { label: 'Orders', to: '/finance?tab=doc_orders', icon: ShoppingCart },
     { label: 'Invoices', to: '/finance?tab=doc_invoices', icon: FileText },
     { label: 'Payments', to: '/finance?tab=doc_payments', icon: Banknote },
+    { label: 'Follow-ups', to: '/finance?tab=followups', icon: BellRing },
     { label: 'Reports', to: '/finance?tab=reports', icon: BarChart3 },
     { label: 'Customers & Suppliers', to: '/finance?tab=parties', icon: Users },
     { label: 'Expense cards', to: '/finance?tab=trip_cards', icon: Plane },
@@ -66,7 +85,10 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Employees', to: '/hr?tab=employees', icon: Users },
     { label: 'Time Off', to: '/hr?tab=timeoff', icon: CalendarDays },
     { label: 'Attendance', to: '/hr?tab=attendance', icon: Clock },
+    { label: 'Schedules', to: '/hr?tab=schedules', icon: CalendarClock },
+    { label: 'Overtime', to: '/hr?tab=overtime', icon: Timer },
     { label: 'Jobs & Applicants', to: '/hr?tab=recruitment', icon: Briefcase },
+    { label: 'Onboarding', to: '/hr?tab=onboarding', icon: ClipboardCheck },
     { label: 'Payroll', to: '/hr?tab=payroll', icon: Wallet },
     { label: 'Documents', to: '/hr?tab=documents', icon: FolderOpen },
   ],
@@ -101,9 +123,20 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // (agent) and the three estimators (real pages under /tools). Surface them here.
   projects: [
     { label: 'Purchase sheet', to: '/agent-hub?capability=project', icon: ClipboardList },
+    // Blueprints are declared to "live under Projects" in nav-items.ts, but the only way in was a
+    // button on the Projects list page — the launcher card linked three /tools estimators and not
+    // the surface the nav comment names.
+    { label: 'Blueprints', to: '/blueprints', icon: DraftingCompass },
     { label: 'Project estimator', to: '/tools/project-plan', icon: Calculator },
     { label: 'Heat-pump sizer', to: '/tools/heat-pump', icon: Flame },
     { label: 'Heating cost compare', to: '/tools/heating-cost', icon: Thermometer },
+  ],
+  // Contracts (nav id 'contracts'). The tile itself deep-links into the agent (drafting +
+  // send-for-signature); `/contracts` is the real list page, registered by the contracts module.
+  // It used to surface as a SECOND "Contracts" card in the launcher's "More" group — deduped in
+  // useLauncherApps, so the list has to be reachable from this card instead.
+  contracts: [
+    { label: 'All contracts', to: '/contracts', icon: FileText },
   ],
   // Quotes (nav id 'quotes', route /quotes). The list is the Open target; Price Monitoring is nested
   // here as an agent deep-link (folded in from a standalone tile to keep the Sales list lean).
