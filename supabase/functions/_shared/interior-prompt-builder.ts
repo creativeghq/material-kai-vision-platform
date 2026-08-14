@@ -10,7 +10,7 @@
 
 import { generateWithClaude } from './ai-client.ts';
 import type { DbClient } from './supabase-client.ts';
-import { getGenerationPrompt, loadPrompt, renderPromptTemplate } from './prompt-utils.ts';
+import { getGenerationPrompt, loadPrompt, renderPromptTemplate, tryLoadPrompt } from './prompt-utils.ts';
 
 export interface DesignParams {
   room_type?: string;
@@ -147,7 +147,18 @@ export async function buildFloorPlanRenderPrompt(
     );
   }
 
-  // Floor plan mode: interpret the uploaded 2D plan and render a perspective view
+  // Floor plan mode. A style may carry its OWN complete floor-plan prompt
+  // (prompt_type='template', category='interior-designer', subcategory=<style_key>) — six
+  // do. When one exists it wins outright; otherwise the generic prompt plus a style
+  // description is used, which covers all 12 styles.
+  //
+  // `tryLoadPrompt` returns null only for PromptNotConfigured. A store outage still throws, so
+  // "this style has no override" can never be confused with "the database is down".
+  const styleOverride = style
+    ? await tryLoadPrompt(db, 'template', 'interior-designer', style.toLowerCase())
+    : null;
+  if (styleOverride) return styleOverride;
+
   return renderPromptTemplate(
     await getGenerationPrompt(db, 'interior_floorplan_render'),
     { style_tag: styleTag, technical_tag: technicalTag },

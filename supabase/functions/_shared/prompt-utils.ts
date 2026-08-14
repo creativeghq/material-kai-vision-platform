@@ -137,20 +137,23 @@ export async function loadPrompt(
   supabase: DbClient,
   promptType: string,
   category: string,
+  subcategory?: string,
 ): Promise<string> {
-  const cacheKey = `${promptType}:${category}`;
+  const cacheKey = `${promptType}:${category}:${subcategory ?? '-'}`;
   const cached = getCachedPrompt(cacheKey);
   if (cached) return cached;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('prompts')
     .select('prompt_text, system_prompt')
     .eq('prompt_type', promptType)
     .eq('category', category)
     .eq('is_active', true)
-    .eq('status', 'active')
-    .order('version', { ascending: false })
-    .limit(1);
+    .eq('status', 'active');
+  // Only filter when asked. A caller that passes no subcategory means "the row for this
+  // category", not "the row whose subcategory is null".
+  if (subcategory !== undefined) query = query.eq('subcategory', subcategory);
+  const { data, error } = await query.order('version', { ascending: false }).limit(1);
 
   // PGRST116 is "no rows" from .single(); we use .limit(1) so any error here is a real
   // reachability failure, never an empty result. supabase-js RESOLVES on an RLS denial rather
@@ -171,6 +174,28 @@ export async function loadPrompt(
 
   setCachedPrompt(cacheKey, text);
   return text;
+}
+
+/**
+ * Load a prompt that is genuinely OPTIONAL, returning null when there is no such row.
+ *
+ * This is not the banned code-fallback pattern and the difference is exact: only
+ * PromptNotConfigured becomes null. PromptStoreUnavailable still throws, so a database outage
+ * can never be mistaken for "this override is not configured". Use it only where absence is a
+ * documented, expected state and the fallback is ANOTHER DB PROMPT — never a hardcoded string.
+ */
+export async function tryLoadPrompt(
+  supabase: DbClient,
+  promptType: string,
+  category: string,
+  subcategory?: string,
+): Promise<string | null> {
+  try {
+    return await loadPrompt(supabase, promptType, category, subcategory);
+  } catch (err) {
+    if (err instanceof PromptNotConfigured) return null;
+    throw err;
+  }
 }
 
 /**
