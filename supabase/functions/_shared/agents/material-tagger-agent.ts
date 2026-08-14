@@ -26,6 +26,7 @@
  *                            tuning the threshold or seeding new canonicals).
  */
 
+import { loadPrompt } from '../prompt-utils.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 
@@ -70,21 +71,11 @@ export class MaterialTaggerAgent implements AgentRunner {
 
     await log('info', `Found ${products.length} products to tag`);
 
-    const systemPrompt = agentConfig.system_prompt_override || `You are a material classification expert for a building materials platform.
-Analyze the product information provided and return structured attribute tags.
-
-For each product return a JSON object with these fields (only include fields that apply):
-- material_type: primary material (e.g. "porcelain tile", "solid oak", "marble", "concrete")
-- color: primary color or color range (e.g. "white", "grey", "warm beige")
-- finish: surface finish (e.g. "polished", "matte", "brushed", "textured")
-- application: where it's used (e.g. "floor", "wall", "indoor outdoor", "countertop")
-- tags: array of 3-6 relevant tags for search
-
-LANGUAGE RULE: Return all values in lowercase English. If the product name or description
-is non-English, translate. Preserve verbatim only: brand names, model numbers, SKUs,
-socket codes (E27/GU10), IP ratings (IP44/IP65), wattages, dimensions, certifications.
-
-Respond with a JSON object only. No markdown, no explanation.`;
+    // The default lives in `prompts` (prompt_type='agent', category='material-tagger').
+    // It used to be a hardcoded literal here: the override path existed, so an admin could
+    // change this — but only by overriding a default nobody could see (#347 phase 3P).
+    const systemPrompt = agentConfig.system_prompt_override
+      || await loadPrompt(supabase, 'agent', 'material-tagger');
 
     let totalInputTokens  = 0;
     let totalOutputTokens = 0;

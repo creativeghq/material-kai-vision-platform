@@ -12,6 +12,7 @@
  * Delegation: throws DelegateToMivaaError when batch_size > 20
  */
 
+import { loadPrompt } from '../prompt-utils.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import { DelegateToMivaaError } from './types.ts';
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
@@ -67,18 +68,11 @@ export class ProductEnrichmentAgent implements AgentRunner {
 
     await log('info', `Found ${products.length} products to enrich`);
 
-    const systemPrompt = agentConfig.system_prompt_override || `You are a material product specialist.
-Your task is to enrich product data for a building materials platform.
-For each product, generate:
-1. A clear, professional description (2-3 sentences) — write in English
-2. 5-8 search keywords relevant to architects and interior designers — lowercase English
-3. The primary material category (e.g. "ceramic tile", "natural stone", "wood flooring") — lowercase English
-
-LANGUAGE RULE: Return all values in English. If the input product name / description
-is in another language (Greek, Italian, German, etc.), translate to English. Preserve
-verbatim only: brand names, model numbers, SKUs, certifications.
-
-Respond with a JSON object only. No prose, no markdown fences.`;
+    // The default lives in `prompts` (prompt_type='agent', category='product-enrichment').
+    // It used to be a hardcoded literal here: the override path existed, so an admin could
+    // change this — but only by overriding a default nobody could see (#347 phase 3P).
+    const systemPrompt = agentConfig.system_prompt_override
+      || await loadPrompt(supabase, 'agent', 'product-enrichment');
 
     let totalInputTokens  = 0;
     let totalOutputTokens = 0;
