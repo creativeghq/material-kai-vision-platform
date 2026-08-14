@@ -451,6 +451,14 @@ interface Message {
    * reload rather than frozen into the row.
    */
   followUps?: { toolkitId: string; ranLabel?: string };
+  /**
+   * Model-written next steps for THIS turn (agent-chat's `next_steps` chunk) — grounded in
+   * what was said and what the tool returned, so they can be specific in a way the catalog
+   * never can ("Remind Maria about Thursday's viewing"). `prompt` is sent verbatim when the
+   * chip is clicked. Absent when the suggestion call failed or had nothing to add, and
+   * `followUps` above is then the fallback.
+   */
+  nextSteps?: Array<{ label: string; prompt: string }>;
   demoData?: any; // Structured demo data for DemoAgent responses
   materialData?: {
     products: any[];
@@ -3496,6 +3504,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         followUps: directRun?.toolkitId
           ? { toolkitId: directRun.toolkitId, ranLabel: directRun.quickStartLabel }
           : undefined,
+        nextSteps: Array.isArray(data.next_steps) && data.next_steps.length > 0
+          ? data.next_steps
+          : undefined,
       };
 
       // Track active generation job if present
@@ -3531,7 +3542,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             generation_job: data.generation_job, // Save generation job info for async 3D generation
             geminiImageData: pendingGeminiData ?? undefined, // Gemini single-image result merged into this message
             searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec
-            followUps: assistantMessage.followUps, // next-step chips, re-derived from the catalog on reload
+            followUps: assistantMessage.followUps, // fallback chips, re-derived from the catalog on reload
+            nextSteps: assistantMessage.nextSteps, // model-written chips — kept verbatim, they were about THIS turn
           },
         });
       }
@@ -3792,6 +3804,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           kitchenCostData: msg.metadata?.kitchenCostData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
           followUps: msg.metadata?.followUps as any | undefined,
+          nextSteps: msg.metadata?.nextSteps as any | undefined,
           mentionSummaryData: msg.metadata?.mentionSummaryData as any | undefined,
           sourcingOptionsData: msg.metadata?.sourcingOptionsData as any | undefined,
           purchaseOrderCreatedData: msg.metadata?.purchaseOrderCreatedData as any | undefined,
@@ -4788,31 +4801,58 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * The one that just ran is excluded; three is the cap so the reply stays a reply.
    */
   const renderFollowUps = (message: Message): React.ReactNode => {
+    const chipRow = (children: React.ReactNode) => (
+      <div className="mt-3 border-t border-white/10 pt-3">
+        <p className="mb-1.5 text-xs text-white/60">Want me to do any of these next?</p>
+        <div className="flex flex-wrap gap-1.5">{children}</div>
+      </div>
+    );
+    const chipClass =
+      'inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 ' +
+      'text-xs text-white/90 transition-colors hover:bg-white/15';
+
+    // Written for THIS turn — specific enough to name the thing ("Remind Maria about
+    // Thursday"), so they lead. Clicking sends the sentence the model wrote, exactly as
+    // if the user had typed it.
+    if (message.nextSteps?.length) {
+      return chipRow(message.nextSteps.map((step, i) => (
+        <button
+          key={`${step.label}-${i}`}
+          type="button"
+          title={step.prompt}
+          onClick={() => {
+            setInput(step.prompt);
+            setTimeout(() => { void handleSendMessageRef.current?.(); }, 0);
+          }}
+          className={chipClass}
+        >
+          <Sparkles className="h-3 w-3 text-primary" />
+          {step.label}
+        </button>
+      )));
+    }
+
+    // Fallback: the toolkit's other quick-starts. Reached when the suggestion call had
+    // nothing to add, timed out, or its prompt row is missing — a generic offer beats a
+    // dead stop, and it keeps a direct run useful while the model path is unavailable.
     if (!message.followUps) return null;
     const tk = TOOLKITS.find((t) => t.id === message.followUps!.toolkitId);
     const next = (tk?.quick_starts ?? [])
       .filter((q) => q.label !== message.followUps!.ranLabel)
       .slice(0, 3);
     if (!tk || next.length === 0) return null;
-    return (
-      <div className="mt-3 border-t border-white/10 pt-3">
-        <p className="mb-1.5 text-xs text-white/60">Want me to do any of these next?</p>
-        <div className="flex flex-wrap gap-1.5">
-          {next.map((qs) => (
-            <button
-              key={qs.label}
-              type="button"
-              title={qs.description}
-              onClick={() => handleQuickStart(qs, tk)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/90 transition-colors hover:bg-white/15"
-            >
-              <Sparkles className="h-3 w-3 text-primary" />
-              {qs.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
+    return chipRow(next.map((qs) => (
+      <button
+        key={qs.label}
+        type="button"
+        title={qs.description}
+        onClick={() => handleQuickStart(qs, tk)}
+        className={chipClass}
+      >
+        <Sparkles className="h-3 w-3 text-primary" />
+        {qs.label}
+      </button>
+    )));
   };
 
   const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;

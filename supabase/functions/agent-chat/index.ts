@@ -2336,6 +2336,7 @@ async function executeAgent(
     return {
       text: summary,
       toolResults: [{ tool: directTool.name, args: directTool.input, result: parsed ?? toolResult }],
+      boundTools: describeBoundTools(tools),
     };
   }
 
@@ -2501,6 +2502,7 @@ async function executeAgent(
       materialResults: result.collectedProducts.length > 0 ? { products: result.collectedProducts } : undefined,
       toolResults: result.toolResults.length > 0 ? result.toolResults : undefined,
       generationJob: result.generationJob,
+      boundTools: describeBoundTools(tools),
       usage: {
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -2618,6 +2620,19 @@ async function promoteTurnToMemory(
       `${result.embedded} embedded, ${result.skipped} rejected) for ${agentId}`,
     );
   }
+}
+
+/**
+ * The tools actually BOUND for a turn, as "name: what it does" lines.
+ *
+ * This is what grounds the next-step suggestions: the real capability set after RBAC and
+ * toolkit gating, so a suggestion can never be an action this agent could not carry out.
+ * Descriptions are clipped — the model needs to know what a tool is for, not its full contract.
+ */
+function describeBoundTools(tools: any[]): string[] {
+  return (tools ?? [])
+    .filter((t: any) => typeof t?.name === 'string')
+    .map((t: any) => `${t.name}: ${String(t.description ?? '').slice(0, 160)}`);
 }
 
 /**
@@ -3183,6 +3198,43 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             }).catch((e: any) => console.warn('ai_call_logs write failed:', e));
           }
 
+          // ── Next steps ──────────────────────────────────────────────────────
+          // Written per turn against what was actually said and what the tool actually
+          // returned, because the alternative — offering the toolkit's other quick-starts
+          // — can only ever propose a fixed list in catalog order, and can propose nothing
+          // at all after a plain chat turn (a chat turn belongs to no toolkit).
+          //
+          // Serial: the chips ride in the final chunk, and the Studio renders the message
+          // only once the stream ends, so emitting them later would buy nothing. Bounded by
+          // its own 8s timeout, and every failure path inside returns an empty list — a
+          // garnish must never take a turn down with it.
+          let nextSteps: Array<{ label: string; prompt: string }> = [];
+          if (finalResult.text) {
+            try {
+              const { proposeNextSteps } = await import('../_shared/next-steps.ts');
+              const firstTool = finalResult.toolResults?.[0];
+              const proposal = await proposeNextSteps(supabase, {
+                userMessage: userInput,
+                agentReply: finalResult.text,
+                toolResult: firstTool?.result,
+                toolName: firstTool?.tool,
+                // The tools actually BOUND this turn — the real capability set after RBAC
+                // and toolkit gating, so a suggestion can never be something this agent
+                // cannot carry out.
+                capabilities: finalResult.boundTools ?? [],
+              });
+              nextSteps = proposal.steps;
+              if (proposal.usage && proposal.usage.totalTokens > 0) {
+                void logAgentUsage(userId, workspaceId, `${agentId}:next_steps`, {
+                  ...proposal.usage,
+                  turnCount: 1,
+                });
+              }
+            } catch (nextStepsErr) {
+              console.error('❌ next-steps generation failed:', nextStepsErr);
+            }
+          }
+
           const modelUsed = finalResult.usage?.modelName || 'claude-opus-4-8';
           const finalChunk = {
             type: 'final_result',
@@ -3192,6 +3244,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             materialResults: finalResult.materialResults,
             tool_results: finalResult.toolResults,
             generation_job: finalResult.generationJob,
+            next_steps: nextSteps,
           };
 
           // Send final result - use safeEnqueue to check if stream is still open
