@@ -10,6 +10,7 @@
 // existing render block (so there's one renderer); interactive types return for
 // the canvas. Refund-on-render-failure is handled by the handler.
 
+import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 
@@ -350,7 +351,7 @@ async function autoDetectCallouts(
             { type: 'image', source: { type: 'url', url: imageUrl } },
             {
               type: 'text',
-              text: 'Identify up to 6 distinct visible interior design elements (e.g. sink, faucet, pendant light, oven, wall tile, floor tile, cabinet, door, window). For each, return its center as normalized [0..1] coordinates (0,0 = top-left, 1,1 = bottom-right) and a 2–4 word label. Output ONLY a JSON array, no prose: [{"x":0.45,"y":0.62,"label":"Pendant Light"}, ...]',
+              text: await getGenerationPrompt(supabase, 'moodboard_sheet_elements'),
             },
           ],
         }],

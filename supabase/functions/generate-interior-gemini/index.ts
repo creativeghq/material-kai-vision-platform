@@ -33,7 +33,7 @@ import {
   buildFloorPlanDiagramPrompt,
   buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
-import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
+import { getGenerationPrompt, loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { resolveGenerationRouting } from '../_shared/generation-routing.ts';
 import {
   buildProductShotPrompt,
@@ -69,7 +69,7 @@ function toBase64(bytes: Uint8Array): string {
  * This spec is then used in Step 2 to edit the room — the inspiration image
  * never reaches the image generator, eliminating spatial bleed entirely.
  */
-async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promise<string> {
+async function extractDesignSpec(supabase: DbClient, imageBuffer: Uint8Array, style?: string): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s hard timeout
 
@@ -85,38 +85,7 @@ async function extractDesignSpec(imageBuffer: Uint8Array, style?: string): Promi
             role: 'user',
             parts: [
               { inlineData: { mimeType: 'image/jpeg', data: toBase64(imageBuffer) } },
-              { text: `You are an interior design aesthetic analyst. Study this photo and produce a precise specification of VISUAL AESTHETICS ONLY.
-
-CRITICAL: Do NOT describe where elements are located, which wall they are on, or their spatial position. Only describe visual appearance — colors, materials, textures, finishes, and styles. Position information will cause fixtures to move in the wrong room.
-
-FIXTURES PRESENT (list only the fixture types visibly present — e.g. freestanding bath, walk-in shower, wall-hung basin, toilet, vanity unit, towel rail, mirror):
-
-FLOORS: [material, exact color/tone, tile size/format if applicable, laying pattern — straight/herringbone/chevron/diagonal, finish — matte/gloss/honed/polished, grout color and joint width]
-
-WALLS - PRIMARY SURFACE: [material, exact color, size/format if tiled, texture, finish, laying pattern, grout color and joint width — this material covers 100% of every wall surface unless a secondary zone is specified below]
-
-WALLS - SECONDARY ZONE (only if the inspiration clearly shows a dual-treatment split): [material, color, exact vertical split height as a percentage — e.g. "lower 40% dark charcoal tile, upper 60% white plaster". If no clear split exists, leave blank — do not invent a split.]
-
-CEILING: [color, finish — matte/gloss, any shadow-gap or cove lighting]
-
-BASIN/SINK STYLE: [shape, material/color, style — undermount/vessel/wall-hung — visual only, no location]
-
-VANITY UNIT: [color, material, door style — flat/shaker/handleless, handle metal finish]
-
-TAPS & FITTINGS: [metal finish — chrome/brushed nickel/brushed brass/matte black/gunmetal/rose gold]
-
-MIRROR: [shape — rectangular/round/arch/irregular, framed or frameless, any integrated LED]
-
-SHOWER: [glass type — clear/fluted/smoked, shower head style — rain/wall-mounted/handheld, any niche tile treatment]
-
-BATHTUB (if present): [freestanding or built-in, shape, material/finish color]
-
-TOWEL RAILS: [style — ladder/bar/ring, metal finish]
-
-LIGHTING: [fixture types, color temperature — warm/neutral/cool, overall mood]
-
-FULL COLOR PALETTE: [every distinct color — be specific: "warm white", "charcoal grey", "brushed brass"]
-${style ? `\nDESIGN STYLE: ${style}` : ''}` },
+              { text: renderPromptTemplate(await loadPrompt(supabase, 'tool', 'interior_aesthetic_analyst'), { style: style ? `\nDESIGN STYLE: ${style}` : '' }) },
             ],
           }],
         }),
@@ -141,21 +110,8 @@ ${style ? `\nDESIGN STYLE: ${style}` : ''}` },
  * Used for image-edit mode with a style reference — cosmetic changes only, no fixture replacement.
  * The inspiration image is NOT passed here — only text + room photo.
  */
-function buildApplySpecPrompt(designSpec: string, userInstruction?: string): string {
-  return `You are performing a cosmetic renovation of the room in this photograph.
-
-CRITICAL — POSITIONS ARE LOCKED:
-Every fixture and architectural element stays on its exact wall in its exact position. Do not move the toilet, sink, vanity, shower, bath, doors, windows, niches, mirrors, or towel rails. The camera angle is unchanged.
-
-RENOVATION SPECIFICATION — apply every item below:
-${designSpec}
-${userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : ''}
-
-You are ONLY changing surfaces, finishes, colors, and material aesthetics. Nothing is added, removed, or relocated.
-
-SELF-CHECK before finalising: confirm the toilet is on the same wall as in the original. Confirm the sink is in the same position. Confirm the shower is in the same corner. If anything moved, correct it.
-
-Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
+async function buildApplySpecPrompt(supabase: DbClient, designSpec: string, userInstruction?: string): Promise<string> {
+  return renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_apply_spec'), { design_spec: designSpec, user_instruction: userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : '' });
 }
 
 /**
@@ -163,27 +119,8 @@ Photorealistic professional interior photography. 24mm architectural lens, corre
  * Like buildApplySpecPrompt but allows fixture replacement — if the design spec describes
  * a different fixture type (e.g. walk-in shower where a bathtub exists), replace it fully.
  */
-function buildCopyStyleApplyPrompt(designSpec: string, userInstruction?: string): string {
-  return `You are redesigning this room to fully match the following design specification extracted from an inspiration image.
-
-STRUCTURAL LOCK — these never change:
-Wall positions, room dimensions, door and window openings, camera angle, and perspective are frozen. Every functional zone stays on the same side of the room (sink zone, toilet zone, bathing zone, seating area, etc.).
-
-FIXTURE REPLACEMENT RULES:
-- For each fixture or furniture piece in the room, check what the design spec describes for the equivalent functional zone.
-- If the spec describes the SAME type (e.g. both have a bathtub): keep it but fully restyle its shape, finish, and material to match the spec exactly.
-- If the spec describes a DIFFERENT type (e.g. spec says walk-in shower, room has bathtub): completely replace the fixture with what the spec describes. Erase the old shape entirely — no remnant. The replacement must match the spec's geometry, proportions, materials, and finish.
-- If the spec describes NO fixture for that zone: remove the fixture and apply the wall finish from the spec.
-
-DESIGN SPECIFICATION — apply every item below to ALL surfaces and fixtures:
-${designSpec}
-${userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : ''}
-
-SURFACE RULES: Every surface — floor, all walls, ceiling, tiles, cladding — must match the spec exactly. No original surface survives.
-
-SELF-CHECK before finalising: every surface matches the spec. Every fixture either matches the spec type or has been replaced. Nothing moved to a different zone. Camera angle unchanged.
-
-Photorealistic professional interior photography. 24mm architectural lens, corrected verticals, no fisheye, ultra-realistic material textures and lighting.`;
+async function buildCopyStyleApplyPrompt(supabase: DbClient, designSpec: string, userInstruction?: string): Promise<string> {
+  return renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_copy_style_apply'), { design_spec: designSpec, user_instruction: userInstruction ? `\nADDITIONAL INSTRUCTION: ${userInstruction}` : '' });
 }
 
 // ── Flux Depth Pro (Replicate) ────────────────────────────────────────────────
@@ -220,40 +157,17 @@ function buildFluxRedesignPrompt(style?: string, roomType?: string, instruction?
  * colors unchanged. The resulting intermediate image is then fed into Flux Depth Pro (step 3)
  * so its depth map reflects the correct fixtures rather than the originals.
  */
-function buildFixtureReplacementPrompt(designSpec: string): string {
-  return `You are preparing a room photo for a style pipeline. Your ONLY job in this step is fixture replacement — do NOT change any colors, tiles, surfaces, or finishes yet.
-
-WHAT TO DO:
-Look at the design specification below. For each fixture or furniture piece described, compare it to what is currently in the room photo.
-- If the spec describes a DIFFERENT type of fixture (e.g. spec says walk-in shower, photo has a bathtub): fully replace the fixture with the type described in the spec. Match the general shape and proportions from the spec. Erase the original completely — no remnant of the old shape.
-- If the spec describes the SAME type: leave it completely unchanged.
-- If the spec describes NO fixture for a zone: remove it and leave a plain wall/floor.
-
-WHAT NOT TO DO:
-Do NOT change wall colors, tile patterns, floor materials, paint, hardware finishes, or any surface. Only the physical fixture shapes change in this step.
-
-STRUCTURAL LOCK: wall positions, room dimensions, camera angle, and all fixture positions/zones stay exactly as in the photo.
-
-DESIGN SPECIFICATION (use only to identify fixture types):
-${designSpec}
-
-Output a photorealistic photo of the room with only the fixture shapes updated as described above. Everything else is pixel-identical to the input.`;
+async function buildFixtureReplacementPrompt(supabase: DbClient, designSpec: string): Promise<string> {
+  return renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_fixture_replacement'), { design_spec: designSpec });
 }
 
 /**
  * Build a Flux text prompt that applies an extracted design spec to a room.
  * Used for Copy Style — the spec was extracted from the inspiration image by Gemini Vision.
  */
-function buildFluxCopyStylePrompt(designSpec: string, roomType?: string, userInstruction?: string): string {
+async function buildFluxCopyStylePrompt(supabase: DbClient, designSpec: string, roomType?: string, userInstruction?: string): Promise<string> {
   const room = roomType || 'interior space';
-  return `Apply the following complete interior design aesthetic to this ${room}. Preserve every fixture position and the spatial layout exactly — nothing moves.
-
-FULL SURFACE COVERAGE — CRITICAL:
-Every wall surface must be covered floor-to-ceiling and edge-to-edge with the specified wall material. No partial application — the tile, cladding, or paint must extend to every corner, behind every fixture, above and below every element, all the way to the ceiling and floor junction. Zero original wall finish should remain visible anywhere. Same rule applies to floors — the specified floor material covers the entire floor plane without gaps.
-
-${designSpec}
-${userInstruction ? `\nAdditional instruction: ${userInstruction}\n` : ''}
-Ultra-realistic physically accurate materials and lighting. 24mm architectural lens, corrected verticals, no fisheye distortion.`;
+  return renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_apply_aesthetic'), { room: room, design_spec: designSpec, user_instruction: userInstruction ? `\nAdditional instruction: ${userInstruction}\n` : '' });
 }
 
 /**
@@ -707,22 +621,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
       if (useGrok) {
         // Grok Aurora edit — sends image directly, superior spatial accuracy
-        const grokPrompt = `You are making a targeted edit to this interior design photo.
-
-INSTRUCTION: "${instruction}"
-
-SPATIAL RULES — never break these:
-- Every fixed element stays in its exact position: sink, vanity, toilet, shower, bath, doors, windows, niches, alcoves, built-ins.
-- Room dimensions, wall positions, ceiling height, and all architectural structure are unchanged.
-- Camera angle and perspective match the reference photo exactly.
-
-DESIGN CHANGES to apply exactly as instructed:
-- Update all surface materials as described (floor, walls, ceiling).
-- Update fixture finishes: taps, rails, handles, mirrors — keep position, change finish as instructed.
-- Update furniture and vanity: keep placement, update color/material/finish.
-- Update lighting: keep fixture positions, change style or temperature as instructed.
-
-OUTPUT: Photorealistic professional interior photography. Ultra-realistic textures, accurate reflections. 24mm architectural lens, corrected verticals, no fisheye.`;
+        const grokPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_targeted_edit'), { instruction: instruction });
 
         const result = await editImageWithGrok(grokPrompt, sourceBuffer);
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
@@ -733,11 +632,11 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic textur
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         let applyPrompt: string;
         try {
-          const designSpec = await extractDesignSpec(styleBuffer, body.style);
-          applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
+          const designSpec = await extractDesignSpec(supabase, styleBuffer, body.style);
+          applyPrompt = await buildApplySpecPrompt(supabase, designSpec, body.prompt);
         } catch (specErr) {
           console.warn('[generate-interior-gemini] Spec extraction failed, using fallback:', specErr);
-          applyPrompt = buildApplySpecPrompt(
+          applyPrompt = await buildApplySpecPrompt(supabase, 
             `Apply a complete visual transformation matching the style of the provided inspiration: ${body.style ?? 'high-end contemporary'}. Copy all surface materials, colors, tile patterns, fixture finishes, and hardware from the inspiration image.`,
             body.prompt,
           );
@@ -749,23 +648,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic textur
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         // Gemini direct edit
-        const editText = `You are redesigning the interior shown in the reference photo.
-
-INSTRUCTION: "${instruction}"
-
-SPATIAL RULES (never break these):
-- Every fixed element stays in its exact position: sink, vanity, toilet, shower, bath, doors, windows, niches, alcoves, built-ins.
-- Room dimensions, wall positions, ceiling height, and all architectural structure are unchanged.
-- Camera angle and perspective match the reference photo exactly.
-
-DESIGN CHANGES to apply:
-- Update all surface materials as described: floor tiles (color, size, pattern, grout), wall tiles (color, size, format, zone splits, grout), ceiling finish.
-- Update all fixture finishes: taps, towel rails, shower heads, handles, mirrors — keep their style/position, change their finish as instructed.
-- Update furniture and vanity: keep placement, update color/material/finish as instructed.
-- Update lighting: keep fixture positions, change style or color temperature as instructed.
-- If no specific material is mentioned, make an intelligent high-end upgrade consistent with the instruction's style direction.
-
-OUTPUT: Photorealistic professional interior photography. Ultra-realistic material textures, accurate reflections, natural lighting. 24mm architectural lens, corrected verticals, no fisheye.`;
+        const editText = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_reference_redesign'), { instruction: instruction });
 
         const result = await generateImageWithGemini(
           { text: editText, images: [sourceBuffer] },
@@ -814,27 +697,7 @@ OUTPUT: Photorealistic professional interior photography. Ultra-realistic materi
 
         // Encode inspiration as base64 data URL for embedding in the prompt
         const inspirationB64 = toBase64(inspirationBuffer);
-        const grokCopyStylePrompt = `You are performing a style transfer on an interior room.
-
-The INSPIRATION IMAGE (provided as context below) shows a reference interior design aesthetic.
-The ROOM IMAGE (attached) is the room to redesign.
-
-TASK: Apply the complete aesthetic from the inspiration image to the room:
-- Extract: wall finish, color, tile pattern and size, floor material, fixture style, hardware finishes, lighting mood, color palette.
-- Apply ALL of these to the room image exactly. Every surface must be updated.
-
-STRUCTURAL LOCK — never change:
-- Room dimensions, wall positions, door and window openings, camera angle, perspective.
-- All fixture positions stay in their zones (sink zone, toilet zone, bathing/seating area).
-
-SURFACE COVERAGE — critical:
-- Every wall surface covered floor-to-ceiling, edge-to-edge with the specified wall material. Zero original wall visible.
-- Floor material covers the entire floor plane without gaps.
-${body.prompt ? `\nADDITIONAL INSTRUCTION: ${body.prompt}` : ''}
-
-INSPIRATION IMAGE (base64): data:image/jpeg;base64,${inspirationB64}
-
-OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected verticals, ultra-realistic textures.`;
+        const grokCopyStylePrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_style_transfer'), { body: body.prompt ? `\nADDITIONAL INSTRUCTION: ${body.prompt}` : '', inspiration_b64: inspirationB64 });
 
         const result = await editImageWithGrok(grokCopyStylePrompt, roomBuffer);
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
@@ -844,8 +707,8 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
         let fluxPrompt: string;
         let designSpec: string | null = null;
         try {
-          designSpec = await extractDesignSpec(inspirationBuffer, body.style);
-          fluxPrompt = buildFluxCopyStylePrompt(designSpec, body.room_type, body.prompt);
+          designSpec = await extractDesignSpec(supabase, inspirationBuffer, body.style);
+          fluxPrompt = await buildFluxCopyStylePrompt(supabase, designSpec, body.room_type, body.prompt);
         } catch (specErr) {
           console.warn('[copy-style] Spec extraction failed, using fallback:', specErr);
           fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.prompt ?? 'Apply a high-end complete visual transformation.');
@@ -860,7 +723,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
           console.warn('[copy-style] Flux failed, falling back to Gemini:', String(fluxErr));
           const roomBuffer = await fetchImageBuffer(body.reference_image_url);
           if (designSpec) {
-            const applyPrompt = buildCopyStyleApplyPrompt(designSpec, body.prompt);
+            const applyPrompt = await buildCopyStyleApplyPrompt(supabase, designSpec, body.prompt);
             const result = await generateImageWithGemini(
               { text: applyPrompt, images: [roomBuffer] },
               { model, aspectRatio },
@@ -891,11 +754,11 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         let applyPrompt: string;
         try {
-          const designSpec = await extractDesignSpec(styleBuffer, body.style);
-          applyPrompt = buildApplySpecPrompt(designSpec, body.prompt);
+          const designSpec = await extractDesignSpec(supabase, styleBuffer, body.style);
+          applyPrompt = await buildApplySpecPrompt(supabase, designSpec, body.prompt);
         } catch (specErr) {
           console.warn('[generate-interior-gemini] Spec extraction failed (floor-plan-render), using fallback:', specErr);
-          applyPrompt = buildApplySpecPrompt(
+          applyPrompt = await buildApplySpecPrompt(supabase, 
             `Apply a complete visual transformation matching the style of the provided inspiration: ${body.style ?? 'high-end contemporary'}. Copy all surface materials, colors, tile patterns, fixture finishes, and hardware from the inspiration image.`,
             body.prompt,
           );

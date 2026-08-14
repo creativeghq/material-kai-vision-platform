@@ -7,6 +7,7 @@
  * Cost: 2 credits (social-caption service in credit-utils). Non-refundable.
  */
 
+import { getGenerationPrompt, loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.39.0';
@@ -111,25 +112,9 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
   try {
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY() });
 
-    const systemPrompt = `You are an expert social media content creator specialising in interior design, materials, and architecture.
-Generate captions that are ${tone} in tone and optimised for ${platform}.
-Platform specs: max ${spec.max_chars} characters. Tone: ${spec.tone_notes}.
-${include_hashtags ? `Include ${hashtag_count} hashtags — style: ${spec.hashtag_style}.` : 'Do not include hashtags.'}
-Always output valid JSON only, no markdown.`;
+    const systemPrompt = renderPromptTemplate(await loadPrompt(supabase, 'tool', 'social_content_system'), { tone: tone, platform: platform, max_chars: spec.max_chars, tone_notes: spec.tone_notes, hashtag_instruction: include_hashtags ? `Include ${hashtag_count} hashtags — style: ${spec.hashtag_style}.` : 'Do not include hashtags.' });
 
-    const userPrompt = `Generate 3 caption variants for a ${platform} post about: "${topic}"
-${product_info ? `Product/material details: ${product_info}` : ''}
-
-Return exactly this JSON structure:
-{
-  "captions": [
-    { "variant": 1, "caption": "...", "char_count": 0 },
-    { "variant": 2, "caption": "...", "char_count": 0 },
-    { "variant": 3, "caption": "...", "char_count": 0 }
-  ],
-  "hashtags": ["#tag1", "#tag2", ...],
-  "best_time_hint": "Brief tip on when to post this type of content"
-}`;
+    const userPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'social_caption_variants'), { platform: platform, topic: topic, product_info: product_info ? `Product/material details: ${product_info}` : '' });
 
     const claudeStart = Date.now();
     const message = await anthropic.messages.create({
