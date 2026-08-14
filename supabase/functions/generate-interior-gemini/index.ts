@@ -593,7 +593,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
     // ── Mode 1: text-to-image ──────────────────────────────────────────────
     if (mode === 'text-to-image') {
-      const narrative = await buildNarrativePrompt({
+      const narrative = await buildNarrativePrompt(supabase, {
         room_type: body.room_type,
         style: body.style,
         materials: body.material_images ? undefined : undefined,
@@ -867,7 +867,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
             );
             imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
           } else {
-            const dualPrompt = buildDualReferenceStylePrompt(body.style, body.prompt);
+            const dualPrompt = await buildDualReferenceStylePrompt(supabase, body.style, body.prompt);
             const result = await generateImageWithGemini(
               { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
               { model, aspectRatio },
@@ -907,7 +907,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         // Single image: floor plan → perspective render, or style reference → new design
-        const renderPrompt = buildFloorPlanRenderPrompt(body.style, body.prompt);
+        const renderPrompt = await buildFloorPlanRenderPrompt(supabase, body.style, body.prompt);
         const result = await generateImageWithGemini(
           { text: renderPrompt, images: [sourceBuffer] },
           { model, aspectRatio: '1:1' },
@@ -918,7 +918,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
 
     // ── Mode 4: floor-plan-text (text → 2D floor plan diagram) ─────────────
     else if (mode === 'floor-plan-text') {
-      const diagramPrompt = buildFloorPlanDiagramPrompt({
+      const diagramPrompt = await buildFloorPlanDiagramPrompt(supabase, {
         room_type: body.room_type,
         style: body.style,
         sqm: body.sqm,

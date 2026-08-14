@@ -931,13 +931,10 @@ async function applyFixes(
     ? `\n=== VOICE TO PRESERVE ===\nTone: ${brief.brandVoice.toneAttributes.join(', ')}\nStyle: ${brief.brandVoice.writingStyle || 'Clear and professional'}\nNEVER introduce: ${brief.brandVoice.avoidList.join(', ') || 'N/A'}`
     : '';
 
-  // Load base fix prompt from DB
-  let baseFixPrompt: string;
-  try {
-    baseFixPrompt = await getToolPrompt(supabase, 'seo_fixer');
-  } catch {
-    baseFixPrompt = 'You are an SEO content editor. Apply ONLY the listed fixes to this article.';
-  }
+  // No fallback. Swallowing this and substituting a one-line stand-in would apply auto-fixes
+  // to a customer's article under a prompt nobody wrote and nobody could see — and the admin's
+  // seo_fixer edits would appear to save while changing nothing (#347 phase 3P).
+  const baseFixPrompt = await getToolPrompt(supabase, 'seo_fixer');
 
   const prompt = `${baseFixPrompt}
 ${voiceInstructions}
