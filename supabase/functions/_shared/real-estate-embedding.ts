@@ -36,7 +36,13 @@ export async function embedText(text: string, inputType: 'document' | 'query'): 
   const mivaaUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
   const res = await fetch(`${mivaaUrl}/api/embeddings/clip-text`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // MIVAA's /api/embeddings/* is excluded from the JWT middleware (no user
+    // JWT exists on this path) and, until audit #12, had no route gate either --
+    // an unauthenticated, uncapped Voyage spend reachable from the internet. It
+    // now requires verify_internal_access; x-cron-secret is the branch that is a
+    // plain string compare, so it works where a service-role Bearer would not
+    // (_validate_supabase_jwt rejects aud="service_role").
+    headers: { 'Content-Type': 'application/json', 'x-cron-secret': Deno.env.get('CRON_SECRET') || '' },
     body: JSON.stringify({ text, model: 'voyage-4', input_type: inputType, dimensions: 1024 }),
   });
   if (!res.ok) throw new Error(`MIVAA embedding API ${res.status}: ${(await res.text().catch(() => '')).substring(0, 200)}`);

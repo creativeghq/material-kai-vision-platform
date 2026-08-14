@@ -18,6 +18,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
 Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -116,7 +117,13 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     // Generate embedding via MIVAA /api/embeddings/clip-text (Voyage AI 4, 1024D)
     const embResponse = await fetch(`${MIVAA_URL}/api/embeddings/clip-text`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // MIVAA's /api/embeddings/* is excluded from the JWT middleware (no user
+      // JWT exists on this path) and, until audit #12, had no route gate either --
+      // an unauthenticated, uncapped Voyage spend reachable from the internet. It
+      // now requires verify_internal_access; x-cron-secret is the branch that is a
+      // plain string compare, so it works where a service-role Bearer would not
+      // (_validate_supabase_jwt rejects aud="service_role").
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
       body: JSON.stringify({
         text: textToEmbed.substring(0, 8000),
         model: 'voyage-4',
