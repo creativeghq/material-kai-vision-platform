@@ -107,10 +107,15 @@ await check('mivaa.health', ['MIVAA_BASE_URL'], async () => {
 });
 
 // 2. Embedding contract (Voyage 1024D) — the pipeline + kb-embedding depend on this.
-await check('mivaa.embeddings.clip-text', ['MIVAA_BASE_URL'], async () => {
+//    Needs the cron secret: /api/embeddings/* is excluded from MIVAA's JWT middleware
+//    and was therefore unauthenticated, uncapped Voyage spend open to the internet
+//    until audit creativeghq/mivaa-pdf-extractor#12 put verify_internal_access in
+//    front of it. x-cron-secret is the branch of that gate which is a plain string
+//    compare, so it works where a service-role Bearer would not.
+await check('mivaa.embeddings.clip-text', ['MIVAA_BASE_URL', 'MIVAA_CRON_SECRET'], async () => {
   const { res, json } = await http(`${MIVAA}/api/embeddings/clip-text`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON },
     body: JSON.stringify({ text: 'ceramic floor tile matte beige', model: 'voyage-4', input_type: 'document', dimensions: 1024 }),
   });
   assert(res.ok, `POST /api/embeddings/clip-text → ${res.status}`);
