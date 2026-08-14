@@ -8825,48 +8825,6 @@ export type Database = {
           },
         ]
       }
-      extraction_prompts: {
-        Row: {
-          category: string
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          id: string
-          is_custom: boolean | null
-          prompt_template: string
-          stage: string
-          updated_at: string | null
-          version: number
-          workspace_id: string
-        }
-        Insert: {
-          category: string
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_custom?: boolean | null
-          prompt_template: string
-          stage: string
-          updated_at?: string | null
-          version: number
-          workspace_id: string
-        }
-        Update: {
-          category?: string
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_custom?: boolean | null
-          prompt_template?: string
-          stage?: string
-          updated_at?: string | null
-          version?: number
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       facet_canonical_values: {
         Row: {
           alias_count: number

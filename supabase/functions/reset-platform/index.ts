@@ -46,7 +46,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - credit_packages          ← available credit package catalogue
 //   ── Prompts (admin-managed) ──
 //   - prompts                  ← saved agent/system prompts
-//   - extraction_prompts       ← PDF extraction prompt configurations
 //   - prompt_history           ← audit trail — TRIMMED to 5 most recent per prompt_id (not wiped)
 //   ── Price Monitoring (DO NOT WIPE — long-running observational state) ──
 //   Price-history series are only useful when contiguous; a reset would
@@ -375,7 +374,7 @@ const TABLES_TO_CLEAR = [
   // - Knowledge Base (kb_*)
   // - CRM (crm_*)
   // - Users / Profiles / Workspaces / Credits
-  // - Admin config: system_settings, prompts, extraction_prompts,
+  // - Admin config: system_settings, prompts,
   //   upsells, timeline_steps, flows, background_agents, roles,
   //   ai_model_pricing, subscription_plans, webhook_endpoints, etc.
   // - prompt_history — trimmed separately (keep 5 most recent per prompt)
@@ -439,7 +438,7 @@ const NEVER_CLEAR = new Set<string>([
   // Accounts / credits / RBAC / admin config
   'user_credits', 'credit_transactions', 'credit_packages', 'workspaces',
   'workspace_members', 'user_profiles', 'roles', 'role_permissions',
-  'prompts', 'extraction_prompts', 'system_settings', 'modules',
+  'prompts', 'system_settings', 'modules',
   // Admin-curated materials taxonomy that drives the ingestion/PDF-processing
   // classifier (categories + subcategories, ai_extraction_enabled, prototype
   // embeddings). Config, not user content — must survive a reset.
@@ -529,7 +528,7 @@ async function listAllFiles(bucketName: string, folderPath = ''): Promise<string
  * PRESERVED: system_settings, upsells, timeline_steps, kb_* tables,
  *            crm_companies, crm_contacts, profiles/auth.users,
  *            user_credits, credit_transactions, credit_packages,
- *            prompts, extraction_prompts, prompt_history,
+ *            prompts, prompt_history,
  *            price-monitoring tables (tracked_queries,
  *            tracked_query_price_history, tracked_query_promoted_urls,
  *            tracked_query_excluded_urls, price_lookups,
