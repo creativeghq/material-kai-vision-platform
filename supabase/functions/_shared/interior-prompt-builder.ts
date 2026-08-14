@@ -36,18 +36,38 @@ export interface FloorPlanParams {
   user_description?: string;
 }
 
-const STYLE_DEFAULTS: Record<string, string> = {
-  modern: 'clean lines, neutral palette, functional furniture, minimal clutter, recessed lighting',
-  minimalist: 'white surfaces, hidden storage, no ornamentation, single accent material, flooded with natural light',
-  scandinavian: 'light birch wood, linen textiles, hygge warmth, muted sage and white palette, indoor plants',
-  industrial: 'exposed brick, raw steel, polished concrete, Edison bulbs, dark moody palette',
-  luxury: 'marble surfaces, bespoke furniture, statement lighting, rich jewel tones, layered textures',
-  mediterranean: 'terracotta tiles, whitewashed plaster, wrought iron, arched openings, warm ochre tones',
-  japandi: 'dark stained oak, limewash walls, wabi-sabi textures, low-profile furniture, deep calm palette',
-  traditional: 'ornate mouldings, warm walnut wood, plush upholstery, Persian rugs, warm ambient lighting',
-  cabin: 'exposed timber beams, wide plank flooring, natural stone, cozy fireside, warm wood tones',
-  contemporary: 'bold geometric forms, mixed materials, statement art, dynamic lighting, open plan',
-};
+// Style -> scene description now lives in `interior_design_styles` (#347), so a style can be
+// added or reworded in admin instead of by editing this file. It was the last hardcoded
+// vocabulary in the interior path, and it had already drifted from replicateConfig's
+// `design_style` enum, which offers rustic/bohemian that this map had no description for.
+const STYLE_CACHE_TTL_MS = 5 * 60 * 1000;
+let styleCache: { at: number; byKey: Map<string, string> } | null = null;
+
+async function loadStyles(db: DbClient): Promise<Map<string, string>> {
+  if (styleCache && Date.now() - styleCache.at < STYLE_CACHE_TTL_MS) return styleCache.byKey;
+
+  const { data, error } = await db
+    .from('interior_design_styles')
+    .select('style_key, description')
+    .eq('is_active', true);
+
+  // supabase-js RESOLVES on an RLS denial, so an unchecked result would surface as "no styles"
+  // and every render would silently fall back to the bare style word.
+  if (error) throw new Error(`Could not read interior_design_styles: ${error.message}`);
+  if (!data?.length) throw new Error('interior_design_styles returned no active rows.');
+
+  const byKey = new Map(data.map((r) => [r.style_key as string, r.description as string]));
+  styleCache = { at: Date.now(), byKey };
+  return byKey;
+}
+
+/** The description for a style, or the style word itself when the DB has no entry for it. */
+async function styleDescription(db: DbClient, style?: string): Promise<string> {
+  const styles = await loadStyles(db);
+  if (!style) return styles.get('modern') ?? 'modern contemporary';
+  return styles.get(style.toLowerCase()) ?? style;
+}
+
 
 /**
  * Build a rich narrative scene description for interior design generation.
@@ -55,7 +75,7 @@ const STYLE_DEFAULTS: Record<string, string> = {
  */
 export async function buildNarrativePrompt(db: DbClient, params: DesignParams): Promise<string> {
   const styleCue = params.style
-    ? (STYLE_DEFAULTS[params.style.toLowerCase()] ?? params.style)
+    ? await styleDescription(db, params.style)
     : 'modern contemporary';
 
   const materialsLine = params.materials && params.materials.length > 0
@@ -110,15 +130,13 @@ ${editContext}`.trim();
 export async function buildFloorPlanRenderPrompt(
   db: DbClient, style?: string, userPrompt?: string,
 ): Promise<string> {
-  const styleDescription = style
-    ? (STYLE_DEFAULTS[style.toLowerCase()] ?? style)
-    : STYLE_DEFAULTS['modern'];
+  const styleDesc = await styleDescription(db, style);
 
   const styleName = style
     ? style.charAt(0).toUpperCase() + style.slice(1)
     : 'Modern Contemporary';
 
-  const styleTag = `Style: ${styleName} — ${styleDescription}.`;
+  const styleTag = `Style: ${styleName} — ${styleDesc}.`;
   const technicalTag = await getGenerationPrompt(db, 'interior_technical_tag');
 
   // Style-reference mode: generate a completely new room inspired by the reference image
