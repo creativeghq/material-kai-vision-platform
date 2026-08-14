@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, Copy, ExternalLink, Layers, Loader2, Pencil, Play, Sparkles, Trash2 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
@@ -19,12 +21,27 @@ import {
 } from '@/services/templates/registry';
 
 /**
+ * Rail values that are not an entity type.
+ *
+ * `?type=` doubles as the tab param rather than growing a second `?tab=` beside it — the App
+ * Launcher already deep-links `/templates?type=invoice` (`config/launcher-sections.ts`), so the
+ * types ARE the tabs. Neither value may collide with a `LIVE_TEMPLATE_TYPES` key.
+ */
+const ALL_TAB = 'all';
+const LIBRARIES_TAB = 'libraries';
+
+/**
  * Template Library (issue #322) — the one place that answers "what can I start from?".
  *
  * Generalizes what /blueprints does for scope-of-works to every record type: your saved templates
  * and the platform's starter examples, filtered by type, plus link-outs to the template systems
  * that already have their own manager (blueprints, email, WhatsApp, catalog designs…). Reached
  * from the App Launcher's "More" group.
+ *
+ * The type filter is a VERTICAL tab rail (the HR / Finance / Stock idiom), not a row of chips:
+ * ten types plus the external libraries wrapped to two or three rows of buttons and pushed the
+ * grid below the fold. Below `lg` the same list collapses into a horizontal scroll strip via
+ * `.finance-tabs-list` in index.css.
  */
 export const TemplateLibraryPage: React.FC = () => {
   const { toast } = useToast();
@@ -51,10 +68,23 @@ export const TemplateLibraryPage: React.FC = () => {
     [can, isModuleAvailable],
   );
 
-  const typeFilter = searchParams.get('type');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<EntityTemplate[]>([]);
+
+  /**
+   * The selected rail value, DERIVED from the URL rather than mirrored into state: `usableTypes`
+   * is empty until permissions and entitlements resolve, and a deep-linked `?type=invoice` has to
+   * land on Invoices once they do instead of being rewritten to All on the first render. A type
+   * this persona cannot use — or any junk value — falls back to All, which also stops an unknown
+   * param from selecting no tab at all and painting a blank page.
+   */
+  const typeParam = searchParams.get('type');
+  const activeTab = useMemo(() => {
+    if (typeParam === LIBRARIES_TAB) return LIBRARIES_TAB;
+    if (typeParam && (usableTypes as readonly string[]).includes(typeParam)) return typeParam;
+    return ALL_TAB;
+  }, [typeParam, usableTypes]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,18 +99,34 @@ export const TemplateLibraryPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const listed = useMemo(
+    () => templates.filter((t) => (usableTypes as readonly string[]).includes(t.entity_type)),
+    [templates, usableTypes],
+  );
+
+  const countByType = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of listed) m.set(t.entity_type, (m.get(t.entity_type) ?? 0) + 1);
+    return m;
+  }, [listed]);
+
   const visible = useMemo(
-    () => templates.filter((t) =>
-      (!typeFilter || t.entity_type === typeFilter)
-      && (usableTypes as readonly string[]).includes(t.entity_type)),
-    [templates, typeFilter, usableTypes],
+    () => (activeTab === ALL_TAB || activeTab === LIBRARIES_TAB
+      ? listed
+      : listed.filter((t) => t.entity_type === activeTab)),
+    [listed, activeTab],
   );
   const own = visible.filter((t) => !t.is_platform_starter);
   const starters = visible.filter((t) => t.is_platform_starter);
 
-  const setType = (t: string | null) => {
+  const externalSources = useMemo(
+    () => EXTERNAL_TEMPLATE_SOURCES.filter((x) => !x.moduleSlug || isModuleAvailable(x.moduleSlug)),
+    [isModuleAvailable],
+  );
+
+  const setTab = (v: string) => {
     const p = new URLSearchParams(searchParams);
-    if (t) p.set('type', t); else p.delete('type');
+    if (v === ALL_TAB) p.delete('type'); else p.set('type', v);
     setSearchParams(p, { replace: true });
   };
 
@@ -179,6 +225,87 @@ export const TemplateLibraryPage: React.FC = () => {
     );
   };
 
+  const activeAdapter = activeTab !== ALL_TAB && activeTab !== LIBRARIES_TAB
+    ? TEMPLATE_ADAPTERS[activeTab as LiveTemplateEntityType]
+    : null;
+
+  /*
+    Radix drops every inactive panel, so the two panel bodies are built ONCE from the active tab
+    and handed to whichever <TabsContent> is mounted — not rebuilt per rail entry. Nothing here
+    refetches on a tab switch either: `entityTemplatesService.list` loads the workspace's
+    templates once and the rail only re-filters what is already in memory.
+  */
+  const libraryPanel = (
+    <>
+      <SectionHeader
+        icon={activeAdapter?.icon ?? Layers}
+        title={activeAdapter?.plural ?? 'All templates'}
+        subtitle={activeAdapter?.description
+          ?? 'Everything saved in this workspace, plus the platform starters you can copy and edit.'}
+      />
+
+      {loading ? (
+        <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="space-y-6">
+          <section className="space-y-2">
+            <div className="text-sm font-medium">Your templates</div>
+            {own.length === 0 ? (
+              <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
+                Nothing saved yet. Open any {activeAdapter ? activeAdapter.label.toLowerCase() : 'invoice, quote, project or moodboard'} and
+                choose <span className="font-medium">Save as template</span> — or copy a starter below.
+              </CardContent></Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {own.map((t) => <Tile key={t.id} tpl={t} />)}
+              </div>
+            )}
+          </section>
+
+          {starters.length > 0 && (
+            <section className="space-y-2">
+              <div className="text-sm font-medium flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Starter examples</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {starters.map((t) => <Tile key={t.id} tpl={t} />)}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  const librariesPanel = (
+    <>
+      <SectionHeader
+        icon={ExternalLink}
+        title="Other template libraries"
+        subtitle="These have their own editors — the links go straight there."
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        {externalSources.map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.id} className="dashboard-card cursor-pointer" onClick={() => navigate(s.route)}>
+              <CardContent className="p-4 flex items-start gap-2">
+                <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium flex items-center gap-1">
+                    <span className="truncate">{s.label}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  </div>
+                  <div className="text-xs text-muted-foreground line-clamp-2">{s.description}</div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  const tabValues: string[] = [ALL_TAB, ...usableTypes, LIBRARIES_TAB];
+
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
@@ -187,89 +314,51 @@ export const TemplateLibraryPage: React.FC = () => {
         subtitle="Start from something you already built. Save any record as a template, or begin from a platform starter."
       />
 
-      <main className="px-4 sm:px-6 py-6 space-y-6">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={typeFilter ? 'outline' : 'default'}
-            size="sm"
-            className="rounded-full"
-            onClick={() => setType(null)}
-          >
-            All
-          </Button>
-          {usableTypes.map((t: LiveTemplateEntityType) => {
-            const adapter = TEMPLATE_ADAPTERS[t];
-            const Icon = adapter.icon;
-            const count = templates.filter((x) => x.entity_type === t).length;
-            return (
-              <Button
-                key={t}
-                variant={typeFilter === t ? 'default' : 'outline'}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setType(t)}
-              >
-                <Icon className="h-3.5 w-3.5 mr-1" /> {adapter.plural}
-                {count > 0 && <span className="ml-1 text-xs opacity-70">{count}</span>}
-              </Button>
-            );
-          })}
-        </div>
+      <main className="px-4 sm:px-6 py-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setTab}
+          orientation="vertical"
+          className="flex flex-col gap-4 lg:flex-row lg:items-start"
+        >
+          <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+            <TabsTrigger value={ALL_TAB} className="w-full justify-start">
+              <Layers className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">All</span>
+              {listed.length > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{listed.length}</span>}
+            </TabsTrigger>
 
-        {loading ? (
-          <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-        ) : (
-          <>
-            <section className="space-y-2">
-              <div className="text-sm font-medium">Your templates</div>
-              {own.length === 0 ? (
-                <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
-                  Nothing saved yet. Open any invoice, quote, project or moodboard and choose
-                  <span className="font-medium"> Save as template</span> — or copy a starter below.
-                </CardContent></Card>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {own.map((t) => <Tile key={t.id} tpl={t} />)}
-                </div>
-              )}
-            </section>
+            {usableTypes.map((t: LiveTemplateEntityType) => {
+              const adapter = TEMPLATE_ADAPTERS[t];
+              const Icon = adapter.icon;
+              const count = countByType.get(t) ?? 0;
+              return (
+                <TabsTrigger key={t} value={t} className="w-full justify-start">
+                  <Icon className="h-4 w-4 mr-2 shrink-0" />
+                  <span className="truncate">{adapter.plural}</span>
+                  {count > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{count}</span>}
+                </TabsTrigger>
+              );
+            })}
 
-            {starters.length > 0 && (
-              <section className="space-y-2">
-                <div className="text-sm font-medium flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Starter examples</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {starters.map((t) => <Tile key={t.id} tpl={t} />)}
-                </div>
-              </section>
-            )}
+            {/* A plain <div> child: `.finance-tabs-list > div` hides it below lg, where a rule
+                inside a horizontal chip strip would just be noise. */}
+            <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
 
-            <section className="space-y-2">
-              <div className="text-sm font-medium flex items-center gap-1"><ExternalLink className="h-3.5 w-3.5" /> Other template libraries</div>
-              <div className="text-xs text-muted-foreground">
-                These have their own editors — the links go straight there.
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {EXTERNAL_TEMPLATE_SOURCES.filter((x) => !x.moduleSlug || isModuleAvailable(x.moduleSlug)).map((s) => {
-                  const Icon = s.icon;
-                  return (
-                    <Card key={s.id} className="dashboard-card cursor-pointer" onClick={() => navigate(s.route)}>
-                      <CardContent className="p-4 flex items-start gap-2">
-                        <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium flex items-center gap-1">
-                            <span className="truncate">{s.label}</span>
-                            <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          </div>
-                          <div className="text-xs text-muted-foreground line-clamp-2">{s.description}</div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </section>
-          </>
-        )}
+            <TabsTrigger value={LIBRARIES_TAB} className="w-full justify-start">
+              <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Other libraries</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="min-w-0 flex-1">
+            {tabValues.map((v) => (
+              <TabsContent key={v} value={v} className="mt-0">
+                {v === LIBRARIES_TAB ? librariesPanel : libraryPanel}
+              </TabsContent>
+            ))}
+          </div>
+        </Tabs>
       </main>
     </div>
   );
