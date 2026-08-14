@@ -602,8 +602,6 @@ export const MarketTrendsTab: React.FC = () => {
         </button>
       </div>
 
-      {/* ── Key Insights (factory mode only) ── */}
-
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <KpiCard label="Active Demand Signals" value={kpis.activeDemandSignals} icon={TrendingUp} />
@@ -612,8 +610,6 @@ export const MarketTrendsTab: React.FC = () => {
         <KpiCard label="Total Category Saves" value={kpis.totalCategorySaves} icon={Eye} color="text-cyan-600" />
         <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
       </div>
-
-      {/* ── Your Factory Position ── */}
 
       {/* ──── Where the Market is Going ──────────────────────── */}
       {materialGrowthRates.length > 0 && (
@@ -1015,8 +1011,6 @@ export const MarketTrendsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* ──── Quote Intelligence (factory mode only) ──── */}
-
       {/* ──── Buyer Profile Intelligence ──── */}
       <SectionHeader
         title="Buyer Profile Intelligence"
@@ -1317,12 +1311,6 @@ export const MarketTrendsTab: React.FC = () => {
           </div>
         </>
       )}
-
-      {/* ──── Moodboard Intelligence (factory mode only) ──── */}
-
-      {/* ──── Catalog Gap Analysis (factory mode only) ──── */}
-
-      {/* ──── Product Velocity (factory mode only) ──── */}
 
       {/* ──── Demand Forecast ──────────────────────────────── */}
       {materialGrowthRates.length > 0 && (
