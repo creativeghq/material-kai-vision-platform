@@ -23,7 +23,7 @@ import {
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool, Activity,
-  Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
+  Wand2, Lightbulb, ListChecks, PauseCircle, Workflow, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -186,6 +186,14 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Onboarding', to: '/templates?type=hr_onboarding', icon: ClipboardList },
     { label: 'Listings', to: '/templates?type=property_listing', icon: Building2 },
     { label: 'Customer terms', to: '/templates?type=crm_company', icon: Contact },
+  ],
+  // Blueprints — the source rail on BlueprintLibraryPage. "All" is what Open reaches, so it is not
+  // repeated here. Giving this card sub-picks is also what takes it OUT of the launcher's Jump-to
+  // rail: that rail is for apps with nothing to expand, computed from these entries rather than
+  // listed by hand, so a card gains chips and leaves the rail in one move.
+  blueprints: [
+    { label: 'My blueprints', to: '/blueprints?tab=mine', icon: LayoutTemplate },
+    { label: 'Starters', to: '/blueprints?tab=starters', icon: Sparkles },
   ],
   // Market Trends — the four sub-areas of MarketTrendsTab (its MARKET_TABS array).
   'market-trends': [
