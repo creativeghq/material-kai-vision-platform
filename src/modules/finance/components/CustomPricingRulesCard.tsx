@@ -1,8 +1,13 @@
 /**
  * Layer B custom pricing rules. Applied at quote-time on top of the level discount
- * (multiplicative). v1 ships the two rule types with full line context:
- *   • volume_category — ≥ N units of a category → % off
- *   • category_extra  — a blanket extra % off a category, any customer
+ * (multiplicative).
+ *   • category_extra — a blanket extra % off a category, any customer
+ *
+ * `volume_category` was RETIRED in #347 phase 1.4 and must not come back here: the CHECK
+ * constraint refuses it, so offering it would let an operator fill a form whose save fails on a
+ * constraint error. "≥ N units of a category → % off" is now a category-scoped
+ * `product_price_breaks` row, which resolves its threshold through `convert_to_base_unit` —
+ * this rule compared the RAW quantity, so 5 pallets and 5 pieces matched the same threshold.
  * (cash_payment is schema-ready but surfaced once a payment-context hook exists, to avoid an inert rule.)
  */
 import React, { useEffect, useState } from 'react';
@@ -22,7 +27,6 @@ interface Rule {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  volume_category: 'Volume discount (per category)',
   category_extra: 'Category extra discount',
   cash_payment: 'Paid upfront (cash)',
 };
@@ -33,9 +37,8 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
   const [categories, setCategories] = useState<Array<{ key: string; label: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [type, setType] = useState<'volume_category' | 'category_extra' | 'cash_payment'>('category_extra');
+  const [type, setType] = useState<'category_extra' | 'cash_payment'>('category_extra');
   const [cat, setCat] = useState('');
-  const [minQty, setMinQty] = useState('');
   const [pct, setPct] = useState('');
 
   const load = async () => {
@@ -45,7 +48,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
         financeService.listCustomRules(workspaceId),
         financeService.listMaterialCategoryTree(workspaceId).catch(() => []),
       ]);
-      setRules(rs.filter((r) => r.rule_type === 'volume_category' || r.rule_type === 'category_extra' || r.rule_type === 'cash_payment'));
+      setRules(rs.filter((r) => r.rule_type === 'category_extra' || r.rule_type === 'cash_payment'));
       setCategories(cats);
     } catch (err: any) {
       toast({ title: 'Failed to load rules', description: err?.message, variant: 'destructive' });
@@ -58,16 +61,11 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
     const isCash = type === 'cash_payment';
     if (!isCash && !cat) { toast({ title: 'Pick a category', variant: 'destructive' }); return; }
     if (!Number.isFinite(p) || p < 0) { toast({ title: 'Enter a discount %', variant: 'destructive' }); return; }
-    let params: any = {};
-    if (type === 'volume_category') {
-      const q = parseInt(minQty, 10);
-      if (!Number.isFinite(q) || q <= 0) { toast({ title: 'Enter a minimum quantity', variant: 'destructive' }); return; }
-      params = { min_qty: q };
-    }
+    const params: any = {};
     setBusy(true);
     try {
       await financeService.upsertCustomRule({ workspaceId, ruleType: type, categoryKey: isCash ? null : cat, params, discountPct: p, sortOrder: rules.length });
-      setCat(''); setMinQty(''); setPct(''); await load();
+      setCat(''); setPct(''); await load();
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
@@ -81,7 +79,6 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
   const describe = (r: Rule) => {
     if (r.rule_type === 'cash_payment') return `Paid upfront → ${r.discount_pct}% off the whole order`;
     const c = String(r.category_key ?? '').replace(/_/g, ' ');
-    if (r.rule_type === 'volume_category') return `${c}: ≥ ${r.params?.min_qty ?? '?'} units → ${r.discount_pct}% off`;
     return `${c}: ${r.discount_pct}% off (all customers)`;
   };
 
@@ -122,7 +119,6 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="category_extra">Category extra</SelectItem>
-                <SelectItem value="volume_category">Volume (per category)</SelectItem>
                 <SelectItem value="cash_payment">Paid upfront (cash)</SelectItem>
               </SelectContent>
             </Select>
@@ -138,12 +134,6 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
                   {categories.map((c) => <SelectItem key={c.key} value={c.key} className="capitalize whitespace-pre">{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-          )}
-          {type === 'volume_category' && (
-            <div className="space-y-1">
-              <Label className="text-xs">Min qty</Label>
-              <Input className="h-8 w-20 text-xs" type="number" min="1" step="1" value={minQty} onChange={(e) => setMinQty(e.target.value)} placeholder="100" />
             </div>
           )}
           <div className="space-y-1">

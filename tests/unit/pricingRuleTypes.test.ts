@@ -33,13 +33,23 @@ const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
 
-/** Mirrors `pricing_custom_rules_rule_type_check`. */
-const ALLOWED_RULE_TYPES = ['category_extra', 'volume_category', 'cash_payment'] as const;
+/**
+ * Mirrors `pricing_custom_rules_rule_type_check`.
+ *
+ * `volume_category` was retired in #347 phase 1.4. It meant "for category X, at quantity >= N,
+ * take M% off" — which `product_price_breaks` already meant, only per-product. It now carries a
+ * `category_key` too, so there is one mechanism instead of two, and the surviving one is the
+ * correct one: it resolves thresholds through `convert_to_base_unit`, while the rule compared
+ * `p_quantity` RAW and so matched "5 pallets" and "5 pieces" at the same threshold.
+ */
+const ALLOWED_RULE_TYPES = ['category_extra', 'cash_payment'] as const;
+
+/** A retired type must not come back without a resolver — that is what this list is for. */
+const RETIRED_RULE_TYPES = ['volume_category'] as const;
 
 /** Where each type is resolved — all SQL, none of it scannable from here. */
 const SQL_RESOLVERS: Record<(typeof ALLOWED_RULE_TYPES)[number], string> = {
   category_extra: 'get_product_price_for_workspace',
-  volume_category: 'get_product_price_for_workspace',
   cash_payment: 'get_workspace_cash_discount_pct',
 };
 
@@ -126,4 +136,18 @@ describe('pricing_custom_rules.rule_type', () => {
     }
     expect(Object.keys(SQL_RESOLVERS).sort()).toEqual([...ALLOWED_RULE_TYPES].sort());
   });
+});
+
+describe('retired rule types stay retired', () => {
+  /**
+   * A retired type is more dangerous than a missing one: the authoring UI would happily offer
+   * it, the CHECK would reject the INSERT, and the operator would see a save fail with a
+   * constraint error. That is the shape that made every `sales` / `realestate_agent` invite
+   * fail at redemption (workspaceRoles.test.ts).
+   */
+  for (const t of RETIRED_RULE_TYPES) {
+    it(`${t} is not offered by the authoring UI`, () => {
+      expect(read(AUTHORING_UI), `${t} was retired — the CHECK constraint refuses it`).not.toContain(`'${t}'`);
+    });
+  }
 });
