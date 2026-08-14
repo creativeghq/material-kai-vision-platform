@@ -58,6 +58,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { ordersService } from '@/modules/finance/services/ordersService';
 import { quotesService } from '../services/QuotesService';
+import { projectIdentity, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
 import {
   getAvailableSizes,
   getAvailableColors,
@@ -222,11 +223,23 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   const handleSelectProduct = useCallback((product: ProductWithImage) => {
     const sizes = getAvailableSizes(product.metadata);
     const colors = getAvailableColors(product.metadata);
+
+    // Seed `selected_attributes` too, then PROJECT size/color out of it — the same contract
+    // handleIdentityChange follows. Setting the two columns directly and leaving the map empty is
+    // the drift projectIdentity exists to prevent: the line printed 600x600 while its attributes
+    // said nothing, so anything reading the map (pricing's variant key, warehouse matching) saw an
+    // unvarianted line.
+    const attrs: Record<string, string> = {};
+    if (sizes.length > 0) attrs[SIZE_KEYS[0]] = sizes[0];
+    if (colors.length > 0) attrs[COLOR_KEYS[0]] = colors[0];
+    const projected = projectIdentity(attrs);
+
     setSelectedProducts(prev => [...prev, {
       ...product,
       quantity: 1,
-      selectedSize: sizes.length > 0 ? sizes[0] : undefined,
-      selectedColor: colors.length > 0 ? colors[0] : undefined,
+      selectedAttributes: attrs,
+      selectedSize: projected.selected_size ?? undefined,
+      selectedColor: projected.selected_color ?? undefined,
     }]);
     setSearchQuery('');
     setSearchResults([]);

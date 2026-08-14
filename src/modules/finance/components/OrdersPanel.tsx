@@ -857,6 +857,9 @@ export const NewOrderModal: React.FC<{
         companyId: party?.type === 'company' ? party.id : null,
         contactId: party?.type === 'contact' ? party.id : null,
         quantity: line?.quantity ?? 1, unit: line?.unit_code ?? DEFAULT_UNIT,
+        // The identity already on the line decides which variant's price applies. Omitting it
+        // priced every line as the base product, so a variant price could never win.
+        selectedAttributes: line?.selected_attributes ?? null,
       });
       setItems((ls) => ls.map((l, idx) => {
         if (idx !== i) return l;
@@ -898,6 +901,7 @@ export const NewOrderModal: React.FC<{
             companyId: party?.type === 'company' ? party.id : null,
             contactId: party?.type === 'contact' ? party.id : null,
             quantity: Number(l.quantity), unit: l.unit_code,
+            selectedAttributes: l.selected_attributes ?? null,
           });
           if (cancelled || pr.unit_price == null) continue;
           setItems((ls) => ls.map((row, j) => (

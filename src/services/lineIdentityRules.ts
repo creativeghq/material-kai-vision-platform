@@ -81,7 +81,12 @@ export function variantKey(attrs: Record<string, string> | null | undefined): st
   const parts = Object.entries(attrs)
     .map(([k, v]) => [String(k ?? '').trim().toLowerCase(), String(v ?? '').trim().toLowerCase()])
     .filter(([, v]) => v !== '')
-    .map(([k, v]) => `${k}=${v}`)
-    .sort();
+    // Sort by KEY, exactly like SQL's `ORDER BY k`. Sorting the joined "k=v" strings instead is a
+    // different order whenever one key is a prefix of another and the next character sorts below
+    // '=' (61) — every digit does. `{size, size2}` produced `size2=b;size=a` here and
+    // `size=a;size2=b` in SQL, so the browser priced a variant the resolver could not find.
+    // No field pair in today's registry triggers it, but the registry is admin-editable.
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`);
   return parts.length ? parts.join(';') : null;
 }

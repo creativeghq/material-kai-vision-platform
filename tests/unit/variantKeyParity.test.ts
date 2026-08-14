@@ -44,6 +44,16 @@ const SQL_FIXTURES: Array<{ label: string; input: unknown; expected: string | nu
   { label: 'array',             input: [1, 2], expected: null },
   { label: 'scalar',            input: 'x', expected: null },
   { label: 'three fields',      input: { color: 'Sand', finish: 'matte', available_sizes: '300x300' }, expected: 'available_sizes=300x300;color=sand;finish=matte' },
+
+  // Prefix keys — the case the fixture set could not see. Every key above extends another with a
+  // LETTER (color/colors), and letters sort ABOVE '=' (61), so joining first and sorting the
+  // "k=v" strings happened to agree with SQL's ORDER BY k. A DIGIT sorts BELOW '=', which flips
+  // the pair: the old TS returned 'size2=b;size=a' where SQL returns 'size=a;size2=b'.
+  // Expected values below are what public._variant_key() actually returns.
+  { label: 'prefix key, digit',  input: { size: 'a', size2: 'b' }, expected: 'size=a;size2=b' },
+  { label: 'prefix key, three',  input: { a: 'Z', a2: 'y', ab: 'x' }, expected: 'a=z;a2=y;ab=x' },
+  { label: 'prefix key, hyphen', input: { width: '10', 'width-2': '20' }, expected: 'width=10;width-2=20' },
+  { label: 'prefix key, letter', input: { color: 'sand', colors: 'sand,grey' }, expected: 'color=sand;colors=sand,grey' },
 ];
 
 describe('variantKey matches public._variant_key', () => {

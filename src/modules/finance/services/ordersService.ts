@@ -896,6 +896,11 @@ export const ordersService = {
         vat_percent: it.vat_percent ?? 0,
         vat_category: it.vat_category ?? null,
         update_warehouse: it.update_warehouse ?? true,
+        // Variant identity travels with the line. Omitting it here is why the SAME line kept its
+        // 600x600 when it created a new order and lost it when it merged into an open one.
+        selected_attributes: it.selected_attributes ?? {},
+        selected_size: it.selected_size ?? null,
+        selected_color: it.selected_color ?? null,
       })),
       p_expect_order_type: opts.expectOrderType ?? null,
       p_expect_currency: opts.expectCurrency ?? null,
@@ -943,6 +948,12 @@ export const ordersService = {
       const pr = await this.resolveLinePricing({
         workspaceId: opts.workspaceId, productId: it.product_id, orderType: 'sales',
         companyId: opts.companyId ?? null, contactId: opts.contactId ?? null,
+        // The mirrored sales line is for the SAME variant the purchase line was for; pricing it as
+        // the base product is how the customer price and the supplier cost end up describing two
+        // different things. Quantity and unit travel together, per the resolver's contract.
+        selectedAttributes: it.selected_attributes ?? null,
+        quantity: Number(it.quantity) || 1,
+        unit: it.measurement_unit_code ?? null,
       }).catch(() => null);
       if (pr?.unit_price == null) {
         unpriced.push(it.description);
@@ -1022,7 +1033,9 @@ export const ordersService = {
       .eq('id', orderId).single();
     if (error) throw error;
     const { data: items, error: iErr } = await supabase.from('order_items')
-      .select('product_id, description, quantity, unit_price, unit_cost, measurement_unit_code, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order')
+      // selected_* included deliberately: a reorder that drops the variant is a reorder of a
+      // DIFFERENT product — same description, no size, and nothing downstream can tell.
+      .select('product_id, description, quantity, unit_price, unit_cost, measurement_unit_code, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order, selected_attributes, selected_size, selected_color')
       .eq('order_id', orderId).order('sort_order', { ascending: true });
     if (iErr) throw iErr;
 
@@ -1043,6 +1056,16 @@ export const ordersService = {
         const pr = await this.resolveLinePricing({
           workspaceId: o.workspace_id, productId: it.product_id, orderType: o.order_type as OrderType,
           companyId, contactId,
+          // Price the variant that was actually ordered. Without this the re-order is priced as
+          // the base product, so a variant with its own price silently reverts on every reorder.
+          selectedAttributes: (it.selected_attributes as Record<string, string> | null) ?? null,
+          // `unit`, not `unitCode`. tsc cannot catch this: `ordersService` is an object literal, so
+          // with `noImplicitThis` off a `this.method(...)` call is typed `any` and excess/renamed
+          // properties pass silently. The doc on the parameter is explicit that a quantity sent
+          // WITHOUT its unit is treated as already being in base units and can match the wrong
+          // price break — so a typo here misprices rather than failing.
+          quantity: Number(it.quantity) || 1,
+          unit: (it.measurement_unit_code as string | null) || null,
         }).catch(() => null);
         if (pr) {
           if (pr.unit_price != null) price = pr.unit_price;
@@ -1069,6 +1092,11 @@ export const ordersService = {
         // order" action did, now a toggle instead of a whole parallel flow.
         original_unit_price: wasPrice,
         original_unit_cost: it.unit_cost != null ? Number(it.unit_cost) : null,
+        // The variant the original line was for. Selected above; returned here, or the prefill
+        // would hand back a line stripped of the identity it was just re-priced at.
+        selected_attributes: (it.selected_attributes as Record<string, string> | null) ?? null,
+        selected_size: (it.selected_size as string | null) ?? null,
+        selected_color: (it.selected_color as string | null) ?? null,
       };
     }));
 

@@ -96,8 +96,18 @@ export async function getAgentSystemPrompt(
 }
 
 /**
- * Load a tool-specific system prompt from the database.
+ * Load a tool-specific prompt from the database.
  * prompt_type = 'tool', category = toolName
+ *
+ * Reads `prompt_text` first, then `system_prompt` — the same order as `loadPrompt`, and for the
+ * same reason: `prompt_text` is the column /admin/ai-configs writes, so reading `system_prompt`
+ * only made admin edits inert.
+ *
+ * It also made rows seeded with `prompt_text` alone throw outright. Four SEO writer sub-prompts
+ * (`seo_writer_article_structure`, `..._firsthand_header`, `..._firsthand_hardrule`,
+ * `..._no_knowledge_panel`) were extracted to the DB that way, so every SEO article-writing request
+ * failed 100% of the time from the moment they shipped — a `.single()` that found its row and threw
+ * anyway because the one column it selected was null.
  */
 export async function getToolPrompt(
   supabase: DbClient,
@@ -109,20 +119,21 @@ export async function getToolPrompt(
 
   const { data, error } = await supabase
     .from('prompts')
-    .select('system_prompt')
+    .select('prompt_text, system_prompt')
     .eq('prompt_type', 'tool')
     .eq('category', toolName)
     .eq('is_active', true)
     .eq('status', 'active')
     .single();
 
-  if (error || !data?.system_prompt) {
+  const text = data?.prompt_text || data?.system_prompt;
+  if (error || !text) {
     console.error(`❌ CRITICAL: No prompt found for tool '${toolName}':`, error);
     throw new Error(`Tool prompt not found in database: ${toolName}. Please add it via /admin/ai-configs.`);
   }
 
-  setCachedPrompt(cacheKey, data.system_prompt);
-  return data.system_prompt;
+  setCachedPrompt(cacheKey, text);
+  return text;
 }
 
 /**
