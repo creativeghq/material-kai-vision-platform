@@ -649,30 +649,28 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 
 ---
 
-## Factory Analytics — Supplier Intelligence Dashboard
+## Supplier & Market Intelligence
 
-Verified manufacturers and brands access `/factory-analytics`:
+Split in two by issue #350, because the old single page mixed two different questions and keyed
+supplier identity off `user_profiles.factory_verified` — a flag no account has ever held, so the
+nav tile rendered for nobody.
 
-**My Factory Tab (own data):**
-- Product view counts and search appearance frequency
-- Which products generate the most buyer interest
-- Quote requests received per product
-- Hire Me enquiries related to their products
-- Buyer geographic distribution
-- Product performance trends over time
+**Per-supplier — CRM company → Market tab** (`/crm/companies/:id`, companies flagged `is_supplier`).
+Keyed on the `products.brand_company_id` FK, so it works off the CRM record with no platform-user
+identity behind it:
+- Demand — views, saves and quote adds on that supplier's catalogue, and where the interest is
+- Pricing — our cost against the live market spread, with per-product monitoring
+- Competitors — same-ΚΑΔ matches from the CRM plus live discovery
+- Financial — billed / paid / outstanding, and unbooked myDATA invoices from that issuer
 
-**Market Trends Tab (platform-wide, anonymized):**
+**Platform-wide — Market Trends** (`/market-trends`, workspace admins):
 - Material category demand trends (which types are searched most)
 - Emerging finish and style trends derived from search query analysis
-- Seasonal demand patterns
-- Competitive positioning signals
+- Seasonal demand patterns and week-over-week momentum
+- Rising & declining materials by save-velocity
 
-**Platform-Wide Tab (Admin/Owner only):**
-- Cross-factory product performance
-- User acquisition, activation, retention cohort analysis
-- Revenue and credit consumption trends
-- AI model performance and cost efficiency
-- Search quality metrics
+Follower, hire-request and profile-view metrics are deliberately absent from the per-supplier view:
+those belong to a platform supplier account, which a CRM company record does not have.
 
 This analytics layer is a significant standalone upsell — providing market intelligence that currently requires expensive industry research reports or trade show attendance.
 

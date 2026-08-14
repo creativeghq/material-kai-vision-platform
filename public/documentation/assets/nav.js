@@ -101,7 +101,7 @@
         { file: "discover-marketplace.html", title: "Marketplace" },
         { file: "discover-network.html", title: "Network" },
       ]},
-      { file: "factory-analytics.html", title: "Supplier Analytics", icon: "📊" },
+      { file: "market-trends.html", title: "Market Trends", icon: "📊" },
       { file: "tools.html", title: "Tools", icon: "🛠️", children: [
         { file: "recognition.html", title: "Material Recognition" },
         { file: "compare.html", title: "Material Compare" },

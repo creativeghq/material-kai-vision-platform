@@ -104,7 +104,7 @@ const PageWatchesPage = lazy(() => import('./pages/PageWatchesPage'));
 const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
-const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
+const MarketTrendsPage = lazy(() => import('./pages/MarketTrendsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
 const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
@@ -882,13 +882,14 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Factory Analytics — factory users + admins */}
+                {/* Platform-wide market trends — workspace admins. Per-supplier analytics live
+                    on the CRM company's Market tab, not here (#350). */}
                 <Route
-                  path="/factory-analytics"
+                  path="/market-trends"
                   element={
                     <AuthGuard>
                       <Layout>
-                        <FactoryAnalyticsPage />
+                        <MarketTrendsPage />
                       </Layout>
                     </AuthGuard>
                   }

@@ -83,7 +83,7 @@ Personas are computed from these sources:
 | MoodBoards (`/moodboard`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | Discover (`/discover`) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | Quotes (`/quotes`) | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Factory Analytics (`/factory-analytics`) | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Market Trends (`/market-trends`) | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Admin Panel (`/admin`) | ❌ | ❌² | ❌² | ❌² | ✅ |
 | Public Profiles (`/u/:id`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 

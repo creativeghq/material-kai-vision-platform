@@ -76,7 +76,7 @@ export function groupAppsByHub(apps: LauncherApp[]): HubGroup[] {
 }
 
 export function useLauncherApps(): LauncherApi {
-  const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
+  const { isAdmin, isPlatformOperator } = useFactoryRole();
   const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable, loading: entLoading } = useEntitlements();
   const { activeWorkspaceId, workspaceRole } = useWorkspace();
@@ -120,7 +120,7 @@ export function useLauncherApps(): LauncherApi {
   }, [activeWorkspaceId, canActivateModules]);
 
   const api = useMemo(() => {
-    const base = { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, can };
+    const base = { isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, can };
     const activeItems = filterNavItems(SIDEBAR_NAV_ITEMS, { ...base, isModuleAvailable })
       .filter((i) => i.surface === 'app');
     const usableItems = filterNavItems(SIDEBAR_NAV_ITEMS, { ...base, isModuleAvailable: () => true })
@@ -167,7 +167,7 @@ export function useLauncherApps(): LauncherApi {
       enabling,
       enable,
     };
-  }, [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, can, isModuleAvailable,
+  }, [isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, can, isModuleAvailable,
       moduleEntries, catalog, catalogLoaded, entLoading, localActivated, canActivateModules, enabling, enable]);
 
   return api;

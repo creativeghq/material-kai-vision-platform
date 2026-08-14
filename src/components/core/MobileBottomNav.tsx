@@ -29,7 +29,7 @@ const BAR_SLOTS = 4;
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
-  const { isFactory, isAdmin, isPlatformOperator } = useFactoryRole();
+  const { isAdmin, isPlatformOperator } = useFactoryRole();
   const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -46,7 +46,6 @@ export const MobileBottomNav: React.FC = () => {
       // — including surface:'app' modules — fall under "More". The mobile top bar keeps no
       // hamburger/App Launcher, so this is the single mobile navigation surface.
       filterNavItems(SIDEBAR_NAV_ITEMS, {
-        isFactory,
         isAdmin,
         isPlatformOperator,
         isAccountant,
@@ -55,7 +54,7 @@ export const MobileBottomNav: React.FC = () => {
         isModuleAvailable,
         can,
       }),
-    [isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
+    [isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
   );
 
   // Order the visible items by bottom-nav priority, then split into bar + overflow.

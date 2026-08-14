@@ -16,7 +16,7 @@ const ROUTES = [
   '/knowledge-base', '/brands',
   // Core authed
   '/', '/profile', '/moodboard', '/agent-hub', '/compare', '/recognition',
-  '/blueprints', '/projects', '/portal', '/factory-analytics', // newer authed surfaces
+  '/blueprints', '/projects', '/portal', '/market-trends', // newer authed surfaces
   '/billing/subscriptions', '/billing/credits',
   // Previously white-screened / capability- & entitlement-gated
   '/finance', '/quotes', '/discover', '/crm', '/sales', '/pos', '/network',

@@ -1,1 +1,0 @@
-export { MyFactoryTab } from './MyFactoryTab';

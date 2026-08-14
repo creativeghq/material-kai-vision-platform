@@ -34,9 +34,8 @@ import {
   GRID_PROPS,
 } from '../shared/analyticsUtils';
 
-export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boolean }> = ({ factoryName}) => {
+export const MarketTrendsTab: React.FC = () => {
   const [isDemoData, setIsDemoData] = useState(false);
-  const [viewScope, setViewScope] = useState<'platform' | 'factory'>('platform');
   const [timeRange, setTimeRange] = useState<number>(12);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [platformCategories, setPlatformCategories] = useState<{ key: string; label: string }[]>([]);
@@ -64,18 +63,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
   const [quoteBasketsData, setQuoteBasketsData] = useState<{ product1: string; product2: string; count: number }[]>([]);
   const [lifecycleKpi, setLifecycleKpi] = useState<{ avgDaysToQuote: number; saveToQuoteRate: number }>({ avgDaysToQuote: 0, saveToQuoteRate: 0 });
 
-  // ── Factory overlay (loaded on top of platform data when viewScope === 'factory')
-  const [quoteFunnelData, setQuoteFunnelData] = useState<{ stage: string; count: number }[]>([]);
-  const [moodboardPairings, setMoodboardPairings] = useState<{ name: string; category: string; materialType?: string; count: number }[]>([]);
-  const [moodboardStats, setMoodboardStats] = useState<{ total: number; public: number }>({ total: 0, public: 0 });
-  const [catalogGaps, setCatalogGaps] = useState<{ name: string; mentions: number }[]>([]);
-  const [productVelocity, setProductVelocity] = useState<{ name: string; saves: number; quotes: number; trend: string }[]>([]);
-  const [insights, setInsights] = useState<string[]>([]);
-  const [factoryProductNames, setFactoryProductNames] = useState<Set<string>>(new Set());
-  const [factoryKpis, setFactoryKpis] = useState<{ saves: number; quotes: number; convRate: string; platformConvRate: string } | null>(null);
-  const [factoryBuyerTypeData, setFactoryBuyerTypeData] = useState<{ type: string; saves: number; quotes: number }[]>([]);
-  const [factoryEngagementFunnel, setFactoryEngagementFunnel] = useState<{ stage: string; count: number; rate: string; color: string }[]>([]);
-  const [platformTotals, setPlatformTotals] = useState<{ saves: number; quotes: number }>({ saves: 0, quotes: 0 });
 
   // ── New analytics sections
   const [engagementFunnel, setEngagementFunnel] = useState<{ stage: string; count: number; rate: string; color: string }[]>([]);
@@ -189,70 +176,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       { type: 'other', saves: 35, quotes: 12 },
     ]);
     setKpis({ activeDemandSignals: 15, topDemandedMaterial: 'Marble Bianco', topCategory: 'Tiles', totalCategorySaves: 592, topBuyerType: 'Interior Designer' });
-    if (viewScope === 'factory') {
-      setProductVelocity([
-        { name: 'Marble Bianco 60x60', saves: 28, quotes: 12, trend: 'up' },
-        { name: 'Natural Stone Tile', saves: 22, quotes: 8, trend: 'up' },
-        { name: 'Travertine Silver', saves: 18, quotes: 6, trend: 'stable' },
-        { name: 'Limestone Classic', saves: 12, quotes: 4, trend: 'down' },
-        { name: 'Calacatta Gold', saves: 9, quotes: 3, trend: 'stable' },
-      ]);
-      setQuoteFunnelData([
-        { stage: 'Materials Quoted', count: 48 },
-        { stage: 'Quotes Submitted', count: 32 },
-        { stage: 'Quotes Accepted', count: 22 },
-      ]);
-      setMoodboardStats({ total: 34, public: 12 });
-      setMoodboardPairings([
-        { name: 'Warm Oak Panel', category: 'Wood', materialType: 'hardwood', count: 28 },
-        { name: 'Concrete Tile', category: 'General Materials', materialType: 'concrete', count: 22 },
-        { name: 'Brushed Brass Fixture', category: 'Lighting', materialType: 'wall_light', count: 18 },
-        { name: 'Linen Cushion', category: 'Decor', materialType: 'cushion', count: 15 },
-        { name: 'Smoked Glass Panel', category: 'General Materials', materialType: 'glass_panel', count: 12 },
-        { name: 'Rattan Side Table', category: 'Furniture', materialType: 'side_table', count: 9 },
-        { name: 'Terracotta Floor Tile', category: 'Tiles', materialType: 'floor_tile', count: 8 },
-      ]);
-      setCatalogGaps([
-        { name: 'Recycled Oak Panel', mentions: 52 },
-        { name: 'Biophilic Wall Panel', mentions: 38 },
-        { name: 'Terrazzo Surface', mentions: 31 },
-        { name: 'Hemp Fiber Board', mentions: 24 },
-        { name: 'Mycelium Composite', mentions: 18 },
-      ]);
-      setInsights([
-        'Interior Designers are your #1 buyer type — 42% of all moodboard saves',
-        'Your Stone materials are gaining traction this period',
-        'Catalog gap: "Recycled Oak Panel" has 52 demand signals not served by your catalog',
-        'Your save-to-quote conversion: 33% (platform avg: 15%) — +18% above average',
-        'Your materials appear in 12 public moodboards — strong organic visibility',
-      ]);
-      setFactoryProductNames(new Set(['marble bianco', 'marble bianco 60x60', 'natural stone tile', 'travertine silver', 'limestone classic', 'calacatta gold']));
-      setFactoryKpis({ saves: 382, quotes: 127, convRate: '33%', platformConvRate: '15%' });
-      setFactoryBuyerTypeData([
-        { type: 'interior_designer', saves: 160, quotes: 55 },
-        { type: 'architect', saves: 98, quotes: 38 },
-        { type: 'designer', saves: 72, quotes: 21 },
-        { type: 'sourcing_agent', saves: 35, quotes: 9 },
-        { type: 'other', saves: 17, quotes: 4 },
-      ]);
-      setFactoryEngagementFunnel([
-        { stage: 'Material Views', count: 1240, rate: '100%', color: 'bg-violet-500' },
-        { stage: 'Moodboard Saves', count: 382, rate: '30.8%', color: 'bg-blue-500' },
-        { stage: 'Quote Requests', count: 127, rate: '10.2%', color: 'bg-cyan-500' },
-        { stage: 'Quotes Accepted', count: 48, rate: '3.9%', color: 'bg-green-500' },
-      ]);
-    } else {
-      setFactoryProductNames(new Set());
-      setFactoryKpis(null);
-      setFactoryBuyerTypeData([]);
-      setFactoryEngagementFunnel([]);
-      setProductVelocity([]);
-      setQuoteFunnelData([]);
-      setMoodboardStats({ total: 0, public: 0 });
-      setMoodboardPairings([]);
-      setCatalogGaps([]);
-      setInsights([]);
-    }
     setVrUsageData([
       { name: 'Marble Bianco 60x60', count: 28, roomType: 'Living Room' },
       { name: 'Natural Oak Panel', count: 22, roomType: 'Bedroom' },
@@ -289,7 +212,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       { stage: 'Quote Requests', count: 592, rate: '4.0%', color: 'bg-cyan-500' },
       { stage: 'Quotes Accepted', count: 312, rate: '2.1%', color: 'bg-green-500' },
     ]);
-    setPlatformTotals({ saves: 3847, quotes: 592 });
     // Discovery per product demo (both modes)
     setDiscoveryByProduct([
       { name: 'Marble Bianco 60x60', search: 62, agent: 18, threeD: 12, manual: 5, page: 3 },
@@ -332,7 +254,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
     setIsDemoData(true);
   };
 
-  useEffect(() => { loadDemoData(); load(); }, [viewScope, timeRange, selectedCategory]);
+  useEffect(() => { loadDemoData(); load(); }, [timeRange, selectedCategory]);
 
   // ── Data loading ───────────────────────────────────────────
   const load = async () => {
@@ -354,11 +276,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         ]);
 
         const hasRealData = (popularSearches ?? []).length > 0 || (demandData ?? []).length > 0;
-        if (!hasRealData) {
-          // No platform data — skip platform population but still run factory overlay
-          if (viewScope === 'factory' && factoryName) await loadFactoryOverlay(ago);
-          return;
-        }
+        if (!hasRealData) return;
 
         // Apply category filter in-memory
         const catFilter = (item: any) => {
@@ -631,244 +549,12 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           totalCategorySaves: filteredMbItems.length,
           topBuyerType,
         });
-        setPlatformTotals({ saves: filteredMbItems.length, quotes: filteredQItems.length });
       } // ─── end platform branch ────────────────────────────────
-
-      // ── FACTORY OVERLAY ──────────────────────────────────────
-      if (viewScope === 'factory' && factoryName) {
-        await loadFactoryOverlay(ago);
-      } else {
-        setFactoryProductNames(new Set());
-        setFactoryKpis(null);
-        setFactoryBuyerTypeData([]);
-        setFactoryEngagementFunnel([]);
-        setProductVelocity([]);
-        setQuoteFunnelData([]);
-        setMoodboardStats({ total: 0, public: 0 });
-        setMoodboardPairings([]);
-        setCatalogGaps([]);
-        setInsights([]);
-      }
 
     } catch (err) {
       console.error('MarketTrendsTab load error:', err);
     }
   };
-
-  // ── Factory overlay loader — runs after platform data is loaded ─────────
-  const loadFactoryOverlay = async (ago: Date) => {
-    try {
-      // B1: Load factory products
-        const { data: factoryProducts } = await supabase.from('products').select('id, name, metadata').contains('metadata', { factory_name: factoryName });
-        const ids = (factoryProducts ?? []).map((p) => p.id);
-        const names = (factoryProducts ?? []).map((p) => String(p.name ?? '').toLowerCase());
-        if (ids.length === 0) return;
-
-        // Filter by selected category if not 'all'
-        const catFilteredIds = selectedCategory === 'all'
-          ? ids
-          : ids.filter((id: string) => {
-              const p = (factoryProducts ?? []).find((fp: any) => fp.id === id);
-              const cat = (p?.metadata as any)?.material_category ?? '';
-              return String(cat).toLowerCase() === selectedCategory.toLowerCase();
-            });
-        const effectiveIds = catFilteredIds.length > 0 ? catFilteredIds : ids;
-
-        // B2: Parallel factory-scoped fetches
-        const [
-          { data: mbItemsRaw },
-          { data: qItemsRaw },
-          { data: demandData },
-        ] = await Promise.all([
-          supabase.from('moodboard_items').select('moodboard_id, material_id, created_at, products(name, metadata)').in('material_id', effectiveIds).limit(1000),
-          supabase.from('quote_items').select('quote_id, product_id, added_from, products(name, metadata)').in('product_id', effectiveIds).limit(500),
-          supabase.from('material_demand_analytics').select('material_name, mention_count, times_saved, times_used_in_3d, last_requested').order('mention_count', { ascending: false }).limit(30),
-        ]);
-
-        const hasRealData = (mbItemsRaw ?? []).length > 0 || (qItemsRaw ?? []).length > 0;
-        if (!hasRealData) return;
-
-        // Factory demand ranking (match by name) — used for insights only; platform topDemands unchanged
-        const factoryDemands = (demandData ?? []).filter((d: any) => names.some((n) => {
-          const dn = String(d.material_name ?? '').toLowerCase();
-          return n.includes(dn.split(' ')[0]) || dn.includes(n.split(' ')[0]);
-        })).slice(0, 15).map((d: any) => ({
-          name: String(d.material_name ?? '').slice(0, 35),
-          mentions: d.mention_count ?? 0, saves: d.times_saved ?? 0,
-          in3d: d.times_used_in_3d ?? 0, momentum: getMomentum(d.last_requested ?? null),
-        }));
-
-        const mbCount = new Map<string, number>();
-        const qCount = new Map<string, number>();
-        (mbItemsRaw ?? []).forEach((i: any) => mbCount.set(i.material_id, (mbCount.get(i.material_id) ?? 0) + 1));
-        (qItemsRaw ?? []).forEach((i: any) => qCount.set(i.product_id, (qCount.get(i.product_id) ?? 0) + 1));
-        const pNameMap = new Map<string, string>((factoryProducts ?? []).map((p) => [String(p.id), String(p.name ?? '').slice(0, 35)]));
-        // B3: Buyer type (factory-scoped → factoryBuyerTypeData)
-        let buyerArr: { type: string; saves: number; quotes: number }[] = [];
-        try {
-          const mbIdSet = [...new Set((mbItemsRaw ?? []).map((i: any) => i.moodboard_id).filter(Boolean))];
-          if (mbIdSet.length > 0) {
-            const { data: mbUsers } = await supabase.from('moodboards').select('id, user_id').in('id', mbIdSet.slice(0, 300));
-            const mbIdToUser = new Map((mbUsers ?? []).map((m) => [m.id, m.user_id]));
-            const userIdSet = [...new Set((mbUsers ?? []).map((m) => m.user_id).filter(Boolean))];
-            const { data: userTypes } = userIdSet.length > 0
-              ? await supabase.from('user_profiles').select('user_id, professional_type').in('user_id', userIdSet.slice(0, 300))
-              : { data: [] };
-            const userToType = new Map((userTypes ?? []).map((u: any) => [u.user_id, u.professional_type ?? 'other']));
-            const savesByType = new Map<string, number>();
-            (mbItemsRaw ?? []).forEach((item: any) => {
-              const uid = mbIdToUser.get(item.moodboard_id);
-              const pt: string = uid ? String(userToType.get(uid as string) ?? 'other') : 'other';
-              savesByType.set(pt, (savesByType.get(pt) ?? 0) + 1);
-            });
-            buyerArr = Array.from(savesByType.entries()).map(([type, saves]) => ({ type, saves, quotes: 0 })).sort((a, b) => b.saves - a.saves);
-          }
-          setFactoryBuyerTypeData(buyerArr);
-        } catch (e) { console.error('Factory buyer type join failed:', e); }
-
-        // B4: Quote funnel
-        let localFunnel: { stage: string; count: number }[] = [];
-        try {
-          const quoteIds = [...new Set((qItemsRaw ?? []).map((i: any) => i.quote_id).filter(Boolean))];
-          if (quoteIds.length > 0) {
-            const { data: quotesData } = await supabase.from('quotes').select('id, status').in('id', quoteIds.slice(0, 300));
-            const statusMap = new Map<string, number>();
-            (quotesData ?? []).forEach((q) => statusMap.set(q.status, (statusMap.get(q.status) ?? 0) + 1));
-            const submitted = (statusMap.get('submitted') ?? 0) + (statusMap.get('quoted') ?? 0) + (statusMap.get('accepted') ?? 0) + (statusMap.get('rejected') ?? 0);
-            const accepted = statusMap.get('accepted') ?? 0;
-            localFunnel = [
-              { stage: 'Materials Quoted', count: quoteIds.length },
-              { stage: 'Quotes Submitted', count: submitted },
-              { stage: 'Quotes Accepted', count: accepted },
-            ];
-            setQuoteFunnelData(localFunnel);
-          }
-        } catch (e) { console.error('Quote funnel load failed:', e); }
-
-        // B5: Moodboard intelligence
-        try {
-          const mbIdSet = [...new Set((mbItemsRaw ?? []).map((i: any) => i.moodboard_id).filter(Boolean))];
-          if (mbIdSet.length > 0) {
-            const { data: mbBoards } = await supabase.from('moodboards').select('id, is_public').in('id', mbIdSet.slice(0, 300));
-            const publicCount = (mbBoards ?? []).filter((m) => m.is_public).length;
-            setMoodboardStats({ total: mbIdSet.length, public: publicCount });
-            // Pairing analysis: other materials in the same moodboards
-            const { data: pairingItemsRaw } = await supabase.from('moodboard_items').select('material_id, products(name, metadata)').in('moodboard_id', mbIdSet.slice(0, 300)).limit(800);
-            const factoryIdSet = new Set(ids);
-            const pairCount = new Map<string, { name: string; category: string; count: number }>();
-            (pairingItemsRaw ?? []).filter((item: any) => !factoryIdSet.has(item.material_id)).forEach((item: any) => {
-              const pName = ((item.products as any)?.name as string) ?? item.material_id;
-              const pCat = ((item.products as any)?.metadata?.category as string) ?? 'Unknown';
-              const key = pName.slice(0, 40);
-              const entry = pairCount.get(key) ?? { name: pName.slice(0, 40), category: pCat, count: 0 };
-              entry.count++;
-              pairCount.set(key, entry);
-            });
-            setMoodboardPairings(Array.from(pairCount.values()).sort((a, b) => b.count - a.count).slice(0, 10));
-          } else {
-            setMoodboardStats({ total: 0, public: 0 });
-            setMoodboardPairings([]);
-          }
-        } catch (e) { console.error('Moodboard pairing load failed:', e); }
-
-        // B6: Catalog gaps
-        const gaps = (demandData ?? []).filter((d: any) => !names.some((n) => {
-          const dn = String(d.material_name ?? '').toLowerCase();
-          return n.includes(dn.split(' ')[0]) || dn.includes(n.split(' ')[0]);
-        })).slice(0, 5).map((d: any) => ({ name: String(d.material_name ?? '').slice(0, 35), mentions: d.mention_count ?? 0 }));
-        setCatalogGaps(gaps);
-
-        // B7: Product velocity (last 4w vs prior 4w)
-        const cut4w = weeksAgo(4);
-        const cut8w = weeksAgo(8);
-        const mbRecent = (mbItemsRaw ?? []).filter((i: any) => new Date(i.created_at) >= cut4w);
-        const mbPrior = (mbItemsRaw ?? []).filter((i: any) => new Date(i.created_at) >= cut8w && new Date(i.created_at) < cut4w);
-        const recentMap = new Map<string, number>();
-        const priorMap = new Map<string, number>();
-        mbRecent.forEach((i: any) => recentMap.set(i.material_id, (recentMap.get(i.material_id) ?? 0) + 1));
-        mbPrior.forEach((i: any) => priorMap.set(i.material_id, (priorMap.get(i.material_id) ?? 0) + 1));
-        const velocity = ids.map((id) => {
-          const pName = (pNameMap.get(id) ?? id).slice(0, 35);
-          const recent = recentMap.get(id) ?? 0;
-          const prior = priorMap.get(id) ?? 0;
-          const trend = prior === 0 ? (recent > 0 ? 'up' : 'stable') : recent > prior * 1.15 ? 'up' : recent < prior * 0.85 ? 'down' : 'stable';
-          return { name: pName, saves: recent, quotes: qCount.get(id) ?? 0, trend };
-        }).filter((p) => p.saves + p.quotes > 0).sort((a, b) => (b.saves + b.quotes) - (a.saves + a.quotes)).slice(0, 10);
-        setProductVelocity(velocity);
-
-        // B8: Rule-based insights
-        const insightsList: string[] = [];
-        if (buyerArr[0]) {
-          const totalSaves = buyerArr.reduce((s, b) => s + b.saves, 0);
-          const topPct = totalSaves > 0 ? Math.round((buyerArr[0].saves / totalSaves) * 100) : 0;
-          insightsList.push(`${formatProfType(buyerArr[0].type)} is your #1 buyer type — ${topPct}% of all moodboard saves`);
-        }
-        const risingProduct = velocity.find((p) => p.trend === 'up');
-        if (risingProduct) insightsList.push(`"${risingProduct.name}" is gaining traction — up this period vs prior 4 weeks`);
-        if (gaps.length > 0) insightsList.push(`Catalog gap: "${gaps[0].name}" has ${gaps[0].mentions} demand signals not served by your catalog`);
-        const vrTotal = factoryDemands.reduce((s, d) => s + d.in3d, 0);
-        if (vrTotal > 0) insightsList.push(`Your materials used in ${vrTotal} VR/3D worlds — indicates serious project buyers`);
-        const localAccepted = localFunnel.find((s) => s.stage === 'Quotes Accepted')?.count ?? 0;
-        const localSubmitted = localFunnel.find((s) => s.stage === 'Quotes Submitted')?.count ?? 0;
-        if (localSubmitted > 0) insightsList.push(`Quote acceptance rate: ${Math.round((localAccepted / localSubmitted) * 100)}% (platform avg ~61%)`);
-        setInsights(insightsList);
-
-        // ── Factory funnel ─────────────────────────────────────
-        try {
-          const factoryMi = await supabase.from('user_material_interactions').select('interaction_type').in('material_id', ids).gte('created_at', ago.toISOString()).limit(2000);
-          const fViews = (factoryMi.data ?? []).filter((r: any) => r.interaction_type === 'view').length;
-          const fSaves = (mbItemsRaw ?? []).length;
-          const fQuoted = (qItemsRaw ?? []).length;
-          const fAccepted = localAccepted;
-          const fTop = Math.max(fViews, fSaves, 1);
-          const fp = (n: number) => `${Math.round((n / fTop) * 100)}%`;
-          setFactoryEngagementFunnel([
-            ...(fViews > 0 ? [{ stage: 'Material Views', count: fViews, rate: '100%', color: 'bg-violet-500' }] : []),
-            { stage: 'Moodboard Saves', count: fSaves, rate: fViews > 0 ? fp(fSaves) : '—', color: 'bg-blue-500' },
-            { stage: 'Quote Requests', count: fQuoted, rate: fViews > 0 ? fp(fQuoted) : '—', color: 'bg-cyan-500' },
-            { stage: 'Quotes Accepted', count: fAccepted, rate: fViews > 0 ? fp(fAccepted) : '—', color: 'bg-green-500' },
-          ].filter(f => f.count > 0));
-        } catch (e) { console.error('Factory engagement funnel load failed:', e); }
-
-        // ── Discovery channel per product (factory) ────────────
-        const factoryChannelPerProduct = new Map<string, { name: string; search: number; agent: number; threeD: number; manual: number; page: number }>();
-        [...(mbItemsRaw ?? []), ...(qItemsRaw ?? [])].forEach((item: any) => {
-          const pid = String(item.material_id ?? item.product_id ?? '');
-          const name = String(item.products?.name ?? '').slice(0, 30);
-          if (!pid || !name) return;
-          const ch = String(item.added_from ?? 'manual');
-          const entry = factoryChannelPerProduct.get(pid) ?? { name, search: 0, agent: 0, threeD: 0, manual: 0, page: 0 };
-          if (ch === 'search') entry.search++;
-          else if (ch === 'agent') entry.agent++;
-          else if (ch === '3d_generation') entry.threeD++;
-          else if (ch === 'product_page') entry.page++;
-          else entry.manual++;
-          factoryChannelPerProduct.set(pid, entry);
-        });
-        const factoryDiscArr = Array.from(factoryChannelPerProduct.values())
-          .map(d => ({ ...d, total: d.search + d.agent + d.threeD + d.manual + d.page }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 8)
-          .map(({ total: _, ...rest }) => rest);
-        setDiscoveryByProduct(factoryDiscArr);
-
-        // Set factory overlay KPIs (benchmarked against platform)
-        setFactoryProductNames(new Set(names));
-        setFactoryKpis({
-          saves: (mbItemsRaw ?? []).length,
-          quotes: (qItemsRaw ?? []).length,
-          convRate: convRate((qItemsRaw ?? []).length, (mbItemsRaw ?? []).length),
-          platformConvRate: convRate(platformTotals.quotes, platformTotals.saves),
-        });
-        setIsDemoData(false);
-    } catch (err) {
-      console.error('loadFactoryOverlay error:', err);
-    }
-  };
-
-  // ── Helpers ────────────────────────────────────────────────
-  const isMyProduct = (name: string) =>
-    viewScope === 'factory' && factoryProductNames.size > 0 && factoryProductNames.has(String(name).toLowerCase().trim());
 
   // ── JSX ────────────────────────────────────────────────────
   return (
@@ -883,17 +569,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
 
       {/* ── Filter bar ── */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={viewScope} onValueChange={(v) => setViewScope(v as 'platform' | 'factory')}>
-          <SelectTrigger className="h-8 w-[180px] text-xs border-border/60">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="platform" className="text-xs">All Platform</SelectItem>
-            <SelectItem value="factory" className="text-xs">
-              {factoryName ? `My Business — ${factoryName}` : 'My Business'}
-            </SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="h-8 w-[175px] text-xs border-border/60">
             <SelectValue placeholder="All Categories" />
@@ -916,11 +591,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <SelectItem value="24" className="text-xs">6M</SelectItem>
           </SelectContent>
         </Select>
-        {viewScope === 'factory' && factoryName && (
-          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded border border-primary/20">
-            My Brand · {factoryName}
-          </span>
-        )}
         <button
           onClick={handleExport}
           disabled={materialGrowthRates.length === 0}
@@ -933,138 +603,17 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       </div>
 
       {/* ── Key Insights (factory mode only) ── */}
-      {viewScope === 'factory' && insights.length > 0 && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-          <div className="flex items-center gap-2 mb-2.5">
-            <Zap className="h-3 w-3 text-primary" />
-            <span className="text-xs font-semibold text-primary">Market Intelligence</span>
-          </div>
-          <ul className="space-y-1.5">
-            {insights.map((insight, i) => (
-              <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                <span className="text-primary mt-0.5 shrink-0 font-bold">›</span>
-                <span>{insight}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {viewScope === 'platform' ? (
-          <>
-            <KpiCard label="Active Demand Signals" value={kpis.activeDemandSignals} icon={TrendingUp} />
-            <KpiCard label="Top Demanded Material" value={kpis.topDemandedMaterial} icon={Package} color="text-violet-600" />
-            <KpiCard label="Most Saved Category" value={kpis.topCategory} icon={Star} color="text-amber-500" />
-            <KpiCard label="Total Category Saves" value={kpis.totalCategorySaves} icon={Eye} color="text-cyan-600" />
-            <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
-          </>
-        ) : factoryKpis ? (
-          <>
-            <KpiCard label="Your Moodboard Saves" value={factoryKpis.saves} sub={`Platform total: ${formatNumber(platformTotals.saves)}`} icon={Star} color="text-violet-600" />
-            <KpiCard label="Your Quote Requests" value={factoryKpis.quotes} sub={`Platform total: ${formatNumber(platformTotals.quotes)}`} icon={Target} color="text-cyan-600" />
-            <KpiCard label="Your Conv. Rate" value={factoryKpis.convRate} sub={`Platform avg: ${factoryKpis.platformConvRate}`} icon={TrendingUp} color="text-green-600" />
-            <KpiCard label="Platform Top Category" value={kpis.topCategory} icon={Package} color="text-amber-500" />
-            <KpiCard label="Platform #1 Buyer" value={kpis.topBuyerType} icon={Users} />
-          </>
-        ) : (
-          <>
-            <KpiCard label="Products in Demand" value={kpis.activeDemandSignals} icon={Package} color="text-violet-600" />
-            <KpiCard label="Top Performing Product" value={kpis.topDemandedMaterial} icon={TrendingUp} />
-            <KpiCard label="Top Category" value={kpis.topCategory} icon={Star} color="text-amber-500" />
-            <KpiCard label="Total Material Saves" value={kpis.totalCategorySaves} icon={Eye} color="text-cyan-600" />
-            <KpiCard label="#1 Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
-          </>
-        )}
+        <KpiCard label="Active Demand Signals" value={kpis.activeDemandSignals} icon={TrendingUp} />
+        <KpiCard label="Top Demanded Material" value={kpis.topDemandedMaterial} icon={Package} color="text-violet-600" />
+        <KpiCard label="Most Saved Category" value={kpis.topCategory} icon={Star} color="text-amber-500" />
+        <KpiCard label="Total Category Saves" value={kpis.totalCategorySaves} icon={Eye} color="text-cyan-600" />
+        <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
       </div>
 
       {/* ── Your Factory Position ── */}
-      {viewScope === 'factory' && factoryKpis && (
-        <>
-          <SectionHeader
-            title="Your Position"
-            desc="How your performance benchmarks against the full platform — funnel comparison and buyer composition"
-            icon={Building2}
-          />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Funnel side-by-side */}
-            {factoryEngagementFunnel.length > 0 && engagementFunnel.length > 0 && (
-              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4"><TrendingUp className="h-4 w-4" /> Your Funnel vs Platform</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-primary mb-2">Your Brand</p>
-                    <div className="space-y-2">
-                      {factoryEngagementFunnel.map((stage, i) => {
-                        const maxCount = factoryEngagementFunnel[0]?.count || 1;
-                        return (
-                          <div key={i} className="space-y-0.5">
-                            <div className="flex justify-between text-[11px]">
-                              <span className="text-muted-foreground truncate pr-1">{stage.stage}</span>
-                              <span className="font-semibold tabular-nums shrink-0">{formatNumber(stage.count)}</span>
-                            </div>
-                            <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                              <div className={`h-1.5 rounded-full ${stage.color} opacity-80`} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">Platform Avg</p>
-                    <div className="space-y-2">
-                      {engagementFunnel.map((stage, i) => {
-                        const maxCount = engagementFunnel[0]?.count || 1;
-                        return (
-                          <div key={i} className="space-y-0.5">
-                            <div className="flex justify-between text-[11px]">
-                              <span className="text-muted-foreground truncate pr-1">{stage.stage}</span>
-                              <span className="tabular-nums shrink-0 text-muted-foreground">{formatNumber(stage.count)}</span>
-                            </div>
-                            <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                              <div className={'h-1.5 rounded-full bg-muted-foreground/40'} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Factory buyer type breakdown */}
-            {factoryBuyerTypeData.length > 0 && (
-              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-1"><Users className="h-4 w-4" /> Your Buyers by Type</h3>
-                <p className="text-xs text-muted-foreground mb-4">Who is saving and quoting your specific materials</p>
-                <div className="overflow-auto max-h-[240px]">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                      <tr className="text-xs font-semibold text-muted-foreground">
-                        <th className="text-left py-2 pr-3 font-medium">Buyer Type</th>
-                        <th className="text-right py-2 pr-3 font-medium">Saves</th>
-                        <th className="text-right py-2 font-medium">Conv.%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {factoryBuyerTypeData.map((row, i) => (
-                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 text-xs">
-                          <td className="py-1.5 pr-3 font-medium">{formatProfType(row.type)}</td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums">{row.saves}</td>
-                          <td className="py-1.5 text-right tabular-nums text-green-500">{convRate(row.quotes, row.saves)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
 
       {/* ──── Where the Market is Going ──────────────────────── */}
       {materialGrowthRates.length > 0 && (
@@ -1158,8 +707,8 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
 
       {/* ──── Demand Intelligence ──────────────────────────── */}
       <SectionHeader
-        title={viewScope === 'factory' ? "Your Products' Demand Signals" : 'Demand Intelligence'}
-        desc={viewScope === 'factory' ? 'How your catalog performs across market demand analytics — matched by product name' : 'What materials and attributes buyers are actively seeking across the platform'}
+        title={'Demand Intelligence'}
+        desc={'What materials and attributes buyers are actively seeking across the platform'}
         icon={TrendingUp}
       />
 
@@ -1170,13 +719,8 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <div>
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                 <Package className="h-4 w-4" />
-                {viewScope === 'factory' ? 'Your Products — Market Demand Ranking' : 'Top 15 Demanded Materials'}
+                {'Top 15 Demanded Materials'}
               </h3>
-              {viewScope === 'factory' && topDemands.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {topDemands.filter((d) => d.mentions > 0).length}/{topDemands.length} products with demand signals
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -1190,7 +734,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                     <th className="text-left px-3 py-2.5 font-medium">Material</th>
                     <th className="text-left px-3 py-2.5 font-medium">Stage</th>
                     <th className="text-right px-3 py-2.5 font-medium">Signals</th>
-                    <th className="text-right px-3 py-2.5 font-medium">{viewScope === 'factory' ? 'Board Saves' : 'Saves'}</th>
+                    <th className="text-right px-3 py-2.5 font-medium">{'Saves'}</th>
                     <th className="text-right px-3 py-2.5 font-medium">3D Uses</th>
                     <th className="text-right px-4 py-2.5 font-medium">Momentum</th>
                   </tr>
@@ -1205,9 +749,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                         <td className="px-3 py-2">
                           <div className="font-medium flex items-center gap-1.5">
                             {row.name}
-                            {isMyProduct(row.name) && (
-                              <span className="text-[10px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary/20 shrink-0">YOURS</span>
-                            )}
                           </div>
                           {row.mentions > 0 && (
                             <div className="mt-0.5 h-0.5 rounded-full bg-border/40 w-24">
@@ -1246,7 +787,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Trending Material Attributes</h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {attrSource
-                  ? `Showing: ${metadataFieldLabels.get(attrSource) ?? prettifyKey(attrSource)}${selectedCategory !== 'all' ? ` · ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ''}${viewScope === 'factory' ? ' · your products' : ''}`
+                  ? `Showing: ${metadataFieldLabels.get(attrSource) ?? prettifyKey(attrSource)}${selectedCategory !== 'all' ? ` · ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ''}`
                   : 'Select an attribute below to explore trends'}
               </p>
             </div>
@@ -1293,7 +834,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         <>
           <SectionHeader
             title="How Materials Are Discovered"
-            desc={viewScope === 'factory' ? 'Which channels buyers use to find your products — optimize for the source that converts best' : 'How buyers are discovering top materials — search-led vs AI-led vs 3D scene exploration'}
+            desc={'How buyers are discovering top materials — search-led vs AI-led vs 3D scene exploration'}
             icon={Search}
           />
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
@@ -1345,7 +886,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       {/* ──── Moodboard Activity ───────────────────────── */}
       <SectionHeader
         title="Moodboard Activity"
-        desc={viewScope === 'factory' ? 'Which of your products buyers are saving to design boards most frequently' : `Most saved products to design boards${selectedCategory !== 'all' ? ` in ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ' across all categories'}`}
+        desc={`Most saved products to design boards${selectedCategory !== 'all' ? ` in ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ' across all categories'}`}
         icon={Layers}
       />
 
@@ -1353,7 +894,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            {viewScope === 'factory' ? 'Your Most Board-Saved Products' : 'Top Products Saved to Moodboards'}
+            {'Top Products Saved to Moodboards'}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">Products buyers include most often in design boards — strong intent signal</p>
         </div>
@@ -1372,14 +913,11 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                 </thead>
                 <tbody>
                   {topMoodboardItems.map((row, i) => (
-                    <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${isMyProduct(row.name) ? 'bg-primary/5' : ''}`}>
+                    <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors `}>
                       <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2 font-medium">
                         <div className="flex items-center gap-1.5">
                           {row.name}
-                          {isMyProduct(row.name) && (
-                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary/20 shrink-0">YOURS</span>
-                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
@@ -1403,7 +941,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       {/* ──── Quote Purchase Flow ───────────────────────── */}
       <SectionHeader
         title="Quote Purchase Flow"
-        desc={viewScope === 'factory' ? 'Which of your products buyers are requesting quotes for — and how they found them' : `Most quoted products${selectedCategory !== 'all' ? ` in ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ''} — the real purchase intent signal`}
+        desc={`Most quoted products${selectedCategory !== 'all' ? ` in ${platformCategories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}` : ''} — the real purchase intent signal`}
         icon={Target}
       />
 
@@ -1412,7 +950,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           <div className="mb-4">
             <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
               <Target className="h-4 w-4" />
-              {viewScope === 'factory' ? 'Your Most Quoted Products' : 'Top Products in Buyer Quotes'}
+              {'Top Products in Buyer Quotes'}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">Direct purchase intent — products requested in quotes</p>
           </div>
@@ -1431,14 +969,11 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                   </thead>
                   <tbody>
                     {topQuotedItems.map((row, i) => (
-                      <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${isMyProduct(row.name) ? 'bg-primary/5' : ''}`}>
+                      <tr key={i} className={`border-b border-border/30 hover:bg-muted/30 transition-colors `}>
                         <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2 font-medium">
                           <div className="flex items-center gap-1.5">
                             {row.name}
-                            {isMyProduct(row.name) && (
-                              <span className="text-[10px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary/20 shrink-0">YOURS</span>
-                            )}
                           </div>
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{row.category}</td>
@@ -1481,29 +1016,11 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       </div>
 
       {/* ──── Quote Intelligence (factory mode only) ──── */}
-      {viewScope === 'factory' && quoteFunnelData.length > 0 && (
-        <>
-          <SectionHeader title="Quote Intelligence" desc="How your quoted materials progress through the buyer pipeline" icon={Award} />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {quoteFunnelData.map((stage, i) => (
-              <div key={i} className="rounded-xl border border-border/50 bg-card px-4 py-3">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">{stage.stage}</p>
-                <p className="text-3xl font-bold text-primary tabular-nums">{stage.count}</p>
-                {i > 0 && quoteFunnelData[i - 1].count > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {Math.round((stage.count / quoteFunnelData[i - 1].count) * 100)}% conversion
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
 
       {/* ──── Buyer Profile Intelligence ──── */}
       <SectionHeader
         title="Buyer Profile Intelligence"
-        desc={viewScope === 'factory' ? 'Who is saving and requesting quotes for your materials — broken down by professional type' : 'Who is actively saving and quoting materials across the platform'}
+        desc={'Who is actively saving and quoting materials across the platform'}
         icon={Users}
       />
 
@@ -1573,7 +1090,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         <>
           <SectionHeader
             title="3D Scene & VR Usage"
-            desc={viewScope === 'factory' ? 'How buyers use your materials in AI 3D room generations and VR scenes' : 'Which materials buyers drop into AI-generated 3D scenes — the highest intent signal'}
+            desc={'Which materials buyers drop into AI-generated 3D scenes — the highest intent signal'}
             icon={Layers}
           />
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -1585,7 +1102,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                 <Layers className="h-4 w-4" />
-                {viewScope === 'factory' ? 'Your Products in 3D Scenes' : 'Top Materials Used in 3D Generations'}
+                {'Top Materials Used in 3D Generations'}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">Materials actively placed in room visualizations — buyers are testing purchase decisions</p>
             </div>
@@ -1646,9 +1163,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Search className="h-4 w-4" /> What Buyers Want but Cannot Find</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {viewScope === 'factory'
-                  ? 'Ranked by search frequency — any term adjacent to your category is a launch opportunity'
-                  : 'Platform-wide gaps — first supplier to list wins all organic demand for these terms'}
+                {'Platform-wide gaps — first supplier to list wins all organic demand for these terms'}
               </p>
             </div>
             <div className="overflow-hidden -mx-6 -mb-6 mt-2">
@@ -1698,14 +1213,14 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         <>
           <SectionHeader
             title="Quote Basket Intelligence"
-            desc={viewScope === 'factory' ? 'Products buyers pair with yours in the same quote — reveals complementary catalog opportunities' : 'Products most frequently co-quoted together — reveals buyer project composition'}
+            desc={'Products most frequently co-quoted together — reveals buyer project composition'}
             icon={Award}
           />
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                 <Award className="h-4 w-4" />
-                {viewScope === 'factory' ? 'Co-Quoted with Your Products' : 'Most Co-Quoted Product Pairs'}
+                {'Most Co-Quoted Product Pairs'}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">When buyers build quotes, they include these products together — understand project composition</p>
             </div>
@@ -1769,7 +1284,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         <>
           <SectionHeader
             title="Buyer Engagement Funnel"
-            desc={viewScope === 'factory' ? 'How buyers progress from first contact to accepting a quote for your materials' : 'Platform-wide buyer journey from material interest to confirmed purchase'}
+            desc={'Platform-wide buyer journey from material interest to confirmed purchase'}
             icon={TrendingUp}
           />
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
@@ -1804,150 +1319,10 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       )}
 
       {/* ──── Moodboard Intelligence (factory mode only) ──── */}
-      {viewScope === 'factory' && (
-        <>
-          <SectionHeader
-            title="Moodboard Intelligence"
-            desc="How buyers incorporate your materials into design boards — and what they pair them with"
-            icon={Layers}
-          />
-          <div className="grid grid-cols-3 gap-3">
-            <KpiCard label="Boards Including Your Materials" value={moodboardStats.total} icon={Package} />
-            <KpiCard label="Public Boards" value={moodboardStats.public} icon={Globe} color="text-cyan-600" />
-            <KpiCard label="Public Share" value={moodboardStats.total > 0 ? `${Math.round((moodboardStats.public / moodboardStats.total) * 100)}%` : '—'} icon={Eye} color="text-green-600" />
-          </div>
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Layers className="h-4 w-4" /> Material Pairing Analysis</h3>
-              <p className="text-xs text-muted-foreground mt-1">When buyers save your materials to moodboards, they also most often include these products — revealing the design contexts your materials belong to</p>
-            </div>
-            <div>
-              {moodboardPairings.length === 0 ? (
-                <EmptyState message="No co-save data yet — grow your catalog visibility to see pairing patterns" />
-              ) : (
-                <div className="overflow-auto max-h-[300px]">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                      <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
-                        <th className="text-left py-2.5 pr-4 font-bold">#</th>
-                        <th className="text-left py-2.5 pr-4 font-bold">Partner Product</th>
-                        <th className="text-left py-2.5 pr-4 font-bold">Category</th>
-                        <th className="text-left py-2.5 pr-4 font-bold">Type</th>
-                        <th className="text-right py-2.5 font-medium">Times Paired</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {moodboardPairings.map((row, i) => (
-                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors text-xs">
-                          <td className="py-2 pr-4 text-muted-foreground">{i + 1}</td>
-                          <td className="py-2 pr-4 font-medium">{row.name}</td>
-                          <td className="py-2 pr-4 text-xs text-muted-foreground">{row.category}</td>
-                          <td className="py-2 pr-4">
-                            {row.materialType && (
-                              <span className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
-                                {row.materialType.replace(/_/g, ' ')}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2 text-right font-mono tabular-nums text-primary font-bold">{row.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
 
       {/* ──── Catalog Gap Analysis (factory mode only) ──── */}
-      {viewScope === 'factory' && (
-        <>
-          <SectionHeader
-            title="Product Development Opportunities"
-            desc="Materials buyers are actively demanding that are not in your catalog — actionable expansion signals"
-            icon={Search}
-          />
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Target className="h-4 w-4" /> Catalog Gaps — Top Unserved Demands</h3>
-              <p className="text-xs text-muted-foreground mt-1">Top platform demand signals that don't match any product in your catalog</p>
-            </div>
-            <div>
-              {catalogGaps.length === 0 ? (
-                <EmptyState message="Your catalog covers all top demanded materials" />
-              ) : (
-                <div className="overflow-auto max-h-[260px]">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                      <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
-                        <th className="text-left py-2.5 pr-4 font-bold">#</th>
-                        <th className="text-left py-2.5 pr-4 font-bold">Demanded Material</th>
-                        <th className="text-right py-2.5 pr-4 font-bold">Signals</th>
-                        <th className="text-right py-2.5 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {catalogGaps.map((row, i) => (
-                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors text-xs">
-                          <td className="py-2 pr-4 text-muted-foreground">{i + 1}</td>
-                          <td className="py-2 pr-4 font-medium">{row.name}</td>
-                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-amber-500 font-bold">{row.mentions}</td>
-                          <td className="py-2 text-right">
-                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">MISSING</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
 
       {/* ──── Product Velocity (factory mode only) ──── */}
-      {viewScope === 'factory' && productVelocity.length > 0 && (
-        <>
-          <SectionHeader title="Product Velocity" desc="Week-over-week traction — last 4 weeks vs prior 4 weeks" icon={Zap} />
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div>
-              <div className="overflow-auto max-h-[300px]">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
-                      <th className="text-left py-2.5 pr-4 font-bold">#</th>
-                      <th className="text-left py-2.5 pr-4 font-bold">Product</th>
-                      <th className="text-right py-2.5 pr-4 font-bold">Saves 4W</th>
-                      <th className="text-right py-2.5 pr-4 font-bold">Quotes</th>
-                      <th className="text-right py-2.5 font-medium">Velocity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productVelocity.map((row, i) => (
-                      <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors text-xs">
-                        <td className="py-2 pr-4 text-muted-foreground">{i + 1}</td>
-                        <td className="py-2 pr-4 font-medium">{row.name}</td>
-                        <td className="py-2 pr-4 text-right font-mono tabular-nums">{row.saves}</td>
-                        <td className="py-2 pr-4 text-right font-mono tabular-nums text-primary">{row.quotes}</td>
-                        <td className="py-2 text-right">
-                          {row.trend === 'up'
-                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/20">▲ RISING</span>
-                            : row.trend === 'down'
-                            ? <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">▼ DECLINE</span>
-                            : <span className="inline-block text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/30">→ STABLE</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* ──── Demand Forecast ──────────────────────────────── */}
       {materialGrowthRates.length > 0 && (

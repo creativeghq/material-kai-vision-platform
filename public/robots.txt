@@ -27,7 +27,7 @@ Disallow: /inbox
 Disallow: /tasks
 Disallow: /monitoring
 Disallow: /analytics
-Disallow: /factory-analytics
+Disallow: /market-trends
 Disallow: /agent-hub
 Disallow: /search-hub
 Disallow: /finance
@@ -60,7 +60,7 @@ Disallow: /inbox
 Disallow: /tasks
 Disallow: /monitoring
 Disallow: /analytics
-Disallow: /factory-analytics
+Disallow: /market-trends
 Disallow: /agent-hub
 Disallow: /search-hub
 Disallow: /finance
@@ -194,7 +194,7 @@ Disallow: /inbox
 Disallow: /tasks
 Disallow: /monitoring
 Disallow: /analytics
-Disallow: /factory-analytics
+Disallow: /market-trends
 Disallow: /agent-hub
 Disallow: /search-hub
 Disallow: /finance

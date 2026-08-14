@@ -117,7 +117,7 @@ describe('the SPA catch-all serves real routes and 404s the scanner surface', ()
     '/i/invite-code', '/brands/acme', '/careers', '/privacy-policy', '/terms-of-service',
     '/supplier-portal', '/finance', '/crm', '/settings', '/profile', '/store', '/pos',
     '/tools', '/analytics', '/room-planner', '/trip-expenses', '/my-hr', '/sheets/token',
-    '/factory-analytics', '/search-hub', '/products/marble-tile-60x60',
+    '/market-trends', '/search-hub', '/products/marble-tile-60x60',
     // The /:slug/clockin route — ANY first segment is legitimate here, which is why
     // enumerating known top-level routes into this regex would have been wrong.
     '/some-workspace/clockin',

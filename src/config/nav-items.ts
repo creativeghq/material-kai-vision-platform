@@ -31,7 +31,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
 
-export type NavRoleRequirement = 'factory' | 'admin';
+export type NavRoleRequirement = 'admin';
 
 /**
  * HubSpot-style "Hubs": the App Launcher and Profile → Modules group the
@@ -97,7 +97,7 @@ export interface SidebarNavItem {
  * Data-driven sidebar navigation. Order here is the order shown to users.
  *
  * To add a module-gated entry: set `moduleSlug` to the module's registry slug.
- * To add a role-gated entry: set `requireRole` to 'factory' or 'admin'.
+ * To add a role-gated entry: set `requireRole` to 'admin'.
  */
 export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── Top bar: universal surfaces every user relies on ──
@@ -177,15 +177,19 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // article writing as sections (Content Writer merged in here, no longer a separate tile). Mention
   // Monitoring is nested under Social Media (see LAUNCHER_SECTIONS) to keep the Marketing list lean.
   { id: 'seo', label: 'SEO & Content', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & SEO article writing — in the AI studio.' },
+  // Platform-wide buyer demand. Per-supplier analytics are NOT here — they live on the CRM
+  // company's Market tab, keyed on brand_company_id (#350). The old 'factory' role gate went with
+  // them: it resolved from user_profiles.factory_verified, which no account has ever held, so this
+  // tile rendered for nobody.
   {
-    id: 'factory-analytics',
-    label: 'Supplier Analytics',
-    path: '/factory-analytics',
+    id: 'market-trends',
+    label: 'Market Trends',
+    path: '/market-trends',
     icon: BarChart3,
-    requireRole: 'factory',
+    requireRole: 'admin',
     surface: 'app',
     hub: 'sales',
-    description: 'Supplier demand and engagement analytics.',
+    description: 'What buyers search for, save and quote across the platform.',
   },
   // Templates (#322) — one library for every record type: invoices, quotes, projects, moodboards,
   // plus link-outs to the template systems that have their own editors. No `hub` on purpose: it is
@@ -206,7 +210,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
 
 /** Context the nav gates resolve against. Computed from hooks by the consuming component. */
 export interface NavGateContext {
-  isFactory: boolean;
   isAdmin: boolean;
   isPlatformOperator: boolean;
   isAccountant: boolean;
@@ -237,8 +240,6 @@ export function filterNavItems(
     // Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
     if (ctx.isRealEstateAgent && item.id !== 'dashboard' && item.id !== 'real-estate') return false;
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
-    // Factory analytics is for verified factories only — not dealers/operators.
-    if (item.requireRole === 'factory' && !ctx.isFactory) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
     // Capability gate (the unified persona model — drives end-user restriction).
     if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
@@ -296,5 +297,5 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   // Cross-cutting
   'templates',
   // Niche / role-specific
-  'factory-analytics',
+  'market-trends',
 ];

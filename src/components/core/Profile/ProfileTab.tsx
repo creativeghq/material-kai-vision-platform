@@ -828,7 +828,11 @@ export const ProfileTab: React.FC = () => {
             type: 'preferred_factory',
             title: 'A user added your brand as a preferred brand',
             body: '',
-            action_url: '/factory-analytics',
+            // Was /factory-analytics, which no longer exists (#350). The recipient here is a
+            // platform supplier account, so the destination has to be a page THEY can open —
+            // /market-trends is workspace-admin gated and the CRM company Market tab lives in the
+            // buyer's workspace. Their own catalog in Discovery is the one surface that qualifies.
+            action_url: `/discover?tab=products&factory=${encodeURIComponent(factoryToAdd)}`,
           });
         });
     }
