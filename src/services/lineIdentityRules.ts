@@ -60,3 +60,28 @@ export function rankIdentityOptions(opt: LineIdentityOption): string[] {
   const inStock = new Set(opt.stocked);
   return [...opt.options.filter((v) => inStock.has(v)), ...opt.options.filter((v) => !inStock.has(v))];
 }
+
+/**
+ * Canonical variant key — the TypeScript twin of SQL `public._variant_key(jsonb)` (#347 phase 7).
+ *
+ * A map has no inherent order, so `{finish, available_sizes}` and `{available_sizes, finish}` are
+ * the SAME variant and must produce the same key — otherwise one product accumulates two price
+ * rows that each look correct. Sorted, lower-cased, blanks dropped.
+ *
+ * This exists in two languages because the browser prices a line before it is saved, while the
+ * warehouse and the resolver key on it in SQL. That is a twin, and twins drift: this platform has
+ * shipped five registries and four money derivations for exactly that reason. So the two are held
+ * byte-identical by tests/unit/variantKeyParity.test.ts against a shared fixture set, the same
+ * arrangement escapeHtml uses — NOT by convention.
+ *
+ * Returns null when nothing is chosen, which is the "applies to any variant" price row.
+ */
+export function variantKey(attrs: Record<string, string> | null | undefined): string | null {
+  if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) return null;
+  const parts = Object.entries(attrs)
+    .map(([k, v]) => [String(k ?? '').trim().toLowerCase(), String(v ?? '').trim().toLowerCase()])
+    .filter(([, v]) => v !== '')
+    .map(([k, v]) => `${k}=${v}`)
+    .sort();
+  return parts.length ? parts.join(';') : null;
+}

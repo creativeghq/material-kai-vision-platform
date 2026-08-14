@@ -37823,6 +37823,17 @@ export type Database = {
           output_price: number
         }[]
       }
+      get_supplier_price_break: {
+        Args: {
+          p_product_id: string
+          p_quantity: number
+          p_supplier_company_id: string
+          p_unit?: string
+          p_variant_key?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       get_line_identity_options: {
         Args: { p_product_id: string }
         Returns: {

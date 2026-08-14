@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { variantKey } from '@/services/lineIdentityRules';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { vatOf } from '@/modules/finance/lib/vatMath';
@@ -1477,6 +1478,8 @@ export const ordersService = {
   async resolveLinePricing(opts: {
     workspaceId: string; productId: string; orderType: OrderType;
     companyId?: string | null; contactId?: string | null;
+    /** The line's chosen identity, so a variant-specific price can win (#347 phase 7.1). */
+    selectedAttributes?: Record<string, string> | null;
     /**
      * The line's quantity and unit, so `product_price_breaks` can fire (#347 defect 16).
      *
@@ -1502,8 +1505,37 @@ export const ordersService = {
     const supplier = (prod?.supplier_company_id as string | null) ?? null;
     if (opts.orderType === 'purchase') {
       // A purchase line pays cost, and `product_price_breaks` is sell-side by construction
-      // (`level_key` = the CUSTOMER's tier). Supplier-side quantity tiers do not exist yet —
-      // #347 phase 7.3 — so this deliberately does not consult the resolver at all.
+      // (`level_key` = the CUSTOMER's tier), so it must never be consulted here. #347 phase 7.3
+      // gave the buy side its own ladder: what the SUPPLIER charges at volume.
+      const supplierId = opts.companyId ?? supplier;
+      const hasQtyBuy = opts.quantity != null && Number.isFinite(Number(opts.quantity)) && Number(opts.quantity) > 0;
+      if (supplierId && hasQtyBuy && opts.unit) {
+        try {
+          const { data: brk } = await supabase.rpc('get_supplier_price_break', {
+            p_workspace_id: opts.workspaceId,
+            p_supplier_company_id: supplierId,
+            p_product_id: opts.productId,
+            p_quantity: Number(opts.quantity),
+            p_unit: opts.unit,
+            p_variant_key: variantKey(opts.selectedAttributes) ?? null,
+          });
+          const tier = (brk ?? null) as { unit_cost?: number; discount_percent?: number } | null;
+          if (tier) {
+            // An explicit tier cost wins; otherwise the tier is a percentage off our standing
+            // cost. Never both — two ways to express one number is how the sell side ended up
+            // with four derivations.
+            const tiered = tier.unit_cost != null
+              ? Number(tier.unit_cost)
+              : (tier.discount_percent != null && cost != null
+                  ? Number((cost * (1 - Number(tier.discount_percent) / 100)).toFixed(2))
+                  : null);
+            if (tiered != null && Number.isFinite(tiered)) {
+              return { unit_price: tiered, unit_cost: tiered, discount_pct: tier.discount_percent ?? null,
+                       measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: 'supplier_break' };
+            }
+          }
+        } catch { /* best-effort: a missing tier must never block pricing the line at cost */ }
+      }
       return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: null };
     }
     try {
@@ -1515,6 +1547,11 @@ export const ordersService = {
       const { data } = await supabase.rpc('get_product_price_for_workspace', {
         p_workspace_id: opts.workspaceId, p_product_id: opts.productId,
         p_company_id: opts.companyId ?? null, p_contact_id: opts.contactId ?? null, p_audience: 'seller',
+        // #347 phase 7.1 — price THIS variant. The resolver prefers a row keyed to it and falls
+        // back to the product-wide row, so a line that has chosen nothing prices exactly as
+        // before. `variantKey` is the twin of SQL `_variant_key`, held equal by
+        // tests/unit/variantKeyParity.test.ts.
+        p_variant_key: variantKey(opts.selectedAttributes) ?? null,
         ...qtyArgs,
       });
       const r = (data ?? {}) as { final_sell?: number; retail?: number; cost_basis?: number; discount_pct?: number; discount_source?: string };
