@@ -11,6 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/po
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLauncherApps, groupAppsByHub, type LauncherApp } from '@/hooks/useLauncherApps';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
 import { getCapability } from '@/config/capabilities';
 import { TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
@@ -34,6 +35,10 @@ export const AppLauncher: React.FC = () => {
   const [activeHubKey, setActiveHubKey] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const { active, available, canManage, enabling, enable, loading } = useLauncherApps();
+  // A section chip can sit behind a DIFFERENT add-on than the card it hangs under — Real Estate's
+  // Property Mgmt / Investments, CRM's Pipeline. Gate per chip so an owner keeps the shortcut and a
+  // non-owner is not sent to an upsell.
+  const { isModuleAvailable } = useEntitlements();
 
   useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
 
@@ -98,7 +103,8 @@ export const AppLauncher: React.FC = () => {
   // One app "card" in the middle: header (icon · name · Open/Enable) + its inner links (sections +
   // create actions, else agent quick-starts).
   const renderAppCard = (app: LauncherApp) => {
-    const sections = LAUNCHER_SECTIONS[app.id] ?? [];
+    const sections = (LAUNCHER_SECTIONS[app.id] ?? [])
+      .filter((s) => !s.moduleSlug || isModuleAvailable(s.moduleSlug));
     const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
     const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
     const quickStarts = cap?.quickStarts ?? [];

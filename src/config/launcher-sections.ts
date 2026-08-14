@@ -32,6 +32,14 @@ export interface LauncherSection {
   /** Real route or ?tab= deep-link whose value matches the page's own TabsTrigger. */
   to: string;
   icon: LucideIcon;
+  /**
+   * Entitlement gate for a tab that sits behind a SEPARATE add-on from the app card it hangs under
+   * (Real Estate's Property Mgmt / Investments, CRM's Pipeline). The launcher hides the chip unless
+   * the workspace owns the slug, so the link never lands on an upsell — and, just as importantly,
+   * a workspace that DOES own the add-on still gets the shortcut. Omitting these entries outright
+   * was the older answer, and it punished exactly the customers who had paid for them.
+   */
+  moduleSlug?: string;
 }
 
 /**
@@ -45,10 +53,9 @@ export interface LauncherSection {
  *   Email    (src/modules/email-marketing/pages/…Page.tsx) → campaigns | templates | contacts | setup
  */
 export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
-  // Property Mgmt (`lettings`) and Investments are NOT here: both render with a padlock unless the
-  // workspace owns the real-estate-management / real-estate-investments add-on, so linking them
-  // sends a click to an upsell — the same reason CRM's Pipeline is omitted below. Syndication is
-  // `canManage`-gated. Overview is the landing tab, which "Open" already reaches.
+  // Property Mgmt and Investments carry their own add-on slug — shown to a workspace that owns
+  // them, hidden from one that doesn't. Syndication is `canManage`-gated (a role, not a purchase,
+  // so there is no slug to hang it on) and Overview is the landing tab "Open" already reaches.
   'real-estate': [
     { label: 'Listings', to: '/properties?tab=listings', icon: Building2 },
     { label: 'Pipeline', to: '/properties?tab=pipeline', icon: ClipboardList },
@@ -57,11 +64,13 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Sellers', to: '/properties?tab=sellers', icon: Store },
     { label: 'Viewings', to: '/properties?tab=viewings', icon: CalendarDays },
     { label: 'Sales', to: '/properties?tab=sales', icon: Banknote },
+    { label: 'Property Mgmt', to: '/properties?tab=lettings', icon: FolderOpen, moduleSlug: 'real-estate-management' },
+    { label: 'Investments', to: '/properties?tab=investments', icon: BarChart3, moduleSlug: 'real-estate-investments' },
   ],
-  // No Pipeline entry on purpose: that tab is gated on the `deals` add-on, and this file lists
-  // only always-available tabs so a launcher link never lands on an upsell.
   crm: [
     { label: 'Users', to: '/crm?tab=users', icon: Users },
+    // Behind the `deals` add-on (ModuleTabGate on the page) — chip appears only if it is owned.
+    { label: 'Pipeline', to: '/crm?tab=pipeline', icon: ClipboardList, moduleSlug: 'deals' },
     { label: 'Contacts', to: '/crm?tab=contacts', icon: Contact },
     { label: 'Companies', to: '/crm?tab=companies', icon: Building2 },
     { label: 'Categories', to: '/crm?tab=categories', icon: Tags },
