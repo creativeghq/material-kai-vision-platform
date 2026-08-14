@@ -8,6 +8,7 @@
  * - trigger-event: Auto-dispatch from DB triggers (Phase 4)
  */
 
+import { loadPrompt, render } from '../_shared/prompt-registry.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -788,7 +789,14 @@ async function executeAction(
         ? `in the ${regionId} region`
         : 'across Europe and major global manufacturing hubs';
 
-      const query = `Find B2B manufacturers of ${category} ${geoScope}. I need actual production companies (not distributors) with their own manufacturing facilities. For each company provide: name, website URL, city/country, main products. Return up to ${limit} results as a structured list.`;
+      // Same row b2b-tools reads. This copy had drifted from it (#347 phase 3P).
+      const query = render(
+        await loadPrompt({ promptType: 'tool', category: 'b2b_manufacturer_query' }),
+        { category, scope: geoScope, limit },
+      );
+      const systemPrompt = await loadPrompt({
+        promptType: 'tool', category: 'b2b_manufacturer_search',
+      });
 
       let textContent = '';
       try {
@@ -804,6 +812,7 @@ async function executeAction(
             body: JSON.stringify({
               model: 'claude-haiku-4-5',
               max_tokens: 4096,
+              system: systemPrompt,
               tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
               messages: [{ role: 'user', content: query }],
             }),

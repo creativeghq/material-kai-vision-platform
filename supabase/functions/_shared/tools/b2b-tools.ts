@@ -36,6 +36,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type B2BChunkSink = ((chunk: any) => void) | undefined;
 
+import { loadPrompt, render } from '../prompt-registry.ts';
 import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
@@ -188,7 +189,17 @@ export const createB2BManufacturerSearchTool = (
           scope = `across these 30 markets: ${B2B_ALL_COUNTRIES.join(', ')}`;
         }
 
-        const query = `Find B2B manufacturers of ${category} ${scope}. I need actual production companies (not distributors or retailers) with their own manufacturing facilities. For each company provide: company name, website URL, city/country, main products, and any manufacturing indicators. Return up to ${limit} results.`;
+        // Both this and flow-engine used to carry their own copy of this query, and the two
+        // had already drifted — flow-engine's dropped "or retailers" and stopped asking for
+        // manufacturing indicators. One row, two readers (#347 phase 3P).
+        const query = render(
+          await loadPrompt({ promptType: 'tool', category: 'b2b_manufacturer_query' }),
+          { category, scope, limit },
+        );
+        // The system prompt has existed in the table all along with nothing reading it.
+        const systemPrompt = await loadPrompt({
+          promptType: 'tool', category: 'b2b_manufacturer_search',
+        });
 
         onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${B2B_REGIONS[region.toLowerCase()]?.label ?? region}` : ''}...`);
 
@@ -203,6 +214,7 @@ export const createB2BManufacturerSearchTool = (
           body: JSON.stringify({
             model: 'claude-haiku-4-5',
             max_tokens: 4096,
+            system: systemPrompt,
             tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
             messages: [{ role: 'user', content: query }],
           }),
