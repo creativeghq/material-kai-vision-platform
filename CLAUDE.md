@@ -101,6 +101,27 @@ a cost-dashboard query exceeds ~500 ms. Same test before adding one for any othe
 10. **No SDK clients for AI providers — standardize on httpx.** The `anthropic` SDK was removed 2026-05-23 (pin-trap broke the `tools` kwarg). New code calls `tracked_claude_call_async` for auto-logging.
 11. **`chunk_type_status ∈ {pending, classified, failed}`** — distinguishes "the classifier returned 'unclassified' as a valid verdict" from "the classifier crashed mid-batch".
 
+## Prompts and extraction fields come from the DATABASE — never from code
+**Never hardcode a prompt in a file that calls a model, and never write a fallback for one.**
+Load it: `prompt_registry.load_prompt(...)` (Python) or `loadPrompt({...})` from
+`_shared/prompt-registry.ts` (edge). A sync site uses `get_cached(...)` after its async entry
+point called `prefetch(...)`. Both raise; there is no default. `PromptNotConfigured` ("add the
+row") is deliberately distinct from `PromptStoreUnavailable` ("the DB is down") — the six loaders
+this replaced returned `None` for both, so no caller could react correctly to either.
+A fallback is invisible when it fires: `segmentation_service` caught every exception, logged at
+DEBUG and used a 9,119-char constant, so an admin's edit saved and changed nothing forever while
+every health signal stayed green. Guarded by
+[tests/unit/test_prompts_come_from_the_database.py](mivaa-pdf-extractor/tests/unit/test_prompts_come_from_the_database.py).
+
+**`material_metadata_fields` + `material_categories` are the field registry.** What fields exist,
+which are canonicalizable, which are variant axes (`role='identity'`), and whether a value belongs
+in `attributes` jsonb or a real column (`destination`) — all DB. There were SIX Python/TS copies
+and they disagreed; `cladding` was offered by the extraction prompt and rejected by stage 4's
+validator, so those products re-classified on every run. A field can mean different things per
+category (`body_material` is vitreous china in sanitary, rattan in lighting) — that is
+`description_by_category`, not a merge. Guarded by
+[tests/unit/test_field_registry_is_the_source.py](mivaa-pdf-extractor/tests/unit/test_field_registry_is_the_source.py).
+
 ## Flows — notifications & automation (READ BEFORE adding any notification/email/automation)
 **Never hardcode a `user_notifications` insert or an `email-api` call in new code.** Emit an event —
 `flowEventService.emit(type, data)` (frontend) or `emitFlowEvent(type, data)` from `_shared/flow-events.ts`
