@@ -85,6 +85,32 @@ export const AppLauncher: React.FC = () => {
     return { capId, toolkitId: cap?.toolkitId, quickStarts: tk?.quick_starts ?? [] };
   };
 
+  /**
+   * The inner links a card would show. Shared by the card renderer and the "Jump to" rail so the
+   * two can never disagree about which apps are link-less — the rail exists precisely to give those
+   * apps a one-click home, and an app appearing in both places would be the duplicate all over again.
+   */
+  const appLinks = (app: LauncherApp) => {
+    const sections = (LAUNCHER_SECTIONS[app.id] ?? [])
+      .filter((s) => !s.moduleSlug || isModuleAvailable(s.moduleSlug));
+    const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
+    const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
+    const quickStarts = cap?.quickStarts ?? [];
+    return { sections, actions, cap, quickStarts, hasLinks: app.active && (sections.length + actions.length + quickStarts.length) > 0 };
+  };
+
+  /**
+   * Active apps with nothing to expand — POS, Supplier Portal, Page Monitoring, Blueprints. Their
+   * card is a name and an arrow, which is a lot of hub real estate for "click here". They get
+   * promoted to the top of the Jump-to rail in the primary colour instead, so the one thing you can
+   * do with them is the thing the menu offers first.
+   */
+  const directApps = useMemo(
+    () => active.filter((a) => !appLinks(a).hasLinks).sort((a, b) => a.label.localeCompare(b.label)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [active, isModuleAvailable],
+  );
+
   const shortcutRow = (s: LauncherSection) => (
     <button
       key={s.to}
@@ -103,12 +129,7 @@ export const AppLauncher: React.FC = () => {
   // One app "card" in the middle: header (icon · name · Open/Enable) + its inner links (sections +
   // create actions, else agent quick-starts).
   const renderAppCard = (app: LauncherApp) => {
-    const sections = (LAUNCHER_SECTIONS[app.id] ?? [])
-      .filter((s) => !s.moduleSlug || isModuleAvailable(s.moduleSlug));
-    const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
-    const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
-    const quickStarts = cap?.quickStarts ?? [];
-    const hasLinks = app.active && (sections.length > 0 || actions.length > 0 || quickStarts.length > 0);
+    const { sections, actions, cap, quickStarts, hasLinks } = appLinks(app);
 
     return (
       <div key={app.id} className="py-1">
@@ -279,6 +300,23 @@ export const AppLauncher: React.FC = () => {
               {/* ── Right rail: cross-app shortcuts + recent ── */}
               <aside className="border-t md:border-t-0 md:border-l border-border/60 bg-muted/20 p-4">
                 <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
+                {directApps.length > 0 && (
+                  <div className="mb-2.5 space-y-1.5">
+                    {directApps.map((app) => (
+                      <button
+                        key={app.id}
+                        type="button"
+                        onClick={() => go(app.path, app.id)}
+                        className="w-full flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-2 text-left text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"><app.icon className="h-4 w-4" /></span>
+                        <span className="flex-1 min-w-0 truncate text-[13px] font-semibold">{app.label}</span>
+                        <ArrowUpRight className="h-4 w-4 shrink-0 opacity-70" />
+                      </button>
+                    ))}
+                    <div className="h-px w-full bg-border/60" aria-hidden="true" />
+                  </div>
+                )}
                 <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
 
                 {recentApps.length > 0 && (

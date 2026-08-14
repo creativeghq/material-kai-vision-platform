@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, Copy, ExternalLink, Layers, Loader2, Pencil, Play, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Copy, ExternalLink, Layers, LayoutTemplate, Loader2, Pencil, Play, Plus, Sparkles, Trash2 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -8,6 +8,13 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Input } from '@/components/core/ui/input';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/core/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
@@ -28,6 +35,8 @@ import {
  * types ARE the tabs. Neither value may collide with a `LIVE_TEMPLATE_TYPES` key.
  */
 const ALL_TAB = 'all';
+/** Everything this workspace saved itself — the starters are the other half of the library. */
+const MINE_TAB = 'mine';
 const LIBRARIES_TAB = 'libraries';
 
 /**
@@ -81,7 +90,7 @@ export const TemplateLibraryPage: React.FC = () => {
    */
   const typeParam = searchParams.get('type');
   const activeTab = useMemo(() => {
-    if (typeParam === LIBRARIES_TAB) return LIBRARIES_TAB;
+    if (typeParam === LIBRARIES_TAB || typeParam === MINE_TAB) return typeParam;
     if (typeParam && (usableTypes as readonly string[]).includes(typeParam)) return typeParam;
     return ALL_TAB;
   }, [typeParam, usableTypes]);
@@ -110,12 +119,13 @@ export const TemplateLibraryPage: React.FC = () => {
     return m;
   }, [listed]);
 
-  const visible = useMemo(
-    () => (activeTab === ALL_TAB || activeTab === LIBRARIES_TAB
-      ? listed
-      : listed.filter((t) => t.entity_type === activeTab)),
-    [listed, activeTab],
-  );
+  const visible = useMemo(() => {
+    // MINE spans every type — it is a source filter, not a type filter. `own`/`starters` below
+    // then split it, and starters comes out empty by construction rather than by a second rule.
+    if (activeTab === MINE_TAB) return listed.filter((t) => !t.is_platform_starter);
+    if (activeTab === ALL_TAB || activeTab === LIBRARIES_TAB) return listed;
+    return listed.filter((t) => t.entity_type === activeTab);
+  }, [listed, activeTab]);
   const own = visible.filter((t) => !t.is_platform_starter);
   const starters = visible.filter((t) => t.is_platform_starter);
 
@@ -123,6 +133,10 @@ export const TemplateLibraryPage: React.FC = () => {
     () => EXTERNAL_TEMPLATE_SOURCES.filter((x) => !x.moduleSlug || isModuleAvailable(x.moduleSlug)),
     [isModuleAvailable],
   );
+
+  /** The rail's current entity type, or null when it is on All / Mine / Other libraries. */
+  const activeAdapterType = (): LiveTemplateEntityType | null =>
+    ((usableTypes as readonly string[]).includes(activeTab) ? activeTab as LiveTemplateEntityType : null);
 
   const setTab = (v: string) => {
     const p = new URLSearchParams(searchParams);
@@ -155,6 +169,43 @@ export const TemplateLibraryPage: React.FC = () => {
       toast({ title: 'Copy failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  /*
+    Add New. Every template until now had to be born from an existing record ("Save as template"),
+    which means you could not start one for a type you had no record of yet — a chicken-and-egg the
+    empty state named but could not solve. This creates the row with an empty payload and opens the
+    editor, where the adapter's `editableFields` are filled in. The type list is `usableTypes`, so
+    it can never offer a type this persona could not then use.
+  */
+  const [creating, setCreating] = useState(false);
+  const [newType, setNewType] = useState<string>('');
+  const [newTitle, setNewTitle] = useState('');
+  const [createBusy, setCreateBusy] = useState(false);
+
+  const openCreate = () => {
+    setNewType(activeAdapterType() ?? usableTypes[0] ?? '');
+    setNewTitle('');
+    setCreating(true);
+  };
+
+  const create = async () => {
+    if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+    if (!newType || !newTitle.trim()) { toast({ title: 'Pick a type and give it a name', variant: 'destructive' }); return; }
+    setCreateBusy(true);
+    try {
+      const tpl = await entityTemplatesService.create({
+        entityType: newType as LiveTemplateEntityType,
+        workspaceId,
+        title: newTitle.trim(),
+      });
+      setCreating(false);
+      navigate(`/templates/${tpl.id}`);
+    } catch (e) {
+      toast({ title: 'Could not create the template', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+    } finally {
+      setCreateBusy(false);
     }
   };
 
@@ -225,9 +276,10 @@ export const TemplateLibraryPage: React.FC = () => {
     );
   };
 
-  const activeAdapter = activeTab !== ALL_TAB && activeTab !== LIBRARIES_TAB
+  const activeAdapter = activeTab !== ALL_TAB && activeTab !== LIBRARIES_TAB && activeTab !== MINE_TAB
     ? TEMPLATE_ADAPTERS[activeTab as LiveTemplateEntityType]
     : null;
+  const mineCount = useMemo(() => listed.filter((t) => !t.is_platform_starter).length, [listed]);
 
   /*
     Radix drops every inactive panel, so the two panel bodies are built ONCE from the active tab
@@ -238,10 +290,12 @@ export const TemplateLibraryPage: React.FC = () => {
   const libraryPanel = (
     <>
       <SectionHeader
-        icon={activeAdapter?.icon ?? Layers}
-        title={activeAdapter?.plural ?? 'All templates'}
+        icon={activeAdapter?.icon ?? (activeTab === MINE_TAB ? LayoutTemplate : Layers)}
+        title={activeAdapter?.plural ?? (activeTab === MINE_TAB ? 'My templates' : 'All templates')}
         subtitle={activeAdapter?.description
-          ?? 'Everything saved in this workspace, plus the platform starters you can copy and edit.'}
+          ?? (activeTab === MINE_TAB
+            ? 'Every template this workspace saved or built, across all types.'
+            : 'Everything saved in this workspace, plus the platform starters you can copy and edit.')}
       />
 
       {loading ? (
@@ -304,7 +358,7 @@ export const TemplateLibraryPage: React.FC = () => {
     </>
   );
 
-  const tabValues: string[] = [ALL_TAB, ...usableTypes, LIBRARIES_TAB];
+  const tabValues: string[] = [MINE_TAB, ALL_TAB, ...usableTypes, LIBRARIES_TAB];
 
   return (
     <div className="min-h-screen bg-background">
@@ -321,7 +375,23 @@ export const TemplateLibraryPage: React.FC = () => {
           orientation="vertical"
           className="flex flex-col gap-4 lg:flex-row lg:items-start"
         >
-          <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+          {/* Left column: the two verbs first — create one, or look at the ones you already have —
+              then the type rail. Both used to be buried: "Add New" did not exist at all, and "your
+              templates" was a heading halfway down whichever panel you happened to be on. */}
+          <div className="w-full shrink-0 space-y-2 lg:w-56">
+            <Button size="sm" className="w-full gap-1.5 rounded-full" onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Add New
+            </Button>
+
+            <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-full lg:flex-col lg:flex-nowrap">
+            <TabsTrigger value={MINE_TAB} className="w-full justify-start">
+              <LayoutTemplate className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">My Templates</span>
+              {mineCount > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{mineCount}</span>}
+            </TabsTrigger>
+
+            <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
+
             <TabsTrigger value={ALL_TAB} className="w-full justify-start">
               <Layers className="h-4 w-4 mr-2 shrink-0" />
               <span className="truncate">All</span>
@@ -349,7 +419,8 @@ export const TemplateLibraryPage: React.FC = () => {
               <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
               <span className="truncate">Other libraries</span>
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+          </div>
 
           <div className="min-w-0 flex-1">
             {tabValues.map((v) => (
@@ -360,6 +431,46 @@ export const TemplateLibraryPage: React.FC = () => {
           </div>
         </Tabs>
       </main>
+
+      <Dialog open={creating} onOpenChange={setCreating}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New template</DialogTitle>
+            <DialogDescription>
+              Pick what it makes and name it — the next screen is where you fill in the details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="new-template-type" className="text-xs font-medium text-muted-foreground">Type</label>
+              <Select value={newType} onValueChange={setNewType}>
+                <SelectTrigger id="new-template-type"><SelectValue placeholder="Choose a type" /></SelectTrigger>
+                <SelectContent>
+                  {usableTypes.map((t: LiveTemplateEntityType) => (
+                    <SelectItem key={t} value={t}>{TEMPLATE_ADAPTERS[t].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="new-template-title" className="text-xs font-medium text-muted-foreground">Name</label>
+              <Input
+                id="new-template-title"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="e.g. Standard kitchen quote"
+                onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setCreating(false)}>Cancel</Button>
+            <Button className="rounded-full gap-1.5" disabled={createBusy || !newType || !newTitle.trim()} onClick={create}>
+              {createBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

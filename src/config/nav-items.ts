@@ -28,6 +28,7 @@ import {
   Layers,
   Ruler,
   DraftingCompass,
+  Handshake,
   FileSearch,
   Radar,
   ScanLine,
@@ -167,6 +168,11 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
   // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
   { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
+  // Deals & Pipeline. Lives on /crm?tab=pipeline (one deal object across CRM and Real Estate,
+  // segmented by deal type), but it is a paid add-on of its own and a daily sales surface, so it
+  // gets a Sales tile rather than staying a chip on the CRM card where it read as a CRM sub-view.
+  // Both gates are real: `crm.view` because it is a CRM tab, `deals` because that is what is sold.
+  { id: 'deals', label: 'Deals', path: '/crm?tab=pipeline', icon: Handshake, requireCapability: 'crm.view', moduleSlug: 'deals', surface: 'app', hub: 'sales', description: 'Track opportunities from first contact to won.' },
   // Real Estate module: appears only when the workspace is entitled to 'real-estate' AND the
   // persona holds realestate.view (owner/admin at P0; P1 adds the scoped realestate_agent persona).
   { id: 'real-estate', label: 'Real Estate', path: '/properties', icon: Building2, requireCapability: 'realestate.view', moduleSlug: 'real-estate', surface: 'app', hub: 'sales', description: 'List, manage and publish properties.' },
@@ -316,6 +322,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'quotes',
   // Customers & revenue
   'crm',
+  'deals',
   'inbox',
   'finance',
   'pos',

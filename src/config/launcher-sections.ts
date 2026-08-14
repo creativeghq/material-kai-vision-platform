@@ -22,7 +22,7 @@ import {
   CalendarClock, Timer, ClipboardCheck,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
-  Radar, Search, PenTool,
+  Radar, Search, PenTool, Activity,
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -69,8 +69,6 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   ],
   crm: [
     { label: 'Users', to: '/crm?tab=users', icon: Users },
-    // Behind the `deals` add-on (ModuleTabGate on the page) — chip appears only if it is owned.
-    { label: 'Pipeline', to: '/crm?tab=pipeline', icon: ClipboardList, moduleSlug: 'deals' },
     { label: 'Contacts', to: '/crm?tab=contacts', icon: Contact },
     { label: 'Companies', to: '/crm?tab=companies', icon: Building2 },
     { label: 'Categories', to: '/crm?tab=categories', icon: Tags },
@@ -189,6 +187,18 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Listings', to: '/templates?type=property_listing', icon: Building2 },
     { label: 'Customer terms', to: '/templates?type=crm_company', icon: Contact },
   ],
+  // Market Trends — the four sub-areas of MarketTrendsTab (its MARKET_TABS array).
+  'market-trends': [
+    { label: 'Demand', to: '/market-trends?tab=demand', icon: TrendingUp },
+    { label: 'Discovery', to: '/market-trends?tab=discovery', icon: Search },
+    { label: 'Buyers', to: '/market-trends?tab=buyers', icon: Users },
+    { label: 'Activity', to: '/market-trends?tab=activity', icon: Activity },
+  ],
+  // Docs (module registry entry; its launcher id is the module SLUG, not a SIDEBAR_NAV_ITEMS id).
+  // The page is a list + editor with no URL tabs, so the useful inner link is the create verb —
+  // see LAUNCHER_ACTIONS below. Categories are free text typed per doc, not a fixed vocabulary, so
+  // there is nothing stable to list here: a chip per category would be a different menu per
+  // workspace and would break the moment someone renamed one.
   // Sales/Inbox have no URL tabs → Open-only. My HR is Open-only too: EmployeeSelfServicePage uses
   // Tabs `defaultValue` and never reads ?tab=, so a tab deep-link would be inert.
 };
@@ -239,6 +249,9 @@ export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
   // guided form (name / trigger / action) and then runs manage_flows. Wired, not inert.
   automations: [
     { label: 'New automation', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Create%20a%20flow', icon: Workflow },
+  ],
+  docs: [
+    { label: 'New doc', to: '/docs?new=doc', icon: FilePlus },
   ],
 };
 

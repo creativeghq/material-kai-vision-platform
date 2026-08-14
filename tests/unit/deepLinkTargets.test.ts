@@ -187,6 +187,18 @@ function tabKeys(file: string, depth = 0, seen = new Set<string>()): Set<string>
       if (r) for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
     }
   }
+  // A page that DELEGATES its body: the route component is a thin shell (guard + PageHeader) and
+  // the tabs live one component down — /market-trends is <MarketTrendsPage> wrapping
+  // <MarketTrendsTab>. Without this the guard reports "renders no tabs at all" for every such page,
+  // which reads as a broken link when the truth is that the check could not see the tabs. Follow
+  // local imports when THIS file declares no panes of its own; the "no tabs at all" verdict then
+  // still fires, but only once the children have been looked at too.
+  if (keys.size === 0) {
+    for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
+      const r = resolveSpec(m[1], file);
+      if (r) for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
+    }
+  }
   return keys;
 }
 

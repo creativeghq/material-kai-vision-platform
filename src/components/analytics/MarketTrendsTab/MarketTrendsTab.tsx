@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   BarChart,
   Bar,
@@ -33,6 +35,20 @@ import {
   CHART_MARGINS,
   GRID_PROPS,
 } from '../shared/analyticsUtils';
+
+/**
+ * The four sub-areas the sections group into. Order here is the order of the rail.
+ *   demand    — momentum, demanded materials & attributes, the 4-week forecast, seasonality
+ *   discovery — how buyers reach a product, and what they searched for and did not find
+ *   buyers    — who they are, how long they take, where they drop out
+ *   activity  — what they actually did: moodboards, quotes, baskets, 3D scenes
+ */
+const MARKET_TABS = [
+  { value: 'demand', label: 'Demand', icon: TrendingUp },
+  { value: 'discovery', label: 'Discovery', icon: Search },
+  { value: 'buyers', label: 'Buyers', icon: Users },
+  { value: 'activity', label: 'Activity', icon: Activity },
+] as const;
 
 export const MarketTrendsTab: React.FC = () => {
   const [isDemoData, setIsDemoData] = useState(false);
@@ -75,6 +91,18 @@ export const MarketTrendsTab: React.FC = () => {
 
   // ── Seasonal trends (monthly, this year vs last year)
   const [monthlyTrend, setMonthlyTrend] = useState<{ label: string; thisYear: number; lastYear: number }[]>([]);
+
+  // Sub-area is URL-driven so the App Launcher (and any shared link) can address one directly.
+  // An unknown ?tab= falls back to Demand rather than selecting no tab and painting a blank body —
+  // the failure deepLinkTargets.test.ts exists to catch.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab = MARKET_TABS.some((t) => t.value === tabParam) ? tabParam! : 'demand';
+  const setTab = (v: string) => {
+    const p = new URLSearchParams(searchParams);
+    p.set('tab', v);
+    setSearchParams(p, { replace: true });
+  };
 
   // ── Computed inline
   const displayedAttributes = metadataByKey.get(attrSource) ?? [];
@@ -611,6 +639,22 @@ export const MarketTrendsTab: React.FC = () => {
         <KpiCard label="Top Buyer Type" value={kpis.topBuyerType} icon={Users} color="text-green-600" />
       </div>
 
+
+      {/* ── Sub-areas ──
+          Thirteen sections in one scroll: the ones below the fold went unread, and no link could
+          address them. Same split the CRM company's Market tab got. `?tab=` so the App Launcher can
+          deep-link a sub-area and a reader can send a URL that lands where they mean.
+          NOTE: every query still runs on arrival — these tabs divide the READING, not the loading. */}
+      <Tabs value={tab} onValueChange={setTab} className="space-y-5">
+        <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0">
+          {MARKET_TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value} className="gap-2">
+              <t.icon className="h-4 w-4 shrink-0" />
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="demand" className="space-y-5 mt-0">
       {/* ──── Where the Market is Going ──────────────────────── */}
       {materialGrowthRates.length > 0 && (
         <>
@@ -825,6 +869,106 @@ export const MarketTrendsTab: React.FC = () => {
         </div>
       </div>
 
+      {/* ──── Demand Forecast ──────────────────────────────── */}
+      {materialGrowthRates.length > 0 && (
+        <>
+          <SectionHeader
+            title="4-Week Demand Forecast"
+            desc="Projected save velocity based on current growth rate — clipped at ±40%/week to avoid outlier distortion"
+            icon={TrendingUp}
+          />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-4 text-muted-foreground font-normal">Material</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">Now</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+1</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+2</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+3</th>
+                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+4</th>
+                    <th className="text-right py-2 pl-3 text-muted-foreground font-normal">Trend</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {materialGrowthRates.slice(0, 10).map((row, i) => {
+                    const fc = forecastWeeks(row.thisWeek, row.growthPct, 4);
+                    const up = row.growthPct > 5;
+                    const down = row.growthPct < -5;
+                    return (
+                      <tr key={i} className="hover:bg-muted/20 transition-colors">
+                        <td className="py-2.5 pr-4 font-medium truncate max-w-[160px]">{row.name}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{row.thisWeek}</td>
+                        {fc.map((v, j) => (
+                          <td key={j} className={`py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-600' : down ? 'text-red-500' : 'text-foreground'}`}>{v}</td>
+                        ))}
+                        <td className="py-2.5 pl-3 text-right">
+                          {up   ? <ChevronUp   className="h-4 w-4 text-green-500 ml-auto" />
+                          : down ? <ChevronDown className="h-4 w-4 text-red-400 ml-auto" />
+                          :        <Minus       className="h-4 w-4 text-muted-foreground ml-auto" />}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-4 italic">
+              Forecast uses linear compound growth. Assumes market conditions remain stable. Treat as directional guidance only.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* ──── Seasonal Patterns ───────────────────────────── */}
+      {monthlyTrend.some((m) => m.thisYear > 0 || m.lastYear > 0) && (
+        <>
+          <SectionHeader
+            title="Seasonal Patterns"
+            desc="Monthly moodboard save volume — current year vs prior year. Reveals demand cycles and seasonal peaks."
+            icon={Calendar}
+          />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary/70" />
+                {new Date().getFullYear()}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/30" />
+                {new Date().getFullYear() - 1}
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthlyTrend} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={30} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                  formatter={(v: number, name: string) => [v, name === 'thisYear' ? String(new Date().getFullYear()) : String(new Date().getFullYear() - 1)]}
+                />
+                <Bar dataKey="lastYear" fill="hsl(var(--muted-foreground) / 0.25)" radius={[3,3,0,0]} />
+                <Bar dataKey="thisYear"  fill="hsl(var(--primary) / 0.75)"          radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            {(() => {
+              const peak = [...monthlyTrend].sort((a, b) => b.thisYear - a.thisYear)[0];
+              const slow = [...monthlyTrend].filter((m) => m.thisYear > 0).sort((a, b) => a.thisYear - b.thisYear)[0];
+              if (!peak || peak.thisYear === 0) return null;
+              return (
+                <div className="mt-4 flex gap-4 text-xs text-muted-foreground">
+                  <span>Peak month: <span className="font-semibold text-foreground">{peak.label}</span> ({peak.thisYear} saves)</span>
+                  {slow && <span>Slowest: <span className="font-semibold text-foreground">{slow.label}</span> ({slow.thisYear} saves)</span>}
+                </div>
+              );
+            })()}
+          </div>
+        </>
+      )}
+        </TabsContent>
+        <TabsContent value="discovery" className="space-y-5 mt-0">
       {/* ── Discovery Channel per Product ── */}
       {discoveryByProduct.length > 0 && (
         <>
@@ -879,6 +1023,218 @@ export const MarketTrendsTab: React.FC = () => {
         </>
       )}
 
+      {/* ──── Catalog Opportunity Intelligence ──── */}
+      {zeroResultDemands.length > 0 && (
+        <>
+          <SectionHeader
+            title="Catalog Opportunity Intelligence"
+            desc="Buyers searched for these materials and found nothing on the platform — each one is an uncontested market gap"
+            icon={Search}
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">Total Unmet Demands</p>
+              <p className="text-2xl font-bold text-amber-600">{zeroResultDemands.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">active gaps with no current supply</p>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">Highest Demand Gap</p>
+              <p className="text-sm font-semibold truncate">{zeroResultDemands[0]?.term ?? '—'}</p>
+              <p className="text-xs text-muted-foreground mt-1">{zeroResultDemands[0]?.count ?? 0} searches, zero results</p>
+            </div>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">Opportunity Signal</p>
+              <p className="text-sm font-semibold text-emerald-600">First-mover advantage</p>
+              <p className="text-xs text-muted-foreground mt-1">No supplier currently serves these searches</p>
+            </div>
+          </div>
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Search className="h-4 w-4" /> What Buyers Want but Cannot Find</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {'Platform-wide gaps — first supplier to list wins all organic demand for these terms'}
+              </p>
+            </div>
+            <div className="overflow-hidden -mx-6 -mb-6 mt-2">
+              <div className="overflow-auto max-h-[320px]">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                    <tr className="text-xs text-muted-foreground">
+                      <th className="text-left px-4 py-2.5 font-medium">#</th>
+                      <th className="text-left px-3 py-2.5 font-medium">Buyer Search Term</th>
+                      <th className="text-right px-3 py-2.5 font-medium">Searches</th>
+                      <th className="text-left px-3 py-2.5 font-medium">Urgency</th>
+                      <th className="text-right px-4 py-2.5 font-medium">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {zeroResultDemands.map((row, i) => {
+                      const maxCount = zeroResultDemands[0]?.count || 1;
+                      const urgency = row.count > maxCount * 0.6 ? 'high' : row.count > maxCount * 0.3 ? 'medium' : 'low';
+                      return (
+                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2.5 text-muted-foreground">{i + 1}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="font-medium">{row.term}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-amber-600">{row.count}</td>
+                          <td className="px-3 py-2.5">
+                            {urgency === 'high'
+                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-red-500/10 text-red-600 border-red-500/20">High</span>
+                              : urgency === 'medium'
+                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/20">Medium</span>
+                              : <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-muted text-muted-foreground border-border/40">Low</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-muted-foreground">{row.lastSeen}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+        </TabsContent>
+        <TabsContent value="buyers" className="space-y-5 mt-0">
+      {/* ──── Buyer Profile Intelligence ──── */}
+      <SectionHeader
+        title="Buyer Profile Intelligence"
+        desc={'Who is actively saving and quoting materials across the platform'}
+        icon={Users}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Platform Activity by Professional Type</h3>
+          </div>
+          <div>
+            {buyerTypeData.length === 0 ? <EmptyState /> : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart
+                  data={buyerTypeData.map((b) => ({ ...b, typeLabel: formatProfType(b.type) }))}
+                  layout="vertical"
+                  margin={CHART_MARGINS.barH}
+                >
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="typeLabel" width={130} tick={{ fontSize: 11 }} />
+                  <Tooltip /><Legend />
+                  <Bar dataKey="saves" name="Moodboard Saves" fill={COLORS[0]} radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="quotes" name="Quote Inclusions" fill={COLORS[1]} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Platform Buyer Segment Breakdown</h3>
+          </div>
+          <div>
+            {buyerTypeData.length === 0 ? <EmptyState /> : (
+              <div className="overflow-auto max-h-[280px]">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
+                    <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
+                      <th className="text-left py-2.5 pr-3 font-bold">Buyer Type</th>
+                      <th className="text-right py-2.5 pr-3 font-bold">Saves</th>
+                      <th className="text-right py-2.5 pr-3 font-bold">Quotes</th>
+                      <th className="text-right py-2.5 font-medium">Conv.%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buyerTypeData.map((row, i) => (
+                      <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors text-xs">
+                        <td className="py-2 pr-3 font-medium">{formatProfType(row.type)}</td>
+                        <td className="py-2 pr-3 text-right font-mono tabular-nums">{row.saves}</td>
+                        <td className="py-2 pr-3 text-right font-mono tabular-nums text-primary">{row.quotes}</td>
+                        <td className="py-2 text-right font-mono tabular-nums text-green-500">
+                          {convRate(row.quotes, row.saves)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+
+      {/* ──── Buyer Intent Lifecycle ──── */}
+      {lifecycleKpi.avgDaysToQuote > 0 && (
+        <>
+          <SectionHeader
+            title="Buyer Intent Lifecycle"
+            desc="How long buyers take to move from saving to quoting — critical for timing your follow-up strategy"
+            icon={Activity}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <KpiCard
+              label="Avg Days: Save → Quote Request"
+              value={`${lifecycleKpi.avgDaysToQuote}d`}
+              sub="Median time from first moodboard save to quote submission"
+              icon={TrendingUp}
+              color="text-cyan-600"
+            />
+            <KpiCard
+              label="Save-to-Quote Conversion"
+              value={`${lifecycleKpi.saveToQuoteRate}%`}
+              sub="Share of saved materials that eventually become quote requests"
+              icon={Award}
+              color="text-green-600"
+            />
+          </div>
+        </>
+      )}
+
+      {/* ── Engagement Funnel ── */}
+      {engagementFunnel.length > 0 && (
+        <>
+          <SectionHeader
+            title="Buyer Engagement Funnel"
+            desc={'Platform-wide buyer journey from material interest to confirmed purchase'}
+            icon={TrendingUp}
+          />
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> From Interest to Conversion</h3>
+              <p className="text-xs text-muted-foreground">Each stage shows drop-off — where buyers disengage in the purchase journey</p>
+            </div>
+            <div>
+              <div className="space-y-3">
+                {engagementFunnel.map((stage, i) => {
+                  const maxCount = engagementFunnel[0]?.count || 1;
+                  const barWidth = Math.round((stage.count / maxCount) * 100);
+                  return (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">{stage.stage}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground tabular-nums">{formatNumber(stage.count)}</span>
+                          <span className={`font-semibold px-1.5 py-0.5 rounded text-white text-[11px] ${stage.color}`}>{stage.rate}</span>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
+                        <div className={`h-2 rounded-full ${stage.color} opacity-80 transition-all`} style={{ width: `${barWidth}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+        </TabsContent>
+        <TabsContent value="activity" className="space-y-5 mt-0">
       {/* ──── Moodboard Activity ───────────────────────── */}
       <SectionHeader
         title="Moodboard Activity"
@@ -1011,74 +1367,6 @@ export const MarketTrendsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* ──── Buyer Profile Intelligence ──── */}
-      <SectionHeader
-        title="Buyer Profile Intelligence"
-        desc={'Who is actively saving and quoting materials across the platform'}
-        icon={Users}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Platform Activity by Professional Type</h3>
-          </div>
-          <div>
-            {buyerTypeData.length === 0 ? <EmptyState /> : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart
-                  data={buyerTypeData.map((b) => ({ ...b, typeLabel: formatProfType(b.type) }))}
-                  layout="vertical"
-                  margin={CHART_MARGINS.barH}
-                >
-                  <CartesianGrid {...GRID_PROPS} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="typeLabel" width={130} tick={{ fontSize: 11 }} />
-                  <Tooltip /><Legend />
-                  <Bar dataKey="saves" name="Moodboard Saves" fill={COLORS[0]} radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="quotes" name="Quote Inclusions" fill={COLORS[1]} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Users className="h-4 w-4" /> Platform Buyer Segment Breakdown</h3>
-          </div>
-          <div>
-            {buyerTypeData.length === 0 ? <EmptyState /> : (
-              <div className="overflow-auto max-h-[280px]">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs font-semibold text-muted-foreground border-b border-border/50">
-                      <th className="text-left py-2.5 pr-3 font-bold">Buyer Type</th>
-                      <th className="text-right py-2.5 pr-3 font-bold">Saves</th>
-                      <th className="text-right py-2.5 pr-3 font-bold">Quotes</th>
-                      <th className="text-right py-2.5 font-medium">Conv.%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {buyerTypeData.map((row, i) => (
-                      <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors text-xs">
-                        <td className="py-2 pr-3 font-medium">{formatProfType(row.type)}</td>
-                        <td className="py-2 pr-3 text-right font-mono tabular-nums">{row.saves}</td>
-                        <td className="py-2 pr-3 text-right font-mono tabular-nums text-primary">{row.quotes}</td>
-                        <td className="py-2 text-right font-mono tabular-nums text-green-500">
-                          {convRate(row.quotes, row.saves)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-
       {/* ──── VR / 3D Scene Usage ──── */}
       {(vrUsageData.length > 0 || vrKpis.totalGenerations > 0) && (
         <>
@@ -1120,80 +1408,6 @@ export const MarketTrendsTab: React.FC = () => {
                         <td className="px-4 py-2 text-right tabular-nums font-semibold text-violet-600">{row.count}</td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ──── Catalog Opportunity Intelligence ──── */}
-      {zeroResultDemands.length > 0 && (
-        <>
-          <SectionHeader
-            title="Catalog Opportunity Intelligence"
-            desc="Buyers searched for these materials and found nothing on the platform — each one is an uncontested market gap"
-            icon={Search}
-          />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-1">Total Unmet Demands</p>
-              <p className="text-2xl font-bold text-amber-600">{zeroResultDemands.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">active gaps with no current supply</p>
-            </div>
-            <div className="rounded-xl border border-border/50 bg-card px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-1">Highest Demand Gap</p>
-              <p className="text-sm font-semibold truncate">{zeroResultDemands[0]?.term ?? '—'}</p>
-              <p className="text-xs text-muted-foreground mt-1">{zeroResultDemands[0]?.count ?? 0} searches, zero results</p>
-            </div>
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-1">Opportunity Signal</p>
-              <p className="text-sm font-semibold text-emerald-600">First-mover advantage</p>
-              <p className="text-xs text-muted-foreground mt-1">No supplier currently serves these searches</p>
-            </div>
-          </div>
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Search className="h-4 w-4" /> What Buyers Want but Cannot Find</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {'Platform-wide gaps — first supplier to list wins all organic demand for these terms'}
-              </p>
-            </div>
-            <div className="overflow-hidden -mx-6 -mb-6 mt-2">
-              <div className="overflow-auto max-h-[320px]">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                    <tr className="text-xs text-muted-foreground">
-                      <th className="text-left px-4 py-2.5 font-medium">#</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Buyer Search Term</th>
-                      <th className="text-right px-3 py-2.5 font-medium">Searches</th>
-                      <th className="text-left px-3 py-2.5 font-medium">Urgency</th>
-                      <th className="text-right px-4 py-2.5 font-medium">Last Seen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {zeroResultDemands.map((row, i) => {
-                      const maxCount = zeroResultDemands[0]?.count || 1;
-                      const urgency = row.count > maxCount * 0.6 ? 'high' : row.count > maxCount * 0.3 ? 'medium' : 'low';
-                      return (
-                        <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-2.5 text-muted-foreground">{i + 1}</td>
-                          <td className="px-3 py-2.5">
-                            <span className="font-medium">{row.term}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-amber-600">{row.count}</td>
-                          <td className="px-3 py-2.5">
-                            {urgency === 'high'
-                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-red-500/10 text-red-600 border-red-500/20">High</span>
-                              : urgency === 'medium'
-                              ? <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 border-amber-500/20">Medium</span>
-                              : <span className="inline-block text-xs font-medium px-1.5 py-0.5 rounded border bg-muted text-muted-foreground border-border/40">Low</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-muted-foreground">{row.lastSeen}</td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               </div>
@@ -1246,170 +1460,8 @@ export const MarketTrendsTab: React.FC = () => {
         </>
       )}
 
-      {/* ──── Buyer Intent Lifecycle ──── */}
-      {lifecycleKpi.avgDaysToQuote > 0 && (
-        <>
-          <SectionHeader
-            title="Buyer Intent Lifecycle"
-            desc="How long buyers take to move from saving to quoting — critical for timing your follow-up strategy"
-            icon={Activity}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <KpiCard
-              label="Avg Days: Save → Quote Request"
-              value={`${lifecycleKpi.avgDaysToQuote}d`}
-              sub="Median time from first moodboard save to quote submission"
-              icon={TrendingUp}
-              color="text-cyan-600"
-            />
-            <KpiCard
-              label="Save-to-Quote Conversion"
-              value={`${lifecycleKpi.saveToQuoteRate}%`}
-              sub="Share of saved materials that eventually become quote requests"
-              icon={Award}
-              color="text-green-600"
-            />
-          </div>
-        </>
-      )}
-
-      {/* ── Engagement Funnel ── */}
-      {engagementFunnel.length > 0 && (
-        <>
-          <SectionHeader
-            title="Buyer Engagement Funnel"
-            desc={'Platform-wide buyer journey from material interest to confirmed purchase'}
-            icon={TrendingUp}
-          />
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> From Interest to Conversion</h3>
-              <p className="text-xs text-muted-foreground">Each stage shows drop-off — where buyers disengage in the purchase journey</p>
-            </div>
-            <div>
-              <div className="space-y-3">
-                {engagementFunnel.map((stage, i) => {
-                  const maxCount = engagementFunnel[0]?.count || 1;
-                  const barWidth = Math.round((stage.count / maxCount) * 100);
-                  return (
-                    <div key={i} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium">{stage.stage}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-muted-foreground tabular-nums">{formatNumber(stage.count)}</span>
-                          <span className={`font-semibold px-1.5 py-0.5 rounded text-white text-[11px] ${stage.color}`}>{stage.rate}</span>
-                        </div>
-                      </div>
-                      <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
-                        <div className={`h-2 rounded-full ${stage.color} opacity-80 transition-all`} style={{ width: `${barWidth}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ──── Demand Forecast ──────────────────────────────── */}
-      {materialGrowthRates.length > 0 && (
-        <>
-          <SectionHeader
-            title="4-Week Demand Forecast"
-            desc="Projected save velocity based on current growth rate — clipped at ±40%/week to avoid outlier distortion"
-            icon={TrendingUp}
-          />
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border/40">
-                    <th className="text-left py-2 pr-4 text-muted-foreground font-normal">Material</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">Now</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+1</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+2</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+3</th>
-                    <th className="text-right py-2 px-3 text-muted-foreground font-normal">W+4</th>
-                    <th className="text-right py-2 pl-3 text-muted-foreground font-normal">Trend</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/20">
-                  {materialGrowthRates.slice(0, 10).map((row, i) => {
-                    const fc = forecastWeeks(row.thisWeek, row.growthPct, 4);
-                    const up = row.growthPct > 5;
-                    const down = row.growthPct < -5;
-                    return (
-                      <tr key={i} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-2.5 pr-4 font-medium truncate max-w-[160px]">{row.name}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{row.thisWeek}</td>
-                        {fc.map((v, j) => (
-                          <td key={j} className={`py-2.5 px-3 text-right tabular-nums font-semibold ${up ? 'text-green-600' : down ? 'text-red-500' : 'text-foreground'}`}>{v}</td>
-                        ))}
-                        <td className="py-2.5 pl-3 text-right">
-                          {up   ? <ChevronUp   className="h-4 w-4 text-green-500 ml-auto" />
-                          : down ? <ChevronDown className="h-4 w-4 text-red-400 ml-auto" />
-                          :        <Minus       className="h-4 w-4 text-muted-foreground ml-auto" />}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-4 italic">
-              Forecast uses linear compound growth. Assumes market conditions remain stable. Treat as directional guidance only.
-            </p>
-          </div>
-        </>
-      )}
-
-      {/* ──── Seasonal Patterns ───────────────────────────── */}
-      {monthlyTrend.some((m) => m.thisYear > 0 || m.lastYear > 0) && (
-        <>
-          <SectionHeader
-            title="Seasonal Patterns"
-            desc="Monthly moodboard save volume — current year vs prior year. Reveals demand cycles and seasonal peaks."
-            icon={Calendar}
-          />
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary/70" />
-                {new Date().getFullYear()}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/30" />
-                {new Date().getFullYear() - 1}
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={monthlyTrend} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={30} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-                  formatter={(v: number, name: string) => [v, name === 'thisYear' ? String(new Date().getFullYear()) : String(new Date().getFullYear() - 1)]}
-                />
-                <Bar dataKey="lastYear" fill="hsl(var(--muted-foreground) / 0.25)" radius={[3,3,0,0]} />
-                <Bar dataKey="thisYear"  fill="hsl(var(--primary) / 0.75)"          radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            {(() => {
-              const peak = [...monthlyTrend].sort((a, b) => b.thisYear - a.thisYear)[0];
-              const slow = [...monthlyTrend].filter((m) => m.thisYear > 0).sort((a, b) => a.thisYear - b.thisYear)[0];
-              if (!peak || peak.thisYear === 0) return null;
-              return (
-                <div className="mt-4 flex gap-4 text-xs text-muted-foreground">
-                  <span>Peak month: <span className="font-semibold text-foreground">{peak.label}</span> ({peak.thisYear} saves)</span>
-                  {slow && <span>Slowest: <span className="font-semibold text-foreground">{slow.label}</span> ({slow.thisYear} saves)</span>}
-                </div>
-              );
-            })()}
-          </div>
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -2,6 +2,7 @@
 // owner can edit; other members read (and, as a follow-up, will propose edits). The KAI agent
 // searches published docs via FTS (no embeddings).
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BookText, Plus, Save, Trash2, Loader2, Pencil } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
@@ -47,6 +48,7 @@ const DocsPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [docs, setDocs] = useState<WorkspaceDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -92,10 +94,20 @@ const DocsPage: React.FC = () => {
     setCategory((d as any).category ?? '');
     setStatus(d.status);
   };
-  const openNew = () => {
+  const openNew = useCallback(() => {
     setSelectedId(NEW);
     setTitle(''); setBody(''); setTags(''); setCategory(''); setStatus('published');
-  };
+  }, []);
+
+  // App Launcher deep-link: /docs?new=doc opens the blank editor. The param is consumed on arrival
+  // so a refresh, or a Back out of the editor, does not silently re-open it.
+  useEffect(() => {
+    if (searchParams.get('new') !== 'doc') return;
+    openNew();
+    const p = new URLSearchParams(searchParams);
+    p.delete('new');
+    setSearchParams(p, { replace: true });
+  }, [searchParams, setSearchParams, openNew]);
 
   const save = async () => {
     if (!activeWorkspaceId || !user?.id) return;
