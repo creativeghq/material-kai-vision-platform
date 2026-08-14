@@ -110,6 +110,6 @@ export const servicesService = {
       list_price: input.price,
       currency: input.currency || 'EUR',
       unit: input.unit || null,
-    }, { onConflict: 'workspace_id,product_id' });
+    }, { onConflict: 'workspace_id,product_id,variant_key' });
   },
 };

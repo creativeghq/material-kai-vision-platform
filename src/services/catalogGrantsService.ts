@@ -119,7 +119,7 @@ export const catalogGrantsService = {
       currency: opts.currency ?? 'EUR',
       unit: opts.unit ?? null,
       confirmed_at: new Date().toISOString(),
-    }, { onConflict: 'workspace_id,product_id' });
+    }, { onConflict: 'workspace_id,product_id,variant_key' });
     if (error) throw error;
   },
 };

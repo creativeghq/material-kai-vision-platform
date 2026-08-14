@@ -128,3 +128,31 @@ describe('size and colour are projected from the map, never written beside it', 
     })).toEqual(options);
   });
 });
+
+describe('price upserts name the variant in their conflict target', () => {
+  /**
+   * `product_prices` is unique on (workspace_id, product_id, variant_key) NULLS NOT DISTINCT
+   * since #347 phase 7.1. An upsert that still says `onConflict: 'workspace_id,product_id'`
+   * does not merge — it raises "there is no unique or exclusion constraint matching the ON
+   * CONFLICT specification" at the moment someone saves a price.
+   *
+   * That is exactly what happened: dropping the two-column constraint broke one SQL function
+   * and three client upserts at once. The SQL half is covered by the production smoke check
+   * `db.plpgsql-lint`, which caught it — but that check compiles plpgsql and cannot see a
+   * string in a TypeScript file, so the client half needs this.
+   */
+  const UPSERT_SITES = [
+    'src/modules/finance/services/servicesService.ts',
+    'src/services/catalogGrantsService.ts',
+    'src/services/marketplacePricingService.ts',
+  ];
+
+  for (const file of UPSERT_SITES) {
+    it(`${file.split('/').pop()} includes variant_key`, () => {
+      const src = blankComments(read(file));
+      if (!src.includes("from('product_prices')")) return; // moved on; nothing to guard here
+      const stale = /onConflict:\s*'workspace_id,\s*product_id'/;
+      expect(src, 'product_prices is unique on (workspace_id, product_id, variant_key)').not.toMatch(stale);
+    });
+  }
+});
