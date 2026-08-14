@@ -5,6 +5,8 @@
 // only for the unsaved public preview.
 
 import { evaluateFormula, computeLinePricing, round2 } from './blueprintFormula';
+import { deriveComposition, hasComposition } from './blueprintComposition';
+import type { Composition, DerivedComposition, RateItemLike, ZoneDef } from './blueprintComposition';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
 
 /** Within each option_group, keep exactly one member selected (prefer tier 'good'). */
@@ -42,23 +44,68 @@ export function subtotalOf(items: ProjectPlanItem[]): number {
   return round2(items.filter((i) => i.kind === 'task' && i.is_selected).reduce((a, i) => a + Number(i.line_total || 0), 0));
 }
 
-/** Map raw blueprint_items (from the public starters payload) to local plan items. */
-export function seedPlanItems(blueprintItems: any[], dims: Record<string, number>): ProjectPlanItem[] {
-  const base = blueprintItems.map((bi): ProjectPlanItem => ({
-    id: bi.id, plan_id: 'local', parent_id: bi.parent_id, sort_order: bi.sort_order,
-    kind: bi.kind, label: bi.label, notes: null, unit: bi.unit,
-    quantity_formula: bi.quantity_formula, quantity: Number(bi.default_quantity ?? 1),
-    line_kind: bi.line_kind, service_id: null, product_id: null,
-    material_cost: bi.material_cost, labor_rate: bi.labor_rate, margin_pct: bi.margin_pct ?? 0,
-    unit_price: 0, line_total: 0, option_group: bi.option_group, tier: bi.tier,
-    // Option members seed UNSELECTED so applyOptionDefaults below resolves the group by
-    // tier:'good' — seeding them all `true` made its `find(is_selected)` match the first
-    // member every time, so the good tier never won here while the engine honoured it.
-    // Everything else follows the blueprint's own default (optional extras start off).
-    is_selected: bi.option_group ? false : (bi.default_selected !== false),
-    is_allowance: !!bi.is_allowance, allowance_amount: bi.allowance_amount,
-    source: 'template', created_at: '', updated_at: '',
-  }));
+/**
+ * Zone configuration → derived variables + priced zone lines, for the anonymous configurator.
+ *
+ * The flat scope is still priced by repriceItems; this adds what the composition contributes and
+ * tells the caller which option_groups the zones have ABSORBED — those must disappear from the
+ * flat scope, because their money now arrives through the zone lines and rendering them anyway
+ * charges the customer twice for the same cabinet fronts.
+ */
+export interface ComposedEstimate {
+  derived: DerivedComposition;
+  /** Base dimensions with every zone-published variable layered over them. */
+  dims: Record<string, number>;
+  absorbed: Set<string>;
+  /** Flat-scope subtotal + zone lines. */
+  subtotal: number;
+}
+
+export function composeEstimate(
+  schema: ZoneDef[] | null | undefined,
+  config: Composition | null | undefined,
+  rawItems: RateItemLike[],
+  baseDims: Record<string, number>,
+  flatItems: ProjectPlanItem[],
+): ComposedEstimate | null {
+  if (!hasComposition(schema)) return null;
+  const derived = deriveComposition(schema as ZoneDef[], config, rawItems);
+  return {
+    derived,
+    dims: { ...baseDims, ...derived.vars },
+    absorbed: new Set(derived.absorbed_groups),
+    subtotal: round2(subtotalOf(flatItems) + derived.total),
+  };
+}
+
+/**
+ * Map raw blueprint_items (from the public starters payload) to local plan items.
+ *
+ * `absorbed` drops the option_groups a zone global owns — they are rate tables for the zones now,
+ * not choices of their own.
+ */
+export function seedPlanItems(
+  blueprintItems: any[],
+  dims: Record<string, number>,
+  absorbed?: Set<string>,
+): ProjectPlanItem[] {
+  const base = blueprintItems
+    .filter((bi) => !(bi.option_group && absorbed?.has(bi.option_group)))
+    .map((bi): ProjectPlanItem => ({
+      id: bi.id, plan_id: 'local', parent_id: bi.parent_id, sort_order: bi.sort_order,
+      kind: bi.kind, label: bi.label, notes: null, unit: bi.unit,
+      quantity_formula: bi.quantity_formula, quantity: Number(bi.default_quantity ?? 1),
+      line_kind: bi.line_kind, service_id: null, product_id: null,
+      material_cost: bi.material_cost, labor_rate: bi.labor_rate, margin_pct: bi.margin_pct ?? 0,
+      unit_price: 0, line_total: 0, option_group: bi.option_group, tier: bi.tier,
+      // Option members seed UNSELECTED so applyOptionDefaults below resolves the group by
+      // tier:'good' — seeding them all `true` made its `find(is_selected)` match the first
+      // member every time, so the good tier never won here while the engine honoured it.
+      // Everything else follows the blueprint's own default (optional extras start off).
+      is_selected: bi.option_group ? false : (bi.default_selected !== false),
+      is_allowance: !!bi.is_allowance, allowance_amount: bi.allowance_amount,
+      source: 'template', created_at: '', updated_at: '',
+    }));
   applyOptionDefaults(base);
   return repriceItems(base, dims);
 }

@@ -12,6 +12,8 @@
  */
 
 import { evaluateFormula, computeLinePricing, round2 } from './formula.ts';
+import { deriveComposition, hasComposition } from './composition.ts';
+import type { Composition, DerivedComposition, ZoneDef } from './composition.ts';
 
 export interface ComputedTask {
   id: string;
@@ -36,6 +38,14 @@ export interface ComputedBlueprint {
   sections: ComputedSection[];
   ungrouped: ComputedTask[];
   subtotal: number;
+  /** Present only when the blueprint is zone-driven. Carries the per-zone metres/counts/issues. */
+  composition?: DerivedComposition;
+}
+
+/** What the caller configured, when the blueprint declares zones. */
+export interface CompositionInput {
+  schema: ZoneDef[];
+  config: Composition | null | undefined;
 }
 
 /**
@@ -45,12 +55,25 @@ export interface ComputedBlueprint {
  *    zero or twice.
  *  - an ungrouped line is on iff listed; pass `null` to fall back to each line's own
  *    `default_selected`, which is what an un-configured estimate wants.
+ *
+ * `composition` is the zone configuration, for blueprints that declare zones. It does two things:
+ * publishes the derived metres/counts as formula variables (so the flat per-metre lines keep
+ * resolving off a real composition), and ABSORBS the option_groups its globals are bound to — those
+ * groups stop being priced here because their money now arrives through the zone's own lines. Skip
+ * that and every zone is charged twice.
  */
 export function computeBlueprint(
   rows: Record<string, any>[],
   dims: Record<string, number>,
   selectedIds: Set<string> | null,
+  composition?: CompositionInput | null,
 ): ComputedBlueprint {
+  const derived = composition && hasComposition(composition.schema)
+    ? deriveComposition(composition.schema, composition.config, rows as any[])
+    : null;
+  const absorbed = new Set(derived?.absorbed_groups ?? []);
+  if (derived) dims = { ...dims, ...derived.vars };
+
   const sectionsById: Record<string, ComputedSection> = {};
   for (const r of rows) if (r.kind === 'section') sectionsById[r.id] = { label: r.label, total: 0, tasks: [] };
   const ungrouped: ComputedTask[] = [];
@@ -58,7 +81,7 @@ export function computeBlueprint(
 
   const byGroup: Record<string, Record<string, any>[]> = {};
   for (const r of rows) {
-    if (r.kind === 'task' && r.option_group) (byGroup[r.option_group] ||= []).push(r);
+    if (r.kind === 'task' && r.option_group && !absorbed.has(r.option_group)) (byGroup[r.option_group] ||= []).push(r);
   }
   const optSelected: Record<string, string> = {};
   for (const [grp, members] of Object.entries(byGroup)) {
@@ -72,6 +95,8 @@ export function computeBlueprint(
 
   for (const r of rows) {
     if (r.kind !== 'task') continue;
+    // A zone owns this group's selection and prices it through its own lines.
+    if (r.option_group && absorbed.has(r.option_group)) continue;
     const selected = r.option_group
       ? optSelected[r.option_group] === r.id
       : (selectedIds ? selectedIds.has(r.id) : r.default_selected !== false);
@@ -97,10 +122,38 @@ export function computeBlueprint(
     else ungrouped.push(task);
   }
 
+  // Zone lines read as their own sections, ahead of the flat scope — that is the order a kitchen
+  // quote is read in: what the units are, then what is done to them.
+  const zoneSections: ComputedSection[] = [];
+  if (derived) {
+    for (const z of derived.zones) {
+      const zoneLines = derived.lines.filter((l) => l.zone_key === z.key);
+      if (!z.enabled || zoneLines.length === 0) continue;
+      zoneSections.push({
+        label: z.label,
+        total: round2(z.total),
+        tasks: zoneLines.map((l) => ({
+          id: l.key,
+          label: l.label,
+          unit: l.unit,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          line_total: l.line_total,
+          is_allowance: false,
+          option_group: null,
+          tier: null,
+          selected: true,
+        })),
+      });
+      subtotal += z.total;
+    }
+  }
+
   return {
-    sections: Object.values(sectionsById).map((s) => ({ ...s, total: round2(s.total) })),
+    sections: [...zoneSections, ...Object.values(sectionsById).map((s) => ({ ...s, total: round2(s.total) }))],
     ungrouped,
     subtotal: round2(subtotal),
+    ...(derived ? { composition: derived } : {}),
   };
 }
 

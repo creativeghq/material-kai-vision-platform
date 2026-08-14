@@ -182,6 +182,20 @@ entity. Adding a type = an adapter in `src/services/templates/` + a value in the
 - **Live types:** invoice, quote, project, moodboard, order, contract, expense, hr_onboarding, property_listing. `crm_company` is in the CHECK but deliberately unbuilt — a CRM party must go through the duplicate search first, never be created silently.
 - The existing per-feature template systems (email, messaging, catalog design, PDF, XML mappings, blueprints) stay where they are; the hub link-outs to them live in `EXTERNAL_TEMPLATE_SOURCES`.
 
+## Blueprints — zones DERIVE the quantities, and a bound option_group is priced ONCE
+A blueprint's `composition_schema` describes ZONES (bottom units, top units, tall, island, worktop):
+shared globals (height, depth, door model) plus module rows (kind × width × how many). The zone's
+length and counts are **derived** and published under the same formula variables the old typed
+scalars used (`run_length`, `wall_run_length`, `worktop_length`), so every per-metre task line keeps
+working — now fed by a real layout instead of a number somebody typed. Before this, a kitchen was
+three sliders and three copy-pasted "Drawer unit N" option groups, which is why it could never say
+four drawer banks, a wall-unit count, or an island.
+- **An option_group bound to a zone global is ABSORBED.** It stops being a priced line anywhere: its money arrives through the zone's derived lines and the zone owns the selection — which is exactly how bottom and top units share one price list and still pick different finishes. Leave it priced in both places and every cabinet front is charged twice. That is a valid number, so no typecheck and no integrity probe can see it.
+- **A plan FREEZES its rate tables** (`project_plans.composition.rate_tables`). Re-opening a quote next month re-prices at the rates it was quoted on, never at whatever the price list has since become. Nothing in the plan path reads back to the blueprint.
+- **Composition lines carry `source='composition'` and are regenerated wholesale on every reprice** — never carried over, or the plan silently doubles its cabinets. Restore-version and add-section drop them for the same reason.
+- **`src/utils/blueprintComposition.ts` is GENERATED** from the edge copy — `npm run blueprint:mirror` (part of `gen:all`). Never hand-edit it: it exists only so an anonymous visitor sees the number the edge copy will record, and a hand edit is how the shown price and the recorded price start to differ.
+Guarded by [tests/unit/blueprintComposition.test.ts](tests/unit/blueprintComposition.test.ts).
+
 ## Workspace roles — the vocabulary lives in four places at once
 `src/auth/workspaceRoles.ts` is the catalog (label + portal + description + module gate). A role must ALSO exist
 in `workspace_members_role_check`, `workspace_invites_role_check`, and the allowlists inside

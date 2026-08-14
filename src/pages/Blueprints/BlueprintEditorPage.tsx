@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, ChevronLeft, Save, LayoutTemplate, Copy } from 'lucide-react';
 
@@ -12,6 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { blueprintsService, type Blueprint, type BlueprintItem, type DimensionDef } from '@/services/blueprintsService';
 import { BlueprintScope } from '@/components/features/blueprint/BlueprintScope';
+import { CompositionEditor } from '@/components/features/blueprint/CompositionEditor';
+import type { ZoneDef } from '@/utils/blueprintComposition';
 
 type EditItem = Partial<BlueprintItem> & { id: string; kind: 'section' | 'task'; label: string };
 
@@ -28,7 +30,15 @@ export const BlueprintEditorPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [schema, setSchema] = useState<DimensionDef[]>([]);
+  const [zones, setZones] = useState<ZoneDef[]>([]);
   const [items, setItems] = useState<EditItem[]>([]);
+
+  // What a zone global can bind to. Derived from the scope below, so adding an option_group there
+  // immediately makes it available as a zone's price list.
+  const optionGroups = useMemo(
+    () => Array.from(new Set(items.filter((i) => i.option_group).map((i) => i.option_group as string))),
+    [items],
+  );
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -37,6 +47,7 @@ export const BlueprintEditorPage: React.FC = () => {
       const [b, its] = await Promise.all([blueprintsService.get(id), blueprintsService.listItems(id)]);
       if (!b) { toast({ title: 'Blueprint not found', variant: 'destructive' }); navigate('/blueprints'); return; }
       setBp(b); setTitle(b.title); setDescription(b.description ?? ''); setSchema(b.dimensions_schema ?? []);
+      setZones(b.composition_schema ?? []);
       setItems(its as EditItem[]);
     } catch (e) {
       toast({ title: 'Failed to load', description: String((e as Error)?.message ?? e), variant: 'destructive' });
@@ -59,7 +70,7 @@ export const BlueprintEditorPage: React.FC = () => {
     if (!bp) return;
     setSaving(true);
     try {
-      await blueprintsService.update(bp.id, { title: title.trim() || bp.title, description: description.trim() || null, dimensions_schema: schema });
+      await blueprintsService.update(bp.id, { title: title.trim() || bp.title, description: description.trim() || null, dimensions_schema: schema, composition_schema: zones });
       await blueprintsService.replaceItems(bp.id, items.map((it, idx) => ({ ...it, sort_order: it.sort_order ?? idx })));
       toast({ title: 'Blueprint saved' });
       navigate('/blueprints');
@@ -118,6 +129,8 @@ export const BlueprintEditorPage: React.FC = () => {
           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Description</Label><Input value={description} onChange={(e) => setDescription(e.target.value)} /></div>
         </div>
       </CardContent></Card>
+
+      <CompositionEditor schema={zones} optionGroups={optionGroups} readOnly={readOnly} onChange={setZones} />
 
       <BlueprintScope
         schema={schema}

@@ -17,6 +17,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { computeBlueprint } from '../_shared/blueprint/compute.ts';
+import type { Composition, ZoneDef } from '../_shared/blueprint/composition.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { verifyTurnstile as verifyTurnstileShared } from '../_shared/turnstile.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
@@ -78,7 +79,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     // price the scope of works entirely client-side (pure math, no metering needed).
     const { data: bps, error } = await supabase
       .from('blueprints')
-      .select('id, title, description, project_type, dimensions_schema, source_currency')
+      .select('id, title, description, project_type, dimensions_schema, composition_schema, source_currency')
       .eq('is_platform_starter', true).eq('status', 'active').order('title');
     if (error) throw new HttpError(400, error.message);
     const ids = (bps ?? []).map((b: any) => b.id);
@@ -96,7 +97,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
   }
 
   if (action === 'estimate') {
-    const { blueprint_id, dimensions, turnstile_token } = body;
+    const { blueprint_id, dimensions, composition, turnstile_token } = body;
     if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
     const ip = clientIp(req);
 
@@ -116,7 +117,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     // Load the starter blueprint + items
     const { data: bp, error: bpErr } = await supabase
       .from('blueprints')
-      .select('id, title, source_currency, dimensions_schema, is_platform_starter')
+      .select('id, title, source_currency, dimensions_schema, composition_schema, is_platform_starter')
       .eq('id', blueprint_id).maybeSingle();
     if (bpErr) throw new HttpError(400, bpErr.message);
     if (!bp || !bp.is_platform_starter) throw new HttpError(404, 'Starter blueprint not found');
@@ -130,8 +131,13 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     for (const [k, v] of Object.entries(dimensions ?? {})) { const n = Number(v); if (!Number.isNaN(n)) dims[k] = n; }
 
     // Compute (default inline rates only — no workspace services for anon). No visitor
-    // selection on this action, so every line falls back to its blueprint default.
-    const computed = computeBlueprint((items ?? []) as any[], dims, null);
+    // selection on this action, so every line falls back to its blueprint default. The zone
+    // configuration IS caller-supplied, but only as a SPEC — how many units of what kind. The
+    // rates it prices against come from the blueprint rows loaded above, never from the request.
+    const computed = computeBlueprint((items ?? []) as any[], dims, null, {
+      schema: (bp.composition_schema ?? []) as ZoneDef[],
+      config: (composition ?? null) as Composition | null,
+    });
 
     // log success (counts toward the combined daily quota)
     // This row IS the quota counter, so `.then(() => {}, () => {})` meant a rejected insert
@@ -151,6 +157,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
         subtotal: computed.subtotal,
         sections: computed.sections,
         ungrouped: computed.ungrouped,
+        composition: computed.composition ?? null,
         used: used + 1,
         limit: ANON_DAILY_QUOTA,
       },
@@ -165,7 +172,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
   // workspace has opted in the submission is REFUSED rather than dropped, because a lead that
   // vanishes silently is the worst possible failure for this surface.
   if (action === 'kitchen_lead') {
-    const { blueprint_id, dimensions, selected_item_ids, contact, turnstile_token } = body ?? {};
+    const { blueprint_id, dimensions, composition, selected_item_ids, contact, turnstile_token } = body ?? {};
     const name = String(contact?.name ?? '').trim().slice(0, 120);
     const email = String(contact?.email ?? '').trim().slice(0, 200);
     const phone = String(contact?.phone ?? '').trim().slice(0, 40);
@@ -202,7 +209,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
 
     const { data: bp, error: bpErr } = await supabase
       .from('blueprints')
-      .select('id, title, source_currency, dimensions_schema, is_platform_starter')
+      .select('id, title, source_currency, dimensions_schema, composition_schema, is_platform_starter')
       .eq('id', blueprint_id).maybeSingle();
     if (bpErr) throw new HttpError(400, bpErr.message);
     if (!bp || !bp.is_platform_starter) throw new HttpError(404, 'Starter blueprint not found');
@@ -220,7 +227,11 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     }
 
     const chosen = Array.isArray(selected_item_ids) ? new Set(selected_item_ids.map(String)) : null;
-    const computed = computeBlueprint((items ?? []) as any[], dims, chosen);
+    const computed = computeBlueprint((items ?? []) as any[], dims, chosen, {
+      schema: (bp.composition_schema ?? []) as ZoneDef[],
+      config: (composition ?? null) as Composition | null,
+    });
+    const derivedLineKeys = new Set((computed.composition?.lines ?? []).map((l) => l.key));
     const currency = bp.source_currency || 'EUR';
 
     // Destination: the OPERATOR workspace, always.
@@ -327,9 +338,16 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
           blueprint_title: bp.title,
           currency,
           dimensions: dims,
+          // The zone configuration IS the spec for everything a zone generates. The engine replays
+          // it against the blueprint's own rates on approval (create-plan-from-kitchen-estimate).
+          composition: (composition ?? null) as Composition | null,
           subtotal: computed.subtotal,
+          // Composition lines carry synthetic keys, not blueprint_item ids — replaying them by id
+          // would match nothing and read as "the visitor deselected everything".
           selected_item_ids: computed.sections
-            .flatMap((s) => s.tasks).filter((t) => t.selected).map((t) => t.id),
+            .flatMap((s) => s.tasks)
+            .filter((t) => t.selected && !derivedLineKeys.has(t.id))
+            .map((t) => t.id),
           lines: computed.sections.map((s) => ({
             section: s.label,
             total: s.total,

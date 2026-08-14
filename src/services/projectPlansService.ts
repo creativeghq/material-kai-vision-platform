@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
+import type { Composition, PlanComposition } from '@/utils/blueprintComposition';
 
 /**
  * Project Plans — per-project (or ephemeral) instances of a Blueprint.
@@ -18,6 +19,12 @@ export interface ProjectPlan {
   title: string;
   brief: string | null;
   dimensions: Record<string, number>;
+  /**
+   * The zones this plan was imported with, what is configured in them, and a FROZEN copy of the
+   * rate tables they price against. Frozen on purpose: re-opening a quote next month must price
+   * at the rates it was quoted on, not at whatever the blueprint has since become.
+   */
+  composition: PlanComposition | Record<string, never>;
   source_currency: string;
   status: 'draft' | 'finalized' | 'quoted' | 'approved' | 'archived';
   subtotal: number;
@@ -60,7 +67,7 @@ export interface ProjectPlanVersion {
   id: string;
   plan_id: string;
   version: number;
-  snapshot: { dimensions: Record<string, number>; subtotal: number; items: ProjectPlanItem[] };
+  snapshot: { dimensions: Record<string, number>; composition?: PlanComposition; subtotal: number; items: ProjectPlanItem[] };
   note: string | null;
   created_by: string | null;
   created_at: string;
@@ -137,9 +144,14 @@ class ProjectPlansService {
     return callEngine<PlanWithItems>('add-section-from-blueprint', { plan_id: planId, source_blueprint_id: sourceBlueprintId, section_id: sectionId });
   }
 
-  /** Update dimensions and recompute quantities + prices. */
-  rescale(planId: string, dimensions: Record<string, number>): Promise<PlanWithItems> {
-    return callEngine<PlanWithItems>('rescale', { plan_id: planId, dimensions });
+  /**
+   * Update dimensions and/or the zone configuration, then recompute quantities + prices.
+   *
+   * Only the CONFIG travels — the schema and the frozen rate tables stay server-side, so a client
+   * can move a cabinet or switch a door model but never restate what either costs.
+   */
+  rescale(planId: string, dimensions: Record<string, number>, composition?: Composition): Promise<PlanWithItems> {
+    return callEngine<PlanWithItems>('rescale', { plan_id: planId, dimensions, ...(composition ? { composition } : {}) });
   }
 
   /** Recompute prices from current dimensions + rates (after manual edits). */

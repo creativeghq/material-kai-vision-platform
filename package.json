@@ -23,10 +23,11 @@
     "openapi:edge": "node scripts/build-openapi-edge.mjs",
     "tools:manifest": "node scripts/gen-tool-manifest.mjs",
     "skills:sync": "node scripts/gen-skill-ts.mjs",
-    "gen:all": "npm run tools:manifest && npm run skills:sync",
+    "gen:all": "npm run tools:manifest && npm run skills:sync && npm run blueprint:mirror",
     "build:embed": "vite build --config vite.embed.config.ts",
     "models:generate": "node scripts/gen-generation-models.mjs",
-    "categories:generate": "node scripts/gen-category-vocab.mjs"
+    "categories:generate": "node scripts/gen-category-vocab.mjs",
+    "blueprint:mirror": "node scripts/gen-blueprint-mirror.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

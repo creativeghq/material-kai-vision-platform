@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { ZoneDef } from '@/utils/blueprintComposition';
 
 /**
  * Blueprints — reusable, versioned scope-of-works templates. A blueprint is
@@ -25,6 +26,13 @@ export interface Blueprint {
   project_type: string | null;
   source_currency: string;
   dimensions_schema: DimensionDef[];
+  /**
+   * Zones — bottom units, top units, island, worktop — each with its own globals (height, depth,
+   * door model) and module types. When this is non-empty the blueprint is configured by
+   * COMPOSITION and its zone lengths/counts are derived, not typed: `dimensions_schema` then only
+   * carries whatever no zone publishes. See src/utils/blueprintComposition.ts.
+   */
+  composition_schema: ZoneDef[];
   is_platform_starter: boolean;
   version: number;
   status: 'active' | 'archived';
@@ -104,7 +112,7 @@ class BlueprintsService {
     return (data ?? []) as BlueprintItem[];
   }
 
-  async create(input: { workspace_id: string; title: string; description?: string; project_type?: string; source_currency?: string; dimensions_schema?: DimensionDef[]; }): Promise<Blueprint> {
+  async create(input: { workspace_id: string; title: string; description?: string; project_type?: string; source_currency?: string; dimensions_schema?: DimensionDef[]; composition_schema?: ZoneDef[]; }): Promise<Blueprint> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
     const { data, error } = await supabase.from('blueprints').insert({
@@ -115,12 +123,13 @@ class BlueprintsService {
       project_type: input.project_type ?? null,
       source_currency: input.source_currency ?? 'EUR',
       dimensions_schema: input.dimensions_schema ?? [],
+      composition_schema: input.composition_schema ?? [],
     }).select('*').single();
     if (error) throw error;
     return data as Blueprint;
   }
 
-  async update(id: string, patch: Partial<Pick<Blueprint, 'title' | 'description' | 'project_type' | 'source_currency' | 'dimensions_schema' | 'status'>>): Promise<Blueprint> {
+  async update(id: string, patch: Partial<Pick<Blueprint, 'title' | 'description' | 'project_type' | 'source_currency' | 'dimensions_schema' | 'composition_schema' | 'status'>>): Promise<Blueprint> {
     const { data, error } = await supabase.from('blueprints').update(patch).eq('id', id).select('*').single();
     if (error) throw error;
     return data as Blueprint;
@@ -227,6 +236,9 @@ class BlueprintsService {
       project_type: source.project_type ?? undefined,
       source_currency: source.source_currency,
       dimensions_schema: schema,
+      // Without this a copied starter keeps the option groups but loses the zones that price
+      // them — the configurator disappears and the copy silently becomes a flat price list.
+      composition_schema: source.composition_schema ?? [],
     });
 
     const idMap: Record<string, string> = {};

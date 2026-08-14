@@ -2,8 +2,8 @@
 // The ONLY writer of persisted plan-line prices, plan versions, and plan→quote items.
 // The frontend may edit plan_items directly (RLS-gated) for labels/quantities, then calls
 // this function to (re)compute authoritative money. Actions:
-//   create-from-blueprint  {project_id?, blueprint_id, dimensions?, title?}  -> {plan, items}
-//   rescale                {plan_id, dimensions}                            -> {plan, items}
+//   create-from-blueprint  {project_id?, blueprint_id, dimensions?, composition?, title?} -> {plan, items}
+//   rescale                {plan_id, dimensions?, composition?}            -> {plan, items}
 //   reprice                {plan_id}                                        -> {plan, items}
 //   save-version           {plan_id, note?}                                 -> {version}
 //   restore-version        {plan_id, version}                              -> {plan, items}
@@ -17,6 +17,14 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
+import {
+  absorbedGroups,
+  defaultComposition,
+  derivePlanComposition,
+  hasComposition,
+  snapshotRateTables,
+} from '../_shared/blueprint/composition.ts';
+import type { Composition, DerivedComposition, PlanComposition, ZoneDef } from '../_shared/blueprint/composition.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface ItemRow {
@@ -159,8 +167,81 @@ function applyOptionDefaults(items: ItemRow[]) {
   }
 }
 
+/**
+ * Zone-driven blueprints carry their cabinet fronts on an option_group that a zone global owns.
+ * Those rows are a RATE TABLE, not lines — the zone prices them through its own derived lines — so
+ * they must not be imported into the plan at all. Their prices are frozen into the plan's
+ * composition (snapshotRateTables) before this runs, which is what keeps the plan self-contained.
+ */
+function stripAbsorbed(items: ItemRow[], schema: ZoneDef[]): ItemRow[] {
+  if (!hasComposition(schema)) return items;
+  const absorbed = new Set(absorbedGroups(schema));
+  if (!absorbed.size) return items;
+  return items.filter((it) => !(it.option_group && absorbed.has(it.option_group)));
+}
+
+/**
+ * Derived zone lines → real plan rows, one section per enabled zone.
+ *
+ * They are MATERIALIZED rather than computed on read so that quotes, material lists, versions and
+ * change orders keep working through the single path they already use. They carry
+ * `source='composition'` and are regenerated wholesale on every reprice — a hand edit to one is
+ * expected to be overwritten, and the marker is how a reader can tell.
+ *
+ * The rate is written into `material_cost` with `margin_pct: 0` because deriveComposition already
+ * put it through `computeLinePricing` with the module's margin. Re-applying it here would charge
+ * the margin twice; resolveItem re-derives these rows to exactly the numbers derived here.
+ */
+function compositionRows(derived: DerivedComposition, startOrder: number): ItemRow[] {
+  const rows: ItemRow[] = [];
+  let order = startOrder;
+  for (const zone of derived.zones) {
+    const zoneLines = derived.lines.filter((l) => l.zone_key === zone.key);
+    if (!zone.enabled || zoneLines.length === 0) continue;
+    const sectionId = crypto.randomUUID();
+    rows.push({
+      id: sectionId, parent_id: null, sort_order: order++, kind: 'section', label: zone.label,
+      notes: null, unit: null, quantity_formula: null, line_kind: 'materials',
+      service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0,
+      option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
+      source: 'composition',
+    });
+    let childOrder = 0;
+    for (const line of zoneLines) {
+      rows.push({
+        id: crypto.randomUUID(), parent_id: sectionId, sort_order: childOrder++, kind: 'task',
+        label: line.label, notes: null, unit: line.unit, quantity_formula: null,
+        default_quantity: line.quantity, quantity: line.quantity,
+        line_kind: line.line_kind, service_id: null, product_id: null,
+        material_cost: line.unit_price, labor_rate: null, margin_pct: 0,
+        option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
+        source: 'composition',
+      });
+    }
+  }
+  return rows;
+}
+
 // Persist resolved items for a plan (replace-all) and return the stored rows + subtotal.
-async function writePlanItems(supabase: DbClient, planId: string, items: ItemRow[], dims: Record<string, number>) {
+// `comp` — when the plan is zone-driven, its derived lines are materialized alongside the tree and
+// its variables are layered over the typed dimensions before any formula is evaluated.
+async function writePlanItems(
+  supabase: DbClient,
+  planId: string,
+  items: ItemRow[],
+  dims: Record<string, number>,
+  comp?: DerivedComposition | null,
+) {
+  if (comp) {
+    dims = { ...dims, ...comp.vars };
+    // Zones read first — a kitchen quote says what the units ARE before what is done to them.
+    const zoneRows = compositionRows(comp, 0);
+    const shift = zoneRows.filter((r) => r.kind === 'section').length;
+    items = [
+      ...zoneRows,
+      ...items.map((it) => (it.parent_id ? it : { ...it, sort_order: (it.sort_order ?? 0) + shift })),
+    ];
+  }
   const rates = await buildRateMap(supabase, items);
   let subtotal = 0;
   const rows = items.map((it) => {
@@ -332,6 +413,19 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       await loadBlueprintTree(supabase, blueprint_id, null, 0, new Set(), tree);
       applyOptionDefaults(tree); // one tier per option_group selected by default
 
+      // Zone-driven blueprint: snapshot the schema + the absorbed rate tables onto the plan, seed a
+      // default configuration, and drop the absorbed rows from the imported tree.
+      const schema = (bp.composition_schema ?? []) as ZoneDef[];
+      const planComp: PlanComposition | null = hasComposition(schema)
+        ? {
+          schema,
+          config: (body.composition as Composition | undefined) ?? defaultComposition(schema, tree),
+          rate_tables: snapshotRateTables(schema, tree),
+        }
+        : null;
+      const scoped = stripAbsorbed(tree, schema);
+      const derived = derivePlanComposition(planComp);
+
       const { data: plan, error: planErr } = await supabase.from('project_plans').insert({
         project_id: project_id ?? null,
         workspace_id: workspaceId,
@@ -339,13 +433,14 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         blueprint_id,
         title: title || bp.title,
         dimensions: dims,
+        composition: planComp ?? {},
         source_currency: bp.source_currency || 'EUR',
         status: 'draft',
         created_by: userId,
       }).select().single();
       if (planErr) throw new HttpError(400, `Failed to create plan: ${planErr.message}`);
 
-      const { subtotal } = await writePlanItems(supabase, plan.id, tree, dims);
+      const { subtotal } = await writePlanItems(supabase, plan.id, scoped, dims, derived);
       await supabase.from('project_plans').update({ subtotal }).eq('id', plan.id);
       const items = await loadPlanItems(supabase, plan.id);
       return json({ plan: { ...plan, subtotal }, items });
@@ -373,6 +468,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const est = metadata.kitchen_estimate as {
         blueprint_id?: string; reference?: string; dimensions?: Record<string, number>;
         selected_item_ids?: string[]; plan_id?: string; project_id?: string;
+        composition?: Composition;
         contact?: { name?: string };
       } | undefined;
       if (!est?.blueprint_id) throw new HttpError(404, 'No kitchen estimate on this thread');
@@ -395,6 +491,18 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const tree: ItemRow[] = [];
       await loadBlueprintTree(supabase, est.blueprint_id, null, 0, new Set(), tree);
       applyOptionDefaults(tree);
+
+      // The visitor's zone configuration is a PROPOSAL like the rest of the estimate: it says how
+      // many units of what kind and which door model, and the rate tables are re-snapshotted from
+      // the blueprint here — so a tampered composition can change the spec but never its prices.
+      const compSchema = (bp.composition_schema ?? []) as ZoneDef[];
+      const planComp: PlanComposition | null = hasComposition(compSchema)
+        ? {
+          schema: compSchema,
+          config: est.composition ?? defaultComposition(compSchema, tree),
+          rate_tables: snapshotRateTables(compSchema, tree),
+        }
+        : null;
 
       // Replay the visitor's choices onto the freshly-expanded tree, matched by source_item_id.
       // Same trust rule as the public function: a group honours the choice only when exactly one
@@ -430,13 +538,16 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         blueprint_id: est.blueprint_id,
         title: est.reference ? `${bp.title} (${est.reference})` : bp.title,
         dimensions: dims,
+        composition: planComp ?? {},
         source_currency: bp.source_currency || 'EUR',
         status: 'draft',
         created_by: userId,
       }).select().single();
       if (planErr) throw new HttpError(400, `Failed to create plan: ${planErr.message}`);
 
-      const { subtotal } = await writePlanItems(supabase, plan.id, tree, dims);
+      const { subtotal } = await writePlanItems(
+        supabase, plan.id, stripAbsorbed(tree, compSchema), dims, derivePlanComposition(planComp),
+      );
       await supabase.from('project_plans').update({ subtotal }).eq('id', plan.id);
 
       // Read-modify-write: metadata also carries the channel binding, and clobbering the column
@@ -470,11 +581,22 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const dims: Record<string, number> = action === 'rescale'
         ? { ...(plan.dimensions ?? {}), ...(body.dimensions ?? {}) }
         : (plan.dimensions ?? {});
-      const items = await loadPlanItems(supabase, plan_id);
-      const { subtotal } = await writePlanItems(supabase, plan_id, items, dims);
-      await supabase.from('project_plans').update({ dimensions: dims, subtotal }).eq('id', plan_id);
+      // The schema and the frozen rate tables stay the plan's; only the CONFIG is caller-supplied,
+      // so a client can move a cabinet or change a door model but never re-write its own prices.
+      const stored = (plan.composition ?? {}) as PlanComposition;
+      const planComp: PlanComposition | null = hasComposition(stored.schema)
+        ? { ...stored, config: (action === 'rescale' && body.composition ? body.composition as Composition : stored.config) }
+        : null;
+      const derived = derivePlanComposition(planComp);
+      // Composition lines are regenerated wholesale — carrying the previous ones over would stack
+      // a second copy of every cabinet on each reprice.
+      const items = (await loadPlanItems(supabase, plan_id)).filter((it) => it.source !== 'composition');
+      const { subtotal } = await writePlanItems(supabase, plan_id, items, dims, derived);
+      await supabase.from('project_plans')
+        .update({ dimensions: dims, subtotal, ...(planComp ? { composition: planComp } : {}) })
+        .eq('id', plan_id);
       const fresh = await loadPlanItems(supabase, plan_id);
-      return json({ plan: { ...plan, dimensions: dims, subtotal }, items: fresh });
+      return json({ plan: { ...plan, dimensions: dims, subtotal, ...(planComp ? { composition: planComp } : {}) }, items: fresh });
     }
 
     case 'save-version': {
@@ -487,7 +609,9 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const nextV = (maxV?.version ?? 0) + 1;
       const { error } = await supabase.from('project_plan_versions').insert({
         plan_id, version: nextV, note: note ?? null, created_by: userId,
-        snapshot: { dimensions: plan.dimensions, subtotal: plan.subtotal, items },
+        // The composition is part of what a version IS: restoring one without it would bring back
+        // the lines but not the zones that generate them, and the next reprice would erase them.
+        snapshot: { dimensions: plan.dimensions, composition: plan.composition ?? {}, subtotal: plan.subtotal, items },
       });
       if (error) throw new HttpError(400, error.message);
       await supabase.from('project_plans').update({ version: nextV }).eq('id', plan_id);
@@ -502,16 +626,20 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { data: ver, error } = await supabase.from('project_plan_versions').select('*').eq('plan_id', plan_id).eq('version', version).maybeSingle();
       if (error) throw new HttpError(400, error.message);
       if (!ver) throw new HttpError(404, 'Version not found');
-      const snap = ver.snapshot as { dimensions: Record<string, number>; items: ItemRow[] };
-      // re-id the snapshot items so self-FKs are fresh
+      const snap = ver.snapshot as { dimensions: Record<string, number>; composition?: PlanComposition; items: ItemRow[] };
+      // re-id the snapshot items so self-FKs are fresh. Composition lines are dropped and
+      // regenerated from the restored composition — re-inserting them would double every zone.
+      const restorable = (snap.items ?? []).filter((it) => it.source !== 'composition');
       const idMap: Record<string, string> = {};
-      for (const it of snap.items) idMap[it.id] = crypto.randomUUID();
-      const reIded = snap.items.map((it) => ({ ...it, id: idMap[it.id], parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null }));
+      for (const it of restorable) idMap[it.id] = crypto.randomUUID();
+      const reIded = restorable.map((it) => ({ ...it, id: idMap[it.id], parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null }));
       const dims = snap.dimensions ?? plan.dimensions ?? {};
-      const { subtotal } = await writePlanItems(supabase, plan_id, reIded, dims);
-      await supabase.from('project_plans').update({ dimensions: dims, subtotal }).eq('id', plan_id);
+      const planComp = (snap.composition ?? plan.composition ?? {}) as PlanComposition;
+      const derived = derivePlanComposition(planComp);
+      const { subtotal } = await writePlanItems(supabase, plan_id, reIded, dims, derived);
+      await supabase.from('project_plans').update({ dimensions: dims, composition: planComp, subtotal }).eq('id', plan_id);
       const items = await loadPlanItems(supabase, plan_id);
-      return json({ plan: { ...plan, dimensions: dims, subtotal }, items });
+      return json({ plan: { ...plan, dimensions: dims, composition: planComp, subtotal }, items });
     }
 
     case 'create-quote-from-plan': {
@@ -582,7 +710,11 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       tasks.forEach((t, idx) => appended.push({ ...t, id: crypto.randomUUID(), parent_id: newSecId, sort_order: idx }));
 
       const dims = plan.dimensions ?? {};
-      const { subtotal } = await writePlanItems(supabase, plan_id, [...existing, ...appended], dims);
+      // Composition lines are regenerated, never carried: keeping the old ones and adding a fresh
+      // set is how a plan silently doubles its cabinets.
+      const kept = existing.filter((i) => i.source !== 'composition');
+      const derived = derivePlanComposition((plan.composition ?? {}) as PlanComposition);
+      const { subtotal } = await writePlanItems(supabase, plan_id, [...kept, ...appended], dims, derived);
       await supabase.from('project_plans').update({ subtotal }).eq('id', plan_id);
       const items = await loadPlanItems(supabase, plan_id);
       return json({ plan: { ...plan, subtotal }, items });

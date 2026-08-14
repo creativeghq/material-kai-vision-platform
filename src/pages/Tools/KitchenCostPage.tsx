@@ -1,15 +1,20 @@
 /**
  * Kitchen cost calculator (/tools/kitchen-cost) — anonymous lead-gen configurator.
  *
- * Same engine as the Project plan estimator, different skin: instead of the plan tree it
- * renders a consumer configurator — measurements, a cabinet model, a worktop, drawer banks,
- * and flat-price extras — with the total updating live. Pricing is the shared
- * blueprintCompute, so what a visitor sees here matches what the backend engine writes when
- * the same blueprint is imported into a project.
+ * Same engine as the Project plan estimator, different skin. The kitchen itself is described
+ * through the blueprint's ZONES — bottom units, top units, island, worktop — each with its own
+ * globals (height, depth, door model) and a list of modules (kind × width × how many). Everything
+ * the flat scope still needs (`run_length`, `wall_run_length`, `worktop_length`) is DERIVED from
+ * that composition, so installation and handles keep pricing per metre off a real layout.
  *
- * The layout is derived from the blueprint, NOT hardcoded: every `option_group` becomes a
- * single-choice control and every ungrouped task becomes a switch. Re-price or restructure
- * the "New Kitchen" starter in the admin and this page follows without a deploy.
+ * Before this, the whole kitchen was three sliders and three hardcoded "Drawer unit N" option
+ * groups, which is why it could never say four drawer banks, a wall unit count, or an island.
+ *
+ * The layout is derived from the blueprint, NOT hardcoded: zones come from `composition_schema`,
+ * every remaining `option_group` becomes a single-choice control and every ungrouped task becomes
+ * a switch. Re-price or restructure the "New Kitchen" starter in the admin and this page follows
+ * without a deploy. Pricing is the shared blueprintCompute + blueprintComposition, so what a
+ * visitor sees matches what the backend engine writes when the same blueprint reaches a project.
  *
  * Registered OUTSIDE <AuthGuard> in App.tsx — no login required. Sending the estimate is the
  * only metered write (Turnstile-gated); browsing and configuring are pure client-side math.
@@ -31,9 +36,12 @@ import { Slider } from '@/components/core/ui/slider';
 import { Switch } from '@/components/core/ui/switch';
 import { Textarea } from '@/components/core/ui/textarea';
 import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
+import { ZoneConfigurator } from '@/components/features/blueprint/ZoneConfigurator';
 import type { DimensionDef } from '@/services/blueprintsService';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
-import { repriceItems, seedPlanItems, subtotalOf } from '@/utils/blueprintCompute';
+import { composeEstimate, repriceItems, seedPlanItems, subtotalOf } from '@/utils/blueprintCompute';
+import { absorbedGroups, defaultComposition, deriveComposition, hasComposition } from '@/utils/blueprintComposition';
+import type { Composition, ZoneDef } from '@/utils/blueprintComposition';
 import { formatMoney } from '@/utils/decimal';
 import { ToolsShell, useToolsQuota } from './toolsShared';
 
@@ -59,7 +67,8 @@ interface RawItem {
 }
 interface Starter {
   id: string; title: string; description: string | null; project_type: string | null;
-  dimensions_schema: DimensionDef[]; source_currency: string; items: RawItem[];
+  dimensions_schema: DimensionDef[]; composition_schema: ZoneDef[];
+  source_currency: string; items: RawItem[];
 }
 
 /** What a line WOULD add if picked. `line_total` is 0 while unselected, so it can't be used here. */
@@ -83,10 +92,22 @@ export default function KitchenCostPage() {
   const [starter, setStarter] = useState<Starter | null>(null);
   const [loading, setLoading] = useState(true);
   const [dims, setDims] = useState<Record<string, number>>({});
+  const [composition, setComposition] = useState<Composition>({});
   const [items, setItems] = useState<ProjectPlanItem[]>([]);
 
   const currency = starter?.source_currency || 'EUR';
-  const subtotal = useMemo(() => subtotalOf(items), [items]);
+  const zones = useMemo(() => (starter?.composition_schema ?? []) as ZoneDef[], [starter]);
+  const zoned = hasComposition(zones);
+
+  // The zones publish run_length / wall_run_length / worktop_length, so the flat scope's per-metre
+  // lines must be repriced against the DERIVED numbers, never the typed ones.
+  const composed = useMemo(
+    () => (starter ? composeEstimate(zones, composition, starter.items, dims, items) : null),
+    [starter, zones, composition, dims, items],
+  );
+  const effectiveDims = composed?.dims ?? dims;
+  const derived = composed?.derived ?? null;
+  const subtotal = composed ? composed.subtotal : subtotalOf(items);
 
   useEffect(() => {
     supabase.functions
@@ -97,30 +118,50 @@ export default function KitchenCostPage() {
         const kitchen = list.find((s) => s.project_type === KITCHEN_PROJECT_TYPE) ?? null;
         setStarter(kitchen);
         if (kitchen) {
+          const schema = (kitchen.composition_schema ?? []) as ZoneDef[];
+          const comp = defaultComposition(schema, kitchen.items, (z, i) => `${z}-${i}`);
+          setComposition(comp);
           const d: Record<string, number> = {};
           for (const dim of kitchen.dimensions_schema ?? []) d[dim.key] = Number(dim.default ?? 0);
+          // Seed the flat scope against the composition's metres — seeding against the schema
+          // defaults would price installation on a run length nothing in the page agrees with.
+          const seedDims = { ...d, ...deriveComposition(schema, comp, kitchen.items).vars };
           setDims(d);
-          setItems(seedPlanItems(kitchen.items, d));
+          setItems(seedPlanItems(kitchen.items, seedDims, new Set(absorbedGroups(schema))));
         }
       })
       .finally(() => setLoading(false));
   }, []);
 
+  // Changing the composition changes the derived metres, so the flat scope reprices with it.
+  const updateComposition = (next: Composition) => {
+    setComposition(next);
+    if (!starter) return;
+    const nextDims = { ...dims, ...deriveComposition(zones, next, starter.items).vars };
+    setItems((cur) => repriceItems(cur, nextDims));
+  };
+
   const setDimension = (key: string, value: number) => {
     const next = { ...dims, [key]: value };
     setDims(next);
-    setItems((cur) => repriceItems(cur, next));
+    setItems((cur) => repriceItems(cur, starter ? { ...next, ...deriveComposition(zones, composition, starter.items).vars } : next));
   };
 
   /** Single-select within an option_group. */
   const pickOption = (group: string, id: string) =>
     setItems((cur) =>
-      repriceItems(cur.map((it) => (it.option_group === group ? { ...it, is_selected: it.id === id } : it)), dims),
+      repriceItems(cur.map((it) => (it.option_group === group ? { ...it, is_selected: it.id === id } : it)), effectiveDims),
     );
 
   /** Multi-select toggle for an ungrouped extra. */
   const toggleExtra = (id: string, on: boolean) =>
-    setItems((cur) => repriceItems(cur.map((it) => (it.id === id ? { ...it, is_selected: on } : it)), dims));
+    setItems((cur) => repriceItems(cur.map((it) => (it.id === id ? { ...it, is_selected: on } : it)), effectiveDims));
+
+  // A dimension a zone already derives must not also get a slider — see the Measurements card.
+  const loneDimensions = useMemo(
+    () => (starter?.dimensions_schema ?? []).filter((d) => !(d.key in (derived?.vars ?? {}))),
+    [starter, derived],
+  );
 
   // Layout comes from the blueprint's own shape, so an admin edit reflows the page.
   const sections = useMemo(() => {
@@ -170,13 +211,29 @@ export default function KitchenCostPage() {
         </div>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Kitchen cost calculator</h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Tell us how long the run is and pick your finishes — the price updates as you go. Free, instant,
-          no sign-up needed.
+          Build your kitchen unit by unit — bottom cabinets, top cabinets, worktop, island — and pick
+          your finishes. The price updates as you go. Free, instant, no sign-up needed.
         </p>
       </div>
 
       <div className="space-y-5">
-        {/* ── Measurements ─────────────────────────────────────────────────── */}
+        {/* ── The kitchen itself: zones, their globals and their units ─────── */}
+        {zoned && (
+          <ZoneConfigurator
+            schema={zones}
+            config={composition}
+            rateItems={starter.items}
+            derived={derived}
+            currency={currency}
+            onChange={updateComposition}
+          />
+        )}
+
+        {/* ── Measurements ─────────────────────────────────────────────────────
+            Only what the zones do NOT publish. Rendering a slider for `run_length`
+            beside a zone that derives it gives two controls for one number, and the
+            one you drag loses. */}
+        {loneDimensions.length > 0 && (
         <Card className="dashboard-card">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -188,7 +245,7 @@ export default function KitchenCostPage() {
             </p>
           </CardHeader>
           <CardContent className="space-y-5">
-            {(starter.dimensions_schema ?? []).map((d) => {
+            {loneDimensions.map((d) => {
               const value = dims[d.key] ?? Number(d.default ?? 0);
               const max = Math.max(20, Number(d.default ?? 0) * 3);
               return (
@@ -211,6 +268,7 @@ export default function KitchenCostPage() {
             })}
           </CardContent>
         </Card>
+        )}
 
         {/* ── One card per blueprint section ───────────────────────────────── */}
         {sections.map((sec) => (
@@ -306,6 +364,7 @@ export default function KitchenCostPage() {
             <SendEstimateDialog
               blueprintId={starter.id}
               dimensions={dims}
+              composition={zoned ? composition : null}
               items={items}
               subtotal={subtotal}
               currency={currency}
@@ -327,6 +386,7 @@ export default function KitchenCostPage() {
 function SendEstimateDialog({
   blueprintId,
   dimensions,
+  composition,
   items,
   subtotal,
   currency,
@@ -334,6 +394,7 @@ function SendEstimateDialog({
 }: {
   blueprintId: string;
   dimensions: Record<string, number>;
+  composition: Composition | null;
   items: ProjectPlanItem[];
   subtotal: number;
   currency: string;
@@ -363,13 +424,15 @@ function SendEstimateDialog({
     }
     setSending(true);
     setError(null);
-    // Only the CHOICES travel. The server re-prices from the blueprint, so a tampered
-    // client total can never become the recorded estimate.
+    // Only the CHOICES travel — the composition is a SPEC (how many units of what kind, which
+    // door model), never a price. The server re-prices it from the blueprint's own rates, so a
+    // tampered client total can never become the recorded estimate.
     const { data, error: fnError } = await supabase.functions.invoke('public-project-plan', {
       body: {
         action: 'kitchen_lead',
         blueprint_id: blueprintId,
         dimensions,
+        ...(composition ? { composition } : {}),
         selected_item_ids: items.filter((i) => i.kind === 'task' && i.is_selected).map((i) => i.id),
         contact: { name: name.trim(), email: email.trim(), phone: phone.trim(), shape, notes: notes.trim() },
         turnstile_token: token,

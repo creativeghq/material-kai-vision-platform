@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles, RefreshCw, Package,
@@ -15,6 +15,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 import { DimensionsPanel } from '@/components/features/blueprint/DimensionsPanel';
+import { ZoneConfigurator } from '@/components/features/blueprint/ZoneConfigurator';
+import { derivePlanComposition, hasComposition, rateItemsFromTables } from '@/utils/blueprintComposition';
+import type { Composition, PlanComposition } from '@/utils/blueprintComposition';
 import { PlanTreeEditor } from '@/components/features/blueprint/PlanTreeEditor';
 import { BlueprintPickerDialog } from '@/components/features/blueprint/BlueprintPickerDialog';
 import { SectionLibraryPicker } from '@/components/features/blueprint/SectionLibraryPicker';
@@ -86,6 +89,28 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     setPlan(next.plan);
     setItems(next.items);
     setDims(next.plan.dimensions ?? {});
+  };
+
+  // The plan carries its own zones and its own FROZEN rate tables — a quote must re-price on the
+  // rates it was quoted at, so nothing here reads back to the blueprint.
+  const planComp = (plan?.composition ?? {}) as PlanComposition;
+  const zoned = hasComposition(planComp.schema);
+  const derivedComp = useMemo(() => (zoned ? derivePlanComposition(planComp) : null), [zoned, planComp]);
+  const compRateItems = useMemo(() => rateItemsFromTables(planComp.rate_tables), [planComp]);
+
+  /** A zone edit is a rescale: the engine re-derives the metres and regenerates the zone lines. */
+  const onCompositionChange = (next: Composition) => {
+    if (!plan) return;
+    setPlan({ ...plan, composition: { ...planComp, config: next } });
+    if (rescaleTimer.current) clearTimeout(rescaleTimer.current);
+    rescaleTimer.current = setTimeout(async () => {
+      setBusy(true);
+      try {
+        refreshItems(await projectPlansService.rescale(plan.id, dims, next));
+      } catch (e) {
+        toast({ title: 'Update failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+      } finally { setBusy(false); }
+    }, 500);
   };
 
   const importBlueprint = async (blueprintId: string) => {
@@ -365,7 +390,25 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         </div>
       )}
 
-      <DimensionsPanel schema={schema} values={dims} onChange={onDimsChange} disabled={busy} />
+      {zoned && (
+        <ZoneConfigurator
+          schema={planComp.schema}
+          config={planComp.config ?? {}}
+          rateItems={compRateItems}
+          derived={derivedComp}
+          currency={currency || plan.source_currency || 'EUR'}
+          readOnly={busy}
+          onChange={onCompositionChange}
+        />
+      )}
+
+      {/* Only the measurements no zone derives — two controls for one number is a bug, not a choice. */}
+      <DimensionsPanel
+        schema={schema.filter((d) => !(d.key in (derivedComp?.vars ?? {})))}
+        values={dims}
+        onChange={onDimsChange}
+        disabled={busy}
+      />
 
       <PlanTreeEditor
         items={items}
