@@ -523,6 +523,26 @@ processor that never runs and nothing says so.
   module nobody uses, and turning the module off is a product decision. The probe stays quiet
   until the combination actually matters.
 
+### `ops.prompt_required_but_inactive` — a prompt something depends on, switched off
+Prompts have no code fallback by design (3P.4): a deactivated or empty row does not degrade the
+output, it RAISES and the work stops. Correct — and it makes "which prompt got turned off" a
+question worth answering before the ingest does.
+
+This is the opposite direction to `ops.prompt_never_read` (3P.7), which reports an *orphan*
+prompt nobody reads. Here the prompt is claimed by a call site in `used_in` and is off or empty.
+
+- **Proven to fire:** 2026-08-14 — switching off the `field_role` classifier prompt reports it;
+  silent otherwise.
+- **Prerequisite fixed first:** one row ("PDF Processing Agent") named two call sites that no
+  longer exist — `agent-chat/index.ts` records the agent as removed. It was correctly deactivated
+  and `used_in` was never cleared, so it read as a live dependency that had been turned off. A
+  probe reading a column that lies is worse than no probe, so the column was cleaned before the
+  probe was trusted.
+- **Overlaps, deliberately, with `/health` + `REQUIRED_PROMPTS` (3P.6)** — and does not replace
+  it. That one derives required keys from the Python call sites and runs at DEPLOY, which is
+  stronger. This one runs nightly, comes from the data side, and therefore also covers prompts
+  no Python call site declares (the Deno/edge sites) and the "active but empty" case.
+
 ---
 
 ## Not defects — checked, and deliberately left alone
