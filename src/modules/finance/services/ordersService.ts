@@ -793,6 +793,11 @@ export const ordersService = {
         discount_pct: l.discountPct,
         update_warehouse: l.it.update_warehouse ?? true,
         sort_order: i,
+        // #347 phase 5 — an order born with a chosen variant keeps it. Omitting these here
+        // would mean the identity only ever survived on orders generated FROM a quote.
+        selected_attributes: l.it.selected_attributes ?? {},
+        selected_size: l.it.selected_size ?? null,
+        selected_color: l.it.selected_color ?? null,
       }));
       const { error: itErr } = await supabase.from('order_items').insert(itemRows);
       if (itErr) throw itErr;

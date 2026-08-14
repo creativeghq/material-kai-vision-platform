@@ -37823,6 +37823,16 @@ export type Database = {
           output_price: number
         }[]
       }
+      get_line_identity_options: {
+        Args: { p_product_id: string }
+        Returns: {
+          field_name: string
+          field_type: string
+          label: string
+          options: string[]
+          stocked: string[]
+        }[]
+      }
       get_my_credit_spend_summary: { Args: { p_days?: number }; Returns: Json }
       get_next_pending_chunk: {
         Args: { session_id_param: string }

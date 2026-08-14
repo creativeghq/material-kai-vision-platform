@@ -4,6 +4,7 @@
  * Supports both catalog product search and custom (ad-hoc) product entry.
  */
 
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
@@ -79,6 +80,12 @@ interface SelectedProduct extends ProductWithImage {
   quantity: number;
   selectedSize?: string;
   selectedColor?: string;
+  /**
+   * Every identity field the registry offers for this product, not just size and colour
+   * (#347 phase 5.2). size/colour remain as the two projected columns the documents render;
+   * this is the whole answer, and it is what reaches `quote_items.selected_attributes`.
+   */
+  selectedAttributes?: Record<string, string>;
   room?: string;
   dimensions?: string;
 }
@@ -225,19 +232,25 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     setSearchResults([]);
   }, []);
 
-  const handleColorChange = useCallback((productId: string, color: string) => {
-    setSelectedProducts(prev => prev.map(p => p.id === productId ? { ...p, selectedColor: color } : p));
+  /**
+   * The picker hands back the full map and both projected columns together — they are derived
+   * from one another, so writing them in one update is what stops a line labelled 600x600 whose
+   * attributes say 300x300.
+   */
+  const handleIdentityChange = useCallback((productId: string, next: {
+    selected_attributes: Record<string, string>; selected_size: string | null; selected_color: string | null;
+  }) => {
+    setSelectedProducts(prev => prev.map(p => p.id === productId ? {
+      ...p,
+      selectedAttributes: next.selected_attributes,
+      selectedSize: next.selected_size ?? undefined,
+      selectedColor: next.selected_color ?? undefined,
+    } : p));
   }, []);
 
   const handleQuantityChange = useCallback((productId: string, delta: number) => {
     setSelectedProducts(prev =>
       prev.map(p => p.id === productId ? { ...p, quantity: Math.max(1, p.quantity + delta) } : p),
-    );
-  }, []);
-
-  const handleSizeChange = useCallback((productId: string, size: string) => {
-    setSelectedProducts(prev =>
-      prev.map(p => p.id === productId ? { ...p, selectedSize: size } : p),
     );
   }, []);
 
@@ -260,10 +273,11 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
           notes: variantBits.length ? variantBits.join(' · ') : undefined,
           selected_size: product.selectedSize || undefined,
           selected_color: product.selectedColor || undefined,
-          selected_attributes: {
-            ...(product.selectedSize ? { size: product.selectedSize } : {}),
-            ...(product.selectedColor ? { color: product.selectedColor } : {}),
-          },
+          // The registry's own field names, not a re-keyed {size, color} pair. Re-keying was a
+          // translation, and a translation is where a fifth vocabulary for "which one" comes
+          // from — `available_sizes` and `finish` are what the registry calls these, and what
+          // the warehouse will match on in phase 6.
+          selected_attributes: product.selectedAttributes ?? {},
           room: product.room || undefined,
           dimensions: product.dimensions || undefined,
         });
@@ -512,7 +526,6 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                     </TableHeader>
                     <TableBody>
                       {selectedProducts.map((product) => {
-                        const availableSizes = getAvailableSizes(product.metadata);
                         return (
                           <TableRow key={product.id}>
                             <TableCell>
@@ -542,26 +555,17 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                               />
                             </TableCell>
                             <TableCell>
-                              <div className="space-y-1">
-                                {availableSizes.length > 0 && (
-                                  <Select value={product.selectedSize || availableSizes[0]} onValueChange={(v) => handleSizeChange(product.id, v)}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Size" /></SelectTrigger>
-                                    <SelectContent>{availableSizes.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
-                                  </Select>
-                                )}
-                                {(() => {
-                                  const availableColors = getAvailableColors(product.metadata);
-                                  return availableColors.length > 0 ? (
-                                    <Select value={product.selectedColor || availableColors[0]} onValueChange={(v) => handleColorChange(product.id, v)}>
-                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Colour" /></SelectTrigger>
-                                      <SelectContent>{availableColors.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                  ) : null;
-                                })()}
-                                {availableSizes.length === 0 && getAvailableColors(product.metadata).length === 0 && (
-                                  <span className="text-xs text-muted-foreground">N/A</span>
-                                )}
-                              </div>
+                              {/* #347 phase 5.2 — the same picker the order line uses. It used to
+                                  be a hardcoded size select plus a colour select, which is why a
+                                  quote could never record a finish, a wood type or a bowl shape:
+                                  the registry has 22 identity fields for tiles alone. The
+                                  resolver withholds any field the product can only be one of, so
+                                  this shows the real choices and nothing else. */}
+                              <LineIdentityPicker
+                                productId={product.id}
+                                value={product.selectedAttributes ?? {}}
+                                onChange={(next) => handleIdentityChange(product.id, next)}
+                              />
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center gap-1">

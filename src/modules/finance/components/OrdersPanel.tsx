@@ -10,6 +10,8 @@ import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
@@ -501,6 +503,13 @@ export type Line = {
   price_auto?: boolean;
   /** Which ladder rung the resolver applied, so the line can say why the price moved. */
   price_source?: string | null;
+  /**
+   * Which variant this line is (#347 phase 5). The registry decides which fields count as
+   * identity; size/colour are projected from the map so the two can never disagree.
+   */
+  selected_attributes?: Record<string, string>;
+  selected_size?: string | null;
+  selected_color?: string | null;
 };
 const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null, supplier_company_id: null });
 
@@ -995,6 +1004,12 @@ export const NewOrderModal: React.FC<{
         measurement_unit_code: it.unit_code,
         vat_percent: pctOf(it.vat_code),
         vat_category: parseInt(it.vat_code, 10) || undefined,
+        // #347 phase 5 — carried into every branch below (create, merge, mirror-to-supplier),
+        // because a purchase order raised to cover a sale must ask the supplier for the SAME
+        // variant the customer chose.
+        selected_attributes: it.selected_attributes ?? {},
+        selected_size: it.selected_size ?? null,
+        selected_color: it.selected_color ?? null,
       }));
 
       // MERGE is the one branch that creates nothing: the lines join an order that already exists,
@@ -1331,6 +1346,13 @@ export const NewOrderModal: React.FC<{
                         → {linkedNames[i] ?? 'linked to catalog'} · unlink
                       </button>
                     )}
+                    {/* #347 phase 5.2 — choose the variant while the order is being written,
+                        not after. Renders nothing unless the product offers a real choice. */}
+                    <LineIdentityPicker
+                      productId={l.product_id}
+                      value={l.selected_attributes ?? {}}
+                      onChange={(next) => setItem(i, next)}
+                    />
                     </>
                     )}
                     {activeLine === i && lineProdOpts.length > 0 && (
@@ -1605,6 +1627,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [payInOpen, setPayInOpen] = useState<{ amount?: number } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editItems, setEditItems] = useState<Line[]>([]);
+  /** Which edit-row has the KB price drawer open (#347 phase 5.3). */
+  const [priceLookupLine, setPriceLookupLine] = useState<number | null>(null);
   // Catalog list prices for the order's products → summarised as a discount total below.
   const [listPrices, setListPrices] = useState<Map<string, number>>(new Map());
   // Per-LINE supplier (who supplies this line / who we owe) → settable inline on any line.
@@ -2245,7 +2269,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     } finally { setSaving(false); }
   };
   const startEdit = () => {
-    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id, available: null })));
+    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id, available: null,
+      // Read the stored identity back into the editor. `updateItems` deletes and re-inserts
+      // every line, so a field missing here would be erased by an unrelated edit.
+      selected_attributes: (it as any).selected_attributes ?? {},
+      selected_size: (it as any).selected_size ?? null,
+      selected_color: (it as any).selected_color ?? null })));
     setEditing(true);
     // Pull on-hand for catalog lines so the edit grid can warn on over-stock (sales).
     const pids = items.map((it) => it.product_id).filter(Boolean) as string[];
@@ -2269,6 +2298,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         supplier_company_id: l.supplier_company_id ?? null,
         measurement_unit_code: l.unit_code,
         vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
+        selected_attributes: l.selected_attributes ?? {},
+        selected_size: l.selected_size ?? null,
+        selected_color: l.selected_color ?? null,
       })), { type: order.discount_type, value: Number(order.discount_value) || 0 });
       setEditing(false);
       await load(order.id); onChanged();
@@ -3293,6 +3325,23 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                           → {productNames.get(l.product_id) ?? 'linked to catalog'} · unlink
                         </button>
                       )}
+                      {/* #347 phase 5.2 — which variant leaves the warehouse. Renders nothing
+                          when the product offers no real choice, so an ordinary line is
+                          unchanged. */}
+                      <LineIdentityPicker
+                        productId={l.product_id}
+                        value={l.selected_attributes ?? {}}
+                        onChange={(next) => setEditItem(i, next)}
+                      />
+                      {/* Sales only: the KB price chain answers "what do we SELL this for",
+                          folding in the customer's standing discount. On a purchase order the
+                          figure is what the supplier charges us, which this cannot know. */}
+                      {order.order_type === 'sales' && (
+                        <button type="button" className="mt-0.5 ml-2 text-[10px] text-primary hover:underline"
+                          onClick={() => setPriceLookupLine(i)}>
+                          price from KB
+                        </button>
+                      )}
                     </div>
                     <MoneyInput className="h-8 text-right text-sm px-1" displayDecimals={null} value={l.quantity} onValueChange={(v) => setEditItem(i, { quantity: v ?? 0 })} />
                     <Select value={l.unit_code} onValueChange={(v) => setEditItem(i, { unit_code: v })}>
@@ -3319,6 +3368,35 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 })}
                 <div className="flex items-center justify-between px-2 py-1.5 border-t border-border/40">
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditItems((ls) => [...ls, blankLine()])}><Plus className="h-3.5 w-3.5 mr-1" /> New product</Button>
+                  {/* #347 phase 5.3 / defect 11 — the SAME drawer the quote line uses, with the
+                      same explicit human confirm. The KB price chain never auto-fills: it
+                      proposes with its reasoning and sources, and a person accepts it. An order
+                      line could not reach it at all before, so the operator either retyped a
+                      figure from the quote or guessed. */}
+                  {priceLookupLine !== null && editItems[priceLookupLine] && (
+                    <PriceLookupDrawer
+                      open
+                      onOpenChange={(o) => { if (!o) setPriceLookupLine(null); }}
+                      productId={editItems[priceLookupLine].product_id ?? undefined}
+                      productName={editItems[priceLookupLine].description || 'Order line'}
+                      quantity={Number(editItems[priceLookupLine].quantity) || 1}
+                      unit={editItems[priceLookupLine].unit_code}
+                      customerCompanyId={order.customer_company_id}
+                      customerContactId={order.customer_contact_id}
+                      onConfirm={(payload) => {
+                        const i = priceLookupLine;
+                        // A confirmed KB price is a HUMAN's figure, so price_auto goes false —
+                        // otherwise the quantity-break repricer would overwrite the number the
+                        // operator just accepted, which is the conflict price_auto exists for.
+                        setEditItem(i, {
+                          unit_price: payload.discount_price ?? payload.unit_price,
+                          price_auto: false,
+                          price_source: 'kb_confirmed',
+                        });
+                        setPriceLookupLine(null);
+                      }}
+                    />
+                  )}
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
                     <Button size="sm" onClick={saveItems} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save items'}</Button>
