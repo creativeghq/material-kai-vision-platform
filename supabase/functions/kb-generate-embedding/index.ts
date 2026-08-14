@@ -129,6 +129,10 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
         model: 'voyage-4',
         input_type: 'document',
         dimensions: 1024,
+        // Attribution only (MIVAA authenticates this route by x-cron-secret, not by
+        // this field): without it every clip-text call landed in ai_usage_logs with a
+        // NULL workspace_id — 979 rows in 30 days, invisible to per-tenant cost views.
+        workspace_id: doc.workspace_id ?? null,
       }),
     });
 

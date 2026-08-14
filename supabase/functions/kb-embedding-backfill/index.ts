@@ -35,6 +35,7 @@ interface DocRow {
   title: string | null;
   content: string | null;
   content_markdown: string | null;
+  workspace_id: string | null;
 }
 
 async function embedOne(doc: DocRow): Promise<{ ok: true; dims: number } | { ok: false; error: string }> {
@@ -63,6 +64,10 @@ async function embedOne(doc: DocRow): Promise<{ ok: true; dims: number } | { ok:
         model: 'voyage-4',
         input_type: 'document',
         dimensions: 1024,
+        // Attribution only (MIVAA authenticates this route by x-cron-secret, not by
+        // this field): without it every clip-text call landed in ai_usage_logs with a
+        // NULL workspace_id — 979 rows in 30 days, invisible to per-tenant cost views.
+        workspace_id: doc.workspace_id ?? null,
       }),
     });
 
@@ -140,7 +145,7 @@ Deno.serve(withApiLogging('kb-embedding-backfill', async (req: Request) => {
   // Claim a batch (oldest first).
   let batchQ = supabaseAdmin
     .from('kb_docs')
-    .select('id, title, content, content_markdown')
+    .select('id, title, content, content_markdown, workspace_id')
     .is('text_embedding', null)
     .in('embedding_status', ['pending', 'failed'])
     .order('created_at', { ascending: true })
