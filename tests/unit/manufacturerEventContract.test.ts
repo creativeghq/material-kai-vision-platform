@@ -33,6 +33,8 @@ const PRODUCT_EVENT_EMITTERS: Record<string, string> = {
   product_save: 'trackProductSave',
   product_quote: 'trackProductQuote',
   product_compare: 'trackProductCompare',
+  product_search_impression: 'trackSearchImpression',
+  product_search_click: 'trackSearchClick',
 };
 
 const SERVICE = 'src/services/manufacturerAnalyticsService.ts';
@@ -56,6 +58,8 @@ const DB_EVENT_TYPES = [
   'product_save',
   'product_quote',
   'product_compare',
+  'product_search_impression',
+  'product_search_click',
   'embed_view',
   'embed_model_load',
   'embed_ar_launch',
@@ -112,9 +116,10 @@ describe('manufacturer_analytics_events event_type contract', () => {
   });
 
   // Declaring a type is not producing one. `product_search_impression` and `product_search_click`
-  // were declared for months, permitted by nothing, and called by nobody — they read as a working
-  // funnel that was structurally incapable of recording anything. This asserts a real call site,
-  // which is the property that was actually missing.
+  // were declared for months and called by nobody — they read as a working funnel that recorded
+  // nothing. (They are wired now, to the smart search, once its result mapping was fixed to return
+  // the product ids the backend actually sends.) This asserts a real call site, which is the
+  // property that was missing.
   it('every declared product event is invoked somewhere in the app', () => {
     const sources = appSources().map((f) => readFileSync(f, 'utf8')).join('\n');
     const uncalled = frontendEventTypes().filter((t) => {

@@ -26,7 +26,8 @@ import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { UnifiedSearchService } from '@/services/unifiedSearchService';
+import { UnifiedSearchService, type SearchResult as ServiceSearchResult } from '@/services/unifiedSearchService';
+import { trackSearchImpression, trackSearchClick } from '@/services/manufacturerAnalyticsService';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { FilterBar, useFilters, type FilterValues } from '@/components/core/filters';
@@ -40,7 +41,14 @@ import {
 } from '@/components/core/ui/select';
 import { onEnterOrSpace } from '@/utils/a11y';
 
-// Search result type based on UnifiedSearchService response
+/**
+ * What this component renders. `id` is a PRODUCT id — the `multi_vector` strategy returns
+ * product-shaped rows, so `onMaterialSelect` can hand it straight to a product lookup.
+ *
+ * Until #350 the two mappers below read `result.chunk_id` / `result.document_name` / `result.content`
+ * — fields `multi_vector` does not return. Every one arrived `undefined`, so results rendered with
+ * no title, and the Discover click handler looked up a product by `undefined` and matched nothing.
+ */
 type SearchResult = {
   id: string;
   title: string;
@@ -98,6 +106,26 @@ interface UnifiedSearchInterfaceProps {
   initialQuery?: string;
 }
 
+/**
+ * Map one backend row to what this component renders. Every field is read defensively: the
+ * strategies disagree about which they populate, and reading an absent one used to surface as a
+ * blank card rather than an error.
+ */
+const toSearchResult = (result: ServiceSearchResult, source: string): SearchResult => ({
+  id: result.id,
+  title: result.product_name || result.name || result.document_name || 'Untitled',
+  // `multi_vector` sends `description`; chunk-shaped strategies send `content`.
+  content: result.content ?? result.description ?? '',
+  type: 'material',
+  similarity_score: result.score ?? result.similarity_score ?? 0,
+  source,
+  category: result.category,
+  document_id: result.document_id,
+  document_name: result.document_name,
+  page_number: result.page_number,
+  metadata: result.metadata ?? {},
+});
+
 export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   onResultsFound,
   onMaterialSelect,
@@ -137,6 +165,40 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   }, []);
   const { values, setValues, filtered, previewCount } = useFilters(results, filterGroups, { initial: savedFilters });
   const filteredResults = filtered;
+
+  // Which products have already been counted as "seen in results" for the CURRENT search. Cleared
+  // on every new search, so searching twice for the same thing counts twice (two impressions) but
+  // narrowing the post-filters does not (one).
+  const impressedRef = useRef<Set<string>>(new Set());
+
+  // An impression is "this product was shown to someone in a ranked result set" — distinct from
+  // product_view, which fires when a catalog card scrolls into sight. Only what actually renders
+  // counts, which is why this keys off filteredResults rather than the raw response.
+  useEffect(() => {
+    filteredResults.forEach((result) => {
+      if (!result.id || impressedRef.current.has(result.id)) return;
+      impressedRef.current.add(result.id);
+      trackSearchImpression(
+        result.id,
+        '',
+        window.location.pathname,
+        { query: activeQuery, rank: filteredResults.indexOf(result) + 1 },
+        result.category,
+      );
+    });
+  }, [filteredResults, activeQuery]);
+
+  const handleResultClick = useCallback((result: SearchResult) => {
+    if (!result.id) return;
+    trackSearchClick(
+      result.id,
+      '',
+      window.location.pathname,
+      { query: activeQuery, rank: filteredResults.indexOf(result) + 1 },
+      result.category,
+    );
+    onMaterialSelect?.(result.id);
+  }, [activeQuery, filteredResults, onMaterialSelect]);
 
   useEffect(() => {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(values));
@@ -218,6 +280,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
     setIsSearching(true);
     setActiveMode(searchType);
+    // A new search is a new result set — reset the impression dedupe so the same product
+    // appearing in two searches counts twice.
+    impressedRef.current = new Set();
     setActiveQuery(IMAGE_MODES.includes(searchType) ? (selectedImage?.name ?? '') : effectiveQuery.trim());
 
     try {
@@ -276,25 +341,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       }
 
       // Transform UnifiedSearchService results to SearchResult format
-      const unifiedResults: SearchResult[] = searchResponse.results.map(
-        (result) => ({
-          id: result.chunk_id,
-          title: result.document_name,
-          content: result.content,
-          type: 'pdf_content' as const,
-          similarity_score: result.similarity_score,
-          source: result.filename || 'knowledge_base',
-          chunk_id: result.chunk_id,
-          document_id: result.document_id,
-          document_name: result.document_name,
-          page_number: result.page_number,
-          metadata: {
-            chunk_metadata: result.chunk_metadata,
-            document_tags: result.document_tags,
-            source_metadata: result.source_metadata,
-          },
-        }),
-      );
+      const unifiedResults: SearchResult[] = searchResponse.results
+        .filter((result) => !!result.id)
+        .map((result) => toSearchResult(result, result.filename || 'catalog'));
 
       // Sort by similarity score
       unifiedResults.sort((a, b) => b.similarity_score - a.similarity_score);
@@ -332,6 +381,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       setIsSearching(true);
       setActiveMode('text');   // the Quick button is always a plain text pass
+      // A new search is a new result set — reset the impression dedupe so the same product
+      // appearing in two searches counts twice.
+      impressedRef.current = new Set();
       setActiveQuery(searchQuery.trim());
       try {
         // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
@@ -359,21 +411,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           throw new Error(quickResponse.error || 'Quick search failed');
         }
 
-        const formatted: SearchResult[] = quickResponse.results.map((result) => ({
-          id: result.chunk_id,
-          title: result.document_name,
-          content: result.content,
-          type: 'pdf_content' as const,
-          similarity_score: result.similarity_score,
-          source: 'quick_search',
-          chunk_id: result.chunk_id,
-          document_id: result.document_id,
-          document_name: result.document_name,
-          page_number: result.page_number,
-          metadata: {
-            chunk_metadata: result.chunk_metadata,
-          },
-        }));
+        const formatted: SearchResult[] = quickResponse.results
+          .filter((result) => !!result.id)
+          .map((result) => toSearchResult(result, 'quick_search'));
 
         setResults(formatted);
         setHasSearched(true);
@@ -667,7 +707,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 <Card
                   key={index}
                   className="border-l-4 border-l-primary hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => onMaterialSelect?.(result.id)}
+                  onClick={() => handleResultClick(result)}
                 >
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between mb-2">
@@ -693,11 +733,13 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                       </div>
                     </div>
 
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {result.content.length > 300
-                        ? `${result.content.substring(0, 300)}...`
-                        : result.content}
-                    </p>
+                    {result.content && (
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {result.content.length > 300
+                          ? `${result.content.substring(0, 300)}...`
+                          : result.content}
+                      </p>
+                    )}
 
                     {/* Metadata */}
                     {result.metadata && (

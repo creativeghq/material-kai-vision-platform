@@ -66,41 +66,81 @@ export interface UnifiedSearchRequest {
 /**
  * Search result from Python backend
  */
+/**
+ * One row from `/api/rag/search`.
+ *
+ * The `multi_vector` strategy returns **product-shaped** rows — `rag_service.multi_vector_search`
+ * fuses visual/chunk/product/keyword channels, maps chunks back to products via
+ * `chunk_product_relationships`, and emits `{id: <product_id>, product_name, description, metadata,
+ * score, ...}`. It does NOT emit `chunk_id`, `document_name`, `page_number` or `content`.
+ *
+ * This interface used to declare those four as REQUIRED, which is how the Discover smart-search UI
+ * came to map `id: result.chunk_id` — reading a field the backend never sends. `undefined` then
+ * flowed into every consumer: the click handler looked up a product by `undefined` and silently
+ * matched nothing. Fields the backend may or may not send are optional here on purpose, so the
+ * compiler forces callers to handle their absence instead of trusting a shape nothing returns.
+ */
 export interface SearchResult {
-  // Core result data
-  chunk_id: string;
-  document_id: string;
-  document_name: string;
-  content: string;
+  /** The PRODUCT id for `multi_vector`. This is the field to key off. */
+  id: string;
+  product_name?: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  workspace_id?: string;
+  source_document_id?: string;
 
-  // Scoring
-  similarity_score: number;
-  combined_score: number;
+  /** Fused relevance, 0–1. The per-channel breakdown below explains it. */
+  score?: number;
+  visual_score?: number;
+  chunk_score?: number;
+  product_score?: number;
   keyword_score?: number;
+  page_score?: number;
   understanding_score?: number;
+  combined_score?: number;
+  /** Only set by chunk-shaped strategies; `multi_vector` reports `score`. */
+  similarity_score?: number;
+  search_type?: string;
+  sources_used?: Record<string, boolean>;
 
-  // Context
-  page_number: number;
+  // Chunk-shaped fields — absent from `multi_vector` results.
+  chunk_id?: string;
+  document_id?: string;
+  document_name?: string;
+  content?: string;
+  page_number?: number;
   context_before?: string;
   context_after?: string;
-
-  // Metadata
-  chunk_metadata: Record<string, any>;
-  document_tags: string[];
+  chunk_metadata?: Record<string, any>;
+  document_tags?: string[];
   filename?: string;
   processing_status?: string;
   created_at?: string;
   source_metadata?: Record<string, any>;
 
-  // Related products (if enabled)
+  /**
+   * Added by `_enhance_search_results`. Shape comes from
+   * `ProductRelationshipService.find_related_products`, which returns `{id, name, ...}` —
+   * NOT `{product_id, product_name}`, which is what this was declared as until #350.
+   */
   related_products?: Array<{
-    product_id: string;
-    product_name: string;
-    relevance_score: number;
-    relationship_type: string;
+    id: string;
+    name?: string;
+    description?: string;
+    relationship_type?: string;
+    relevance_score?: number;
+    reason?: string;
+    metadata?: Record<string, any>;
+  }>;
+  related_images?: Array<{
+    id: string;
+    url?: string;
+    relationship_type?: string;
+    relevance_score?: number;
+    caption?: string;
   }>;
 
-  // Product-level enrichment (when result is product-shaped, not chunk-shaped)
+  // Product-level enrichment
   name?: string;
   category?: string;
   metafield_values?: Record<string, unknown>;

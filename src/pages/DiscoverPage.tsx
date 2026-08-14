@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   Users, MapPin, Globe, Building2, Package,
   Layers, X, Package2, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
   Sparkles, LayoutList, Home,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 import { useModule } from '@/modules/_core';
 import { PropertyDiscoveryTab } from '@/modules/real-estate/components/PropertyDiscoveryTab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
@@ -442,6 +443,7 @@ export const DiscoverPage: React.FC = () => {
   // Products / Factories
   const [products, setProducts] = useState<RawProduct[]>([]);
   const [searchParams] = useSearchParams();
+  const { toast } = useToast();
 
   // Sorting is a separate control from filtering — it never belongs in the filter modal.
   const [profileSort, setProfileSort] = useState<'followers' | 'views' | 'name'>('followers');
@@ -508,32 +510,67 @@ export const DiscoverPage: React.FC = () => {
     })));
   }
 
+  /**
+   * One row → one RawProduct. Shared by the catalog load and the smart-search fallback below so
+   * the two cannot drift — a product opened from search must be the same object the grid shows.
+   */
+  function toRawProduct(p: any): RawProduct {
+    const meta = (p.metadata ?? {}) as Record<string, any>;
+    // Use shared accessor so VALENOVA-style records (manufacturer in
+    // metadata.manufacturer rather than factory_group_name) are correctly
+    // bucketed under their real factory.
+    return {
+      ...p,
+      metadata: meta,
+      detectedCat: detectCat(meta),
+      factoryName: getManufacturer(meta) || 'Unknown',
+      imageUrl: getProductImageUrl(p),
+    };
+  }
+
+  const PRODUCT_SELECT = `id, name, description, status, metadata, ${PRODUCT_IMAGE_SELECT}`;
+
   async function loadProducts() {
     const { data } = await supabase
       .from('products')
-      .select(`id, name, description, status, metadata, ${PRODUCT_IMAGE_SELECT}`)
+      .select(PRODUCT_SELECT)
       .limit(300);
     if (!data) return;
 
-    setProducts(data.map((p) => {
-      const meta = (p.metadata ?? {}) as Record<string, any>;
-      // Use shared accessor so VALENOVA-style records (manufacturer in
-      // metadata.manufacturer rather than factory_group_name) are correctly
-      // bucketed under their real factory.
-      const factoryName = getManufacturer(meta) || 'Unknown';
-      return {
-        ...p,
-        metadata: meta,
-        detectedCat: detectCat(meta),
-        factoryName,
-        imageUrl: getProductImageUrl(p),
-      };
-    }));
+    setProducts(data.map(toRawProduct));
   }
 
   function openProduct(p: RawProduct) {
     setModalProduct(toProduct(p));
   }
+
+  /**
+   * Open a product the user picked somewhere that only knows its id — currently the smart-search
+   * results. The grid holds at most 300 rows, so a search hit outside that window is not in
+   * `products` and has to be fetched; before #350 this path looked the id up in `products` and
+   * silently did nothing when it missed, which was every time, because the id it was handed was
+   * a chunk_id the search never actually returns.
+   */
+  const openProductById = useCallback(async (id: string) => {
+    if (!id) return;
+    const local = products.find((p) => p.id === id);
+    if (local) { openProduct(local); return; }
+    const { data, error } = await supabase
+      .from('products')
+      .select(PRODUCT_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (error || !data) {
+      toast({
+        title: 'Could not open that result',
+        description: error?.message ?? 'That product is no longer available.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    openProduct(toRawProduct(data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
 
   // Deep-link: /discover?product=<id> (e.g. from a Brand page) opens that
   // product's detail modal once the catalog has loaded.
@@ -841,10 +878,7 @@ export const DiscoverPage: React.FC = () => {
             {productMode === 'smart' ? (
               <UnifiedSearchInterface
                 initialQuery={smartInitialQuery}
-                onMaterialSelect={(id) => {
-                  const raw = products.find((p) => p.id === id);
-                  if (raw) openProduct(raw);
-                }}
+                onMaterialSelect={openProductById}
               />
             ) : (
               <>

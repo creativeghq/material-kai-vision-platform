@@ -16,7 +16,7 @@ Two independent producers write to it, and they never see each other:
 
 | Producer | Events | Auth |
 |---|---|---|
-| [manufacturerAnalyticsService.ts](../src/services/manufacturerAnalyticsService.ts) | `product_view`, `product_save`, `product_quote`, `product_compare` | the signed-in user |
+| [manufacturerAnalyticsService.ts](../src/services/manufacturerAnalyticsService.ts) | `product_view`, `product_save`, `product_quote`, `product_compare`, `product_search_impression`, `product_search_click` | the signed-in user |
 | [products-3d-api](../supabase/functions/products-3d-api/index.ts) (`EMBED_EVENT_TYPES`) | `embed_view`, `embed_model_load`, `embed_ar_launch`, `embed_add_to_cart`, `embed_configure`, `embed_plan_room` | service role, per embed key |
 
 `event_type` is CHECK-constrained to the union of both lists. **Adding an event to either producer
@@ -29,13 +29,20 @@ Every declared product event has a live call site, and the guard test asserts it
 `product_save` ([AddToMoodboardButton](../src/components/business/moodboard/AddToMoodboardButton.tsx)),
 `product_quote` ([AddToQuoteButton](../src/modules/quotes/components/AddToQuoteButton.tsx)),
 `product_compare` ([MaterialComparePage](../src/pages/MaterialComparePage.tsx), once a shortlist of
-2–4 actually loads).
+2–4 actually loads), and `product_search_impression` / `product_search_click`
+([UnifiedSearchInterface](../src/components/features/search/UnifiedSearchInterface.tsx)).
 
-`product_search_impression` and `product_search_click` were **removed**, not wired. There is no
-surface that could emit them: the only search UI ([UnifiedSearchInterface](../src/components/features/search/UnifiedSearchInterface.tsx))
-returns PDF chunks, whose ids are `chunk_id`s rather than product ids, and products in Discover are
-browsed with facets and already emit `product_view` — an "impression" there would be the same event
-under a second name.
+**An impression is not a view.** `product_view` fires when a catalog card scrolls into sight;
+`product_search_impression` means the product was shown inside a *ranked result set*, and carries
+the query and its rank. Only what actually renders counts — impressions key off the post-filtered
+results, deduped per search, so narrowing a filter does not re-count.
+
+> The search surface is real, but it was invisible for a while. `multi_vector` returns
+> **product-shaped** rows (`{id: <product_id>, product_name, description, metadata, score}`), and
+> the frontend was mapping `id` from `result.chunk_id` — a field that payload never carries. Every
+> result arrived with an undefined id, rendered untitled, and its click matched no product. Fixed
+> in #350; `SearchResult` in [unifiedSearchService.ts](../src/services/unifiedSearchService.ts) now
+> declares chunk-shaped fields optional so the compiler refuses that mistake.
 
 The service batches: flush every 5s or at 20 events, fire-and-forget, and it never blocks the UI.
 A batch rejected for a permanent reason (bad `event_type`, RLS refusal, dangling `product_id`) is
