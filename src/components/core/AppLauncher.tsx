@@ -42,42 +42,10 @@ export const AppLauncher: React.FC = () => {
 
   useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
 
-  // All apps (active + available-to-add) grouped into Hubs. Inactive apps stay visible in their Hub
-  // with a lock → Enable/Request inline (upsell → revenue).
+  // All apps (active + available-to-add). Inactive apps stay visible in their Hub with a lock →
+  // Enable/Request inline (upsell → revenue).
   const allApps = useMemo(() => [...active, ...available], [active, available]);
-  const hubGroups = useMemo(() => groupAppsByHub(allApps), [allApps]);
 
-  // Default the middle to the first non-empty Hub once loaded.
-  useEffect(() => {
-    if (activeHubKey) return;
-    const first = hubGroups[0];
-    if (first) setActiveHubKey(first.hub?.id ?? 'more');
-  }, [hubGroups, activeHubKey]);
-
-  const byId = useMemo(() => {
-    const m = new Map<string, LauncherApp>();
-    allApps.forEach((a) => m.set(a.id, a));
-    return m;
-  }, [allApps]);
-
-  const activeHubGroup = activeHubKey
-    ? hubGroups.find((g) => (g.hub?.id ?? 'more') === activeHubKey) ?? null
-    : null;
-
-  const go = (path: string, moduleId?: string) => {
-    setOpen(false);
-    if (moduleId) setRecent(pushRecent(moduleId));
-    navigate(path);
-  };
-
-  const onEnable = async (e: React.MouseEvent, app: LauncherApp) => {
-    e.stopPropagation();
-    const res = await enable(app);
-    toast({ title: res.message, variant: res.ok ? 'default' : 'destructive' });
-  };
-
-  // An app's agent-capability quick-starts (Interior / Social / SEO carry ?capability=<id>), used as
-  // a fallback set of inner links when the app has no page sections/create-actions.
   const capabilityQuickStarts = (app: LauncherApp) => {
     const capId = new URLSearchParams(app.path.split('?')[1] || '').get('capability');
     const cap = capId ? getCapability(capId) : undefined;
@@ -111,6 +79,47 @@ export const AppLauncher: React.FC = () => {
     [active, isModuleAvailable],
   );
 
+  // ...and they come OUT of the hub, rather than appearing in both places. A card whose only
+  // content is its own name is not worth a row in the middle column when the rail already offers
+  // exactly that click. Only ACTIVE apps are ever promoted, so an available-to-add app keeps its
+  // hub card and its Enable button.
+  const hubGroups = useMemo(() => {
+    const promoted = new Set(directApps.map((a) => a.id));
+    return groupAppsByHub(allApps.filter((a) => !promoted.has(a.id)));
+  }, [allApps, directApps]);
+
+
+  // Default the middle to the first non-empty Hub once loaded.
+  useEffect(() => {
+    if (activeHubKey) return;
+    const first = hubGroups[0];
+    if (first) setActiveHubKey(first.hub?.id ?? 'more');
+  }, [hubGroups, activeHubKey]);
+
+  const byId = useMemo(() => {
+    const m = new Map<string, LauncherApp>();
+    allApps.forEach((a) => m.set(a.id, a));
+    return m;
+  }, [allApps]);
+
+  const activeHubGroup = activeHubKey
+    ? hubGroups.find((g) => (g.hub?.id ?? 'more') === activeHubKey) ?? null
+    : null;
+
+  const go = (path: string, moduleId?: string) => {
+    setOpen(false);
+    if (moduleId) setRecent(pushRecent(moduleId));
+    navigate(path);
+  };
+
+  const onEnable = async (e: React.MouseEvent, app: LauncherApp) => {
+    e.stopPropagation();
+    const res = await enable(app);
+    toast({ title: res.message, variant: res.ok ? 'default' : 'destructive' });
+  };
+
+  // An app's agent-capability quick-starts (Interior / Social / SEO carry ?capability=<id>), used as
+  // a fallback set of inner links when the app has no page sections/create-actions.
   const shortcutRow = (s: LauncherSection) => (
     <button
       key={s.to}

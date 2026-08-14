@@ -113,18 +113,26 @@ export const TemplateLibraryPage: React.FC = () => {
     [templates, usableTypes],
   );
 
+  // Counted over the STARTERS only, because that is what a type tab now shows. A count that
+  // includes rows the tab will not render is a number that argues with the screen.
   const countByType = useMemo(() => {
     const m = new Map<string, number>();
-    for (const t of listed) m.set(t.entity_type, (m.get(t.entity_type) ?? 0) + 1);
+    for (const t of listed) if (t.is_platform_starter) m.set(t.entity_type, (m.get(t.entity_type) ?? 0) + 1);
     return m;
   }, [listed]);
+  const starterCount = useMemo(() => listed.filter((t) => t.is_platform_starter).length, [listed]);
 
+  /*
+    The rail is a SOURCE split first, a type split second. `mine` is everything this workspace saved,
+    across all types; every other tab is the starter library, optionally narrowed to one type. Own
+    templates used to be repeated under every type tab as well, which put the same card on screen
+    twice and pushed the starters below the fold.
+  */
   const visible = useMemo(() => {
-    // MINE spans every type — it is a source filter, not a type filter. `own`/`starters` below
-    // then split it, and starters comes out empty by construction rather than by a second rule.
     if (activeTab === MINE_TAB) return listed.filter((t) => !t.is_platform_starter);
-    if (activeTab === ALL_TAB || activeTab === LIBRARIES_TAB) return listed;
-    return listed.filter((t) => t.entity_type === activeTab);
+    const catalogue = listed.filter((t) => t.is_platform_starter);
+    if (activeTab === ALL_TAB || activeTab === LIBRARIES_TAB) return catalogue;
+    return catalogue.filter((t) => t.entity_type === activeTab);
   }, [listed, activeTab]);
   const own = visible.filter((t) => !t.is_platform_starter);
   const starters = visible.filter((t) => t.is_platform_starter);
@@ -291,39 +299,47 @@ export const TemplateLibraryPage: React.FC = () => {
     <>
       <SectionHeader
         icon={activeAdapter?.icon ?? (activeTab === MINE_TAB ? LayoutTemplate : Layers)}
-        title={activeAdapter?.plural ?? (activeTab === MINE_TAB ? 'My templates' : 'All templates')}
+        title={activeAdapter?.plural ?? (activeTab === MINE_TAB ? 'My templates' : 'Starter templates')}
         subtitle={activeAdapter?.description
           ?? (activeTab === MINE_TAB
             ? 'Every template this workspace saved or built, across all types.'
-            : 'Everything saved in this workspace, plus the platform starters you can copy and edit.')}
+            : 'Platform starters. Copy one into your workspace to edit it.')}
       />
 
       {loading ? (
         <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="space-y-6">
-          <section className="space-y-2">
-            <div className="text-sm font-medium">Your templates</div>
-            {own.length === 0 ? (
-              <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
-                Nothing saved yet. Open any {activeAdapter ? activeAdapter.label.toLowerCase() : 'invoice, quote, project or moodboard'} and
-                choose <span className="font-medium">Save as template</span> — or copy a starter below.
-              </CardContent></Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {own.map((t) => <Tile key={t.id} tpl={t} />)}
-              </div>
-            )}
-          </section>
-
-          {starters.length > 0 && (
+          {/* Your own templates belong to the My Templates view and appear ONLY there. Repeating
+              them under every type tab meant the same card was on screen twice the moment you had
+              saved anything, and pushed the starters — the half you cannot get anywhere else —
+              below the fold. */}
+          {activeTab === MINE_TAB && (
             <section className="space-y-2">
-              <div className="text-sm font-medium flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Starter examples</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {starters.map((t) => <Tile key={t.id} tpl={t} />)}
-              </div>
+              {own.length === 0 ? (
+                <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
+                  Nothing saved yet. Open any invoice, quote, project or moodboard and
+                  choose <span className="font-medium">Save as template</span>, or start one with <span className="font-medium">Add New</span>.
+                </CardContent></Card>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {own.map((t) => <Tile key={t.id} tpl={t} />)}
+                </div>
+              )}
             </section>
           )}
+
+          {/* No inner "Starter examples" heading: the panel IS the starters now, and the
+              SectionHeader above already says so. */}
+          {activeTab !== MINE_TAB && (starters.length === 0 ? (
+            <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
+              No starter templates for this type yet.
+            </CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {starters.map((t) => <Tile key={t.id} tpl={t} />)}
+            </div>
+          ))}
         </div>
       )}
     </>
@@ -392,10 +408,13 @@ export const TemplateLibraryPage: React.FC = () => {
 
             <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
 
+            {/* Labelled for what it holds. It stopped being "All" the moment your own templates
+                moved to their own view, and a tab that says All while showing half the library is
+                worse than one with a narrower name. */}
             <TabsTrigger value={ALL_TAB} className="w-full justify-start">
-              <Layers className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">All</span>
-              {listed.length > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{listed.length}</span>}
+              <Sparkles className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Starters</span>
+              {starterCount > 0 && <span className="ml-auto pl-2 text-xs tabular-nums opacity-70">{starterCount}</span>}
             </TabsTrigger>
 
             {usableTypes.map((t: LiveTemplateEntityType) => {

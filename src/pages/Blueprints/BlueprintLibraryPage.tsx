@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, LayoutTemplate, Layers, Sparkles, Trash2, Pencil, Copy, Eye, ChevronLeft } from 'lucide-react';
+import { Loader2, Plus, LayoutTemplate, Sparkles, Trash2, Pencil, Copy, Eye, ChevronLeft } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -17,7 +17,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
-import { blueprintsService, type Blueprint } from '@/services/blueprintsService';
+import { blueprintsService, type Blueprint, type BlueprintItem } from '@/services/blueprintsService';
 
 /**
  * Rail values. The axis is the blueprint's SOURCE — yours vs the platform's — because that is the
@@ -41,9 +41,17 @@ const STARTERS_TAB = 'starters';
  */
 type BlueprintTab = typeof MINE_TAB | typeof ALL_TAB | typeof STARTERS_TAB;
 
+/**
+ * The two FIXED rail entries. Everything below them in the rail is one starter blueprint by name —
+ * with five starters, a single "Starters" bucket hid every one of them behind a second click and
+ * told you nothing about what was in there. Naming them makes the rail the index it should have
+ * been, and selecting one previews it on the right.
+ *
+ * `all` stays as the value the two named entries fall back to, and as what "Open" reaches.
+ */
 const BLUEPRINT_TABS = [
   { value: 'mine', label: 'My Blueprints', icon: LayoutTemplate },
-  { value: 'all', label: 'All', icon: Layers },
+  { value: 'all', label: 'All Starters', icon: Sparkles },
   { value: 'starters', label: 'Starters', icon: Sparkles },
 ] as const satisfies readonly { value: BlueprintTab; label: string; icon: LucideIcon }[];
 
@@ -118,8 +126,37 @@ export const BlueprintLibraryPage: React.FC = () => {
   const setTab = (v: string) => {
     const p = new URLSearchParams(searchParams);
     if (v === ALL_TAB) p.delete('tab'); else p.set('tab', v);
+    p.delete('bp');
     setSearchParams(p, { replace: true });
   };
+
+  /*
+    A named rail entry selects one blueprint into the preview. It rides in `?bp=` rather than `?tab=`
+    so the tab param keeps a small closed vocabulary the deep-link guard can check — an id is not a
+    pane, and putting it in `?tab=` would make every future guard run report an unknown tab.
+  */
+  const selectedId = searchParams.get('bp');
+  const selected = useMemo(() => blueprints.find((b) => b.id === selectedId) ?? null, [blueprints, selectedId]);
+  const [preview, setPreview] = useState<BlueprintItem[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const selectBlueprint = (id: string) => {
+    const p = new URLSearchParams(searchParams);
+    p.set('bp', id);
+    p.delete('tab');
+    setSearchParams(p, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!selectedId) { setPreview([]); return; }
+    let cancelled = false;
+    setPreviewLoading(true);
+    blueprintsService.listItems(selectedId)
+      .then((its) => { if (!cancelled) setPreview(its); })
+      .catch(() => { if (!cancelled) setPreview([]); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedId]);
 
   const createBlueprint = async () => {
     if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
@@ -205,8 +242,80 @@ export const BlueprintLibraryPage: React.FC = () => {
     </CardContent></Card>
   );
 
+  const previewSections = useMemo(
+    () => preview.filter((i) => i.kind === 'section').sort((a, b) => a.sort_order - b.sort_order),
+    [preview],
+  );
+
   const grid = (list: Blueprint[]) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{list.map((b) => <Tile key={b.id} b={b} />)}</div>
+  );
+
+  /* Read-only preview of one blueprint: its sections and the tasks under each, with the copy verb
+     at the TOP where the decision is made — you decide from the scope, not after scrolling it. */
+  const previewPanel = selected && (
+    <>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SectionHeader
+          icon={selected.is_platform_starter ? Sparkles : LayoutTemplate}
+          title={selected.title}
+          subtitle={selected.description || (selected.is_platform_starter
+            ? 'A platform starter. Copy it into your library to edit it.'
+            : 'Your blueprint.')}
+        />
+        <div className="flex shrink-0 items-center gap-2 pt-1">
+          {selected.is_platform_starter ? (
+            <Button size="sm" className="rounded-full" disabled={busy} onClick={() => duplicateStarter(selected)}>
+              <Copy className="h-4 w-4 mr-1" /> Copy to my library
+            </Button>
+          ) : (
+            <Button size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${selected.id}`)}>
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${selected.id}`)}>
+            <Eye className="h-4 w-4 mr-1" /> Open
+          </Button>
+        </div>
+      </div>
+
+      {previewLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      ) : previewSections.length === 0 ? (
+        <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
+          This blueprint has no sections yet.
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {previewSections.map((sec) => {
+            const tasks = preview.filter((i) => i.kind === 'task' && i.parent_id === sec.id);
+            return (
+              <Card key={sec.id} className="dashboard-card">
+                <CardContent className="p-4">
+                  <div className="text-sm font-medium">{sec.label}</div>
+                  {tasks.length === 0 ? (
+                    <div className="mt-1 text-xs text-muted-foreground">No tasks in this section.</div>
+                  ) : (
+                    <ul className="mt-2 space-y-1">
+                      {tasks.map((t) => (
+                        <li key={t.id} className="flex items-baseline justify-between gap-3 text-xs">
+                          <span className="min-w-0 truncate text-muted-foreground">{t.label}</span>
+                          {t.unit && (
+                            <span className="shrink-0 tabular-nums text-muted-foreground/70">
+                              {t.default_quantity ?? 1} {t.unit}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 
   const panel = loading ? (
@@ -214,30 +323,18 @@ export const BlueprintLibraryPage: React.FC = () => {
   ) : (
     <>
       <SectionHeader
-        icon={activeTab === STARTERS_TAB ? Sparkles : activeTab === MINE_TAB ? LayoutTemplate : Layers}
-        title={activeTab === STARTERS_TAB ? 'Starter blueprints' : activeTab === MINE_TAB ? 'My blueprints' : 'All blueprints'}
-        subtitle={activeTab === STARTERS_TAB
-          ? 'Platform-built scopes. Copy one into your library to edit it.'
-          : activeTab === MINE_TAB
-            ? 'Everything this workspace built or copied.'
-            : 'Everything in this workspace, plus the platform starters you can copy and edit.'}
+        icon={activeTab === MINE_TAB ? LayoutTemplate : Sparkles}
+        title={activeTab === MINE_TAB ? 'My blueprints' : 'Starter blueprints'}
+        subtitle={activeTab === MINE_TAB
+          ? 'Everything this workspace built or copied.'
+          : 'Platform-built scopes — pick one from the rail to preview it, or copy it into your library.'}
       />
-      {activeTab === MINE_TAB && (own.length === 0 ? emptyOwn : grid(own))}
-      {activeTab === STARTERS_TAB && grid(starters)}
-      {activeTab === ALL_TAB && (
-        <div className="space-y-6">
-          <section className="space-y-2">
-            <div className="text-sm font-medium">Your blueprints</div>
-            {own.length === 0 ? emptyOwn : grid(own)}
-          </section>
-          {starters.length > 0 && (
-            <section className="space-y-2">
-              <div className="text-sm font-medium flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Starter blueprints</div>
-              {grid(starters)}
-            </section>
-          )}
-        </div>
-      )}
+      {/* Your own blueprints render under My Blueprints and nowhere else. They used to head the
+          All view as well, so the same card was on screen twice and the starters — the half you
+          cannot get anywhere else — sat below them. */}
+      {activeTab === MINE_TAB
+        ? (own.length === 0 ? emptyOwn : grid(own))
+        : grid(starters)}
     </>
   );
 
@@ -268,8 +365,8 @@ export const BlueprintLibraryPage: React.FC = () => {
             </Button>
 
             <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
-              {BLUEPRINT_TABS.map((t) => {
-                const count = t.value === MINE_TAB ? own.length : t.value === STARTERS_TAB ? starters.length : blueprints.length;
+              {BLUEPRINT_TABS.filter((t) => t.value !== STARTERS_TAB).map((t) => {
+                const count = t.value === MINE_TAB ? own.length : blueprints.length;
                 return (
                   <React.Fragment key={t.value}>
                     {t.value === ALL_TAB && (
@@ -286,10 +383,34 @@ export const BlueprintLibraryPage: React.FC = () => {
                 );
               })}
             </TabsList>
+
+            {/* Starters by NAME. Deliberately plain buttons rather than TabsTriggers: the rail
+                selection they drive is `?bp=<id>`, not a tab pane, and a TabsTrigger whose value
+                matched no TabsContent would leave Radix with nothing selected. */}
+            {starters.length > 0 && (
+              <div className="space-y-1">
+                {starters.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => selectBlueprint(b.id)}
+                    className={[
+                      'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                      b.id === selectedId
+                        ? 'bg-accent text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                    <span className="min-w-0 truncate">{b.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="min-w-0 flex-1">
-            {TAB_VALUES.map((v) => (
+            {selected ? previewPanel : TAB_VALUES.map((v) => (
               <TabsContent key={v} value={v} className="mt-0">
                 {panel}
               </TabsContent>
