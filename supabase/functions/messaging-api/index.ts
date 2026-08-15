@@ -28,6 +28,8 @@ import {
   zernioKey,
   ensureZernioSecrets,
   fetchZernioAccount,
+  ensureZernioWebhook,
+  getZernioWebhookStatus,
   publicAppUrl,
   resolveWorkspaceProfile,
   sendWhatsAppMessage,
@@ -129,6 +131,29 @@ async function resolveChannel(supabase: any, workspaceIds: string[] | null, from
     return null;
   }
   return data?.[0] ?? null;
+}
+
+
+/**
+ * Whether a template-less send may go out as a Meta Direct Send UTILITY message.
+ *
+ * WhatsApp refuses a business-initiated message outside the 24h service window unless it uses
+ * an approved template. Before Direct Send existed, a send with no template bound simply
+ * failed at Meta for every cold recipient — the operator saw a provider error and had no way
+ * to act on it except to go and get a template approved (up to 24h).
+ *
+ * `category: 'utility'` lifts that for UTILITY content: Meta matches or auto-creates the
+ * template asynchronously. It is NOT a way around marketing rules — marketing content under
+ * this category is rejected — so a marketing send still requires its approved template, and
+ * asking for one here would swap a clear Meta rejection for a confusing one.
+ */
+function directSendCategory(
+  template: { whatsapp_template_name?: string | null } | null | undefined,
+  messageType: string | undefined,
+): 'utility' | undefined {
+  if (template?.whatsapp_template_name) return undefined;   // a template wins; both is a 400
+  if (messageType === 'marketing') return undefined;        // not allowed under utility
+  return 'utility';
 }
 
 /**
@@ -251,6 +276,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const OPERATOR_ACTIONS = new Set([
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
+      'register-webhook', 'create-whatsapp-template',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -360,6 +386,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               templateName: template?.whatsapp_template_name || undefined,
               templateLanguage: template?.whatsapp_language_code || undefined,
               templateParams: template ? orderedTemplateParams(template, body.templateVariables || {}) : undefined,
+              category: directSendCategory(template, body.messageType),
             });
           } catch (sendErr) {
             if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
@@ -465,6 +492,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               templateName: template?.whatsapp_template_name || undefined,
               templateLanguage: template?.whatsapp_language_code || undefined,
               templateParams: template ? orderedTemplateParams(template, vars) : undefined,
+              category: directSendCategory(template, body.messageType),
             });
           } catch (sendErr) {
             if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
@@ -636,6 +664,63 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Webhook registration.
+      //
+      // Nothing ever told Zernio where to deliver events, so zernio-webhook-handler — which
+      // verifies signatures and writes the whole WhatsApp inbox — was unreachable by
+      // construction. That cannot be inferred locally: "no inbound messages" and "Zernio was
+      // never asked to send any" look identical from here.
+      // ─────────────────────────────────────────────────────────────
+      case 'webhook-status': {
+        const status = await getZernioWebhookStatus();
+        return jsonResponse({ success: true, ...status });
+      }
+
+      case 'register-webhook': {
+        try {
+          const { action: outcome, status } = await ensureZernioWebhook(supabaseClient);
+          return jsonResponse({ success: true, outcome, ...status });
+        } catch (err) {
+          // A missing signing secret is the operator's to fix, not a server fault.
+          throw new HttpError(400, err instanceof Error ? err.message : String(err));
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Submit a WhatsApp template to Meta for approval.
+      //
+      // whatsapp-templates only ever LISTED what Meta had already approved, so the only way to
+      // get a new one was to leave this app for WhatsApp Manager. A `library` template is
+      // pre-approved and usable immediately; a custom one goes to review (up to 24h).
+      // ─────────────────────────────────────────────────────────────
+      case 'create-whatsapp-template': {
+        const { from, name, category, language, components, libraryTemplateName } = requestBody;
+        if (!name || !category || !language) {
+          throw new HttpError(400, 'name, category and language are required');
+        }
+        if (!components && !libraryTemplateName) {
+          throw new HttpError(400, 'Provide either components (custom template) or libraryTemplateName');
+        }
+        if (!['AUTHENTICATION', 'MARKETING', 'UTILITY'].includes(category)) {
+          throw new HttpError(400, 'category must be AUTHENTICATION, MARKETING or UTILITY');
+        }
+
+        const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), from);
+        if (!channel?.zernio_account_id) throw new HttpError(400, 'No WhatsApp channel configured');
+        { const gate = await requireMessaging(channel.workspace_id); if (gate) return gate; }
+
+        const payload: Record<string, unknown> = {
+          accountId: channel.zernio_account_id,
+          name, category, language,
+        };
+        if (libraryTemplateName) payload.library_template_name = libraryTemplateName;
+        else payload.components = components;
+
+        const res = await zernioApi('POST', '/whatsapp/templates', payload);
+        return jsonResponse({ success: true, template: res.template ?? res });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Sync channels: pull connected WhatsApp accounts from Zernio
       // ─────────────────────────────────────────────────────────────
       case 'sync-channels': {
@@ -645,7 +730,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const syncWsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
         if (!syncWsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(syncWsId); if (gate) return gate; }
-        const data = await zernioApi('GET', '/accounts?platform=whatsapp');
+        // includeOverLimit so a plan-limit account still reconciles instead of vanishing
+        // from the sync and looking deleted.
+        const data = await zernioApi('GET', '/accounts?platform=whatsapp&includeOverLimit=true');
         const accounts = (data.accounts || data.data || []) as any[];
         const synced: any[] = [];
 
@@ -659,13 +746,18 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             .eq('zernio_account_id', accountId).maybeSingle();
 
           if (existing) {
+            // Zernio flags an account whose token Meta has invalidated. It still LISTS, so
+            // treating the row as healthy left a channel that looked connected and failed
+            // every send. needsReconnection is the only signal that says so.
+            const needsReconnect = acc.needsReconnection === true;
             await supabaseClient.from('messaging_channels').update({
               sender_id: senderId,
               display_name: acc.displayName || senderId,
-              is_active: acc.isActive !== false,
+              is_active: acc.isActive !== false && !needsReconnect,
+              config: { ...(acc.metadata ?? {}), zernio_account_id: accountId, display_phone_number: senderId, needs_reconnection: needsReconnect },
               updated_at: new Date().toISOString(),
             }).eq('id', existing.id);
-            synced.push({ action: 'updated', senderId });
+            synced.push({ action: needsReconnect ? 'needs_reconnection' : 'updated', senderId });
           } else {
             const { count } = await supabaseClient
               .from('messaging_channels').select('*', { count: 'exact', head: true })
@@ -680,11 +772,11 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               sender_id: senderId,
               zernio_account_id: accountId,
               display_name: acc.displayName || senderId,
-              is_active: acc.isActive !== false,
+              is_active: acc.isActive !== false && acc.needsReconnection !== true,
               is_default: (count || 0) === 0,
               daily_quota: 10000,
               max_send_rate: 100,
-              config: { zernio_account_id: accountId, display_phone_number: senderId },
+              config: { zernio_account_id: accountId, display_phone_number: senderId, needs_reconnection: acc.needsReconnection === true },
             });
             if (chanErr) {
               console.error(`[messaging-api] could not create the channel for ${senderId}`, chanErr);

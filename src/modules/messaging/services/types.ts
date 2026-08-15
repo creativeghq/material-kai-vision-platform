@@ -189,6 +189,27 @@ export interface WhatsAppOAuthStart {
   profile_id: string;
 }
 
+/**
+ * Which Embedded Signup screen Meta shows.
+ *  - `api`          standard WABA/number picker, for a number already on Cloud API
+ *  - `business_app` coexistence: a number shared with the consumer WhatsApp Business app
+ * Omitting it inherits Zernio's default, which is coexistence.
+ */
+export type WhatsAppOnboardingMode = 'api' | 'business_app';
+
+/** Zernio-side delivery registration for our webhook handler. */
+export interface ZernioWebhookStatus {
+  registered: boolean;
+  webhookId?: string;
+  url: string;
+  isActive?: boolean;
+  failureCount?: number;
+  lastFiredAt?: string | null;
+  missingEvents?: string[];
+  secretConfigured: boolean;
+  outcome?: 'created' | 'updated' | 'unchanged';
+}
+
 export interface MessageLogFilters {
   status?: MessageStatus;
   channelType?: MessagingChannelType;

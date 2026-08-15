@@ -20,6 +20,8 @@ import type {
   SendBulkOptions,
   ConnectWhatsAppOptions,
   WhatsAppOAuthStart,
+  WhatsAppOnboardingMode,
+  ZernioWebhookStatus,
   MessageLogFilters,
   MessagingAnalyticsResponse,
 } from './types';
@@ -399,7 +401,7 @@ export class MessagingService {
      * already on Cloud API); `business_app` = coexistence, sharing a number with the consumer
      * WhatsApp Business app. Omitted means Zernio's default, which is coexistence.
      */
-    onboarding?: 'api' | 'business_app';
+    onboarding?: WhatsAppOnboardingMode;
   } = {}): Promise<WhatsAppOAuthStart> {
     const { data, error } = await supabase.functions.invoke('messaging-api', {
       body: { action: 'connect-whatsapp-oauth', ...options },
@@ -435,6 +437,53 @@ export class MessagingService {
       body: { action: 'connect-whatsapp', ...options },
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Failed to connect WhatsApp'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
+   * Is our webhook handler actually registered with Zernio?
+   *
+   * Nothing in this platform ever registered it, so the inbound path (replies, delivery
+   * receipts, number health) was unreachable by construction. "No inbound messages" and
+   * "Zernio was never told where to deliver" are indistinguishable without asking.
+   */
+  async getWebhookStatus(): Promise<ZernioWebhookStatus> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'webhook-status' },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to read webhook status'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /** Create or repair the Zernio webhook registration (also re-enables an auto-disabled one). */
+  async registerWebhook(): Promise<ZernioWebhookStatus> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'register-webhook' },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to register the webhook'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
+   * Submit a WhatsApp template to Meta. Pass `libraryTemplateName` for one of Meta's
+   * pre-approved library templates (usable immediately), or `components` for a custom
+   * template (review can take up to 24h).
+   */
+  async createWhatsAppTemplate(options: {
+    name: string;
+    category: 'AUTHENTICATION' | 'MARKETING' | 'UTILITY';
+    language: string;
+    components?: unknown[];
+    libraryTemplateName?: string;
+    from?: string;
+  }): Promise<{ template: Record<string, unknown> }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'create-whatsapp-template', ...options },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to create the template'));
     if (data?.error) throw new Error(data.error);
     return data;
   }

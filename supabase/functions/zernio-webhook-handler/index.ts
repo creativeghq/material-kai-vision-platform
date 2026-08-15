@@ -569,14 +569,138 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       }
     }
 
+    // ── account.connected ───────────────────────────────────────────
+    // Zernio announces a finished connection here, whoever started it — including one made
+    // straight in the Zernio dashboard, which the OAuth callback never sees. Without this the
+    // only way such an account reached us was an operator remembering to press "Sync from
+    // Zernio", so a number could be live at Meta and invisible here indefinitely.
+    else if (event === 'account.connected') {
+      const zernioAccountId = accountIdOf(account);
+      const platform: string | undefined = account?.platform;
+      const profileId: string | undefined = account?.profileId;
+
+      // Bind to the workspace that owns the Zernio profile. Without one we cannot place the
+      // row safely (a NULL workspace_id channel is visible to every tenant), so skip rather
+      // than write it unbound.
+      let workspaceId: string | null = null;
+      if (profileId) {
+        const { data: prof } = await supabase
+          .from('social_zernio_profiles').select('workspace_id')
+          .eq('zernio_profile_id', profileId).maybeSingle();
+        workspaceId = prof?.workspace_id ?? null;
+      }
+
+      if (!zernioAccountId || !workspaceId) {
+        console.warn(`[zernio-webhook] account.connected without a resolvable workspace (account=${zernioAccountId}, profile=${profileId}) — ignored`);
+      } else if (platform === 'whatsapp') {
+        const senderId = account?.selectedPhoneNumber || account?.username || account?.platformIdentifier;
+        const { data: existing } = await supabase
+          .from('messaging_channels').select('id')
+          .eq('zernio_account_id', zernioAccountId).maybeSingle();
+        if (existing) {
+          const { error: updErr } = await supabase.from('messaging_channels')
+            .update({ is_active: true, sender_id: senderId, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+          if (updErr) console.error('[zernio-webhook] account.connected channel refresh FAILED', zernioAccountId, updErr);
+        } else if (senderId) {
+          const { count } = await supabase
+            .from('messaging_channels').select('*', { count: 'exact', head: true })
+            .eq('channel_type', 'whatsapp');
+          const { error: insErr } = await supabase.from('messaging_channels').insert({
+            workspace_id: workspaceId,
+            channel_type: 'whatsapp',
+            provider: 'zernio',
+            sender_id: senderId,
+            zernio_account_id: zernioAccountId,
+            display_name: account?.displayName || senderId,
+            is_active: true,
+            is_default: (count || 0) === 0,
+            daily_quota: 10000,
+            max_send_rate: 100,
+            config: {
+              zernio_account_id: zernioAccountId,
+              display_phone_number: senderId,
+              profile_id: profileId ?? null,
+            },
+          });
+          // The row is the ONLY trace that this number connected — Zernio does not resend
+          // account.connected, and supabase-js resolves on an RLS denial rather than throwing.
+          if (insErr) console.error('[zernio-webhook] account.connected channel insert FAILED', senderId, insErr);
+        }
+      } else {
+        const { error: upErr } = await supabase.from('social_accounts').upsert({
+          workspace_id: workspaceId,
+          platform,
+          zernio_account_id: zernioAccountId,
+          handle: account?.username,
+          display_name: account?.displayName,
+          avatar_url: account?.profilePicture ?? null,
+          followers_count: account?.followersCount ?? 0,
+          is_active: true,
+          last_synced_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id,platform,zernio_account_id' });
+        if (upErr) console.error('[zernio-webhook] account.connected social upsert FAILED', zernioAccountId, upErr);
+      }
+    }
+
     // ── account.disconnected ────────────────────────────────────────
     else if (event === 'account.disconnected') {
-      const zernioAccountId: string | undefined = account?.accountId;
+      const zernioAccountId = accountIdOf(account) || account?.accountId;
       if (zernioAccountId) {
-        await supabase
+        const { error: saErr } = await supabase
           .from('social_accounts')
           .update({ is_active: false })
           .eq('zernio_account_id', zernioAccountId);
+        if (saErr) console.error('[zernio-webhook] account.disconnected social update FAILED', zernioAccountId, saErr);
+        // A disconnected WhatsApp number cannot send. Leaving the channel active meant every
+        // subsequent send failed at Meta with nothing on the channel card explaining why.
+        const { error: mcErr } = await supabase
+          .from('messaging_channels')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('zernio_account_id', zernioAccountId);
+        if (mcErr) console.error('[zernio-webhook] account.disconnected channel update FAILED', zernioAccountId, mcErr);
+      }
+    }
+
+    // ── whatsapp.number.* — operational health of the sender number ─
+    // Meta can decline, suspend or release a number without anything in this app changing.
+    // Each of these stops sending outright, so the channel must not stay green.
+    else if (typeof event === 'string' && event.startsWith('whatsapp.number.')) {
+      const zernioAccountId = accountIdOf(account);
+      const HEALTHY = new Set(['whatsapp.number.activated', 'whatsapp.number.reactivated']);
+      const isHealthy = HEALTHY.has(event);
+      if (zernioAccountId) {
+        const { error: numErr } = await supabase
+          .from('messaging_channels')
+          .update({ is_active: isHealthy, updated_at: new Date().toISOString() })
+          .eq('zernio_account_id', zernioAccountId);
+        if (numErr) console.error(`[zernio-webhook] ${event} channel update FAILED`, zernioAccountId, numErr);
+      }
+      if (!isHealthy) {
+        console.warn(`[zernio-webhook] ${event} for account ${zernioAccountId} — channel deactivated`);
+      }
+    }
+
+    // ── whatsapp.template.* ─────────────────────────────────────────
+    // Meta approves, rejects, or silently RE-CATEGORISES a template (which re-prices every
+    // message sent on it). Mirror the verdict so a rejected template stops being offered.
+    else if (event === 'whatsapp.template.status_updated' || event === 'whatsapp.template.category_updated') {
+      const tpl = (payload as any).template ?? {};
+      const name: string | undefined = tpl.name;
+      const status: string | undefined = tpl.status;
+      if (name) {
+        const approved = String(status || '').toUpperCase() === 'APPROVED';
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (status) {
+          patch.is_approved = approved;
+          patch.approval_status = approved ? 'approved' : 'rejected';
+          patch.is_active = approved;
+        }
+        const { error: tplErr } = await supabase
+          .from('messaging_templates')
+          .update(patch)
+          .eq('whatsapp_template_name', name);
+        if (tplErr) console.error(`[zernio-webhook] ${event} template update FAILED`, name, tplErr);
       }
     }
 

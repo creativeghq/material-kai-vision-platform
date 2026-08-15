@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound } from 'lucide-react';
+import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound, AlertTriangle, Webhook } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -20,18 +20,34 @@ import { Switch } from '@/components/core/ui/switch';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingChannel } from '../services';
+import type { WhatsAppOnboardingMode, ZernioWebhookStatus } from '../services/types';
 import { formatNumber } from '@/utils/decimal';
 
 export const MessagingChannelsTab: React.FC = () => {
   const [channels, setChannels] = useState<MessagingChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<WhatsAppOnboardingMode | null>(null);
   const [showConnect, setShowConnect] = useState(false);
+  const [showOnboardingPicker, setShowOnboardingPicker] = useState(false);
+  const [webhook, setWebhook] = useState<ZernioWebhookStatus | null>(null);
+  const [registeringWebhook, setRegisteringWebhook] = useState(false);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => { loadChannels(); }, []);
+  useEffect(() => { loadChannels(); loadWebhook(); }, []);
+
+  // Zernio only delivers to a webhook it has been told about. Nothing ever registered ours,
+  // so replies, delivery receipts and number-health events had nowhere to land — and that is
+  // invisible from here, because "no inbound messages" looks exactly the same.
+  const loadWebhook = async () => {
+    try {
+      setWebhook(await messagingService.getWebhookStatus());
+    } catch {
+      // Not configured / no key yet — the 503 path already tells the operator what to do.
+      setWebhook(null);
+    }
+  };
 
   // Zernio returns the browser here after Embedded Signup with
   // ?connected=whatsapp&accountId=<id>&profileId=&username=<phone>. Channels is this page's
@@ -110,10 +126,34 @@ export const MessagingChannelsTab: React.FC = () => {
     }
   };
 
-  const handleConnect = async () => {
+  const handleRegisterWebhook = async () => {
     try {
-      setConnecting(true);
+      setRegisteringWebhook(true);
+      const status = await messagingService.registerWebhook();
+      setWebhook(status);
+      toast({
+        title: status.outcome === 'unchanged' ? 'Already registered' : 'Webhook registered',
+        description: status.outcome === 'updated'
+          ? 'Re-enabled and re-subscribed to every event we handle.'
+          : 'Zernio will now deliver replies and delivery receipts.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Could not register the webhook',
+        description: error?.message || String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setRegisteringWebhook(false);
+    }
+  };
+
+  const handleConnect = async (onboarding: WhatsAppOnboardingMode) => {
+    setShowOnboardingPicker(false);
+    try {
+      setConnecting(onboarding);
       const { oauth_url } = await messagingService.startWhatsAppOAuth({
+        onboarding,
         // Come back to this exact page so the callback effect above runs.
         redirectUrl: `${window.location.origin}${window.location.pathname}`,
       });
@@ -130,7 +170,7 @@ export const MessagingChannelsTab: React.FC = () => {
         variant: 'destructive',
       });
     } finally {
-      setConnecting(false);
+      setConnecting(null);
     }
   };
 
@@ -179,7 +219,7 @@ export const MessagingChannelsTab: React.FC = () => {
               <Download className={`h-4 w-4 mr-2 ${syncing ? 'animate-pulse' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync from Zernio'}
             </Button>
-            <Button onClick={handleConnect} disabled={connecting}>
+            <Button onClick={() => setShowOnboardingPicker(true)} disabled={Boolean(connecting)}>
               {connecting
                 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 : <Plus className="h-4 w-4 mr-2" />}
@@ -188,6 +228,46 @@ export const MessagingChannelsTab: React.FC = () => {
           </div>
         }
       />
+
+      {/* Delivery registration — a connected number with no webhook receives nothing back. */}
+      {webhook && !(webhook.registered && webhook.isActive !== false && !webhook.missingEvents?.length) && (
+        <div className="dashboard-card border-amber-500/30">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-sm">
+                {!webhook.registered
+                  ? 'Zernio is not delivering events to this app'
+                  : webhook.isActive === false
+                    ? 'Zernio disabled this webhook'
+                    : 'This webhook is missing events'}
+              </h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                {!webhook.registered
+                  ? 'Incoming replies, delivery receipts and number-health alerts will not arrive until the webhook is registered.'
+                  : webhook.isActive === false
+                    ? `Delivery is off after ${webhook.failureCount ?? 'repeated'} consecutive failures. Registering again re-enables it.`
+                    : `Not subscribed to: ${webhook.missingEvents?.join(', ')}.`}
+              </p>
+              {!webhook.secretConfigured && (
+                <p className="text-sm text-amber-500 mt-1">
+                  Set <code>ZERNIO_WEBHOOK_SECRET</code> first — the handler rejects unsigned deliveries.
+                </p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleRegisterWebhook}
+              disabled={registeringWebhook || !webhook.secretConfigured}
+            >
+              {registeringWebhook
+                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                : <Webhook className="h-4 w-4 mr-2" />}
+              {webhook.registered ? 'Repair' : 'Register'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Channels List */}
       {channels.length === 0 ? (
@@ -199,7 +279,7 @@ export const MessagingChannelsTab: React.FC = () => {
               Connect a WhatsApp Business number to start sending. You'll sign in with Meta and
               pick the number there — nothing to copy across.
             </p>
-            <Button onClick={handleConnect} disabled={connecting}>
+            <Button onClick={() => setShowOnboardingPicker(true)} disabled={Boolean(connecting)}>
               {connecting
                 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 : <Plus className="h-4 w-4 mr-2" />}
@@ -226,9 +306,18 @@ export const MessagingChannelsTab: React.FC = () => {
                   </div>
                 </div>
                 <Badge variant={channel.is_active ? 'default' : 'secondary'}>
-                  {channel.is_active ? 'Active' : 'Inactive'}
+                  {channel.config?.needs_reconnection
+                    ? 'Reconnect'
+                    : channel.is_active ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
+
+              {channel.config?.needs_reconnection && (
+                <p className="text-xs text-amber-500 mb-3 flex items-start gap-1.5">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                  Meta invalidated this number&apos;s token. Sends will fail until you connect it again.
+                </p>
+              )}
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -283,6 +372,12 @@ export const MessagingChannelsTab: React.FC = () => {
         </div>
       )}
 
+      {showOnboardingPicker && (
+        <OnboardingPickerModal
+          onClose={() => setShowOnboardingPicker(false)}
+          onPick={handleConnect}
+        />
+      )}
       {showConnect && (
         <ConnectWhatsAppModal
           onClose={() => setShowConnect(false)}
@@ -299,6 +394,52 @@ export const MessagingChannelsTab: React.FC = () => {
     </div>
   );
 };
+
+// ── Which Embedded Signup screen Meta should show ──────────────────────
+// Not a preference: the two produce differently-provisioned numbers. Zernio defaults to
+// coexistence when the parameter is omitted, which is the wrong default for a business
+// connecting a Cloud API number — and silently so, because both paths "work".
+const OnboardingPickerModal: React.FC<{
+  onClose: () => void;
+  onPick: (mode: WhatsAppOnboardingMode) => void;
+}> = ({ onClose, onPick }) => (
+  <Dialog open onOpenChange={onClose}>
+    <DialogContent className="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Connect WhatsApp</DialogTitle>
+        <DialogDescription>
+          You&apos;ll finish on Meta&apos;s own screen. Which describes your number?
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => onPick('business_app')}
+          className="dashboard-card w-full text-left hover:border-primary/50 transition-colors"
+        >
+          <p className="font-medium text-sm">It&apos;s on the WhatsApp Business app</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Keep using the app on your phone and send from here too. Meta calls this coexistence.
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => onPick('api')}
+          className="dashboard-card w-full text-left hover:border-primary/50 transition-colors"
+        >
+          <p className="font-medium text-sm">It&apos;s a dedicated business number</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            A new number, or one already on the WhatsApp Cloud API. Meta shows its account and
+            number picker.
+          </p>
+        </button>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
 
 // ── Connect WhatsApp (Meta credentials → Zernio account) ───────────────
 const ConnectWhatsAppModal: React.FC<{ onClose: () => void; onSuccess: () => void }> = ({ onClose, onSuccess }) => {

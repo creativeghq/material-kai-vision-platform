@@ -176,3 +176,68 @@ describe('we only call Zernio endpoints that exist', () => {
     expect(client.code).toMatch(/Retry-After/i);
   });
 });
+
+describe('inbound delivery is actually wired end to end', () => {
+  const client = SOURCES.find((f) => f.rel === '_shared/zernio.ts')!;
+  const handler = SOURCES.find((f) => f.rel === 'zernio-webhook-handler/index.ts')!;
+
+  it('registers the webhook — nothing used to, so the handler was unreachable', () => {
+    // zernio-webhook-handler verified signatures and wrote the whole WhatsApp inbox, and
+    // Zernio had never been told the URL. That is not detectable locally: "no inbound
+    // messages" and "nobody was ever asked to send any" produce identical evidence.
+    expect(client.code).toContain('export async function ensureZernioWebhook');
+    expect(client.code).toMatch(/zernioApi\(\s*'POST'\s*,\s*'\/webhooks\/settings'/);
+    const api = SOURCES.find((f) => f.rel === 'messaging-api/index.ts')!;
+    expect(api.code).toContain("case 'register-webhook'");
+    expect(api.code).toContain("case 'webhook-status'");
+  });
+
+  it('subscribes to every event the handler branches on', () => {
+    // An event we branch on but never subscribe to is dead code that reads as live: the
+    // branch is right there, reviewed and typechecked, and Zernio simply never sends it.
+    const subscribed = new Set(
+      (client.code.match(/ZERNIO_WEBHOOK_EVENTS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
+        .match(/'([a-z][a-z0-9_.]+)'/g)?.map((q) => q.slice(1, -1)) ?? [],
+    );
+    expect(subscribed.size, 'event list not found').toBeGreaterThan(10);
+
+    // Exact-match branches, plus the prefix branches (whatsapp.number.*) the handler uses.
+    // Every Zernio event name is dotted (post.published, whatsapp.number.declined), which is
+    // also what keeps `typeof event === 'string'` out of this set.
+    const branched = new Set(
+      (handler.code.match(/(?<!typeof )event === '([a-z][a-z0-9_]*\.[a-z0-9_.]+)'/g) ?? [])
+        .map((m) => m.replace(/^event === '/, '').replace(/'$/, '')),
+    );
+    const prefixes = (handler.code.match(/event\.startsWith\('([a-z][a-z0-9_]*\.[a-z0-9_.]*)'\)/g) ?? [])
+      .map((m) => m.replace(/^event\.startsWith\('/, '').replace(/'\)$/, ''));
+
+    const unsubscribed = [...branched].filter((e) => !subscribed.has(e));
+    expect(unsubscribed, 'handled but never delivered — add to ZERNIO_WEBHOOK_EVENTS').toEqual([]);
+
+    for (const prefix of prefixes) {
+      expect(
+        [...subscribed].some((e) => e.startsWith(prefix)),
+        `handler branches on ${prefix}* but nothing under it is subscribed`,
+      ).toBe(true);
+    }
+  });
+
+  it('deactivates the channel when Meta or Zernio says the number cannot send', () => {
+    // A number Meta declined/suspended, or an account whose token was invalidated, still
+    // LISTS as an account. Left active, every send fails at Meta with a green channel card.
+    expect(handler.code).toContain("event.startsWith('whatsapp.number.')");
+    expect(handler.code).toMatch(/account\.disconnected[\s\S]{0,900}messaging_channels/);
+    const api = SOURCES.find((f) => f.rel === 'messaging-api/index.ts')!;
+    expect(api.code).toContain('needsReconnection');
+  });
+
+  it('only uses Direct Send where Meta allows it', () => {
+    // category:'utility' starts a conversation with no approved template, but marketing
+    // content is rejected under it, and sending it alongside templateName is a 400.
+    const api = SOURCES.find((f) => f.rel === 'messaging-api/index.ts')!;
+    expect(api.code).toContain('function directSendCategory');
+    expect(api.code).toMatch(/whatsapp_template_name\)\s*return undefined/);
+    expect(api.code).toMatch(/messageType === 'marketing'\)\s*return undefined/);
+    expect(client.code).toMatch(/else if \(params\.category\)/);
+  });
+});

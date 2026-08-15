@@ -189,6 +189,124 @@ export async function verifyZernioSignature(rawBody: ArrayBuffer, signature: str
 }
 
 /**
+ * Every webhook event this platform acts on, plus the WhatsApp operational events that tell
+ * an operator their number is in trouble. Subscribing to an event we do not branch on is
+ * harmless (the handler logs and 200s); NOT subscribing to one we do branch on makes that
+ * branch dead code, which is the failure mode worth avoiding.
+ */
+export const ZERNIO_WEBHOOK_EVENTS = [
+  // Inbound + delivery — the WhatsApp inbox depends entirely on these.
+  'message.received', 'message.sent', 'message.delivered', 'message.read', 'message.failed',
+  'message.edited', 'message.deleted', 'conversation.started', 'reaction.received',
+  // Connection lifecycle.
+  'account.connected', 'account.disconnected',
+  // Publishing outcomes.
+  'post.scheduled', 'post.published', 'post.partial', 'post.failed', 'post.cancelled',
+  'post.platform.published', 'post.platform.failed',
+  // WhatsApp operational health — a declined/suspended number stops all sending, and a
+  // template whose category Meta changed silently re-prices every message on it.
+  'whatsapp.template.status_updated', 'whatsapp.template.category_updated',
+  'whatsapp.number.activated', 'whatsapp.number.declined', 'whatsapp.number.action_required',
+  'whatsapp.number.verification_required', 'whatsapp.number.suspended',
+  'whatsapp.number.reactivated', 'whatsapp.number.released',
+] as const;
+
+/** Public URL Zernio should POST events to. */
+export function zernioWebhookUrl(): string {
+  const base = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
+  return `${base}/functions/v1/zernio-webhook-handler`;
+}
+
+export interface ZernioWebhookStatus {
+  registered: boolean;
+  webhookId?: string;
+  url: string;
+  isActive?: boolean;
+  failureCount?: number;
+  lastFiredAt?: string | null;
+  missingEvents?: string[];
+  secretConfigured: boolean;
+}
+
+/** Read our webhook registration from Zernio, if it exists. */
+export async function getZernioWebhookStatus(): Promise<ZernioWebhookStatus> {
+  const url = zernioWebhookUrl();
+  const data = await zernioApi('GET', '/webhooks/settings');
+  const hooks = (data.webhooks ?? []) as Array<Record<string, any>>;
+  const mine = hooks.find((h) => h.url === url);
+  if (!mine) {
+    return { registered: false, url, secretConfigured: Boolean(zernioWebhookSecret()) };
+  }
+  const subscribed = new Set<string>(mine.events ?? []);
+  return {
+    registered: true,
+    webhookId: mine._id,
+    url,
+    isActive: mine.isActive,
+    failureCount: mine.failureCount,
+    lastFiredAt: mine.lastFiredAt ?? null,
+    missingEvents: ZERNIO_WEBHOOK_EVENTS.filter((e) => !subscribed.has(e)),
+    secretConfigured: Boolean(zernioWebhookSecret()),
+  };
+}
+
+/**
+ * Register (or repair) the Zernio webhook pointing at zernio-webhook-handler.
+ *
+ * NOTHING in this repo ever did this. The handler existed, verified signatures and wrote to
+ * the inbox, and Zernio had never been told the URL — so the entire inbound path was
+ * unreachable by construction, not by bug. It cannot be inferred from any local signal:
+ * "no inbound messages" is indistinguishable from "nobody messaged us".
+ *
+ * Also repairs two states Zernio can land in on its own:
+ *  - `isActive: false` — Zernio auto-disables a webhook after 10 consecutive delivery
+ *    failures, and our own signature check fails CLOSED, so a misconfigured secret
+ *    switches the hook off permanently after ten inbound messages.
+ *  - a subscription missing events we now branch on, after this list grows.
+ */
+export async function ensureZernioWebhook(
+  supabase: SupabaseLike,
+  opts: { secret?: string } = {},
+): Promise<{ action: 'created' | 'updated' | 'unchanged'; status: ZernioWebhookStatus }> {
+  const url = zernioWebhookUrl();
+  const secret = opts.secret || zernioWebhookSecret();
+  if (!secret) {
+    throw new Error(
+      'ZERNIO_WEBHOOK_SECRET is not set. Set it first — registering a webhook without a ' +
+      'signing secret would leave the handler rejecting every delivery (it fails closed).',
+    );
+  }
+
+  const existing = await getZernioWebhookStatus();
+
+  if (!existing.registered) {
+    const created = await zernioApi('POST', '/webhooks/settings', {
+      name: 'Material KAI',
+      url,
+      secret,
+      events: [...ZERNIO_WEBHOOK_EVENTS],
+      isActive: true,
+    });
+    void created;
+    return { action: 'created', status: await getZernioWebhookStatus() };
+  }
+
+  const needsRepair = existing.isActive === false || (existing.missingEvents?.length ?? 0) > 0;
+  if (needsRepair) {
+    await zernioApi('PUT', '/webhooks/settings', {
+      _id: existing.webhookId,
+      url,
+      secret,
+      events: [...ZERNIO_WEBHOOK_EVENTS],
+      isActive: true,
+    });
+    return { action: 'updated', status: await getZernioWebhookStatus() };
+  }
+
+  return { action: 'unchanged', status: existing };
+}
+
+/**
  * Find-or-create exactly one Zernio profile per workspace and cache its id in
  * social_zernio_profiles. Zernio requires a profileId on every connect call;
  * a profile is just a container that holds many connected accounts, so this
@@ -287,6 +405,16 @@ export async function sendWhatsAppMessage(params: {
   templateName?: string;
   templateLanguage?: string;
   templateParams?: string[];
+  /**
+   * Meta Direct Send. With `message` and WITHOUT `templateName`, starts a business-initiated
+   * conversation using no pre-approved template — Meta matches or auto-creates one
+   * asynchronously. UTILITY content only; marketing under this category is rejected. The WABA
+   * must be eligible, otherwise the send fails telling you to use an approved template.
+   * Mutually exclusive with templateName (templates are categorised at creation).
+   */
+  category?: 'utility';
+  /** Override a media-header template's header asset for THIS send only. */
+  headerMedia?: Record<string, unknown>;
 }): Promise<ZernioSendResult> {
   try {
     const participantId = waParticipantId(params.to);
@@ -298,6 +426,10 @@ export async function sendWhatsAppMessage(params: {
       body.templateName = params.templateName;
       if (params.templateLanguage) body.templateLanguage = params.templateLanguage;
       if (params.templateParams?.length) body.templateParams = params.templateParams;
+      if (params.headerMedia) body.headerMedia = params.headerMedia;
+    } else if (params.category) {
+      // Sending both is a 400 from Zernio, so this is an else-branch rather than a second if.
+      body.category = params.category;
     }
     if (params.message) body.message = params.message;
 

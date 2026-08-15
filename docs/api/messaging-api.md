@@ -32,11 +32,13 @@ The per-recipient send path uses `/v1/inbox/conversations` (cold start with temp
 
 | Action | Purpose |
 |---|---|
-| `send` | Send to one/many recipients. Uses the channel's template (cold) or freeform `content` (in-window). Logs to `messaging_logs`, debits `zernio-whatsapp` credits. |
+| `send` | Send to one/many recipients. Uses the channel's template (cold) or freeform `content` (in-window). With no template bound and a non-marketing `messageType`, falls back to **Meta Direct Send** (`category:'utility'`), which starts a conversation with no pre-approved template — Meta matches or auto-creates one. Marketing still requires its approved template. Logs to `messaging_logs`, debits `zernio-whatsapp` credits. |
 | `send-bulk` | Same, for a `recipients[]` list with per-recipient `variables`. |
 | `connect-whatsapp-oauth` | **The default connect path.** `{ workspaceId?, redirectUrl? }` → `GET /v1/connect/whatsapp?profileId=&redirect_url=` → `{ oauth_url }`. Send the operator there; Meta Embedded Signup handles WABA + number selection. `redirectUrl` MUST be same-origin (open-redirect guard, mirrors the social handler). |
 | `connect-whatsapp-callback` | Finish the signup. Zernio returns the browser with `?connected=whatsapp&accountId=&profileId=&username=`; post `{ zernioAccountId }` here and the account is re-read from `GET /v1/accounts/{id}` (never trusted from the URL) and upserted as a channel. |
 | `connect-whatsapp` | **Headless sibling** — for a caller that already holds Meta credentials: `{ accessToken, wabaId, phoneNumberId, displayName? }` → `POST /v1/connect/whatsapp/credentials`. Do not route a human through this; it means digging a permanent token out of Business Suite for something OAuth does in two clicks. |
+| `webhook-status` / `register-webhook` | Read / create-or-repair the Zernio webhook pointing at `zernio-webhook-handler` (`GET|POST|PUT /v1/webhooks/settings`). **Nothing registered it before**, so the entire inbound path was unreachable by construction. Also re-enables a hook Zernio auto-disabled (it does so after 10 consecutive delivery failures) and re-subscribes when `ZERNIO_WEBHOOK_EVENTS` grows. Requires `ZERNIO_WEBHOOK_SECRET`. |
+| `create-whatsapp-template` | Submit a template to Meta (`POST /v1/whatsapp/templates`). `libraryTemplateName` = one of Meta's pre-approved library templates, usable immediately; `components` = custom, review up to 24h. |
 | `sync-channels` | Pull connected WhatsApp accounts from Zernio (`GET /v1/accounts?platform=whatsapp`) into `messaging_channels`. |
 | `whatsapp-templates` | List the WABA's Meta templates (`GET /v1/whatsapp/templates?accountId=`). |
 | `channels` / `templates` / `logs` / `analytics` | DB reads (all filtered to `channel_type='whatsapp'`). |
