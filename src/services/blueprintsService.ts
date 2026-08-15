@@ -63,6 +63,18 @@ export interface BlueprintItem {
   is_allowance: boolean;
   allowance_amount: number | null;
   /**
+   * A quantity-only line: it reports HOW MANY (hinges, drawer boxes, gola profile metres) and adds
+   * nothing to the plan total. Priced when the plan becomes a quote — a client is not quoted thirty
+   * hinges, but the workshop cannot order without the count. `material_cost` stays NULL until
+   * someone sets a rate; NULL is "not priced yet" and must never render as 0.
+   */
+  is_schedule: boolean;
+  /**
+   * Stable slug on an option_group member. The engine publishes `opt_<key>` so OTHER lines can be
+   * conditional on this choice — how the four gola parts switch on together when gola is picked.
+   */
+  option_key: string | null;
+  /**
    * Whether a NON-option_group line starts selected when imported into a plan. Optional extras
    * (accessories, add-on mechanisms, a removal service) seed as `false` so a configurator does
    * not open with every extra already in the total. Members of an `option_group` ignore this —
@@ -205,6 +217,8 @@ class BlueprintsService {
       tier: it.tier ?? null,
       is_allowance: it.is_allowance ?? false,
       allowance_amount: it.allowance_amount ?? null,
+      is_schedule: it.is_schedule ?? false,
+      option_key: it.option_key ?? null,
       default_selected: it.default_selected ?? true,
       source: it.source ?? 'manual',
     }));

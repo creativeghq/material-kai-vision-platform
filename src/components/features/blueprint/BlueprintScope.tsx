@@ -50,6 +50,11 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">Allowance
           <Switch checked={!!it.is_allowance} onCheckedChange={(v) => patch(it.id, { is_allowance: v })} />
         </div>
+        {/* A schedule line answers HOW MANY and adds no money here — hinges, runners, gola profile.
+            It is priced when the plan becomes a quote. */}
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">Schedule
+          <Switch checked={!!it.is_schedule} onCheckedChange={(v) => patch(it.id, { is_schedule: v })} />
+        </div>
         {!readOnly && (
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDeleteItem?.(it.id)}><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
         )}
@@ -85,6 +90,17 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
               <option value="better">Better</option>
               <option value="best">Best</option>
             </select>
+          )}
+          {/* A stable slug publishes `opt_<key>` so OTHER lines can be conditional on this choice —
+              how the four gola parts switch on together. Slug, not label: renaming the option must
+              not silently zero every line that depends on it. */}
+          {it.option_group && (
+            <span className="flex items-center gap-1">opt_
+              <Input
+                className="h-6 w-24" value={it.option_key ?? ''} placeholder="key"
+                onChange={(e) => patch(it.id, { option_key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') || null })}
+              />
+            </span>
           )}
         </div>
       )}

@@ -12,7 +12,7 @@
  */
 
 import { evaluateFormula, computeLinePricing, round2 } from './formula.ts';
-import { deriveComposition, hasComposition } from './composition.ts';
+import { deriveComposition, hasComposition, optionFlags } from './composition.ts';
 import type { Composition, DerivedComposition, ZoneDef } from './composition.ts';
 
 export interface ComputedTask {
@@ -26,6 +26,8 @@ export interface ComputedTask {
   option_group: string | null;
   tier: string | null;
   selected: boolean;
+  /** Quantity-only schedule line. Counted, never added to the subtotal. */
+  is_schedule?: boolean;
 }
 
 export interface ComputedSection {
@@ -93,6 +95,17 @@ export function computeBlueprint(
     if (pick) optSelected[grp] = pick.id;
   }
 
+  // Choice flags must exist BEFORE any formula is evaluated — a gola line asking for `opt_gola`
+  // while the variable is still undefined does not fail loudly, it falls back to its default
+  // quantity, which is a wrong number that looks like a right one.
+  dims = {
+    ...dims,
+    ...optionFlags(rows.map((r) => ({
+      option_key: r.option_key,
+      is_selected: r.option_group ? optSelected[r.option_group] === r.id : (selectedIds ? selectedIds.has(r.id) : r.default_selected !== false),
+    }))),
+  };
+
   for (const r of rows) {
     if (r.kind !== 'task') continue;
     // A zone owns this group's selection and prices it through its own lines.
@@ -111,15 +124,41 @@ export function computeBlueprint(
       material_cost: r.material_cost, labor_rate: r.labor_rate, margin_pct: r.margin_pct,
       quantity: qty, is_selected: selected,
     });
+    // A schedule line reports HOW MANY, not how much: it is priced when the plan becomes a quote.
+    // Its rate rides along in unit_price so the value is visible, but it adds nothing here — and a
+    // rate that was never set stays NULL rather than becoming a confident 0.00.
+    const isSchedule = !!r.is_schedule;
     const task: ComputedTask = {
-      id: r.id, label: r.label, unit: r.unit, quantity: qty, unit_price, line_total,
+      id: r.id, label: r.label, unit: r.unit, quantity: qty,
+      unit_price: isSchedule ? (r.material_cost != null ? unit_price : 0) : unit_price,
+      line_total: isSchedule ? 0 : line_total,
       is_allowance: !!r.is_allowance, option_group: r.option_group ?? null,
-      tier: r.tier ?? null, selected,
+      tier: r.tier ?? null, selected, ...(isSchedule ? { is_schedule: true } : {}),
     };
-    if (selected) subtotal += line_total;
+    if (selected && !isSchedule) subtotal += line_total;
     const sec = r.parent_id ? sectionsById[r.parent_id] : null;
-    if (sec) { sec.tasks.push(task); if (selected) sec.total += line_total; }
+    if (sec) { sec.tasks.push(task); if (selected && !isSchedule) sec.total += line_total; }
     else ungrouped.push(task);
+  }
+
+  // COMPLETENESS: the zones derived a count that no schedule line consumes.
+  //
+  // `total_hinges` sitting at 30 with nothing referencing it is the silent-zero shape wearing a
+  // different hat — the kitchen needs thirty hinges, the schedule says nothing, and the workshop
+  // finds out on fitting day. The derivation cannot see this (it does not know what lines exist)
+  // and the lines cannot see it either, so the check belongs exactly here, where both are in scope.
+  if (derived) {
+    const referenced = rows
+      .filter((r) => r.is_schedule && r.quantity_formula)
+      .map((r) => String(r.quantity_formula))
+      .join(' ');
+    for (const row of derived.schedule) {
+      if (!referenced.includes(`total_${row.key}`)) {
+        derived.issues.push(
+          `${row.quantity} ${row.unit} of ${row.label.toLowerCase()} are derived but no schedule line counts them (total_${row.key}).`,
+        );
+      }
+    }
   }
 
   // Zone lines read as their own sections, ahead of the flat scope — that is the order a kitchen

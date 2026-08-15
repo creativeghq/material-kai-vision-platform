@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   absorbedGroups,
+  optionFlags,
   defaultComposition,
   deriveComposition,
   derivePlanComposition,
@@ -65,13 +66,19 @@ const schema: ZoneDef[] = [
       { key: 'door_model', label: 'Door model', type: 'option', option_group: RATES, is_rate_source: true },
       { key: 'height', label: 'Height', type: 'number', unit: 'cm', default: 72 },
     ],
+    hinge_bands: [{ up_to: 90, count: 2 }, { up_to: 999, count: 5 }],
     modules: [
-      { key: 'door2', label: '2-door', default_width_cm: 80, price_mode: 'per_m' },
+      { key: 'door2', label: '2-door', default_width_cm: 80, price_mode: 'per_m', yields: { doors: 2, shelves: 1, legs: 4 } },
       {
         key: 'drawers', label: 'Drawer bank', default_width_cm: 60, price_mode: 'per_m',
+        yields: { legs: 4 },
         options: [{
           key: 'runners', label: 'Drawer set', default: 'g2',
-          choices: [{ value: 'g2', label: 'Grass 2', price: 80 }, { value: 'b3', label: 'Blum 3', price: 145 }],
+          choices: [
+            { value: 'g2', label: 'Grass 2', price: 80, yields: { drawers: 2, runner_sets: 1 } },
+            { value: 'b3', label: 'Blum 3', price: 145, yields: { drawers: 3, runner_sets: 1 } },
+            { value: 'free', label: 'Included', yields: { drawers: 2, runner_sets: 1 } },
+          ],
         }],
       },
       { key: 'panel', label: 'End panel', default_width_cm: 0, price_mode: 'per_piece', unit_price: 45, counts_length: false },
@@ -295,6 +302,149 @@ describe('a plan freezes the rates it was quoted on', () => {
     const back = rateItemsFromTables(tables);
     const direct = rateChoices(withMargin, RATES).find((c) => c.id === 'posh')!.unit_price;
     expect(rateChoices(back, RATES).find((c) => c.id === 'posh')!.unit_price).toBe(direct);
+  });
+});
+
+describe('hardware schedule', () => {
+  const drawerCfg = (runners: string, qty = 1) => cfg({
+    base: {
+      globals: { door_model: 'posh', height: 72 },
+      modules: [
+        { id: 'r1', type: 'door2', width_cm: 80, qty: 2 },
+        { id: 'd1', type: 'drawers', width_cm: 60, qty, options: { runners } },
+      ],
+    },
+  });
+
+  it('counts what the units are made of, per piece', () => {
+    // 2 × 2-door: 4 doors, 2 shelves, 8 legs. Plus a drawer bank: 4 more legs.
+    const vars = deriveComposition(schema, drawerCfg('g2'), items).vars;
+    expect(vars.base_doors).toBe(4);
+    expect(vars.base_shelves).toBe(2);
+    expect(vars.base_legs).toBe(12);
+  });
+
+  it('takes the drawer count from the runner CHOICE, not the bank count', () => {
+    // The whole reason `grass_3` stopped being an opaque string: three banks of three drawers is
+    // nine drawer boxes to order, and the old model could only ever say "three drawer units".
+    expect(deriveComposition(schema, drawerCfg('b3', 3), items).vars.total_drawers).toBe(9);
+    expect(deriveComposition(schema, drawerCfg('g2', 3), items).vars.total_drawers).toBe(6);
+    expect(deriveComposition(schema, drawerCfg('b3', 3), items).vars.total_runner_sets).toBe(3);
+  });
+
+  it('counts a free choice yields — no extra charge is not no drawer boxes', () => {
+    expect(deriveComposition(schema, drawerCfg('free'), items).vars.total_drawers).toBe(2);
+  });
+
+  it('derives hinges from the door HEIGHT, not two per door everywhere', () => {
+    // A 210cm larder door does not take two hinges, and a kitchen that assumes it does arrives on
+    // site short. 4 doors × 2 at 72cm; the same 4 doors × 5 once the zone is full height.
+    expect(deriveComposition(schema, cfg(), items).vars.base_hinges).toBe(8);
+    const tall = cfg({ base: { globals: { door_model: 'posh', height: 210 }, modules: [{ id: 'r1', type: 'door2', width_cm: 80, qty: 2 }] } });
+    expect(deriveComposition(schema, tall, items).vars.base_hinges).toBe(20);
+  });
+
+  it('publishes run totals a per-run fitting can be counted from', () => {
+    const vars = deriveComposition(schema, cfg(), items).vars;
+    expect(vars.total_units).toBe(3);   // 2 base + 1 wall
+    expect(vars.total_runs).toBe(2);    // two runs with units in them
+    expect(vars.total_run_length).toBe(2.4);
+  });
+
+  it('renders a schedule of everything non-zero, and nothing that is zero', () => {
+    const d = deriveComposition(schema, cfg(), items);
+    const byKey = Object.fromEntries(d.schedule.map((r) => [r.key, r]));
+    expect(byKey.hinges).toMatchObject({ quantity: 8, unit: 'pcs' });
+    expect(byKey.drawers).toBeUndefined();  // no drawer bank in this configuration
+  });
+});
+
+describe('a line conditional on a choice', () => {
+  it('publishes opt_<key> for the chosen member and 0 for the others', () => {
+    const flags = optionFlags([
+      { option_key: 'handles', is_selected: true },
+      { option_key: 'gola', is_selected: false },
+    ]);
+    expect(flags).toEqual({ opt_handles: 1, opt_gola: 0 });
+  });
+
+  it('never lets a later unselected row flip a selected key back to 0', () => {
+    // Two members can share a key across zones; seeing one selected is enough.
+    expect(optionFlags([
+      { option_key: 'gola', is_selected: true },
+      { option_key: 'gola', is_selected: false },
+    ]).opt_gola).toBe(1);
+  });
+
+  it('switches every gola part on and off together', () => {
+    // The bug this replaces: the base rail was in the pick-one group and the WALL rail was a
+    // separate toggle defaulting off, so choosing handleless fitted the bottom and silently left
+    // the top with no profile.
+    const golaItems = [
+      ...items,
+      { id: 'hsec', parent_id: null, sort_order: 1, kind: 'section', label: 'Hardware' },
+      { id: 'h-std', parent_id: 'hsec', sort_order: 0, kind: 'task', label: 'Handles', option_group: 'Handle system', option_key: 'handles', tier: 'good', is_allowance: true, allowance_amount: 0, margin_pct: 0 },
+      { id: 'h-gola', parent_id: 'hsec', sort_order: 1, kind: 'task', label: 'Gola profile', unit: 'm', option_group: 'Handle system', option_key: 'gola', quantity_formula: '= total_run_length', material_cost: 25, margin_pct: 0 },
+      { id: 'h-vert', parent_id: 'hsec', sort_order: 2, kind: 'task', label: 'Gola verticals', unit: 'pcs', quantity_formula: '= opt_gola * total_units', is_schedule: true, default_selected: true, margin_pct: 0 },
+      { id: 'h-cap', parent_id: 'hsec', sort_order: 3, kind: 'task', label: 'Gola end caps', unit: 'pcs', quantity_formula: '= opt_gola * total_runs * 2', is_schedule: true, default_selected: true, margin_pct: 0 },
+    ];
+    const qty = (sel: Set<string> | null, label: string) =>
+      computeBlueprint(golaItems, {}, sel, { schema, config: cfg() })
+        .sections.flatMap((s) => s.tasks).find((t) => t.label === label)!.quantity;
+
+    // Standard handles is the tier:'good' default — every gola part is 0, not "some of them".
+    expect(qty(null, 'Gola verticals')).toBe(0);
+    expect(qty(null, 'Gola end caps')).toBe(0);
+
+    const gola = new Set(['h-gola']);
+    expect(qty(gola, 'Gola verticals')).toBe(3);
+    expect(qty(gola, 'Gola end caps')).toBe(4);
+  });
+});
+
+describe('a schedule line is a count, not a price', () => {
+  const withSchedule = [
+    ...items,
+    { id: 'hsec', parent_id: null, sort_order: 1, kind: 'section', label: 'Hardware' },
+    { id: 'hinges', parent_id: 'hsec', sort_order: 0, kind: 'task', label: 'Hinges', unit: 'pcs', quantity_formula: '= total_hinges', is_schedule: true, default_selected: true, margin_pct: 0 },
+    { id: 'doors', parent_id: 'hsec', sort_order: 1, kind: 'task', label: 'Door fronts', unit: 'pcs', quantity_formula: '= total_doors', is_schedule: true, default_selected: true, margin_pct: 0 },
+    { id: 'shelves', parent_id: 'hsec', sort_order: 2, kind: 'task', label: 'Shelves', unit: 'pcs', quantity_formula: '= total_shelves', is_schedule: true, default_selected: true, margin_pct: 0 },
+    { id: 'legs', parent_id: 'hsec', sort_order: 3, kind: 'task', label: 'Legs', unit: 'pcs', quantity_formula: '= total_legs', is_schedule: true, default_selected: true, margin_pct: 0 },
+  ];
+
+  it('carries its derived quantity', () => {
+    const c = computeBlueprint(withSchedule, {}, null, { schema, config: cfg() });
+    const hinges = c.sections.flatMap((s) => s.tasks).find((t) => t.label === 'Hinges')!;
+    expect(hinges.quantity).toBe(8);
+    expect(hinges.is_schedule).toBe(true);
+  });
+
+  it('adds nothing to the plan subtotal', () => {
+    // The schedule counts; the quote prices. A hardware line quietly inflating the plan total is
+    // the same number arriving twice by the time it reaches the quote.
+    const without = computeBlueprint(items, {}, null, { schema, config: cfg() }).subtotal;
+    const withIt = computeBlueprint(withSchedule, {}, null, { schema, config: cfg() }).subtotal;
+    expect(withIt).toBe(without);
+  });
+
+  it('stays at 0 when no rate is set, rather than inventing one', () => {
+    // material_cost NULL means NOT PRICED YET and must never render as a confident 0.00 line —
+    // the plan UI and the quote both key off the null, so the two states have to stay distinct.
+    const c = computeBlueprint(withSchedule, {}, null, { schema, config: cfg() });
+    const hinges = c.sections.flatMap((s) => s.tasks).find((t) => t.label === 'Hinges')!;
+    expect(hinges.unit_price).toBe(0);
+    expect(hinges.line_total).toBe(0);
+    expect(withSchedule.find((i) => i.id === 'hinges')!.material_cost).toBeUndefined();
+  });
+
+  it('raises an issue when a derived count reaches no schedule line at all', () => {
+    // 8 hinges derived and nothing counting them is the silent-zero shape in another hat: the
+    // kitchen needs them, the schedule says nothing, and the workshop finds out on fitting day.
+    const partial = withSchedule.filter((i) => i.id !== 'hinges');
+    const issues = computeBlueprint(partial, {}, null, { schema, config: cfg() }).composition!.issues;
+    expect(issues.some((i) => i.includes('total_hinges'))).toBe(true);
+    // ...and with every total consumed, it says nothing.
+    expect(computeBlueprint(withSchedule, {}, null, { schema, config: cfg() }).composition!.issues).toEqual([]);
   });
 });
 

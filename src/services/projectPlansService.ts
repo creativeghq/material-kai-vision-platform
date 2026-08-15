@@ -58,6 +58,18 @@ export interface ProjectPlanItem {
   is_selected: boolean;
   is_allowance: boolean;
   allowance_amount: number | null;
+  /**
+   * A quantity-only line: it reports HOW MANY (hinges, drawer boxes, gola profile metres) and adds
+   * nothing to the plan total. Priced when the plan becomes a quote — a client is not quoted thirty
+   * hinges, but the workshop cannot order without the count. `material_cost` stays NULL until
+   * someone sets a rate; NULL is "not priced yet" and must never render as 0.
+   */
+  is_schedule: boolean;
+  /**
+   * Stable slug on an option_group member. The engine publishes `opt_<key>` so OTHER lines can be
+   * conditional on this choice — how the four gola parts switch on together when gola is picked.
+   */
+  option_key: string | null;
   source: 'manual' | 'template' | 'ai';
   created_at: string;
   updated_at: string;

@@ -73,12 +73,23 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
             />
           </div>
         )}
-        <div className="w-24 text-right text-sm tabular-nums">{money(it.line_total, currency)}</div>
+        <div className="w-24 text-right text-sm tabular-nums">
+          {it.is_schedule
+            ? <span className="text-muted-foreground text-xs">{it.material_cost != null ? money(Number(it.material_cost) * Number(it.quantity ?? 0), currency) : 'to price'}</span>
+            : money(it.line_total, currency)}
+        </div>
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={busy} onClick={() => onDelete(it.id)}>
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
       </div>
-      {!it.is_allowance && (
+      {it.is_schedule && (
+        <div className="flex items-center gap-2 pl-9 pt-1 text-[11px] text-muted-foreground">
+          <Badge variant="outline" className="text-[10px] h-4">schedule</Badge>
+          <span>counted here, priced on the quote</span>
+          {it.quantity_formula && <Badge variant="outline" className="text-[10px] h-4 gap-1"><Sigma className="h-2.5 w-2.5" />{it.quantity_formula}</Badge>}
+        </div>
+      )}
+      {!it.is_allowance && !it.is_schedule && (
         <div className="flex items-center gap-3 pl-9 pt-1 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">labor
             <Input className="h-6 w-16 text-right" defaultValue={it.labor_rate != null ? String(it.labor_rate) : ''} placeholder="—" disabled={busy}

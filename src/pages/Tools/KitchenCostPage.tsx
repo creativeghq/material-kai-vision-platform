@@ -176,11 +176,14 @@ export default function KitchenCostPage() {
           id: sec.id,
           label: sec.label,
           groups: groupNames.map((name) => ({ name, members: tasks.filter((t) => t.option_group === name) })),
-          extras: tasks.filter((t) => !t.option_group),
+          // A schedule line is a COUNT, not a choice — rendering it as a switch would invite a
+          // visitor to turn off the hinges their kitchen needs.
+          extras: tasks.filter((t) => !t.option_group && !t.is_schedule),
+          schedule: tasks.filter((t) => t.is_schedule && t.is_selected && Number(t.quantity ?? 0) > 0),
           total: tasks.filter((t) => t.is_selected).reduce((a, t) => a + Number(t.line_total || 0), 0),
         };
       })
-      .filter((s) => s.groups.length > 0 || s.extras.length > 0);
+      .filter((s) => s.groups.length > 0 || s.extras.length > 0 || s.schedule.length > 0);
   }, [items]);
 
   if (loading) {
@@ -329,6 +332,19 @@ export default function KitchenCostPage() {
                   </div>
                 );
               })}
+
+              {sec.schedule.length > 0 && (
+                <div className="divide-y divide-border/40">
+                  {sec.schedule.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <span className="text-sm">{row.label}</span>
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        {row.quantity} {row.unit ?? 'pcs'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {sec.extras.length > 0 && (
                 <div className="divide-y divide-border/40">

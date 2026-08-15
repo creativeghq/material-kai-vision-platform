@@ -22,6 +22,7 @@ import {
   defaultComposition,
   derivePlanComposition,
   hasComposition,
+  optionFlags,
   snapshotRateTables,
 } from '../_shared/blueprint/composition.ts';
 import type { Composition, DerivedComposition, PlanComposition, ZoneDef } from '../_shared/blueprint/composition.ts';
@@ -60,6 +61,10 @@ interface ItemRow {
   source_item_id?: string;
   is_allowance: boolean;
   allowance_amount: number | null;
+  /** Quantity-only hardware line: counted here, priced when the plan becomes a quote. */
+  is_schedule?: boolean;
+  /** Stable slug on an option_group member; publishes `opt_<key>` for conditional lines. */
+  option_key?: string | null;
   source: string;
 }
 
@@ -82,6 +87,9 @@ async function buildRateMap(supabase: DbClient, items: ItemRow[]) {
 }
 
 // Recompute quantity (from formula) + pricing for one item against the dimensions + rate map.
+// A `is_schedule` row reports HOW MANY and adds nothing to the plan total — it is priced at quote
+// conversion. Its rate rides along in unit_price when one exists; when none does it stays 0 AND the
+// row keeps material_cost NULL, so "not priced yet" never reads as "costs nothing".
 function resolveItem(it: ItemRow, dims: Record<string, number>, rates: Record<string, number>) {
   if (it.kind === 'section') return { quantity: 0, unit_price: 0, line_total: 0 };
   let qty: number;
@@ -103,6 +111,7 @@ function resolveItem(it: ItemRow, dims: Record<string, number>, rates: Record<st
     quantity: qty,
     is_selected: it.is_selected,
   });
+  if (it.is_schedule) return { quantity: qty, unit_price: it.material_cost != null ? unit_price : 0, line_total: 0 };
   return { quantity: qty, unit_price, line_total };
 }
 
@@ -204,6 +213,7 @@ function compositionRows(derived: DerivedComposition, startOrder: number): ItemR
       notes: null, unit: null, quantity_formula: null, line_kind: 'materials',
       service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0,
       option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
+      is_schedule: false, option_key: null,
       source: 'composition',
     });
     let childOrder = 0;
@@ -215,6 +225,7 @@ function compositionRows(derived: DerivedComposition, startOrder: number): ItemR
         line_kind: line.line_kind, service_id: null, product_id: null,
         material_cost: line.unit_price, labor_rate: null, margin_pct: 0,
         option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
+        is_schedule: false, option_key: null,
         source: 'composition',
       });
     }
@@ -242,6 +253,9 @@ async function writePlanItems(
       ...items.map((it) => (it.parent_id ? it : { ...it, sort_order: (it.sort_order ?? 0) + shift })),
     ];
   }
+  // Choice flags before any formula: a `= opt_gola * total_run_length` line evaluated while
+  // `opt_gola` is undefined silently falls back to its default quantity instead of failing.
+  dims = { ...dims, ...optionFlags(items.map((it) => ({ option_key: it.option_key, is_selected: it.is_selected !== false }))) };
   const rates = await buildRateMap(supabase, items);
   let subtotal = 0;
   const rows = items.map((it) => {
@@ -271,6 +285,8 @@ async function writePlanItems(
       is_selected: it.is_selected !== false,
       is_allowance: it.is_allowance ?? false,
       allowance_amount: it.allowance_amount ?? null,
+      is_schedule: it.is_schedule ?? false,
+      option_key: it.option_key ?? null,
       source: it.source ?? 'manual',
     };
   });
@@ -307,13 +323,44 @@ function topoOrder<T extends { id: string; parent_id: string | null }>(rows: T[]
 }
 
 // Build quote_item rows from a plan's selected leaf tasks, grouped by section→room.
+/**
+ * Plan lines → quote items.
+ *
+ * An ordinary line collapses to one row at its line total. A SCHEDULE line does not: it crosses
+ * with its real QUANTITY (30 hinges, not "1 × hinges") and its rate, because the schedule exists to
+ * be priced at exactly this moment — the plan counts what the kitchen needs, the quote puts a
+ * number on it. A schedule line with no rate yet arrives at 0 and says so in `dimensions`, so it
+ * reads as an unpriced row waiting for you rather than as a fitting that costs nothing.
+ */
 function buildQuoteItems(quoteId: string, items: ItemRow[]) {
   const sectionLabel: Record<string, string> = {};
   for (const it of items) if (it.kind === 'section') sectionLabel[it.id] = it.label;
   const leaf = items.filter((it) => it.kind !== 'section' && it.is_selected !== false);
+  let subtotal = 0;
   const rows = leaf.map((it) => {
     const qty = Number(it.quantity ?? 1);
+    if (it.is_schedule) {
+      const rate = it.material_cost != null ? Number(it.material_cost) : null;
+      const lineTotal = round2(qty * Number(rate ?? 0));
+      subtotal += lineTotal;
+      return {
+        quote_id: quoteId,
+        product_id: null,
+        custom_product_name: it.label,
+        custom_unit: it.unit ?? null,
+        quantity: qty,
+        unit_price: Number(rate ?? 0),
+        line_total: lineTotal,
+        room: it.parent_id ? sectionLabel[it.parent_id] ?? null : null,
+        dimensions: rate == null
+          ? `${qty}${it.unit ? ` ${it.unit}` : ''} — needs a price`
+          : `${qty}${it.unit ? ` ${it.unit}` : ''} × ${rate.toFixed(2)}`,
+        notes: it.notes ?? null,
+        added_from: 'manual',
+      };
+    }
     const lineTotal = Number(it.line_total ?? 0);
+    subtotal += lineTotal;
     const dimsText = it.is_allowance ? 'Allowance' : `${qty}${it.unit ? ` ${it.unit}` : ''} × ${Number(it.unit_price ?? 0).toFixed(2)}`;
     return {
       quote_id: quoteId,
@@ -329,8 +376,7 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
       added_from: 'manual',
     };
   });
-  const subtotal = round2(leaf.reduce((s, it) => s + Number(it.line_total ?? 0), 0));
-  return { rows, subtotal };
+  return { rows, subtotal: round2(subtotal) };
 }
 
 async function loadPlan(supabase: DbClient, planId: string) {
@@ -734,10 +780,14 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
 
       const materialRows = items.filter((it) =>
         it.kind !== 'section' && it.is_selected !== false &&
-        (it.is_allowance || it.line_kind === 'materials' || it.line_kind === 'both' || it.material_cost != null || it.product_id != null));
+        // A schedule row IS the ordering list — hinges, runners, gola profile. It carries no money
+        // in the plan, so none of the money-shaped tests below would let it through.
+        (it.is_schedule || it.is_allowance || it.line_kind === 'materials' || it.line_kind === 'both' || it.material_cost != null || it.product_id != null));
 
       const purchaseItems = materialRows.map((it, idx) => {
-        const qty = it.is_allowance ? 1 : Math.max(Number(it.quantity ?? 1), 0.0001);
+        // A schedule row's quantity is the count itself and must survive verbatim — rounding 30
+        // hinges to an allowance of 1 is how a workshop orders one hinge.
+        const qty = (it.is_allowance && !it.is_schedule) ? 1 : Math.max(Number(it.quantity ?? 1), 0.0001);
         const unitCost = it.is_allowance
           ? Number(it.allowance_amount ?? 0)
           : (it.material_cost != null ? Number(it.material_cost) : null);
@@ -752,7 +802,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
           unit_cost: unitCost,
           currency: plan.source_currency || 'EUR',
           status: 'draft',
-          details: { source: 'blueprint_plan', plan_id, unit: it.unit ?? null, is_allowance: !!it.is_allowance },
+          details: { source: 'blueprint_plan', plan_id, unit: it.unit ?? null, is_allowance: !!it.is_allowance, is_schedule: !!it.is_schedule },
           sort_order: idx,
         };
       });

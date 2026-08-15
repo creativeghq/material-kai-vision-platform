@@ -65,11 +65,36 @@ export interface ZoneGlobalDef {
   factors?: ZoneFactorBand[];
 }
 
+/**
+ * What one piece of something is MADE of — the hardware bill nobody wants to count by hand.
+ *
+ * A module type declaring `{ doors: 2, shelves: 1, legs: 4 }` is what lets the schedule answer
+ * "how many hinges do I order". Hinges are not listed here: they follow from the DOOR count and the
+ * door's height (a 210cm larder door does not take two hinges), so the zone derives them from its
+ * own band ladder rather than every module type restating the same rule.
+ */
+export interface Yields {
+  doors?: number;
+  drawers?: number;
+  shelves?: number;
+  legs?: number;
+  /** Vertical handleless profiles this module contributes. */
+  gola_vertical?: number;
+  /** Anything else the blueprint wants counted; published as `total_<key>`. */
+  [key: string]: number | undefined;
+}
+
 export interface ModuleOptionChoice {
   value: string;
   label: string;
   /** Flat amount added per module PIECE. 0/absent = included. */
   price?: number;
+  /**
+   * What choosing this adds to the schedule, per module piece. A "3 drawers - Blum" runner set
+   * yields `{ drawers: 3, runner_sets: 1 }`, which is how the model stops treating `blum_3` as an
+   * opaque string and starts knowing three drawer boxes have to be ordered.
+   */
+  yields?: Yields;
 }
 
 export interface ModuleOptionDef {
@@ -89,6 +114,8 @@ export interface ModuleTypeDef {
   unit_price?: number;
   margin_pct?: number;
   options?: ModuleOptionDef[];
+  /** What one piece of this module is made of. Feeds the hardware schedule. */
+  yields?: Yields;
   /** Fillers and end panels take no run length. Default true. */
   counts_length?: boolean;
   /** Width is fixed by the module type (a 15cm pull-out larder) — the configurator locks the field. */
@@ -119,6 +146,19 @@ export interface ZoneDef {
    * adjust is the difference between a lead and a bounce. The blueprint decides what typical is.
    */
   default_modules?: Array<{ type: string; width_cm?: number; qty?: number; options?: Record<string, string> }>;
+  /**
+   * Hinges per door, by door height. A 72cm base door takes two; a 210cm larder door takes four or
+   * five, and counting them all as two is how a kitchen arrives on site short of hinges.
+   * Absent = 2 per door, which is right for base and wall units and wrong for tall ones.
+   */
+  hinge_bands?: Array<{ up_to: number; count: number }>;
+  /** Which numeric global holds the DOOR height for `hinge_bands`. Defaults to `height`. */
+  door_height_global?: string;
+  /**
+   * What one RUN of this zone needs regardless of how many units are in it — the two end caps that
+   * close a gola profile, a run-length plinth. Applied once per enabled zone.
+   */
+  run_yields?: Yields;
 }
 
 // ── Configuration (project_plans.composition) ───────────────────────────────
@@ -164,6 +204,16 @@ export interface DerivedZone {
   length_m: number;
   unit_count: number;
   total: number;
+  /** What this zone alone contributes to the hardware schedule. */
+  yields: Record<string, number>;
+}
+
+/** One row of the hardware schedule: how many of a thing the configured kitchen needs. */
+export interface ScheduleRow {
+  key: string;
+  label: string;
+  quantity: number;
+  unit: string;
 }
 
 export interface DerivedComposition {
@@ -179,7 +229,29 @@ export interface DerivedComposition {
    * added" are different problems and the configurator must be able to say which.
    */
   issues: string[];
+  /**
+   * The hardware schedule, summed across every enabled zone: doors, drawers, hinges, shelves, legs,
+   * gola profiles. Quantities only — these are priced when the plan becomes a quote, because a
+   * client is not quoted thirty hinges but a workshop absolutely has to order them.
+   */
+  schedule: ScheduleRow[];
 }
+
+/** Display names + units for the yields the schedule knows about. Anything else falls back. */
+const YIELD_LABELS: Record<string, { label: string; unit: string }> = {
+  doors: { label: 'Doors', unit: 'pcs' },
+  drawers: { label: 'Drawer boxes', unit: 'pcs' },
+  hinges: { label: 'Hinges', unit: 'pcs' },
+  shelves: { label: 'Shelves', unit: 'pcs' },
+  legs: { label: 'Cabinet legs', unit: 'pcs' },
+  runner_sets: { label: 'Drawer runner sets', unit: 'set' },
+  gola_vertical: { label: 'Gola vertical profile', unit: 'pcs' },
+  gola_end_cap: { label: 'Gola end caps', unit: 'pcs' },
+  gola_joiner: { label: 'Gola corner joiners', unit: 'pcs' },
+};
+
+const titleise = (key: string) =>
+  key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 /** The subset of a blueprint_item / project_plan_item this module needs to read a rate off. */
 export interface RateItemLike {
@@ -260,6 +332,26 @@ function sizeFactor(zone: ZoneDef, globals: Record<string, number | string>): nu
     factor *= band ? num(band.factor, 1) : num(bands[bands.length - 1]?.factor, 1);
   }
   return factor;
+}
+
+/** Hinges one door of this height needs. No ladder = 2, right for base and wall, wrong for tall. */
+function hingesPerDoor(zone: ZoneDef, globals: Record<string, number | string>): number {
+  const bands = asArray<{ up_to: number; count: number }>(zone.hinge_bands);
+  if (!bands.length) return 2;
+  const height = num(
+    globals[zone.door_height_global || 'height'],
+    num(asArray<ZoneGlobalDef>(zone.globals).find((g) => g.key === (zone.door_height_global || 'height'))?.default),
+  );
+  const band = [...bands].sort((a, b) => num(a.up_to) - num(b.up_to)).find((b) => height <= num(b.up_to));
+  return band ? num(band.count, 2) : num(bands[bands.length - 1]?.count, 2);
+}
+
+/** Add `src × times` into `into`. Undefined/NaN contribute nothing rather than poisoning the total. */
+function addYields(into: Record<string, number>, src: Yields | undefined, times: number) {
+  for (const [key, value] of Object.entries(src ?? {})) {
+    const n = num(value) * times;
+    if (n !== 0) into[key] = (into[key] ?? 0) + n;
+  }
 }
 
 /** A zone is on unless it is optional and switched off. */
@@ -351,6 +443,7 @@ export function deriveComposition(
   const derivedZones: DerivedZone[] = [];
   const issues: string[] = [];
   const lengthByZone: Record<string, number> = {};
+  const scheduleTotals: Record<string, number> = {};
   let total = 0;
 
   const emit = (line: Omit<DerivedLine, 'line_total' | 'unit_price'>, rate: number, marginPct: number) => {
@@ -383,6 +476,7 @@ export function deriveComposition(
     let count = 0;
     let zoneTotal = 0;
     const perType: Record<string, number> = {};
+    const zoneYields: Record<string, number> = {};
 
     if (enabled) {
       const rows = asArray<ZoneModuleRow>(cfg.modules);
@@ -395,6 +489,7 @@ export function deriveComposition(
         count += qty;
         perType[mod.key] = (perType[mod.key] ?? 0) + qty;
         if (mod.counts_length !== false) length += widthM * qty;
+        addYields(zoneYields, mod.yields, qty);
 
         if (mod.price_mode === 'per_piece') {
           zoneTotal += emit({
@@ -427,6 +522,8 @@ export function deriveComposition(
         for (const opt of asArray<ModuleOptionDef>(mod.options)) {
           const chosen = (row.options ?? {})[opt.key] ?? opt.default;
           const choice = asArray<ModuleOptionChoice>(opt.choices).find((c) => c.value === chosen);
+          // Yields count even when the choice is free: "no extra charge" is not "no drawer boxes".
+          addYields(zoneYields, choice?.yields, qty);
           const price = num(choice?.price);
           if (!choice || price === 0) continue;
           zoneTotal += emit({
@@ -441,6 +538,12 @@ export function deriveComposition(
         }
       }
       if (rows.length === 0) issues.push(`${zone.label}: no units added yet.`);
+      // Whatever one RUN needs regardless of unit count — the two caps that close a gola profile.
+      if (count > 0) addYields(zoneYields, zone.run_yields, 1);
+      // Hinges follow the doors and the door HEIGHT, so the rule lives once here rather than being
+      // restated (and eventually contradicted) by every module type that has a door.
+      const doors = zoneYields.doors ?? 0;
+      if (doors > 0) zoneYields.hinges = (zoneYields.hinges ?? 0) + doors * hingesPerDoor(zone, globals);
     }
 
     length = round2(length);
@@ -452,7 +555,9 @@ export function deriveComposition(
     for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
       if (g.type === 'number') vars[`${zone.key}_${g.key}`] = enabled ? num(globals[g.key], num(g.default)) : 0;
     }
-    derivedZones.push({ key: zone.key, label: zone.label, enabled, length_m: length, unit_count: count, total: round2(zoneTotal) });
+    for (const [key, value] of Object.entries(zoneYields)) vars[`${zone.key}_${key}`] = value;
+    addYields(scheduleTotals, zoneYields, 1);
+    derivedZones.push({ key: zone.key, label: zone.label, enabled, length_m: length, unit_count: count, total: round2(zoneTotal), yields: zoneYields });
   }
 
   // Pass 2 — `surface` zones (worktop, splashback, island top): one length × a material rate.
@@ -489,8 +594,26 @@ export function deriveComposition(
     for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
       if (g.type === 'number') vars[`${zone.key}_${g.key}`] = enabled ? num(globals[g.key], num(g.default)) : 0;
     }
-    derivedZones.push({ key: zone.key, label: zone.label, enabled, length_m: length, unit_count: 0, total: round2(zoneTotal) });
+    derivedZones.push({ key: zone.key, label: zone.label, enabled, length_m: length, unit_count: 0, total: round2(zoneTotal), yields: {} });
   }
+
+  // Totals are published BOTH as formula variables (`total_hinges`, so a schedule line can be an
+  // ordinary blueprint task with a formula) and as a rendered schedule.
+  const schedule: ScheduleRow[] = [];
+  for (const [key, quantity] of Object.entries(scheduleTotals)) {
+    vars[`total_${key}`] = round2(quantity);
+    if (quantity === 0) continue;
+    const meta = YIELD_LABELS[key];
+    schedule.push({ key, label: meta?.label ?? titleise(key), quantity: round2(quantity), unit: meta?.unit ?? 'pcs' });
+  }
+  schedule.sort((a, b) => a.label.localeCompare(b.label));
+  // Run-level totals, for anything fitted along every zone at once — a handleless profile runs the
+  // length of each run, needs a vertical between units and a cap at each open end, so all three
+  // shapes have to be expressible in a formula.
+  const liveRuns = derivedZones.filter((z) => z.enabled && z.unit_count > 0);
+  vars.total_run_length = round2(liveRuns.reduce((sum, z) => sum + z.length_m, 0));
+  vars.total_units = liveRuns.reduce((sum, z) => sum + z.unit_count, 0);
+  vars.total_runs = liveRuns.length;
 
   return {
     vars,
@@ -499,7 +622,30 @@ export function deriveComposition(
     absorbed_groups: absorbedGroups(zones),
     total: round2(total),
     issues,
+    schedule,
   };
+}
+
+/**
+ * `opt_<option_key> = 1 | 0` for every option_group member carrying a stable key.
+ *
+ * This is what makes a line CONDITIONAL ON A CHOICE, which the flat scope could not express: gola
+ * needs four lines on at once (horizontal profile, verticals, end caps, joiners) and an option_group
+ * is pick-one, so they cannot be members of it. They are ordinary lines multiplied by `opt_gola`
+ * instead — `= opt_gola * total_run_length` — and switching to standard handles zeroes all four
+ * together, rather than leaving the top units with no profile because somebody forgot a switch.
+ *
+ * Keyed off `option_key` rather than the label because renaming "Gola (handleless)" must not
+ * silently zero every gola line in every plan.
+ */
+export function optionFlags(items: Array<{ option_key?: string | null; is_selected?: boolean }>): Record<string, number> {
+  const flags: Record<string, number> = {};
+  for (const it of items) {
+    if (!it.option_key) continue;
+    // A member seen selected wins: the same key must never be flipped back to 0 by a later row.
+    flags[`opt_${it.option_key}`] = it.is_selected ? 1 : (flags[`opt_${it.option_key}`] ?? 0);
+  }
+  return flags;
 }
 
 /** True when the blueprint drives itself off zones rather than typed scalars. */

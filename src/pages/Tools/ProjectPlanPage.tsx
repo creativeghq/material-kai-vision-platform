@@ -80,13 +80,13 @@ export default function ProjectPlanPage() {
   const addTask = (sectionId: string) =>
     setItems((cur) => {
       const sibs = cur.filter((i) => i.parent_id === sectionId).length;
-      const row: ProjectPlanItem = { id: crypto.randomUUID(), plan_id: 'local', parent_id: sectionId, sort_order: sibs, kind: 'task', label: 'New task', notes: null, unit: 'item', quantity_formula: null, quantity: 1, line_kind: 'labor', service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0, unit_price: 0, line_total: 0, option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null, source: 'manual', created_at: '', updated_at: '' };
+      const row: ProjectPlanItem = { id: crypto.randomUUID(), plan_id: 'local', parent_id: sectionId, sort_order: sibs, kind: 'task', label: 'New task', notes: null, unit: 'item', quantity_formula: null, quantity: 1, line_kind: 'labor', service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0, unit_price: 0, line_total: 0, option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null, is_schedule: false, option_key: null, source: 'manual', created_at: '', updated_at: '' };
       return repriceItems([...cur, row], dims);
     });
   const addSection = () =>
     setItems((cur) => {
       const n = cur.filter((i) => i.kind === 'section').length;
-      const row: ProjectPlanItem = { id: crypto.randomUUID(), plan_id: 'local', parent_id: null, sort_order: n, kind: 'section', label: 'New section', notes: null, unit: null, quantity_formula: null, quantity: 0, line_kind: 'labor', service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0, unit_price: 0, line_total: 0, option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null, source: 'manual', created_at: '', updated_at: '' };
+      const row: ProjectPlanItem = { id: crypto.randomUUID(), plan_id: 'local', parent_id: null, sort_order: n, kind: 'section', label: 'New section', notes: null, unit: null, quantity_formula: null, quantity: 0, line_kind: 'labor', service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0, unit_price: 0, line_total: 0, option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null, is_schedule: false, option_key: null, source: 'manual', created_at: '', updated_at: '' };
       return [...cur, row];
     });
   const selectOption = (item: ProjectPlanItem) => {

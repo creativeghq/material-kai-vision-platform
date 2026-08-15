@@ -104,6 +104,7 @@ export function seedPlanItems(
       // Everything else follows the blueprint's own default (optional extras start off).
       is_selected: bi.option_group ? false : (bi.default_selected !== false),
       is_allowance: !!bi.is_allowance, allowance_amount: bi.allowance_amount,
+      is_schedule: !!bi.is_schedule, option_key: bi.option_key ?? null,
       source: 'template', created_at: '', updated_at: '',
     }));
   applyOptionDefaults(base);
