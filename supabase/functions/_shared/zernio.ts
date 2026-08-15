@@ -177,6 +177,30 @@ export async function fetchZernioAccount(
 }
 
 /**
+ * Sign a body with the SAME secret verifyZernioSignature checks, for a locally-originated
+ * replay (the inbox backfill).
+ *
+ * The alternative was a service-role bypass on the webhook handler, i.e. a second way in that
+ * skips signature verification. Invariant 6 says verify before processing and fail closed; a
+ * bypass added "just for replay" is the shape that ends up reachable. Signing instead means the
+ * replay goes through the exact same door as a real delivery, and an unset secret fails it for
+ * the same reason.
+ */
+export async function signZernioBody(rawBody: string): Promise<string> {
+  const secret = zernioWebhookSecret();
+  if (!secret) throw new Error('ZERNIO_WEBHOOK_SECRET is not set — cannot sign a replay');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
  * Verify an `X-Zernio-Signature` HMAC-SHA256 over the raw webhook body.
  * Supports both "sha256=<hex>" and bare-hex header formats. Fails closed when
  * no secret is configured.
@@ -215,6 +239,8 @@ export const ZERNIO_WEBHOOK_EVENTS = [
   'message.edited', 'message.deleted', 'conversation.started', 'reaction.received',
   // Connection lifecycle.
   'account.connected', 'account.disconnected',
+  // Comments on our own posts, routed into the unified inbox as a `social` thread.
+  'comment.received',
   // Publishing outcomes.
   'post.scheduled', 'post.published', 'post.partial', 'post.failed', 'post.cancelled',
   'post.platform.published', 'post.platform.failed',
@@ -455,6 +481,62 @@ export async function sendWhatsAppMessage(params: {
       messageId: data?.messageId,
       conversationId: data?.conversationId,
     };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Reply to a comment on one of our posts.
+ *
+ * `commentId` decides who actually hears it: with one, the reply threads under that comment and
+ * notifies its author; without one it is a new TOP-LEVEL comment on the post, which the person
+ * who asked will most likely never see. Both are valid API calls and both "succeed", so the
+ * distinction cannot be left to chance — inbox-api resolves the target explicitly.
+ */
+export async function sendSocialCommentReply(params: {
+  accountId: string;
+  postId: string;
+  message: string;
+  commentId?: string;
+  attachmentUrl?: string;
+}): Promise<ZernioSendResult> {
+  try {
+    const body: Record<string, unknown> = { accountId: params.accountId, message: params.message };
+    if (params.commentId) body.commentId = params.commentId;
+    if (params.attachmentUrl) body.attachmentUrl = params.attachmentUrl;
+
+    const res = await zernioApi(
+      'POST',
+      `/inbox/comments/${encodeURIComponent(params.postId)}`,
+      body,
+    );
+    const data = res?.data ?? res;
+    return { success: true, messageId: data?.id ?? data?.commentId ?? data?.messageId };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Start or continue a DM on a non-WhatsApp platform (Instagram, Facebook, X, Bluesky, Reddit,
+ * Telegram, Slack). Same endpoint as the WhatsApp cold start — Zernio upserts into the existing
+ * thread when one exists — but keyed on the platform's own participant id rather than a phone
+ * number, and with no template machinery, which is WhatsApp-only.
+ */
+export async function sendSocialDirectMessage(params: {
+  accountId: string;
+  participantId: string;
+  message: string;
+}): Promise<ZernioSendResult> {
+  try {
+    const res = await zernioApi('POST', '/inbox/conversations', {
+      accountId: params.accountId,
+      participantId: params.participantId,
+      message: params.message,
+    });
+    const data = res?.data ?? res;
+    return { success: true, messageId: data?.messageId, conversationId: data?.conversationId };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }

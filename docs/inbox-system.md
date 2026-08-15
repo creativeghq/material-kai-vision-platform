@@ -1,5 +1,36 @@
 # Inbox System (Multi-tenant unified inbox)
 
+
+## Channels
+
+`inbox_channel` is `internal | whatsapp | email | social`. The send-router in `inbox-api`
+branches on it: `internal` stores only, the other three store AND relay.
+
+**`social` covers two different things and they relay to different Zernio endpoints**, keyed on
+`thread.metadata.social_kind`:
+
+| `social_kind` | What it is | Relay | Agent |
+|---|---|---|---|
+| `dm` | 1:1 DM on Instagram / Facebook / X / Bluesky / Reddit / Telegram | `POST /v1/inbox/conversations` | follows the workspace `inbox_agent.auto_respond`, like WhatsApp |
+| `comments` | Comments under one of **our own** posts | `POST /v1/inbox/comments/{postId}` with the `commentId` of the message being answered | **never auto-answers**; account tools are withheld entirely |
+
+Sending one down the other's path either publishes a private answer under a public post or drops
+a public reply into a DM nobody is in — both succeed at the API layer, so the routing is explicit.
+
+A comment reply MUST carry `commentId`. Without it the reply is a new top-level comment, which
+does not notify the person who asked: answered, and never read.
+
+**Social counterparties have no participant row.** They are a handle with neither phone nor
+email and they never read this inbox, so minting a `crm_contacts` row per commenter would fill
+the CRM with people nobody can contact again. Their identity lives on
+`inbox_messages.metadata.author_handle`, the thread is matched on `metadata.external_key`, and
+the agent's "is this a customer?" guard falls back to `metadata.direction === 'incoming'` —
+without that fallback it rejected every social message and the agent could never answer one.
+
+A comment thread is public, which changes what is safe to say: order confirmations are withheld
+there, account tools are not passed to the model at all (refusing in the prompt is not enough
+while the tool is still callable), and the composer says so before the operator types.
+
 > Issue **#209**. Backend: [`supabase/functions/inbox-api/index.ts`](../supabase/functions/inbox-api/index.ts) (single action-router edge function).
 > Multi-tenant: **tenant = workspace**. Every thread is bound to a `workspace_id`; access is derived from workspace membership / participation, never trusted from the request body.
 

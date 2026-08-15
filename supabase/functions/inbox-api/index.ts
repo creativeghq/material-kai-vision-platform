@@ -7,8 +7,10 @@
 // All directional ACL walls (operator↔everyone, dealer↔customer, sales jump-in, etc.) are
 // enforced HERE at thread-create / participant-add time — never at read time. RLS on the
 // tables only gates direct client reads/realtime to "active participant OR platform operator".
-// Channel send-router: an `internal` thread stores only; a `whatsapp` thread stores AND
-// relays via Zernio (Meta 24h service window applies — freeform in-window).
+// Channel send-router: an `internal` thread stores only; `whatsapp`, `email` and `social`
+// threads store AND relay (WhatsApp via Zernio's inbox, with Meta's 24h service window
+// applying — freeform in-window; `social` via Zernio's comment or DM endpoint depending on
+// what kind of social thread it is).
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -17,7 +19,11 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
-import { sendWhatsAppReply, sendWhatsAppMessage } from '../_shared/zernio.ts';
+import {
+  sendWhatsAppReply, sendWhatsAppMessage,
+  sendSocialCommentReply, sendSocialDirectMessage,
+  ensureZernioSecrets,
+} from '../_shared/zernio.ts';
 import {
   allocateUserEmailAddress,
   buildOutboundMessageId,
@@ -455,22 +461,34 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
     // Recent conversation (exclude private notes), newest first — used for the guard and transcript.
     const { data: history } = await db
       .from('inbox_messages')
-      .select('body, message_type, sender_participant_id')
+      .select('body, message_type, sender_participant_id, metadata')
       .eq('thread_id', threadId)
       .is('deleted_at', null)
       .neq('message_type', 'note')
       .order('created_at', { ascending: false })
       .limit(20);
-    const rows = (history || []) as Array<{ body: string | null; message_type: string; sender_participant_id: string | null }>;
+    const rows = (history || []) as Array<{
+      body: string | null; message_type: string; sender_participant_id: string | null; metadata: Json | null;
+    }>;
 
     // Loop / human-takeover guard: only answer when the most recent message is a fresh inbound
     // CUSTOMER text. Skip if it was the assistant (already replied), a member (staff is handling),
     // or a system event — prevents double-replies, billing loops, and talking over a human.
     const latest = rows[0];
-    if (!latest || latest.message_type !== 'text' || !latest.sender_participant_id) return;
-    const { data: latestSender } = await db.from('inbox_participants')
-      .select('participant_type').eq('id', latest.sender_participant_id).maybeSingle();
-    if ((latestSender as { participant_type?: string } | null)?.participant_type !== 'customer') return;
+    if (!latest || latest.message_type !== 'text') return;
+
+    if (latest.sender_participant_id) {
+      const { data: latestSender } = await db.from('inbox_participants')
+        .select('participant_type').eq('id', latest.sender_participant_id).maybeSingle();
+      if ((latestSender as { participant_type?: string } | null)?.participant_type !== 'customer') return;
+    } else {
+      // An EXTERNAL author with no participant row. Social counterparties are a handle with
+      // neither phone nor email and they never read this inbox, so they get no participant row
+      // — and this guard, which proved "is a customer" by looking one up, therefore rejected
+      // every social message and the agent could never answer one. `direction: 'incoming'` on
+      // the message is the equivalent proof: our own relay always writes 'outgoing'.
+      if ((latest.metadata as Json | null)?.direction !== 'incoming') return;
+    }
 
     const owner = await workspaceOwner(db, workspaceId);
     if (!owner) return;
@@ -579,13 +597,32 @@ async function buildAgentDraft(
   // Self-service tools — only when we know which customer this is AND the workspace allows account
   // answers. Scope is derived from the thread, never from the message (injection-proof).
   const scope = await resolveThreadCustomerScope(db, threadId);
-  const tools = (settings.allowAccountData && scope.contactId)
+  // Withheld entirely on a public thread: a tool that returns a real balance or invoice is one
+  // sentence away from publishing it under a post. Refusing in the prompt is not enough when the
+  // tool is still callable.
+  const publicThread = thread.channel === 'social'
+    && ((thread.metadata as Json) || {}).social_kind === 'comments';
+  const tools = (settings.allowAccountData && scope.contactId && !publicThread)
     ? buildCustomerSupportTools(db, { workspaceId, contactId: scope.contactId })
     : {};
   const personaBase = await loadInboxAgentPersona(db);
+  // PUBLIC vs private is the one channel fact that changes what is safe to say. A comment reply
+  // is posted under the post for the account's whole audience, so account data, order details
+  // and anything else customer-specific must not appear in one — the model cannot infer that
+  // from the channel name alone, and `social` covers both cases.
+  const threadMeta = (thread.metadata as Json) || {};
+  const isPublic = thread.channel === 'social' && threadMeta.social_kind === 'comments';
+  const audienceNote = isPublic
+    ? 'This reply will be posted PUBLICLY as a comment under our own social post, visible to ' +
+      'everyone. Never include order details, account data, prices quoted to an individual, ' +
+      'phone numbers or email addresses. Keep it short and friendly, and move anything specific ' +
+      'to a private channel by inviting them to message us directly. '
+    : '';
+
   const systemPrompt =
     `${personaBase}\n\n` +
     `Business: ${businessName}. Channel: ${String(thread.channel)}. ` +
+    audienceNote +
     (Object.keys(tools).length
       ? "Use the tools to look up THIS customer's own account (statement/balance, open invoices, " +
         'quotes & projects); always call a tool for real figures and only share a payment link a tool returns.'
@@ -883,6 +920,66 @@ async function insertMessageAndNotify(
     }
   }
 
+  // Social relay. A `social` thread is one of two things and they relay to DIFFERENT endpoints:
+  // a comment thread (many commenters under one of our posts) or a 1:1 DM. Sending one down the
+  // other's path would either post a private answer publicly under a post, or silently drop a
+  // public reply into a DM nobody is in — both "succeed" at the API layer.
+  if (thread.channel === 'social' && (messageType === 'text' || messageType === 'agent') && body) {
+    const meta = (thread.metadata as Json) || {};
+    const accountId = String(meta.zernio_account_id || '');
+    const kind = String(meta.social_kind || '');
+    let res: { success?: boolean; messageId?: string; error?: string } = { success: false, error: 'unrouted' };
+
+    if (!accountId) {
+      throw new HttpError(502, 'Message stored but NOT delivered: this social thread has no connected account.');
+    }
+
+    if (kind === 'comments') {
+      const postId = String(meta.zernio_post_id || '');
+      if (!postId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no post id.');
+
+      // Reply UNDER the comment we are answering, not as a fresh top-level comment: a
+      // top-level comment does not notify the person who asked, so the answer is written and
+      // never read. The target is the most recent inbound comment on the thread, which is what
+      // the transcript shows the operator replying to.
+      const { data: lastInbound } = await db
+        .from('inbox_messages').select('metadata')
+        .eq('thread_id', thread.id)
+        .eq('metadata->>direction', 'incoming')
+        .order('created_at', { ascending: false })
+        .limit(1).maybeSingle();
+      const commentId = (lastInbound?.metadata as Json | undefined)?.comment_id as string | undefined;
+
+      res = await sendSocialCommentReply({ accountId, postId, message: body, commentId });
+    } else {
+      const participantId = String(meta.participant_id || '');
+      if (!participantId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no recipient.');
+      res = await sendSocialDirectMessage({ accountId, participantId, message: body });
+    }
+
+    const relayOk = !!res?.success;
+    // This row carries the provider id that delivery receipts match on, plus the only record
+    // of whether the relay worked. Losing it silently means receipts never apply to this
+    // message and the failure marker is gone — so read the error rather than assume.
+    const { error: metaErr } = await db.from('inbox_messages').update({
+      metadata: {
+        channel: 'social',
+        direction: 'outgoing',
+        social_kind: kind,
+        wamid: res?.messageId ?? null,
+        relay: res,
+        delivery_status: relayOk ? 'sent' : 'relay_failed',
+      },
+    }).eq('id', (msg as { id: string }).id);
+    if (metaErr) console.error('[inbox-api] social relay metadata write FAILED', (msg as { id: string }).id, metaErr);
+
+    // Same contract as the WhatsApp branch: these helpers never throw, so an unread result
+    // leaves a delivered-looking bubble in the operator's thread that nobody ever received.
+    if (!relayOk) {
+      throw new HttpError(502, `Message stored but NOT delivered: ${String(res?.error ?? 'social relay failed')}`);
+    }
+  }
+
   // Email relay (#342). Without this an email thread is write-only: a member replies, sees their
   // own bubble, the composer clears — and the customer is never sent anything. Same failure the
   // WhatsApp branch above was fixed for, so it is built the same way: send, CHECK the result, and
@@ -1161,6 +1258,23 @@ async function sendOrderConfirmation(
         : { channel: 'whatsapp_template', status: 'failed', at, detail: sent.error ?? 'template send refused' };
     }
 
+    if (channel === 'social') {
+      // An order confirmation names what someone bought and what they paid. On a COMMENTS
+      // thread the relay posts publicly under our own post, so this would broadcast a
+      // customer's order to the account's whole audience. Refuse, and record that it was not
+      // sent — the order still stands, and "approved but never told" stays queryable.
+      const meta = (thread.metadata || {}) as Record<string, unknown>;
+      if (meta.social_kind === 'comments') {
+        return { channel: 'none', status: 'unavailable', at, detail: 'public comment thread — confirmation withheld' };
+      }
+      // A social DM is private; the send-router relays it and throws on a failed relay.
+      await insertMessageAndNotify(db, {
+        thread, senderParticipantId: null, body, attachments: [],
+        messageType: 'text', senderUserId: null, senderLabel: 'Order confirmation',
+      });
+      return { channel: 'social', status: 'sent', at };
+    }
+
     if (channel === 'email') {
       // insertMessageAndNotify's email branch actually sends (and throws on a failed send), so
       // the catch below turns a delivery failure into status:'failed' rather than a false 'sent'.
@@ -1190,7 +1304,7 @@ async function sendOrderConfirmation(
     // `channel` is the thread's own channel string; narrow it to the confirmation vocabulary so
     // a future inbox_channel value cannot widen this record without the compiler noticing.
     const failedOn: IntakeConfirmation['channel'] =
-      channel === 'whatsapp' || channel === 'email' ? channel : 'none';
+      channel === 'whatsapp' || channel === 'email' || channel === 'social' ? channel : 'none';
     return { channel: failedOn, status: 'failed', at, detail: e instanceof Error ? e.message : String(e) };
   }
 }
@@ -2773,6 +2887,12 @@ async function handler(req: Request): Promise<Response> {
   if (!action) throw new HttpError(400, 'action is required');
 
   const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // The send-router relays WhatsApp and social replies through Zernio, and bootstrapForFunction()
+  // above CANNOT surface a DB-only key on the edge runtime (Deno.env.set throws there). Without
+  // this, every operator reply on a connected thread relayed with an empty bearer and came back
+  // 401 — stored, shown in the transcript, never delivered.
+  await ensureZernioSecrets(db);
 
   // Internal branch — function-to-function (e.g. the Zernio webhook after a WhatsApp inbound).
   // Guarded by the service-role bearer; never reachable by external callers.

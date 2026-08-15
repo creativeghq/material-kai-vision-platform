@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type InboxThreadType = 'internal' | 'customer' | 'upstream';
 /** `email` is inbound via Cloudflare Email Routing → `email-webhooks` (#342); outbound stays Resend. */
-export type InboxChannel = 'internal' | 'whatsapp' | 'email';
+export type InboxChannel = 'internal' | 'whatsapp' | 'email' | 'social';
 export type InboxThreadStatus = 'open' | 'snoozed' | 'closed';
 export type InboxMessageType = 'text' | 'system' | 'agent' | 'note';
 export type InboxParticipantType = 'member' | 'customer' | 'agent';

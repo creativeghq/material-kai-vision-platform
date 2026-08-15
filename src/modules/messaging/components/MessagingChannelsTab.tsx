@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound, AlertTriangle, Webhook, HeartPulse } from 'lucide-react';
+import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound, AlertTriangle, Webhook, HeartPulse, History } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -35,6 +35,7 @@ export const MessagingChannelsTab: React.FC = () => {
   const [registeringWebhook, setRegisteringWebhook] = useState(false);
   const [health, setHealth] = useState<Record<string, ChannelHealthAccount>>({});
   const [checkingHealth, setCheckingHealth] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
@@ -158,6 +159,24 @@ export const MessagingChannelsTab: React.FC = () => {
     }
   };
 
+  const handleBackfill = async () => {
+    try {
+      setBackfilling(true);
+      const res = await messagingService.backfillInbox({ limit: 100 });
+      toast({
+        title: res.imported > 0 ? `Imported ${res.imported} message(s)` : 'Nothing new to import',
+        description: res.message
+          ?? `${res.conversations} conversation(s) scanned across ${res.accounts} account(s).`
+             + ((res.errors?.length ?? 0) > 0 ? ` ${res.errors!.length} could not be read.` : ''),
+        variant: (res.errors?.length ?? 0) > 0 ? 'destructive' : undefined,
+      });
+    } catch (error: any) {
+      toast({ title: 'Back-fill failed', description: error?.message || String(error), variant: 'destructive' });
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const handleRegisterWebhook = async () => {
     try {
       setRegisteringWebhook(true);
@@ -246,6 +265,11 @@ export const MessagingChannelsTab: React.FC = () => {
             <Button variant="outline" onClick={loadChannels} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button variant="outline" onClick={handleBackfill} disabled={backfilling}
+              title="Pull conversation history from Zernio — webhooks carry no history, so anything that arrived before the webhook was registered is only there">
+              <History className={`h-4 w-4 mr-2 ${backfilling ? 'animate-spin' : ''}`} />
+              {backfilling ? 'Importing...' : 'Import history'}
             </Button>
             <Button variant="outline" onClick={handleCheckHealth} disabled={checkingHealth}>
               <HeartPulse className={`h-4 w-4 mr-2 ${checkingHealth ? 'animate-pulse' : ''}`} />

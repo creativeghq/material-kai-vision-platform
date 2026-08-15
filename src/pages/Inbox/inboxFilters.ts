@@ -27,6 +27,7 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
             { value: 'internal', label: 'Team' },
             { value: 'whatsapp', label: 'WhatsApp' },
             { value: 'email', label: 'Email' },
+            { value: 'social', label: 'Social' },
           ],
         },
         {

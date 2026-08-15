@@ -36,7 +36,7 @@ export interface IntakeItem {
 }
 
 export interface IntakeConfirmation {
-  channel: 'whatsapp' | 'whatsapp_template' | 'email' | 'none';
+  channel: 'whatsapp' | 'whatsapp_template' | 'email' | 'social' | 'none';
   status: 'sent' | 'failed' | 'unavailable';
   at: string;
   detail?: string | null;

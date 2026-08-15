@@ -181,8 +181,18 @@ async function matchOrCreateContact(
  */
 async function handleInboundMessage(supabase: any, payload: any): Promise<void> {
   const msg = payload.message || {};
-  if (msg.platform && msg.platform !== 'whatsapp') return;       // WhatsApp only
   if (msg.direction && msg.direction !== 'incoming') return;
+
+  // Zernio's inbox covers Instagram, Facebook, X, Bluesky, Reddit and Telegram DMs as well as
+  // WhatsApp. Everything that was not WhatsApp used to hit `return` on the line below and be
+  // discarded — silently, and indistinguishably from nobody having written to us. WhatsApp
+  // keeps its own path because it is the only one keyed on a PHONE number, which is what makes
+  // CRM contact matching (and STOP/START compliance) possible; a social DM has a handle and no
+  // phone, so it cannot reuse any of that.
+  if (msg.platform && msg.platform !== 'whatsapp') {
+    await handleSocialDirectMessage(supabase, payload);
+    return;
+  }
 
   const accountId = accountIdOf(payload.account);
   const phone = contactPhoneOf(msg.sender);
@@ -445,6 +455,271 @@ async function handleMessageSent(supabase: any, payload: any): Promise<void> {
   if (error) console.error('[zernio-webhook] message.sent update FAILED', error);
 }
 
+
+/**
+ * Find the workspace that owns a Zernio account, for SOCIAL accounts.
+ *
+ * resolveAccountWorkspace() reads messaging_channels, which only ever holds WhatsApp numbers.
+ * A social account lives in social_accounts, so a social event resolved to no workspace and
+ * was dropped.
+ */
+async function resolveSocialWorkspace(
+  supabase: any,
+  zernioAccountId: string | undefined,
+): Promise<{ workspaceId: string | null; socialAccountId: string | null; platform: string | null }> {
+  if (!zernioAccountId) return { workspaceId: null, socialAccountId: null, platform: null };
+  const { data } = await supabase
+    .from('social_accounts').select('id, workspace_id, platform')
+    .eq('zernio_account_id', zernioAccountId).maybeSingle();
+  return {
+    workspaceId: data?.workspace_id ?? null,
+    socialAccountId: data?.id ?? null,
+    platform: data?.platform ?? null,
+  };
+}
+
+/** Everyone who should be told about a thread, and the notification itself. */
+async function notifyThreadMembers(
+  supabase: any,
+  threadId: string,
+  workspaceId: string,
+  title: string,
+  body: string,
+): Promise<void> {
+  const { data: members } = await supabase
+    .from('inbox_participants').select('user_id')
+    .eq('thread_id', threadId).eq('participant_type', 'member')
+    .eq('status', 'active').not('user_id', 'is', null);
+  await emitInboxMessageEvent({
+    userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
+    threadId,
+    workspaceId,
+    title,
+    body,
+  });
+}
+
+/**
+ * Find-or-create a `social` thread and make sure the workspace owner is on it.
+ *
+ * `externalKey` is what identifies the conversation on the platform side — the DM participant
+ * id, or the post id for a comment thread. It is matched against thread metadata rather than a
+ * participant row because a social counterparty has NO CRM contact: they are a handle, with
+ * neither phone nor email, and minting a crm_contacts row per commenter would fill the CRM
+ * with people nobody can ever contact again.
+ */
+async function findOrCreateSocialThread(supabase: any, params: {
+  workspaceId: string;
+  externalKey: string;
+  subject: string;
+  metadata: Record<string, unknown>;
+  at: string;
+  /** A DM is a 1:1 service conversation like WhatsApp; a comment thread is not. */
+  allowAgent: boolean;
+}): Promise<string> {
+  const { data: existing } = await supabase
+    .from('inbox_threads').select('id')
+    .eq('workspace_id', params.workspaceId).eq('channel', 'social')
+    .eq('metadata->>external_key', params.externalKey)
+    .limit(1).maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await supabase.from('inbox_threads').update({
+      status: 'open',
+      last_message_at: params.at,
+      metadata: { ...params.metadata, external_key: params.externalKey },
+    }).eq('id', existing.id);
+    if (error) console.error('[zernio-webhook] social thread refresh FAILED', existing.id, error);
+    return existing.id;
+  }
+
+  const { data: thread, error: threadErr } = await supabase.from('inbox_threads').insert({
+    workspace_id: params.workspaceId,
+    thread_type: 'customer',
+    channel: 'social',
+    subject: params.subject,
+    status: 'open',
+    // A DM is a 1:1 service conversation and follows the same workspace auto-respond setting
+    // WhatsApp does. A COMMENT thread never auto-answers: the reply is posted publicly under
+    // our own post, so an agent replying unprompted would be broadcasting to the account's
+    // whole audience on its own initiative. That stays opt-in, per thread.
+    agent_state: params.allowAgent ? 'active' : 'off',
+    agent_id: params.allowAgent ? 'kai' : null,
+    metadata: { ...params.metadata, external_key: params.externalKey },
+    last_message_at: params.at,
+  }).select('id').single();
+  if (threadErr) throw new Error(`social inbox_threads insert failed: ${threadErr.message}`);
+  const threadId = thread?.id as string | undefined;
+  if (!threadId) throw new Error('social inbox_threads insert returned no id');
+
+  if (params.allowAgent) {
+    const { error: aErr } = await supabase.from('inbox_participants').insert({
+      thread_id: threadId, participant_type: 'agent', agent_id: 'kai', thread_role: 'agent',
+    });
+    if (aErr) console.error('[zernio-webhook] social agent participant insert FAILED', threadId, aErr);
+  }
+
+  const owner = await resolveWorkspaceOwner(supabase, params.workspaceId);
+  if (owner) {
+    const { error: pErr } = await supabase.from('inbox_participants').insert({
+      thread_id: threadId, participant_type: 'member', user_id: owner,
+      workspace_id: params.workspaceId, thread_role: 'owner', added_by: owner,
+    });
+    if (pErr) throw new Error(`social inbox_participants insert failed: ${pErr.message}`);
+  }
+  return threadId;
+}
+
+/** An inbound DM on a non-WhatsApp platform (Instagram, Facebook, X, Bluesky, Reddit, Telegram). */
+async function handleSocialDirectMessage(supabase: any, payload: any): Promise<void> {
+  const msg = payload.message || {};
+  const accountId = accountIdOf(payload.account);
+  const { workspaceId, socialAccountId, platform } = await resolveSocialWorkspace(supabase, accountId);
+  if (!workspaceId) {
+    console.warn(`[zernio-webhook] no workspace for social account ${accountId} — DM dropped`);
+    return;
+  }
+
+  const participantId = String(msg.sender?.id ?? msg.participantId ?? '');
+  const handle = msg.sender?.username ?? msg.sender?.name ?? participantId;
+  if (!participantId) {
+    console.warn('[zernio-webhook] social DM without a resolvable sender — dropped');
+    return;
+  }
+
+  const at = msg.sentAt || new Date().toISOString();
+  const plat = msg.platform ?? platform ?? 'social';
+
+  const { data: wsRow } = await supabase.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
+  const agentCfg = (((wsRow as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>)
+    .inbox_agent as Record<string, unknown> | undefined;
+  const autoRespond = agentCfg?.auto_respond !== false;
+
+  const threadId = await findOrCreateSocialThread(supabase, {
+    allowAgent: autoRespond,
+    workspaceId,
+    externalKey: `dm:${plat}:${participantId}`,
+    subject: `${plat} · ${handle}`,
+    metadata: {
+      social_kind: 'dm',
+      platform: plat,
+      zernio_account_id: accountId,
+      zernio_conversation_id: msg.conversationId ?? null,
+      social_account_id: socialAccountId,
+      participant_id: participantId,
+      participant_handle: handle,
+    },
+    at,
+  });
+
+  const { error: msgErr } = await supabase.from('inbox_messages').insert({
+    thread_id: threadId,
+    sender_participant_id: null,          // external author, no participant row
+    body: msg.text ?? null,
+    attachments: msg.attachments ?? [],
+    message_type: 'text',
+    metadata: {
+      channel: 'social', direction: 'incoming', platform: plat,
+      wamid: msg.platformMessageId || msg.id || null,
+      author_handle: handle, author_id: participantId,
+    },
+  });
+  if (msgErr) throw new Error(`social DM inbox_messages insert failed: ${msgErr.message}`);
+
+  await notifyThreadMembers(
+    supabase, threadId, workspaceId,
+    `${plat} · ${handle}`,
+    (msg.text || '[attachment]').substring(0, 200),
+  );
+
+  // Same handover the WhatsApp path uses — inbox-api owns the Claude call, the credit debit and
+  // the relay back out. Without this a social DM thread could be marked agent-active and simply
+  // never answer, which looks identical to the agent choosing not to.
+  await fetch(`${supabaseUrl}/functions/v1/inbox-api`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'internal_agent_reply', thread_id: threadId }),
+  }).catch(() => {});
+}
+
+/**
+ * A comment on one of our posts.
+ *
+ * The thread is keyed on the POST, not the commenter: an operator triaging replies thinks in
+ * terms of "the comments under this post", and one thread per commenter would turn a post with
+ * fifty comments into fifty threads. Each comment carries its own author and comment id on the
+ * message, which is what the reply relay in inbox-api targets.
+ */
+async function handleSocialComment(supabase: any, payload: any): Promise<void> {
+  const comment = payload.comment || payload.message || {};
+  const accountId = accountIdOf(payload.account);
+  const { workspaceId, socialAccountId, platform } = await resolveSocialWorkspace(supabase, accountId);
+  if (!workspaceId) {
+    console.warn(`[zernio-webhook] no workspace for social account ${accountId} — comment dropped`);
+    return;
+  }
+
+  const postId = String(payload.post?.id ?? comment.postId ?? '');
+  const commentId = String(comment.id ?? '');
+  if (!postId || !commentId) {
+    console.warn('[zernio-webhook] comment without a post/comment id — dropped');
+    return;
+  }
+
+  // Our own reply, echoed back. Storing it would double every reply in the transcript.
+  const authorId = String(comment.from?.id ?? comment.author?.id ?? '');
+  if (authorId && accountId && authorId === accountId) return;
+
+  const handle = comment.from?.name ?? comment.from?.username ?? comment.author?.username ?? 'Someone';
+  const at = comment.createdTime || new Date().toISOString();
+  const plat = comment.platform ?? platform ?? 'social';
+
+  const threadId = await findOrCreateSocialThread(supabase, {
+    allowAgent: false,          // never auto-answer in public
+    workspaceId,
+    externalKey: `comments:${plat}:${postId}`,
+    subject: `${plat} comments · ${String(payload.post?.content ?? postId).substring(0, 60)}`,
+    metadata: {
+      social_kind: 'comments',
+      platform: plat,
+      zernio_account_id: accountId,
+      zernio_post_id: postId,
+      social_account_id: socialAccountId,
+      post_permalink: payload.post?.permalink ?? null,
+    },
+    at,
+  });
+
+  // A platform can redeliver a comment; the transcript must not gain a duplicate each time.
+  const { data: dupe } = await supabase
+    .from('inbox_messages').select('id')
+    .eq('thread_id', threadId).eq('metadata->>comment_id', commentId)
+    .limit(1).maybeSingle();
+  if (dupe) return;
+
+  const { error: msgErr } = await supabase.from('inbox_messages').insert({
+    thread_id: threadId,
+    sender_participant_id: null,
+    body: comment.message ?? comment.text ?? null,
+    attachments: [],
+    message_type: 'text',
+    metadata: {
+      channel: 'social', direction: 'incoming', platform: plat,
+      social_kind: 'comment', comment_id: commentId,
+      parent_comment_id: comment.parentId ?? null,
+      author_handle: handle, author_id: authorId || null,
+      permalink: comment.url ?? null,
+    },
+  });
+  if (msgErr) throw new Error(`social comment inbox_messages insert failed: ${msgErr.message}`);
+
+  await notifyThreadMembers(
+    supabase, threadId, workspaceId,
+    `${plat} comment · ${handle}`,
+    (comment.message || comment.text || '[comment]').substring(0, 200),
+  );
+}
+
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */
 async function resolveCampaignOwner(supabase: any, phone: string): Promise<string | null> {
   const { data: log } = await supabase
@@ -599,6 +874,10 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     }
     if (event === 'reaction.received') {
       await handleReaction(supabase, payload);
+      return jsonResponse({ received: true, event });
+    }
+    if (event === 'comment.received') {
+      await handleSocialComment(supabase, payload);
       return jsonResponse({ received: true, event });
     }
     if (event === 'conversation.started') {
@@ -838,7 +1117,8 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     // Anything carrying customer CONTENT is retried; a lost one is unrecoverable because
     // Zernio does not resend on a 200. Status/lifecycle syncs stay 200 — they are best-effort
     // and reconverge on the next event or sync, so retrying them just loops.
-    if (event === 'message.received' || event === 'message.edited' || event === 'message.deleted') {
+    if (event === 'message.received' || event === 'message.edited'
+        || event === 'message.deleted' || event === 'comment.received') {
       return jsonResponse({ error: `Transient failure handling ${event}`, event }, 500);
     }
   }

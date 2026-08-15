@@ -444,6 +444,25 @@ export class MessagingService {
   }
 
   /**
+   * Pull conversation history from Zernio into the inbox.
+   *
+   * Webhooks are push-only with no history — Zernio does not resend after a 200, and the
+   * webhook was never registered at all before this, so everything that happened up to then
+   * exists on the platform and nowhere here. There is no local signal for that: an empty inbox
+   * and an inbox that missed a month are the same picture. Idempotent; safe to run twice.
+   */
+  async backfillInbox(options: { workspaceId?: string; limit?: number } = {}): Promise<{
+    accounts: number; conversations: number; imported: number; errors?: string[]; truncated?: boolean; message?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'backfill-inbox', ...options },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to back-fill the inbox'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
    * Live token health for every WhatsApp number this caller can see, from Zernio.
    * Also mirrors the verdict onto messaging_channels, so a number whose token died stops
    * showing a green "Active" badge whether or not anyone opens the health panel.

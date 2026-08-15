@@ -30,6 +30,7 @@ import {
   fetchZernioAccount,
   ensureZernioWebhook,
   getZernioWebhookStatus,
+  signZernioBody,
   publicAppUrl,
   resolveWorkspaceProfile,
   sendWhatsAppMessage,
@@ -276,7 +277,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const OPERATOR_ACTIONS = new Set([
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
-      'register-webhook', 'create-whatsapp-template',
+      'register-webhook', 'create-whatsapp-template', 'backfill-inbox',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -661,6 +662,127 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
 
         return jsonResponse({ success: true, channel: saved, account });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Backfill the inbox from Zernio.
+      //
+      // Webhooks are a PUSH channel with no history: Zernio does not resend after a 200, and it
+      // was never registered at all until this pass, so every conversation that happened before
+      // then exists on the platform and nowhere here. There is no local signal for that — an
+      // empty inbox and an inbox that missed a month look the same.
+      //
+      // This is also the recovery path for the two states that lose events afterwards: a
+      // webhook Zernio auto-disabled after 10 failures, and a deploy window. Idempotent, so
+      // running it twice is safe.
+      // ─────────────────────────────────────────────────────────────
+      case 'backfill-inbox': {
+        const { workspaceId, limit } = requestBody;
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        const cap = Math.min(Math.max(Number(limit) || 50, 1), 200);
+
+        // Only this workspace's accounts. Zernio's key is platform-wide, so an unfiltered pull
+        // would import another tenant's conversations into this inbox.
+        const [{ data: channels }, { data: socials }] = await Promise.all([
+          supabaseClient.from('messaging_channels').select('zernio_account_id')
+            .eq('workspace_id', wsId).eq('channel_type', 'whatsapp').not('zernio_account_id', 'is', null),
+          supabaseClient.from('social_accounts').select('zernio_account_id')
+            .eq('workspace_id', wsId).eq('is_active', true).not('zernio_account_id', 'is', null),
+        ]);
+        const accountIds = [
+          ...((channels ?? []) as Array<{ zernio_account_id: string }>).map((c) => c.zernio_account_id),
+          ...((socials ?? []) as Array<{ zernio_account_id: string }>).map((a) => a.zernio_account_id),
+        ].filter(Boolean);
+
+        if (!accountIds.length) {
+          return jsonResponse({ success: true, imported: 0, message: 'No connected accounts to back-fill from.' });
+        }
+
+        let imported = 0;
+        let scanned = 0;
+        const errors: string[] = [];
+
+        for (const accountId of accountIds) {
+          let convs: Array<Record<string, any>> = [];
+          try {
+            const data = await zernioApi('GET', `/inbox/conversations?accountId=${encodeURIComponent(accountId)}&limit=${cap}`);
+            convs = (data.data ?? []) as Array<Record<string, any>>;
+          } catch (err) {
+            // One account's failure must not abandon the others — a revoked token on a single
+            // number would otherwise silently truncate the whole backfill.
+            errors.push(`${accountId}: ${String(err)}`);
+            continue;
+          }
+
+          for (const conv of convs) {
+            scanned++;
+            let messages: Array<Record<string, any>> = [];
+            try {
+              const md = await zernioApi(
+                'GET',
+                `/inbox/conversations/${encodeURIComponent(String(conv.id))}/messages?limit=50`,
+              );
+              messages = (md.data ?? md.messages ?? []) as Array<Record<string, any>>;
+            } catch (err) {
+              errors.push(`${conv.id}: ${String(err)}`);
+              continue;
+            }
+
+            for (const m of messages) {
+              // Replay each one through the webhook handler's own path so the backfill and the
+              // live path can never diverge into two different importers — the second copy is
+              // exactly how "it works live but not on replay" gets built.
+              const replayBody = JSON.stringify({
+                  event: 'message.received',
+                  account: { accountId, platform: conv.platform },
+                  message: {
+                    id: m.id,
+                    platformMessageId: m.platformMessageId ?? m.id,
+                    platform: conv.platform,
+                    direction: m.direction ?? 'incoming',
+                    text: m.text ?? m.message ?? null,
+                    attachments: m.attachments ?? [],
+                    conversationId: conv.id,
+                    sentAt: m.sentAt ?? m.createdTime ?? null,
+                    sender: {
+                      id: conv.participantId,
+                      name: conv.participantName,
+                      username: conv.accountUsername ?? conv.participantName,
+                      phone: conv.platform === 'whatsapp' ? conv.participantId : undefined,
+                    },
+                  },
+              });
+
+              // Signed with the real webhook secret rather than let in through a service-role
+              // bypass: invariant 6 is verify-before-process and fail closed, and a second door
+              // added "only for replay" is the one that ends up reachable.
+              const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/zernio-webhook-handler`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Zernio-Signature': await signZernioBody(replayBody),
+                },
+                body: replayBody,
+              });
+              if (res.ok) imported++;
+              else errors.push(`replay ${m.id}: ${res.status}`);
+            }
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          accounts: accountIds.length,
+          conversations: scanned,
+          imported,
+          // Never a silent partial: a truncated backfill that reports plain success is
+          // indistinguishable from one that found nothing.
+          errors: errors.slice(0, 20),
+          truncated: errors.length > 20,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────

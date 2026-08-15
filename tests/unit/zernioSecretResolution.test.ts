@@ -94,10 +94,20 @@ describe('Zernio secrets resolve through _shared/zernio.ts, not Deno.env', () =>
   it('every entry point that reads the key awaits ensureZernioSecrets first', () => {
     // A file that calls zernioKey()/zernioApi()/zernioWebhookSecret() but never awaits the
     // resolver silently falls back to env-only — the exact bug, reintroduced one file at a time.
-    const consumers = SOURCES.filter(
-      (f) => !f.isCanonical && /\b(zernioApi|zernioKey|zernioWebhookSecret)\s*\(/.test(f.code),
-    );
-
+    // Every entry point into the Zernio client, not just the three low-level ones. The
+    // WRAPPERS matter more, not less: inbox-api relays every operator reply through
+    // sendWhatsAppReply() and names zernioKey() nowhere, so checking only the low level
+    // declared the one function that relays customer messages compliant while it ran on an
+    // unresolved key.
+    const ENTRY_POINTS = [
+      'zernioApi', 'zernioKey', 'zernioWebhookSecret',
+      'sendWhatsAppMessage', 'sendWhatsAppReply',
+      'sendSocialCommentReply', 'sendSocialDirectMessage',
+      'fetchZernioAccount', 'resolveWorkspaceProfile',
+      'ensureZernioWebhook', 'getZernioWebhookStatus',
+    ];
+    const callsClient = new RegExp(`\\b(${ENTRY_POINTS.join('|')})\\s*\\(`);
+    const consumers = SOURCES.filter((f) => !f.isCanonical && callsClient.test(f.code));
     expect(consumers.length, 'expected the Zernio consumers to still exist').toBeGreaterThan(0);
 
     const missing = consumers
@@ -293,5 +303,86 @@ describe('service stability', () => {
     // tenant every other tenant's numbers (invariant 1).
     const block = api.code.slice(api.code.indexOf("case 'channel-health'"));
     expect(block.slice(0, 2000)).toMatch(/readScopeWorkspaceIds|in\('workspace_id'/);
+  });
+});
+
+describe('social lands in the inbox, and public stays public', () => {
+  const handler = SOURCES.find((f) => f.rel === 'zernio-webhook-handler/index.ts')!;
+  const inboxApi = SOURCES.find((f) => f.rel === 'inbox-api/index.ts')!;
+  const client = SOURCES.find((f) => f.rel === '_shared/zernio.ts')!;
+
+  it('no longer discards every non-WhatsApp DM', () => {
+    // handleInboundMessage opened with `if (msg.platform !== 'whatsapp') return`, so Instagram,
+    // Facebook, X, Bluesky, Reddit and Telegram DMs were dropped — indistinguishably from
+    // nobody having written to us.
+    expect(handler.code).toContain('handleSocialDirectMessage');
+    expect(handler.code).toContain('handleSocialComment');
+    expect(handler.code).not.toMatch(/if \(msg\.platform && msg\.platform !== 'whatsapp'\) return;/);
+  });
+
+  it('routes a comment reply to the comment, not the post', () => {
+    // Replying at top level posts a new comment on the post, which does NOT notify the person
+    // who asked. Both calls succeed, so the difference is invisible at the API layer and shows
+    // up only as a customer who was answered and never knew.
+    expect(client.code).toContain('sendSocialCommentReply');
+    // Anchor on the relay itself — `thread.channel === 'social'` also appears earlier, in the
+    // agent-prompt gate, and slicing from there never reaches this code.
+    const block = inboxApi.code.slice(inboxApi.code.indexOf('sendSocialCommentReply({'));
+    expect(block.slice(0, 400)).toContain('commentId');
+    const routing = inboxApi.code.slice(inboxApi.code.indexOf("if (kind === 'comments') {"));
+    expect(routing.slice(0, 1500)).toMatch(/'metadata->>direction', 'incoming'/);
+  });
+
+  it('never auto-answers in public, and withholds account tools there', () => {
+    // A comment reply goes out under our own post to the whole audience. An agent replying
+    // unprompted is broadcasting on its own initiative, and a tool that returns a real balance
+    // is one sentence from publishing it.
+    expect(handler.code).toMatch(/allowAgent: false,\s*\/\/ never auto-answer in public/);
+    expect(inboxApi.code).toContain('publicThread');
+    expect(inboxApi.code).toMatch(/&& !publicThread\)/);
+    expect(inboxApi.code).toMatch(/posted PUBLICLY as a comment/);
+  });
+
+  it('withholds an order confirmation from a public thread', () => {
+    // An order confirmation names what someone bought and what they paid.
+    const block = inboxApi.code.slice(inboxApi.code.indexOf('async function sendOrderConfirmation'));
+    expect(block.slice(0, 3000)).toMatch(/social_kind === 'comments'/);
+    expect(block.slice(0, 3000)).toMatch(/confirmation withheld/);
+  });
+
+  it('lets the agent recognise an author with no participant row', () => {
+    // The loop guard proved "is a customer" by looking up a participant. Social counterparties
+    // have none, so it rejected every social message and the agent could never answer one.
+    const guard = inboxApi.code.slice(inboxApi.code.indexOf('async function maybeRunAgentReply'));
+    expect(guard.slice(0, 3000)).toMatch(/direction'?\]? !== 'incoming'/);
+  });
+});
+
+describe('history can be recovered, without a second door', () => {
+  const api = SOURCES.find((f) => f.rel === 'messaging-api/index.ts')!;
+  const client = SOURCES.find((f) => f.rel === '_shared/zernio.ts')!;
+
+  it('can back-fill, because webhooks carry no history', () => {
+    // Zernio does not resend after a 200 and the webhook was unregistered until now, so every
+    // conversation before that point exists on the platform and nowhere here. No local signal
+    // exists for it: an empty inbox and one that missed a month are the same picture.
+    expect(api.code).toContain("case 'backfill-inbox'");
+    expect(api.code).toMatch(/\/inbox\/conversations\?accountId=/);
+  });
+
+  it('replays through the real signature check, not a service-role bypass', () => {
+    // Invariant 6 is verify-before-process, fail closed. A second door added "only for replay"
+    // is the one that ends up reachable.
+    expect(client.code).toContain('export async function signZernioBody');
+    const block = api.code.slice(api.code.indexOf("case 'backfill-inbox'"));
+    expect(block.slice(0, 6000)).toContain('X-Zernio-Signature');
+    expect(block.slice(0, 6000)).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+  });
+
+  it('scopes the pull to the caller workspace and never truncates silently', () => {
+    // Zernio's key is platform-wide: an unfiltered pull imports other tenants' conversations.
+    const block = api.code.slice(api.code.indexOf("case 'backfill-inbox'"));
+    expect(block.slice(0, 6000)).toMatch(/\.eq\('workspace_id', wsId\)/);
+    expect(block.slice(0, 6000)).toContain('truncated');
   });
 });

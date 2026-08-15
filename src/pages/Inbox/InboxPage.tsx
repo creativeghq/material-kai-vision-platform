@@ -5,7 +5,7 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, Share2,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
 } from 'lucide-react';
@@ -89,13 +89,26 @@ function money(amount: number | null | undefined, currency: string | null | unde
 }
 
 /** Per-source presentation for a thread's channel (the "Team / Customer / WhatsApp / Email" tag).
- *  Email became a real inbound channel in #342 (Cloudflare Email Routing → email-webhooks). */
+ *  Email became a real inbound channel in #342 (Cloudflare Email Routing → email-webhooks);
+ *  `social` in the Zernio pass — Instagram/Facebook/X DMs plus comments on our own posts. */
 function channelMeta(t: InboxThread): { label: string; Icon: typeof MessageCircle; className: string } {
   if (t.channel === 'whatsapp') {
     return { label: 'WhatsApp', Icon: MessageCircle, className: 'bg-green-500/15 text-green-400 border-green-500/30' };
   }
   if (t.channel === 'email') {
     return { label: 'Email', Icon: Mail, className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+  }
+  if (t.channel === 'social') {
+    // A comment is PUBLIC and a DM is not, and the reply composer behaves differently for each.
+    // Labelling both "Social" would leave an operator one keystroke from answering a private
+    // question underneath a public post.
+    const meta = (t.metadata ?? {}) as Record<string, unknown>;
+    const isComments = meta.social_kind === 'comments';
+    const platform = typeof meta.platform === 'string' ? meta.platform : 'Social';
+    const pretty = platform.charAt(0).toUpperCase() + platform.slice(1);
+    return isComments
+      ? { label: `${pretty} comments`, Icon: MessagesSquare, className: 'bg-pink-500/15 text-pink-300 border-pink-500/30' }
+      : { label: `${pretty} DM`, Icon: Share2, className: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30' };
   }
   if (t.thread_type === 'internal') {
     return { label: 'Team', Icon: Users, className: 'bg-sky-500/15 text-sky-300 border-sky-500/30' };
@@ -456,7 +469,8 @@ const InboxPage: React.FC = () => {
     [threads, showArchived],
   );
 
-  const threadDisplayName = (t: InboxThread) => t.subject || (t.channel === 'whatsapp' ? 'WhatsApp contact' : 'Conversation');
+  const threadDisplayName = (t: InboxThread) => t.subject
+    || (t.channel === 'whatsapp' ? 'WhatsApp contact' : t.channel === 'social' ? 'Social conversation' : 'Conversation');
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
 
@@ -857,6 +871,21 @@ const InboxPage: React.FC = () => {
 
               {/* Composer */}
               <div className="border-t border-white/10 p-3 space-y-2">
+                {/* A comment reply is PUBLIC. Nothing else about the composer says so, and the
+                    same box is used for private DMs one filter click away — an operator who
+                    assumes private has already published the mistake by the time they find out. */}
+                {activeThread.channel === 'social'
+                  && (activeThread.metadata as Record<string, unknown> | null)?.social_kind === 'comments'
+                  && !isNote && (
+                  <div className="text-xs bg-pink-500/10 border border-pink-500/30 text-pink-300 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                    <MessagesSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      This posts publicly as a reply under your {String((activeThread.metadata as Record<string, unknown> | null)?.platform ?? 'social')} post,
+                      visible to everyone. Keep order details and personal information out of it.
+                    </span>
+                  </div>
+                )}
+
                 {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
                   <div className="text-xs bg-amber-bg/60 border border-amber/30 text-amber-foreground rounded-lg px-3 py-2">
                     WhatsApp 24-hour reply window has closed. Freeform replies are blocked by Meta — an approved
@@ -1002,6 +1031,16 @@ const MessageBubble: React.FC<{
   const isSystem = m.message_type === 'system';
   const isAgent = m.message_type === 'agent';
 
+  // A social commenter or DM sender has NO participant row — they are a handle with neither
+  // phone nor email, and they never read this inbox. Their name lives on the message instead,
+  // so without this every social message renders as an unattributed grey bubble and a thread
+  // of ten different commenters looks like one anonymous person talking to themselves.
+  const meta = (m.metadata ?? {}) as Record<string, unknown>;
+  const externalAuthor = !m.sender_participant_id && typeof meta.author_handle === 'string'
+    ? (meta.author_handle as string)
+    : null;
+  const displayLabel = info?.label ?? externalAuthor ?? undefined;
+
   if (isSystem) {
     return (
       <div className="flex justify-center my-1.5">
@@ -1028,13 +1067,16 @@ const MessageBubble: React.FC<{
   return (
     <div className={`flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
       <Avatar className="h-7 w-7 mt-5 shrink-0">
-        <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(info?.label)}`}>
-          {isAgent ? <Bot className="w-3.5 h-3.5" /> : initials(info?.label)}
+        <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(displayLabel)}`}>
+          {isAgent ? <Bot className="w-3.5 h-3.5" /> : initials(displayLabel)}
         </AvatarFallback>
       </Avatar>
       <div className={`flex flex-col min-w-0 ${ours ? 'items-end' : 'items-start'}`}>
-        {info && !isNote && (
-          <div className="text-[10px] text-muted-foreground mb-1 px-1">{info.label}</div>
+        {displayLabel && !isNote && (
+          <div className="text-[10px] text-muted-foreground mb-1 px-1">
+            {displayLabel}
+            {meta.social_kind === 'comment' && <span className="ml-1 opacity-70">· public comment</span>}
+          </div>
         )}
         <div className={`rounded-2xl px-3.5 py-2 text-left ${bubbleClass}`}>
           {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
