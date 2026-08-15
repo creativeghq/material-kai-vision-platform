@@ -140,6 +140,23 @@ export type TriggerType =
   // Social publishing (Zernio): a scheduled post went live or failed on all platforms
   | 'social_post_published'
   | 'social_post_failed'
+  // ── Zernio inbound (WhatsApp + social). These are the events the API already sends us;
+  //    routing them here rather than adopting Zernio's own workflow engine is deliberate —
+  //    theirs can only see Zernio's world, this one already knows what a deal or a quote is.
+  //
+  //    A public comment under one of OUR posts. Distinct from inbox.message_received on
+  //    purpose: a reply to this is published to the account's whole audience, so a flow that
+  //    auto-answers a DM must not silently also auto-answer in public.
+  | 'social_comment_received'
+  // A number Meta declined / suspended / released / re-activated. Every one of these except
+  // re-activation STOPS ALL SENDING, and nothing else in the platform can tell you.
+  | 'whatsapp_number_status_changed'
+  // Meta approved, rejected, or silently RE-CATEGORISED a template. A recategorisation
+  // re-prices every message sent on that template without changing anything visible.
+  | 'whatsapp_template_status_changed'
+  // A connected account appeared or dropped (either side: our OAuth, or Zernio's dashboard).
+  | 'social_account_connected'
+  | 'social_account_disconnected'
   // Project Client Views: a client approved / requested changes / commented on a deliverable
   | 'client_view_feedback_received'
   // Project Requests: a client/teammate raised a request, or the team answered one
@@ -219,6 +236,11 @@ export interface EmailBouncedTriggerConfig {}
 export interface EmailComplainedTriggerConfig {}
 export interface SocialPostPublishedTriggerConfig {}
 export interface SocialPostFailedTriggerConfig {}
+export interface SocialCommentReceivedTriggerConfig {}
+export interface WhatsappNumberStatusChangedTriggerConfig {}
+export interface WhatsappTemplateStatusChangedTriggerConfig {}
+export interface SocialAccountConnectedTriggerConfig {}
+export interface SocialAccountDisconnectedTriggerConfig {}
 export interface ClientViewFeedbackReceivedTriggerConfig {}
 export interface ProjectRequestRaisedTriggerConfig {}
 export interface ProjectRequestAnsweredTriggerConfig {}
@@ -484,6 +506,11 @@ export type TriggerConfigMap = {
   email_complained: EmailComplainedTriggerConfig;
   social_post_published: SocialPostPublishedTriggerConfig;
   social_post_failed: SocialPostFailedTriggerConfig;
+  social_comment_received: SocialCommentReceivedTriggerConfig;
+  whatsapp_number_status_changed: WhatsappNumberStatusChangedTriggerConfig;
+  whatsapp_template_status_changed: WhatsappTemplateStatusChangedTriggerConfig;
+  social_account_connected: SocialAccountConnectedTriggerConfig;
+  social_account_disconnected: SocialAccountDisconnectedTriggerConfig;
   client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
   project_request_raised: ProjectRequestRaisedTriggerConfig;
   project_request_answered: ProjectRequestAnsweredTriggerConfig;

@@ -330,6 +330,17 @@ export const inboxApi = {
   markRead(thread_id: string) {
     return call<{ ok: boolean }>('mark_read', { thread_id });
   },
+  /**
+   * Answer a public comment PRIVATELY, by DM. Instagram and Facebook allow exactly ONE per
+   * comment, inside a limited window, so a failure is final and is surfaced rather than retried.
+   */
+  commentPrivateReply(thread_id: string, message_id: string, body: string) {
+    return call<{ ok: boolean; message_id: string | null }>('comment_private_reply', { thread_id, message_id, body });
+  },
+  /** Hide or unhide a comment on one of our own posts. */
+  setCommentHidden(thread_id: string, message_id: string, hidden: boolean) {
+    return call<{ ok: boolean; hidden: boolean }>('set_comment_hidden', { thread_id, message_id, hidden });
+  },
   setStatus(thread_id: string, status: InboxThreadStatus) {
     return call<{ ok: boolean }>('set_status', { thread_id, status });
   },

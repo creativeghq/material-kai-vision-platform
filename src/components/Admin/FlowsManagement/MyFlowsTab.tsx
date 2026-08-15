@@ -67,7 +67,7 @@ import {
   Wrench,
   AlarmClock,
   ShieldCheck,
-  Coins,
+  Coins, MessagesSquare, PhoneOff, Link2, Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -197,6 +197,11 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   email_bounced: MailX,
   email_complained: MailWarning,
   social_post_published: Share2,
+  social_comment_received: MessagesSquare,
+  whatsapp_number_status_changed: PhoneOff,
+  whatsapp_template_status_changed: FileCheck,
+  social_account_connected: Link2,
+  social_account_disconnected: Unlink,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
   project_request_raised: MessageSquarePlus,
@@ -325,6 +330,11 @@ const triggerLabels: Record<TriggerType, string> = {
   email_bounced: 'Email Bounced',
   email_complained: 'Spam Complaint',
   social_post_published: 'Social Post Published',
+  social_comment_received: 'Social Comment Received',
+  whatsapp_number_status_changed: 'WhatsApp Number Status Changed',
+  whatsapp_template_status_changed: 'WhatsApp Template Status Changed',
+  social_account_connected: 'Social Account Connected',
+  social_account_disconnected: 'Social Account Disconnected',
   social_post_failed: 'Social Post Failed',
   client_view_feedback_received: 'Client View Feedback',
   project_request_raised: 'Project Request Raised',

@@ -25,10 +25,10 @@ import { editImageWithGrok } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
-import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
 
+import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -54,12 +54,11 @@ function jsonResponse(body: unknown, status = 200) {
  * guard's contract: a public URL can 302 to a blocked address after the check.
  * On failure we deliberately do NOT echo the status or URL back to the caller.
  */
+/** Guarded AND bounded. This one already called assertSafeUrl and refused
+ *  redirects; what it lacked was a size cap, so an attacker-chosen URL could still
+ *  stream unbounded bytes into the isolate. */
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
-  const safeUrl = await assertSafeUrl(url);
-  const res = await fetch(safeUrl, { redirect: 'error' });
-  if (!res.ok) throw new Error('Failed to fetch the source image');
-  const mimeType = res.headers.get('content-type') || 'image/jpeg';
-  return { bytes: new Uint8Array(await res.arrayBuffer()), mimeType };
+  return await fetchImageGuarded(url);
 }
 
 /** Decode a PNG data URL into raw bytes */

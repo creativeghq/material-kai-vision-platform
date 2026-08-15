@@ -22,6 +22,7 @@ import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } f
 import {
   sendWhatsAppReply, sendWhatsAppMessage,
   sendSocialCommentReply, sendSocialDirectMessage,
+  sendCommentPrivateReply, setCommentHidden, markConversationRead,
   ensureZernioSecrets,
 } from '../_shared/zernio.ts';
 import {
@@ -1557,8 +1558,103 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const me = await callerParticipant(db, threadId, userId);
       if (!me) throw new HttpError(403, 'You are not a participant of this thread');
-      await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', me.id);
+      const { error: readErr } = await db.from('inbox_participants')
+        .update({ last_read_at: new Date().toISOString() }).eq('id', me.id);
+      if (readErr) throw new HttpError(500, `Could not mark the thread read: ${readErr.message}`);
+
+      // Tell the platform as well. We tracked read state only locally, so the customer's
+      // "seen" indicator never moved and Zernio's unread counts drifted permanently from ours.
+      // Best-effort by design — failing to sync a read receipt must not fail the operator's read.
+      const thread = await getThreadOrThrow(db, threadId);
+      const convId = String(((thread.metadata as Json) || {}).zernio_conversation_id || '');
+      if (convId && (thread.channel === 'whatsapp' || thread.channel === 'social')) {
+        await markConversationRead(convId);
+      }
       return json({ ok: true });
+    }
+
+    // ── Answer a public comment PRIVATELY ────────────────────────────────
+    // The agent is instructed in prose to "invite them to message us directly". This does it:
+    // the customer gets the specific answer by DM without it being published under the post.
+    // Instagram and Facebook allow exactly ONE private reply per comment, inside a limited
+    // window — so a failure here is final, and is surfaced rather than swallowed.
+    case 'comment_private_reply': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      const body = String(payload.body || '').trim();
+      if (!threadId || !messageId || !body) {
+        throw new HttpError(400, 'thread_id, message_id and body are required');
+      }
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember && !operator) throw new HttpError(404, 'Conversation not found');
+
+      const meta = (thread.metadata as Json) || {};
+      if (thread.channel !== 'social' || meta.social_kind !== 'comments') {
+        throw new HttpError(400, 'Only a social comment can be answered privately');
+      }
+      const { data: srcMsg } = await db.from('inbox_messages')
+        .select('metadata').eq('id', messageId).eq('thread_id', threadId).maybeSingle();
+      const commentId = ((srcMsg?.metadata as Json | undefined) || {}).comment_id as string | undefined;
+      if (!commentId) throw new HttpError(400, 'That message is not a comment');
+
+      const res = await sendCommentPrivateReply({
+        accountId: String(meta.zernio_account_id || ''),
+        postId: String(meta.zernio_post_id || ''),
+        commentId,
+        message: body,
+      });
+      if (!res.success) throw new HttpError(502, `Private reply not delivered: ${res.error ?? 'refused'}`);
+
+      // Recorded as a NOTE, deliberately: it is not part of the public comment transcript, and
+      // rendering it as an ordinary reply would read as though it had been posted under the post.
+      const { error: noteErr } = await db.from('inbox_messages').insert({
+        thread_id: threadId,
+        message_type: 'note',
+        body: `Sent privately to the commenter: ${body}`,
+        attachments: [],
+        metadata: { channel: 'social', social_kind: 'private_reply', comment_id: commentId, relay: res },
+      });
+      if (noteErr) console.error('[inbox-api] private reply sent but its note FAILED', threadId, noteErr);
+
+      return json({ ok: true, message_id: res.messageId ?? null });
+    }
+
+    // ── Hide / unhide a comment (spam and abuse under our own posts) ─────
+    case 'set_comment_hidden': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      const hidden = payload.hidden !== false;
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember && !operator) throw new HttpError(404, 'Conversation not found');
+
+      const meta = (thread.metadata as Json) || {};
+      if (thread.channel !== 'social' || meta.social_kind !== 'comments') {
+        throw new HttpError(400, 'Only a social comment can be hidden');
+      }
+      const { data: srcMsg } = await db.from('inbox_messages')
+        .select('metadata').eq('id', messageId).eq('thread_id', threadId).maybeSingle();
+      const srcMeta = ((srcMsg?.metadata as Json | undefined) || {});
+      const commentId = srcMeta.comment_id as string | undefined;
+      if (!commentId) throw new HttpError(400, 'That message is not a comment');
+
+      const res = await setCommentHidden({
+        accountId: String(meta.zernio_account_id || ''),
+        postId: String(meta.zernio_post_id || ''),
+        commentId,
+        hidden,
+      });
+      if (!res.success) throw new HttpError(502, `Could not ${hidden ? 'hide' : 'unhide'} the comment: ${res.error ?? 'refused'}`);
+
+      const { error: hidErr } = await db.from('inbox_messages')
+        .update({ metadata: { ...srcMeta, hidden_on_platform: hidden } })
+        .eq('id', messageId);
+      if (hidErr) console.error('[inbox-api] comment hidden but the local flag FAILED', messageId, hidErr);
+
+      return json({ ok: true, hidden });
     }
 
     case 'set_status': {

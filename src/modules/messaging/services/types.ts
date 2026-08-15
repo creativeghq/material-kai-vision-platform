@@ -242,6 +242,24 @@ export interface InboxAnalyticsResponse {
   errors?: string[];
 }
 
+/**
+ * Zernio plan headroom.
+ *
+ * `profileCeilingReached` is the one that matters: resolveWorkspaceProfile falls back to the
+ * SHARED default profile when Zernio refuses a new one, so at the ceiling every further
+ * workspace's accounts land together and tenant separation is gone — while the connect still
+ * reports success.
+ */
+export interface ZernioPlanStatus {
+  plan: string | null;
+  status: string | null;
+  profiles: { used: number; limit: number | null };
+  accounts: { used: number; limit: number | null };
+  profileCeilingReached: boolean;
+  workspacesMapped: number;
+  warning: string | null;
+}
+
 /** Zernio-side delivery registration for our webhook handler. */
 export interface ZernioWebhookStatus {
   registered: boolean;

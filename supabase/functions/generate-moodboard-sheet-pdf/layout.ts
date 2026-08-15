@@ -9,6 +9,7 @@ import {
 } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 // A3 landscape in points (1190.55 x 841.89)
 export const PAGE_W = 1190.55;
 export const PAGE_H = 841.89;
@@ -54,17 +55,12 @@ export async function embedImageBytes(
   }
 }
 
+/** One missing image must not abandon a whole sheet, so this still returns null —
+ *  but it no longer fetches an arbitrary URL with no guard, no redirect policy and
+ *  no size cap. Chip and backdrop URLs come from user-editable rows. */
 export async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
-  if (!url) return null;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const buf = await res.arrayBuffer();
-    return new Uint8Array(buf);
-  } catch (err) {
-    console.warn('fetchImageBytes failed', url, err);
-    return null;
-  }
+  const img = await fetchImageGuardedOrNull(url);
+  return img?.bytes ?? null;
 }
 
 export interface TitleBlockData {

@@ -41,10 +41,10 @@ import {
   buildMaterialTexturePrompt,
 } from '../_shared/product-prompt-builder.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
 
+import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
@@ -327,11 +327,8 @@ function jsonResponse(body: unknown, status = 200) {
  * which fetches it from Replicate's own network — validate before it leaves here.
  */
 async function fetchImageBuffer(url: string): Promise<Uint8Array> {
-  const safeUrl = await assertSafeUrl(url);
-  const res = await fetch(safeUrl, { redirect: 'error' });
-  if (!res.ok) throw new Error('Failed to fetch the reference image');
-  const buf = await res.arrayBuffer();
-  return new Uint8Array(buf);
+  const { bytes } = await fetchImageGuarded(url);
+  return bytes;
 }
 
 /** Upload base64 image to Supabase Storage, return permanent public URL */

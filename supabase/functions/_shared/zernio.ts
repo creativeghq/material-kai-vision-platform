@@ -227,6 +227,54 @@ export async function verifyZernioSignature(rawBody: ArrayBuffer, signature: str
   }
 }
 
+export interface ZernioPlan {
+  plan: string | null;
+  status: string | null;
+  profiles: { used: number; limit: number | null };
+  accounts: { used: number; limit: number | null };
+  /** True when the next workspace to connect will be forced onto the shared default profile. */
+  profileCeilingReached: boolean;
+  raw: Record<string, unknown>;
+}
+
+/**
+ * Read the plan / quota snapshot.
+ *
+ * This exists because of resolveWorkspaceProfile above: when the profile ceiling is hit, tenant
+ * separation on Zernio silently collapses into one shared profile. The failure is invisible from
+ * this side — the connect succeeds either way — so the only way to see it coming is to ask what
+ * the ceiling is and how close we are.
+ */
+export async function getZernioPlan(): Promise<ZernioPlan> {
+  const data = await zernioApi('GET', '/usage');
+  const usage = (data.usage ?? data) as Record<string, any>;
+  const limits = (usage.limits ?? usage.caps ?? {}) as Record<string, any>;
+
+  const pick = (...keys: string[]): number | null => {
+    for (const k of keys) {
+      const v = k.split('.').reduce<any>((o, part) => (o == null ? o : o[part]), usage as any);
+      if (typeof v === 'number') return v;
+      const l = k.split('.').reduce<any>((o, part) => (o == null ? o : o[part]), limits as any);
+      if (typeof l === 'number') return l;
+    }
+    return null;
+  };
+
+  const profilesUsed = pick('profiles.used', 'profilesUsed', 'profileCount') ?? 0;
+  const profilesLimit = pick('profiles.limit', 'profilesLimit', 'maxProfiles');
+  const accountsUsed = pick('accounts.used', 'accountsUsed', 'accountCount') ?? 0;
+  const accountsLimit = pick('accounts.limit', 'accountsLimit', 'maxAccounts');
+
+  return {
+    plan: usage.plan?.name ?? usage.plan ?? null,
+    status: usage.status ?? usage.accessState ?? null,
+    profiles: { used: profilesUsed, limit: profilesLimit },
+    accounts: { used: accountsUsed, limit: accountsLimit },
+    profileCeilingReached: profilesLimit != null && profilesUsed >= profilesLimit,
+    raw: usage,
+  };
+}
+
 /**
  * Every webhook event this platform acts on, plus the WhatsApp operational events that tell
  * an operator their number is in trouble. Subscribing to an event we do not branch on is
@@ -379,6 +427,7 @@ export async function resolveWorkspaceProfile(
   } catch (_) { /* listing is best-effort */ }
 
   // 3. Create a fresh profile for this workspace
+  let sharedFallback = false;
   if (!profileId) {
     try {
       const created = await zernioApi('POST', '/profiles', {
@@ -388,14 +437,27 @@ export async function resolveWorkspaceProfile(
       profileId = created.profile?._id;
     } catch (err) {
       // Plan ceiling / payment gate → fall back to the default profile.
+      //
+      // This is a TENANCY COLLAPSE, not a graceful degradation: every workspace past the plan
+      // ceiling lands on the SAME shared Zernio profile, so their connected accounts and
+      // conversations sit together. It used to happen in silence — the connect succeeded, the
+      // UI showed a connected account, and nothing anywhere said the separation was gone.
+      // Loud now, and reportable via getZernioPlan() below so it can be seen coming.
       try {
         const list = await zernioApi('GET', '/profiles?includeOverLimit=true');
         const profiles = (list.profiles || []) as any[];
         profileId = (profiles.find((p) => p.isDefault) || profiles[0])?._id;
+        sharedFallback = Boolean(profileId);
       } catch (_) { /* ignore */ }
       if (!profileId) throw err;
+      console.error(
+        `[zernio] PROFILE CEILING: workspace ${workspaceId} could not get its own Zernio profile ` +
+        `and is sharing the default one (${profileId}). Tenant separation on Zernio is GONE for ` +
+        `this workspace until the plan is raised. Cause: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
+  void sharedFallback;
 
   if (!profileId) {
     throw new Error('Could not resolve a Zernio profile for this workspace');
@@ -515,6 +577,95 @@ export async function sendSocialCommentReply(params: {
     return { success: true, messageId: data?.id ?? data?.commentId ?? data?.messageId };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Answer a public comment PRIVATELY, by DM.
+ *
+ * Instagram and Facebook allow exactly one private reply per comment, and only inside a
+ * limited window after it was posted. This is the move the inbox agent is instructed to make
+ * in prose — "invite them to message us directly" — done properly instead of asked for: the
+ * customer gets the specific answer without it being published under the post.
+ */
+export async function sendCommentPrivateReply(params: {
+  accountId: string;
+  postId: string;
+  commentId: string;
+  message: string;
+}): Promise<ZernioSendResult> {
+  try {
+    const res = await zernioApi(
+      'POST',
+      `/inbox/comments/${encodeURIComponent(params.postId)}/${encodeURIComponent(params.commentId)}/private-reply`,
+      { accountId: params.accountId, message: params.message },
+    );
+    const data = res?.data ?? res;
+    return { success: true, messageId: data?.messageId ?? data?.id, conversationId: data?.conversationId };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Hide or unhide a comment on one of our posts (spam and abuse moderation). */
+export async function setCommentHidden(params: {
+  accountId: string;
+  postId: string;
+  commentId: string;
+  hidden: boolean;
+}): Promise<ZernioSendResult> {
+  try {
+    await zernioApi(
+      params.hidden ? 'POST' : 'DELETE',
+      `/inbox/comments/${encodeURIComponent(params.postId)}/${encodeURIComponent(params.commentId)}/hide`,
+      { accountId: params.accountId },
+    );
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Tell the platform a conversation has been read.
+ *
+ * We track read state locally and never told Zernio, so the customer's "seen" indicator never
+ * moved and Zernio's unread counts drifted permanently away from ours. Best-effort: failing to
+ * mark read must never block the operator's actual work.
+ */
+export async function markConversationRead(conversationId: string): Promise<boolean> {
+  try {
+    await zernioApi('POST', `/inbox/conversations/${encodeURIComponent(conversationId)}/read`, {});
+    return true;
+  } catch (err) {
+    console.warn('[zernio] mark-read failed (non-fatal):', err);
+    return false;
+  }
+}
+
+/**
+ * Presigned upload for media that must reach Zernio as a URL it can fetch.
+ *
+ * Publishing sends `mediaItems` as URLs. Everything in a PRIVATE bucket is therefore
+ * unpublishable today — the signed URL we could mint expires, and storage convention #7 forbids
+ * persisting one. Uploading to Zernio instead makes private assets publishable at all.
+ */
+export async function presignZernioMedia(params: {
+  fileName: string;
+  contentType: string;
+}): Promise<{ uploadUrl: string; publicUrl: string } | null> {
+  try {
+    const res = await zernioApi('POST', '/media/presign', {
+      fileName: params.fileName,
+      contentType: params.contentType,
+    });
+    const data = res?.data ?? res;
+    const uploadUrl = data?.uploadUrl ?? data?.url;
+    const publicUrl = data?.publicUrl ?? data?.fileUrl ?? data?.mediaUrl;
+    return uploadUrl && publicUrl ? { uploadUrl, publicUrl } : null;
+  } catch (err) {
+    console.warn('[zernio] media presign failed:', err);
+    return null;
   }
 }
 

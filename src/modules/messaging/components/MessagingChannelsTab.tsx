@@ -20,7 +20,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingChannel } from '../services';
-import type { WhatsAppOnboardingMode, ZernioWebhookStatus, ChannelHealthAccount } from '../services/types';
+import type { WhatsAppOnboardingMode, ZernioWebhookStatus, ChannelHealthAccount, ZernioPlanStatus } from '../services/types';
 import { formatNumber } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 
@@ -36,10 +36,17 @@ export const MessagingChannelsTab: React.FC = () => {
   const [health, setHealth] = useState<Record<string, ChannelHealthAccount>>({});
   const [checkingHealth, setCheckingHealth] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [plan, setPlan] = useState<ZernioPlanStatus | null>(null);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => { loadChannels(); loadWebhook(); }, []);
+  useEffect(() => { loadChannels(); loadWebhook(); loadPlan(); }, []);
+
+  // The profile ceiling is a tenancy cliff, not a quota: past it every new workspace shares one
+  // Zernio profile and the connect still says success. Read it so it can be seen coming.
+  const loadPlan = async () => {
+    try { setPlan(await messagingService.getPlanStatus()); } catch { setPlan(null); }
+  };
 
   // Zernio only delivers to a webhook it has been told about. Nothing ever registered ours,
   // so replies, delivery receipts and number-health events had nowhere to land — and that is
@@ -288,6 +295,22 @@ export const MessagingChannelsTab: React.FC = () => {
           </div>
         }
       />
+
+      {plan?.warning && (
+        <div className="dashboard-card border-destructive/40">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-sm">Zernio profile limit reached</h4>
+              <p className="text-sm text-muted-foreground mt-1">{plan.warning}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {plan.profiles.used}/{plan.profiles.limit ?? '?'} profiles used
+                {plan.plan ? ` on the ${plan.plan} plan` : ''} · {plan.workspacesMapped} workspace(s) mapped
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delivery registration — a connected number with no webhook receives nothing back. */}
       {webhook && !(webhook.registered && webhook.isActive !== false && !webhook.missingEvents?.length) && (

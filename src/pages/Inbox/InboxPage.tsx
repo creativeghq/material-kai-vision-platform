@@ -5,7 +5,7 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, Share2,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, Share2, EyeOff, Eye, Reply,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
 } from 'lucide-react';
@@ -469,6 +469,34 @@ const InboxPage: React.FC = () => {
     [threads, showArchived],
   );
 
+  const isCommentThread = activeThread?.channel === 'social'
+    && (activeThread.metadata as Record<string, unknown> | null)?.social_kind === 'comments';
+
+  const handlePrivateReply = async (m: InboxMessage) => {
+    if (!activeId) return;
+    const body = window.prompt('Send this person a private DM instead of replying under the post:');
+    if (!body?.trim()) return;
+    try {
+      await inboxApi.commentPrivateReply(activeId, m.id, body.trim());
+      toast({ title: 'Sent privately', description: 'They received it as a direct message.' });
+      await openThread(activeId);
+    } catch (e: any) {
+      // One shot per comment, inside a window — a failure here is final, not a retry prompt.
+      toast({ title: 'Private reply not delivered', description: e?.message ?? String(e), variant: 'destructive' });
+    }
+  };
+
+  const handleToggleHidden = async (m: InboxMessage, hidden: boolean) => {
+    if (!activeId) return;
+    try {
+      await inboxApi.setCommentHidden(activeId, m.id, hidden);
+      toast({ title: hidden ? 'Comment hidden' : 'Comment visible again' });
+      await openThread(activeId);
+    } catch (e: any) {
+      toast({ title: 'Could not update the comment', description: e?.message ?? String(e), variant: 'destructive' });
+    }
+  };
+
   const threadDisplayName = (t: InboxThread) => t.subject
     || (t.channel === 'whatsapp' ? 'WhatsApp contact' : t.channel === 'social' ? 'Social conversation' : 'Conversation');
 
@@ -864,6 +892,8 @@ const InboxPage: React.FC = () => {
                     info={m.sender_participant_id ? labels.get(m.sender_participant_id) : undefined}
                     myUserId={myUserId}
                     isCustomerThread={activeThread.thread_type !== 'internal'}
+                    onPrivateReply={isCommentThread && isMember ? handlePrivateReply : undefined}
+                    onToggleHidden={isCommentThread && isMember ? handleToggleHidden : undefined}
                   />
                 ))}
                 <div ref={messagesEndRef} />
@@ -1015,7 +1045,10 @@ const MessageBubble: React.FC<{
   info?: ParticipantLabel;
   myUserId: string | null;
   isCustomerThread: boolean;
-}> = ({ m, info, myUserId, isCustomerThread }) => {
+  /** Present only on a social COMMENT thread — a DM has neither affordance. */
+  onPrivateReply?: (m: InboxMessage) => void;
+  onToggleHidden?: (m: InboxMessage, hidden: boolean) => void;
+}> = ({ m, info, myUserId, isCustomerThread, onPrivateReply, onToggleHidden }) => {
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     (async () => {
@@ -1073,15 +1106,49 @@ const MessageBubble: React.FC<{
       </Avatar>
       <div className={`flex flex-col min-w-0 ${ours ? 'items-end' : 'items-start'}`}>
         {displayLabel && !isNote && (
-          <div className="text-[10px] text-muted-foreground mb-1 px-1">
-            {displayLabel}
-            {meta.social_kind === 'comment' && <span className="ml-1 opacity-70">· public comment</span>}
+          <div className="text-[10px] text-muted-foreground mb-1 px-1 flex items-center gap-1.5">
+            <span>{displayLabel}</span>
+            {meta.social_kind === 'comment' && <span className="opacity-70">· public comment</span>}
+            {meta.hidden_on_platform === true && (
+              <span className="text-amber-400 inline-flex items-center gap-0.5">
+                <EyeOff className="w-2.5 h-2.5" /> hidden
+              </span>
+            )}
           </div>
         )}
         <div className={`rounded-2xl px-3.5 py-2 text-left ${bubbleClass}`}>
           {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
           {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> KAI assistant</div>}
           {m.body && <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>}
+          {/* A public comment answered in public stays public. These are the two ways out:
+              answer the person privately, or take the comment down. Both are one-shot at the
+              platform (Meta allows a single private reply per comment, inside a window), so
+              they live on the comment itself rather than in a menu three clicks away. */}
+          {meta.social_kind === 'comment' && (onPrivateReply || onToggleHidden) && (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
+              {onPrivateReply && (
+                <button
+                  type="button"
+                  onClick={() => onPrivateReply(m)}
+                  className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                  title="Answer this person by DM instead of publicly under the post"
+                >
+                  <Reply className="w-3 h-3" /> Reply privately
+                </button>
+              )}
+              {onToggleHidden && (
+                <button
+                  type="button"
+                  onClick={() => onToggleHidden(m, meta.hidden_on_platform !== true)}
+                  className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-amber-400 transition-colors"
+                >
+                  {meta.hidden_on_platform === true
+                    ? <><Eye className="w-3 h-3" /> Unhide</>
+                    : <><EyeOff className="w-3 h-3" /> Hide</>}
+                </button>
+              )}
+            </div>
+          )}
           {(m.attachments || []).map((a, i) => {
             const k = a.storage_object_path || a.url || '';
             return (

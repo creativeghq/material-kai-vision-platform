@@ -20,6 +20,7 @@ import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
 
+import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const replicateToken = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
@@ -54,10 +55,8 @@ async function uploadToStorage(
   jobId: string,
   ctx: Partial<SessionPathCtx> = {},
 ): Promise<string> {
-  const resp = await fetch(imageUrl);
-  if (!resp.ok) throw new Error(`Failed to download staged image: ${resp.status}`);
-  const bytes = new Uint8Array(await resp.arrayBuffer());
-  const contentType = resp.headers.get('content-type') || 'image/jpeg';
+  // Was a bare fetch(imageUrl): no SSRF guard, redirects followed, unbounded read.
+  const { bytes, mimeType: contentType } = await fetchImageGuarded(imageUrl);
   const ext = contentType.includes('png') ? 'png' : 'jpg';
   const path = resolveOutputPath(ctx, 'virtual-staging', `${jobId}.${ext}`);
 

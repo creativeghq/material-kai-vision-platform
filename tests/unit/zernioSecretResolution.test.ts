@@ -386,3 +386,68 @@ describe('history can be recovered, without a second door', () => {
     expect(block.slice(0, 6000)).toContain('truncated');
   });
 });
+
+describe('Zernio events land in OUR flow engine, not a second one', () => {
+  const handler = SOURCES.find((f) => f.rel === 'zernio-webhook-handler/index.ts')!;
+  const inboxApi = SOURCES.find((f) => f.rel === 'inbox-api/index.ts')!;
+  const client = SOURCES.find((f) => f.rel === '_shared/zernio.ts')!;
+
+  it('emits a flow event for every operational Zernio state change', () => {
+    // Adopting Zernio Workflows would have been a second automation engine that can only see
+    // Zernio's world. These events feed the one that already knows what a deal is (109 flows,
+    // 5,051 runs) — the inversion is the whole point.
+    for (const evt of [
+      'social_comment_received',
+      'social_account_connected',
+      'social_account_disconnected',
+      'whatsapp_number_status_changed',
+      'whatsapp_template_status_changed',
+    ]) {
+      expect(handler.code, `${evt} is never emitted`).toContain(`'${evt}'`);
+    }
+  });
+
+  it('never notifies a workspace about another tenant"s template', () => {
+    // messaging_templates is platform-global (no workspace_id). Picking "the first workspace
+    // with a WhatsApp channel" would tell one tenant about another's template — a tenancy leak
+    // wearing a notification. Resolve via the account, or notify nobody.
+    const block = handler.code.slice(handler.code.indexOf('whatsapp.template.status_updated'));
+    expect(block.slice(0, 3000)).toContain('tplAccountId');
+    expect(block.slice(0, 3000)).toMatch(/no resolvable workspace, not notifying/);
+  });
+
+  it('reports the profile ceiling instead of collapsing tenants in silence', () => {
+    // resolveWorkspaceProfile falls back to the SHARED default profile at the plan ceiling, so
+    // every workspace past it lands together and the connect still returns success.
+    expect(client.code).toContain('export async function getZernioPlan');
+    expect(client.code).toContain('profileCeilingReached');
+    expect(client.code).toMatch(/PROFILE CEILING/);
+    const api = SOURCES.find((f) => f.rel === 'messaging-api/index.ts')!;
+    expect(api.code).toContain("case 'plan-status'");
+  });
+
+  it('offers the private answer and the moderation escape from a public comment', () => {
+    expect(client.code).toContain('export async function sendCommentPrivateReply');
+    expect(client.code).toContain('export async function setCommentHidden');
+    expect(inboxApi.code).toContain("case 'comment_private_reply'");
+    expect(inboxApi.code).toContain("case 'set_comment_hidden'");
+    // Both must refuse on a DM thread — the endpoints are comment-only.
+    const priv = inboxApi.code.slice(inboxApi.code.indexOf("case 'comment_private_reply'"));
+    expect(priv.slice(0, 2000)).toMatch(/social_kind !== 'comments'/);
+  });
+
+  it('records a private reply as a note, not as a public bubble', () => {
+    // Rendering it as an ordinary reply would read as though it had been posted under the post,
+    // which is the exact confusion the feature exists to remove.
+    const priv = inboxApi.code.slice(inboxApi.code.indexOf("case 'comment_private_reply'"));
+    expect(priv.slice(0, 3000)).toMatch(/message_type: 'note'/);
+  });
+
+  it('tells the platform when a conversation is read', () => {
+    // Read state was local-only, so the customer's "seen" never moved and Zernio's unread
+    // counts drifted permanently from ours.
+    expect(client.code).toContain('export async function markConversationRead');
+    const mr = inboxApi.code.slice(inboxApi.code.indexOf("case 'mark_read'"));
+    expect(mr.slice(0, 1500)).toContain('markConversationRead');
+  });
+});

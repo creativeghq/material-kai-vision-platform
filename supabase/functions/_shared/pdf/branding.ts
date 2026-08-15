@@ -15,6 +15,7 @@
 import type { DbClient } from '../supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+import { fetchImageGuardedOrNull } from '../fetch-image.ts';
 export interface BrandingConfig {
   // Template image storage paths (in the `quote-templates` bucket). Free-form — whatever
   // the owner uploaded; null when unset. Read from workspace_pdf_templates (per-workspace,
@@ -178,19 +179,15 @@ export async function fetchTemplateImage(
   }
 }
 
-/** Fetch an image from a public URL (https only, 8 MB cap, image/* only). Null on any failure. */
+/** Fetch an image from a public URL. Null on any failure.
+ *
+ * The docstring here used to promise "https only, 8 MB cap" and the body delivered
+ * neither: the regex accepted `http://`, `redirect: 'follow'` let a public URL 302
+ * to an internal address, and the cap was checked AFTER `arrayBuffer()` had already
+ * read everything. `image_url` on a catalog material is model-supplied
+ * (`add_material_to_catalog`), so this was the reachable end of audit #352 `A8`.
+ * One helper now — see _shared/fetch-image.ts for why there were five. */
 export async function fetchImageBytesFromUrl(url: string | null | undefined): Promise<Uint8Array | null> {
-  if (!url) return null;
-  try {
-    if (!/^https?:\/\//i.test(url)) return null;
-    const resp = await fetch(url, { redirect: 'follow' });
-    if (!resp.ok) return null;
-    const ct = resp.headers.get('content-type') || '';
-    if (ct && !ct.startsWith('image/')) return null;
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    if (buf.length === 0 || buf.length > 8 * 1024 * 1024) return null;
-    return buf;
-  } catch {
-    return null;
-  }
+  const img = await fetchImageGuardedOrNull(url);
+  return img?.bytes ?? null;
 }

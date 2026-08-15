@@ -22,6 +22,7 @@ import type {
   WhatsAppOAuthStart,
   WhatsAppOnboardingMode,
   ZernioWebhookStatus,
+  ZernioPlanStatus,
   ChannelHealthResponse,
   InboxAnalyticsResponse,
   MessageLogFilters,
@@ -439,6 +440,16 @@ export class MessagingService {
       body: { action: 'connect-whatsapp', ...options },
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Failed to connect WhatsApp'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /** Zernio plan headroom — see ZernioPlanStatus for why profileCeilingReached matters. */
+  async getPlanStatus(): Promise<ZernioPlanStatus> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'plan-status' },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to read the Zernio plan'));
     if (data?.error) throw new Error(data.error);
     return data;
   }

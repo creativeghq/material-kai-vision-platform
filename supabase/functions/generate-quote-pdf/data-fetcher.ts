@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { QuoteData, QuoteItemData, ClientData, TemplateConfig } from './types.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 /**
  * Fetch complete quote data including items with product details
  */
@@ -253,17 +254,10 @@ export async function fetchStorageFile(
  * https(s), 8 MB cap, image/* only — a failure just renders a blank thumbnail
  * cell rather than breaking PDF generation.
  */
+/** A byte-identical twin of the copy in _shared/pdf/branding.ts, with the same three
+ *  faults: `http://` accepted, `redirect: 'follow'`, and an 8 MB cap consulted only
+ *  after arrayBuffer() had already read everything. Sixth implementation of this. */
 export async function fetchImageBytesFromUrl(url: string): Promise<Uint8Array | null> {
-  try {
-    if (!/^https?:\/\//i.test(url)) return null;
-    const resp = await fetch(url, { redirect: 'follow' });
-    if (!resp.ok) return null;
-    const ct = resp.headers.get('content-type') || '';
-    if (ct && !ct.startsWith('image/')) return null;
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    if (buf.length === 0 || buf.length > 8 * 1024 * 1024) return null;
-    return buf;
-  } catch {
-    return null;
-  }
+  const img = await fetchImageGuardedOrNull(url);
+  return img?.bytes ?? null;
 }

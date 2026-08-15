@@ -19,7 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
-  Wrench, AlarmClock, ShieldCheck, Coins,
+  Wrench, AlarmClock, ShieldCheck, Coins, MessagesSquare, PhoneOff, Link2, Unlink,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -120,6 +120,11 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   email_bounced: MailX,
   email_complained: MailWarning,
   social_post_published: Share2,
+  social_comment_received: MessagesSquare,
+  whatsapp_number_status_changed: PhoneOff,
+  whatsapp_template_status_changed: FileCheck,
+  social_account_connected: Link2,
+  social_account_disconnected: Unlink,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
   project_request_raised: MessageSquarePlus,

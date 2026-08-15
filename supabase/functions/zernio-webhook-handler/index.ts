@@ -718,6 +718,25 @@ async function handleSocialComment(supabase: any, payload: any): Promise<void> {
     `${plat} comment · ${handle}`,
     (comment.message || comment.text || '[comment]').substring(0, 200),
   );
+
+  // Distinct from inbox.message_received on purpose: a reply to THIS is published to the
+  // account's whole audience, so a flow that auto-answers a DM must not silently also
+  // auto-answer in public. Owners/admins, because a comment is not assigned to anyone.
+  await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'social_comment_received', (uid: string) => ({
+    user_id: uid,
+    type: 'social_comment_received',
+    title: `New ${plat} comment from ${handle}`,
+    body: (comment.message || comment.text || '[comment]').substring(0, 200),
+    action_url: `/inbox?thread=${threadId}`,
+    workspace_id: workspaceId,
+    thread_id: threadId,
+    platform: plat,
+    post_id: postId,
+    comment_id: commentId,
+    author_handle: handle,
+    permalink: comment.url ?? payload.post?.permalink ?? null,
+    is_public: true,
+  })).catch(() => {});
 }
 
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */
@@ -1041,6 +1060,20 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
         }, { onConflict: 'workspace_id,platform,zernio_account_id' });
         if (upErr) console.error('[zernio-webhook] account.connected social upsert FAILED', zernioAccountId, upErr);
       }
+
+      if (workspaceId && zernioAccountId) {
+        await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'social_account_connected', (uid: string) => ({
+          user_id: uid,
+          type: 'social_account_connected',
+          title: `${platform ?? 'An account'} connected`,
+          body: account?.username ?? account?.displayName ?? zernioAccountId,
+          action_url: platform === 'whatsapp' ? '/messaging' : '/profile?tab=social-accounts',
+          workspace_id: workspaceId,
+          platform: platform ?? null,
+          zernio_account_id: zernioAccountId,
+          handle: account?.username ?? null,
+        })).catch(() => {});
+      }
     }
 
     // ── account.disconnected ────────────────────────────────────────
@@ -1059,6 +1092,25 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
           .update({ is_active: false, updated_at: new Date().toISOString() })
           .eq('zernio_account_id', zernioAccountId);
         if (mcErr) console.error('[zernio-webhook] account.disconnected channel update FAILED', zernioAccountId, mcErr);
+
+        // Publishing and replies stop dead until someone reconnects. Nothing else tells them.
+        const { data: owned } = await supabase
+          .from('social_accounts').select('workspace_id, platform, handle')
+          .eq('zernio_account_id', zernioAccountId).maybeSingle();
+        const wsId = (owned as { workspace_id?: string } | null)?.workspace_id;
+        if (wsId) {
+          await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'social_account_disconnected', (uid: string) => ({
+            user_id: uid,
+            type: 'social_account_disconnected',
+            title: `${(owned as { platform?: string })?.platform ?? 'An account'} disconnected`,
+            body: 'Publishing and replies stop until it is reconnected.',
+            action_url: (owned as { platform?: string })?.platform === 'whatsapp' ? '/messaging' : '/profile?tab=social-accounts',
+            workspace_id: wsId,
+            platform: (owned as { platform?: string })?.platform ?? null,
+            zernio_account_id: zernioAccountId,
+            handle: (owned as { handle?: string })?.handle ?? null,
+          })).catch(() => {});
+        }
       }
     }
 
@@ -1078,6 +1130,33 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       }
       if (!isHealthy) {
         console.warn(`[zernio-webhook] ${event} for account ${zernioAccountId} — channel deactivated`);
+      }
+
+      // The single highest-value alert on this whole surface: a declined or suspended number
+      // stops EVERY outbound message, and Meta tells Zernio, not us. Without this the first
+      // sign is a customer saying they never heard back.
+      if (zernioAccountId) {
+        const { data: chan } = await supabase
+          .from('messaging_channels').select('workspace_id, sender_id')
+          .eq('zernio_account_id', zernioAccountId).maybeSingle();
+        const wsId = (chan as { workspace_id?: string } | null)?.workspace_id;
+        if (wsId) {
+          const state = String(event).replace('whatsapp.number.', '');
+          await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'whatsapp_number_status_changed', (uid: string) => ({
+            user_id: uid,
+            type: 'whatsapp_number_status_changed',
+            title: isHealthy
+              ? `WhatsApp number ${state}`
+              : `WhatsApp number ${state} — sending has stopped`,
+            body: (chan as { sender_id?: string })?.sender_id ?? zernioAccountId,
+            action_url: '/messaging',
+            workspace_id: wsId,
+            zernio_account_id: zernioAccountId,
+            sender_id: (chan as { sender_id?: string })?.sender_id ?? null,
+            status: state,
+            is_healthy: isHealthy,
+          })).catch(() => {});
+        }
       }
     }
 
@@ -1101,6 +1180,43 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
           .update(patch)
           .eq('whatsapp_template_name', name);
         if (tplErr) console.error(`[zernio-webhook] ${event} template update FAILED`, name, tplErr);
+
+        // A rejection blocks every cold send that used it; a RE-CATEGORISATION changes nothing
+        // visible and re-prices every message on it. Both need a human told.
+        const { data: tplRow } = await supabase
+          .from('messaging_templates').select('id, name, channel_type')
+          .eq('whatsapp_template_name', name).maybeSingle();
+        // Attribute via the ACCOUNT the event names. messaging_templates is platform-global
+        // (no workspace_id), so picking "the first workspace with a WhatsApp channel" would
+        // tell one tenant about another tenant's template — a tenancy leak dressed as a
+        // notification. If the account cannot be resolved, notify nobody rather than guess.
+        const tplAccountId = accountIdOf(account) || (payload as any).accountId;
+        const { data: ownChan } = tplAccountId
+          ? await supabase.from('messaging_channels').select('workspace_id')
+              .eq('zernio_account_id', tplAccountId).maybeSingle()
+          : { data: null };
+        const wsId = (ownChan as { workspace_id?: string } | null)?.workspace_id;
+        if (!wsId) {
+          console.warn(`[zernio-webhook] ${event} for "${name}" — no resolvable workspace, not notifying`);
+        }
+        if (wsId) {
+          await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'whatsapp_template_status_changed', (uid: string) => ({
+            user_id: uid,
+            type: 'whatsapp_template_status_changed',
+            title: event === 'whatsapp.template.category_updated'
+              ? `Meta re-categorised the template "${name}"`
+              : `Template "${name}" is now ${String(status ?? 'updated').toLowerCase()}`,
+            body: event === 'whatsapp.template.category_updated'
+              ? 'Its category changed, which changes what every message sent on it costs.'
+              : `Meta ${String(status ?? '').toUpperCase() === 'APPROVED' ? 'approved' : 'rejected'} this template.`,
+            action_url: '/messaging',
+            workspace_id: wsId,
+            template_name: name,
+            template_id: (tplRow as { id?: string } | null)?.id ?? null,
+            status: status ?? null,
+            category: tpl.category ?? null,
+          })).catch(() => {});
+        }
       }
     }
 

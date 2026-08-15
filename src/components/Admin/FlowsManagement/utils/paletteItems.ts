@@ -345,6 +345,24 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'social_post_failed', group: 'Social',
     label: 'Social Post Failed', description: 'A social post failed to publish', icon: 'XCircle', color: 'amber',
     defaultData: { label: 'Social Post Failed', category: 'trigger', triggerType: 'social_post_failed', config: {} } as TriggerNodeData },
+  // Zernio inbound — WhatsApp + social. Routed into THIS engine rather than adopting Zernio's
+  // own workflow product: theirs can only see Zernio's world, this one already knows what a
+  // deal, a quote or a contact is.
+  { type: 'triggerNode', category: 'trigger', subType: 'social_comment_received', group: 'Social',
+    label: 'Social Comment Received', description: 'Someone commented on one of your posts (a reply is PUBLIC)', icon: 'MessagesSquare', color: 'violet',
+    defaultData: { label: 'Social Comment Received', category: 'trigger', triggerType: 'social_comment_received', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'social_account_connected', group: 'Social',
+    label: 'Social Account Connected', description: 'An account finished connecting, here or in the Zernio dashboard', icon: 'Link2', color: 'emerald',
+    defaultData: { label: 'Social Account Connected', category: 'trigger', triggerType: 'social_account_connected', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'social_account_disconnected', group: 'Social',
+    label: 'Social Account Disconnected', description: 'An account dropped — publishing and replies stop until it is reconnected', icon: 'Unlink', color: 'amber',
+    defaultData: { label: 'Social Account Disconnected', category: 'trigger', triggerType: 'social_account_disconnected', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'whatsapp_number_status_changed', group: 'Messaging',
+    label: 'WhatsApp Number Status', description: 'Meta declined, suspended, released or re-activated a number — sending stops', icon: 'PhoneOff', color: 'rose',
+    defaultData: { label: 'WhatsApp Number Status', category: 'trigger', triggerType: 'whatsapp_number_status_changed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'whatsapp_template_status_changed', group: 'Messaging',
+    label: 'WhatsApp Template Status', description: 'Meta approved, rejected or re-categorised a template (recategorising re-prices it)', icon: 'FileCheck', color: 'amber',
+    defaultData: { label: 'WhatsApp Template Status', category: 'trigger', triggerType: 'whatsapp_template_status_changed', config: {} } as TriggerNodeData },
   // Project Client Views
   { type: 'triggerNode', category: 'trigger', subType: 'client_view_feedback_received', group: 'Projects',
     label: 'Client View Feedback', description: 'A client approved / requested changes / commented on a shared deliverable', icon: 'ClipboardCheck', color: 'emerald',

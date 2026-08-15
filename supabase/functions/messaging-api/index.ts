@@ -30,6 +30,7 @@ import {
   fetchZernioAccount,
   ensureZernioWebhook,
   getZernioWebhookStatus,
+  getZernioPlan,
   signZernioBody,
   publicAppUrl,
   resolveWorkspaceProfile,
@@ -662,6 +663,31 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
 
         return jsonResponse({ success: true, channel: saved, account });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Plan headroom.
+      //
+      // Not a vanity metric. resolveWorkspaceProfile falls back to the SHARED default profile
+      // when Zernio refuses a new one at the plan ceiling — so at exactly that moment, every
+      // further workspace's accounts and conversations land in the same profile and tenant
+      // separation is gone, with the connect still reporting success. This is how you see it
+      // coming instead of discovering it afterwards.
+      // ─────────────────────────────────────────────────────────────
+      case 'plan-status': {
+        const plan = await getZernioPlan();
+        const { count: mappedProfiles } = await supabaseClient
+          .from('social_zernio_profiles').select('*', { count: 'exact', head: true });
+        return jsonResponse({
+          success: true,
+          ...plan,
+          workspacesMapped: mappedProfiles ?? 0,
+          // Stated rather than implied: at the ceiling the NEXT workspace silently shares.
+          warning: plan.profileCeilingReached
+            ? 'The Zernio profile limit is reached. Any workspace connecting from now on will '
+              + 'share the default profile, and its accounts will not be separated from other tenants.'
+            : null,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
