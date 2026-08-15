@@ -609,13 +609,19 @@ function competitorResearchQuery(seed: CompetitorSeed): string {
  */
 async function findCompetitorsViaGemini(
   admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
+  note: (s: string) => void,
 ): Promise<CompetitorOrg[] | null> {
-  if (!GEMINI_API_KEY()) return null;
+  if (!GEMINI_API_KEY()) { note('gemini (no GOOGLE_GENERATIVE_AI_API_KEY)'); return null; }
   const base = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   try {
     // Step 1 — grounded research (Google Search).
+    // 90s, not 30s. Measured 2026-08-15 against the deployed function: grounded research on
+    // gemini-3.5-flash blew the old 30s abort (30.8s round trip, zero results) while Anthropic
+    // answered the same seed in 21.6s. Google Search grounding fans out to real searches and
+    // reads pages; it is simply slower than the budget it was given, and the abort landed in a
+    // catch that returned null — indistinguishable from "found nothing".
     const rc = new AbortController();
-    const rt = setTimeout(() => rc.abort(), 30_000);
+    const rt = setTimeout(() => rc.abort(), 90_000);
     const researchRes = await fetch(`${base}?key=${GEMINI_API_KEY()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -626,13 +632,13 @@ async function findCompetitorsViaGemini(
       signal: rc.signal,
     });
     clearTimeout(rt);
-    if (!researchRes.ok) return null;
+    if (!researchRes.ok) { note(`gemini (research HTTP ${researchRes.status})`); return null; }
     const research = await researchRes.json();
     const researchText = (research?.candidates?.[0]?.content?.parts ?? [])
       .map((p: any) => p?.text).filter(Boolean).join('\n') || '';
     let inTok = research?.usageMetadata?.promptTokenCount ?? 0;
     let outTok = research?.usageMetadata?.candidatesTokenCount ?? 0;
-    if (!researchText) return [];
+    if (!researchText) { note('gemini (grounding returned no text)'); return []; }
 
     // Step 2 — structured extraction (JSON mode, no grounding).
     let list: any[] = [];
@@ -739,7 +745,13 @@ async function findCompetitorsViaGemini(
       }))
       .filter((c) => c.name && c.name.toLowerCase() !== selfName);
   } catch (e) {
-    console.warn('[company-enrich] gemini competitors failed:', (e as Error)?.message);
+    const msg = (e as Error)?.message ?? String(e);
+    // An abort and a network error must not read the same, and neither may read as "found no
+    // competitors" — that ambiguity is exactly what hid a dead provider for weeks.
+    note((e as Error)?.name === 'AbortError' || /abort/i.test(msg)
+      ? 'gemini (timed out after 90s)'
+      : `gemini (error: ${msg.slice(0, 80)})`);
+    console.warn('[company-enrich] gemini competitors failed:', msg);
     return null;
   }
 }
@@ -793,9 +805,14 @@ async function handleFindCompetitors(userId: string, body: any): Promise<Respons
   } else skipped.push(notAttempted('apollo'));
 
   if (competitors.length === 0 && (!forced || forced === 'gemini')) {
-    const viaGemini = await findCompetitorsViaGemini(admin, userId, seed.workspaceId ?? null, seed);
+    // The provider reports its OWN reason. A bare 'gemini' in `skipped` told you nothing:
+    // no key, timed out, HTTP error and genuinely-no-results all looked the same, and the
+    // first two were true for weeks without anyone being able to tell.
+    const notes: string[] = [];
+    const viaGemini = await findCompetitorsViaGemini(
+      admin, userId, seed.workspaceId ?? null, seed, (s) => notes.push(s));
     if (viaGemini && viaGemini.length) { competitors = viaGemini; source = 'gemini'; }
-    else skipped.push(GEMINI_API_KEY() ? 'gemini' : 'gemini (no GOOGLE_GENERATIVE_AI_API_KEY)');
+    else skipped.push(notes[0] ?? 'gemini (no results)');
   } else if (forced && forced !== 'gemini') skipped.push(notAttempted('gemini'));
 
   if (competitors.length === 0 && (!forced || forced === 'web_search')) {
