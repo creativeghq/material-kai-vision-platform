@@ -34,7 +34,9 @@ The per-recipient send path uses `/v1/inbox/conversations` (cold start with temp
 |---|---|
 | `send` | Send to one/many recipients. Uses the channel's template (cold) or freeform `content` (in-window). Logs to `messaging_logs`, debits `zernio-whatsapp` credits. |
 | `send-bulk` | Same, for a `recipients[]` list with per-recipient `variables`. |
-| `connect-whatsapp` | Connect a Meta WABA: `{ accessToken, wabaId, phoneNumberId, displayName? }` → `POST /v1/connect/whatsapp/credentials` → upserts a channel with `zernio_account_id`. |
+| `connect-whatsapp-oauth` | **The default connect path.** `{ workspaceId?, redirectUrl? }` → `GET /v1/connect/whatsapp?profileId=&redirect_url=` → `{ oauth_url }`. Send the operator there; Meta Embedded Signup handles WABA + number selection. `redirectUrl` MUST be same-origin (open-redirect guard, mirrors the social handler). |
+| `connect-whatsapp-callback` | Finish the signup. Zernio returns the browser with `?connected=whatsapp&accountId=&profileId=&username=`; post `{ zernioAccountId }` here and the account is re-read from `GET /v1/accounts/{id}` (never trusted from the URL) and upserted as a channel. |
+| `connect-whatsapp` | **Headless sibling** — for a caller that already holds Meta credentials: `{ accessToken, wabaId, phoneNumberId, displayName? }` → `POST /v1/connect/whatsapp/credentials`. Do not route a human through this; it means digging a permanent token out of Business Suite for something OAuth does in two clicks. |
 | `sync-channels` | Pull connected WhatsApp accounts from Zernio (`GET /v1/accounts?platform=whatsapp`) into `messaging_channels`. |
 | `whatsapp-templates` | List the WABA's Meta templates (`GET /v1/whatsapp/templates?accountId=`). |
 | `channels` / `templates` / `logs` / `analytics` | DB reads (all filtered to `channel_type='whatsapp'`). |
@@ -42,6 +44,10 @@ The per-recipient send path uses `/v1/inbox/conversations` (cold start with temp
 | `get-settings` / `update-settings` | `messaging_settings` (provider pinned to `zernio`). |
 
 Not configured → `503` with code `provider_not_configured` and settings path `/admin/modules/messaging/settings → Keys`.
+That path only works because `ZERNIO_API_KEY` is resolved through `_shared/zernio.ts → ensureZernioSecrets()`
+(env first, `platform_secrets` second). Reading `Deno.env.get('ZERNIO_API_KEY')` directly — which four
+hand-rolled copies used to do — can never see an admin-saved value, because the env bootstrap is a no-op on
+the edge runtime. Guarded by [tests/unit/zernioSecretResolution.test.ts](../../tests/unit/zernioSecretResolution.test.ts).
 
 ---
 

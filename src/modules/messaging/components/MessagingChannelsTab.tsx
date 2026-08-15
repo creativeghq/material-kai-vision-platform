@@ -2,10 +2,15 @@
  * Messaging Channels Tab
  * Connect + manage WhatsApp sender numbers via Zernio (Meta Cloud API).
  * A channel = a connected Zernio WhatsApp account (WABA phone number).
+ *
+ * Connecting goes through Meta Embedded Signup, brokered by Zernio — the same one-click
+ * flow the social accounts tab uses. No Meta access token is ever typed into this app.
+ * Pasting WABA credentials by hand still exists behind "already have Meta credentials",
+ * because Zernio documents that endpoint for server-to-server callers who hold them.
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download } from 'lucide-react';
+import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -21,11 +26,43 @@ export const MessagingChannelsTab: React.FC = () => {
   const [channels, setChannels] = useState<MessagingChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [showConnect, setShowConnect] = useState(false);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
   useEffect(() => { loadChannels(); }, []);
+
+  // Zernio returns the browser here after Embedded Signup with
+  // ?connected=whatsapp&accountId=<id>&profileId=&username=<phone>. Channels is this page's
+  // DEFAULT tab, so this component is mounted when the redirect lands — if that default ever
+  // changes, the redirect below must carry the tab or the callback is silently never processed
+  // (exactly the bug that bit the social accounts tab).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const accountId = params.get('accountId');
+    if (connected !== 'whatsapp' || !accountId) return;
+
+    (async () => {
+      try {
+        await messagingService.finishWhatsAppOAuth({ zernioAccountId: accountId });
+        toast({ title: 'WhatsApp connected', description: params.get('username') || undefined });
+        await loadChannels();
+      } catch (error: any) {
+        console.error('Error finishing WhatsApp connection:', error);
+        toast({
+          title: 'Could not finish connecting',
+          description: error?.message || String(error),
+          variant: 'destructive',
+        });
+      } finally {
+        const clean = new URL(window.location.href);
+        ['connected', 'accountId', 'username', 'profileId', 'state'].forEach((k) => clean.searchParams.delete(k));
+        window.history.replaceState({}, '', clean.toString());
+      }
+    })();
+  }, []);
 
   const loadChannels = async () => {
     try {
@@ -70,6 +107,30 @@ export const MessagingChannelsTab: React.FC = () => {
     } catch (error) {
       console.error('Error setting default channel:', error);
       toast({ title: 'Error', description: 'Failed to set default channel', variant: 'destructive' });
+    }
+  };
+
+  const handleConnect = async () => {
+    try {
+      setConnecting(true);
+      const { oauth_url } = await messagingService.startWhatsAppOAuth({
+        // Come back to this exact page so the callback effect above runs.
+        redirectUrl: `${window.location.origin}${window.location.pathname}`,
+      });
+      window.open(oauth_url, '_blank', 'noopener,noreferrer');
+      toast({
+        title: 'Continue in the new tab',
+        description: 'Pick your WhatsApp Business account and number on Meta, then come back here.',
+      });
+    } catch (error: any) {
+      console.error('Error starting WhatsApp connection:', error);
+      toast({
+        title: 'Could not start the connection',
+        description: error?.message || 'Failed to reach Zernio',
+        variant: 'destructive',
+      });
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -118,8 +179,10 @@ export const MessagingChannelsTab: React.FC = () => {
               <Download className={`h-4 w-4 mr-2 ${syncing ? 'animate-pulse' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync from Zernio'}
             </Button>
-            <Button onClick={() => setShowConnect(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={handleConnect} disabled={connecting}>
+              {connecting
+                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                : <Plus className="h-4 w-4 mr-2" />}
               Connect WhatsApp
             </Button>
           </div>
@@ -133,14 +196,21 @@ export const MessagingChannelsTab: React.FC = () => {
             <MessageCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No WhatsApp numbers connected</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Connect a WhatsApp Business number to start sending. You'll need a Meta WABA
-              (access token, WABA ID, phone number ID) — or "Sync from Zernio" if you connected
-              one in the Zernio dashboard.
+              Connect a WhatsApp Business number to start sending. You'll sign in with Meta and
+              pick the number there — nothing to copy across.
             </p>
-            <Button onClick={() => setShowConnect(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={handleConnect} disabled={connecting}>
+              {connecting
+                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                : <Plus className="h-4 w-4 mr-2" />}
               Connect WhatsApp
             </Button>
+            <div className="mt-4">
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setShowConnect(true)}>
+                <KeyRound className="h-3 w-3 mr-2" />
+                I already have Meta credentials
+              </Button>
+            </div>
           </div>
         </div>
       ) : (
@@ -259,10 +329,11 @@ const ConnectWhatsAppModal: React.FC<{ onClose: () => void; onSuccess: () => voi
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect WhatsApp</DialogTitle>
+          <DialogTitle>Connect with Meta credentials</DialogTitle>
           <DialogDescription>
-            Paste your Meta WhatsApp Business credentials (Business Suite → System Users →
-            permanent token; WABA ID + Phone Number ID from WhatsApp Manager).
+            Only needed if you already hold a permanent token — otherwise close this and use
+            <strong> Connect WhatsApp</strong>, which signs you in with Meta instead. Token:
+            Business Suite → System Users; WABA ID + Phone Number ID: WhatsApp Manager.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
