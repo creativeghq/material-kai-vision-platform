@@ -28,12 +28,17 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { ensureZernioSecrets, zernioWebhookSecret } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const webhookSecret = () => Deno.env.get('ZERNIO_WEBHOOK_SECRET') || Deno.env.get('LATE_WEBHOOK_SECRET') || '';
+// Resolved via _shared/zernio.ts (env → platform_secrets); ensureZernioSecrets() runs at
+// handler entry, before the first read below. A local Deno.env-only copy lived here and
+// could not see an admin-saved secret, so verifySignature failed CLOSED on every inbound
+// message whenever ZERNIO_WEBHOOK_SECRET was DB-only.
+const webhookSecret = zernioWebhookSecret;
 
 const OPT_OUT_KEYWORDS = ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT', 'STOPALL', 'STOP ALL'];
 const OPT_IN_KEYWORDS = ['START', 'YES', 'UNSTOP', 'SUBSCRIBE'];
@@ -442,6 +447,11 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
 
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
 
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  // MUST precede verifySignature — the secret may live only in platform_secrets, and
+  // bootstrapForFunction() cannot surface it on the edge runtime.
+  await ensureZernioSecrets(supabase);
+
   // Read raw body BEFORE parsing (required for HMAC verification)
   const rawBody = await req.arrayBuffer();
 
@@ -461,7 +471,6 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     return jsonResponse({ error: 'Invalid JSON body' }, 400);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const { event, post, account } = payload as any;
 
   console.log(`[zernio-webhook] Event: ${event}`, JSON.stringify(payload).substring(0, 200));

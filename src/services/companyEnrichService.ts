@@ -105,6 +105,12 @@ export interface FindCompetitorsArgs {
   excludeDomains?: string[];
   limit?: number;
   workspaceId?: string;
+  /**
+   * Force ONE discovery provider instead of the first-wins chain. Without it every provider
+   * after the first working one is unobservable — you cannot compare them, or notice one has
+   * quietly rotted. Leave unset for normal use.
+   */
+  provider?: 'apollo' | 'gemini' | 'web_search';
 }
 
 /**
@@ -125,6 +131,7 @@ export async function findCompetitors(args: FindCompetitorsArgs): Promise<FindCo
         exclude_domains: args.excludeDomains,
         limit: args.limit,
         workspace_id: args.workspaceId,
+        provider: args.provider,
       },
     });
     if (error) return { ok: false, source: 'none', competitors: [], skipped: [], error: error.message };

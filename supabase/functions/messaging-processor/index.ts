@@ -17,7 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
-import { zernioKey, sendWhatsAppMessage } from '../_shared/zernio.ts';
+import { zernioKey, ensureZernioSecrets, sendWhatsAppMessage } from '../_shared/zernio.ts';
 import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -60,6 +60,9 @@ serve(withApiLogging('messaging-processor', async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // env → platform_secrets. bootstrapForFunction() above cannot do this on the edge runtime
+    // (Deno.env.set throws there), so an admin-saved key is only visible through this call.
+    await ensureZernioSecrets(supabase);
     if (!zernioKey()) {
       console.warn('[messaging-processor] Zernio not configured — skipping this tick');
       return notConfiguredResponse({

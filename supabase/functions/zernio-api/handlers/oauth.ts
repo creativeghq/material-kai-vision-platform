@@ -24,7 +24,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
-import { zernioApi, zernioKey, publicAppUrl, resolveWorkspaceProfile } from '../zernio.ts';
+import { zernioApi, zernioKey, ensureZernioSecrets, publicAppUrl, resolveWorkspaceProfile } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -38,6 +38,8 @@ const SUPPORTED_PLATFORMS = [
 
 export async function handleZernioOauth(req: Request, body: any): Promise<Response> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  // env → platform_secrets, before any zernioKey() / zernioApi() read.
+  await ensureZernioSecrets(supabase);
   const auth = await authenticate(req);
 
   if (!auth.user) {

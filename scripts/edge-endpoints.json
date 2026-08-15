@@ -5015,6 +5015,12 @@
         "type": "string",
         "required": false,
         "desc": "crm_companies.id - if provided and authorized, caches empty-only columns onto the row"
+      },
+      {
+        "name": "provider",
+        "type": "string",
+        "required": false,
+        "desc": "find-competitors only: force ONE discovery provider ('apollo' | 'gemini' | 'web_search') instead of the first-wins chain"
       }
     ],
     "response": "{ok:boolean, fields:{website,email,phone,linkedin,facebook,twitter,description,industry,employee_count,city,state,country}, sources:string[], skipped:string[]}"

@@ -169,12 +169,24 @@ export interface SendBulkOptions extends Omit<SendMessageOptions, 'to'> {
   }>;
 }
 
+/**
+ * Headless connect — for a caller that ALREADY holds Meta credentials.
+ * The default path for a human is the Embedded Signup redirect below, which never
+ * asks for a token at all.
+ */
 export interface ConnectWhatsAppOptions {
   accessToken: string;
   wabaId: string;
   phoneNumberId: string;
   displayName?: string;
   workspaceId?: string;
+}
+
+/** Meta Embedded Signup, brokered by Zernio — same shape as the social OAuth flow. */
+export interface WhatsAppOAuthStart {
+  oauth_url: string;
+  state: string | null;
+  profile_id: string;
 }
 
 export interface MessageLogFilters {

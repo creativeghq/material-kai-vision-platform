@@ -41,32 +41,33 @@
   <div class="callout"><p><strong>Business vs solopreneur.</strong> A contact who runs a business can be promoted to (or linked with) a <strong>business</strong> Account; when that happens, the financials (orders, invoices, balance) <strong>roll up to the business</strong> rather than the individual, and the individual contact's financial tabs are hidden in favour of a “Check Company” link to the Account. This keeps one customer's money in one place instead of split across a person and their company.</p></div>
 
   <h2>The Market tab — competitive &amp; market intelligence <span class="badge gated">suppliers only</span></h2>
-  <p><strong>What it is —</strong> a market-intelligence view that appears as an extra tab on a company's detail page <strong>only when the company is flagged as a supplier</strong>. <strong>Why it matters —</strong> for the brands you buy from, it answers four questions in one place: who competes with them, how your own catalogue built on their products is performing, where your buying prices sit against the live market, and what the money side of the relationship looks like. It stacks four cards:</p>
+  <p><strong>What it is —</strong> a market-intelligence view that appears as an extra tab on a company's detail page <strong>only when the company is flagged as a supplier</strong>. <strong>Why it matters —</strong> for the brands you buy from, it answers four questions — each of which costs money or a round-trip, so they're asked one at a time — organised as a <strong>four-item sub-tab rail</strong>: <strong>Demand</strong>, <strong>Pricing</strong>, <strong>Competitors</strong> and <strong>Financial</strong>. (This is where the platform's supplier analytics now live — the old standalone Supplier Analytics page was retired into here; a separate, platform-wide <a href="market-trends.html">Market Trends</a> page covers buyer demand across the <em>whole</em> platform.)</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/company-market.png" alt="The Market tab on a supplier company">
-    <figcaption>The Market tab (suppliers only) — Competitors, Market position, Product price intelligence and Financial relationship, stacked top to bottom.</figcaption>
+    <figcaption>The Market tab (suppliers only) — a sub-tab rail: <strong>Demand</strong> (the default), <strong>Pricing</strong>, <strong>Competitors</strong> and <strong>Financial</strong>.</figcaption>
   </figure>
 
-  <h3>Competitors</h3>
-  <p><strong>What it shows —</strong> who competes with this supplier, in two parts:</p>
-  <ul class="feat">
-    <li><strong>In your CRM</strong> — automatically finds other companies in your own CRM whose <strong>ΚΑΔ activity codes overlap</strong> this one's, so you instantly see the rivals you already know. Each is a clickable link tagged Supplier / Customer. (If the company has no ΚΑΔ codes yet, it prompts you to run the ΑΑΔΕ/ΓΕΜΗ import first.)</li>
-    <li><strong>Discover competitors</strong> — a button that goes out and finds competitors on the open web. It tries, in order, <strong>Apollo</strong> (a business database), then <strong>Gemini grounded on Google Search</strong>, then a general <strong>web search</strong> — the first source with results wins, and the card labels which one answered. Each result shows the name, industry/location and an outbound website link.</li>
-  </ul>
-  <div class="callout warn"><p><strong>Discover competitors debits credits.</strong> The web discovery runs paid look-ups (Apollo / Gemini / web search), so it draws on your workspace <a href="account-credits.html">credit pool</a>; if you're out of credits it stops rather than charging you. The “In your CRM” list is a free database query. Discovered competitors are shown for reference only — there's no one-click “add to CRM”.</p></div>
+  <h3>Demand</h3>
+  <p><strong>What it shows —</strong> how <em>MaterialsHub users engage with this supplier's products in your catalogue</em> over the last 90 days — a read-only analytics roll-up (no credit cost), populated once the supplier's products are linked to the company (the brand link on the Details tab). Panels: the headline <strong>Products / Views / Saves / Quote adds</strong> counts and the save→quote rate; <strong>“Where demand comes from”</strong> (geography); <strong>Most-engaged products</strong>; <strong>Category mix</strong>; the <strong>Quote pipeline</strong>; and <strong>Reviews</strong>. A second card, <strong>Attribute explorer</strong>, rolls up which material attributes buyers actually engage with. If the read <em>fails</em>, it says so plainly (“a query failure, not a statement about your data”) rather than showing an empty result.</p>
 
-  <h3>Market position</h3>
-  <p><strong>What it shows —</strong> how <em>MaterialsHub users engage with this supplier's products in your catalogue</em> over the last 90 days: the number of products, and their <strong>views, saves and quote-adds</strong>, plus a <em>“where demand comes from”</em> geographic breakdown and your most-engaged products. It's a read-only analytics roll-up (no credit cost), and it only has data once the supplier's products are linked to the company (via the Factory/brand link on the Details tab).</p>
-
-  <h3>Product price intelligence</h3>
+  <h3>Pricing</h3>
   <p><strong>What it shows —</strong> the products you carry from this supplier (matched on the brand link), each with <strong>“Our cost”</strong>. Two actions per product:</p>
   <ul class="feat">
-    <li><strong>Check market</strong> — runs a one-shot live price scan and returns the market <strong>min–max range</strong>, <strong>median</strong> and <strong>retailer count</strong>, then shows your <strong>Headroom / Underwater</strong> figure (median minus your cost) so you can see at a glance whether you're buying below or above the going rate. <em>This debits credits</em> (it calls out to live pricing sources).</li>
-    <li><strong>Monitor</strong> — a toggle that enrols the product into ongoing <a href="finance-op-marketplace.html">price monitoring</a> so its market price is tracked over time (turn it off to stop tracking).</li>
+    <li><strong>Check market</strong> — runs a one-shot live price scan and returns the market <strong>min–max range</strong>, <strong>median</strong> and <strong>retailer count</strong>, then shows your <strong>Headroom / Underwater</strong> figure (median minus your cost) so you can see at a glance whether you're buying below or above the going rate. <em>This debits credits</em> (it calls out to live pricing sources) and is <strong>admin-only</strong>; if the product is already monitored and was scanned in the last few hours it reuses that snapshot for <strong>0 credits</strong>.</li>
+    <li><strong>Monitor</strong> — a toggle that enrols the product into ongoing <a href="finance-op-marketplace.html">price monitoring</a> so its market price is refreshed on the daily cadence (turn it off to stop tracking).</li>
   </ul>
 
-  <h3>Financial relationship</h3>
+  <h3>Competitors</h3>
+  <p><strong>What it shows —</strong> who competes with this supplier, in three parts:</p>
+  <ul class="feat">
+    <li><strong>In your CRM</strong> — automatically finds other companies in your CRM whose <strong>ΚΑΔ activity codes overlap</strong> this one's. Each is a clickable link tagged Supplier / Customer. (No ΚΑΔ codes yet? It prompts you to run the ΑΑΔΕ/ΓΕΜΗ import first.)</li>
+    <li><strong>Discover competitors</strong> — a button that finds competitors on the open web, trying <strong>Apollo</strong> → <strong>Gemini grounded on Google Search</strong> → a general <strong>web search</strong> (first source with results wins, and it labels which answered). Each result shows name, industry/location and a website link.</li>
+    <li><strong>Similar in your CRM</strong> — <em>“ranked by what they do, not by ΚΑΔ.”</em> This is the new <strong>lookalikes</strong> list (#289): it compares the <em>meaning</em> of each company's registry activity text and surfaces the ones most alike, so a “tile importer” and a “ceramics wholesaler” can match even with different filed codes. Instead of a meaningless percentage it labels each as <strong>Very close</strong>, <strong>Close</strong> or <strong>Related</strong>, and only lists ones that genuinely stand out. Each row links to the company.</li>
+  </ul>
+  <div class="callout warn"><p><strong>What costs credits here:</strong> only <strong>Discover competitors</strong> (paid Apollo / Gemini / web look-ups from your <a href="account-credits.html">credit pool</a>). The <strong>In your CRM</strong> and <strong>Similar in your CRM</strong> lists are <strong>free</strong> — the lookalike comparison uses a vector the company already carries, so asking costs nothing. Discovered competitors are reference only (no one-click “add to CRM”).</p></div>
+
+  <h3>Financial</h3>
   <p><strong>What it shows —</strong> the money side of the supplier relationship, drawn entirely from <em>your own</em> finance data (not the registry): <strong>Billed to us</strong>, <strong>Paid to them</strong> and <strong>We owe (outstanding)</strong> from your accounts-payable ledger. It also flags <strong>unbooked myDATA documents</strong> — received documents matched to this supplier's VAT that you haven't turned into a bill yet — with a link straight to <a href="finance-doc-expenses.html">Finance → Expenses</a>, plus an <strong>Open ledger</strong> button to the supplier's full account.</p>
 
   <h2>The Companies list</h2>

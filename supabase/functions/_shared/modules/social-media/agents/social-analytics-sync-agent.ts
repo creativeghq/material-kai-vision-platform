@@ -14,9 +14,8 @@
  */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from '../../../agents/types.ts';
+import { ZERNIO_BASE_URL, zernioKey, ensureZernioSecrets } from '../../../zernio.ts';
 
-const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
-const zernioKey = () => Deno.env.get('ZERNIO_API_KEY') || Deno.env.get('LATE_API_KEY') || '';
 
 async function fetchZernioAnalytics(zernioPostId: string): Promise<{
   impressions?: number; reach?: number; likes?: number; comments?: number;
@@ -48,6 +47,14 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat } = ctx;
+
+    // env → platform_secrets. Every Zernio fetch below swallows its error and returns null,
+    // so an unresolved key reads as "synced 0" forever instead of as a failure.
+    await ensureZernioSecrets(supabase);
+    if (!zernioKey()) {
+      await log('error', 'Zernio is not configured (ZERNIO_API_KEY) — nothing to sync');
+      throw new Error('Zernio is not configured (ZERNIO_API_KEY)');
+    }
 
     const cfg = { ...agentConfig.config, ...input } as Record<string, unknown>;
     const batchSize      = Math.min(Number(cfg.batch_size       ?? 20), 50);

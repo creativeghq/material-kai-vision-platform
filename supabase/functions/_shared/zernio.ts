@@ -7,20 +7,63 @@
  * This file is the single source of truth for the Zernio client. `zernio-api/zernio.ts`
  * re-exports from here so the social functions keep their existing import paths.
  *
- * Secret resolution is env-first / DB-fallback (see _shared/secrets-bootstrap.ts):
- * we read ZERNIO_API_KEY first and fall back to the legacy LATE_API_KEY so existing
+ * Secret resolution is env-first / DB-fallback and goes through _shared/secrets.ts →
+ * resolveSecret(): ZERNIO_API_KEY first, falling back to the legacy LATE_API_KEY so existing
  * deployments keep working until the new key is pasted in.
  */
 
+import { resolveSecret } from './secrets.ts';
+
+type SupabaseLike = { from: (t: string) => any };
+
 export const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
 
-/** Resolve the Zernio API key, falling back to the legacy LATE_API_KEY. */
+// Resolved once per worker. Both getters stay SYNCHRONOUS because ~12 call sites and the whole
+// zernioApi surface are sync; an entry point awaits ensureZernioSecrets() once and everything
+// downstream reads this cache. `null` means "not resolved yet", '' means "resolved, and absent".
+let resolvedApiKey: string | null = null;
+let resolvedWebhookSecret: string | null = null;
+
+/**
+ * Resolve the Zernio secrets through the platform resolver and cache them for the worker.
+ * MUST be awaited at handler entry, before the first zernioKey() / zernioApi() call.
+ *
+ * Both getters used to read Deno.env.get() directly, which can NEVER see an admin-saved value:
+ * the secrets-bootstrap that would copy platform_secrets into env is a no-op on the Supabase
+ * edge runtime, where Deno.env.set throws 'The operation is not supported' (the warning is
+ * documented in _shared/secrets-bootstrap.ts). That made the whole Zernio surface a silent dead
+ * end — messaging-api answered 503 with 'paste the key at /admin/modules/messaging/settings →
+ * Keys', the admin pasted it, the row saved, and nothing ever read it back. Sentry KAI-RD.
+ */
+export async function ensureZernioSecrets(supabase: SupabaseLike): Promise<void> {
+  if (resolvedApiKey !== null) return;
+  const [api, legacyApi, hook, legacyHook] = await Promise.all([
+    resolveSecret(supabase, 'ZERNIO_API_KEY'),
+    resolveSecret(supabase, 'LATE_API_KEY'),
+    resolveSecret(supabase, 'ZERNIO_WEBHOOK_SECRET'),
+    resolveSecret(supabase, 'LATE_WEBHOOK_SECRET'),
+  ]);
+  resolvedApiKey = api.value || legacyApi.value || '';
+  resolvedWebhookSecret = hook.value || legacyHook.value || '';
+}
+
+/** Reset the worker cache — for tests, and after an admin saves a new key. */
+export function resetZernioSecrets(): void {
+  resolvedApiKey = null;
+  resolvedWebhookSecret = null;
+}
+
+/** The Zernio API key. Empty until ensureZernioSecrets() has run (env-only fallback below). */
 export function zernioKey(): string {
+  if (resolvedApiKey !== null) return resolvedApiKey;
+  // Pre-resolve fallback: a caller that forgot ensureZernioSecrets() still sees a real
+  // deployment secret — just not an admin-saved one.
   return Deno.env.get('ZERNIO_API_KEY') || Deno.env.get('LATE_API_KEY') || '';
 }
 
-/** Resolve the Zernio webhook signing secret, falling back to the legacy LATE_WEBHOOK_SECRET. */
+/** The Zernio webhook signing secret, falling back to the legacy LATE_WEBHOOK_SECRET. */
 export function zernioWebhookSecret(): string {
+  if (resolvedWebhookSecret !== null) return resolvedWebhookSecret;
   return Deno.env.get('ZERNIO_WEBHOOK_SECRET') || Deno.env.get('LATE_WEBHOOK_SECRET') || '';
 }
 

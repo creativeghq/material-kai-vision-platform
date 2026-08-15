@@ -16,7 +16,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
-import { zernioApi } from '../zernio.ts';
+import { zernioApi, ensureZernioSecrets } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -24,6 +24,8 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 export async function handleZernioPublish(req: Request, body: any): Promise<Response> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  // env → platform_secrets, before any zernioApi() read.
+  await ensureZernioSecrets(supabase);
   const auth = await authenticate(req);
   if (!auth.user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
 

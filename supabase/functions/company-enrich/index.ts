@@ -698,23 +698,35 @@ async function handleFindCompetitors(userId: string, body: any): Promise<Respons
   let competitors: CompetitorOrg[] = [];
   let source: 'apollo' | 'gemini' | 'web_search' | 'none' = 'none';
 
+  // Optional single-provider override. The chain below is FIRST-WINS, which means every
+  // provider after the first working one is unobservable: you cannot see what the fallback
+  // would have returned, so you cannot compare them or notice one has quietly rotted. As of
+  // 2026-08-15 that was not hypothetical — ai_usage_logs held zero find_competitors rows of
+  // any kind, so no provider here had ever been measured against another.
+  // Anything outside the three names runs the normal chain.
+  const only = cleanStr(body?.provider);
+  const forced = only === 'apollo' || only === 'gemini' || only === 'web_search' ? only : null;
+  const notAttempted = (p: string) => `${p} (not attempted: provider=${forced})`;
+
   // Chain: Apollo (structured firmographics) → Gemini + Google-Search grounding (broadest live
   // web index) → Anthropic web_search. First provider that returns results wins.
-  const viaApollo = await findCompetitorsViaApollo(admin, userId, seed.workspaceId ?? null, seed);
-  if (viaApollo && viaApollo.length) { competitors = viaApollo; source = 'apollo'; }
-  else skipped.push(APOLLO_API_KEY ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
+  if (!forced || forced === 'apollo') {
+    const viaApollo = await findCompetitorsViaApollo(admin, userId, seed.workspaceId ?? null, seed);
+    if (viaApollo && viaApollo.length) { competitors = viaApollo; source = 'apollo'; }
+    else skipped.push(APOLLO_API_KEY ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
+  } else skipped.push(notAttempted('apollo'));
 
-  if (competitors.length === 0) {
+  if (competitors.length === 0 && (!forced || forced === 'gemini')) {
     const viaGemini = await findCompetitorsViaGemini(admin, userId, seed.workspaceId ?? null, seed);
     if (viaGemini && viaGemini.length) { competitors = viaGemini; source = 'gemini'; }
     else skipped.push(GEMINI_API_KEY ? 'gemini' : 'gemini (no GEMINI_API_KEY)');
-  }
+  } else if (forced && forced !== 'gemini') skipped.push(notAttempted('gemini'));
 
-  if (competitors.length === 0) {
+  if (competitors.length === 0 && (!forced || forced === 'web_search')) {
     const viaWeb = await findCompetitorsViaWebSearch(admin, userId, seed.workspaceId ?? null, seed);
     if (viaWeb && viaWeb.length) { competitors = viaWeb; source = 'web_search'; }
     else skipped.push(ANTHROPIC_API_KEY ? 'web_search' : 'web_search (no ANTHROPIC_API_KEY)');
-  }
+  } else if (forced && forced !== 'web_search') skipped.push(notAttempted('web_search'));
 
   // Drop the seed company's own domains + de-dupe by domain/name.
   const ex = new Set(seed.excludeDomains);

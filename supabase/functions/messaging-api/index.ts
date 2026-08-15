@@ -26,6 +26,8 @@ import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 import {
   zernioApi,
   zernioKey,
+  ensureZernioSecrets,
+  publicAppUrl,
   resolveWorkspaceProfile,
   sendWhatsAppMessage,
 } from '../_shared/zernio.ts';
@@ -128,6 +130,76 @@ async function resolveChannel(supabase: any, workspaceIds: string[] | null, from
   return data?.[0] ?? null;
 }
 
+/**
+ * Insert-or-update the messaging_channels row for a connected Zernio WhatsApp account.
+ * Shared by both connect paths (OAuth redirect and headless credentials) so the two can
+ * never drift into writing differently-shaped channels.
+ */
+async function upsertWhatsAppChannel(
+  supabaseClient: SupabaseClient<any, 'public', 'public', any, any>,
+  params: {
+    workspaceId: string;
+    accountId: string;
+    profileId: string;
+    senderId: string;
+    displayName?: string;
+    wabaId?: string | null;
+    phoneNumberId?: string | null;
+  },
+): Promise<any> {
+  const config = {
+    zernio_account_id: params.accountId,
+    waba_id: params.wabaId ?? null,
+    phone_number_id: params.phoneNumberId ?? null,
+    display_phone_number: params.senderId,
+    profile_id: params.profileId,
+  };
+
+  // Insert or update by zernio_account_id (no reliance on a composite unique constraint).
+  const { data: existing } = await supabaseClient
+    .from('messaging_channels').select('id')
+    .eq('zernio_account_id', params.accountId).maybeSingle();
+
+  if (existing) {
+    const { data, error } = await supabaseClient
+      .from('messaging_channels')
+      .update({
+        sender_id: params.senderId,
+        display_name: params.displayName || params.senderId,
+        is_active: true,
+        provider: 'zernio',
+        config,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { count } = await supabaseClient
+    .from('messaging_channels')
+    .select('*', { count: 'exact', head: true })
+    .eq('channel_type', 'whatsapp');
+  const { data, error } = await supabaseClient
+    .from('messaging_channels')
+    .insert({
+      workspace_id: params.workspaceId, // Bind the channel to the caller's workspace
+      channel_type: 'whatsapp',
+      provider: 'zernio',
+      sender_id: params.senderId,
+      zernio_account_id: params.accountId,
+      display_name: params.displayName || params.senderId,
+      is_active: true,
+      is_default: (count || 0) === 0,
+      daily_quota: 10000,
+      max_send_rate: 100,
+      config,
+    })
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
 Deno.serve(withApiLogging('messaging-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -146,9 +218,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     // that path — debiting here too would double-charge). A real session/partner caller still debits.
     const billingUserId: string | null = auth.userId ?? user?.id ?? null;
 
-    // Zernio is the engine for every WhatsApp action. Fail with a clean 503 +
-    // admin-actionable settings path when the key is absent (mirrors the old
-    // Twilio not-configured behaviour).
+    // Zernio is the engine for every WhatsApp action. Resolve the key through the platform
+    // resolver FIRST (env → platform_secrets) — reading Deno.env alone made the admin-facing
+    // settings path in the 503 below a dead end. Then fail with a clean 503 when it is absent.
+    await ensureZernioSecrets(supabaseClient);
     if (!zernioKey()) {
       return notConfiguredResponse(
         {
@@ -174,7 +247,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     // spends the platform's WhatsApp credits and edits connection config. Gate the
     // credit-spending / config-mutating actions to platform operators; reads stay
     // open to any authenticated user.
-    const OPERATOR_ACTIONS = new Set(['send', 'send-bulk', 'connect-whatsapp', 'sync-channels', 'update-settings']);
+    const OPERATOR_ACTIONS = new Set([
+      'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
+      'connect-whatsapp-callback', 'sync-channels', 'update-settings',
+    ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
       if (!op.success) return jsonResponse({ error: 'Operator role required for this action' }, 403);
@@ -430,12 +506,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
-      // Connect a WhatsApp number (Meta credentials → Zernio account)
+      // Connect a WhatsApp number with Meta credentials — the HEADLESS path.
+      // Prefer connect-whatsapp-oauth below for anything a human drives.
       // ─────────────────────────────────────────────────────────────
       case 'connect-whatsapp': {
         const { accessToken, wabaId, phoneNumberId, displayName, workspaceId } = requestBody;
         if (!accessToken || !wabaId || !phoneNumberId) {
-          throw new Error('accessToken, wabaId and phoneNumberId are required (from Meta Business Suite)');
+          throw new HttpError(400, 'accessToken, wabaId and phoneNumberId are required (from Meta Business Suite)');
         }
 
         // Operator roles are workspace-scoped — the caller must be an active member
@@ -448,65 +525,100 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
-        // Zernio: POST /v1/connect/whatsapp/credentials → { account: { accountId, username, displayName, selectedPhoneNumber } }
+        // Zernio: POST /v1/connect/whatsapp/credentials -> { account: { accountId, username, displayName, selectedPhoneNumber } }
         const res = await zernioApi('POST', '/connect/whatsapp/credentials', {
           profileId, accessToken, wabaId, phoneNumberId,
         });
         const account = res?.account ?? {};
-        const senderId = account.selectedPhoneNumber || account.username || phoneNumberId;
 
-        const config = {
-          zernio_account_id: account.accountId,
-          waba_id: wabaId,
-          phone_number_id: phoneNumberId,
-          display_phone_number: senderId,
-          profile_id: profileId,
-        };
+        const saved = await upsertWhatsAppChannel(supabaseClient, {
+          workspaceId: wsId,
+          accountId: account.accountId,
+          profileId,
+          senderId: account.selectedPhoneNumber || account.username || phoneNumberId,
+          displayName: displayName || account.displayName,
+          wabaId,
+          phoneNumberId,
+        });
 
-        // Insert or update by zernio_account_id (no reliance on a composite unique constraint).
-        const { data: existing } = await supabaseClient
-          .from('messaging_channels').select('id')
-          .eq('zernio_account_id', account.accountId).maybeSingle();
+        return jsonResponse({ success: true, channel: saved, account });
+      }
 
-        let saved;
-        if (existing) {
-          const { data, error } = await supabaseClient
-            .from('messaging_channels')
-            .update({
-              sender_id: senderId,
-              display_name: displayName || account.displayName || senderId,
-              is_active: true,
-              provider: 'zernio',
-              config,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id).select().single();
-          if (error) throw error;
-          saved = data;
-        } else {
-          const { count } = await supabaseClient
-            .from('messaging_channels')
-            .select('*', { count: 'exact', head: true })
-            .eq('channel_type', 'whatsapp');
-          const { data, error } = await supabaseClient
-            .from('messaging_channels')
-            .insert({
-              workspace_id: wsId, // Bind the channel to the caller's workspace
-              channel_type: 'whatsapp',
-              provider: 'zernio',
-              sender_id: senderId,
-              zernio_account_id: account.accountId,
-              display_name: displayName || account.displayName || senderId,
-              is_active: true,
-              is_default: (count || 0) === 0,
-              daily_quota: 10000,
-              max_send_rate: 100,
-              config,
-            })
-            .select().single();
-          if (error) throw error;
-          saved = data;
+      // ─────────────────────────────────────────────────────────────
+      // Connect a WhatsApp number via Meta Embedded Signup (the DEFAULT path).
+      //
+      // Mirrors the social flow in zernio-api/handlers/oauth.ts: Zernio brokers the OAuth,
+      // the operator picks the WABA + number on Meta's own screen, and no Meta access token
+      // ever reaches this app. 'connect-whatsapp' above is the headless sibling Zernio
+      // documents for server-to-server callers that already hold credentials — it is NOT the
+      // path a human should be pushed down, which is what the UI used to do.
+      // ─────────────────────────────────────────────────────────────
+      case 'connect-whatsapp-oauth': {
+        const { workspaceId, redirectUrl } = requestBody;
+
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
+
+        // A caller-supplied redirect is an open-redirect/phishing vector — require
+        // same-origin before handing it to Zernio (same rule as the social handler).
+        let appRedirect = `${publicAppUrl()}/messaging`;
+        if (redirectUrl) {
+          let sameOrigin = false;
+          try {
+            sameOrigin = new URL(redirectUrl).origin === new URL(publicAppUrl()).origin;
+          } catch {
+            throw new HttpError(400, 'invalid redirectUrl');
+          }
+          if (!sameOrigin) throw new HttpError(400, 'redirectUrl must be same-origin as the app');
+          appRedirect = redirectUrl;
         }
+
+        // Zernio: GET /v1/connect/whatsapp?profileId=&redirect_url= -> { authUrl, state }
+        const qs = new URLSearchParams({ profileId, redirect_url: appRedirect });
+        const data = await zernioApi('GET', `/connect/whatsapp?${qs.toString()}`);
+
+        return jsonResponse({
+          success: true,
+          oauth_url: data.authUrl,
+          state: data.state ?? null,
+          profile_id: profileId,
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Finish the Embedded Signup. Zernio sends the browser back to the app with
+      // ?connected=whatsapp&profileId=&accountId=&username=<phone>. The UI posts that
+      // accountId here and we read the real account off Zernio rather than trusting it.
+      // ─────────────────────────────────────────────────────────────
+      case 'connect-whatsapp-callback': {
+        const { zernioAccountId, workspaceId, displayName } = requestBody;
+        if (!zernioAccountId) throw new HttpError(400, 'zernioAccountId is required');
+
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
+
+        // Zernio: GET /v1/accounts/{accountId} -> { account: {...} }
+        const accountData = await zernioApi('GET', `/accounts/${encodeURIComponent(zernioAccountId)}`);
+        const account = accountData?.account ?? accountData ?? {};
+        const senderId = account.selectedPhoneNumber || account.username || account.platformIdentifier;
+        if (!senderId) throw new HttpError(502, 'Zernio returned no phone number for this account');
+
+        const meta = account.metadata ?? {};
+        const saved = await upsertWhatsAppChannel(supabaseClient, {
+          workspaceId: wsId,
+          accountId: account._id || account.accountId || zernioAccountId,
+          profileId,
+          senderId,
+          displayName: displayName || account.displayName,
+          // Embedded Signup fills these in on Meta's side; keep them when Zernio reports
+          // them so the channel card can still show the WABA.
+          wabaId: meta.wabaId ?? account.wabaId ?? null,
+          phoneNumberId: meta.phoneNumberId ?? account.phoneNumberId ?? null,
+        });
 
         return jsonResponse({ success: true, channel: saved, account });
       }

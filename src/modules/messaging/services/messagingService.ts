@@ -19,6 +19,7 @@ import type {
   SendMessageOptions,
   SendBulkOptions,
   ConnectWhatsAppOptions,
+  WhatsAppOAuthStart,
   MessageLogFilters,
   MessagingAnalyticsResponse,
 } from './types';
@@ -385,7 +386,40 @@ export class MessagingService {
   }
 
   /**
-   * Connect a WhatsApp number (Meta WABA credentials → Zernio account → channel).
+   * Start Meta Embedded Signup, brokered by Zernio. Returns the URL to send the operator to;
+   * Zernio redirects back with ?connected=whatsapp&accountId=… which finishWhatsAppOAuth()
+   * turns into a channel. This is the DEFAULT connect path — no Meta token is ever typed
+   * into this app, exactly like the social accounts flow.
+   */
+  async startWhatsAppOAuth(options: { workspaceId?: string; redirectUrl?: string } = {}): Promise<WhatsAppOAuthStart> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'connect-whatsapp-oauth', ...options },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to start WhatsApp connection'));
+    if (data?.error) throw new Error(data.error);
+    if (!data?.oauth_url) throw new Error('Zernio returned no authorisation URL');
+    return data;
+  }
+
+  /**
+   * Finish Embedded Signup — exchanges the Zernio accountId from the redirect for a channel.
+   */
+  async finishWhatsAppOAuth(options: {
+    zernioAccountId: string;
+    workspaceId?: string;
+    displayName?: string;
+  }): Promise<{ channel: MessagingChannel; account: any }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'connect-whatsapp-callback', ...options },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to finish connecting WhatsApp'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
+   * Headless connect for a caller that already holds Meta WABA credentials.
+   * Prefer startWhatsAppOAuth() for anything a person drives.
    */
   async connectWhatsApp(options: ConnectWhatsAppOptions): Promise<{ channel: MessagingChannel; account: any }> {
     const { data, error } = await supabase.functions.invoke('messaging-api', {
