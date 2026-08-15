@@ -31,7 +31,11 @@ export function buildEmbeddingText(p: any): string {
 
 /** Embed `text` through the MIVAA gateway. `inputType` must be 'document' for stored
  *  listings and 'query' for search queries (Voyage asymmetric-retrieval contract). */
-export async function embedText(text: string, inputType: 'document' | 'query'): Promise<number[] | null> {
+export async function embedText(
+  text: string,
+  inputType: 'document' | 'query',
+  workspaceId?: string | null,
+): Promise<number[] | null> {
   // Read env at call time — the secrets bootstrap populates env at handler entry.
   const mivaaUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
   const res = await fetch(`${mivaaUrl}/api/embeddings/clip-text`, {
@@ -43,7 +47,19 @@ export async function embedText(text: string, inputType: 'document' | 'query'): 
     // plain string compare, so it works where a service-role Bearer would not
     // (_validate_supabase_jwt rejects aud="service_role").
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': Deno.env.get('CRON_SECRET') || '' },
-    body: JSON.stringify({ text, model: 'voyage-4', input_type: inputType, dimensions: 1024 }),
+    // Attribution only — MIVAA authenticates this route by x-cron-secret, and never
+    // consults this field for authorization. Without it every listing embedding
+    // landed in ai_usage_logs owned by nobody: this shared helper was the last
+    // clip-text caller still writing NULL workspace_id after audit #12 fixed the
+    // two KB ones, and it is the reason that operation_type kept producing NULLs
+    // when the others had stopped.
+    body: JSON.stringify({
+      text,
+      model: 'voyage-4',
+      input_type: inputType,
+      dimensions: 1024,
+      workspace_id: workspaceId ?? null,
+    }),
   });
   if (!res.ok) throw new Error(`MIVAA embedding API ${res.status}: ${(await res.text().catch(() => '')).substring(0, 200)}`);
   const result = await res.json();
@@ -56,7 +72,7 @@ export async function refreshListingEmbedding(supabase: any, property: any): Pro
   try {
     const text = buildEmbeddingText(property);
     if (!text) return;
-    const embedding = await embedText(text, 'document');
+    const embedding = await embedText(text, 'document', property?.workspace_id ?? null);
     if (!embedding) return;
     const { error } = await supabase.from('properties')
       .update({ text_embedding: embedding }).eq('id', property.id);
