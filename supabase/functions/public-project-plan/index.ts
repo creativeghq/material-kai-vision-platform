@@ -87,7 +87,12 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     if (ids.length) {
       const { data: items } = await supabase
         .from('blueprint_items')
-        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier, default_selected')
+        // Every column the client's seedPlanItems reads. An explicit list that falls behind the
+        // table is silent: `is_schedule` missing turns hardware counts into on/off switches, and
+        // `option_key` missing means `opt_gola` is never published, so every gola formula fails and
+        // falls back to its default quantity of 0 — forever, without complaint. Guarded by the
+        // "starters payload" case in tests/unit/blueprintComposition.test.ts.
+        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier, default_selected, is_schedule, option_key')
         .in('blueprint_id', ids)
         .order('sort_order', { ascending: true });
       for (const it of (items ?? []) as any[]) (itemsByBp[it.blueprint_id] ||= []).push(it);

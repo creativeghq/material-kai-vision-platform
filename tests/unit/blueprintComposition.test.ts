@@ -448,6 +448,41 @@ describe('a schedule line is a count, not a price', () => {
   });
 });
 
+describe('the anonymous starters payload carries every column the client reads', () => {
+  // WHY: `public-project-plan → starters` selects an EXPLICIT column list, and the client's
+  // seedPlanItems reads `bi.<column>` off what comes back. A column added to the table and to the
+  // client but not to that list fails in total silence — which is exactly what happened when
+  // is_schedule and option_key shipped: hardware counts rendered as on/off switches, and
+  // `opt_gola` was never published, so every gola line's formula failed and fell back to its
+  // default quantity of 0. No error, no empty result, just four fittings that quietly stopped
+  // existing. The required set is DERIVED from the client rather than restated here, so this
+  // cannot pass by being updated in lockstep with the bug.
+  const CLIENT = readFileSync('src/utils/blueprintCompute.ts', 'utf8');
+  const FN = readFileSync('supabase/functions/public-project-plan/index.ts', 'utf8');
+
+  const columnsClientReads = Array.from(new Set(
+    Array.from(CLIENT.matchAll(/\bbi\.([a-z_]+)/g)).map((m) => m[1]),
+  )).sort();
+
+  const startersSelect = (() => {
+    const idx = FN.indexOf(".from('blueprint_items')");
+    expect(idx).toBeGreaterThan(-1);
+    const after = FN.slice(idx, idx + 1200);
+    const m = after.match(/\.select\('([^']+)'\)/);
+    expect(m).toBeTruthy();
+    return m![1].split(',').map((c) => c.trim());
+  })();
+
+  it('reads at least one column, or the derivation below is vacuous', () => {
+    expect(columnsClientReads.length).toBeGreaterThan(10);
+  });
+
+  it('selects every column seedPlanItems reads', () => {
+    const missing = columnsClientReads.filter((c) => !startersSelect.includes(c));
+    expect(missing).toEqual([]);
+  });
+});
+
 /** The one line the generator is allowed to rewrite: Deno resolves a file, Vite resolves a module. */
 const EDGE_IMPORT = "import { computeLinePricing, round2 } from './formula.ts';";
 const WEB_IMPORT = "import { computeLinePricing, round2 } from './blueprintFormula';";
