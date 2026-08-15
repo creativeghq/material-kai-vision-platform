@@ -152,7 +152,7 @@ const CompetitorsCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, company
           <div>
             <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Competitors</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Businesses in the same market — matched from your CRM by activity code (ΚΑΔ), plus live discovery.
+              Businesses in the same market — matched from your CRM by activity code (ΚΑΔ) and by what they do, plus live discovery.
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={runDiscovery} disabled={discovering || !canDiscover}>
@@ -242,8 +242,108 @@ const CompetitorsCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, company
             )}
           </div>
         )}
+
+        <LookalikesPanel companyId={companyId} />
       </CardContent>
     </Card>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lookalikes — "who else in our CRM does what this company does" (#289)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Lookalike {
+  id: string;
+  name: string;
+  industry: string | null;
+  city: string | null;
+  country: string | null;
+  is_customer: boolean | null;
+  is_supplier: boolean | null;
+  similarity: number;
+}
+
+/**
+ * The fourth competitor signal, and the only one ranked BY WHAT A COMPANY DOES rather
+ * than by a code it shares or a name a model recalled: cosine over the Voyage embedding
+ * of each company's own registry prose, activities and catalogue.
+ *
+ * Costs nothing to ask — the seed's vector is already stored, so no query is embedded
+ * and no provider is called on render. `crm_company_lookalikes` runs with invoker rights,
+ * so RLS confines both the seed and the candidates to the caller's own workspace.
+ */
+const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
+  // Four outcomes that would all render as "no rows" are kept apart, or the panel states
+  // a fact about their CRM that is really a fact about our pipeline: the query broke; the
+  // seed has no vector yet; the seed had nothing worth embedding; nobody resembles them.
+  const [rows, setRows] = useState<Lookalike[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [seedStatus, setSeedStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setRows(null); setFailed(false); setSeedStatus(null);
+      // RPC is not in the generated types (no Supabase access token on this machine) → cast.
+      const { data, error } = await (supabase.rpc as any)('crm_company_lookalikes', {
+        p_company_id: companyId, p_limit: 8,
+      });
+      if (cancelled) return;
+      if (error) { setFailed(true); return; }
+      const payload = (data ?? {}) as { seed_status?: string; matches?: Lookalike[] };
+      setSeedStatus(payload.seed_status ?? 'unknown');
+      setRows(payload.matches ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [companyId]);
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+        <Layers className="h-3.5 w-3.5" />Similar in your CRM
+        <span className="text-muted-foreground/70">· ranked by what they do, not by ΚΑΔ</span>
+      </p>
+      {failed ? (
+        <p className="text-sm text-destructive">Similarity search failed — this ranking is missing, not empty.</p>
+      ) : rows === null ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Ranking…</div>
+      ) : seedStatus === 'skipped' ? (
+        <p className="text-sm text-muted-foreground italic">
+          There is nothing on this company to compare yet — add an industry, activity codes (ΚΑΔ) or a
+          description on the Details tab and it will be profiled automatically.
+        </p>
+      ) : seedStatus !== 'success' ? (
+        <p className="text-sm text-muted-foreground italic">
+          This company has not been profiled yet — it is queued, and similar companies appear once it has been.
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic">No other profiled company in your CRM resembles this one yet.</p>
+      ) : (
+        <div className="divide-y divide-border rounded-lg border border-border">
+          {rows.map((r) => (
+            <Link
+              key={r.id}
+              to={`/crm/companies/${r.id}`}
+              className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/40 transition-colors"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{r.name}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {[r.industry, [r.city, r.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || '—'}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm tabular-nums">{Math.round(r.similarity * 100)}%</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {r.is_supplier ? 'Supplier' : r.is_customer ? 'Customer' : 'Company'}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 

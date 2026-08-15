@@ -842,6 +842,30 @@
     "response": "{}"
   },
   {
+    "name": "crm-company-embedding-backfill",
+    "tag": "CRM",
+    "summary": "Embed CRM companies so lookalike search has something to rank",
+    "description": "Drains the derived embedding backlog for crm_companies: every row whose stored embedding_source_hash differs from the hash of crm_company_embedding_text(id) right now. Sequential, small batches, idempotent. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.",
+    "security": [
+      "apiKeySecret",
+      "cronSecret",
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "limit",
+        "type": "integer",
+        "required": false,
+        "desc": "Max companies to process this run (clamped to an internal MAX_LIMIT of 200)"
+      }
+    ],
+    "response": "{success, processed, succeeded, skipped, failed, remaining, remaining_capped}"
+  },
+  {
     "name": "email-api",
     "tag": "Email",
     "summary": "Action-discriminated email sending, domain management, logs, and analytics via Resend.",

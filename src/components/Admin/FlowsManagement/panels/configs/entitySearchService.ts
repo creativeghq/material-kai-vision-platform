@@ -51,6 +51,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'contracts-api', label: 'contracts-api', sublabel: 'Contracts & e-signature - manage contracts and the public signer page' },
   { id: 'crawl-user-website', label: 'crawl-user-website', sublabel: 'Sitemap-driven indexer for SEO inter-linking; preview or full crawl mode' },
   { id: 'crm-api', label: 'crm-api', sublabel: 'REST CRM resource router for companies, contacts, users, and Stripe.' },
+  { id: 'crm-company-embedding-backfill', label: 'crm-company-embedding-backfill', sublabel: 'Embed CRM companies so lookalike search has something to rank' },
   { id: 'crm-lead-score', label: 'crm-lead-score', sublabel: 'AI lead + health scoring for any CRM contact (canonical platform scorer)' },
   { id: 'crm-meeting-reminders', label: 'crm-meeting-reminders', sublabel: 'Cron: send reminders for upcoming CRM meetings whose reminder time has arrived.' },
   { id: 'customer-assets-api', label: 'customer-assets-api', sublabel: "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343)." },

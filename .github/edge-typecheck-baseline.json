@@ -1,6 +1,6 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
-  "entrypoints": 171,
+  "entrypoints": 172,
   "total": 56,
   "uncheckable": {
     "agent-chat/index.ts": "type graph exceeds 12 GB even alone (@langchain/langgraph generics); no runner has the heap"
