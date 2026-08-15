@@ -35,7 +35,8 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
-import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
+import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -43,6 +44,15 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY') || '';
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || '';
+/**
+ * One constant, used for the endpoint URL, the price lookup and the logged `model_name`, so
+ * those three can never disagree about which model actually ran. This sat on
+ * `gemini-2.0-flash` — two generations behind the rest of the repo, which is on
+ * `gemini-3.5-flash` / `gemini-3.1-pro` — while its hardcoded rates described 2.0-Flash.
+ * Must match a `model_key` in `ai_model_pricing`, or the call logs `pricing_missing` and is
+ * not debited.
+ */
+const GEMINI_MODEL = 'gemini-3.5-flash';
 
 // Ceiling reserved up front for affordability (web search ~2cr + Apollo ~7.5cr worst case).
 const ENRICH_CREDIT_CEILING = 12;
@@ -103,6 +113,48 @@ function extractJson(text: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+interface CallPrice {
+  inputCost: number; outputCost: number; surcharge: number;
+  rawCost: number; markup: number; billedCost: number; credits: number;
+}
+
+/**
+ * Price one provider call. Token rates come from `ai_model_pricing` via `resolveTokenPrice`,
+ * and the per-query search/grounding surcharge from the same table via `getServicePricing` —
+ * NEVER from a constant in this file.
+ *
+ * This file used to carry its own: `0.80/4.00` for Haiku 4.5 (the table says 1.00/5.00, so
+ * every enrichment since it shipped under-billed by 20%) and `0.10/0.40` for Gemini. That is
+ * the second-price-table bug `ai-logger.ts` documents — ai-client.ts kept one for months and
+ * priced Gemini 3.5 Flash at a third of its real rate. A wrong price is a valid number, so
+ * neither typecheck nor an integrity probe can see it.
+ *
+ * Returns null when the model has no price row. We do NOT fall back to a guess: an unpriced
+ * call is logged with an explicit marker and left undebited, which is loud, rather than
+ * charged a made-up number, which is silent.
+ */
+async function priceCall(
+  admin: any, model: string, inTok: number, outTok: number,
+  surchargeService: string | null, units: number,
+): Promise<CallPrice | null> {
+  const price = await resolveTokenPrice(admin, model);
+  if (!price) return null;
+  const svc = surchargeService ? await getServicePricing(admin, surchargeService) : null;
+  if (surchargeService && !svc) {
+    console.error(`[company-enrich] no price row for service '${surchargeService}' — surcharge not billed`);
+  }
+  const inputCost = (inTok / 1_000_000) * price.input;
+  const outputCost = (outTok / 1_000_000) * price.output;
+  const surcharge = (svc?.cost_per_unit ?? 0) * units;
+  const rawCost = inputCost + outputCost + surcharge;
+  const billedCost = rawCost * price.markup;
+  return {
+    inputCost, outputCost, surcharge, rawCost,
+    markup: price.markup, billedCost,
+    credits: Math.round(billedCost * 100 * 100) / 100,
+  };
 }
 
 /** Structured-output tool the extraction pass is forced to emit. */
@@ -198,21 +250,21 @@ async function enrichViaWebSearch(
     fields = (extractJson(researchText) as Partial<EnrichFields>) ?? {};
   }
 
-  // Cost log + debit (Haiku 4.5 $0.80/$4 per MTok + web_search surcharge ~$0.04 for 4 uses)
+  // Cost log + debit — rates from ai_model_pricing, never from a constant here. 4 web searches.
   try {
-    const inputCost = (inTok / 1_000_000) * 0.80;
-    const outputCost = (outTok / 1_000_000) * 4.00;
-    const rawCost = inputCost + outputCost + 0.04;
-    const billedCost = rawCost * 1.5;
-    const credits = Math.round(billedCost * 100 * 100) / 100;
-    await admin.rpc('debit_credits', {
-      p_user_id: userId,
-      p_amount: credits,
-      p_operation_type: 'company_enrich_web_search',
-      p_description: `Business info web search (${name})`,
-      p_metadata: { name, country: countryName },
-      p_workspace_id: workspaceId,
-    });
+    const p = await priceCall(admin, 'claude-haiku-4-5', inTok, outTok, 'anthropic-web-search', 4);
+    if (p) {
+      await admin.rpc('debit_credits', {
+        p_user_id: userId,
+        p_amount: p.credits,
+        p_operation_type: 'company_enrich_web_search',
+        p_description: `Business info web search (${name})`,
+        p_metadata: { name, country: countryName },
+        p_workspace_id: workspaceId,
+      });
+    } else {
+      console.error('[company-enrich] no price row for claude-haiku-4-5 — enrichment NOT debited');
+    }
     await admin.from('ai_usage_logs').insert({
       user_id: userId,
       workspace_id: workspaceId,
@@ -220,14 +272,19 @@ async function enrichViaWebSearch(
       model_name: 'claude-haiku-4-5',
       input_tokens: inTok,
       output_tokens: outTok,
-      input_cost_usd: inputCost,
-      output_cost_usd: outputCost,
-      raw_cost_usd: rawCost,
-      markup_multiplier: 1.5,
-      billed_cost_usd: billedCost,
-      credits_debited: credits,
+      input_cost_usd: p?.inputCost ?? null,
+      output_cost_usd: p?.outputCost ?? null,
+      raw_cost_usd: p?.rawCost ?? null,
+      markup_multiplier: p?.markup ?? null,
+      billed_cost_usd: p?.billedCost ?? null,
+      credits_debited: p?.credits ?? 0,
       module_slug: 'crm',
-      metadata: { feature: 'company_enrich', sub_feature: 'web_search', provider: 'anthropic', name },
+      metadata: {
+        feature: 'company_enrich', sub_feature: 'web_search', provider: 'anthropic', name,
+        // Explicit marker, not an absence: a NULL cost must be readable as "we could not
+        // price this", never as "it was free".
+        ...(p ? {} : { pricing_missing: true }),
+      },
       created_at: new Date().toISOString(),
     });
   } catch (e) {
@@ -452,16 +509,13 @@ async function findCompetitorsViaWebSearch(
       list = [];
     }
 
-    // Cost log + debit (2 Haiku calls + web_search surcharge).
+    // Cost log + debit (2 Haiku calls + 5 web searches). Rates from ai_model_pricing.
     try {
-      const inputCost = (inTok / 1_000_000) * 0.80;
-      const outputCost = (outTok / 1_000_000) * 4.00;
-      const rawCost = inputCost + outputCost + 0.05;
-      const billedCost = rawCost * 1.5;
-      const credits = Math.round(billedCost * 100 * 100) / 100;
-      await admin.rpc('debit_credits', {
+      const p = await priceCall(admin, 'claude-haiku-4-5', inTok, outTok, 'anthropic-web-search', 5);
+      if (!p) console.error('[company-enrich] no price row for claude-haiku-4-5 — competitor search NOT debited');
+      if (p) await admin.rpc('debit_credits', {
         p_user_id: userId,
-        p_amount: credits,
+        p_amount: p.credits,
         p_operation_type: 'find_competitors_web_search',
         p_description: `Competitor discovery (${seed.name ?? seed.industry ?? 'company'})`,
         p_metadata: { name: seed.name, industry: seed.industry, country: seed.country },
@@ -474,14 +528,17 @@ async function findCompetitorsViaWebSearch(
         model_name: 'claude-haiku-4-5',
         input_tokens: inTok,
         output_tokens: outTok,
-        input_cost_usd: inputCost,
-        output_cost_usd: outputCost,
-        raw_cost_usd: rawCost,
-        markup_multiplier: 1.5,
-        billed_cost_usd: billedCost,
-        credits_debited: credits,
+        input_cost_usd: p?.inputCost ?? null,
+        output_cost_usd: p?.outputCost ?? null,
+        raw_cost_usd: p?.rawCost ?? null,
+        markup_multiplier: p?.markup ?? null,
+        billed_cost_usd: p?.billedCost ?? null,
+        credits_debited: p?.credits ?? 0,
         module_slug: 'crm',
-        metadata: { feature: 'find_competitors', provider: 'anthropic', name: seed.name },
+        metadata: {
+          feature: 'find_competitors', provider: 'anthropic', name: seed.name,
+          ...(p ? {} : { pricing_missing: true }),
+        },
         created_at: new Date().toISOString(),
       });
     } catch (e) {
@@ -535,7 +592,7 @@ async function findCompetitorsViaGemini(
   admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
 ): Promise<CompetitorOrg[] | null> {
   if (!GEMINI_API_KEY) return null;
-  const base = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  const base = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   try {
     // Step 1 — grounded research (Google Search).
     const rc = new AbortController();
@@ -611,16 +668,13 @@ async function findCompetitorsViaGemini(
       list = [];
     }
 
-    // Cost log + debit (Gemini Flash tokens + Google-Search grounding surcharge).
+    // Cost log + debit — Gemini tokens + ONE grounded query. Rates from ai_model_pricing.
     try {
-      const inputCost = (inTok / 1_000_000) * 0.10;
-      const outputCost = (outTok / 1_000_000) * 0.40;
-      const rawCost = inputCost + outputCost + 0.035; // grounded-query surcharge
-      const billedCost = rawCost * 1.5;
-      const credits = Math.round(billedCost * 100 * 100) / 100;
-      await admin.rpc('debit_credits', {
+      const p = await priceCall(admin, GEMINI_MODEL, inTok, outTok, 'google-search-grounding', 1);
+      if (!p) console.error(`[company-enrich] no price row for ${GEMINI_MODEL} — competitor search NOT debited`);
+      if (p) await admin.rpc('debit_credits', {
         p_user_id: userId,
-        p_amount: credits,
+        p_amount: p.credits,
         p_operation_type: 'find_competitors_gemini',
         p_description: `Competitor discovery via Gemini (${seed.name ?? seed.industry ?? 'company'})`,
         p_metadata: { name: seed.name, industry: seed.industry, country: seed.country },
@@ -630,17 +684,20 @@ async function findCompetitorsViaGemini(
         user_id: userId,
         workspace_id: workspaceId,
         operation_type: 'find_competitors_gemini',
-        model_name: 'gemini-2.0-flash',
+        model_name: GEMINI_MODEL,
         input_tokens: inTok,
         output_tokens: outTok,
-        input_cost_usd: inputCost,
-        output_cost_usd: outputCost,
-        raw_cost_usd: rawCost,
-        markup_multiplier: 1.5,
-        billed_cost_usd: billedCost,
-        credits_debited: credits,
+        input_cost_usd: p?.inputCost ?? null,
+        output_cost_usd: p?.outputCost ?? null,
+        raw_cost_usd: p?.rawCost ?? null,
+        markup_multiplier: p?.markup ?? null,
+        billed_cost_usd: p?.billedCost ?? null,
+        credits_debited: p?.credits ?? 0,
         module_slug: 'crm',
-        metadata: { feature: 'find_competitors', provider: 'gemini', grounded: true, name: seed.name },
+        metadata: {
+          feature: 'find_competitors', provider: 'gemini', grounded: true, name: seed.name,
+          ...(p ? {} : { pricing_missing: true }),
+        },
         created_at: new Date().toISOString(),
       });
     } catch (e) {
