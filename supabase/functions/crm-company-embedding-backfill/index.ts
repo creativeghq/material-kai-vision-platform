@@ -16,6 +16,14 @@
  * Sequential, small batches — the same courtesy to MIVAA that kb-embedding-backfill
  * pays. A pg_cron job drains it; it is idempotent and early-returns when clean.
  *
+ * One hazard worth knowing about before you add a field to the derivation:
+ * `crm_companies` carries a BEFORE-UPDATE normaliser (`crm_normalize_country`) that can
+ * rewrite `country` / `country_code` / `state`, and the derivation reads all three. If our
+ * own write ever changed one of them, the hash would move and every embed would re-queue
+ * itself — a paid loop with no error anywhere. Verified 2026-08-15 across all 42 live
+ * companies: this exact update changes nothing the derivation reads. Re-check it if you add
+ * a derivation input that any BEFORE-write trigger touches.
+ *
  * Auth: service-role bearer or x-cron-secret (cron / internal), or an admin JWT.
  */
 

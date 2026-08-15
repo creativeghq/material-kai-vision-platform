@@ -85,6 +85,22 @@ web-search call), not transliteration. Covered by [tests/unit/transliterate.test
 **ΑΑΔΕ (Greek-business) fields** (written by `myaade-rgwspublic2`, see [`src/modules/myaade/README.md`](../src/modules/myaade/README.md)): `commercial_title`, `legal_status`, `kad_primary`, `kad_primary_description`, `kad_secondary jsonb`, `business_start_date`, `aade_data jsonb`, `aade_data_at` (90-day cache).
 
 
+**Lookalikes — "who else in our CRM does what this company does"** (#289). The Market tab's
+Competitors panel carries four signals, and only this one ranks by business substance: ΚΑΔ overlap is
+a code an accountant picked, and Apollo / Gemini / `web_search` look outward at companies we do not
+hold. `crm_companies.text_embedding_1024` is a Voyage `voyage-4` 1024D vector of the company's own
+registry prose; `crm_company_lookalikes(company_id, limit)` cosine-ranks the workspace's CRM against
+the seed's **stored** vector, so asking costs nothing — no query is embedded and no provider is called
+on render.
+
+- **`crm_company_embedding_text(id)` is the derivation, and it lives in SQL.** Nothing in TypeScript assembles this text. The drain embeds exactly what it returns and the staleness hash is taken over exactly what it returns, so the two cannot disagree about what a company *is*. ΚΑΔ descriptions carry most of the signal — full ΑΑΔΕ/ΓΕΜΗ activity prose, in Greek, which `voyage-4` handles natively.
+- **There is no trigger and no refresh-on-write hook.** `crm_companies_embedding_backlog()` compares the stored `embedding_source_hash` against the hash of the derivation *right now*, so a CRM edit, a ΓΕΜΗ re-import, an XML import and a catalogue change all fall out of one comparison — including the writers nobody would have remembered to hook. The first run of `crm-company-embedding-backfill` (pg_cron, `*/20`) is therefore also the backfill; there is no separate one.
+- **`crm_company_lookalikes` runs with INVOKER rights**, so the `is_workspace_member(workspace_id)` SELECT policy scopes the seed and the candidates alike. There is no `workspace_id` parameter to pass in and therefore none to forge.
+- **It returns `{seed_status, population, matches}`, not a row set.** "The query broke", "not profiled yet", "nothing worth embedding" and "genuinely nobody similar" would otherwise all render as no rows, and the panel would state a fact about the customer's CRM that is really a fact about our pipeline.
+- **The score is relative, and the UI never shows a percentage.** Measured over this workspace's 861 company pairs: the MEDIAN pair — two businesses with nothing in common — scores **0.645** cosine and the floor is 0.324. "65% similar" would be a valid, confident, meaningless number that an operator would act on. So the RPC returns `z` — standard deviations above the *seed's own* mean similarity to the workspace — drops everything below +1σ (a company with no close neighbour returns nothing, not its four least-distant strangers), and the panel renders "Very close / Close / Related". The absolute cosine buries exactly the matches that matter most: the CRM's two software companies score 0.637 to each other, which is *below* the median unrelated pair and **+4.0σ** for that seed.
+- **`embedding_status='skipped'` is a verdict, not an absence.** A company whose only fact is its name is not embedded: that vector would encode spelling and rank strangers as lookalikes. Left `pending` it would also be re-picked on every run forever.
+- Guarded by `ops.crm_company_embeddings_never_written` — see [prevention-coverage.md](prevention-coverage.md).
+
 **Routes:**
 - `/admin/crm` (companies tab)
 - `/admin/crm/companies/:id` (company detail)

@@ -262,7 +262,19 @@ interface Lookalike {
   is_customer: boolean | null;
   is_supplier: boolean | null;
   similarity: number;
+  /** Standard deviations above this seed's own mean similarity to the workspace. */
+  z: number | null;
 }
+
+/**
+ * Deliberately NOT a percentage. Measured over this workspace's 861 company pairs, the
+ * median pair — two businesses with nothing in common — scores 0.645 cosine, and the floor
+ * is 0.324. "65% similar" would be a valid, confident, meaningless number that an operator
+ * would act on. Only position within the seed's own neighbourhood carries information, so
+ * that is what we render.
+ */
+const strengthLabel = (z: number | null): string =>
+  z == null ? 'Related' : z >= 2.5 ? 'Very close' : z >= 1.5 ? 'Close' : 'Related';
 
 /**
  * The fourth competitor signal, and the only one ranked BY WHAT A COMPANY DOES rather
@@ -280,19 +292,22 @@ const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
   const [rows, setRows] = useState<Lookalike[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [seedStatus, setSeedStatus] = useState<string | null>(null);
+  /** How many OTHER companies were actually available to rank against. */
+  const [population, setPopulation] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setRows(null); setFailed(false); setSeedStatus(null);
+      setRows(null); setFailed(false); setSeedStatus(null); setPopulation(0);
       // RPC is not in the generated types (no Supabase access token on this machine) → cast.
       const { data, error } = await (supabase.rpc as any)('crm_company_lookalikes', {
         p_company_id: companyId, p_limit: 8,
       });
       if (cancelled) return;
       if (error) { setFailed(true); return; }
-      const payload = (data ?? {}) as { seed_status?: string; matches?: Lookalike[] };
+      const payload = (data ?? {}) as { seed_status?: string; population?: number; matches?: Lookalike[] };
       setSeedStatus(payload.seed_status ?? 'unknown');
+      setPopulation(payload.population ?? 0);
       setRows(payload.matches ?? []);
     })();
     return () => { cancelled = true; };
@@ -318,7 +333,11 @@ const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
           This company has not been profiled yet — it is queued, and similar companies appear once it has been.
         </p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground italic">No other profiled company in your CRM resembles this one yet.</p>
+        <p className="text-sm text-muted-foreground italic">
+          {population === 0
+            ? 'No other company in your CRM has been profiled yet, so there is nothing to compare against.'
+            : `Nothing in your CRM stands out as similar — ${population} other ${population === 1 ? 'company was' : 'companies were'} compared.`}
+        </p>
       ) : (
         <div className="divide-y divide-border rounded-lg border border-border">
           {rows.map((r) => (
@@ -334,7 +353,7 @@ const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-sm tabular-nums">{Math.round(r.similarity * 100)}%</p>
+                <p className="text-sm">{strengthLabel(r.z)}</p>
                 <p className="text-[11px] text-muted-foreground">
                   {r.is_supplier ? 'Supplier' : r.is_customer ? 'Customer' : 'Company'}
                 </p>
