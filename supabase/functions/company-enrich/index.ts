@@ -41,9 +41,28 @@ import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
-const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY') || '';
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || '';
+// Lazy getters, never module-load captures: the secrets bootstrap populates env at HANDLER
+// ENTRY, so `const X = Deno.env.get('Y')` at module scope reads undefined for anything that
+// arrives from platform_secrets rather than a deploy-time secret. All three were captured at
+// module load here.
+const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
+const APOLLO_API_KEY = () => Deno.env.get('APOLLO_API_KEY') || '';
+/**
+ * `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY`.
+ *
+ * This read `GEMINI_API_KEY`, which is set NOWHERE — empty on the MIVAA host, no value in
+ * platform_secrets, and absent from the edge env. Every Gemini call that has ever succeeded on
+ * this platform (generate-interior-gemini, _shared/ai-client.ts) reads
+ * GOOGLE_GENERATIVE_AI_API_KEY. So `findCompetitorsViaGemini` returned null on its first line
+ * every time and the chain fell silently through to Anthropic — a provider that was ordered
+ * FIRST, documented as "the broadest live index", and never once executed.
+ *
+ * Proven from production on 2026-08-15: forcing provider=gemini against the deployed function
+ * returned `skipped: ["gemini (no GEMINI_API_KEY)"]` and zero competitors in 0.8s.
+ *
+ * `generate-social-image` reads the same dead name and has likewise never logged a call.
+ */
+const GEMINI_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 /**
  * One constant, used for the endpoint URL, the price lookup and the logged `model_name`, so
  * those three can never disagree about which model actually ran. This sat on
@@ -184,7 +203,7 @@ async function anthropic(body: Record<string, unknown>): Promise<any> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
+      'x-api-key': ANTHROPIC_API_KEY(),
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'web-search-2025-03-05',
       'Content-Type': 'application/json',
@@ -203,7 +222,7 @@ async function enrichViaWebSearch(
   admin: any, userId: string, workspaceId: string | null,
   name: string, countryName: string | null, vat: string | null,
 ): Promise<Partial<EnrichFields> | null> {
-  if (!ANTHROPIC_API_KEY) return null;
+  if (!ANTHROPIC_API_KEY()) return null;
 
   const scope = [countryName ? `in ${countryName}` : '', vat ? `(VAT/registration ${vat})` : '']
     .filter(Boolean).join(' ');
@@ -311,13 +330,13 @@ async function enrichViaApollo(
   admin: any, userId: string, workspaceId: string | null,
   name: string, countryName: string | null,
 ): Promise<Partial<EnrichFields> | null> {
-  if (!APOLLO_API_KEY) return null;
+  if (!APOLLO_API_KEY()) return null;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20_000);
     const res = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Api-Key': APOLLO_API_KEY },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Api-Key': APOLLO_API_KEY() },
       body: JSON.stringify({
         q_organization_name: name,
         organization_locations: countryName ? [countryName] : undefined,
@@ -436,14 +455,14 @@ function mapApolloOrg(org: any): CompetitorOrg {
 async function findCompetitorsViaApollo(
   admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
 ): Promise<CompetitorOrg[] | null> {
-  if (!APOLLO_API_KEY) return null;
+  if (!APOLLO_API_KEY()) return null;
   try {
     const keywords = [seed.industry, ...seed.kadCodes].filter(Boolean) as string[];
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20_000);
     const res = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Api-Key': APOLLO_API_KEY },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Api-Key': APOLLO_API_KEY() },
       body: JSON.stringify({
         q_organization_keyword_tags: keywords.length ? keywords : undefined,
         organization_locations: seed.country ? [seed.country] : undefined,
@@ -472,7 +491,7 @@ async function findCompetitorsViaApollo(
 async function findCompetitorsViaWebSearch(
   admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
 ): Promise<CompetitorOrg[] | null> {
-  if (!ANTHROPIC_API_KEY) return null;
+  if (!ANTHROPIC_API_KEY()) return null;
   try {
     const researchQuery = competitorResearchQuery(seed);
 
@@ -586,18 +605,18 @@ function competitorResearchQuery(seed: CompetitorSeed): string {
 /**
  * Gemini + Google Search grounding — the broadest live web index for freeform competitor
  * research. Two Flash calls: (1) grounded research (text, google_search tool), (2) JSON-mode
- * structured extraction. Only when GEMINI_API_KEY is set. Debits its own cost.
+ * structured extraction. Only when GOOGLE_GENERATIVE_AI_API_KEY is set. Debits its own cost.
  */
 async function findCompetitorsViaGemini(
   admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
 ): Promise<CompetitorOrg[] | null> {
-  if (!GEMINI_API_KEY) return null;
+  if (!GEMINI_API_KEY()) return null;
   const base = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   try {
     // Step 1 — grounded research (Google Search).
     const rc = new AbortController();
     const rt = setTimeout(() => rc.abort(), 30_000);
-    const researchRes = await fetch(`${base}?key=${GEMINI_API_KEY}`, {
+    const researchRes = await fetch(`${base}?key=${GEMINI_API_KEY()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -620,7 +639,7 @@ async function findCompetitorsViaGemini(
     try {
       const ec = new AbortController();
       const et = setTimeout(() => ec.abort(), 20_000);
-      const extractRes = await fetch(`${base}?key=${GEMINI_API_KEY}`, {
+      const extractRes = await fetch(`${base}?key=${GEMINI_API_KEY()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -770,19 +789,19 @@ async function handleFindCompetitors(userId: string, body: any): Promise<Respons
   if (!forced || forced === 'apollo') {
     const viaApollo = await findCompetitorsViaApollo(admin, userId, seed.workspaceId ?? null, seed);
     if (viaApollo && viaApollo.length) { competitors = viaApollo; source = 'apollo'; }
-    else skipped.push(APOLLO_API_KEY ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
+    else skipped.push(APOLLO_API_KEY() ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
   } else skipped.push(notAttempted('apollo'));
 
   if (competitors.length === 0 && (!forced || forced === 'gemini')) {
     const viaGemini = await findCompetitorsViaGemini(admin, userId, seed.workspaceId ?? null, seed);
     if (viaGemini && viaGemini.length) { competitors = viaGemini; source = 'gemini'; }
-    else skipped.push(GEMINI_API_KEY ? 'gemini' : 'gemini (no GEMINI_API_KEY)');
+    else skipped.push(GEMINI_API_KEY() ? 'gemini' : 'gemini (no GOOGLE_GENERATIVE_AI_API_KEY)');
   } else if (forced && forced !== 'gemini') skipped.push(notAttempted('gemini'));
 
   if (competitors.length === 0 && (!forced || forced === 'web_search')) {
     const viaWeb = await findCompetitorsViaWebSearch(admin, userId, seed.workspaceId ?? null, seed);
     if (viaWeb && viaWeb.length) { competitors = viaWeb; source = 'web_search'; }
-    else skipped.push(ANTHROPIC_API_KEY ? 'web_search' : 'web_search (no ANTHROPIC_API_KEY)');
+    else skipped.push(ANTHROPIC_API_KEY() ? 'web_search' : 'web_search (no ANTHROPIC_API_KEY)');
   } else if (forced && forced !== 'web_search') skipped.push(notAttempted('web_search'));
 
   // Drop the seed company's own domains + de-dupe by domain/name.
@@ -857,8 +876,8 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
 
     const sources: string[] = [];
     const skipped: string[] = [];
-    if (web) sources.push('web_search'); else skipped.push(ANTHROPIC_API_KEY ? 'web_search' : 'web_search (no ANTHROPIC_API_KEY)');
-    if (apollo) sources.push('apollo'); else skipped.push(APOLLO_API_KEY ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
+    if (web) sources.push('web_search'); else skipped.push(ANTHROPIC_API_KEY() ? 'web_search' : 'web_search (no ANTHROPIC_API_KEY)');
+    if (apollo) sources.push('apollo'); else skipped.push(APOLLO_API_KEY() ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
 
     // Web search wins for the soft fields; Apollo fills structured blanks + employee band.
     const fields = mergeFields(web ?? {}, apollo ?? {});
