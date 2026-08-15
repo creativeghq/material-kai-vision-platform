@@ -111,6 +111,7 @@ function businessDaysInMonth(period: string): number {
   return count;
 }
 import { round2 } from '../_shared/money.ts';
+import { loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 
 // ── Payroll rules engine (configurable per workspace; Greek 2026 defaults) ──────────────
 // tax_credit_per_child holds the ADD-ON over the base credit: base 777 (0 kids) → 900/1120/1340/1580/1780.
@@ -542,7 +543,14 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
           required: ['score', 'summary'],
         },
       };
-      const prompt = `You are a hiring assistant. Rate how well this CV fits the role below and be specific about matches and gaps. Do not invent experience.\n\nROLE: ${post?.title ?? ''}\n\nDESCRIPTION:\n${post?.description ?? ''}\n\nREQUIREMENTS:\n${post?.requirements ?? ''}`;
+      const prompt = renderPromptTemplate(
+        await loadPrompt(supabase, 'tool', 'hr_cv_rating'),
+        {
+          title: post?.title ?? '',
+          description: post?.description ?? '',
+          requirements: post?.requirements ?? '',
+        },
+      );
       let res;
       try {
         res = await callClaudeTool([

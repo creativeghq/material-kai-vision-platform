@@ -141,7 +141,7 @@ export async function runOrderIntake(
   const ordered = rows.slice().reverse();
   const transcript = buildTranscript(ordered);
 
-  const intent = await classifyOrderIntent(transcript);
+  const intent = await classifyOrderIntent(db, transcript);
   if (intent.intent === 'other') {
     return { ran: false, reason: `not an order: ${intent.reason}` };
   }
@@ -174,7 +174,7 @@ export async function runOrderIntake(
 
   let extracted;
   try {
-    extracted = await extractOrderLines(transcript, { hasImages: Boolean(imageBase64) });
+    extracted = await extractOrderLines(db, transcript, { hasImages: Boolean(imageBase64) });
   } catch (err) {
     await refund();
     throw err;

@@ -24,6 +24,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
+import { loadPrompt } from '../_shared/prompt-utils.ts';
 // deno-lint-ignore no-explicit-any
 type SB = any;
 
@@ -206,16 +207,9 @@ async function gatherSnapshot(admin: SB, userId: string, workspaceId: string): P
 }
 
 // ── AI prompt ─────────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are the analytics assistant for an interior-design and building-materials B2B platform.
-Given a JSON snapshot of ONE user's workspace activity, write a short, friendly, specific set of dashboard insights.
-Rules:
-- Use ONLY the numbers in the snapshot. Never invent products, names, brands, or figures that are not present.
-- Be concrete: cite the actual counts/amounts. Format money with the snapshot's currency.
-- Each insight body is one or two sentences, plain and actionable.
-- Choose tone: "warning" for things needing attention (overdue invoices/tasks), "positive" for good momentum,
-  "tip" for an actionable suggestion, "info" for neutral context.
-- If the workspace is nearly empty, encourage a clear first action (add materials, create a project) with a "tip".
-- 2 to 5 insights. The headline is a single friendly sentence.`;
+// The system prompt lives in `prompts` (prompt_type='tool', category='dashboard_insights')
+// so it is tunable at /admin/ai-configs without a deploy — audit #12. There is no inline
+// copy to drift from it.
 
 function buildPrompt(snap: Snapshot): string {
   return `Workspace activity snapshot (JSON):\n${JSON.stringify(snap, null, 2)}\n\nWrite the dashboard insights now.`;
@@ -377,7 +371,7 @@ serve(
       try {
         const result = await generateStructuredWithClaude(buildPrompt(snapshot), InsightsSchema, {
           model: INSIGHTS_MODEL,
-          systemPrompt: SYSTEM_PROMPT,
+          systemPrompt: await loadPrompt(admin, 'tool', 'dashboard_insights'),
           temperature: 0.5,
           maxTokens: 900,
           task: 'dashboard_insights',

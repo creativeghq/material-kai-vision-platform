@@ -40,6 +40,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
+import { getAgentSystemPrompt } from '../_shared/prompt-utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -343,20 +344,25 @@ function buildCustomerSupportTools(db: DbClient, scope: { workspaceId: string; c
   };
 }
 
-// Fallback persona if the editable DB row (prompts: prompt_type='agent', category='inbox') is missing.
-const FALLBACK_INBOX_PERSONA =
-  'You are a customer-support assistant for a business, replying inside a customer conversation. ' +
-  "Reply in the customer's language; be concise, warm, and professional. Never invent facts — only " +
-  'state amounts, balances, dates, invoice numbers, statuses, or links returned by a tool. For anything ' +
-  'that needs a person (negotiation, discounts, complaints, refunds, account changes, legal), say a team ' +
-  'member will follow up shortly and do not make commitments on the business’s behalf.';
-
-/** Editable inbox-agent persona/policy (prompts row), with an inline fallback. */
+/**
+ * Editable inbox-agent persona/policy — `prompts` row (prompt_type='agent', category='inbox').
+ *
+ * There is no inline fallback, and that is the point. A byte-similar
+ * FALLBACK_INBOX_PERSONA used to sit here behind `|| `, loaded with a query whose
+ * error was DISCARDED (`const { data } = await ...`). supabase-js resolves rather
+ * than throws on an RLS denial, so a permissions change or a database blip would
+ * have swapped the operator's edited persona for the hardcoded one — silently,
+ * indefinitely, with every health signal green. `_shared/rerank.ts` has the same
+ * story written in its comments: its FALLBACK_PROMPT ran 100% of the time while
+ * the admin's row sat in the table untouched.
+ *
+ * getAgentSystemPrompt reads `system_prompt` specifically. That matters here: this
+ * row's `prompt_text` is a placeholder note ("this column is unused for the inbox
+ * agent"), so a naive swap to the generic loadPrompt() — which prefers prompt_text
+ * — would have replaced the whole persona with that sentence.
+ */
 async function loadInboxAgentPersona(db: DbClient): Promise<string> {
-  const { data } = await db.from('prompts').select('system_prompt')
-    .eq('prompt_type', 'agent').eq('category', 'inbox').eq('is_active', true)
-    .order('updated_at', { ascending: false }).limit(1).maybeSingle();
-  return (data as { system_prompt?: string } | null)?.system_prompt?.trim() || FALLBACK_INBOX_PERSONA;
+  return await getAgentSystemPrompt(db, 'inbox');
 }
 
 /**

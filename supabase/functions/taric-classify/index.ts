@@ -24,6 +24,7 @@ import { authenticate, isCronAuthorized, userCanAccessWorkspace, getUserId } fro
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
+import { loadPrompt } from '../_shared/prompt-utils.ts';
 
 interface RequestBody {
   product_ids?: string[];
@@ -341,10 +342,7 @@ async function classifyOne(
     }
     try {
       const facts = await generateStructuredWithClaude(buildFactPrompt(product), FACT_SCHEMA, {
-        systemPrompt:
-          'You identify what a product IS and what it is MADE OF, from a supplier description. ' +
-          'You do not classify it, price it, or infer anything you were not told. Answer with an ' +
-          'empty string rather than a guess when the input does not say.',
+        systemPrompt: await loadPrompt(supabase, 'tool', 'taric_fact_extraction'),
         temperature: 0,
         task: 'taric_fact_extraction',
       });
@@ -417,12 +415,7 @@ async function classifyOne(
       buildPrompt(product, candidates, hsHint, rule.reason ?? null),
       VERDICT_SCHEMA,
       {
-        systemPrompt:
-          'You are a customs tariff classifier for the EU TARIC nomenclature. You choose the ' +
-          'single best code from a supplied candidate list. You never invent a code that is not ' +
-          'in the list. Classification follows the material and the form of the article, not its ' +
-          'brand or its intended room. If the candidates do not contain a genuinely correct code, ' +
-          'return an empty code and a confidence below 0.5 rather than the closest-looking one.',
+        systemPrompt: await loadPrompt(supabase, 'tool', 'taric_classification'),
         temperature: 0,
         task: 'taric_classification',
       },

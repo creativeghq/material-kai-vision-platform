@@ -7,6 +7,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
+import { loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 
 export interface AcctCtx { supabase: any; workspaceId: string; userId: string; body: any; access: { canView: boolean; canManage: boolean }; }
 
@@ -125,7 +126,11 @@ export async function handleAccounting(action: string, ctx: AcctCtx): Promise<Re
       };
       let res;
       try {
-        res = await callClaudeTool([source, { type: 'text', text: `This is a monthly accounting/payment document for a company's payroll (period ${doc.period}). Identify exactly what kind of document it is (including seasonal ones like Christmas/Easter bonus, leave allowance, auxiliary-fund contributions) and extract the fields. If it bundles several distinct obligations, list each in "entries". Do not invent values — leave a field empty/0 if it isn't present.` }], tool, 1400);
+        const analyzePrompt = renderPromptTemplate(
+          await loadPrompt(supabase, 'tool', 'hr_accounting_analyze'),
+          { period: String(doc.period ?? '') },
+        );
+        res = await callClaudeTool([source, { type: 'text', text: analyzePrompt }], tool, 1400);
       } catch (e) {
         await refundHrCredits(supabase, userId, workspaceId, ANALYZE_MAX_CREDITS, 'hr_accounting_analyze', 'AI failed');
         await supabase.from('hr_accounting_documents').update({ status: 'error', ai_notes: (e as Error).message }).eq('id', id);

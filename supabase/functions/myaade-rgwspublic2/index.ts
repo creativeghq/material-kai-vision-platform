@@ -40,6 +40,8 @@ import {
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
+import { loadPrompt } from '../_shared/prompt-utils.ts';
+import type { DbClient } from '../_shared/supabase-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -113,6 +115,7 @@ function parseActivities(xml: string): FirmActivity[] {
  * Best-effort: any failure returns null and the caller just keeps the Greek slots.
  */
 async function translateBasicRec(
+  db: DbClient,
   basicRec: BasicRec,
   primaryActivityDescr: string | null,
   // Who this translation is billed to. The caller resolves the workspace by VERIFYING the
@@ -161,7 +164,7 @@ ${JSON.stringify(src, null, 2)}`,
         task: 'aade_field_translation',
         userId: billedTo.userId,
         workspaceId: billedTo.workspaceId,
-        systemPrompt: 'You are a precise Greek→Latin transliterator for business-registry data (names/addresses transliterated verbatim, only activity descriptions translated). Output only the requested JSON.',
+        systemPrompt: await loadPrompt(db, 'tool', 'aade_field_translation'),
       },
     );
     return output as BasicRecEn;
@@ -443,7 +446,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
         const billedWs = await userCanAccessWorkspace(admin, user.id, claimedWs)
           ? claimedWs ?? undefined
           : undefined;
-        basicRecEn = await translateBasicRec(basicRec, primaryActDescr, {
+        basicRecEn = await translateBasicRec(admin, basicRec, primaryActDescr, {
           userId: user.id, workspaceId: billedWs,
         });
         if (!basicRecEn) {
