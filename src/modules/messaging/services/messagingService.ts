@@ -391,7 +391,16 @@ export class MessagingService {
    * turns into a channel. This is the DEFAULT connect path — no Meta token is ever typed
    * into this app, exactly like the social accounts flow.
    */
-  async startWhatsAppOAuth(options: { workspaceId?: string; redirectUrl?: string } = {}): Promise<WhatsAppOAuthStart> {
+  async startWhatsAppOAuth(options: {
+    workspaceId?: string;
+    redirectUrl?: string;
+    /**
+     * Which Embedded Signup screen Meta shows. `api` = standard WABA/number picker (a number
+     * already on Cloud API); `business_app` = coexistence, sharing a number with the consumer
+     * WhatsApp Business app. Omitted means Zernio's default, which is coexistence.
+     */
+    onboarding?: 'api' | 'business_app';
+  } = {}): Promise<WhatsAppOAuthStart> {
     const { data, error } = await supabase.functions.invoke('messaging-api', {
       body: { action: 'connect-whatsapp-oauth', ...options },
     });

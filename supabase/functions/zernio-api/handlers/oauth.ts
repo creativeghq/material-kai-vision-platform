@@ -24,7 +24,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
-import { zernioApi, zernioKey, ensureZernioSecrets, publicAppUrl, resolveWorkspaceProfile } from '../zernio.ts';
+import { zernioApi, zernioKey, ensureZernioSecrets, publicAppUrl, resolveWorkspaceProfile, fetchZernioAccount } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -196,9 +196,17 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
     if (!callbackEnt.ok) return callbackEnt.response;
 
     try {
-      // Zernio: GET /v1/accounts/{accountId} → { account: SocialAccount }
-      const accountData = await zernioApi('GET', `/accounts/${zernio_account_id}`);
-      const account = (accountData.account ?? accountData) as {
+      // Same workspace→profile mapping the connect step used, so the list read below is
+      // narrowed to this tenant's accounts rather than every account on the Zernio key.
+      const profileId = await resolveWorkspaceProfile(supabase, workspace_id);
+
+      // There is NO GET /v1/accounts/{accountId} — only PUT/PATCH/DELETE live on that path,
+      // so this step 404'd on every connect. Read it off the list endpoint instead.
+      const found = await fetchZernioAccount(zernio_account_id, { profileId, platform });
+      if (!found) {
+        return jsonResponse({ success: false, error: 'Zernio has no such connected account' }, 404);
+      }
+      const account = found as {
         username?: string;
         displayName?: string;
         profilePicture?: string | null;

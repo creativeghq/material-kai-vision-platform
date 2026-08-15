@@ -27,6 +27,7 @@ import {
   zernioApi,
   zernioKey,
   ensureZernioSecrets,
+  fetchZernioAccount,
   publicAppUrl,
   resolveWorkspaceProfile,
   sendWhatsAppMessage,
@@ -554,7 +555,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // path a human should be pushed down, which is what the UI used to do.
       // ─────────────────────────────────────────────────────────────
       case 'connect-whatsapp-oauth': {
-        const { workspaceId, redirectUrl } = requestBody;
+        const { workspaceId, redirectUrl, onboarding } = requestBody;
+
+        // WhatsApp-only. Meta shows a different Embedded Signup screen per mode, and Zernio's
+        // DEFAULT is coexistence — a number shared with the consumer WhatsApp Business app.
+        // A business connecting a Cloud API number wants 'api' (Meta's WABA/number picker).
+        // Getting this wrong is not an error, it is a differently-provisioned number, so let
+        // the caller choose rather than inheriting a default nobody picked.
+        if (onboarding && onboarding !== 'api' && onboarding !== 'business_app') {
+          throw new HttpError(400, "onboarding must be 'api' or 'business_app'");
+        }
 
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
@@ -577,6 +587,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         // Zernio: GET /v1/connect/whatsapp?profileId=&redirect_url= -> { authUrl, state }
         const qs = new URLSearchParams({ profileId, redirect_url: appRedirect });
+        if (onboarding) qs.set('onboarding', onboarding);
         const data = await zernioApi('GET', `/connect/whatsapp?${qs.toString()}`);
 
         return jsonResponse({
@@ -601,9 +612,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
-        // Zernio: GET /v1/accounts/{accountId} -> { account: {...} }
-        const accountData = await zernioApi('GET', `/accounts/${encodeURIComponent(zernioAccountId)}`);
-        const account = accountData?.account ?? accountData ?? {};
+        // There is NO GET /v1/accounts/{accountId} — the spec exposes only PUT/PATCH/DELETE
+        // there, so reading one account by id 404s. The list endpoint is the supported read.
+        const account = await fetchZernioAccount(zernioAccountId, { profileId, platform: 'whatsapp' });
+        if (!account) throw new HttpError(404, 'Zernio has no such connected WhatsApp account');
         const senderId = account.selectedPhoneNumber || account.username || account.platformIdentifier;
         if (!senderId) throw new HttpError(502, 'Zernio returned no phone number for this account');
 

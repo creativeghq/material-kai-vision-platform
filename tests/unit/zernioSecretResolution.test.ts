@@ -140,3 +140,39 @@ describe('WhatsApp connects the same way social does', () => {
     expect(ops).toContain("'connect-whatsapp-callback'");
   });
 });
+
+describe('we only call Zernio endpoints that exist', () => {
+  // Checked against the published OpenAPI spec (https://docs.zernio.com/api/openapi, v1.0.4,
+  // 566 operations). Our ZERNIO_BASE_URL ends in /v1, so a call to `/accounts` is the spec's
+  // `/v1/accounts`.
+  it('never reads a single account by id — that path has no GET', () => {
+    // `/v1/accounts/{accountId}` exposes PUT, PATCH and DELETE only. Both OAuth callbacks
+    // called GET on it, so the LAST step of every connect — social and WhatsApp — would have
+    // 404'd. Nothing caught it because ZERNIO_API_KEY has never had a value, so every request
+    // failed earlier at the 503. Use fetchZernioAccount(), which reads the list endpoint.
+    const offenders = SOURCES.filter((f) =>
+      /zernioApi\(\s*['"]GET['"]\s*,\s*[`'"]\/accounts\/\$\{/.test(f.code),
+    ).map((f) => f.rel);
+
+    expect(
+      offenders,
+      'Use fetchZernioAccount(accountId, { profileId, platform }) — GET /v1/accounts/{id} does not exist.',
+    ).toEqual([]);
+  });
+
+  it('sends an idempotency key when creating a post', () => {
+    // POST /v1/posts dedups on x-request-id for 5 minutes. Without it a retried invocation
+    // double-posts to the customer's real social account — the one Zernio failure mode that
+    // is publicly visible and cannot be taken back.
+    const publish = SOURCES.find((f) => f.rel === 'zernio-api/handlers/publish.ts');
+    expect(publish, 'publish handler moved').toBeTruthy();
+    expect(publish!.code).toMatch(/['"]x-request-id['"]/);
+  });
+
+  it('backs off on 429 rather than surfacing it as an opaque failure', () => {
+    const client = SOURCES.find((f) => f.rel === '_shared/zernio.ts')
+      ?? { code: readFileSync(join(FUNCTIONS_DIR, CANONICAL), 'utf-8') };
+    expect(client.code).toContain('429');
+    expect(client.code).toMatch(/Retry-After/i);
+  });
+});

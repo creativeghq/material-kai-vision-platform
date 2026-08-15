@@ -72,24 +72,93 @@ export function publicAppUrl(): string {
   return (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
 }
 
-/** Call the Zernio REST API. Throws on non-2xx. Returns parsed JSON (or {} for empty bodies). */
-export async function zernioApi(method: string, path: string, body?: unknown): Promise<any> {
-  const res = await fetch(`${ZERNIO_BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${zernioKey()}`,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Zernio ${method} ${path} → ${res.status}: ${text}`);
+export class ZernioApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly method: string,
+    readonly path: string,
+    readonly bodyText: string,
+  ) {
+    super(`Zernio ${method} ${path} → ${status}: ${bodyText}`);
+    this.name = 'ZernioApiError';
   }
+}
 
-  const text = await res.text();
-  return text ? JSON.parse(text) : {};
+/**
+ * Call the Zernio REST API. Throws ZernioApiError on non-2xx. Returns parsed JSON
+ * (or {} for empty bodies).
+ *
+ * Rate limits are tier-based (60 req/min on the free tier, 600 on standard; analytics
+ * endpoints are stricter at ~6 req/s). A 429 carries `Retry-After` in seconds, which is
+ * relative and therefore immune to clock skew — honour it rather than guessing. Without this
+ * a single burst (sync-channels over N accounts, the analytics agent over a batch of 20)
+ * surfaced as an opaque failure with no indication that waiting would have fixed it.
+ *
+ * `opts.headers` exists for `x-request-id`, Zernio's 5-minute idempotency key.
+ */
+export async function zernioApi(
+  method: string,
+  path: string,
+  body?: unknown,
+  opts: { headers?: Record<string, string>; retries?: number } = {},
+): Promise<any> {
+  const maxRetries = opts.retries ?? 2;
+
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${ZERNIO_BASE_URL}${path}`, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${zernioKey()}`,
+        'Content-Type': 'application/json',
+        ...(opts.headers ?? {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (res.status === 429 && attempt < maxRetries) {
+      // Retry-After is seconds. Cap the wait so an edge function cannot park on a long one.
+      const retryAfter = Number(res.headers.get('Retry-After') ?? '');
+      const waitMs = Math.min(
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000 * (attempt + 1),
+        15_000,
+      );
+      console.warn(`[zernio] 429 on ${method} ${path} — retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!res.ok) {
+      throw new ZernioApiError(res.status, method, path, await res.text());
+    }
+
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+  }
+}
+
+/**
+ * Fetch ONE connected account by its Zernio id.
+ *
+ * There is no `GET /v1/accounts/{accountId}` — the spec exposes only PUT / PATCH / DELETE on
+ * that path. Both OAuth callbacks called it anyway and would have died at the last step of
+ * every connect, social and WhatsApp alike. It was never noticed because ZERNIO_API_KEY has
+ * never had a value, so the request failed earlier, at the 503.
+ *
+ * The list endpoint is the supported read. Narrow it with the filters the spec accepts
+ * (`profileId`, `platform`) so this stays one page even on a large tenant, then match on
+ * `_id` — the list item's id field is `_id`, not `accountId`.
+ */
+export async function fetchZernioAccount(
+  accountId: string,
+  filters: { profileId?: string; platform?: string } = {},
+): Promise<Record<string, any> | null> {
+  const qs = new URLSearchParams({ includeOverLimit: 'true' });
+  if (filters.profileId) qs.set('profileId', filters.profileId);
+  if (filters.platform) qs.set('platform', filters.platform);
+
+  const data = await zernioApi('GET', `/accounts?${qs.toString()}`);
+  const accounts = (data.accounts ?? data.data ?? []) as Array<Record<string, any>>;
+  return accounts.find((a) => (a._id ?? a.accountId ?? a.id) === accountId) ?? null;
 }
 
 /**

@@ -99,7 +99,15 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     }
 
     // Zernio: POST /v1/posts → { message, post: Post }
-    const result = await zernioApi('POST', '/posts', payload);
+    //
+    // x-request-id is Zernio's 5-minute idempotency key: a repeat with the same value returns
+    // the ORIGINAL post instead of creating a second one. Key it on our post id + action so a
+    // retried edge invocation (or a double-clicked Publish) cannot double-post, and so two
+    // DIFFERENT posts never collide — Zernio's docs call out reusing one id across calls as
+    // the common pitfall, since every later call then returns the first call's post.
+    const result = await zernioApi('POST', '/posts', payload, {
+      headers: { 'x-request-id': `${post_id}:${action}` },
+    });
     const zernioPost = result.post ?? result;
     const zernioPostId: string | undefined = zernioPost?._id;
     const platformTarget = (zernioPost?.platforms || [])[0] ?? {};
