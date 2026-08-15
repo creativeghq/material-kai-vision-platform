@@ -281,6 +281,30 @@ interface TemplateModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * Our category vocabulary → Meta's. AUTHENTICATION is deliberately unreachable from here:
+ * Meta only accepts it for one-time-passcode templates with a fixed, non-editable body, so
+ * offering it on a freeform editor would produce a rejection nobody could act on.
+ */
+const META_CATEGORY: Record<string, 'UTILITY' | 'MARKETING'> = {
+  transactional: 'UTILITY',
+  notification: 'UTILITY',
+  otp: 'UTILITY',
+  marketing: 'MARKETING',
+};
+
+/**
+ * Rewrite `{{name}}` placeholders into Meta's positional `{{1}}`, `{{2}}` in ORDER OF
+ * APPEARANCE — the same order `variables` is derived in, and the same order the edge's
+ * orderedTemplateParams() emits values in. Keeping all three keyed on appearance is what
+ * makes the substitution correct without a shared schema: get it wrong and every message
+ * renders with its values swapped, which is a valid string, so nothing raises.
+ */
+function toMetaBody(content: string): string {
+  let n = 0;
+  return content.replace(/\{\{(\w+)\}\}/g, () => `{{${++n}}}`);
+}
+
 const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: template?.name || '',
@@ -299,6 +323,57 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
 
   // Extract variables from content
   const variables = (formData.content.match(/{{(\w+)}}/g) || []).map(v => v.replace(/[{}]/g, ''));
+  const [submittingToMeta, setSubmittingToMeta] = useState(false);
+
+  /**
+   * Submit this template to Meta and bind the approved name back onto the row.
+   *
+   * Before this, the field below asked for a name that could only exist if you left the app,
+   * built the template in WhatsApp Manager, waited up to 24h and came back to type it in —
+   * the same dead end the connect flow had. A template with no bound name cannot be used for
+   * a cold send at all, so an unsubmitted template is a template that silently never sends.
+   */
+  const handleSubmitToMeta = async () => {
+    const metaCategory = META_CATEGORY[formData.category] ?? 'UTILITY';
+    // Meta's own constraint: lowercase, letters/numbers/underscore, must start with a letter.
+    const metaName = (formData.whatsapp_template_name || formData.name)
+      .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^[^a-z]+/, '').slice(0, 60);
+
+    if (!metaName) {
+      toast({ title: 'Name it first', description: 'Meta template names must start with a letter.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.content.trim()) {
+      toast({ title: 'Add the message body first', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setSubmittingToMeta(true);
+      const { template: created } = await messagingService.createWhatsAppTemplate({
+        name: metaName,
+        category: metaCategory,
+        language: formData.whatsapp_language_code || 'en',
+        components: [{ type: 'BODY', text: toMetaBody(formData.content) }],
+      });
+      setFormData((prev) => ({ ...prev, whatsapp_template_name: metaName }));
+      const status = String((created as { status?: string })?.status ?? 'PENDING').toUpperCase();
+      toast({
+        title: status === 'APPROVED' ? 'Approved by Meta' : 'Submitted to Meta',
+        description: status === 'APPROVED'
+          ? 'Usable immediately. Save the template to bind it.'
+          : 'Review can take up to 24h. Save the template — the name is bound now, and the webhook updates the status when Meta decides.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Meta rejected the submission',
+        description: error?.message || String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingToMeta(false);
+    }
+  };
 
   const handleContentChange = (content: string) => {
     setFormData({ ...formData, content });
@@ -451,7 +526,9 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
                   placeholder="approved_template_name"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Pre-approved template name from Meta Business
+                  {formData.whatsapp_template_name
+                    ? 'Bound. Cold sends will use this template.'
+                    : 'Required for a cold send — WhatsApp refuses an untemplated first message.'}
                 </p>
               </div>
               <div className="space-y-2">
@@ -462,6 +539,27 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
                   placeholder="en"
                 />
               </div>
+            </div>
+          )}
+
+          {formData.channel_type === 'whatsapp' && (
+            <div className="rounded-lg border border-border/60 p-3 flex items-start gap-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Submit to Meta</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Creates the template on your WhatsApp Business Account and binds the name here,
+                  so you don&apos;t have to build it in WhatsApp Manager and come back. Review can
+                  take up to 24h; the status updates itself when Meta decides.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSubmitToMeta}
+                disabled={submittingToMeta || !formData.content.trim()}
+              >
+                {submittingToMeta ? 'Submitting...' : 'Submit'}
+              </Button>
             </div>
           )}
 

@@ -22,6 +22,8 @@ import type {
   WhatsAppOAuthStart,
   WhatsAppOnboardingMode,
   ZernioWebhookStatus,
+  ChannelHealthResponse,
+  InboxAnalyticsResponse,
   MessageLogFilters,
   MessagingAnalyticsResponse,
 } from './types';
@@ -437,6 +439,34 @@ export class MessagingService {
       body: { action: 'connect-whatsapp', ...options },
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Failed to connect WhatsApp'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
+   * Live token health for every WhatsApp number this caller can see, from Zernio.
+   * Also mirrors the verdict onto messaging_channels, so a number whose token died stops
+   * showing a green "Active" badge whether or not anyone opens the health panel.
+   */
+  async getChannelHealth(): Promise<ChannelHealthResponse> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'channel-health' },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to read channel health'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
+   * Two-way inbox analytics (volume + time-to-first-response).
+   * `getAnalytics()` counts only what WE sent, out of messaging_logs — it cannot see a reply,
+   * so it cannot say whether anyone is being answered.
+   */
+  async getInboxAnalytics(options: { from?: string; fromDate?: string; toDate?: string } = {}): Promise<InboxAnalyticsResponse> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'inbox-analytics', ...options },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to load inbox analytics'));
     if (data?.error) throw new Error(data.error);
     return data;
   }

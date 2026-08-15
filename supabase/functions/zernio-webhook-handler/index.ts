@@ -345,6 +345,106 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   }).catch(() => {});
 }
 
+
+/**
+ * Locate a stored inbox message by the provider id the webhook carries.
+ *
+ * Inbound rows store `metadata.wamid`. Zernio sends BOTH `platformMessageId` (the WhatsApp
+ * wamid) and its own `id`, and which one create returned is not contractually pinned — the
+ * same ambiguity handleDeliveryStatus documents — so try both rather than assume.
+ */
+async function findInboxMessageByProviderId(supabase: any, msg: any): Promise<{ id: string; metadata: any } | null> {
+  const candidates = [msg?.platformMessageId, msg?.id]
+    .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
+    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+
+  for (const wamid of candidates) {
+    const { data } = await supabase
+      .from('inbox_messages').select('id, metadata')
+      .eq('metadata->>wamid', wamid).limit(1).maybeSingle();
+    if (data) return data as { id: string; metadata: any };
+  }
+  return null;
+}
+
+/**
+ * message.edited — WhatsApp lets a sender edit a delivered message for 15 minutes.
+ * Without this the inbox keeps showing the ORIGINAL text, which is worse than showing
+ * nothing: an operator reads and acts on wording the customer has already retracted.
+ */
+async function handleMessageEdited(supabase: any, payload: any): Promise<void> {
+  const msg = payload.message || {};
+  const row = await findInboxMessageByProviderId(supabase, msg);
+  if (!row) return;                       // not a thread we track — nothing to correct
+
+  const { error } = await supabase.from('inbox_messages').update({
+    body: msg.text ?? null,
+    edited_at: payload.editedAt || msg.editedAt || new Date().toISOString(),
+    metadata: { ...(row.metadata ?? {}), edited: true },
+  }).eq('id', row.id);
+  if (error) console.error('[zernio-webhook] message.edited update FAILED', row.id, error);
+}
+
+/**
+ * message.deleted — "delete for everyone". Soft-delete so the thread keeps its shape and the
+ * audit trail survives; the UI decides how to render a tombstone.
+ */
+async function handleMessageDeleted(supabase: any, payload: any): Promise<void> {
+  const msg = payload.message || {};
+  const row = await findInboxMessageByProviderId(supabase, msg);
+  if (!row) return;
+
+  const { error } = await supabase.from('inbox_messages').update({
+    deleted_at: payload.deletedAt || new Date().toISOString(),
+    metadata: { ...(row.metadata ?? {}), deleted_by_sender: true },
+  }).eq('id', row.id);
+  if (error) console.error('[zernio-webhook] message.deleted update FAILED', row.id, error);
+}
+
+/**
+ * reaction.received — an emoji on one of our messages. Kept on the message's metadata rather
+ * than as a new row: a reaction is not a message, and inserting one would bump the thread's
+ * unread count and re-notify every participant for a thumbs-up.
+ */
+async function handleReaction(supabase: any, payload: any): Promise<void> {
+  const msg = payload.message || {};
+  const emoji: string | null = payload.reaction?.emoji ?? payload.emoji ?? null;
+  const row = await findInboxMessageByProviderId(supabase, msg);
+  if (!row) return;
+
+  const reactions = Array.isArray(row.metadata?.reactions) ? row.metadata.reactions : [];
+  // WhatsApp sends an EMPTY emoji to mean "reaction removed".
+  const next = emoji ? [...reactions.filter((r: string) => r !== emoji), emoji] : [];
+
+  const { error } = await supabase.from('inbox_messages').update({
+    metadata: { ...(row.metadata ?? {}), reactions: next },
+  }).eq('id', row.id);
+  if (error) console.error('[zernio-webhook] reaction update FAILED', row.id, error);
+}
+
+/**
+ * message.sent — Meta accepted an outbound message.
+ *
+ * The send path already writes `status: 'sent'` optimistically from the API response, so this
+ * only fills the gap where a message left through Zernio WITHOUT going through our send action
+ * (an agent reply relayed by inbox-api, a Zernio-side automation). Never downgrades a row that
+ * has already progressed to delivered/read — webhook order is not guaranteed, and a late
+ * `sent` overwriting `read` would silently walk the status backwards.
+ */
+async function handleMessageSent(supabase: any, payload: any): Promise<void> {
+  const msg = payload.message || {};
+  const candidates = [msg.platformMessageId, msg.id]
+    .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0);
+  if (!candidates.length) return;
+
+  const { error } = await supabase
+    .from('messaging_logs')
+    .update({ status: 'sent', sent_at: payload.sentAt || msg.sentAt || new Date().toISOString() })
+    .in('provider_message_id', candidates)
+    .eq('status', 'queued');            // only ever forward, never back
+  if (error) console.error('[zernio-webhook] message.sent update FAILED', error);
+}
+
 /** Best-effort: find which user a contact's most recent outbound campaign belonged to. */
 async function resolveCampaignOwner(supabase: any, phone: string): Promise<string | null> {
   const { data: log } = await supabase
@@ -484,6 +584,27 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     if (event === 'message.delivered' || event === 'message.read' || event === 'message.failed') {
       await handleDeliveryStatus(supabase, event, payload);
       return jsonResponse({ received: true, event });
+    }
+    if (event === 'message.sent') {
+      await handleMessageSent(supabase, payload);
+      return jsonResponse({ received: true, event });
+    }
+    if (event === 'message.edited') {
+      await handleMessageEdited(supabase, payload);
+      return jsonResponse({ received: true, event });
+    }
+    if (event === 'message.deleted') {
+      await handleMessageDeleted(supabase, payload);
+      return jsonResponse({ received: true, event });
+    }
+    if (event === 'reaction.received') {
+      await handleReaction(supabase, payload);
+      return jsonResponse({ received: true, event });
+    }
+    if (event === 'conversation.started') {
+      // The thread is created by message.received, which always accompanies or follows this.
+      // Acknowledged explicitly so it does not read as an unhandled event in the logs.
+      return jsonResponse({ received: true, event, note: 'thread is created on message.received' });
     }
 
     const zernioPostId: string | undefined = post?.id;
@@ -714,8 +835,11 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     // Return 5xx so Zernio retries the delivery; the upsert/find-or-create logic above
     // is idempotent enough for a retry to converge. Status-sync events (post.*, account.*,
     // delivery status) stay 200 to avoid pointless retry loops on best-effort updates.
-    if (event === 'message.received') {
-      return jsonResponse({ error: 'Transient failure handling inbound message', event }, 500);
+    // Anything carrying customer CONTENT is retried; a lost one is unrecoverable because
+    // Zernio does not resend on a 200. Status/lifecycle syncs stay 200 — they are best-effort
+    // and reconverge on the next event or sync, so retrying them just loops.
+    if (event === 'message.received' || event === 'message.edited' || event === 'message.deleted') {
+      return jsonResponse({ error: `Transient failure handling ${event}`, event }, 500);
     }
   }
 

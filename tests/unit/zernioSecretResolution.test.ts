@@ -241,3 +241,57 @@ describe('inbound delivery is actually wired end to end', () => {
     expect(client.code).toMatch(/else if \(params\.category\)/);
   });
 });
+
+describe('service stability', () => {
+  const client = SOURCES.find((f) => f.rel === '_shared/zernio.ts')!;
+  const api = SOURCES.find((f) => f.rel === 'messaging-api/index.ts')!;
+  const handler = SOURCES.find((f) => f.rel === 'zernio-webhook-handler/index.ts')!;
+
+  it('expires the resolved-key cache, so a pasted key takes effect', () => {
+    // An edge worker stays warm for minutes. Caching the resolution for ever means the exact
+    // state an admin is fixing — key absent — sticks for the worker's life: they paste it, the
+    // row saves, and the warm worker keeps answering 503 from a cached ''. Same
+    // "saved and never read" shape as the original bug, with a shorter fuse.
+    expect(client.code).toContain('ABSENT_TTL_MS');
+    expect(client.code).toContain('RESOLVED_TTL_MS');
+    expect(client.code).toMatch(/Date\.now\(\) - resolvedAt < ttl/);
+  });
+
+  it('never lets one analytics endpoint blank the whole panel', () => {
+    // Analytics is a stricter rate-limit bucket (~6 req/s), so a 429 on one of a pair is
+    // routine. Promise.all would turn that into an empty dashboard, which reads as "no
+    // activity" rather than "we could not ask".
+    expect(api.code).toContain('Promise.allSettled');
+    const tab = readFileSync(
+      join(__dirname, '..', '..', 'src', 'modules', 'messaging', 'components', 'MessagingAnalyticsTab.tsx'),
+      'utf-8',
+    );
+    // A partial failure must be stated, not silently rendered as a zero.
+    expect(tab).toMatch(/inbox\.errors\?\.length/);
+  });
+
+  it('retries only the events whose loss is unrecoverable', () => {
+    // Zernio does not resend after a 200, so anything carrying customer CONTENT must 5xx on a
+    // transient fault. Status/lifecycle syncs must NOT — they reconverge on the next event or
+    // sync, and retrying them just loops.
+    const block = handler.code.slice(handler.code.indexOf('catch (err)'));
+    expect(block).toMatch(/message\.received/);
+    expect(block).toMatch(/message\.edited/);
+    expect(block).toMatch(/message\.deleted/);
+    expect(block).not.toMatch(/'message\.delivered'/);
+  });
+
+  it('never walks an outbound status backwards', () => {
+    // Webhook ordering is not guaranteed. A late message.sent overwriting a delivered/read row
+    // would silently regress the status, and a regressed status is a valid status.
+    const sent = handler.code.slice(handler.code.indexOf('async function handleMessageSent'));
+    expect(sent.slice(0, 1400)).toMatch(/\.eq\('status', 'queued'\)/);
+  });
+
+  it('scopes the health read to channels the caller owns', () => {
+    // Zernio's key is platform-wide: returning its whole health list verbatim would hand one
+    // tenant every other tenant's numbers (invariant 1).
+    const block = api.code.slice(api.code.indexOf("case 'channel-health'"));
+    expect(block.slice(0, 2000)).toMatch(/readScopeWorkspaceIds|in\('workspace_id'/);
+  });
+});

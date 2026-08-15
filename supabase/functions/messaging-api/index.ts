@@ -664,6 +664,102 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Connection health, straight from Zernio.
+      //
+      // account-info reports what META thinks of ONE number (quality rating, tier). This is the
+      // orthogonal question — whether the token we hold still works at all. A revoked or expired
+      // token keeps listing as a connected account, so nothing in messaging_channels can tell
+      // the difference between "connected and idle" and "connected and unable to send".
+      // ─────────────────────────────────────────────────────────────
+      case 'channel-health': {
+        const wsIds = await readScopeWorkspaceIds();
+        const data = await zernioApi('GET', '/accounts/health?platform=whatsapp');
+        const accounts = (data.accounts ?? []) as Array<Record<string, any>>;
+
+        // Only report on numbers this caller can actually see. Zernio's key is platform-wide,
+        // so returning its whole health list would leak other tenants' numbers.
+        let visible = accounts;
+        if (wsIds !== null) {
+          const { data: mine } = await supabaseClient
+            .from('messaging_channels').select('zernio_account_id')
+            .eq('channel_type', 'whatsapp').in('workspace_id', wsIds);
+          const allowed = new Set((mine ?? []).map((c: any) => c.zernio_account_id).filter(Boolean));
+          visible = accounts.filter((a) => allowed.has(a.accountId));
+        }
+
+        // Mirror the verdict onto the channel so the card is right even before anyone opens
+        // this panel — a token Zernio calls invalid must not leave a green "Active" badge.
+        for (const acc of visible) {
+          const unusable = acc.needsReconnect === true || acc.tokenValid === false || acc.status === 'error';
+          const { error: healthErr } = await supabaseClient
+            .from('messaging_channels')
+            .update({
+              is_active: !unusable,
+              config: {
+                zernio_account_id: acc.accountId,
+                display_phone_number: acc.username,
+                needs_reconnection: acc.needsReconnect === true,
+                health_status: acc.status ?? null,
+                health_issues: acc.issues ?? [],
+                token_expires_at: acc.tokenExpiresAt ?? null,
+                health_checked_at: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('zernio_account_id', acc.accountId);
+          if (healthErr) console.error('[messaging-api] channel-health write FAILED', acc.accountId, healthErr);
+        }
+
+        return jsonResponse({
+          success: true,
+          summary: {
+            total: visible.length,
+            healthy: visible.filter((a) => a.status === 'healthy').length,
+            warning: visible.filter((a) => a.status === 'warning').length,
+            error: visible.filter((a) => a.status === 'error').length,
+            needsReconnect: visible.filter((a) => a.needsReconnect === true).length,
+          },
+          accounts: visible,
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Inbox analytics — the two-way view.
+      //
+      // `analytics` below counts what WE sent, out of messaging_logs. It cannot see a reply, so
+      // it cannot answer the only question that matters on a conversational channel: are we
+      // answering people, and how fast. Zernio holds both sides.
+      // ─────────────────────────────────────────────────────────────
+      case 'inbox-analytics': {
+        const { from, fromDate, toDate } = requestBody;
+        const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), from);
+        if (!channel?.zernio_account_id) throw new HttpError(400, 'No WhatsApp channel configured');
+
+        // Zernio requires fromDate and caps the range at 365 days.
+        const start = fromDate || new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+        const qs = new URLSearchParams({ fromDate: start, accountId: channel.zernio_account_id });
+        if (toDate) qs.set('toDate', toDate);
+
+        // One slow endpoint must not take the panel down with it — analytics is a stricter
+        // rate-limit bucket (~6 req/s), so a 429 on one of these is normal and survivable.
+        const [volume, responseTime] = await Promise.allSettled([
+          zernioApi('GET', `/analytics/inbox/volume?${qs.toString()}`),
+          zernioApi('GET', `/analytics/inbox/response-time?${qs.toString()}`),
+        ]);
+
+        return jsonResponse({
+          success: true,
+          from: start,
+          to: toDate ?? null,
+          volume: volume.status === 'fulfilled' ? volume.value : null,
+          responseTime: responseTime.status === 'fulfilled' ? responseTime.value : null,
+          errors: [volume, responseTime]
+            .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+            .map((r) => String(r.reason)),
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Webhook registration.
       //
       // Nothing ever told Zernio where to deliver events, so zernio-webhook-handler — which

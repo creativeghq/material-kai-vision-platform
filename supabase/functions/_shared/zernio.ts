@@ -23,6 +23,18 @@ export const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
 // downstream reads this cache. `null` means "not resolved yet", '' means "resolved, and absent".
 let resolvedApiKey: string | null = null;
 let resolvedWebhookSecret: string | null = null;
+let resolvedAt = 0;
+
+// A resolved key is cached, but NOT for ever.
+//
+// An edge worker stays warm for many minutes. Caching indefinitely means the very state an
+// admin is actively fixing — key absent — sticks for the life of the worker: they paste the
+// key, the row saves, and the warm worker keeps answering 503 from a cached ''. That is the
+// same "saved and never read" shape this whole resolver exists to remove, just with a shorter
+// fuse. A found key is stable, so it is held longer; an ABSENT one is re-checked almost
+// immediately, because someone is probably fixing it right now.
+const RESOLVED_TTL_MS = 5 * 60_000;
+const ABSENT_TTL_MS = 15_000;
 
 /**
  * Resolve the Zernio secrets through the platform resolver and cache them for the worker.
@@ -36,7 +48,8 @@ let resolvedWebhookSecret: string | null = null;
  * Keys', the admin pasted it, the row saved, and nothing ever read it back. Sentry KAI-RD.
  */
 export async function ensureZernioSecrets(supabase: SupabaseLike): Promise<void> {
-  if (resolvedApiKey !== null) return;
+  const ttl = resolvedApiKey ? RESOLVED_TTL_MS : ABSENT_TTL_MS;
+  if (resolvedApiKey !== null && Date.now() - resolvedAt < ttl) return;
   const [api, legacyApi, hook, legacyHook] = await Promise.all([
     resolveSecret(supabase, 'ZERNIO_API_KEY'),
     resolveSecret(supabase, 'LATE_API_KEY'),
@@ -45,12 +58,14 @@ export async function ensureZernioSecrets(supabase: SupabaseLike): Promise<void>
   ]);
   resolvedApiKey = api.value || legacyApi.value || '';
   resolvedWebhookSecret = hook.value || legacyHook.value || '';
+  resolvedAt = Date.now();
 }
 
 /** Reset the worker cache — for tests, and after an admin saves a new key. */
 export function resetZernioSecrets(): void {
   resolvedApiKey = null;
   resolvedWebhookSecret = null;
+  resolvedAt = 0;
 }
 
 /** The Zernio API key. Empty until ensureZernioSecrets() has run (env-only fallback below). */

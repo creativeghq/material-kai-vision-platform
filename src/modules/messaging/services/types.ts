@@ -197,6 +197,51 @@ export interface WhatsAppOAuthStart {
  */
 export type WhatsAppOnboardingMode = 'api' | 'business_app';
 
+/**
+ * Whether the token behind each number still works.
+ *
+ * Orthogonal to `account-info`, which reports what META thinks of a number (quality, tier).
+ * A revoked token keeps LISTING as a connected account, so nothing local distinguishes
+ * "connected and idle" from "connected and unable to send".
+ */
+export interface ChannelHealthAccount {
+  accountId: string;
+  platform: string;
+  username?: string;
+  displayName?: string;
+  status: 'healthy' | 'warning' | 'error';
+  canPost?: boolean;
+  tokenValid?: boolean;
+  tokenExpiresAt?: string | null;
+  needsReconnect?: boolean;
+  issues?: string[];
+}
+
+export interface ChannelHealthResponse {
+  summary: { total: number; healthy: number; warning: number; error: number; needsReconnect: number };
+  accounts: ChannelHealthAccount[];
+}
+
+/** Both sides of the conversation — our own logs can only see what we sent. */
+export interface InboxAnalyticsResponse {
+  from: string;
+  to: string | null;
+  volume: {
+    summary?: { received: number; sent: number; read: number; failed: number; uniqueConversations: number };
+    timeseries?: Array<{ date: string; sent: number; received: number; read: number; failed: number }>;
+    byPlatform?: Array<{ platform: string; sent: number; received: number; read: number; failed: number }>;
+  } | null;
+  responseTime: {
+    summary?: {
+      sampleSize: number; medianSeconds: number; p90Seconds: number; p99Seconds: number;
+      meanSeconds: number; fastestSeconds: number; slowestSeconds: number;
+    };
+    histogram?: Array<{ bucket: string; lowerSeconds: number; upperSeconds: number; count: number }>;
+  } | null;
+  /** Per-endpoint failures — one endpoint 429ing must not blank the whole panel. */
+  errors?: string[];
+}
+
 /** Zernio-side delivery registration for our webhook handler. */
 export interface ZernioWebhookStatus {
   registered: boolean;

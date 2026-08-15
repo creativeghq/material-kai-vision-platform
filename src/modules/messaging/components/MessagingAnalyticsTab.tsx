@@ -1,15 +1,21 @@
 /**
  * Messaging Analytics Tab
- * View messaging metrics and statistics
+ *
+ * Two sources, deliberately: `getAnalytics()` reads messaging_logs — what WE sent, plus what it
+ * cost, which only we know. `getInboxAnalytics()` reads Zernio, which sees BOTH sides and can
+ * therefore answer the question a conversational channel actually turns on: are we replying to
+ * people, and how fast. Our own logs cannot see a reply at all, so a 100%-delivered dashboard
+ * was compatible with nobody ever being answered.
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign } from 'lucide-react';
+import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign, MessageSquare, Timer, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingAnalyticsResponse } from '../services';
+import type { InboxAnalyticsResponse } from '../services/types';
 import { formatNumber } from '@/utils/decimal';
 
 interface StatCardProps {
@@ -40,8 +46,19 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, trend
   </div>
 );
 
+/** Seconds → the coarsest unit that still reads honestly. */
+function formatDuration(seconds: number | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds)) return '—';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
+}
+
 export const MessagingAnalyticsTab: React.FC = () => {
   const [analytics, setAnalytics] = useState<MessagingAnalyticsResponse | null>(null);
+  const [inbox, setInbox] = useState<InboxAnalyticsResponse | null>(null);
+  const [inboxError, setInboxError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<string>('7d');
   const { toast } = useToast();
@@ -80,6 +97,18 @@ export const MessagingAnalyticsTab: React.FC = () => {
       setLoading(true);
       const data = await messagingService.getAnalytics(undefined, getDateRange());
       setAnalytics(data);
+
+      // Zernio-side, and independently fallible: no channel connected yet, no key, or a 429
+      // from the stricter analytics bucket. None of those should blank the cost/delivery half
+      // above, which comes from our own tables and is always available.
+      try {
+        const range = getDateRange();
+        setInbox(await messagingService.getInboxAnalytics({ fromDate: range.start, toDate: range.end }));
+        setInboxError(null);
+      } catch (err: any) {
+        setInbox(null);
+        setInboxError(err?.message || 'Two-way stats are unavailable');
+      }
     } catch (error) {
       console.error('Error loading analytics:', error);
       toast({
@@ -163,6 +192,74 @@ export const MessagingAnalyticsTab: React.FC = () => {
               icon={<DollarSign className="h-5 w-5 text-yellow-500" />}
             />
           </div>
+
+          {/* Two-way conversation stats — Zernio sees the replies our own logs cannot. */}
+          {inbox?.volume?.summary && (
+            <>
+              <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Conversations
+              </h4>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <StatCard
+                  title="Received"
+                  value={formatNumber(inbox.volume.summary.received ?? 0)}
+                  subtitle={`${formatNumber(inbox.volume.summary.uniqueConversations ?? 0)} conversations`}
+                  icon={<MessageSquare className="h-5 w-5 text-primary" />}
+                />
+                <StatCard
+                  title="Reply rate"
+                  value={
+                    inbox.volume.summary.received > 0 && inbox.responseTime?.summary
+                      ? `${Math.round((inbox.responseTime.summary.sampleSize / inbox.volume.summary.received) * 100)}%`
+                      : '—'
+                  }
+                  subtitle={
+                    inbox.responseTime?.summary
+                      ? `${formatNumber(inbox.responseTime.summary.sampleSize)} answered`
+                      : 'No replies measured'
+                  }
+                  icon={<CheckCircle className="h-5 w-5 text-green-500" />}
+                />
+                <StatCard
+                  title="Median reply time"
+                  value={formatDuration(inbox.responseTime?.summary?.medianSeconds)}
+                  subtitle={
+                    inbox.responseTime?.summary
+                      ? `p90 ${formatDuration(inbox.responseTime.summary.p90Seconds)}`
+                      : undefined
+                  }
+                  icon={<Timer className="h-5 w-5 text-blue-500" />}
+                />
+                <StatCard
+                  title="Slowest reply"
+                  value={formatDuration(inbox.responseTime?.summary?.slowestSeconds)}
+                  subtitle={
+                    inbox.responseTime?.summary
+                      ? `fastest ${formatDuration(inbox.responseTime.summary.fastestSeconds)}`
+                      : undefined
+                  }
+                  icon={<Timer className="h-5 w-5 text-amber-500" />}
+                />
+              </div>
+
+              {/* Partial failure is stated, never rendered as a zero — an endpoint that 429'd
+                  and a genuinely empty window look identical once you print 0. */}
+              {(inbox.errors?.length ?? 0) > 0 && (
+                <p className="text-xs text-amber-500 flex items-start gap-1.5">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                  Some conversation stats could not be loaded, so the figures above are incomplete.
+                </p>
+              )}
+            </>
+          )}
+
+          {inboxError && !inbox && (
+            <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+              Reply-rate and response-time stats are unavailable ({inboxError}). Delivery and cost
+              figures above come from this platform&apos;s own logs and are unaffected.
+            </p>
+          )}
 
           {/* Daily Data Table */}
           {analytics.dailyData && analytics.dailyData.length > 0 && (

@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound, AlertTriangle, Webhook } from 'lucide-react';
+import { Plus, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download, Loader2, KeyRound, AlertTriangle, Webhook, HeartPulse } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -20,8 +20,9 @@ import { Switch } from '@/components/core/ui/switch';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingChannel } from '../services';
-import type { WhatsAppOnboardingMode, ZernioWebhookStatus } from '../services/types';
+import type { WhatsAppOnboardingMode, ZernioWebhookStatus, ChannelHealthAccount } from '../services/types';
 import { formatNumber } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 export const MessagingChannelsTab: React.FC = () => {
   const [channels, setChannels] = useState<MessagingChannel[]>([]);
@@ -32,6 +33,8 @@ export const MessagingChannelsTab: React.FC = () => {
   const [showOnboardingPicker, setShowOnboardingPicker] = useState(false);
   const [webhook, setWebhook] = useState<ZernioWebhookStatus | null>(null);
   const [registeringWebhook, setRegisteringWebhook] = useState(false);
+  const [health, setHealth] = useState<Record<string, ChannelHealthAccount>>({});
+  const [checkingHealth, setCheckingHealth] = useState(false);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
@@ -126,6 +129,35 @@ export const MessagingChannelsTab: React.FC = () => {
     }
   };
 
+  // Whether the TOKEN still works, which is orthogonal to what Meta thinks of the number.
+  // A revoked token keeps listing as a connected account, so without asking there is nothing
+  // to distinguish "connected and idle" from "connected and unable to send a thing".
+  const handleCheckHealth = async () => {
+    try {
+      setCheckingHealth(true);
+      const res = await messagingService.getChannelHealth();
+      setHealth(Object.fromEntries(res.accounts.map((a) => [a.accountId, a])));
+      const bad = res.summary.error + res.summary.needsReconnect;
+      toast({
+        title: bad > 0 ? `${bad} number(s) need attention` : 'All numbers healthy',
+        description: bad > 0
+          ? 'Affected channels have been deactivated so sends stop failing silently.'
+          : `${res.summary.total} checked.`,
+        variant: bad > 0 ? 'destructive' : undefined,
+      });
+      // The edge action writes the verdict back to the channel rows, so re-read them.
+      await loadChannels();
+    } catch (error: any) {
+      toast({
+        title: 'Health check failed',
+        description: error?.message || String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+
   const handleRegisterWebhook = async () => {
     try {
       setRegisteringWebhook(true);
@@ -214,6 +246,10 @@ export const MessagingChannelsTab: React.FC = () => {
             <Button variant="outline" onClick={loadChannels} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button variant="outline" onClick={handleCheckHealth} disabled={checkingHealth}>
+              <HeartPulse className={`h-4 w-4 mr-2 ${checkingHealth ? 'animate-pulse' : ''}`} />
+              {checkingHealth ? 'Checking...' : 'Check health'}
             </Button>
             <Button variant="outline" onClick={handleSyncChannels} disabled={syncing}>
               <Download className={`h-4 w-4 mr-2 ${syncing ? 'animate-pulse' : ''}`} />
@@ -318,6 +354,26 @@ export const MessagingChannelsTab: React.FC = () => {
                   Meta invalidated this number&apos;s token. Sends will fail until you connect it again.
                 </p>
               )}
+
+              {(() => {
+                const h = channel.zernio_account_id ? health[channel.zernio_account_id] : undefined;
+                if (!h || h.status === 'healthy') return null;
+                return (
+                  <p className={`text-xs mb-3 flex items-start gap-1.5 ${h.status === 'error' ? 'text-destructive' : 'text-amber-500'}`}>
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    <span>
+                      {h.issues?.length
+                        ? h.issues.join('; ')
+                        : h.tokenValid === false
+                          ? 'The stored token is no longer valid.'
+                          : 'Zernio reports a problem with this connection.'}
+                      {h.tokenExpiresAt && (
+                        <> Token expires {formatDate(h.tokenExpiresAt)}.</>
+                      )}
+                    </span>
+                  </p>
+                );
+              })()}
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
