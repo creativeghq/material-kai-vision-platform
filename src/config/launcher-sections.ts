@@ -24,8 +24,11 @@ import {
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool, Activity,
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
+  Share2, Globe, Coins, CreditCard, ScanLine, Star, MessagesSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { HubId } from './nav-items';
+import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
 
 export interface LauncherSection {
   label: string;
@@ -40,6 +43,13 @@ export interface LauncherSection {
    * was the older answer, and it punished exactly the customers who had paid for them.
    */
   moduleSlug?: string;
+  /**
+   * Capability gate, same shape as a nav item's `requireAnyCapability`. A `moduleSlug` answers
+   * "has this workspace bought it"; this answers "may this PERSON open it", which is a different
+   * question and the one a `CapabilityGuard` on the route asks. Without it a shortcut to a guarded
+   * route resolves perfectly and then renders an access-denied page — a live link to a wall.
+   */
+  requireAnyCapability?: Capability[];
 }
 
 /**
@@ -262,7 +272,70 @@ export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
   ],
 };
 
-/** Right-column "Jump to" — a few high-value shortcuts across the workspace. All real routes. */
+/**
+ * Right-column "Jump to", PER HUB. The rail follows the Hub selected on the left, so the menu
+ * changes as you move through it instead of showing the same three links under every hub.
+ *
+ * What belongs here is decided by ONE rule: **the middle column must not already offer it.** The
+ * centre pane renders every app in the selected hub with all of its sections and create actions, so
+ * a rail entry that repeats one of those is pure duplication — the same trap the promoted-apps note
+ * in AppLauncher describes, and the reason the rail exists at all. Each entry is therefore a
+ * cross-cutting surface the hub's own cards cannot reach: a Profile tab, a public calculator, a
+ * template type, a billing page.
+ *
+ * Guarded by tests/unit/launcherHubShortcuts.test.ts (every hub covered; nothing repeated from that
+ * hub's cards), and every `?tab=` value is resolved against its page by tests/unit/deepLinkTargets.
+ * Both are cheap; neither can tell you an entry is USEFUL, so pick real destinations by hand.
+ */
+export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
+  // The channels marketing actually has to keep connected, plus the one-off scan that needs no
+  // module (the Mention Monitoring tile is the subscribed version of the same capability).
+  marketing: [
+    { label: 'Social accounts', to: '/profile?tab=social-accounts', icon: Share2 },
+    { label: 'My websites', to: '/profile?tab=websites', icon: Globe },
+    { label: 'Quick mention scan', to: '/tools/mention-scan', icon: Radar },
+  ],
+  // What a rep reaches for around a quote but never finds on the Quotes card: the catalog they
+  // price from, a saved starting point, and their own trip card.
+  sales: [
+    // /discover is wrapped in <CapabilityGuard anyOf={PRODUCT_BROWSE_ANY}> — carry the same gate.
+    { label: 'Find materials', to: '/discover?tab=products', icon: Search, requireAnyCapability: PRODUCT_BROWSE_ANY },
+    { label: 'Quote templates', to: '/templates?type=quote', icon: FilePlus },
+    { label: 'My trip expenses', to: '/trip-expenses', icon: Plane },
+  ],
+  // Finance's own cards cover documents and stock; what they never cover is what the workspace
+  // itself is paying for.
+  finance: [
+    { label: 'Invoice templates', to: '/templates?type=invoice', icon: Receipt },
+    { label: 'Credits & top-ups', to: '/billing/credits', icon: Coins },
+    { label: 'Subscription', to: '/billing/subscriptions', icon: CreditCard },
+  ],
+  // Service is three agent surfaces (Inbox / WhatsApp / Reviews); the personal side of the same
+  // conversations lives on the profile and is otherwise unreachable from this menu.
+  service: [
+    { label: 'Reviews about you', to: '/profile?tab=reviews', icon: Star },
+    { label: 'My appointments', to: '/profile?tab=appointments', icon: CalendarDays },
+    { label: 'My messages', to: '/profile?tab=inbox', icon: MessagesSquare },
+  ],
+  // The Projects card already lists the project / heat-pump / heating estimators, so the kitchen
+  // calculator is the one that is missing — plus photo recognition and a board starting point.
+  studio: [
+    { label: 'Kitchen calculator', to: '/tools/kitchen-cost', icon: Calculator },
+    { label: 'Identify a material', to: '/recognition', icon: ScanLine },
+    { label: 'Moodboard templates', to: '/templates?type=moodboard', icon: LayoutTemplate },
+  ],
+  // HR's card is the manager view of everyone; these are the employee's own surfaces.
+  people: [
+    { label: 'Onboarding templates', to: '/templates?type=hr_onboarding', icon: ClipboardCheck },
+    { label: 'My documents', to: '/profile?tab=documents', icon: FolderOpen },
+    { label: 'My calendar', to: '/profile?tab=calendar', icon: CalendarDays },
+  ],
+};
+
+/**
+ * Fallback for the catch-all "More" group — apps with no `hub` (Templates, registry modules), which
+ * by definition cut across every hub and so have no hub-specific set of their own.
+ */
 export const LAUNCHER_SHORTCUTS: LauncherSection[] = [
   { label: 'Quotes', to: '/quotes', icon: FileText },
   { label: 'Orders', to: '/finance?tab=doc_orders', icon: ShoppingCart },

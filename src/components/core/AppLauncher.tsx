@@ -1,8 +1,11 @@
 // top-bar App Launcher, three-pane layout. Hubs-first: the LEFT rail lists the
 // Hubs; clicking a Hub fills the MIDDLE with every app in that hub AND each app's inner links
 // (sections + create actions), so e.g. Sales → Quotes (New Quote · Open), CRM (Users · Contacts …).
-// The RIGHT rail keeps cross-app shortcuts + recent. Data comes from useLauncherApps
-// (active/available + entitlement-aware enable/request) and the verified LAUNCHER_* deep-links.
+// The RIGHT rail follows that SAME selection — its shortcuts are per-hub (LAUNCHER_HUB_SHORTCUTS),
+// so the menu changes as you move through it instead of repeating one fixed trio under every hub.
+// Only Recent stays global, because "where I was last" is not a hub fact. Data comes from
+// useLauncherApps (active/available + entitlement-aware enable/request) and the verified
+// LAUNCHER_* deep-links.
 import React, { useEffect, useMemo, useState } from 'react';
 import { LayoutGrid, ArrowUpRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +15,9 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLauncherApps, groupAppsByHub, type LauncherApp } from '@/hooks/useLauncherApps';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
+import { usePermissions } from '@/hooks/usePermissions';
+import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_HUB_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
+import type { HubId } from '@/config/nav-items';
 import { getCapability } from '@/config/capabilities';
 import { TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
 
@@ -39,6 +44,10 @@ export const AppLauncher: React.FC = () => {
   // Property Mgmt / Investments, CRM's Pipeline. Gate per chip so an owner keeps the shortcut and a
   // non-owner is not sent to an upsell.
   const { isModuleAvailable } = useEntitlements();
+  // ...and a rail shortcut can point at a route wrapped in a CapabilityGuard, which is a gate on the
+  // PERSON rather than on the purchase. Both filters run, for the same reason: never offer a click
+  // whose destination will refuse it.
+  const { can } = usePermissions();
 
   useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
 
@@ -68,7 +77,7 @@ export const AppLauncher: React.FC = () => {
   };
 
   /**
-   * Active apps with nothing to expand — POS, Supplier Portal, Page Monitoring, Blueprints. Their
+   * Active apps with nothing to expand — POS, Supplier Portal, Page Monitoring, Room Planner. Their
    * card is a name and an arrow, which is a lot of hub real estate for "click here". They get
    * promoted to the top of the Jump-to rail in the primary colour instead, so the one thing you can
    * do with them is the thing the menu offers first.
@@ -78,15 +87,16 @@ export const AppLauncher: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [active, isModuleAvailable],
   );
+  const promotedIds = useMemo(() => new Set(directApps.map((a) => a.id)), [directApps]);
 
-  // ...and they come OUT of the hub, rather than appearing in both places. A card whose only
-  // content is its own name is not worth a row in the middle column when the rail already offers
-  // exactly that click. Only ACTIVE apps are ever promoted, so an available-to-add app keeps its
-  // hub card and its Enable button.
-  const hubGroups = useMemo(() => {
-    const promoted = new Set(directApps.map((a) => a.id));
-    return groupAppsByHub(allApps.filter((a) => !promoted.has(a.id)));
-  }, [allApps, directApps]);
+  // ...and they come out of the CENTRE column, rather than appearing in both places. A card whose
+  // only content is its own name is not worth a row in the middle when the rail already offers
+  // exactly that click. They stay INSIDE their hub group, though — the rail is hub-scoped now, so a
+  // promoted app is only offered under its own hub, and dropping it from the group here would drop
+  // the hub itself from the left rail the moment every one of its apps was promoted, taking the
+  // apps with it. Only ACTIVE apps are ever promoted, so an available-to-add app keeps its hub card
+  // and its Enable button.
+  const hubGroups = useMemo(() => groupAppsByHub(allApps), [allApps]);
 
 
   // Default the middle to the first non-empty Hub once loaded.
@@ -105,6 +115,19 @@ export const AppLauncher: React.FC = () => {
   const activeHubGroup = activeHubKey
     ? hubGroups.find((g) => (g.hub?.id ?? 'more') === activeHubKey) ?? null
     : null;
+
+  // The centre lists the hub's expandable apps; the promoted ones are the rail's first tier.
+  const centreApps = (activeHubGroup?.apps ?? []).filter((a) => !promotedIds.has(a.id));
+  const hubDirectApps = (activeHubGroup?.apps ?? []).filter((a) => promotedIds.has(a.id));
+
+  // Tier two: this hub's cross-cutting shortcuts. The catch-all "More" group has no hub of its own
+  // (Templates and registry modules cut across all of them), so it falls back to the global trio.
+  const hubShortcuts = useMemo(() => {
+    const set = (activeHubKey && LAUNCHER_HUB_SHORTCUTS[activeHubKey as HubId]) || LAUNCHER_SHORTCUTS;
+    return set.filter((sc) => (!sc.moduleSlug || isModuleAvailable(sc.moduleSlug))
+      && (!sc.requireAnyCapability || sc.requireAnyCapability.some(can)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeHubKey, isModuleAvailable, can]);
 
   const go = (path: string, moduleId?: string) => {
     setOpen(false);
@@ -299,34 +322,51 @@ export const AppLauncher: React.FC = () => {
                         {activeHubGroup.hub?.description && <p className="text-xs text-muted-foreground leading-snug">{activeHubGroup.hub.description}</p>}
                       </div>
                     </div>
-                    <div className="mt-4 space-y-2.5">
-                      {activeHubGroup.apps.map(renderAppCard)}
-                    </div>
+                    {centreApps.length ? (
+                      <div className="mt-4 space-y-2.5">
+                        {centreApps.map(renderAppCard)}
+                      </div>
+                    ) : (
+                      // Every app in this hub was promoted to the rail (it has nothing to expand).
+                      // Say so, rather than drawing an empty column next to a full one.
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        Everything in this hub opens in one click — see <span className="font-medium text-foreground">Jump to</span>.
+                      </p>
+                    )}
                   </>
                 )}
               </section>
 
-              {/* ── Right rail: cross-app shortcuts + recent ── */}
+              {/* ── Right rail: THIS hub's direct apps + its shortcuts, then global Recent ── */}
               <aside className="border-t md:border-t-0 md:border-l border-border/60 bg-muted/20 p-4">
-                <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Jump to</div>
-                {directApps.length > 0 && (
-                  <div className="mb-2.5 space-y-1.5">
-                    {directApps.map((app) => (
-                      <button
-                        key={app.id}
-                        type="button"
-                        onClick={() => go(app.path, app.id)}
-                        className="w-full flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-2 text-left text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors"
-                      >
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"><app.icon className="h-4 w-4" /></span>
-                        <span className="flex-1 min-w-0 truncate text-[13px] font-semibold">{app.label}</span>
-                        <ArrowUpRight className="h-4 w-4 shrink-0 opacity-70" />
-                      </button>
-                    ))}
-                    <div className="h-px w-full bg-border/60" aria-hidden="true" />
+                {/* Keyed on the hub so React remounts the block and it fades in — the rail changing
+                    under you is the point, and a silent swap reads as "nothing happened". */}
+                <div key={activeHubKey ?? 'none'} className="animate-in fade-in-0 slide-in-from-right-1 duration-200">
+                  <div className="mb-2.5 flex items-baseline gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span>Jump to</span>
+                    <span className="truncate normal-case tracking-normal text-primary/80">
+                      · {activeHubGroup?.hub?.label.replace(/ Hub$/, '') ?? 'More'}
+                    </span>
                   </div>
-                )}
-                <div className="space-y-1.5">{LAUNCHER_SHORTCUTS.map(shortcutRow)}</div>
+                  {hubDirectApps.length > 0 && (
+                    <div className="mb-2.5 space-y-1.5">
+                      {hubDirectApps.map((app) => (
+                        <button
+                          key={app.id}
+                          type="button"
+                          onClick={() => go(app.path, app.id)}
+                          className="w-full flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-2 text-left text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors"
+                        >
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"><app.icon className="h-4 w-4" /></span>
+                          <span className="flex-1 min-w-0 truncate text-[13px] font-semibold">{app.label}</span>
+                          <ArrowUpRight className="h-4 w-4 shrink-0 opacity-70" />
+                        </button>
+                      ))}
+                      <div className="h-px w-full bg-border/60" aria-hidden="true" />
+                    </div>
+                  )}
+                  <div className="space-y-1.5">{hubShortcuts.map(shortcutRow)}</div>
+                </div>
 
                 {recentApps.length > 0 && (
                   <>
