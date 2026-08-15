@@ -92,7 +92,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
         // `option_key` missing means `opt_gola` is never published, so every gola formula fails and
         // falls back to its default quantity of 0 — forever, without complaint. Guarded by the
         // "starters payload" case in tests/unit/blueprintComposition.test.ts.
-        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier, default_selected, is_schedule, option_key')
+        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier, default_selected, is_schedule, option_key, suggests_quantity')
         .in('blueprint_id', ids)
         .order('sort_order', { ascending: true });
       for (const it of (items ?? []) as any[]) (itemsByBp[it.blueprint_id] ||= []).push(it);

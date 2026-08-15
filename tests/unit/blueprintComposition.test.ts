@@ -81,6 +81,7 @@ const schema: ZoneDef[] = [
           ],
         }],
       },
+      { key: 'corner', label: 'Corner unit', default_width_cm: 90, price_mode: 'per_m', yields: { doors: 1, shelves: 1, legs: 4 } },
       { key: 'panel', label: 'End panel', default_width_cm: 0, price_mode: 'per_piece', unit_price: 45, counts_length: false },
     ],
     default_modules: [{ type: 'door2', width_cm: 80, qty: 2 }],
@@ -109,6 +110,13 @@ const cfg = (over: Composition = {}): Composition => ({
   ...over,
 });
 
+/** A layout with N corner units, so a suggestion derived from base_corner_count has something to read. */
+const cornerCfg = (corners: number): Composition => cfg({
+  base: { globals: { door_model: 'posh', height: 72 }, modules: [
+    { id: 'r1', type: 'door2', width_cm: 80, qty: 2 },
+    ...(corners > 0 ? [{ id: 'c1', type: 'corner', width_cm: 90, qty: corners }] : []),
+  ] },
+});
 describe('zone composition — quantities', () => {
   it('derives a zone length from its module widths, not from a typed number', () => {
     // 2 × 80cm = 1.60 m, published under the variable the old scalar used.
@@ -480,6 +488,79 @@ describe('the anonymous starters payload carries every column the client reads',
   it('selects every column seedPlanItems reads', () => {
     const missing = columnsClientReads.filter((c) => !startersSelect.includes(c));
     expect(missing).toEqual([]);
+  });
+});
+
+describe('an accessory is a count, not a switch', () => {
+  // WHY: these lines used to be ALLOWANCES, and computeLinePricing returns an allowance's lump sum
+  // whatever the quantity says. That is what pinned every accessory at exactly one — you could not
+  // ask for three wire baskets, and a quantity field would have lied if you had. They are ordinary
+  // per-piece material lines now, so the quantity finally means something.
+  const accessories = [
+    ...items,
+    { id: 'asec', parent_id: null, sort_order: 1, kind: 'section', label: 'Accessories' },
+    { id: 'basket', parent_id: 'asec', sort_order: 0, kind: 'task', label: 'Wire basket', unit: 'pcs', material_cost: 35, margin_pct: 0, is_allowance: false, default_quantity: 1, default_selected: false },
+    // The shape this replaces, kept so the difference is visible rather than asserted from memory.
+    { id: 'old', parent_id: 'asec', sort_order: 1, kind: 'task', label: 'Old-style allowance', unit: 'pcs', is_allowance: true, allowance_amount: 35, margin_pct: 0, default_quantity: 3, default_selected: true },
+  ];
+  const find = (label: string, rows = accessories, sel: Set<string> | null = null) =>
+    computeBlueprint(rows, {}, sel, { schema, config: cornerCfg(1) })
+      .sections.flatMap((s) => s.tasks).find((t) => t.label === label)!;
+
+  it('multiplies by the quantity', () => {
+    // 3 baskets at 35 is 105. The old allowance shape returns 35 for the same quantity of 3 —
+    // which is exactly why an accessory could never be counted.
+    const three = accessories.map((i) => (i.id === 'basket' ? { ...i, default_quantity: 3 } : i));
+    expect(find('Wire basket', three, new Set(['basket'])).line_total).toBe(105);
+    expect(find('Old-style allowance').line_total).toBe(35);
+  });
+
+  it('costs nothing while it is not selected, but still shows what one costs', () => {
+    expect(find('Wire basket').line_total).toBe(0);
+    expect(find('Wire basket').unit_price).toBe(35);
+  });
+});
+
+describe('what the layout implies', () => {
+  const lemans = (extra: Record<string, unknown> = {}) => [
+    ...items,
+    { id: 'asec', parent_id: null, sort_order: 1, kind: 'section', label: 'Accessories' },
+    {
+      id: 'lemans', parent_id: 'asec', sort_order: 0, kind: 'task', label: 'Le Mans', unit: 'pcs',
+      material_cost: 302, margin_pct: 0, default_quantity: 1, default_selected: false,
+      suggests_quantity: '= base_corner_count', ...extra,
+    },
+  ];
+  const task = (rows: Record<string, unknown>[], corners: number, label = 'Le Mans') =>
+    computeBlueprint(rows, {}, null, { schema, config: cornerCfg(corners) })
+      .sections.flatMap((s) => s.tasks).find((x) => x.label === label)!;
+
+  it('reports the quantity the composition derives', () => {
+    expect(task(lemans(), 2).suggested_quantity).toBe(2);
+    // No corner units at all: the suggestion is zero, which is what lets "5 Le Mans in a kitchen
+    // with no corners" be visible instead of silently accepted.
+    expect(task(lemans(), 0).suggested_quantity).toBe(0);
+  });
+
+  it('suggests without driving — the quantity is still the caller’s', () => {
+    // The distinction from quantity_formula: that one DERIVES the quantity and locks the field.
+    // A mechanism count is a judgement (one corner may stay plain shelves), so the suggestion must
+    // never overwrite what was asked for.
+    const t = task(lemans({ default_selected: true }), 3);
+    expect(t.suggested_quantity).toBe(3);
+    expect(t.quantity).toBe(1);
+    expect(t.line_total).toBe(302);
+  });
+
+  it('says nothing when the line does not ask', () => {
+    expect(task(items, 1, 'Installation').suggested_quantity).toBeUndefined();
+  });
+
+  it('stays silent rather than guessing when the formula cannot resolve', () => {
+    // An unknown variable must not collapse to 0 — that would read as "your layout has no corners",
+    // which is a confident wrong answer where saying nothing is the honest one.
+    const t = task(lemans({ default_selected: true, suggests_quantity: '= no_such_variable' }), 2);
+    expect(t.suggested_quantity).toBeUndefined();
   });
 });
 

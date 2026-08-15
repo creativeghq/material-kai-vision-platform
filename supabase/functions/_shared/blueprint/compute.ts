@@ -28,6 +28,12 @@ export interface ComputedTask {
   selected: boolean;
   /** Quantity-only schedule line. Counted, never added to the subtotal. */
   is_schedule?: boolean;
+  /**
+   * What the composition IMPLIES this quantity should be — two corner mechanisms for two corner
+   * units. Present only when the line declares `suggests_quantity`. A suggestion, never a rule:
+   * the UI seeds from it and flags a mismatch, and the customer decides.
+   */
+  suggested_quantity?: number;
 }
 
 export interface ComputedSection {
@@ -128,12 +134,18 @@ export function computeBlueprint(
     // Its rate rides along in unit_price so the value is visible, but it adds nothing here — and a
     // rate that was never set stays NULL rather than becoming a confident 0.00.
     const isSchedule = !!r.is_schedule;
+    // Evaluated against the SAME dims as the quantity, so a suggestion can never disagree with the
+    // composition it is derived from.
+    const suggestion = r.suggests_quantity && String(r.suggests_quantity).trim()
+      ? evaluateFormula(r.suggests_quantity, dims)
+      : null;
     const task: ComputedTask = {
       id: r.id, label: r.label, unit: r.unit, quantity: qty,
       unit_price: isSchedule ? (r.material_cost != null ? unit_price : 0) : unit_price,
       line_total: isSchedule ? 0 : line_total,
       is_allowance: !!r.is_allowance, option_group: r.option_group ?? null,
       tier: r.tier ?? null, selected, ...(isSchedule ? { is_schedule: true } : {}),
+      ...(suggestion?.ok ? { suggested_quantity: round2(suggestion.value) } : {}),
     };
     if (selected && !isSchedule) subtotal += line_total;
     const sec = r.parent_id ? sectionsById[r.parent_id] : null;

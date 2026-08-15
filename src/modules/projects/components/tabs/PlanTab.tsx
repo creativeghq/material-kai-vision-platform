@@ -421,6 +421,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         onAddSection={() => addItem('section')}
         onSelectOption={selectOption}
         onAddFromLibrary={() => setSectionPickerOpen(true)}
+        vars={{ ...dims, ...(derivedComp?.vars ?? {}) }}
       />
 
       <BlueprintPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} workspaceId={workspaceId} onPick={importBlueprint} />

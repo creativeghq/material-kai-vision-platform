@@ -33,14 +33,15 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Slider } from '@/components/core/ui/slider';
-import { Switch } from '@/components/core/ui/switch';
 import { Textarea } from '@/components/core/ui/textarea';
 import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
+import { QuantityStepper } from '@/components/features/blueprint/QuantityStepper';
 import { ZoneConfigurator } from '@/components/features/blueprint/ZoneConfigurator';
 import type { DimensionDef } from '@/services/blueprintsService';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
 import { composeEstimate, repriceItems, seedPlanItems, subtotalOf } from '@/utils/blueprintCompute';
 import { absorbedGroups, defaultComposition, deriveComposition, hasComposition } from '@/utils/blueprintComposition';
+import { evaluateFormula } from '@/utils/blueprintFormula';
 import type { Composition, ZoneDef } from '@/utils/blueprintComposition';
 import { formatMoney } from '@/utils/decimal';
 import { ToolsShell, useToolsQuota } from './toolsShared';
@@ -75,6 +76,14 @@ interface Starter {
 function previewTotal(it: ProjectPlanItem): number {
   if (it.is_allowance) return Number(it.allowance_amount ?? 0);
   return Number(it.unit_price ?? 0) * Number(it.quantity ?? 0);
+}
+
+/** What ONE of an extra costs. Its line total is rendered separately and would read as
+ *  "Included" at quantity zero, which is the opposite of what a price list should say. */
+function unitHint(it: ProjectPlanItem, currency: string): string {
+  const each = Number(it.is_allowance ? (it.allowance_amount ?? 0) : (it.unit_price ?? 0));
+  if (each === 0) return 'Included';
+  return `${formatMoney(each, currency)}/${it.unit ?? 'unit'}`;
 }
 
 function priceHint(it: ProjectPlanItem, currency: string): string {
@@ -153,9 +162,22 @@ export default function KitchenCostPage() {
       repriceItems(cur.map((it) => (it.option_group === group ? { ...it, is_selected: it.id === id } : it)), effectiveDims),
     );
 
-  /** Multi-select toggle for an ungrouped extra. */
-  const toggleExtra = (id: string, on: boolean) =>
-    setItems((cur) => repriceItems(cur.map((it) => (it.id === id ? { ...it, is_selected: on } : it)), effectiveDims));
+  /**
+   * How many of an extra. Zero means none — one gesture sets both the count and whether the line is
+   * in at all, so the two can never disagree the way a switch beside a quantity field would.
+   */
+  const setExtraQty = (id: string, qty: number) =>
+    setItems((cur) => repriceItems(
+      cur.map((it) => (it.id === id ? { ...it, quantity: Math.max(0, qty), is_selected: qty > 0 } : it)),
+      effectiveDims,
+    ));
+
+  /** What the composition implies this quantity should be, if the line says so. */
+  const suggestionFor = (it: ProjectPlanItem): number | null => {
+    if (!it.suggests_quantity) return null;
+    const r = evaluateFormula(it.suggests_quantity, effectiveDims);
+    return r.ok ? r.value : null;
+  };
 
   // A dimension a zone already derives must not also get a slider — see the Measurements card.
   const loneDimensions = useMemo(
@@ -348,19 +370,47 @@ export default function KitchenCostPage() {
 
               {sec.extras.length > 0 && (
                 <div className="divide-y divide-border/40">
-                  {sec.extras.map((x) => (
-                    <div key={x.id} className="flex items-center justify-between gap-3 py-2.5">
-                      <div className="min-w-0">
-                        <div className="text-sm">{x.label}</div>
-                        <div className="text-xs text-muted-foreground">{priceHint(x, currency)}</div>
+                  {sec.extras.map((x) => {
+                    const qty = Number(x.quantity ?? 0);
+                    const on = !!x.is_selected && qty > 0;
+                    const suggested = suggestionFor(x);
+                    return (
+                      <div key={x.id} className="flex items-center justify-between gap-3 py-2.5">
+                        <div className="min-w-0">
+                          <div className="text-sm">{x.label}</div>
+                          <div className="text-xs text-muted-foreground">{unitHint(x, currency)}</div>
+                          {/* A mechanism that goes in a corner unit, in a kitchen with fewer corner
+                              units than that. Said out loud, never enforced — you might leave one
+                              corner as plain shelves, and that is your call to make. */}
+                          {suggested != null && on && qty > suggested && (
+                            <div className="text-xs text-primary mt-0.5">
+                              {suggested === 0
+                                ? 'Your layout has no corner units for this.'
+                                : `Your layout has ${suggested} corner ${suggested === 1 ? 'unit' : 'units'}.`}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {on && (
+                            <span className="text-sm tabular-nums w-20 text-right">
+                              {formatMoney(Number(x.line_total ?? 0), currency)}
+                            </span>
+                          )}
+                          <QuantityStepper
+                            value={qty}
+                            min={0}
+                            label={x.label}
+                            onChange={(next) => setExtraQty(
+                              x.id,
+                              // 0 -> 1 lands on what the layout implies, so configuring two corner
+                              // units and switching on a Le Mans gives you two, not one.
+                              next === 1 && qty === 0 && suggested != null ? Math.max(1, suggested) : next,
+                            )}
+                          />
+                        </div>
                       </div>
-                      <Switch
-                        checked={!!x.is_selected}
-                        onCheckedChange={(on) => toggleExtra(x.id, on)}
-                        aria-label={x.label}
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

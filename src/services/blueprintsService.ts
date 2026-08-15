@@ -75,6 +75,13 @@ export interface BlueprintItem {
    */
   option_key: string | null;
   /**
+   * Formula giving the quantity the composition IMPLIES — `= base_corner_count` on a Le Mans
+   * mechanism, because it goes in a corner unit. It SEEDS the quantity and lets a mismatch be
+   * flagged; it never drives or locks the field, because how many corners get a mechanism is a
+   * judgement. Contrast `quantity_formula`, which does drive and does lock.
+   */
+  suggests_quantity: string | null;
+  /**
    * Whether a NON-option_group line starts selected when imported into a plan. Optional extras
    * (accessories, add-on mechanisms, a removal service) seed as `false` so a configurator does
    * not open with every extra already in the total. Members of an `option_group` ignore this —
@@ -219,6 +226,7 @@ class BlueprintsService {
       allowance_amount: it.allowance_amount ?? null,
       is_schedule: it.is_schedule ?? false,
       option_key: it.option_key ?? null,
+      suggests_quantity: it.suggests_quantity ?? null,
       default_selected: it.default_selected ?? true,
       source: it.source ?? 'manual',
     }));

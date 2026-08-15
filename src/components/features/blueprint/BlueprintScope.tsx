@@ -83,6 +83,15 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
           <span className="flex items-center gap-1">Option
             <Input className="h-6 w-24" value={it.option_group ?? ''} placeholder="group" onChange={(e) => patch(it.id, { option_group: e.target.value || null })} />
           </span>
+          {/* What the LAYOUT implies this quantity should be. Seeds the stepper and flags a
+              mismatch; unlike QTY Formula it never drives or locks the field, because how many
+              corners get a mechanism is a judgement, not a derivation. */}
+          <span className="flex items-center gap-1">Suggests
+            <Input
+              className="h-6 w-40" value={it.suggests_quantity ?? ''} placeholder="= base_corner_count"
+              onChange={(e) => patch(it.id, { suggests_quantity: e.target.value || null })}
+            />
+          </span>
           {it.option_group && (
             <select className="h-6 bg-transparent border border-border rounded px-1 text-[11px]" value={it.tier ?? ''} onChange={(e) => patch(it.id, { tier: (e.target.value || null) as ScopeItem['tier'] })}>
               <option value="">Tier…</option>

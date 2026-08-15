@@ -65,6 +65,8 @@ interface ItemRow {
   is_schedule?: boolean;
   /** Stable slug on an option_group member; publishes `opt_<key>` for conditional lines. */
   option_key?: string | null;
+  /** Formula for the quantity the composition IMPLIES. Seeds and flags; never drives. */
+  suggests_quantity?: string | null;
   source: string;
 }
 
@@ -213,7 +215,7 @@ function compositionRows(derived: DerivedComposition, startOrder: number): ItemR
       notes: null, unit: null, quantity_formula: null, line_kind: 'materials',
       service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0,
       option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
-      is_schedule: false, option_key: null,
+      is_schedule: false, option_key: null, suggests_quantity: null,
       source: 'composition',
     });
     let childOrder = 0;
@@ -225,7 +227,7 @@ function compositionRows(derived: DerivedComposition, startOrder: number): ItemR
         line_kind: line.line_kind, service_id: null, product_id: null,
         material_cost: line.unit_price, labor_rate: null, margin_pct: 0,
         option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
-        is_schedule: false, option_key: null,
+        is_schedule: false, option_key: null, suggests_quantity: null,
         source: 'composition',
       });
     }
@@ -287,6 +289,7 @@ async function writePlanItems(
       allowance_amount: it.allowance_amount ?? null,
       is_schedule: it.is_schedule ?? false,
       option_key: it.option_key ?? null,
+      suggests_quantity: it.suggests_quantity ?? null,
       source: it.source ?? 'manual',
     };
   });

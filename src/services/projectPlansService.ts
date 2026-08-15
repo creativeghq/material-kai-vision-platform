@@ -70,6 +70,13 @@ export interface ProjectPlanItem {
    * conditional on this choice — how the four gola parts switch on together when gola is picked.
    */
   option_key: string | null;
+  /**
+   * Formula giving the quantity the composition IMPLIES — `= base_corner_count` on a Le Mans
+   * mechanism, because it goes in a corner unit. It SEEDS the quantity and lets a mismatch be
+   * flagged; it never drives or locks the field, because how many corners get a mechanism is a
+   * judgement. Contrast `quantity_formula`, which does drive and does lock.
+   */
+  suggests_quantity: string | null;
   source: 'manual' | 'template' | 'ai';
   created_at: string;
   updated_at: string;

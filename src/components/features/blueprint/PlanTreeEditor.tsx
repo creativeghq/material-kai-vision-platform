@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import { parseDecimalOr } from '@/utils/decimal';
+import { evaluateFormula } from '@/utils/blueprintFormula';
 import { UnitSelect } from '@/components/features/blueprint/UnitSelect';
 import type { ProjectPlanItem } from '@/services/projectPlansService';
 
@@ -26,6 +27,11 @@ export interface PlanTreeEditorProps {
   onSelectOption?: (item: ProjectPlanItem) => void;
   /** Open the premade-section library picker (build the plan from parts). */
   onAddFromLibrary?: () => void;
+  /**
+   * Derived composition variables, so a line carrying `suggests_quantity` can say what the layout
+   * implies — two corner mechanisms for two corner units. Absent = no hints, never an error.
+   */
+  vars?: Record<string, number>;
 }
 
 function money(n: number, currency: string) {
@@ -33,7 +39,13 @@ function money(n: number, currency: string) {
   return `${currency === 'EUR' ? '€' : currency + ' '}${v}`;
 }
 
-export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDelete, onAddTask, onAddSection, onSelectOption, onAddFromLibrary }: PlanTreeEditorProps) {
+export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDelete, onAddTask, onAddSection, onSelectOption, onAddFromLibrary, vars }: PlanTreeEditorProps) {
+  /** What the composition implies this quantity should be. Null when the line does not say. */
+  const suggestionFor = (it: ProjectPlanItem): number | null => {
+    if (!it.suggests_quantity || !vars) return null;
+    const r = evaluateFormula(it.suggests_quantity, vars);
+    return r.ok ? r.value : null;
+  };
   const sections = items.filter((i) => i.kind === 'section').sort((a, b) => a.sort_order - b.sort_order);
   const tasksOf = (sectionId: string) => items.filter((i) => i.kind === 'task' && i.parent_id === sectionId).sort((a, b) => a.sort_order - b.sort_order);
   const looseTasks = items.filter((i) => i.kind === 'task' && (!i.parent_id || !sections.find((s) => s.id === i.parent_id)));
@@ -91,6 +103,13 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
       )}
       {!it.is_allowance && !it.is_schedule && (
         <div className="flex items-center gap-3 pl-9 pt-1 text-[11px] text-muted-foreground">
+          {(() => {
+            // A corner mechanism in a kitchen with fewer corner units than that. Stated, not
+            // enforced — leaving one corner as plain shelves is a legitimate choice.
+            const s = suggestionFor(it);
+            if (s == null || !it.is_selected || Number(it.quantity ?? 0) <= s) return null;
+            return <span className="text-primary">layout implies {s}</span>;
+          })()}
           <span className="flex items-center gap-1">labor
             <Input className="h-6 w-16 text-right" defaultValue={it.labor_rate != null ? String(it.labor_rate) : ''} placeholder="—" disabled={busy}
               onBlur={(e) => { const raw = e.target.value.trim(); const v = raw === '' ? null : parseDecimalOr(raw, it.labor_rate ?? 0); if (v !== it.labor_rate) onPatch(it.id, { labor_rate: v }); }} />
