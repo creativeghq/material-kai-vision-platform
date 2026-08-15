@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi, MaterialZone } from '@/services/mivaaApiClient';
+import { imageUrlToBase64 } from '@/utils/imageToBase64';
 
 export interface SegmentWithResults extends MaterialZone {
   id?: string;
@@ -115,7 +116,7 @@ export function useSegmentation({
     try {
       for (const { model_id, image_url } of completedImages) {
         // Fetch image and convert to base64
-        const imageBase64 = await fetchImageAsBase64(image_url);
+        const imageBase64 = await imageUrlToBase64(image_url);
         if (!imageBase64) continue;
 
         // 1. Detect zones
@@ -234,23 +235,6 @@ export function useSegmentation({
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-async function fetchImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]); // strip data URI prefix
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
 
 async function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {

@@ -19,6 +19,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { imageUrlToBase64 } from '@/utils/imageToBase64';
 interface ModelResult {
   model_id: string;
   model_name: string;
@@ -312,18 +313,14 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
         return;
       }
 
-      // 2. Fetch image bytes and convert to base64 (avoids canvas CORS taint issues)
+      // 2. Read image bytes as base64 (avoids canvas CORS taint issues).
+      // A generated image arrives as a data: URI, which the shared helper
+      // decodes in place rather than fetching - see imageToBase64.ts.
       let imageBase64: string;
       try {
-        const res = await fetch(selectedImage.url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        imageBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        const decoded = await imageUrlToBase64(selectedImage.url);
+        if (!decoded) throw new Error('could not read image bytes');
+        imageBase64 = decoded;
       } catch {
         setModalSegmentError('Failed to load image for segmentation');
         setModalSegmentsLoaded(true);
