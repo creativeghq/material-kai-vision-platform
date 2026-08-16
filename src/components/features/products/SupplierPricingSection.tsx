@@ -27,9 +27,10 @@ interface Props { productId: string; workspaceId: string }
 export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<SupplierProductRow[]>([]);
-  const [names, setNames] = useState<Record<string, string>>({});
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [suppliersFailed, setSuppliersFailed] = useState(false);
   const [enforceMoq, setEnforceMoq] = useState(false);
+  const [moqSaving, setMoqSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<SupplierProductRow | 'new' | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -43,31 +44,53 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
       ]);
       setRows(list);
       setEnforceMoq(moq);
-      setNames(await supplierPricingService.supplierNames(list.map((r) => r.supplier_company_id)));
     } catch (e: any) {
       toast({ title: 'Failed to load suppliers', description: e?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   }, [productId, toast]);
 
+  // #368 PD-7. An async write behind a Switch that was never disabled: two quick toggles race,
+  // and whichever request the server finishes LAST decides `products.enforce_moq` — which is
+  // not necessarily the one the switch is showing. The switch stays latched until the write
+  // this position started has come back.
   const toggleEnforceMoq = async (next: boolean) => {
+    if (moqSaving) return;
+    setMoqSaving(true);
     setEnforceMoq(next); // optimistic — a switch that lags feels broken
     try {
       await supplierPricingService.setEnforceMoq(productId, next);
     } catch (e: any) {
       setEnforceMoq(!next);
       toast({ title: 'Failed', description: e?.message, variant: 'destructive' });
-    }
+    } finally { setMoqSaving(false); }
   };
 
   useEffect(() => { void load(); }, [load]);
 
+  // #368 PD-6. This discarded `error`, so a permission or network failure rendered as "no
+  // suppliers" — and an operator looking at an empty dropdown adds a supplier that already
+  // exists. An empty list now means empty; a failure says so.
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      const { data } = await supabase.from('crm_companies')
+      const { data, error } = await supabase.from('crm_companies')
         .select('id, name').eq('workspace_id', workspaceId).eq('is_supplier', true).order('name');
+      if (cancelled) return;
+      if (error) {
+        setSuppliersFailed(true);
+        setSuppliers([]);
+        toast({
+          title: 'Could not load suppliers',
+          description: `${error.message} — the list below is incomplete, not empty.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setSuppliersFailed(false);
       setSuppliers((data ?? []) as Array<{ id: string; name: string }>);
     })();
-  }, [workspaceId]);
+    return () => { cancelled = true; };
+  }, [workspaceId, toast]);
 
   const remove = async (row: SupplierProductRow) => {
     setBusyId(row.id);
@@ -133,7 +156,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
                 <tr key={r.id} className="border-b last:border-0">
                   <td className="px-4 py-2">
                     <span className={r.is_preferred ? 'font-medium' : undefined}>
-                      {names[r.supplier_company_id] || '—'}
+                      {r.supplier_name || '—'}
                     </span>
                     {r.is_preferred && <span className="ml-2 text-[10px] text-emerald-600 dark:text-emerald-400">preferred</span>}
                   </td>
@@ -170,7 +193,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
                 When on, ordering this product rounds up to the chosen supplier's MOQ and shows their lead time.
               </p>
             </div>
-            <Switch id={`moq-${productId}`} checked={enforceMoq} onCheckedChange={toggleEnforceMoq} />
+            <Switch id={`moq-${productId}`} checked={enforceMoq} disabled={moqSaving} onCheckedChange={toggleEnforceMoq} />
           </div>
         )}
       </CardContent>
@@ -180,8 +203,9 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
         row={editing === 'new' ? null : editing}
         suppliers={suppliers}
         onClose={() => setEditing(null)}
+        suppliersFailed={suppliersFailed}
         onSave={async (input, id) => {
-          await supplierPricingService.upsert(workspaceId, productId, input, id);
+          await supplierPricingService.upsert(productId, input, id);
           setEditing(null);
           await load();
         }}
@@ -194,9 +218,11 @@ const SupplierRowDialog: React.FC<{
   open: boolean;
   row: SupplierProductRow | null;
   suppliers: Array<{ id: string; name: string }>;
+  /** The supplier fetch failed, so an empty list means "unknown", not "none". */
+  suppliersFailed: boolean;
   onClose: () => void;
   onSave: (input: SupplierProductInput, id?: string) => Promise<void>;
-}> = ({ open, row, suppliers, onClose, onSave }) => {
+}> = ({ open, row, suppliers, suppliersFailed, onClose, onSave }) => {
   const { toast } = useToast();
   const [supplierId, setSupplierId] = useState('');
   const [sku, setSku] = useState('');
@@ -247,6 +273,12 @@ const SupplierRowDialog: React.FC<{
                 {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            {suppliersFailed && (
+              <p className="text-xs text-destructive">
+                The supplier list could not be loaded, so this dropdown is incomplete. Reopen this
+                dialog before adding one — the supplier you need may already exist.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Their SKU</Label>

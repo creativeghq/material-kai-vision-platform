@@ -46,6 +46,20 @@ interface ProductCardProps {
    *  Supplied by the parent grid via the bulk catalog-price RPC to avoid an N+1.
    *  `kind` ('your_price' | 'retail' | 'seller') drives the label authoritatively. */
   viewerPrice?: { price: number | null; discount_pct: number; currency: string; kind?: string } | null;
+  /**
+   * Render `product.pricing.retail` when no `viewerPrice` was resolved (#368 PD-4).
+   *
+   * OFF by default, and it must stay that way on any surface backed by real catalog rows.
+   * The embedded retail is the shelf price for everyone; a reseller entitled to a discount
+   * who lands on a grid that forgot to pass `viewerPrice` was silently shown retail instead
+   * of their own price. The label was honest ("Retail") — the number was not the one they
+   * would be charged, which is the same divergence as FP-2 in #367 and is invisible because
+   * a wrong price is still a valid price.
+   *
+   * The one legitimate caller is the demo grid: `src/data/demo/*.json` products have made-up
+   * ids that no pricing RPC can resolve, so their embedded retail is all there is.
+   */
+  allowEmbeddedRetail?: boolean;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -54,6 +68,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   categoryColor = '#3b82f6',
   showActions = true,
   viewerPrice = null,
+  allowEmbeddedRetail = false,
 }) => {
   const { showPrices } = useShowPrices();
   const navigate = useNavigate();
@@ -151,7 +166,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Pricing — per-viewer price (reseller buy price + discount, or retail) gated on the
             Show Prices toggle. NEVER the procurement cost (the old "Wholesale" column leaked products.cost). */}
         {showPrices && (() => {
-          const price = viewerPrice?.price ?? (product.pricing.retail > 0 ? product.pricing.retail : null);
+          // One price source. The embedded retail is a fallback only where a resolver cannot
+          // reach (the demo grid), and never a silent stand-in for one that was not called.
+          const embedded = allowEmbeddedRetail && product.pricing?.retail > 0
+            ? product.pricing.retail
+            : null;
+          const price = viewerPrice?.price ?? embedded;
           if (price == null) return null;
           const disc = viewerPrice?.discount_pct ?? 0;
           const cur = viewerPrice?.currency ?? product.pricing.currency;

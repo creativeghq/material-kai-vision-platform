@@ -84,6 +84,21 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
   },
 ];
 
+/**
+ * Every category key, as a literal tuple so `UploadCategory` can be a type rather than a
+ * hand-written union that drifts. `building_materials` was live in the DB and absent from
+ * the union for months, so a door resolved to `general_materials` and rendered under the
+ * wrong heading (#368 PD-5).
+ */
+export const CATEGORY_KEYS = ['building_materials', 'decor', 'furniture', 'general_materials', 'heating', 'kitchen', 'lighting', 'paint_wall_decor', 'sanitary', 'tiles', 'wood'] as const;
+
+export type CategoryKey = typeof CATEGORY_KEYS[number];
+
+/** Display name per category key, straight from material_categories. */
+export const CATEGORY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
+  CATEGORY_VOCAB.map((c) => [c.key, c.displayName]),
+);
+
 /** Every canonical value across all categories. */
 export const ALL_CONTROLLED_VOCAB: ReadonlySet<string> = new Set(
   CATEGORY_VOCAB.flatMap((c) => c.controlledVocab),

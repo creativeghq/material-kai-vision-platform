@@ -29,7 +29,7 @@ import {
   ALL_CONTROLLED_VOCAB,
   categoryKeyForVocab,
 } from '../../src/lib/categoryVocab.generated';
-import { CATEGORY_DISPLAY_REGISTRY, resolveUploadCategory } from '../../src/lib/categoryFieldRegistry';
+import { UPLOAD_CATEGORIES, resolveUploadCategory } from '../../src/lib/categoryFieldRegistry';
 
 const ROOT = process.cwd();
 
@@ -67,12 +67,10 @@ describe('category vocabulary — one source', () => {
     ).toEqual([]);
   });
 
-  it('every display-registry category exists in the projection', () => {
-    const projected = new Set(CATEGORY_VOCAB.map((c) => c.key));
-    const missing = Object.keys(CATEGORY_DISPLAY_REGISTRY).filter((k) => !projected.has(k));
-    expect(missing,
-      'a category is rendered by CATEGORY_DISPLAY_REGISTRY but absent from material_categories',
-    ).toEqual([]);
+  it('the categories the product surfaces use ARE the projection', () => {
+    // These used to be two lists that had to agree. `UPLOAD_CATEGORIES` is now the projection
+    // itself (#368 PD-5), so this asserts the wiring rather than a coincidence.
+    expect([...UPLOAD_CATEGORIES].sort()).toEqual(CATEGORY_VOCAB.map((c) => c.key).sort());
   });
 
   it('canonical values win over aliases', () => {

@@ -47,15 +47,19 @@ import { ProductOptionsEditor } from '@/components/features/configurator/Product
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { SupplierPricingSection } from './SupplierPricingSection';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 import {
-  getCategoryDisplayConfig,
+  categoryDisplayName,
+  resolveProductCategory,
   resolveUploadCategory,
 } from '@/lib/categoryFieldRegistry';
+import { useFieldRegistry } from '@/hooks/useFieldRegistry';
+import { productDetailService } from '@/services/productDetailService';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -224,6 +228,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isAdmin = can('pricing.manage');
   const { user } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
+  const { toast } = useToast();
+  // The field registry (`material_metadata_fields`) drives which sections this product's
+  // category has, what each field is called here, and — the part that matters for access —
+  // whether a key found in the product's jsonb is safe to render at all (#368 PD-1/PD-5).
+  const fieldRegistry = useFieldRegistry();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Bumped whenever the option editor changes something, to remount the configurator preview
@@ -245,23 +254,49 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Modal stacking for recommendations — clicking a result opens that product
   const [stackedProductId, setStackedProductId] = useState<string | null>(null);
   const [stackedProduct, setStackedProduct] = useState<Product | null>(null);
+  const [stackedError, setStackedError] = useState<string | null>(null);
   // Price lookup drawer (admin-only)
   const [priceLookupOpen, setPriceLookupOpen] = useState(false);
 
   // All hooks must be declared before any conditional return (Rules of Hooks)
 
-  // Load stacked product when a recommendation card is clicked
+  // Load stacked product when a recommendation card is clicked.
+  //
+  // This used to be `.from('products').select('*')` with the error discarded and the row cast
+  // to `Product` (#368 PD-2). `select('*')` is every column, and products carries `cost`,
+  // `cost_source`, `markup_percent`, `supplier_company_id` and the raw supplier feed in
+  // `attributes_raw` — all of it gated everywhere else in this file, none of it gated by the
+  // table's RLS, which grants plain workspace membership. So clicking a recommendation handed
+  // procurement data to a project client. The RPC returns an allowlisted, jsonb-redacted
+  // projection and verifies membership against the caller's JWT rather than the id it was given.
   useEffect(() => {
-    if (!stackedProductId) { setStackedProduct(null); return; }
-    supabase
-      .from('products')
-      .select('*')
-      .eq('id', stackedProductId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setStackedProduct(data as unknown as Product);
+    if (!stackedProductId) { setStackedProduct(null); setStackedError(null); return; }
+    let cancelled = false;
+    setStackedError(null);
+    productDetailService.fetch(stackedProductId)
+      .then((detail) => {
+        if (cancelled) return;
+        if (!detail) {
+          // Absent or not visible to this viewer — deliberately the same answer.
+          setStackedProductId(null);
+          setStackedError('That product is no longer available.');
+          return;
+        }
+        setStackedProduct(detail as unknown as Product);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        // A swallowed error here left the previous product on screen, or an empty modal,
+        // with nothing said.
+        setStackedProductId(null);
+        setStackedError(e instanceof Error ? e.message : 'Could not open that product.');
       });
+    return () => { cancelled = true; };
   }, [stackedProductId]);
+
+  useEffect(() => {
+    if (stackedError) toast({ title: 'Could not open product', description: stackedError, variant: 'destructive' });
+  }, [stackedError, toast]);
 
 
   // Load images from image_product_associations when modal opens
@@ -1878,10 +1913,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 Category-specific rows are driven by the registry config.
                 Packaging subsection only shows for categories that have it. */}
             {(() => {
-              const catConfig = getCategoryDisplayConfig(product.metadata, product.type, product.category);
-              const uploadCat = resolveUploadCategory(
-                product.metadata?.material_category || product.type || product.category,
-              );
+              const uploadCat = resolveProductCategory(product.metadata, product.type, product.category);
 
               // ── Universal rows (always shown) ──────────────────────────
               const universalRows: Array<{ label: string; value: string }> = [];
@@ -2041,7 +2073,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               }
 
               // ── Packaging subsection (only for categories that use it) ─
-              const packagingCategories = new Set(['tiles', 'wood', 'general_materials']);
+              // "Which categories have packaging" is a registry fact — the set of categories
+              // any `section = 'packaging'` field applies to — not a list to keep by hand.
+              // The hand-kept one said tiles/wood/general_materials; the registry says tiles
+              // and wood, and general_materials has no packaging field at all.
               const pkg = (allData?.packaging || {}) as Record<string, unknown>;
               const pickPkg = (k: string): string | null => {
                 const v = pkg[k];
@@ -2056,7 +2091,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               };
 
               let packagingRows: Array<{ label: string; value: string }> = [];
-              if (packagingCategories.has(uploadCat)) {
+              if (fieldRegistry.hasSection(uploadCat, 'packaging')) {
                 const pieces = pickPkg('pieces_per_box');
                 const patternsCount = pickPkg('patterns_count');
                 const boxes = pickPkg('boxes_per_pallet');
@@ -2102,8 +2137,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               if (warrantyCol) {
                 categorySpecRows.push({ label: 'Warranty', value: String(warrantyCol) });
               } else {
-                const warrantyCategories = new Set(['heating', 'sanitary', 'kitchen', 'lighting', 'furniture']);
-                if (warrantyCategories.has(uploadCat)) {
+                // Same reasoning as packaging: whether a category carries `warranty_years` is
+                // what `applies_to_categories` on that field says, not a second list here.
+                if (fieldRegistry.hasField(uploadCat, 'warranty_years')) {
                   const warranty = tryExtract(allData?.warranty_years, commercialData?.warranty_years);
                   if (warranty) categorySpecRows.push({ label: 'Warranty', value: `${warranty} years` });
                 }
@@ -2135,7 +2171,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <>
                         <div className="pt-2 pb-1">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">
-                            {catConfig.displayName} Specs
+                            {categoryDisplayName(uploadCat)} Specs
                           </p>
                         </div>
                         {categorySpecRows.map((r, i) => {
@@ -2259,11 +2295,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             are never rendered even if data exists (prevents showing
             grout codes for lighting, PEI for furniture, etc.). */}
         {(() => {
-          const sectionCatConfig = getCategoryDisplayConfig(product.metadata, product.type, product.category);
-          const activeSectionKeys = new Set(sectionCatConfig.sections.map(s => s.key));
-          const sectionUploadCat = resolveUploadCategory(
-            product.metadata?.material_category || product.type || product.category,
-          );
+          const sectionUploadCat = resolveProductCategory(product.metadata, product.type, product.category);
+          const registrySections = fieldRegistry.sections(sectionUploadCat);
+          const activeSectionKeys = new Set(registrySections.map(s => s.key));
 
           // Appearance card — shared across all categories (colors/patterns are universal)
           const renderAppearanceCard = () => {
@@ -2378,8 +2412,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // neither drops nor duplicates it. Driving this off the registry rather
           // than a hardcoded key list is what lets lighting / wood / sanitary /
           // kitchen show their full spec sheet instead of a tile-shaped subset.
-          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'packaging', 'commercial']);
-          const registrySectionCards = sectionCatConfig.sections
+          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial']);
+          const registrySectionCards = registrySections
             .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
             .map(section => {
               const data: Record<string, unknown> = {};
@@ -2484,6 +2518,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               `consumedKeys` (sidebar + special cards + registry sections)
               guarantees no duplication and that nothing is ever dropped. */}
           {(() => {
+            // ── Sensitivity (#368 PD-1) ──────────────────────────────────
+            // Everything above this point is gated by SECTION: stock, cost, listings,
+            // movements each ask whether this viewer may see that section. This block is not
+            // a section — it is a walker over whatever keys the product happens to carry, so
+            // section gating does not reach it. `attributes` and `attributes_raw` are where
+            // supplier XML lands and where AI extraction writes, and extraction is explicitly
+            // allowed to produce fields the registry has never heard of. A feed carrying
+            // `cost`, `wholesale`, `buy_price` or `margin` therefore rendered to whoever
+            // could see the product, including a project client.
+            //
+            // The decision is the registry's (`material_metadata_fields.sensitivity`), with
+            // `internal_product_field_pattern()` as the floor for keys it has never seen.
+            // Both are read from the DB by useFieldRegistry — the same two things
+            // `is_internal_product_field()` consults server-side.
+            //
+            // `withhold` is deliberately three-valued. Until the registry has loaded there is
+            // no answer, and rendering everything while waiting is exactly the failure this
+            // exists to prevent — so an unresolved key is withheld, not shown.
+            const canSeeInternalFields = canSeeCost;
+            const withholdKey = (key: string): boolean => {
+              if (canSeeInternalFields) return false;
+              const verdict = fieldRegistry.isInternalField(key);
+              return verdict !== false;
+            };
+
             // Groups the registry already rendered above — their leftover inner
             // fields go to the generic bucket (not a duplicate titled card).
             const KNOWN_GROUPS = new Set([
@@ -2501,6 +2560,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               for (const [ik, iv] of Object.entries(obj)) {
                 if (!ik || ik.startsWith('_')) continue;
                 if (consumedKeys.has(ik) || seen.has(ik)) continue;
+                if (withholdKey(ik)) continue;
                 const str = extractValue(iv);
                 if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') continue;
                 seen.add(ik);
@@ -2518,6 +2578,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             // Walk every top-level metadata key.
             Object.entries(allData || {}).forEach(([k, v]) => {
               if (k.startsWith('_')) return;
+              if (withholdKey(k)) return;
               const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
                 ? (v as Record<string, unknown>).value
                 : v;

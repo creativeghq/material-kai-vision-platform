@@ -264,6 +264,30 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 - **Why it is a source-text check, not a build check:** the defect is visible in `vite.config.ts` and `vercel.json` without a 93-second build, so the guard costs milliseconds and runs in the normal unit suite. The cost is that it reasons about config, not the emitted artifact — see the blind spot.
 - **Blind spot:** it pins a **named list** of packages. A *new* heavy dependency pinned for the first time is invisible, as is a chunk that lands in the eager path through a static import chain rather than a `manualChunks` entry. Closing that properly means asserting a byte budget on `dist/index.html`'s modulepreload set in CI, which needs a build step. Also unguarded: `@mdxeditor/editor` pulls 1.2 MB plus 75 CodeMirror language-mode chunks (`apl`, `brainfuck`, `commonlisp`, …) for one component — correctly lazy, so it costs no visitor anything today, but nothing stops it becoming eager.
 
+### 10. Gate and renderer at different granularities — per-section access, per-key rendering
+Audit #368 found this in the best-reasoned access control in the codebase, which is the point:
+`ProductDetailModal` gates stock, cost, listings and movements on **both** ownership and capability,
+with the persona reasoning written down. Then the Details tab renders `attributes` + `metadata` +
+`properties` + `specifications` by **walking the keys** — so the gate asks about sections and the
+renderer asks about keys, and anything sensitive that lands in jsonb instead of a dedicated column
+falls through the gap. It is not a missing check; it is a check at the wrong granularity, which is
+why reviewing the permission model finds nothing wrong.
+
+The platform makes it concrete rather than theoretical: `attributes_raw` is where supplier XML lands,
+`attributes` is where AI extraction writes, and extraction is *explicitly allowed* to produce fields
+the registry has never seen. A feed carrying `cost`, `wholesale` or `margin` renders to whoever can
+see the product, project clients included.
+
+The same audit found the read-side twin. The Related tab opened a stacked product with
+`.from('products').select('*')` — and that table carries `cost`, `cost_source`, `markup_percent`,
+`supplier_company_id` and the raw supplier feed, behind an RLS policy whose only test is workspace
+membership. Everything the modal gates, handed over by one click on a recommendation.
+
+- **Guarded by:** `material_metadata_fields.sensitivity` + `internal_product_field_pattern()` as the floor for keys the registry has never seen, applied server-side by `get_product_detail()` / `redact_internal_product_fields()` and in the browser by [tests/unit/productFieldSensitivity.test.ts](../tests/unit/productFieldSensitivity.test.ts). The client fetches the pattern rather than restating it, so the two engines evaluate one string.
+- **Proven to fire:** 2026-08-16 — the `withholdKey(ik)` line was deleted from the nested-group walk and the three-valued verdict collapsed to `verdict === true`, in the real file; two assertions failed naming both, and passed again on restore.
+- **Why the verdict is three-valued:** `null` means "the registry loaded, the pattern did not, and this key is unknown". Collapsing that to "public" is a filter that turns itself off in precisely the situation nobody notices — the fallback-fires-invisibly shape from the prompt-registry incident, moved to access control.
+- **Blind spot:** the client half only covers the walker in this one modal. Other surfaces still `select('*')` from `products` and hand the row to it as a prop; `get_product_detail()` exists for them to adopt, and until they do the server-side redaction reaches only the stacked-product path.
+
 ---
 
 ## Mechanism inventory
@@ -297,6 +321,8 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | [tests/unit/productRelationDerivation.test.ts](../tests/unit/productRelationDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a second client-side derivation of "what relates to this product" (#267) | **yes** — asserts its scan matched >100 files, and was watched to fail on a planted violation before shipping |
 | `product_edges` composite FKs | every write | invariant 1 — an edge's two products must both sit in the edge's workspace | n/a — declarative; unlike a trigger it cannot be disabled |
 | `ops.product_edges_never_written` | nightly | shape 4 on the edge rebuild — it ran and wrote nothing, or has not run for 3 days | **yes** — both branches were watched to fire on planted state, and the healthy case was confirmed to return **0** rows first, so a probe that always fires would have been caught |
+| [tests/unit/productFieldSensitivity.test.ts](../tests/unit/productFieldSensitivity.test.ts) | `npm test`, blocking | shape 10 — the product Details tab renders arbitrary jsonb keys, so it must withhold anything the registry has not vouched for; plus "no `select('*')` from `products` in the modal" | **yes** — 2026-08-16, mutation-tested on the REAL file in both places the walker enters (flat keys and nested groups) and on the three-valued verdict. Asserts the *unknown-with-no-pattern* case resolves to `null`, not `false`, because that is the branch a failed fetch takes |
+| [tests/unit/categoryFieldRegistry.test.ts](../tests/unit/categoryFieldRegistry.test.ts) | `npm test`, blocking | one field registry — `UploadCategory` derived from the projection rather than typed out, no hardcoded facet array, and no per-category map of sections and field labels anywhere in `src/` | partly — the copy-detection is a source walk, so a copy in a shape it does not recognise is invisible. The category assertions are real: it fails if `resolveUploadCategory` cannot resolve a DB category, which is how `building_materials` sat unresolvable |
 
 | [tests/unit/installedBaseDerivation.test.ts](../tests/unit/installedBaseDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a cached `next_due_on` or a client-side recomputation of a service date (#343), plus a hardcoded notification/email send in the reminder cron | **yes** — the banned-identifier regex was checked in BOTH directions against the realistic spellings (a snake_case-only first draft waved `nextDueOn` straight through), then a real violation was appended to `customerAssetsService.ts` and watched to fail before being reverted |
 | `ops.asset_reminders_silent_zero` | nightly | shape 4 on the equipment reminder cron — it ran, exited 0, and told nobody | **yes** — watched to fire on a planted 30-day-overdue occurrence AND watched to stay silent once that row was stamped, so a probe that always fires would have been caught. Fixing the second half changed the probe: the overdue-only path leaves `reminded_at` null by design, which the first draft reported as neglect |

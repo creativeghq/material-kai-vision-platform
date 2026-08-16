@@ -11,7 +11,7 @@
  * are kept for backwards compatibility in theme colors and existing UI.
  */
 import { formatLabel } from '@/lib/labelUtils';
-import { resolveUploadCategory, type UploadCategory } from '@/lib/categoryFieldRegistry';
+import { UPLOAD_CATEGORIES, resolveUploadCategory, type UploadCategory } from '@/lib/categoryFieldRegistry';
 
 /** Legacy display categories — kept for theme colors across existing components. */
 export const MATERIAL_CATS = [
@@ -20,11 +20,12 @@ export const MATERIAL_CATS = [
 
 export type MaterialCategory = typeof MATERIAL_CATS[number] | 'other' | string;
 
-/** All 10 DB categories. */
-export const DB_CATEGORIES: UploadCategory[] = [
-  'tiles', 'wood', 'decor', 'furniture', 'general_materials',
-  'paint_wall_decor', 'heating', 'sanitary', 'kitchen', 'lighting',
-];
+/**
+ * Every DB category, from the projection of `material_categories`. Hand-listing them here
+ * was a copy that had already gone stale — it named ten and the DB has had eleven since
+ * `building_materials` was added (#368 PD-5).
+ */
+export const DB_CATEGORIES: readonly UploadCategory[] = UPLOAD_CATEGORIES;
 
 export const CAT_COLORS: Record<string, string> = {
   // Legacy display categories

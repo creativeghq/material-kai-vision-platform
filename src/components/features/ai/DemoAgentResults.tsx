@@ -79,6 +79,9 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
               product={product}
               onViewDetails={handleViewDetails}
               categoryColor={categoryColors[product.category] || categoryColors[product.type]}
+              // Demo ids are not real products, so no pricing RPC can resolve them — this is
+              // the one surface where the embedded retail is the only price there is (#368 PD-4).
+              allowEmbeddedRetail
             />
           ))}
         </div>

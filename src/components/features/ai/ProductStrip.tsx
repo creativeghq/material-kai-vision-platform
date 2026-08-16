@@ -121,8 +121,12 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                   {product.name}
                 </p>
                 {showPrices && (() => {
+                  // One price source (#368 PD-4). These are real catalog rows, so the resolver
+                  // is the answer: falling back to the embedded retail showed a reseller the
+                  // shelf price instead of the discounted one they would actually be charged,
+                  // and nothing about a valid number says it came from the wrong place.
                   const vp = viewerPrices[product.id];
-                  const price = vp?.price ?? (product.pricing?.retail != null ? Number(product.pricing.retail) : null);
+                  const price = vp?.price ?? null;
                   if (price == null) return null;
                   const cur = vp?.currency ?? 'EUR';
                   const disc = vp?.discount_pct ?? 0;

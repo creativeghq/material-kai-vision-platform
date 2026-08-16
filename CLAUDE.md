@@ -119,8 +119,26 @@ in `attributes` jsonb or a real column (`destination`) — all DB. There were SI
 and they disagreed; `cladding` was offered by the extraction prompt and rejected by stage 4's
 validator, so those products re-classified on every run. A field can mean different things per
 category (`body_material` is vitreous china in sanitary, rattan in lighting) — that is
-`description_by_category`, not a merge. Guarded by
-[tests/unit/test_field_registry_is_the_source.py](mivaa-pdf-extractor/tests/unit/test_field_registry_is_the_source.py).
+`description_by_category`, not a merge, and its NAME can differ per category too
+(`label_by_category`: "Material" for kitchen, "Body Material" elsewhere). The client reads it at
+runtime through `fieldRegistryService` — **never a hardcoded section/field/label map.** The seventh
+copy was 900 lines of `CATEGORY_DISPLAY_REGISTRY`, disagreeing with the DB on 124 labels and missing
+`building_materials` entirely, so a door rendered under General Materials (#368). Guarded by
+[tests/unit/test_field_registry_is_the_source.py](mivaa-pdf-extractor/tests/unit/test_field_registry_is_the_source.py)
+and [tests/unit/categoryFieldRegistry.test.ts](tests/unit/categoryFieldRegistry.test.ts).
+
+**`sensitivity` decides what a viewer may see, and the gate must match the RENDERER's granularity.**
+A surface that walks `attributes`/`metadata`/`properties`/`specifications` and renders every key it
+finds is gated **per key** — section-level permission checks do not reach it, and supplier XML and AI
+extraction both write there and may invent fields nobody has classified. Ask
+`is_internal_product_field()` (SQL) or `useFieldRegistry().isInternalField()` (client): the registry
+answers for a key it knows, `internal_product_field_pattern()` is the floor for one it does not, and
+the client FETCHES that pattern rather than restating it. **An unresolved verdict (`null`) withholds**
+— treating it as public is a filter that switches itself off exactly when the fetch fails. Reads of a
+single product go through `get_product_detail()`, never `select('*')`: `products` carries `cost`,
+`markup_percent`, `cost_source`, `supplier_company_id` and `attributes_raw` behind an RLS policy whose
+only test is workspace membership. Guarded by
+[tests/unit/productFieldSensitivity.test.ts](tests/unit/productFieldSensitivity.test.ts).
 
 ## Flows — notifications & automation (READ BEFORE adding any notification/email/automation)
 **Never hardcode a `user_notifications` insert or an `email-api` call in new code.** Emit an event —

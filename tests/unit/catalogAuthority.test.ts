@@ -28,6 +28,10 @@ import { join } from 'node:path';
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
+/** Strip comments so prose describing the old shape never counts as the old shape. */
+const blankComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
+
 const CATALOG_SERVICE = 'src/services/catalogMasterService.ts';
 const PRICING_SERVICE = 'src/services/supplierPricingService.ts';
 const CLAIMS_SERVICE = 'src/services/supplierClaimsService.ts';
@@ -82,8 +86,38 @@ describe('supplier pricing — a tenant cost is written only by its own workspac
     // write a row into a workspace that is not theirs.
     expect(/\.(insert|update|upsert)\(\s*\{\s*\.\.\./.test(src),
       'supplierPricingService must not spread input into a DB write').toBe(false);
-    expect(src).toContain('workspace_id: workspaceId');
-    expect(src).toContain('product_id: productId');
+  });
+
+  it('no supplier-pricing mutation goes near the table, or carries a client workspace id', () => {
+    // #368 PD-3. The explicit payload above was the previous bar, and it was one layer deep:
+    // the workspace id in it came from React state, and the row was found by id alone. RLS
+    // bounded that; nothing in the query shape did. Every mutation is now an RPC that reads
+    // the workspace off the PRODUCT — so there is no workspace id on this surface at all,
+    // and the parameter that used to carry one must not come back.
+    const src = blankComments(read(PRICING_SERVICE));
+
+    const tableWrites = /\.from\(\s*['"]supplier_products['"]\s*\)\s*\.\s*(insert|update|upsert|delete)/;
+    expect(tableWrites.test(src),
+      'supplier rows are mutated through the RPCs, which derive the workspace server-side').toBe(false);
+
+    // `products.enforce_moq` is the same shape: a client-side update scoped by product id.
+    const productWrites = /\.from\(\s*['"]products['"]\s*\)\s*\.\s*(insert|update|upsert|delete)/;
+    expect(productWrites.test(src),
+      'enforce_moq is set through set_product_enforce_moq, which checks the caller').toBe(false);
+
+    expect(/workspaceId/.test(src),
+      'a client-supplied workspace id is exactly what the RPCs removed — do not thread one back through')
+      .toBe(false);
+
+    for (const rpc of [
+      'list_supplier_products',
+      'upsert_supplier_product',
+      'delete_supplier_product',
+      'set_preferred_supplier_product',
+      'set_product_enforce_moq',
+    ]) {
+      expect(src, `${rpc} must be the route for its operation`).toContain(rpc);
+    }
   });
 
   it('does not import the publish service — the two price worlds stay separate', () => {
