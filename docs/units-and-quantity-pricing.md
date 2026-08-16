@@ -95,6 +95,79 @@ whichever is better for the buyer and reports which won in `discount_source`, be
 this price what it is" has to stay answerable. `price_unit` and the matched `price_break` come
 back in the payload too.
 
+### Quantity and unit travel together, or not at all
+
+`get_product_price_break` resolves the threshold with
+`coalesce(convert_to_base_unit(product, qty, unit), qty)`. A quantity passed **without** its unit
+therefore does not fail — it falls back to the raw number and is compared against a threshold expressed
+in base units, so "5 pallets" matches a break meant for 5 pieces. Every call site builds its
+`p_quantity` / `p_unit` pair as one spreadable object that is `{}` when the unit is missing, and
+[tests/unit/pricingChain.test.ts](../tests/unit/pricingChain.test.ts) fails the build if the two are
+ever separated. A product with no `metadata.unit` consequently gets no break — silently, and correctly.
+
+Whichever rung priced a line is recorded on it: `quote_items.price_source` and (since #332)
+`order_items.price_source`. It is **evidence, never an input to money** — but without it no probe could
+ask whether a configured break had ever actually reached a document, which is what
+`finance.quantity_breaks_never_fire` now watches.
+
+## Markup — cost becomes retail
+
+Before any discount there is a **markup ladder**, and it has exactly one implementation:
+`public._pricing_markup_ladder`. `_pricing_retail` is now only *"a pinned `product_prices.list_price`,
+else the ladder"*, and the two preview entry points call the same function rather than a copy of it.
+
+| Rung | `pricing_rules.scope` | matched on |
+|---|---|---|
+| 1 | `product` | the product itself |
+| 2 | `brand` | `products.brand_company_id` |
+| 3 | `supplier` | `products.supplier_company_id` |
+| 4 | `category` | `products.metadata->>'material_category'`, nearest ancestor first |
+| 5 | — | `finance_settings.default_markup_pct` |
+
+Each rung is either a fixed `sell_price` or a `markup_pct` on cost; the first match wins outright.
+Supplier sits **below** brand deliberately: a brand is what the customer is buying, a supplier is only
+who we happen to buy it from, and the same brand arriving through two distributors should not move the
+shelf price.
+
+Editors are one card per rung under *Finance → Settings → Pricing* — `PricingRulesCard`,
+`BrandMarkupCard`, `SupplierMarkupCard`. The scope vocabulary exists in three places at once (the
+`pricing_rules_scope_check` CHECK, the `PricingRuleScope` union, and one card each), which is why
+[tests/unit/pricingChain.test.ts](../tests/unit/pricingChain.test.ts) pins all three together: `brand`
+was in the resolver and in the UI but **not in the CHECK** for months, so every brand-markup save
+raised a constraint violation and that rung could never hold a row.
+
+### Asking the ladder before a product exists
+
+Two RPCs expose it so no caller ever re-implements a rung:
+
+- `preview_pending_item_sell_price(pending_item_id, cost)` — the invoice queue's suggestion. For a
+  matched line it prices the real product; for a new one the ladder honestly reduces to
+  supplier → workspace default, because nothing about a fresh invoice line says "tiles".
+- `preview_markup_ladder_price(workspace, cost, …)` — the generic form, used to seed the
+  receive-to-warehouse form.
+
+**Never fetch a markup policy and apply it in TypeScript.** Three copies of `cost × (1 + margin/100)`
+existed at once — one reading `finance_categories.margin_pct` (a *second* markup system, keyed on the
+accounting taxonomy; now dropped), one in the browser, one seeding from `default_markup_pct` alone.
+All three produced a valid number, so nothing complained. Arithmetic on a markup the **operator typed**
+is fine; fetching the policy is not.
+
+## Supplier minimums (MOQ)
+
+`supplier_products.moq` is the supplier's minimum. Whether it *bites* is a property of the product:
+**`products.enforce_moq`**, `NOT NULL DEFAULT false`.
+
+- **Off (the default)** — the MOQ is information. `resolve_sourcing_options` still reports `meets_moq`
+  so the operator can see the order may be refused, and nothing changes the quantity.
+- **On** — `raise_cover_purchase_orders` and `reorder_warehouse_item` round the quantity up to the next
+  multiple, **and say so**: `moq_rounded` / `quantity_requested` / a `rounded[]` array, surfaced as
+  *"Rounded up to 50 (supplier minimum 50)"*. A purchase order that quietly buys more than the operator
+  asked for is its own bug.
+
+`finance.moq_enforcement_mismatch` reports a confirmed purchase line whose quantity is not a multiple
+of an enforced MOQ. The inverse — "rounded while the flag is off" — is deliberately **not** checked: a
+quantity that happens to be a multiple of the MOQ is not evidence of rounding.
+
 ## Who can edit it
 
 **Packaging & units** sits on the product modal's *Fiscal & Customs* tab (next to the invoicing
