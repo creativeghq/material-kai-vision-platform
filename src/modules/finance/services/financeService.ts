@@ -9,12 +9,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
-import { normalizeIban } from '@/utils/iban';
+import { isValidIban, normalizeIban } from '@/utils/iban';
 import { round2, extractNet, vatCategory } from '@/modules/finance/lib/vatMath';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 import type { BuyerIdentity } from '@/modules/finance/utils/salesDocumentKind';
+import { toLocalISODate } from '@/utils/datetime';
 
 // ─── Finance flow events (fire-and-forget) ───────────────────────────────────
 // Emitted when a document is issued or a payment is received, so seeded
@@ -1712,6 +1713,9 @@ const _financeServiceCore = {
     if (makeDefault && existing.some((a) => a.is_default)) {
       await supabase.from('finance_bank_accounts').update({ is_default: false }).eq('workspace_id', input.workspaceId);
     }
+    // mod-97 on the write path (#366 BU-9). A treasury account's IBAN is printed on invoices as
+    // "pay here", so a typo misroutes money in the other direction from the CRM one.
+    if (!isValidIban(input.iban)) throw new Error('That IBAN fails its checksum — check it against the bank statement.');
     const { data, error } = await supabase.from('finance_bank_accounts').insert({
       workspace_id: input.workspaceId,
       name: input.name.trim(),
@@ -1730,6 +1734,9 @@ const _financeServiceCore = {
 
   async updateBankAccount(id: string, patch: Partial<Pick<BankAccount,
     'name' | 'kind' | 'currency' | 'iban' | 'account_ref' | 'opening_balance' | 'is_active' | 'show_on_invoice' | 'sort_order' | 'notes'>>): Promise<void> {
+    if (patch.iban !== undefined && !isValidIban(patch.iban)) {
+      throw new Error('That IBAN fails its checksum — check it against the bank statement.');
+    }
     const { error } = await supabase.from('finance_bank_accounts')
       .update({
         ...patch,
@@ -2577,7 +2584,7 @@ const _financeServiceCore = {
       .from('vw_monthly_pnl')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .gte('period_month', cutoff.toISOString().slice(0, 10))
+      .gte('period_month', toLocalISODate(cutoff))
       .order('period_month', { ascending: true });
     if (error) throw error;
     return (data ?? []) as PnlRow[];
@@ -2590,7 +2597,7 @@ const _financeServiceCore = {
       .from('vw_cash_flow_forecast')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .lte('expected_date', limit.toISOString().slice(0, 10))
+      .lte('expected_date', toLocalISODate(limit))
       .order('expected_date', { ascending: true });
     if (error) throw error;
     return (data ?? []) as CashFlowRow[];

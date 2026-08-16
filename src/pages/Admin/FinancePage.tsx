@@ -94,8 +94,7 @@ import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { buildExpensePrefill, buildInvoicePrefill, type ExpensePrefill, type InvoicePrefill } from '@/services/templates/registry';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
   { value: 'doc_invoices', type: 'invoices', label: 'Invoices', icon: FileText },
@@ -127,7 +126,7 @@ const DASH_PERIOD_LABEL: Record<'this_month' | 'last_month' | 'last_quarter' | '
 /** {from,to} ISO dates for a dashboard period selector. */
 function dashRange(p: 'this_month' | 'last_month' | 'last_quarter' | 'ytd'): { from: string; to: string } {
   const today = new Date();
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const fmt = (d: Date) => toLocalISODate(d);
   if (p === 'last_month') {
     return { from: fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1)), to: fmt(new Date(today.getFullYear(), today.getMonth(), 0)) };
   }
@@ -1104,7 +1103,7 @@ const FinancePage: React.FC = () => {
                       onClick={async () => {
                         if (draftAllBusy) return;
                         // Preview before acting: this is a bulk money instruction.
-                        const dueBills = apFiltered.filter((b) => b.entry_kind !== 'order' && Number(b.amount_due) > 0 && b.due_at && b.due_at <= new Date().toISOString().slice(0, 10));
+                        const dueBills = apFiltered.filter((b) => b.entry_kind !== 'order' && Number(b.amount_due) > 0 && b.due_at && b.due_at <= todayLocalISO());
                         const dueTotal = dueBills.reduce((n, b) => n + Number(b.amount_due), 0);
                         if (dueBills.length === 0) { toast({ title: 'No due bills to draft' }); return; }
                         if (!window.confirm(`Draft ONE Revolut payment run for ${dueBills.length} due bill(s), ~${dueTotal.toFixed(2)} total? Suppliers without a verified Revolut counterparty are skipped. You approve the run in the Revolut app before any money moves.`)) return;

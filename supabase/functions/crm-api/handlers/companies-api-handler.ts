@@ -134,11 +134,17 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
-      // Resolve the target workspace: an explicit body workspace_id must be in scope
-      // (any workspace for a global operator); otherwise default to the caller's primary
-      // (first active) membership. workspace_id is NOT NULL, so a global operator that
-      // omits it still needs a concrete home workspace — without this, global admins/
-      // super_admins (workspaceIds derived from their own memberships) could not create.
+      // Resolve the target workspace: an explicit body workspace_id must be in scope (any
+      // workspace for a global operator). workspace_id is NOT NULL, so a caller that omits it
+      // still needs a concrete home workspace.
+      //
+      // It used to fall back to `scope.workspaceIds[0]` — third instance of that shape after
+      // CM-22 (#359) and EX-3 (#364), and closed here for the same reason (#366 BU-10). It was
+      // never a tenancy hole: `scopeAllows` 403s a workspace the caller cannot reach. It is
+      // wrong-tenant-BY-DEFAULT — a caller omitting the field filed the company in whichever
+      // workspace happened to sort first, and nothing anywhere raised. Defaulting is only
+      // unambiguous when there is exactly one workspace to default to; with a choice to make,
+      // the caller has to make it.
       const requestedWs = (body.workspace_id as string | undefined) || undefined;
       if (requestedWs && !scopeAllows(scope, requestedWs)) {
         return new Response(
@@ -146,12 +152,14 @@ export async function handleCompanies(req: Request): Promise<Response> {
           { status: 403, headers: corsHeaders },
         );
       }
-      const targetWs = (requestedWs && scopeAllows(scope, requestedWs))
-        ? requestedWs
-        : scope.workspaceIds[0];
+      const targetWs = requestedWs ?? (scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : undefined);
       if (!targetWs) {
         return new Response(
-          JSON.stringify({ error: 'No workspace available to create this company in. Pass workspace_id.' }),
+          JSON.stringify({
+            error: scope.workspaceIds.length > 1
+              ? 'workspace_id is required: you belong to more than one workspace and a company must be filed in a named one.'
+              : 'No workspace available to create this company in. Pass workspace_id.',
+          }),
           { status: 400, headers: corsHeaders },
         );
       }
@@ -165,6 +173,45 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const companyFields = pickCompanyFields(body);
       if (companyFields.is_customer === undefined && companyFields.is_supplier === undefined) {
         companyFields.is_customer = true;
+      }
+
+      // Server-side dedupe (#366 BU-3). The client probe in QuickAddCompanyDialog is a courtesy:
+      // it is debounced, non-blocking and swallows its own errors, so Create could always win the
+      // race. This is the guarantee — one query, on the same folded key, immediately before the
+      // insert. `name_fold` is a generated column holding `crm_fold(name)`, so the match survives
+      // Greek case and accents: "Καρέλης ΑΕ" finds the stored "ΚΑΡΕΛΗΣ ΑΕ", which plain `ilike`
+      // on the raw column never did. Duplicates are not cosmetic — they are what makes
+      // spend-per-supplier and AP aging wrong later.
+      //
+      // `allow_duplicate: true` is the escape hatch for the genuine case (two distinct legal
+      // entities sharing a trading name). Refusing by default and opting in is the right way
+      // round: the accidental duplicate is silent, the deliberate one is typed by a human.
+      if (body.allow_duplicate !== true) {
+        const { data: existing, error: dupError } = await supabase
+          .from('crm_companies')
+          .select('id, name')
+          .eq('workspace_id', targetWs)
+          .eq('name_fold', foldForSearch(body.name))
+          .limit(1)
+          .maybeSingle();
+        // A failed lookup does NOT fall through to the insert. Creating a duplicate is cheap to
+        // detect and expensive to unpick; retrying a create is neither.
+        if (dupError) {
+          return new Response(
+            JSON.stringify({ error: `Could not check for an existing business: ${dupError.message}` }),
+            { status: 503, headers: corsHeaders },
+          );
+        }
+        if (existing) {
+          return new Response(
+            JSON.stringify({
+              error: `"${existing.name}" already exists in this workspace.`,
+              code: 'duplicate_company',
+              existing: { id: existing.id, name: existing.name },
+            }),
+            { status: 409, headers: corsHeaders },
+          );
+        }
       }
 
       const { data, error } = await supabase

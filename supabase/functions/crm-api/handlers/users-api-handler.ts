@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope } from './_scope.ts';
+import { foldForSearch } from '../../_shared/searchFold.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -164,21 +165,11 @@ export async function handleUsers(req: Request): Promise<Response> {
     if (method === 'GET' && path.length === 0) {
       const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '100', 10), 1), 1000);
       const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10), 0);
+      const search = (url.searchParams.get('search') || '').trim();
 
-      // Fetch all auth users using admin API
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
-        page: Math.floor(offset / limit) + 1,
-        perPage: limit,
-      });
-
-      if (authError) {
-        return new Response(
-          JSON.stringify({ error: authError.message }),
-          { status: 400, headers: corsHeaders },
-        );
-      }
-
-      // Fetch user profiles
+      // Fetch user profiles. Loaded BEFORE the auth users because the search below matches on
+      // full_name as well as email, and the name lives here — `auth.admin.listUsers` has no
+      // search parameter of its own.
       const { data: profilesData, error: profilesError } = await supabase
         .from('user_profiles')
         .select(`
@@ -200,13 +191,72 @@ export async function handleUsers(req: Request): Promise<Response> {
         );
       }
 
+      /**
+       * Resolve the page of auth users to return.
+       *
+       * The `search` param was accepted by the client and then DISCARDED here (#366 BU-8):
+       * UserSearchDropdown sent it, this handler never read it, and the component filtered the
+       * first 20 of up to 1000 in the browser. So user #21 onward was unfindable through that
+       * control no matter what was typed — an empty dropdown that reads as "no such user".
+       *
+       * `auth.admin.listUsers` cannot filter, so a real search has to walk it. That is bounded:
+       * `MAX_SCAN_PAGES` pages of 1000, and `truncated` is REPORTED rather than swallowed — a
+       * silently short list is the defect being fixed, not an acceptable version of it.
+       */
+      const PER_PAGE = 1000;
+      const MAX_SCAN_PAGES = 10;
+      const nameById = new Map<string, string>();
+      for (const p of profilesData ?? []) {
+        if (p.user_id && p.full_name) nameById.set(p.user_id as string, String(p.full_name));
+      }
+      // Case- and accent-insensitive, the same fold the CRM party search uses: an operator
+      // typing "Κώστας" must find "ΚΩΣΤΑΣ".
+      const needle = foldForSearch(search);
+
+      // Structural, not `typeof authData.users`: listUsers' return type is a union whose error
+      // arm has `users: []`, so indexing it yields `User[] | never[]` and a push is rejected.
+      // These three fields are everything the merge below reads.
+      type AuthUserRow = { id: string; email?: string | null; created_at: string };
+      let pageUsers: AuthUserRow[] = [];
+      let matchedCount = 0;
+      let truncated = false;
+
+      if (!search) {
+        const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
+          page: Math.floor(offset / limit) + 1,
+          perPage: limit,
+        });
+        if (authError) {
+          return new Response(JSON.stringify({ error: authError.message }), { status: 400, headers: corsHeaders });
+        }
+        pageUsers = authData.users;
+        matchedCount = authData.users.length;
+      } else {
+        const matched: AuthUserRow[] = [];
+        for (let page = 1; page <= MAX_SCAN_PAGES; page++) {
+          const { data: authData, error: authError } = await supabase.auth.admin.listUsers({ page, perPage: PER_PAGE });
+          if (authError) {
+            return new Response(JSON.stringify({ error: authError.message }), { status: 400, headers: corsHeaders });
+          }
+          const users = authData.users ?? [];
+          for (const u of users) {
+            const haystack = foldForSearch(`${u.email ?? ''} ${nameById.get(u.id) ?? ''}`);
+            if (haystack.includes(needle)) matched.push(u);
+          }
+          if (users.length < PER_PAGE) break;
+          if (page === MAX_SCAN_PAGES) truncated = true;
+        }
+        matchedCount = matched.length;
+        pageUsers = matched.slice(offset, offset + limit);
+      }
+
       // Fetch user credits
       const { data: creditsData } = await supabase
         .from('user_credits')
         .select('user_id, balance');
 
       // Merge auth users with profiles and credits
-      const mergedUsers = authData.users.map((authUser) => {
+      const mergedUsers = pageUsers.map((authUser) => {
         const profile = profilesData?.find((p) => p.user_id === authUser.id);
         const credits = creditsData?.find((c) => c.user_id === authUser.id);
 
@@ -226,7 +276,10 @@ export async function handleUsers(req: Request): Promise<Response> {
       });
 
       return new Response(
-        JSON.stringify({ data: mergedUsers, count: mergedUsers.length }),
+        // `count` is the size of the MATCHED set, not the page — the caller cannot paginate on a
+        // page length. `truncated` says the scan hit its ceiling, so a short list is never
+        // mistaken for a complete one.
+        JSON.stringify({ data: mergedUsers, count: matchedCount, ...(truncated ? { truncated: true } : {}) }),
         { status: 200, headers: corsHeaders },
       );
     }

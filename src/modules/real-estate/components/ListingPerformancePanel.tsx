@@ -4,8 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type ListingPerformance, type ListingViewPoint, type VendorReport } from '../services/realEstateService';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, localISODateOffset } from '@/utils/datetime';
 /**
  * Listing performance (#281 gap 8). Everything here is READ from
  * `get_property_performance` — days-on-market included. Nothing on this panel recomputes a metric
@@ -112,7 +111,7 @@ export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: 
     const byDay = new Map(series.map((s) => [s.day, s.views]));
     const out: { day: string; views: number }[] = [];
     for (let i = 89; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
+      const d = localISODateOffset(-i);
       out.push({ day: d, views: byDay.get(d) ?? 0 });
     }
     return out;

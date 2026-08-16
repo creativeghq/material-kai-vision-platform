@@ -24,8 +24,7 @@ import {
 } from '@/services/clientViewsService';
 import { SHEET_TYPE_LABELS, type SheetType } from '@/services/moodboardSheetsService';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 interface ClientViewTabProps {
   projectId: string;
   projectName: string;
@@ -65,7 +64,7 @@ const emptyForm = (): FormState => ({
   title: 'Client Presentation',
   subtitle: '',
   clientName: '',
-  date: new Date().toISOString().slice(0, 10),
+  date: todayLocalISO(),
   selectedSheetIds: [],
   embedVr: true,
   embedLighting: true,

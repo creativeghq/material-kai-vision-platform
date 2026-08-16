@@ -9,6 +9,7 @@ import {
   type PresentationSheet,
   SHEET_TYPE_LABELS,
 } from '@/services/moodboardSheetsService';
+import { todayLocalISO } from '@/utils/datetime';
 
 /**
  * Full-Deck composer. Lists all sheets attached to the moodboard, lets the
@@ -49,7 +50,7 @@ export function DeckBuilderCanvas({ sheetId, moodboardId, initialData, onPdfRead
     description: initialData.cover?.description || '',
     client_name: initialData.cover?.client_name || '',
     cover_image_url: initialData.cover?.cover_image_url || '',
-    date: initialData.cover?.date || new Date().toISOString().slice(0, 10),
+    date: initialData.cover?.date || todayLocalISO(),
   });
 
   useEffect(() => {

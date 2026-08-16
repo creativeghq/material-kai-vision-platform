@@ -17,6 +17,9 @@ import {
 } from '@/components/core/ui/popover';
 import { Badge } from '@/components/core/ui/badge';
 
+/** Rows offered in the dropdown. The server pages, so this is a display cap, not a search cap. */
+const PAGE_SIZE = 20;
+
 interface UserSearchDropdownProps {
   onSelect: (userId: string) => void;
   excludeUserIds?: string[];
@@ -55,10 +58,13 @@ export function UserSearchDropdown({
 
       setLoading(true);
       try {
-        const response = await usersAPI.listUsers(20, 0, search);
-        const filteredUsers = response.data.filter(
-          (user: User) => !excludeUserIds.includes(user.id),
-        );
+        // `search` is honoured server-side now — crm-api used to accept the param and discard it,
+        // leaving this component filtering the first 20 of up to 1000 in the browser (#366 BU-8).
+        // Over-fetch by the exclusion count so excluded users cannot eat result slots.
+        const response = await usersAPI.listUsers(PAGE_SIZE + excludeUserIds.length, 0, search);
+        const filteredUsers = (response.data as User[])
+          .filter((user) => !excludeUserIds.includes(user.id))
+          .slice(0, PAGE_SIZE);
         setUsers(filteredUsers);
       } catch (error) {
         console.error('Error fetching users:', error);

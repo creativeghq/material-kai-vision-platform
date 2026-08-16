@@ -25,8 +25,7 @@ import {
   type DateRangeValue,
 } from '@/components/core/filters';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, toLocalISODate } from '@/utils/datetime';
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
 interface LogEntry {
@@ -44,7 +43,7 @@ interface LogEntry {
 
 const PAGE_SIZE = TABLE_PAGE_SIZE;
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => toLocalISODate(d);
 
 /**
  * Default window. system_logs holds hundreds of thousands of rows (INFO is pruned at 7d,

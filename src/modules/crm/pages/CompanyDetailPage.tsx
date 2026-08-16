@@ -258,7 +258,9 @@ export const CompanyDetailPage: React.FC = () => {
     }
     try {
       setSaving(true);
-      const response = await companiesAPI.createCompany(company);
+      // Name the workspace. crm-api used to default to `scope.workspaceIds[0]` when a create
+      // omitted it, which filed the company in whichever workspace sorted first (#366 BU-10).
+      const response = await companiesAPI.createCompany({ ...company, workspace_id: activeWorkspaceId });
       toast({ title: 'Success', description: 'Company created successfully' });
       navigate(`/crm/companies/${response.data.id}`, { replace: true });
     } catch (error) {

@@ -36,6 +36,7 @@ import { MYDATA_TYPE_FAMILY } from '@/modules/finance/components/mydataTypes';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 import { parseDecimalOr } from '@/utils/decimal';
+import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -240,7 +241,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [currency, setCurrency] = useState('EUR');
   const [vatRate, setVatRate] = useState('24');
   const [paymentTermsDays, setPaymentTermsDays] = useState('30');
-  const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [issueDate, setIssueDate] = useState(() => todayLocalISO());
   const [notes, setNotes] = useState('');
   const [issueNow, setIssueNow] = useState(true);
   const [categoryId, setCategoryId] = useState('');
@@ -326,7 +327,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
     setClientDialogOpen(false);
     setDocumentType(initialDocType || '1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
-    setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(initialNotes ?? ''); setIssueNow(true);
+    setIssueDate(todayLocalISO()); setNotes(initialNotes ?? ''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
@@ -901,8 +902,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const previewSpec = useMemo(() => getTemplateSpec(previewTemplateId), [previewTemplateId]);
   const previewColors = useMemo(() => resolveColors(previewTemplateId, issuer?.invoice_template_colors), [previewTemplateId, issuer]);
   const dueDatePreview = useMemo(() => {
-    const d = new Date(issueDate); d.setDate(d.getDate() + (parseInt(paymentTermsDays, 10) || 0));
-    return d.toISOString().slice(0, 10);
+    // `new Date('2026-08-01')` is UTC midnight, but setDate/getDate read LOCAL components — west
+    // of Greenwich the two disagree and the preview lands a day early. Parse at local midnight.
+    const d = new Date(`${issueDate}T00:00:00`); d.setDate(d.getDate() + (parseInt(paymentTermsDays, 10) || 0));
+    return toLocalISODate(d);
   }, [issueDate, paymentTermsDays]);
   const previewData = useMemo(() => buildInvoiceRenderData({
     invoice: {

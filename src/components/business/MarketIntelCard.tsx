@@ -28,7 +28,15 @@ export const MarketIntelCard: React.FC<{ productId: string; className?: string }
           .is('api_key_id', null).eq('product_id', productId).limit(1).maybeSingle(),
       ]);
       if (cancelled) return;
-      setPrice(pq.data as any); setMention(mq.data as any); setLoading(false);
+      // Neither `.error` was checked, so a failed read rendered as "this product isn't monitored"
+      // — identical to the real no-data case (#366 BU-16). The card is additive and must not grow
+      // an error banner on a product page, so the distinction goes to the console: it is enough to
+      // tell "not monitored" from "the read broke" when someone asks why the panel is missing.
+      if (pq.error) console.warn('[MarketIntelCard] price read failed:', pq.error.message);
+      if (mq.error) console.warn('[MarketIntelCard] mention read failed:', mq.error.message);
+      setPrice(pq.error ? null : (pq.data as any));
+      setMention(mq.error ? null : (mq.data as any));
+      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [productId]);

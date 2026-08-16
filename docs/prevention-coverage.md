@@ -27,7 +27,7 @@ clean codebase.** So "green" is not the question. "When did we last watch it fai
 
 ---
 
-## The seven defect shapes
+## The defect shapes
 
 Derived from the #293/#294 audit and the incident history in CLAUDE.md.
 
@@ -221,6 +221,35 @@ actually said.
 - **The first version of this probe was wrong, and that is worth recording.** It checked `currency IS NULL` across six money tables. **Five of the six columns are `NOT NULL`**, so five sixths of it could never fire — it would have sat in this table looking like coverage. Worse, NULL was the wrong thing to look for at all: those columns are `NOT NULL DEFAULT 'EUR'`, so a document created without an explicit currency does not arrive NULL and get noticed — **it arrives silently, confidently EUR.** That default *is* the AgingRow bug one level down, and no NULL check can ever see it. Caught only because step 2 below forced an attempt to make it fail.
 - **Blind spot:** the `DEFAULT 'EUR'` itself. Nothing distinguishes "the user chose EUR" from "nobody chose anything", so a wrong single-currency figure stays invisible. Closing that needs a nullable column and an explicit choice at write time — a schema change, not a probe.
 
+### 6b. UTC "today" on a date of record — right format, wrong day
+`new Date().toISOString().slice(0, 10)` is the **UTC** calendar date. This platform serves Greek
+customers (UTC+2 winter, UTC+3 summer), so between local midnight and 02:00–03:00 it returns
+*yesterday*. It was written by hand at **25 sites** because `src/utils/datetime.ts` held only
+display formatters and there was nowhere to send them. The distribution is what made it High: the
+invoice `issueDate` (a fiscal document of record submitted to AADE via myDATA, numbered sequentially
+**by date**), `paidAt` (feeds `get_order_settlements`), and the attendance date that feeds payroll.
+
+Exactly the shape of a wrong money number, applied to dates: it produces a perfectly valid
+`YYYY-MM-DD`, raises nothing, logs nothing, and typechecks. An invoice issued at 01:30 on 1 August
+is stamped 31 July — wrong fiscal period, and out of order against its own sequence.
+
+- **Guarded by:** `todayLocalISO()` / `toLocalISODate()` / `localISODateOffset()` in [src/utils/datetime.ts](../src/utils/datetime.ts), the semgrep rule `no-utc-today-as-local-date`, and the `local calendar dates` block in [tests/unit/datetimePrimitives.test.ts](../tests/unit/datetimePrimitives.test.ts).
+- **Proven to fire:** 2026-08-16 — the rule was run against a probe file holding all five offending spellings and matched exactly those five, while leaving the two deliberate-UTC shapes (`new Date(ms)`, `new Date(t + n)`) alone. Re-run over the whole of `src/` afterwards: 0 findings, i.e. the 25-site sweep is complete.
+- **Deliberately narrow.** The rule matches only `new Date()` and `Date.now() ± n`. Three modules do all their arithmetic in UTC and are self-consistent (`projects/lib/schedule.ts`, `financeService.nextRecurrenceDate`, and `ordersService`'s alignment with the DB aging view's UTC session); widening the rule would flag those, and the fix would be to suppress it, which is how a rule stops being read. Pinned by a `semgrepRuleset.test.ts` case so the narrowness is a decision rather than drift.
+- **Blind spot:** the server side. Edge functions and MIVAA run in UTC by definition, and there is no workspace-pinned business timezone to resolve against, so `current_date` in SQL is the same defect one layer down. Any date stamped server-side is still UTC. Closing that is a schema + settings change, not a probe.
+
+### 6c. Compliance control keyed on a client-declared class
+Email suppression ran only inside `if (body.emailType === 'marketing')`, and `emailType` is a
+**request-body field** that defaults to `'transactional'`. So omitting it skipped the unsubscribe
+check, and so did setting it — and the freeform CRM composer, the meeting-invite sender and the
+real-estate buyer digest all declared `'transactional'`. The lookup also destructured `{ data }`
+and dropped `{ error }`, so a failed query let the send proceed: a control that switches itself off
+exactly when it cannot do its job.
+
+- **Guarded by:** suppression is now the default for every send; exemption requires **both** an allowlisted `tags.feature` **and** `isAdminAccess(auth)` — a server-to-server bearer. A browser session authenticates at `level: 'user'`, so nothing a page can send buys the exemption. Pinned by [tests/unit/emailSuppression.test.ts](../tests/unit/emailSuppression.test.ts), which asserts the lookup sits *before and outside* the marketing branch, reads its error, and returns 503.
+- **Proven to fire:** 2026-08-16 — the ordering assertion failed on first run against the real file (it matched the sentence in the comment describing the old shape, not the branch), which is the guard demonstrating it reads position rather than presence; anchored to a line start and re-run.
+- **Blind spot:** a send with no `workspace_id` and no `attribution_workspace_id` has no workspace-scoped list to check against. Those are platform system sends (password resets), but the gap is real.
+
 ### 7. Direction-blind roll-up — a sum that ignores in/out
 Closely related to shape 1, but at the aggregate rather than the row.
 
@@ -308,7 +337,10 @@ and never what crossed the wire.
 
 | Mechanism | Runs | Enforces | Self-proving? |
 |---|---|---|---|
-| `.github/semgrep-security.yml` (8 rules) | CI, blocking | invariants 1, 6–11 | partly — [tests/unit/semgrepRuleset.test.ts](../tests/unit/semgrepRuleset.test.ts) checks parse validity and rejects `catch (...)`, but cannot prove a rule *matches* |
+| `.github/semgrep-security.yml` (9 rules) | CI, blocking | invariants 1, 6–11, plus shape 6b | partly — [tests/unit/semgrepRuleset.test.ts](../tests/unit/semgrepRuleset.test.ts) checks parse validity, rejects `catch (...)`, and pins the UTC-date rule's shape, but cannot prove a rule *matches*. `no-utc-today-as-local-date` was probe-run against a file of known offenders before being trusted |
+| [tests/unit/paymentDestinationGuards.test.ts](../tests/unit/paymentDestinationGuards.test.ts) | `npm test`, blocking | an IBAN is mod-97 checked on every service write path; "set primary" goes through one SQL transaction | partly — the mod-97 half is behavioural (published specimen IBANs plus their single-digit typos); the atomicity half is source shape |
+| `crm_bank_accounts_iban_mod97_check` + `public.iban_is_valid(text)` | every write, DB | shape: a typo'd payment destination | **yes** — watched to reject a single-digit typo and accept the real IBAN, as `authenticated`, inside a rolled-back transaction (2026-08-16) |
+| [tests/unit/emailSuppression.test.ts](../tests/unit/emailSuppression.test.ts) | `npm test`, blocking | shape 6c — the unsubscribe check cannot move back inside the marketing branch, must read its lookup error, and the periodic pushes stay off the transactional allowlist | **yes** — the ordering assertion was watched to fail against a decoy match before being anchored |
 | `check_security_invariants()` RPC | nightly | invariants 2–4, live DB | no |
 | `run_data_integrity_checks` | nightly cron | detect/heal registry | yes — `ops.integrity_registry_broken` validates the registry's own signatures |
 | `npm run typecheck` | CI, blocking | `src/` types | n/a |

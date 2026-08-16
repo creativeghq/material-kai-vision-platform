@@ -17,7 +17,8 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { companiesAPI } from '@/services/crm.service';
+import { foldForSearch } from '@/components/core/filters/types';
+import { companiesAPI, type CreateCompanyError } from '@/services/crm.service';
 import {
   CompanyIdentityLookup,
   companyIdentityPayload,
@@ -64,6 +65,9 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   // A business already in this workspace matching the VAT (or the exact name). Offered instead of
   // a create — the duplicate is what makes spend-per-supplier and AP aging wrong later.
   const [duplicate, setDuplicate] = useState<QuickCreatedCompany | null>(null);
+  // The probe is debounced, so there is a window where the operator has finished typing and the
+  // answer is not back yet. Create used to be live in that window and could beat it.
+  const [probing, setProbing] = useState(false);
 
   // Seed on the OPEN TRANSITION only. `initialName` is a live search-box value in both callers,
   // so keying the reset on its identity meant any change to it mid-dialog — including the
@@ -81,25 +85,39 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
 
   // Dedupe probe. VAT first (authoritative, and matched across every spelling a row might be
   // stored under), name second. Debounced because it runs as you type.
+  //
+  // The name half used to be `ilike('name', name)` — case-insensitive but NOT accent-insensitive,
+  // so "Καρέλης ΑΕ" never found the stored "ΚΑΡΕΛΗΣ ΑΕ" and the probe missed exactly the case the
+  // platform built folding machinery for (#366 BU-3). `name_fold` is the generated
+  // `crm_fold(name)` column; `foldForSearch` is its client twin, held byte-equivalent to the SQL
+  // and Deno copies by tests/unit/searchFoldParity.test.ts. Still an EQUALITY match, not a
+  // substring one — this is a dedupe, not a search box.
   useEffect(() => {
     if (!open) return;
     const vat = draft.vatNumber.trim();
     const name = draft.name.trim();
-    if (!vat && name.length < 2) { setDuplicate(null); return; }
+    if (!vat && name.length < 2) { setDuplicate(null); setProbing(false); return; }
     let cancelled = false;
+    setProbing(true);
     const t = setTimeout(async () => {
       try {
         const forms = vatDedupeForms(vat);
         let q = supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).limit(1);
-        q = forms.length ? q.in('vat_number', forms) : q.ilike('name', name);
-        const { data } = await q.maybeSingle();
-        if (!cancelled) setDuplicate(data ? { id: (data as any).id, name: (data as any).name ?? name } : null);
+        q = forms.length ? q.in('vat_number', forms) : q.eq('name_fold', foldForSearch(name));
+        const { data, error } = await q.maybeSingle();
+        if (cancelled) return;
+        if (error) throw error;
+        setDuplicate(data ? { id: (data as any).id, name: (data as any).name ?? name } : null);
       } catch {
-        // Non-blocking — worst case a duplicate gets created and can be merged.
+        // Still non-blocking, but no longer the whole story: crm-api runs the same folded check
+        // immediately before the insert and 409s, so a probe that fails (or that Create outruns)
+        // can no longer produce a duplicate. This branch only loses the "Use it" shortcut.
         if (!cancelled) setDuplicate(null);
+      } finally {
+        if (!cancelled) setProbing(false);
       }
     }, 350);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { cancelled = true; clearTimeout(t); setProbing(false); };
   }, [open, draft.vatNumber, draft.name, workspaceId]);
 
   // Adopting the existing row still has to apply the role. A company only ever flagged as a
@@ -144,7 +162,16 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
       onCreated({ id: data.id as string, name: (data.name as string) ?? name });
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: 'Could not create the business', description: err?.message, variant: 'destructive' });
+      // The server ran the same folded-name check and found one the debounced probe missed —
+      // either it lost the race or it errored. Surface the row it found so the operator gets the
+      // "Use it" shortcut rather than a dead end. (#366 BU-3)
+      const dup = err as CreateCompanyError;
+      if (dup?.code === 'duplicate_company' && dup.existing) {
+        setDuplicate({ id: dup.existing.id, name: dup.existing.name || name });
+        toast({ title: 'Already in CRM', description: `"${dup.existing.name || name}" exists in this workspace — use it instead of adding a second one.` });
+      } else {
+        toast({ title: 'Could not create the business', description: err?.message, variant: 'destructive' });
+      }
     } finally {
       setSaving(false);
     }
@@ -199,8 +226,10 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-          <Button type="button" onClick={() => void handleCreate()} disabled={saving || lookupBusy || !draft.name.trim()}>
-            {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+          {/* `probing` latches Create shut while the dedupe probe is in flight. Without it Create
+              could win the debounce race and file the duplicate the probe was about to find. */}
+          <Button type="button" onClick={() => void handleCreate()} disabled={saving || lookupBusy || probing || !draft.name.trim()}>
+            {(saving || probing) && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
             Create business
           </Button>
         </DialogFooter>

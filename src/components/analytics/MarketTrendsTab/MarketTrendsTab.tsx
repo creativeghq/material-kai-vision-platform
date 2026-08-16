@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import {
   COLORS, KpiCard, SectionHeader, EmptyState, LifecycleBadge,
@@ -114,7 +114,7 @@ export const MarketTrendsTab: React.FC = () => {
       const fc = forecastWeeks(r.thisWeek, r.growthPct, 4);
       return [r.name, String(r.thisWeek), String(r.priorWeek), `${r.growthPct}%`, r.lifecycle, ...fc.map(String)];
     });
-    downloadCSV(`material-trends-${new Date().toISOString().slice(0,10)}.csv`, [header, ...dataRows]);
+    downloadCSV(`material-trends-${todayLocalISO()}.csv`, [header, ...dataRows]);
   };
 
   // ── Load platform categories once on mount

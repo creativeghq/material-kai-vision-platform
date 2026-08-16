@@ -202,7 +202,11 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   const [remindWhatsapp, setRemindWhatsapp] = useState(false);
   const [reminderLead, setReminderLead] = useState(60); // minutes before meeting_at
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]); // contacts a call/meeting is with
-  const [sendInvites, setSendInvites] = useState(true); // email a calendar invite to attendees
+  // Emailing the attendees is OPT-IN. It defaulted to true, so logging a meeting that had already
+  // happened mailed everyone in it — and that send goes out through the path that was skipping the
+  // unsubscribe list entirely (#366 BU-15/BU-2). Sending mail on someone's behalf is not a sane
+  // default for a "record what happened" action.
+  const [sendInvites, setSendInvites] = useState(false); // email a calendar invite to attendees
   const [saving, setSaving] = useState(false);
 
   // Person picker. Email can go to any person with an address; only real contacts

@@ -63,7 +63,7 @@ import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/
 import { UNITS } from '@/lib/units';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
@@ -4167,7 +4167,7 @@ const LineWarrantyDialog: React.FC<{
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [months, setMonths] = useState('');
-  const [startsOn, setStartsOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startsOn, setStartsOn] = useState(() => todayLocalISO());
   // `ends_on` is the FIELD, not a computed display: it is what gets stored and what the customer
   // can hold us to. "Cover (months)" below is a convenience that asks the database to fill it in.
   const [endsOn, setEndsOn] = useState('');

@@ -482,18 +482,109 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           );
         }
 
-        // ── Email#1: marketing opt-out enforcement + compliance merge-vars ──────────
-        // Marketing sends MUST honor unsubscribes and carry a working opt-out. Transactional /
-        // notification sends are exempt (receipts, account notices).
+        // ── Email#1: opt-out enforcement + compliance merge-vars ────────────────────
+        // The suppression check used to be nested inside `if (body.emailType === 'marketing')`,
+        // and `emailType` is CLIENT-SUPPLIED with a 'transactional' default — so omitting the
+        // field skipped suppression entirely, and so did setting it. The one path the comment
+        // claimed to close ("the freeform / multi-`to` bypass") is precisely the path that
+        // declares itself transactional: SendEmailDialog sends free-text operator-composed mail
+        // to a CRM contact as `transactional`, and so did the meeting-invite sender and the
+        // real-estate buyer digest. (#366 BU-2)
+        //
+        // Suppression is now the DEFAULT and exemption is the allowlist below.
         let unsubHeaders: Record<string, string> | undefined;
-        const primaryTo = Array.isArray(body.to) ? body.to[0] : body.to;
+
+        // Which sends may skip an opt-out, and it is NOT a caller-declared class.
+        //
+        // Two conditions, both required. The feature names a specific document-or-account send;
+        // and the request must be server-to-server (`isAdminAccess` = service-role/admin-secret
+        // bearer, which is how one edge function invokes another). That second half is what
+        // makes this unforgeable rather than another honour system: a browser session holds a
+        // user JWT and authenticates at `level: 'user'`, so nothing a page can send — tags
+        // included — buys the exemption. The freeform CRM composer and the meeting invite are
+        // browser sends, which is exactly why they are the two that were bypassing.
+        //
+        // What is NOT here is the point of the list. `buyer_digest` is a periodic push to a
+        // saved search; `email_marketing` / `presentation_catalogs` / `automations` are
+        // campaigns. Those are marketing whatever the caller calls them.
+        const TRANSACTIONAL_FEATURES = new Set([
+          'invoice_email',        // finance-send-invoice-email — a fiscal document
+          'finance_statement',    // finance-send-statement — an account statement
+          'finance_digest',       // finance-digest-aggregate — to the workspace's OWN staff
+          'quotes',               // send-quote-email — a quote the customer asked for
+          'contracts',            // contracts-api — a contract to sign
+          'purchase_orders',      // generate-purchase-sheet-pdf — a PO to a supplier
+          'crm_meeting_reminder', // crm-meeting-reminders — a meeting they already accepted
+          'inbox_email_reply',    // inbox-api — a reply on a thread they wrote to
+          'role_upgrade_requests',// role-upgrade-requests — an account notice
+          'vendor_report',        // _shared/real-estate — to a property's own vendor
+        ]);
+        const sendFeature = typeof body.tags?.feature === 'string' ? body.tags.feature : null;
+        const suppressionExempt = isAdminAccess(auth)
+          && sendFeature !== null
+          && TRANSACTIONAL_FEATURES.has(sendFeature);
+
+        // The suppression list is workspace-scoped, so it needs a workspace to scope to.
+        // `attributionWorkspaceId` (already ownership-verified above) rather than
+        // `body.workspace_id` alone: an operator flow mailing a tenant's customer from the
+        // PLATFORM sender deliberately carries no `workspace_id`, and that customer's opt-out
+        // still has to hold.
+        if (!suppressionExempt && attributionWorkspaceId) {
+          const recipients = [
+            ...(Array.isArray(body.to) ? body.to : [body.to]),
+            ...(body.cc ?? []),
+            ...(body.bcc ?? []),
+          ].filter((a): a is string => typeof a === 'string' && a.trim().length > 0);
+          const lowered = [...new Set(recipients.map((a) => a.trim().toLowerCase()))];
+
+          if (lowered.length > 0) {
+            const { data: supp, error: suppError } = await supabaseClient
+              .from('email_unsubscribes').select('email')
+              .eq('workspace_id', attributionWorkspaceId)
+              .in('email', lowered);
+            // FAIL CLOSED. The old code destructured `{ data }` only, so a failed lookup left
+            // `supp` undefined, `if (supp)` false, and the send went out — a compliance control
+            // that switches itself off exactly when it cannot do its job. Refuse instead.
+            if (suppError) {
+              return new Response(
+                JSON.stringify({
+                  success: false,
+                  error: 'Could not check the unsubscribe list; the send was refused rather than risk mailing an opted-out recipient.',
+                  code: 'suppression_check_failed',
+                }),
+                { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+              );
+            }
+            const blocked = new Set((supp ?? []).map((r: { email: string }) => String(r.email).toLowerCase()));
+            if (blocked.size > 0) {
+              const keep = (a: string) => !blocked.has(a.trim().toLowerCase());
+              const remainingTo = (Array.isArray(body.to) ? body.to : [body.to]).filter((a) => typeof a === 'string' && keep(a));
+              // Every addressee opted out — nothing left to send to.
+              if (remainingTo.length === 0) {
+                return new Response(
+                  JSON.stringify({ success: false, suppressed: true, code: 'recipient_unsubscribed' }),
+                  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+                );
+              }
+              // Partial: drop the opted-out addressees and send to the rest. Dropping is the
+              // whole point — refusing the batch would punish the recipients who never opted out.
+              body.to = remainingTo.length === 1 ? remainingTo[0] : remainingTo;
+              if (body.cc) body.cc = body.cc.filter(keep);
+              if (body.bcc) body.bcc = body.bcc.filter(keep);
+            }
+          }
+        }
+
         if (body.emailType === 'marketing') {
           // Compliance is per-(workspace, recipient): the suppression list is workspace-scoped and the
           // unsubscribe token is minted for ONE address. So a marketing send MUST carry a workspace_id
           // and target exactly one recipient — otherwise the opt-out link would be minted for the wrong
-          // person and suppression couldn't be enforced for recipients after the first. Bulk marketing
-          // is fanned out one-recipient-per-send by campaign-processor, so this never blocks that path;
-          // it closes the freeform / multi-`to` bypass.
+          // person. Bulk marketing is fanned out one-recipient-per-send by campaign-processor, so this
+          // never blocks that path.
+          // Read AFTER the suppression filter above, which may have rewritten body.to. Minting the
+          // opt-out token from a stale address would hand the recipient a link that unsubscribes
+          // someone else.
+          const primaryTo = Array.isArray(body.to) ? body.to[0] : body.to;
           if (!body.workspace_id) {
             throw new HttpError(400, 'A marketing email requires workspace_id (for suppression + a workspace-scoped unsubscribe link).');
           }
@@ -501,18 +592,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             throw new HttpError(400, 'A marketing email must target a single recipient — use campaign_recipients for bulk sends.');
           }
           if (!primaryTo) throw new HttpError(400, 'No recipient for the marketing send.');
-          // Never re-email an address that opted out of THIS workspace's marketing.
-          const { data: supp } = await supabaseClient
-            .from('email_unsubscribes').select('id')
-            .eq('workspace_id', body.workspace_id)
-            .eq('email', String(primaryTo).toLowerCase())
-            .maybeSingle();
-          if (supp) {
-            return new Response(
-              JSON.stringify({ success: false, suppressed: true, code: 'recipient_unsubscribed' }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-            );
-          }
           const fromForUnsub = body.from || sender.fromEmail || '';
           const built = fromForUnsub
             ? await buildUnsubscribe(body.workspace_id, String(primaryTo), fromForUnsub, (body.tags?.campaign_id as string | undefined) ?? null)

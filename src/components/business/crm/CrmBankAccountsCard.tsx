@@ -7,7 +7,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { crmBankAccountsAPI, type CrmBankAccount, type CrmBankAccountInput } from '@/services/crm.service';
-import { normalizeIban } from '@/utils/iban';
+import { isValidIban, normalizeIban } from '@/utils/iban';
 import { callRevolutApi, getRevolutStatus } from '@/modules/banking-revolut/services/revolutConfigService';
 
 interface Props {
@@ -36,6 +36,9 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
   const [vopAvailable, setVopAvailable] = React.useState(false);
   const [vopBusy, setVopBusy] = React.useState(false);
   const [vopVerdict, setVopVerdict] = React.useState<{ code: string; actualName?: string } | null>(null);
+  // Id of the row whose "make primary" is in flight — latches every star so a double-click, or a
+  // click on a second row mid-request, cannot race the first.
+  const [primaryBusy, setPrimaryBusy] = React.useState<string | null>(null);
 
   const parent = companyId ? { companyId } : { contactId };
 
@@ -108,6 +111,13 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
 
   const save = async () => {
     if (!(form.bank_name ?? '').trim()) { toast({ title: 'Bank name is required', variant: 'destructive' }); return; }
+    // mod-97 before the round trip, so a typo is caught at the field rather than as a
+    // constraint-violation string from Postgres (#366 BU-9). Empty stays allowed — a
+    // SWIFT/account-number counterparty legitimately has no IBAN.
+    if (!isValidIban(form.iban ?? '')) {
+      toast({ title: 'That IBAN fails its checksum', description: 'Check it against the bank statement — a wrong one is a wrong payment destination.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       if (editingId === 'new') {
@@ -128,13 +138,23 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
     catch (e: any) { toast({ title: 'Failed to delete', description: e?.message, variant: 'destructive' }); }
   };
 
+  /**
+   * At most one primary, in ONE transaction.
+   *
+   * This used to clear the other primaries client-side and then set this one — two round trips
+   * with no transaction around them. If the second failed after the first succeeded, the
+   * counterparty was left with NO primary account while the toast said "Failed to set primary",
+   * which an operator reads as "nothing changed". On a payment destination. There was no latch
+   * either, so a double-click raced itself. (#366 BU-4)
+   */
   const makePrimary = async (id: string) => {
+    if (primaryBusy) return;
+    setPrimaryBusy(id);
     try {
-      // At most one primary — clear the others client-side, then set this one.
-      await Promise.all(rows.filter((r) => r.is_primary && r.id !== id).map((r) => crmBankAccountsAPI.update(r.id, { is_primary: false })));
-      await crmBankAccountsAPI.update(id, { is_primary: true });
+      await crmBankAccountsAPI.setPrimary(id);
       await load();
     } catch (e: any) { toast({ title: 'Failed to set primary', description: e?.message, variant: 'destructive' }); }
+    finally { setPrimaryBusy(null); }
   };
 
   const editor = (
@@ -212,7 +232,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
                   {r.account_ref && <div className="text-[11px] text-muted-foreground">SWIFT/Acct: {r.account_ref}</div>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {!r.is_primary && <button type="button" title="Make primary" aria-label="Make primary" className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring rounded p-1" onClick={() => makePrimary(r.id)}><Star className="h-3.5 w-3.5" /></button>}
+                  {!r.is_primary && <button type="button" title="Make primary" aria-label="Make primary" disabled={primaryBusy !== null} className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring rounded p-1 disabled:opacity-40" onClick={() => void makePrimary(r.id)}>{primaryBusy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Star className="h-3.5 w-3.5" />}</button>}
                   <button type="button" title="Edit" aria-label="Edit bank account" className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring rounded p-1" onClick={() => startEdit(r)}><Pencil className="h-3.5 w-3.5" /></button>
                   <button type="button" title="Delete" aria-label="Delete bank account" className="text-muted-foreground hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring rounded p-1" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>

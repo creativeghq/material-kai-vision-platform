@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeIban } from '@/utils/iban';
+import { isValidIban, normalizeIban } from '@/utils/iban';
 
 // Get Supabase URL — lazy to avoid crash at module load time
 const getApiBase = (): string => {
@@ -449,6 +449,16 @@ export const contactsAPI = {
   },
 };
 
+/**
+ * What `createCompany` throws when crm-api refuses the create because the workspace already
+ * holds a business under that (folded) name. Carries the row it found so the caller can offer
+ * it instead of just reporting a failure.
+ */
+export interface CreateCompanyError extends Error {
+  code?: 'duplicate_company';
+  existing?: { id: string; name: string };
+}
+
 // Companies API
 export const companiesAPI = {
   async createCompany(company: any) {
@@ -465,7 +475,15 @@ export const companiesAPI = {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to create company');
+      // crm-api refuses a create whose folded name already exists in the workspace and returns
+      // the row it found (#366 BU-3). Carry that through as structured data rather than flattening
+      // it to a message string — the caller offers "use the existing one" instead of a dead end.
+      const err = new Error(error.error || 'Failed to create company') as CreateCompanyError;
+      if (error.code === 'duplicate_company' && error.existing?.id) {
+        err.code = 'duplicate_company';
+        err.existing = { id: String(error.existing.id), name: String(error.existing.name ?? '') };
+      }
+      throw err;
     }
 
     return response.json();
@@ -805,6 +823,10 @@ export const crmBankAccountsAPI = {
       notes: input.notes?.trim() || null,
     };
     if (!payload.bank_name) throw new Error('Bank name is required');
+    // mod-97 on the WRITE path (#366 BU-9). `crm_bank_accounts` also carries a CHECK backed by
+    // `public.iban_is_valid`, so a caller that skips this service still cannot store a typo —
+    // this exists so the operator sees a sentence instead of a constraint-violation string.
+    if (!isValidIban(payload.iban)) throw new Error('That IBAN fails its checksum — check it against the bank statement.');
     const { data, error } = await (supabase as any).from('crm_bank_accounts').insert(payload).select('*').single();
     if (error) throw new Error(error.message || 'Failed to add bank account');
     return data as CrmBankAccount;
@@ -814,7 +836,10 @@ export const crmBankAccountsAPI = {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (input.bank_name !== undefined) patch.bank_name = (input.bank_name ?? '').trim();
     if (input.account_holder !== undefined) patch.account_holder = input.account_holder?.trim() || null;
-    if (input.iban !== undefined) patch.iban = normalizeIban(input.iban) || null;
+    if (input.iban !== undefined) {
+      patch.iban = normalizeIban(input.iban) || null;
+      if (!isValidIban(patch.iban)) throw new Error('That IBAN fails its checksum — check it against the bank statement.');
+    }
     if (input.account_ref !== undefined) patch.account_ref = input.account_ref?.trim() || null;
     if (input.currency !== undefined) patch.currency = input.currency || 'EUR';
     if (input.is_primary !== undefined) patch.is_primary = input.is_primary;
@@ -822,6 +847,20 @@ export const crmBankAccountsAPI = {
     const { data, error } = await (supabase as any).from('crm_bank_accounts').update(patch).eq('id', id).select('*').single();
     if (error) throw new Error(error.message || 'Failed to update bank account');
     return data as CrmBankAccount;
+  },
+
+  /**
+   * Make this the counterparty's primary account — ONE transaction, in SQL.
+   *
+   * This was a client-side two-phase write: clear the other primaries, then set this one. A
+   * failure between the two left the counterparty with NO primary while the toast said "Failed
+   * to set primary", which reads as "nothing changed". On a payment destination. (#366 BU-4,
+   * pipeline convention 3.) The RPC re-checks workspace membership itself — it is SECURITY
+   * DEFINER, so RLS does not do it for us.
+   */
+  async setPrimary(id: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('crm_set_primary_bank_account', { p_account_id: id });
+    if (error) throw new Error(error.message || 'Failed to set the primary bank account');
   },
 
   async remove(id: string): Promise<void> {

@@ -22,8 +22,7 @@ import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 interface Props {
   workspaceId: string;
   /** Finance reviewers see every card and can approve/reject lines. Reps see only their own. */
@@ -635,7 +634,7 @@ const AddExpenseDialog: React.FC<{
   onAdded: () => void;
 }> = ({ reportId, workspaceId, currency, open, onOpenChange, onAdded }) => {
   const { toast } = useToast();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocalISO());
   const [category, setCategory] = useState<string>('transport');
   const [description, setDescription] = useState('');
   const [vendor, setVendor] = useState('');

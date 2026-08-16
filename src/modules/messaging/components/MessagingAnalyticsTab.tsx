@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingAnalyticsResponse } from '../services';
 import type { InboxAnalyticsResponse } from '../services/types';
 import { formatNumber } from '@/utils/decimal';
+import { toLocalISODate } from '@/utils/datetime';
 
 interface StatCardProps {
   title: string;
@@ -87,8 +88,8 @@ export const MessagingAnalyticsTab: React.FC = () => {
     }
 
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: toLocalISODate(start),
+      end: toLocalISODate(end),
     };
   };
 

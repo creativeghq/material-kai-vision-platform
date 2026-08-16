@@ -108,3 +108,56 @@ export function timeAgo(iso: string | null | undefined, opts: TimeAgoOptions = {
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 }
+
+/**
+ * Today's date in the VIEWER'S calendar, as `YYYY-MM-DD`.
+ *
+ * The thing this replaces was `new Date().toISOString().slice(0, 10)`, written by hand at 25
+ * sites because there was nowhere to send them — this module had only display formatters.
+ * `toISOString()` renders in UTC, and this platform serves Greek customers (UTC+2 winter,
+ * UTC+3 summer), so between local midnight and 02:00–03:00 every one of those returned
+ * YESTERDAY. It produces a perfectly valid `YYYY-MM-DD`, raises nothing, and typechecks —
+ * the same shape as a wrong money number, applied to dates.
+ *
+ * The sites it was wrong at were not cosmetic: the invoice `issueDate` is a fiscal document of
+ * record submitted to AADE via myDATA (numbering is sequential by date and the period is
+ * classified from it), `paidAt` feeds `get_order_settlements`, and attendance dates feed payroll.
+ *
+ * "Local" is the browser's zone, which is the operator's own calendar — the frame in which they
+ * mean "today" when they click a button labelled today. This is deliberately NOT derived in SQL:
+ * the database session runs in UTC, so `current_date` there is the same defect with a longer
+ * stack trace. A workspace-pinned business timezone is the real answer for server-side date
+ * stamping and is not built.
+ */
+export function todayLocalISO(): string {
+  return toLocalISODate(new Date());
+}
+
+/**
+ * A `Date` (or epoch ms) rendered as its LOCAL calendar date, `YYYY-MM-DD`.
+ *
+ * Use this instead of `.toISOString().slice(0, 10)` on anything a user picked or the app
+ * constructed locally — `new Date(2026, 7, 1)` is midnight local, which is 31 July in UTC.
+ *
+ * Only accepts a `Date`/number on purpose. Passing a `'YYYY-MM-DD'` string through `new Date()`
+ * parses it as UTC midnight, so re-rendering it locally can shift it a day west — a date-only
+ * string is already in this format and needs no conversion.
+ */
+export function toLocalISODate(value: Date | number): string {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * `days` calendar days from today (negative = in the past), as a local `YYYY-MM-DD`.
+ *
+ * Calendar arithmetic via `setDate`, not `Date.now() ± n * 86400000`: on a DST boundary a day is
+ * 23 or 25 hours, so the millisecond form lands at 23:00 the previous day and slices off the
+ * wrong date. Every "last 30 days" range in the app was written the millisecond way.
+ */
+export function localISODateOffset(days: number, from: Date = new Date()): string {
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  d.setDate(d.getDate() + days);
+  return toLocalISODate(d);
+}

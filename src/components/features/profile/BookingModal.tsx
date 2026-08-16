@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { toLocalISODate } from '@/utils/datetime';
 
 function formatSlot(slot: string) {
   const [h, m] = slot.split(':').map(Number);
@@ -55,7 +56,7 @@ export const BookingModal: React.FC<{
       client_message: message.trim() || null,
       service_id: serviceId || null,
       service_name: selectedService?.name ?? null,
-      appointment_date: date.toISOString().split('T')[0],
+      appointment_date: toLocalISODate(date),
       appointment_time: timeSlot,
       status: 'pending',
     }).select().single();
@@ -79,7 +80,7 @@ export const BookingModal: React.FC<{
       professional_user_id: professionalUserId,
       client_name: name.trim(),
       client_email: email.trim(),
-      date: date.toISOString().split('T')[0],
+      date: toLocalISODate(date),
       time: timeSlot,
       service_name: selectedService?.name ?? null,
     });

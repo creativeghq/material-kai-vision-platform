@@ -45,6 +45,32 @@ describe('semgrep security ruleset', () => {
     ).toEqual([]);
   });
 
+  /**
+   * The UTC-date rule is deliberately NARROW — it matches `new Date()` and `Date.now() ± n`, and
+   * leaves `d.toISOString().slice(0, 10)` on a variable alone, because three modules
+   * (projects/lib/schedule, financeService.nextRecurrenceDate, ordersService's aging-view
+   * alignment) do all their arithmetic in UTC and are self-consistent. Widening it to any
+   * `.toISOString().slice` would flag those and the fix would be to suppress it, which is how a
+   * rule stops being read. Pin the narrowness so it is a decision, not a drift.
+   */
+  it('scopes the UTC-date rule to the frontend and to unambiguous now-shapes', () => {
+    const doc = parse(raw) as {
+      rules: Array<{ id: string; paths?: { include?: string[] }; 'pattern-either'?: Array<{ pattern: string }> }>;
+    };
+    const rule = doc.rules.find((r) => r.id === 'no-utc-today-as-local-date');
+    expect(rule, 'the UTC-date rule is gone — 25 sites regress silently without it').toBeTruthy();
+    const pats = (rule!['pattern-either'] ?? []).map((p) => p.pattern);
+    // Every pattern must start from a NOW expression. `new Date($X)` on a variable is not one.
+    for (const p of pats) {
+      expect(p, `"${p}" would also match deliberate UTC arithmetic on a variable`)
+        .toMatch(/^new Date\((\)|Date\.now\(\) [+-] \$N\))/);
+    }
+    expect(pats.some((p) => p.includes("split('T')[0]")), 'the split() spelling must be covered too').toBe(true);
+    // Edge functions and MIVAA run in UTC by definition and have no workspace timezone to resolve
+    // against; only `src/**` runs in the operator's browser, where "today" means their calendar.
+    expect(rule!.paths?.include).toEqual(['/src/**']);
+  });
+
   it('keeps the JSX rules anchored to an element (the empty-pattern trap)', () => {
     // `dangerouslySetInnerHTML={=~/.*/}` parsed fine and matched NOTHING for months. A pattern
     // that cannot match is indistinguishable from a clean codebase, so pin the working shape.

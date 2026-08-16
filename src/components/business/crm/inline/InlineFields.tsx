@@ -22,6 +22,23 @@ import { onEnterOrSpace } from '@/utils/a11y';
 
 type SaveFn = (value: any) => Promise<void> | void;
 
+/**
+ * Every commit here is `try { await onSave(...) } finally { setSaving(false) }` — no `catch`.
+ * On failure the spinner stopped, the field stayed open, and NOTHING told the user (#366 BU-11).
+ * An inline edit is optimistic by design, so a silent failure looks exactly like a save: the
+ * operator moves on believing the value is stored.
+ *
+ * The field is left OPEN with the draft intact so the edit is not lost — retry is one Enter away.
+ */
+function useSaveFailureToast() {
+  const { toast } = useToast();
+  return (err: unknown) => toast({
+    title: 'Not saved',
+    description: err instanceof Error ? err.message : 'The change was not stored — try again.',
+    variant: 'destructive',
+  });
+}
+
 /** Small copy-to-clipboard button shown next to copyable values. */
 export const CopyButton: React.FC<{ value?: string | null; className?: string }> = ({ value, className }) => {
   const { toast } = useToast();
@@ -106,6 +123,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const reportSaveFailure = useSaveFailureToast();
   const str = value == null ? '' : String(value);
 
   const begin = () => { setDraft(str); setEditing(true); };
@@ -115,6 +133,9 @@ export const InlineText: React.FC<InlineTextProps> = ({
     try {
       await onSave(toSaveValue(draft, type));
       setEditing(false);
+    } catch (err) {
+      // Stay in edit mode: the draft survives so the operator can retry without retyping.
+      reportSaveFailure(err);
     } finally {
       setSaving(false);
     }
@@ -216,6 +237,7 @@ export const InlineMultiSelect: React.FC<InlineMultiSelectProps> = ({
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
+  const reportSaveFailure = useSaveFailureToast();
 
   const selected = options.filter((o) => values.includes(o.value));
   const showSearch = options.length >= searchThreshold;
@@ -224,7 +246,9 @@ export const InlineMultiSelect: React.FC<InlineMultiSelectProps> = ({
     const name = newName.trim();
     if (!name || !onCreate) return;
     setCreating(true);
-    try { await onCreate(name); setNewName(''); } finally { setCreating(false); }
+    try { await onCreate(name); setNewName(''); }
+    catch (err) { reportSaveFailure(err); }
+    finally { setCreating(false); }
   };
 
   const chips = (
@@ -355,6 +379,7 @@ export const InlineSelect: React.FC<InlineSelectProps> = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const reportSaveFailure = useSaveFailureToast();
 
   const selected = value != null ? options.find((o) => o.value === value) : undefined;
   const current = displayValue ?? selected?.label;
@@ -364,7 +389,9 @@ export const InlineSelect: React.FC<InlineSelectProps> = ({
     setOpen(false);
     if (v === (value ?? null)) return;
     setSaving(true);
-    try { await onSave(v); } finally { setSaving(false); }
+    try { await onSave(v); }
+    catch (err) { reportSaveFailure(err); }
+    finally { setSaving(false); }
   };
 
   const triggerClass = alwaysEdit

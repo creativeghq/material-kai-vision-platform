@@ -16,6 +16,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimal } from '@/utils/decimal';
+import { todayLocalISO } from '@/utils/datetime';
 
 interface Party { type: 'company' | 'contact'; id: string; label: string }
 
@@ -49,7 +50,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<string>('0');
   const [currency, setCurrency] = useState('EUR');
-  const [scheduledFor, setScheduledFor] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [scheduledFor, setScheduledFor] = useState<string>(() => todayLocalISO());
   const [category, setCategory] = useState<PlannedPaymentCategory>('supplier_bill');
   const [reminderAt, setReminderAt] = useState<string>('');
   const [notes, setNotes] = useState('');
@@ -68,7 +69,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
       setTitle(d?.title ?? '');
       setAmount(d?.amount ?? '0');
       setCurrency(d?.currency ?? 'EUR');
-      setScheduledFor(d?.scheduledFor ?? new Date().toISOString().slice(0, 10));
+      setScheduledFor(d?.scheduledFor ?? todayLocalISO());
       setCategory(d?.category ?? (defaultDirection === 'in' ? 'expected_receipt' : 'supplier_bill'));
       setReminderAt(d?.reminderAt ?? '');
       setNotes(d?.notes ?? '');

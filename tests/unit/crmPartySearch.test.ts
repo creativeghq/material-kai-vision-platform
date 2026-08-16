@@ -35,19 +35,20 @@ const RAW_ILIKE = new RegExp(
  * Lines that legitimately match a raw column, keyed by file. Each is an EXACT match lookup, not
  * a search box — folding them would change what they mean, not just how forgiving they are.
  */
+/**
+ * The two dedupe probes that used to live here — QuickAddCompanyDialog and NewExpenseDialog's
+ * payee find-or-create — were exempted as "an exact-name lookup, deliberately not fuzzy". That
+ * reasoning was right about the SHAPE and wrong about the result: `ilike` is case-insensitive but
+ * NOT accent-insensitive, so "Καρέλης ΑΕ" never matched the stored "ΚΑΡΕΛΗΣ ΑΕ" and the probe
+ * missed exactly the case the platform built folding machinery for (#366 BU-3). They now match a
+ * generated `name_fold` column — `crm_fold(name)` alone, so it stays an equality lookup — and
+ * needed no exemption at all.
+ */
 const ALLOWED: Record<string, { text: string; why: string }[]> = {
   'src/components/Admin/DocumentFactoriesCrmLinker.tsx': [{
     text: 'return `name.ilike.${quoteOrValue(safe)}`;',
     why: 'Exact-name batch join: the result is keyed back by lowercased name, so a substring hit '
       + 'would attach the wrong company to a factory.',
-  }],
-  'src/components/business/crm/QuickAddCompanyDialog.tsx': [{
-    text: "q = forms.length ? q.in('vat_number', forms) : q.ilike('name', name);",
-    why: 'Duplicate check before create — an exact-name lookup, deliberately not fuzzy.',
-  }],
-  'src/modules/finance/components/NewExpenseDialog.tsx': [{
-    text: ".eq('workspace_id', workspaceId).ilike('name', name).limit(1).maybeSingle();",
-    why: 'Duplicate check before create — an exact-name lookup, deliberately not fuzzy.',
   }],
   'src/modules/email/components/CreateCampaignModal.tsx': [{
     text: ".ilike('email', `%${searchQuery}%`)",

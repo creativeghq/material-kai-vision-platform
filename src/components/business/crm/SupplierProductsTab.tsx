@@ -54,11 +54,16 @@ interface ProductRow {
  * (resolve_brand_company) and the "Linked factory / manufacturer" pin claims matching
  * products onto the company (claim_brand_for_company). No fuzzy metadata-name match.
  */
+/** How many of a supplier's products this tab loads. The filter and paging are client-side, so
+ *  this is a real ceiling — it is SHOWN when hit rather than quietly cutting the list short. */
+const ROW_LIMIT = 500;
+
 export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
   workspaceId,
   companyId,
 }) => {
   const [rows, setRows] = useState<ProductRow[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -75,13 +80,21 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
         const { data, error: err } = await supabase
           .from('products')
           .select(`id, name, sku, external_sku, status, created_at, metadata, ${PRODUCT_IMAGE_SELECT}`)
+          // Belt-and-braces workspace scope. RLS already bounds this (all 286 tenant tables have
+          // it, per the #358 sweep), so its absence was never a live leak — but the props and the
+          // comment both said this query was workspace-scoped and it was not (#366 BU-13).
+          // Defence in depth only counts when it is actually applied.
+          .eq('workspace_id', workspaceId)
           .eq('brand_company_id', companyId)
           .order('created_at', { ascending: false })
-          .limit(500);
+          // One over the cap, so a truncated list can say so instead of just being short.
+          .limit(ROW_LIMIT + 1);
 
         if (err) throw err;
         if (cancelled) return;
-        setRows((data ?? []) as ProductRow[]);
+        const all = (data ?? []) as ProductRow[];
+        setTruncated(all.length > ROW_LIMIT);
+        setRows(all.slice(0, ROW_LIMIT));
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? 'Failed to load products');
       } finally {
@@ -130,7 +143,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
             />
           </div>
           <Badge variant="secondary" className="shrink-0">
-            {loading ? '…' : `${filteredRows.length}${filteredRows.length !== rows.length ? ` / ${rows.length}` : ''} products`}
+            {loading ? '…' : `${filteredRows.length}${filteredRows.length !== rows.length ? ` / ${rows.length}` : ''} products${truncated ? '+' : ''}`}
           </Badge>
         </div>
       </CardHeader>
@@ -196,6 +209,11 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
               </TableBody>
             </Table>
             <TablePagination page={page} total={filteredRows.length} onPageChange={setPage} label="products" />
+            {truncated && (
+              <p className="px-4 pb-3 text-[11px] text-muted-foreground">
+                Showing the first {ROW_LIMIT} — this supplier has more products than that.
+              </p>
+            )}
           </div>
         )}
       </CardContent>

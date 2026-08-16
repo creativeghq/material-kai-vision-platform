@@ -16,6 +16,9 @@ import {
   PopoverTrigger,
 } from '@/components/core/ui/popover';
 
+/** Rows offered in the dropdown. The server pages, so this is a display cap, not a search cap. */
+const PAGE_SIZE = 20;
+
 interface CompanySearchDropdownProps {
   onSelect: (companyId: string) => void;
   excludeCompanyIds?: string[];
@@ -53,10 +56,13 @@ export function CompanySearchDropdown({
 
       setLoading(true);
       try {
-        const response = await companiesAPI.listCompanies(20, 0, search);
-        const filteredCompanies = response.data.filter(
-          (company: Company) => !excludeCompanyIds.includes(company.id),
-        );
+        // Over-fetch by the exclusion count. The exclusions are applied HERE (the server has no
+        // denylist filter), so asking for exactly 20 meant excluded companies consumed result
+        // slots and could empty the dropdown outright (#366 BU-14).
+        const response = await companiesAPI.listCompanies(PAGE_SIZE + excludeCompanyIds.length, 0, search);
+        const filteredCompanies = (response.data as Company[])
+          .filter((company) => !excludeCompanyIds.includes(company.id))
+          .slice(0, PAGE_SIZE);
         setCompanies(filteredCompanies);
       } catch (error) {
         console.error('Error fetching companies:', error);

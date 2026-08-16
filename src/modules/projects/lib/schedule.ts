@@ -4,6 +4,7 @@
  * only finish-to-start is treated as a real constraint (the other three dep types are stored but
  * scheduled as FS). That is the documented v1 scope.
  */
+import { todayLocalISO } from '@/utils/datetime';
 
 export interface ScheduleTask {
   id: string;
@@ -149,7 +150,7 @@ export function scheduleWindow(tasks: ScheduleTask[]): { start: number; end: num
     if (s != null) points.push(s);
     if (e != null) points.push(e);
   }
-  const today = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+  const today = Date.parse(`${todayLocalISO()}T00:00:00Z`);
   let start = points.length ? Math.min(...points) : today - 7 * DAY_MS;
   let end = points.length ? Math.max(...points) : today + 21 * DAY_MS;
   start -= 2 * DAY_MS;

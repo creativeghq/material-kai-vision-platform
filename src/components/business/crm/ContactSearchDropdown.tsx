@@ -16,6 +16,9 @@ import {
   PopoverTrigger,
 } from '@/components/core/ui/popover';
 
+/** Rows offered in the dropdown. The server pages, so this is a display cap, not a search cap. */
+const PAGE_SIZE = 50;
+
 interface ContactSearchDropdownProps {
   onSelect: (contactId: string) => void;
   excludeContactIds?: string[];
@@ -54,16 +57,18 @@ export function ContactSearchDropdown({
 
       setLoading(true);
       try {
-        const response = await contactsAPI.listContacts(50, 0);
-        const term = search.toLowerCase();
-        const filteredContacts = response.data.filter((contact: Contact) => {
-          if (excludeContactIds.includes(contact.id)) return false;
-          const haystack = [contact.name, contact.email, contact.company]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          return haystack.includes(term);
-        });
+        // The term goes to the SERVER. This used to fetch the first 50 contacts and filter the
+        // result in the browser, so contact #51 onward was unfindable through this control no
+        // matter what was typed — silently, as an empty dropdown reading "no contacts found"
+        // (#366 BU-7). crm-api's contacts search matches the folded `search_fold` column and
+        // resolves the attached company too, which the client-side substring match never could.
+        //
+        // Over-fetch by the exclusion count so excluded contacts cannot eat result slots and
+        // empty the list; the server has no denylist filter, so the trimming stays here.
+        const response = await contactsAPI.listContacts(PAGE_SIZE + excludeContactIds.length, 0, { search });
+        const filteredContacts = (response.data as Contact[])
+          .filter((contact) => !excludeContactIds.includes(contact.id))
+          .slice(0, PAGE_SIZE);
         setContacts(filteredContacts);
       } catch (error) {
         console.error('Error fetching contacts:', error);

@@ -59,6 +59,17 @@ wrong number is a valid `number`, so no typecheck could either.
 - **Never** re-pick a half by order type, re-compute `total − settled`, or hand-roll an allocation-by-direction query in the frontend. [tests/unit/moneyDerivation.test.ts](tests/unit/moneyDerivation.test.ts) fails the build if you do (verified against all 5 historical offenders).
 - Applying this to a NEW money quantity: derive it in SQL, return it derived, and add a drift check comparing any cached copy against the derivation.
 
+### 1b. A date of record is the OPERATOR'S calendar day, never UTC.
+`new Date().toISOString().slice(0, 10)` is the UTC date. Greek customers are UTC+2/+3, so between
+local midnight and 02:00–03:00 it returns **yesterday** — on the invoice `issueDate` (a fiscal record
+submitted to AADE, numbered sequentially *by date*), on `paidAt`, on the attendance date that feeds
+payroll. It was hand-written at 25 sites because there was no helper. Same shape as a wrong money
+number: a valid `YYYY-MM-DD`, nothing raised, typechecks clean.
+
+- Use `todayLocalISO()` / `toLocalISODate(d)` / `localISODateOffset(n)` from `src/utils/datetime.ts`. Never `.toISOString().slice(0, 10)` on a local `Date`, and never `Date.now() ± n * 86400000` for a day offset — a DST day is 23 or 25 hours.
+- Enforced by the semgrep rule `no-utc-today-as-local-date` (frontend only) + [tests/unit/datetimePrimitives.test.ts](tests/unit/datetimePrimitives.test.ts).
+- **Do NOT "fix" this by deriving the date in SQL.** The DB session runs in UTC, so `current_date` is the same defect one layer down. There is no workspace business timezone; a server-stamped date is still UTC and that is a known gap, not something a probe can close.
+
 ### 2. Silent zero — check the world, not the exit code.
 The dominant historical failure here is **a number that should be non-zero sitting at zero forever while nothing
 complains**: `stamp_job_refresh_cost` referencing a column that did not exist (billing stuck at 0, exception

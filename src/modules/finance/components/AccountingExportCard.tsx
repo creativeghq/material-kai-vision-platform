@@ -14,12 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 import {
   accountingExportService, journalToCsv, toCsv, downloadCsv,
 } from '@/modules/finance/services/accountingExportService';
+import { toLocalISODate } from '@/utils/datetime';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
 
 function rangeFor(p: Period): { from: string; to: string } {
   const today = new Date();
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const fmt = (d: Date) => toLocalISODate(d);
   switch (p) {
     case 'this_month': return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(today) };
     case 'last_month': return { from: fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1)), to: fmt(new Date(today.getFullYear(), today.getMonth(), 0)) };

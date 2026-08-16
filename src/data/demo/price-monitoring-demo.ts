@@ -2,6 +2,7 @@
  * Demo Price Monitoring Data
  * Provides realistic price monitoring data for Demo Agent products
  */
+import { toLocalISODate } from '@/utils/datetime';
 
 export interface DemoCompetitorSource {
   id: string;
@@ -123,7 +124,7 @@ export function getDemoPriceHistory(
     const price = basePrice * (1 + variation);
 
     history.push({
-      date: date.toISOString().split('T')[0],
+      date: toLocalISODate(date),
       price: Math.round(price * 100) / 100,
       source: i % 3 === 0 ? 'BuildMart Online' : i % 3 === 1 ? 'TilesDirect Pro' : 'MaterialHub Supply',
       availability: 'in_stock',

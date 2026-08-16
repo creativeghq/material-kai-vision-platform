@@ -23,6 +23,7 @@ import {
   criticalPathIds, rollupProgress, scheduleWindow, barGeometry, shiftTask,
   parseDay, type ScheduleTask,
 } from '../../lib/schedule';
+import { todayLocalISO } from '@/utils/datetime';
 
 const ROW_H = 36;
 const PX_PER_DAY = 26;
@@ -119,7 +120,7 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
   }, [win]);
 
   const todayLeft = useMemo(() => {
-    const today = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    const today = Date.parse(`${todayLocalISO()}T00:00:00Z`);
     const offset = ((today - win.start) / DAY_MS) * PX_PER_DAY;
     return offset >= 0 && offset <= timelineWidth ? offset : null;
   }, [win, timelineWidth]);

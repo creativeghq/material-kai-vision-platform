@@ -15,6 +15,7 @@ import {
   Building2, Check, Plus, Loader2, ExternalLink, AlertCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { quoteOrValue } from '@/services/crmSearch';
 import { useToast } from '@/hooks/use-toast';
 import { companiesAPI } from '@/services/crm.service';
@@ -88,6 +89,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [matchesByKey, setMatchesByKey] = useState<Map<string, CompanyMatch | null>>(new Map());
   const [loading, setLoading] = useState(false);
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
@@ -195,6 +197,9 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
     setCreatingKey(dialog.factoryKey);
     try {
       const response = await companiesAPI.createCompany({
+        // A factory promoted from a catalog belongs to the workspace being administered. crm-api
+        // used to fall back to the caller's first workspace when this was omitted (#366 BU-10).
+        workspace_id: activeWorkspaceId,
         name,
         website: dialog.website.trim() || undefined,
         description: dialog.description.trim() || undefined,

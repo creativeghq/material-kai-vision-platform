@@ -22,6 +22,7 @@ import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/c
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
+import { localISODateOffset } from '@/utils/datetime';
 
 export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -774,8 +775,7 @@ const ListToMarketplaceDialog: React.FC<{
     setCondition('new'); setBatchLot('');
     setCity(warehouseLocation || item.location || '');
     setDelivery('pickup');
-    const d = new Date(); d.setDate(d.getDate() + 60);
-    setExpiry(d.toISOString().slice(0, 10));
+    setExpiry(localISODateOffset(60));
 
     let cancelled = false;
     (async () => {

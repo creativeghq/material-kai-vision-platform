@@ -575,6 +575,9 @@ export const ContactDetailPage: React.FC = () => {
     setCreatingBusiness(true);
     try {
       const res = await companiesAPI.createCompany({
+        // The new business belongs to the workspace being viewed — never "whichever sorts
+        // first", which is what crm-api defaulted to before #366 BU-10.
+        workspace_id: activeWorkspaceId,
         name: contact.billing_name || contact.company || contact.name,
         email: contact.email ?? null,
         phone: contact.phone ?? null,

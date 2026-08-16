@@ -30,13 +30,13 @@ import {
   type CatalogAccessLogRow,
 } from '@/services/catalogsService';
 import { buildCatalogOperationsFilters } from './catalogOperationsFilters';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, toLocalISODate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 
 /** Preserves the tab's previous default window now that the range Select is a dateRange field. */
 function defaultFilterValues(): FilterValues {
   const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  return { created_at: { from: from.toISOString().slice(0, 10) } };
+  return { created_at: { from: toLocalISODate(from) } };
 }
 
 export const CatalogOperationsTab: React.FC = () => {

@@ -17,6 +17,7 @@ import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeR
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { todayLocalISO } from '@/utils/datetime';
 
 interface Props { workspaceId: string }
 type Customer = { type: 'company' | 'contact'; id: string; label: string };
@@ -35,7 +36,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [search, setSearch] = useState('');
   const [options, setOptions] = useState<Customer[]>([]);
-  const [workDate, setWorkDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [workDate, setWorkDate] = useState(() => todayLocalISO());
   const [hours, setHours] = useState('1');
   const [rate, setRate] = useState('50');
   const [desc, setDesc] = useState('');
@@ -49,7 +50,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   // Time reports — per user / per contact
   const thisYear = new Date().getFullYear();
   const [repFrom, setRepFrom] = useState(`${thisYear}-01-01`);
-  const [repTo, setRepTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [repTo, setRepTo] = useState(() => todayLocalISO());
   const [report, setReport] = useState<{ byUser: TimeReportUserRow[]; byContact: TimeReportContactRow[] } | null>(null);
   const [repLoading, setRepLoading] = useState(false);
   const [repView, setRepView] = useState<'user' | 'contact'>('user');

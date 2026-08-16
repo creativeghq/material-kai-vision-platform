@@ -10,10 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { hrService, type Punch, type TimesheetRow } from '../services/hrService';
 import { EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { formatTime } from '@/utils/datetime';
+import { formatTime, localISODateOffset, todayLocalISO } from '@/utils/datetime';
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const daysAgoISO = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const daysAgoISO = (n: number) => localISODateOffset(-n);
 
 /** ISO instant → value for <input type="datetime-local"> in local time. */
 function toLocalInput(iso: string): string {
@@ -35,7 +34,7 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
   const load = useCallback(async () => {
     setLoading(true);
     // Deleting a punch can empty the last page — re-clamp on every reload.
-    try { const r = await hrService.listPunches(workspaceId, { employee_id: employeeId, from: daysAgoISO(30), to: todayISO() }); setPunches(r.punches); setPage((p) => clampPage(p, r.punches.length)); }
+    try { const r = await hrService.listPunches(workspaceId, { employee_id: employeeId, from: daysAgoISO(30), to: todayLocalISO() }); setPunches(r.punches); setPage((p) => clampPage(p, r.punches.length)); }
     catch (e) { toast({ title: 'Failed to load punches', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
   }, [workspaceId, employeeId, toast]);
@@ -107,7 +106,7 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(daysAgoISO(14));
-  const [to, setTo] = useState(todayISO());
+  const [to, setTo] = useState(todayLocalISO());
   const [rows, setRows] = useState<TimesheetRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);

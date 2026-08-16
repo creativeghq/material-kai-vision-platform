@@ -19,6 +19,7 @@ import { CampaignsTab } from '../components/CampaignsTab';
 import { TestEmailDialog } from '../components/TestEmailDialog';
 import { EmailSettingsModal } from '../components/EmailSettingsModal';
 import { formatNumber } from '@/utils/decimal';
+import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 
 export const EmailManagement: React.FC = () => {
   const [analytics, setAnalytics] = useState({
@@ -50,8 +51,8 @@ export const EmailManagement: React.FC = () => {
       fromDate.setDate(fromDate.getDate() - 30);
 
       const analyticsData = await emailService.getAnalytics({
-        start: fromDate.toISOString().split('T')[0],
-        end: new Date().toISOString().split('T')[0],
+        start: toLocalISODate(fromDate),
+        end: todayLocalISO(),
       });
 
       setAnalytics((prev) => ({ ...prev, ...analyticsData }));

@@ -24,6 +24,7 @@ import {
   type DateRangeValue,
   type RangeValue,
 } from './types';
+import { toLocalISODate } from '@/utils/datetime';
 
 /** Quick date windows offered on every dateRange field. */
 const DATE_PRESETS: { label: string; days: number | 'mtd' | 'ytd' }[] = [
@@ -34,7 +35,7 @@ const DATE_PRESETS: { label: string; days: number | 'mtd' | 'ytd' }[] = [
   { label: 'Year to date', days: 'ytd' },
 ];
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => toLocalISODate(d);
 
 function presetRange(days: number | 'mtd' | 'ytd'): DateRangeValue {
   const today = new Date();

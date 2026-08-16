@@ -310,3 +310,41 @@ rules:
       A third argument is the removed `fallback` parameter, which made a missed lookup
       indistinguishable from a configured prompt.
     pattern: getGenerationPrompt($A, $B, $C)
+
+  # ── K · Dates of record computed in UTC (#366 BU-1) ────────────────────────
+  # `new Date().toISOString().slice(0, 10)` is the UTC calendar date, not the operator's. This
+  # platform serves Greek customers (UTC+2/+3), so between local midnight and 02:00–03:00 every
+  # one of these returned YESTERDAY — on the invoice issue date (a fiscal record submitted to
+  # AADE via myDATA, numbered sequentially BY DATE), on `paidAt` (feeds get_order_settlements),
+  # and on attendance dates (payroll). It was written by hand at 25 sites because there was no
+  # helper to reach for; there is one now.
+  #
+  # Frontend only. `src/**` runs in the operator's browser, where "today" means their calendar
+  # day. Edge functions and MIVAA run in UTC by definition and have no workspace timezone to
+  # resolve against — a rule there would be noise, not a finding.
+  #
+  # Deliberately narrow: only the `new Date()` / `Date.now() ± n` shapes, which can have no other
+  # intent. `d.toISOString().slice(0, 10)` on a variable is left alone — `projects/lib/schedule.ts`
+  # and `financeService.nextRecurrenceDate` do all their arithmetic in UTC and are self-consistent,
+  # and `ordersService` matches the DB aging view's UTC session on purpose.
+  - id: no-utc-today-as-local-date
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      Date of record (#366 BU-1): toISOString() renders the UTC calendar date, which is
+      YESTERDAY for a UTC+2/+3 operator between local midnight and 02:00–03:00. Use
+      `todayLocalISO()` / `toLocalISODate(d)` / `localISODateOffset(n)` from `@/utils/datetime`.
+    paths:
+      include:
+        - "/src/**"
+      exclude:
+        - "/src/utils/datetime.ts"
+    pattern-either:
+      - pattern: new Date().toISOString().slice(0, 10)
+      - pattern: new Date().toISOString().substring(0, 10)
+      - pattern: new Date().toISOString().split('T')[0]
+      - pattern: new Date().toISOString().split("T")[0]
+      - pattern: new Date(Date.now() + $N).toISOString().slice(0, 10)
+      - pattern: new Date(Date.now() - $N).toISOString().slice(0, 10)
+      - pattern: new Date(Date.now() + $N).toISOString().split('T')[0]
+      - pattern: new Date(Date.now() - $N).toISOString().split('T')[0]

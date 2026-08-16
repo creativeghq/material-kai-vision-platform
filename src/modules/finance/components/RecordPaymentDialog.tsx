@@ -36,6 +36,7 @@ import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { parseDecimal } from '@/utils/decimal';
+import { todayLocalISO } from '@/utils/datetime';
 
 // 'supplier' = money OUT to the counterparty of a PURCHASE order, and the ONLY direction a
 // purchase order offers. You do not receive money from someone you are buying from, so the
@@ -95,7 +96,7 @@ export const RecordPaymentDialog: React.FC<{
   const [fxRate, setFxRate] = useState('1');
   const [fxRateToBase, setFxRateToBase] = useState('1');
   const [method, setMethod] = useState<PaymentMethod>('cash');
-  const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paidAt, setPaidAt] = useState(() => todayLocalISO());
   const [categoryId, setCategoryId] = useState<string>('');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -182,7 +183,7 @@ export const RecordPaymentDialog: React.FC<{
     setBillId('');
     // Paying a bill is a bank transfer far more often than cash; the general flow starts on cash
     // because it is a counter-side collection.
-    setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod(payingExpense ? 'bank_transfer' : 'cash'); setPaidAt(new Date().toISOString().slice(0, 10));
+    setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod(payingExpense ? 'bank_transfer' : 'cash'); setPaidAt(todayLocalISO());
     setCategoryId(''); setReference(''); setNotes('');
     setCurrency(orderCurrency || 'EUR'); setFxRate('1'); setFxRateToBase('1');
     setTargetInvoiceId(presetInvoiceId ?? '');

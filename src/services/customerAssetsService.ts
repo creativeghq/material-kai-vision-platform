@@ -9,6 +9,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 
 export type AssetStatus = 'active' | 'removed' | 'replaced' | 'decommissioned';
 export type WarrantyKind = 'manufacturer' | 'extended' | 'installer' | 'insurance';
@@ -74,7 +75,7 @@ export async function warrantyEndDate(startsOn: string, months: number): Promise
 export function activeCover(
   warranties: Array<Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'>> | null | undefined,
 ): Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'> | null {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalISO();
   return (warranties ?? [])
     .filter((w) => w.ends_on >= today)
     .sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0] ?? null;
@@ -261,14 +262,25 @@ export function describeInterval(plan: { interval_months: number | null; interva
   return '—';
 }
 
-/** Warranty state for display. `ends_on` is the only input — nothing is cached server-side. */
+/**
+ * Warranty state for display. `ends_on` is the only input — nothing is cached server-side.
+ *
+ * "Today" is the VIEWER'S calendar day (#366 BU-12). It used to be
+ * `new Date().toISOString().slice(0, 10)`, which is the UTC day, so a warranty ending yesterday
+ * still read `active` to a Greek operator until 03:00 — and one starting today read `pending`.
+ *
+ * Deliberately NOT pushed into SQL, which is where the audit pointed: the database session runs
+ * in UTC, so `current_date` there is the same defect one layer down. A workspace-pinned business
+ * timezone would make a server-side answer meaningful; until that exists, the operator's own
+ * calendar is the only frame that matches what "expired today" means to them.
+ */
 export function warrantyState(w: { starts_on: string; ends_on: string }): 'active' | 'expiring' | 'expired' | 'pending' {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalISO();
   if (w.starts_on > today) return 'pending';
   if (w.ends_on < today) return 'expired';
   const soon = new Date();
   soon.setDate(soon.getDate() + 60);
-  return w.ends_on <= soon.toISOString().slice(0, 10) ? 'expiring' : 'active';
+  return w.ends_on <= toLocalISODate(soon) ? 'expiring' : 'active';
 }
 
 export const customerAssetsService = {

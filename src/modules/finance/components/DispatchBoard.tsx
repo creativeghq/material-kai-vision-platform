@@ -16,8 +16,7 @@ import { formatMoney } from '@/modules/finance/services/financeService';
 import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { deliveryNotesService, type DispatchQueueOrder } from '@/modules/finance/services/deliveryNotesService';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, localISODateOffset } from '@/utils/datetime';
 type BucketKey = 'overdue' | 'today' | 'next7' | 'later' | 'undated';
 const BUCKET_LABEL: Record<BucketKey, string> = {
   overdue: 'Overdue', today: 'Today', next7: 'Next 7 days', later: 'Later', undated: 'No ship date',
@@ -125,7 +124,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
   };
 
   // Planning: schedule an order into a day (buckets update on reload). Tomorrow = next day's dispatch load.
-  const tomorrowISO = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
+  const tomorrowISO = localISODateOffset(1);
   const schedule = async (o: DispatchQueueOrder, date: string | null) => {
     setBusy(o.invoice_id);
     try {

@@ -32,10 +32,14 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
-import { dealsService, getDealForecast, type Deal, type DealForecastRow, type DealStage, type DealTask, type DealType } from '@/services/dealsService';
+import { dealsService, getDealForecast, getDealStageTotals, type Deal, type DealForecastRow, type DealStage, type DealStageTotalRow, type DealTask, type DealType } from '@/services/dealsService';
 import { DealTypeManager } from '@/components/business/crm/DealTypeManager';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: '' });
+
+/** How many properties/projects the deal subject picker offers. One extra row is fetched so a
+ *  truncated list can SAY it is truncated rather than just being short. */
+const SUBJECT_LIMIT = 500;
 
 /** What a card is called, in falling order of specificity. */
 function dealLabel(d: Deal): string {
@@ -59,6 +63,7 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
   const [stages, setStages] = useState<DealStage[]>([]);
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [forecast, setForecast] = useState<DealForecastRow[]>([]);
+  const [stageTotals, setStageTotals] = useState<DealStageTotalRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [managingTypes, setManagingTypes] = useState(false);
   const [showLost, setShowLost] = useState(false);
@@ -84,14 +89,16 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
 
   const load = useCallback(async () => {
     if (!ws || !typeId) return;
-    const [s, d, f] = await Promise.all([
+    const [s, d, f, t] = await Promise.all([
       dealsService.listStages(typeId).catch(() => [] as DealStage[]),
       dealsService.listDeals(ws, typeId).catch(() => [] as Deal[]),
       getDealForecast(ws, typeId).catch(() => [] as DealForecastRow[]),
+      getDealStageTotals(ws, typeId).catch(() => [] as DealStageTotalRow[]),
     ]);
     setStages(s);
     setDeals(d);
     setForecast(f);
+    setStageTotals(t);
   }, [ws, typeId]);
 
   useEffect(() => { setDeals(null); void load(); }, [load]);
@@ -107,6 +114,15 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
   }, [open, stages]);
 
   const wonStage = stages.find((s) => s.is_won) ?? null;
+
+  // Column money, DERIVED in SQL by get_deal_stage_totals and only formatted here — one row per
+  // (stage, currency), because adding EUR to USD makes a number that is true of nothing.
+  const totalsByStage = new Map<string, DealStageTotalRow[]>();
+  for (const t of stageTotals) {
+    const list = totalsByStage.get(t.stage) ?? [];
+    list.push(t);
+    totalsByStage.set(t.stage, list);
+  }
 
   if (types === null || (deals === null && typeId)) {
     return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
@@ -154,12 +170,15 @@ export const PipelineBoard: React.FC<Props> = ({ ws, canManage, lockedTypeKey, c
       <div className="flex gap-3 overflow-x-auto pb-2">
         {stages.map((s) => {
           const col = byStage[s.key] ?? [];
-          const colValue = col.reduce((t, d) => t + Number(d.value ?? 0), 0);
+          const colTotals = (totalsByStage.get(s.key) ?? []).filter((t) => Number(t.total_value) > 0);
           return (
             <div key={s.id} className="w-[248px] shrink-0">
-              <div className="mb-2 flex items-center justify-between px-1">
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
                 <span className="text-xs font-semibold">{s.label}</span>
-                <span className="text-[10px] text-muted-foreground">{col.length}{colValue ? ` · ${money(colValue, col[0]?.currency ?? 'EUR')}` : ''}</span>
+                <span className="text-[10px] text-muted-foreground text-right">
+                  {col.length}
+                  {colTotals.map((t) => <span key={t.currency}> · {money(Number(t.total_value), t.currency)}</span>)}
+                </span>
               </div>
               <div className="space-y-2">
                 {col.map((d) => (
@@ -358,6 +377,8 @@ const DealDialog: React.FC<{
 }> = ({ ws, type, deal, stages, onClose, onSaved }) => {
   const { toast } = useToast();
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [subjectError, setSubjectError] = useState<string | null>(null);
+  const [subjectsTruncated, setSubjectsTruncated] = useState(false);
   const [busy, setBusy] = useState(false);
   const subjectKind = type?.subject_kind ?? (deal?.property_id ? 'property' : 'none');
   const [f, setF] = useState<Record<string, any>>(deal
@@ -376,11 +397,20 @@ const DealDialog: React.FC<{
   useEffect(() => {
     if (subjectKind === 'none') { setSubjects([]); return; }
     const q = subjectKind === 'property'
-      ? supabase.from('properties').select('id, title, reference_code').eq('workspace_id', ws).order('title').limit(500)
-      : supabase.from('projects').select('id, name').eq('workspace_id', ws).order('name').limit(500);
-    q.then(({ data }) => setSubjects(((data ?? []) as any[]).map((r) => ({
-      id: r.id, label: r.title || r.name || r.reference_code || 'Untitled',
-    }))));
+      ? supabase.from('properties').select('id, title, reference_code').eq('workspace_id', ws).order('title').limit(SUBJECT_LIMIT + 1)
+      : supabase.from('projects').select('id, name').eq('workspace_id', ws).order('name').limit(SUBJECT_LIMIT + 1);
+    // `.then(({ data }) => …)` — the swallowed-error signature. A failed load rendered as "no
+    // properties/projects", which reads as an empty workspace rather than a broken query, and
+    // past the cap the list was silently short (#366 BU-6). Say both out loud.
+    q.then(({ data, error }) => {
+      if (error) { setSubjectError(error.message); setSubjects([]); setSubjectsTruncated(false); return; }
+      const rows = (data ?? []) as any[];
+      setSubjectError(null);
+      setSubjectsTruncated(rows.length > SUBJECT_LIMIT);
+      setSubjects(rows.slice(0, SUBJECT_LIMIT).map((r) => ({
+        id: r.id, label: r.title || r.name || r.reference_code || 'Untitled',
+      })));
+    });
   }, [ws, subjectKind]);
 
   const save = async () => {
@@ -434,6 +464,14 @@ const DealDialog: React.FC<{
                 <SelectTrigger><SelectValue placeholder={subjectKind === 'property' ? 'Select a listing…' : 'Select a project…'} /></SelectTrigger>
                 <SelectContent>{subjects.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}</SelectContent>
               </Select>
+              {/* An empty picker used to mean either "none exist" or "the query failed" with no way
+                  to tell them apart, and a full one gave no hint that it stopped at the cap. */}
+              {subjectError && <p className="mt-1 text-[11px] text-destructive">Could not load the list: {subjectError}</p>}
+              {subjectsTruncated && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Showing the first {SUBJECT_LIMIT} — there are more than this in the workspace.
+                </p>
+              )}
             </div>
           )}
           <div>

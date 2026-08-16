@@ -28,6 +28,7 @@ import {
   type AssetDetail, type AssetWarranty, type CustomerAsset, type ServiceDueRow,
   type ServiceHistoryRow, type WarrantyKind,
 } from '@/services/customerAssetsService';
+import { todayLocalISO } from '@/utils/datetime';
 
 interface WarrantiesTabProps {
   /** Exactly one of these identifies whose units these are. */
@@ -44,7 +45,7 @@ const WARRANTY_KINDS: Array<{ value: WarrantyKind; label: string }> = [
   { value: 'insurance', label: 'Insurance' },
 ];
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocalISO();
 
 /** "in 12 days" / "3 days overdue" — the only place a due date becomes a phrase. */
 function dueLabel(row: { due_on: string; days_until_due: number; is_overdue: boolean }): string {

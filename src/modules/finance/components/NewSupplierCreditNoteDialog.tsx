@@ -22,6 +22,7 @@ import { vatOf } from '@/modules/finance/lib/vatMath';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
+import { todayLocalISO } from '@/utils/datetime';
 
 type Supplier = { type: 'company' | 'contact'; id: string; label: string };
 interface Line { id: string; description: string; qty: string; unitPrice: string; vatCode: string; }
@@ -48,7 +49,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   const [supSearch, setSupSearch] = useState('');
   const [supOptions, setSupOptions] = useState<Supplier[]>([]);
 
-  const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [issueDate, setIssueDate] = useState(() => todayLocalISO());
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [reason, setReason] = useState('');
   const [externalMark, setExternalMark] = useState('');
@@ -65,7 +66,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
       setCategoryId(d?.categoryId ?? '');
       setSupplier(d?.supplier ?? null);
       setSupSearch('');
-      setIssueDate(d?.issueDate ?? new Date().toISOString().slice(0, 10));
+      setIssueDate(d?.issueDate ?? todayLocalISO());
       setLines(d?.lines ?? [newLine()]);
       setReason(d?.reason ?? '');
       setExternalMark(d?.externalMark ?? '');

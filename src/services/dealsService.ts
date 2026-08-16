@@ -439,6 +439,31 @@ export async function getDealForecast(workspaceId: string, dealTypeId?: string |
   return (data ?? []) as DealForecastRow[];
 }
 
+/** Per-stage, per-currency pipeline value. One row per (stage, currency) — never a mixed sum. */
+export interface DealStageTotalRow {
+  stage: string;
+  currency: string;
+  deal_count: number;
+  total_value: number;
+}
+
+/**
+ * Read the per-stage column totals.
+ *
+ * The board used to do `col.reduce((t, d) => t + Number(d.value ?? 0), 0)` and label the result
+ * with `col[0]?.currency` — so a stage holding a €10,000 deal and a $10,000 deal displayed
+ * "€20,000" (#366 BU-5). Derived in SQL and grouped by currency for the same reason the forecast
+ * above is: TypeScript formats a money quantity, it does not add one up.
+ */
+export async function getDealStageTotals(workspaceId: string, dealTypeId?: string | null): Promise<DealStageTotalRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_deal_stage_totals', {
+    p_workspace_id: workspaceId,
+    p_deal_type_id: dealTypeId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DealStageTotalRow[];
+}
+
 // ── Deal team ─────────────────────────────────────────────────────────────────────────────────
 /** A per-deal LABEL. Membership grants nothing — access lives in workspace_members.role. */
 export const DEAL_TEAM_ROLES = [

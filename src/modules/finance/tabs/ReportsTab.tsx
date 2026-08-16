@@ -9,8 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, formatPct } from '@/modules/finance/services/financeService';
 import { AccountingExportCard } from '@/modules/finance/components/AccountingExportCard';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { formatDate } from '@/utils/datetime';
-
+import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 type ReportKind =
   | 'cashflow_per_day' | 'pnl_per_category'
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
@@ -74,7 +73,7 @@ const GROUP_LABELS: Record<ReportGroup, string> = {
 
 function rangeForPeriod(p: Period): { from: string; to: string } {
   const today = new Date();
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const fmt = (d: Date) => toLocalISODate(d);
   if (p === 'this_month') {
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
     return { from: fmt(start), to: fmt(today) };
@@ -337,7 +336,7 @@ function downloadReportCsv(report: ReportKind, rows: any[]): void {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `${report}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.href = url; a.download = `${report}-${todayLocalISO()}.csv`;
   a.click(); URL.revokeObjectURL(url);
 }
 

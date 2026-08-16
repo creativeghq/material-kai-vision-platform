@@ -25,6 +25,7 @@ import { humanizeLabel } from '@/utils/humanize';
 import {
   tripExpenseService, TRIP_EXPENSE_CATEGORIES, type TripExpenseItem,
 } from '@/modules/finance/services/tripExpenseService';
+import { todayLocalISO } from '@/utils/datetime';
 
 const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
@@ -149,7 +150,7 @@ const AddProjectExpenseDialog: React.FC<{
   onClose: () => void; onSaved: () => void;
 }> = ({ projectId, projectName, workspaceId, onClose, onSaved }) => {
   const { toast } = useToast();
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayLocalISO());
   const [category, setCategory] = useState<string>('transport');
   const [description, setDescription] = useState('');
   const [vendor, setVendor] = useState('');

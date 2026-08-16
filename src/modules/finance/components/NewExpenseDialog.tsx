@@ -16,6 +16,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { foldForSearch } from '@/components/core/filters/types';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import {
   financeService, type PaymentMethod, type BankAccountBalance, type RecurringCadence,
@@ -28,6 +29,7 @@ import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service'
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
+import { todayLocalISO } from '@/utils/datetime';
 
 // A payee is a CRM company, a CRM person, or a one-off name.
 // type 'adhoc' → a one-off payee not saved in CRM; `id` is null and `label` holds the typed name.
@@ -77,7 +79,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [currency, setCurrency] = useState('EUR');
   const [subtotalNet, setSubtotalNet] = useState<string>('0');
   const [vatAmount, setVatAmount] = useState<string>('0');
-  const [issuedAt, setIssuedAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [issuedAt, setIssuedAt] = useState<string>(() => todayLocalISO());
   const [dueAt, setDueAt] = useState<string>('');
   const [notes, setNotes] = useState('');
 
@@ -138,7 +140,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setCurrency(d?.currency ?? 'EUR');
       setSubtotalNet(d?.subtotalNet ?? '0');
       setVatAmount(d?.vatAmount ?? '0');
-      setIssuedAt(d?.issuedAt ?? new Date().toISOString().slice(0, 10));
+      setIssuedAt(d?.issuedAt ?? todayLocalISO());
       setDueAt(d?.dueAt ?? '');
       setNotes(d?.notes ?? '');
       setPaidNow(d?.paidNow ?? true);
@@ -189,7 +191,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setDescription(prefill?.description ?? '');
       setReference(''); setNotes(''); setCurrency('EUR'); setRepeat('none');
       setPaidNow(true); setDueAt('');
-      setIssuedAt(new Date().toISOString().slice(0, 10));
+      setIssuedAt(todayLocalISO());
       // Supplier: set from the line/order, or CLEAR (so a prior line's supplier never carries over).
       if (prefill?.supplier?.companyId) setParty({ type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' });
       else if (prefill?.supplier?.contactId) setParty({ type: 'contact', id: prefill.supplier.contactId, label: prefill.supplier.name || 'Supplier' });
@@ -315,8 +317,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (name.length < 2) return;
     setCreatingContact(true);
     try {
+      // Matched on `name_fold` (the generated `crm_fold(name)`), not raw `ilike`: that was
+      // case-insensitive but accent-BLIND, so "Κώστας Παπάς" never found the stored
+      // "ΚΩΣΤΑΣ ΠΑΠΑΣ" and this monthly find-or-create spawned a fresh payee every month
+      // (#366 BU-3). Still an EQUALITY match — a find-or-create, not a search box.
       const existing = await supabase.from('crm_contacts').select('id, name')
-        .eq('workspace_id', workspaceId).ilike('name', name).limit(1).maybeSingle();
+        .eq('workspace_id', workspaceId).eq('name_fold', foldForSearch(name)).limit(1).maybeSingle();
       let id = existing.data?.id as string | undefined;
       if (!id) {
         const ins = await supabase.from('crm_contacts')
@@ -443,7 +449,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           vatAmount: parseDecimalOr(vatAmount, 0),
           cadence: repeat,
           dueDays: 0,
-          nextRunAt: financeService.nextRecurrenceDate(issuedAt || new Date().toISOString().slice(0, 10), repeat),
+          nextRunAt: financeService.nextRecurrenceDate(issuedAt || todayLocalISO(), repeat),
           autoPay: paidNow,
           bankAccountId: paidNow ? (bankAccountId || null) : null,
           paymentMethod: method,

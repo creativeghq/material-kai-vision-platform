@@ -16,6 +16,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { round2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
+import { todayLocalISO } from '@/utils/datetime';
 
 export type TripStatus =
   | 'draft' | 'submitted' | 'partially_approved' | 'approved' | 'rejected' | 'reimbursed';
@@ -220,7 +221,7 @@ export const tripExpenseService = {
       .from('trip_expense_items')
       .insert({
         report_id: input.report_id,
-        expense_date: input.expense_date ?? new Date().toISOString().slice(0, 10),
+        expense_date: input.expense_date ?? todayLocalISO(),
         category: input.category ?? 'other',
         description: input.description ?? null,
         vendor: input.vendor ?? null,

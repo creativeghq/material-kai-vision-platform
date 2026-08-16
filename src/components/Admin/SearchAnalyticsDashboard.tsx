@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { todayLocalISO } from '@/utils/datetime';
 
 interface PerformanceStats {
   total_searches: number;
@@ -270,7 +271,7 @@ export const SearchAnalyticsDashboard = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${filename}-${todayLocalISO()}.csv`;
     a.click();
   };
 

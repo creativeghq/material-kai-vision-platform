@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 import { projectsService, type ProjectRoom } from '../../services/projectsService';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   siteService, SNAG_STATUSES, SNAG_SEVERITIES, SNAG_CLOSED_STATUSES,
   type ProjectSnag, type ProjectSiteLog, type SnagStatus, type SnagSeverity,
@@ -413,7 +413,7 @@ const AddSiteLogDialog: React.FC<{ projectId: string; onClose: () => void; onSav
   projectId, onClose, onSaved,
 }) => {
   const { toast } = useToast();
-  const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [logDate, setLogDate] = useState(() => todayLocalISO());
   const [notes, setNotes] = useState('');
   const [attendance, setAttendance] = useState('');
   const [weather, setWeather] = useState('');
