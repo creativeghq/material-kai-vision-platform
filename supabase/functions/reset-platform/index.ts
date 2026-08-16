@@ -147,15 +147,12 @@ const TABLES_TO_CLEAR = [
   'agent_checkpoints',             // Agent intermediate checkpoints
   'agent_memories',                // Agent long-term memory (hallucination risk)
   'agent_usage_logs',              // Per-run token/cost usage
-  'agent_tasks',                   // Agent task records
 
   // ── Agent Fabric runtime — runtime only; the persistent layer
   //    (agent_definitions / agent_projects / agent_project_secrets /
   //    agent_project_deployments / agent_project_snapshots) is PRESERVED in
   //    NEVER_CLEAR — agent_project_secrets CASCADEs from agent_projects, so the
   //    whole persistent layer must survive to keep secrets safe.
-  'agent_artifacts',               // Run output artifacts (CASCADE child of agent_runs)
-  'agent_inbox_messages',          // Inter-agent inbox messages (SET NULL from agent_runs)
 
   // ── Flow Engine ─────────────────────────────────────────────────────
   'flow_run_steps',                // Step runs (child of flow_runs)
@@ -176,7 +173,6 @@ const TABLES_TO_CLEAR = [
   'moodboard_comments',            // Comments on moodboards
   'moodboard_quote_requests',      // Moodboard quote requests
   'moodboard_presentation_sheets', // Presentation sheets (child of moodboards, CASCADE)
-  'moodboard_products',            // Moodboard products
   'moodboard_items',               // Moodboard items
   'moodboards',                    // Moodboards
 
@@ -200,8 +196,6 @@ const TABLES_TO_CLEAR = [
   'proposals',                     // User proposals
 
   // ── Designer module (user-generated) ────────────────────────────────
-  'designer_materials',            // Designer materials
-  'designer_assets',               // Designer assets
   'designer_projects',             // Designer projects
 
   // ── Storefront (transient commerce state) ───────────────────────────
@@ -239,27 +233,18 @@ const TABLES_TO_CLEAR = [
   // ── Analytics (user-generated + derived metrics) ────────────────────
   'analytics_events',              // Analytics events
   'manufacturer_analytics_events', // Manufacturer product view/save/quote events
-  'quality_metrics_daily',         // Daily quality metrics
-  'quality_scoring_logs',          // Quality scoring logs
-  'recommendation_analytics',      // Recommendation analytics
   'recommendation_scores',         // Cached recommendation scores
-  'response_quality_metrics',      // Assistant response quality
-  'retrieval_quality_metrics',     // RAG retrieval quality
-  'user_interaction_events',       // User interaction events
   'user_material_interactions',    // Per-user material interactions
-  'user_behavior_profiles',        // Derived personalization profiles (hallucination risk)
 
   // ── Search caches & derived search state (direct hallucination risk)
   'saved_searches',                // User saved searches
   'search_analytics',              // Search analytics events
   'search_query_corrections',      // Derived query corrections
   'search_query_tracking',         // Per-query tracking
-  'search_sessions',               // Search sessions
   'search_suggestion_clicks',      // Suggestion click tracking
   'search_suggestions',            // Derived autocomplete suggestions
   'trending_searches',             // Trending terms
   'unmatched_term_frequency',      // Unknown term frequency
-  'query_intelligence',            // Derived query intelligence
   // query_understanding_cache (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'duplicate_detection_cache',     // Cached duplicate detection
   'product_similarity_cache',      // Cached product similarity
@@ -280,12 +265,8 @@ const TABLES_TO_CLEAR = [
   'ai_analysis_queue',             // AI analysis queue
   'image_processing_queue',        // Image processing queue
   'claude_validation_queue',       // Claude validation queue
-  'processing_queue',              // Generic processing queue
-  'processing_metrics',            // Processing metrics
   'pipeline_strategy_metrics',     // Chunking-strategy / Phase-3 distribution metrics
   // paddleocr_metrics (bigint PK, not uuid) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
-  'batch_jobs',                    // Batch jobs
-  'embedding_stability_metrics',   // Embedding drift metrics
   'product_prices',                // Product price rows (child of products, CASCADE)
   'product_tables',                // Layout-extracted tables
   'product_layout_regions',        // Layout regions
@@ -293,18 +274,11 @@ const TABLES_TO_CLEAR = [
   'product_merge_history',         // Product merge history
   'product_processing_status',     // Product processing status
   'product_usage_stats',           // Product usage stats
-  'chunk_boundaries',              // Chunk boundary metadata
-  'chunk_classifications',         // Chunk classifications
   'chunk_quality_flags',           // Chunk quality flags
-  'chunk_validation_scores',       // Chunk validation scores
-  'category_extractions',          // Category extraction results
   'document_layout_analysis',      // PaddleOCR structural-pass layout cache
-  'document_processing_status',    // Document processing status
-  'document_quality_metrics',      // Document quality metrics
   'ocr_results',                   // OCR results
   'spatial_analysis',              // Spatial analysis results
   'pdf_processing_results',        // PDF processing results
-  'pdf_integration_health_results',// PDF integration health
   // review_summaries (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
@@ -438,7 +412,6 @@ const NEVER_CLEAR = new Set<string>([
   // so the entire persistent layer must be preserved to keep secrets safe; only
   // the runtime (agent_runs/agent_artifacts/agent_inbox_messages) is cleared.
   'agent_definitions', 'agent_projects', 'agent_project_secrets',
-  'agent_project_deployments', 'agent_project_snapshots',
   // Accounts / credits / RBAC / admin config
   'user_credits', 'credit_transactions', 'credit_packages', 'workspaces',
   'workspace_members', 'user_profiles', 'roles', 'role_permissions',

@@ -82,76 +82,27 @@ const DB_ONLY: Record<string, string> = {
  * without doing one of those two things first.
  */
 const KNOWN_UNREFERENCED: Record<string, string> = {
-  // ── DROP: a second source of truth for authorization, next to a fully derived one ──────────
-  // Capabilities are derived: workspace_members.role -> resolvePersona -> capabilities
-  // (src/auth/), pinned by workspaceRoles.test.ts. A stored permission row would out-rank or
-  // silently contradict that chain, and workspace_permissions' SELECT policy already reads
-  // `workspace_id IS NULL OR ...` — a global row would be readable by every authenticated user.
-  role_permissions: 'DROP — empty; authorization is derived in src/auth/, never stored',
-  workspace_permissions: 'DROP — empty; same, plus a workspace_id IS NULL read hole if wired',
-
-  // ── DROP: the analytics graveyard CLAUDE.md says not to build yet ───────────────────────────
-  // "Do NOT build analytics rollup tables yet ... Revisit only when it passes ~5M rows." These
-  // are those rollups, pre-built and never written. Leaving them invites someone to wire one.
-  performance_alerts: 'DROP — empty rollup; alerting is the integrity framework',
-  performance_reports: 'DROP — empty rollup; superseded by data_integrity_runs',
-  system_performance_metrics: 'DROP — empty rollup; api_usage_logs is the real metric',
-  quality_metrics_daily: 'DROP — empty rollup',
-  quality_scoring_logs: 'DROP — empty rollup',
-  response_quality_metrics: 'DROP — empty rollup',
-  retrieval_quality_metrics: 'DROP — empty rollup',
-  embedding_stability_metrics: 'DROP — empty rollup',
-  processing_metrics: 'DROP — empty rollup',
-  pdf_integration_health_results: 'DROP — empty rollup',
-  recommendation_analytics: 'DROP — empty rollup',
-  user_behavior_profiles: 'DROP — empty rollup',
-  user_interaction_events: 'DROP — empty rollup',
-  query_intelligence: 'DROP — empty rollup',
-  search_sessions: 'DROP — empty rollup',
-
-  // ── DROP: pipeline-era tables superseded by background_jobs + cache_status ──────────────────
-  document_processing_status: 'DROP — empty; background_jobs is the job record',
-  document_quality_metrics: 'DROP — empty; stage_history carries the verdict',
-  processing_queue: 'DROP — empty; background_jobs is the queue',
-  batch_jobs: 'DROP — empty; background_jobs is the queue',
-  category_extractions: 'DROP — empty; stage 4 writes products.attributes',
-  chunk_boundaries: 'DROP — empty; document_chunks carries its own boundaries',
-  chunk_classifications: 'DROP — empty; document_chunks.chunk_type_status is the verdict',
-  chunk_validation_scores: 'DROP — empty; superseded by cache_status',
-
-  // ── DROP: features that never shipped, 0 rows across the whole cluster ──────────────────────
-  agent_projects: 'DROP — empty; the agent-projects cluster never shipped',
-  agent_project_deployments: 'DROP — empty; part of the agent-projects cluster',
-  agent_project_secrets: 'DROP — empty; part of the agent-projects cluster',
-  agent_project_snapshots: 'DROP — empty; part of the agent-projects cluster',
-  agent_artifacts: 'DROP — empty; part of the agent-projects cluster',
-  agent_tasks: 'DROP — empty; agent_runs is the live record',
-  agent_inbox_messages: 'DROP — empty; inbox_messages is the live table',
-  designer_assets: 'DROP — empty; the designer feature never shipped',
-  designer_materials: 'DROP — empty; the designer feature never shipped',
-  asset_categories: 'DROP — 8 seeded rows, read only by the dead designer_assets',
-  shopping_carts: 'DROP — empty; storefront checkout is not built on it',
-  moodboard_products: 'DROP — empty; moodboard_items is the live join',
-  competitor_source_promoted_urls: 'DROP — empty; the SEO promote step was never built',
-  api_endpoints: 'DROP — 22 seeded rows, read by nothing; api_usage_logs is the real record',
+  // ── BLOCKED: dead, but a LIVE table holds a foreign key into them ───────────────────────────
+  // Dropping these means first altering a table that is in use, which is its own change with its
+  // own blast radius — not a rider on a cleanup migration.
+  agent_projects:
+    'DROP, BLOCKED — empty and unreachable, but live agent_runs.agent_project_id FKs it. '
+    + 'Needs that column dropped from agent_runs first.',
+  agent_project_snapshots:
+    'DROP, BLOCKED — empty and unreachable, but live agent_runs.snapshot_id FKs it.',
+  shopping_carts:
+    'DROP, BLOCKED — empty; cart_items.cart_id FKs it. The pair goes together or not at all.',
 
   // ── WIRE, do not drop: the parent feature is LIVE and the gap is user-facing ────────────────
+  // A DROP here would delete a design that is actually wanted. The fix is a writer.
   kb_doc_versions:
-    'WIRE — kb_docs has 677 live rows and no edit history. Dropping this removes the design; '
-    + 'the honest fix is a writer in the KB save path.',
+    'WIRE — kb_docs has 677 live rows and no edit history.',
   kb_doc_comments:
-    'WIRE — same: the KB is live, commenting is designed and unbuilt.',
+    'WIRE — the KB is live; commenting is designed and unbuilt.',
   email_template_versions:
-    'WIRE — 22 live email_templates with no version history; an admin edit is unrecoverable.',
-
-  // ── DECIDE: promises an opt-out nothing honours ─────────────────────────────────────────────
-  user_notification_preferences:
-    'DROP or WIRE — flows deliver to every recipient a flow names and consult no preference. '
-    + 'A preferences table nothing reads is worse than none: a settings UI built on it would '
-    + 'save happily and change nothing (the silent-zero shape).',
-  user_preferences:
-    'DROP — 1 stale row; preferences are read from user_profiles',
+    'WIRE — 22 live email_templates whose edits are currently unrecoverable.',
 };
+
 
 function tableNames(): string[] {
   const src = readFileSync(TYPES, 'utf8');

@@ -58,41 +58,6 @@ export type Database = {
           },
         ]
       }
-      agent_artifacts: {
-        Row: {
-          created_at: string
-          id: string
-          kind: string
-          metadata: Json
-          run_id: string
-          url: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          kind: string
-          metadata?: Json
-          run_id: string
-          url?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          kind?: string
-          metadata?: Json
-          run_id?: string
-          url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_artifacts_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "agent_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       agent_chat_conversations: {
         Row: {
           agent_id: string
@@ -345,41 +310,6 @@ export type Database = {
           },
         ]
       }
-      agent_inbox_messages: {
-        Row: {
-          channel: string
-          created_at: string
-          dispatched_run_id: string | null
-          id: string
-          raw_payload: Json
-          rejected_reason: string | null
-        }
-        Insert: {
-          channel: string
-          created_at?: string
-          dispatched_run_id?: string | null
-          id?: string
-          raw_payload?: Json
-          rejected_reason?: string | null
-        }
-        Update: {
-          channel?: string
-          created_at?: string
-          dispatched_run_id?: string | null
-          id?: string
-          raw_payload?: Json
-          rejected_reason?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_inbox_messages_dispatched_run_id_fkey"
-            columns: ["dispatched_run_id"]
-            isOneToOne: false
-            referencedRelation: "agent_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       agent_memories: {
         Row: {
           agent_id: string
@@ -457,89 +387,6 @@ export type Database = {
             columns: ["superseded_by"]
             isOneToOne: false
             referencedRelation: "agent_memories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      agent_project_deployments: {
-        Row: {
-          agent_definition_id: string
-          agent_project_id: string
-          config_overrides: Json
-          created_at: string
-          enabled: boolean
-          id: string
-          secrets_ref: string | null
-          updated_at: string
-        }
-        Insert: {
-          agent_definition_id: string
-          agent_project_id: string
-          config_overrides?: Json
-          created_at?: string
-          enabled?: boolean
-          id?: string
-          secrets_ref?: string | null
-          updated_at?: string
-        }
-        Update: {
-          agent_definition_id?: string
-          agent_project_id?: string
-          config_overrides?: Json
-          created_at?: string
-          enabled?: boolean
-          id?: string
-          secrets_ref?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_project_deployments_agent_definition_id_fkey"
-            columns: ["agent_definition_id"]
-            isOneToOne: false
-            referencedRelation: "agent_definitions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_project_deployments_agent_project_id_fkey"
-            columns: ["agent_project_id"]
-            isOneToOne: false
-            referencedRelation: "agent_projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      agent_project_secrets: {
-        Row: {
-          agent_project_id: string
-          created_at: string
-          encrypted_value: string
-          id: string
-          key: string
-          updated_at: string
-        }
-        Insert: {
-          agent_project_id: string
-          created_at?: string
-          encrypted_value: string
-          id?: string
-          key: string
-          updated_at?: string
-        }
-        Update: {
-          agent_project_id?: string
-          created_at?: string
-          encrypted_value?: string
-          id?: string
-          key?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_project_secrets_agent_project_id_fkey"
-            columns: ["agent_project_id"]
-            isOneToOne: false
-            referencedRelation: "agent_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -831,63 +678,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      agent_tasks: {
-        Row: {
-          agent_name: string
-          completed_at: string | null
-          created_at: string | null
-          error_message: string | null
-          id: string
-          input_data: Json | null
-          metadata: Json | null
-          output_data: Json | null
-          priority: number | null
-          started_at: string | null
-          status: string
-          task_name: string
-          task_type: string
-          updated_at: string | null
-          user_id: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          agent_name: string
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          input_data?: Json | null
-          metadata?: Json | null
-          output_data?: Json | null
-          priority?: number | null
-          started_at?: string | null
-          status?: string
-          task_name: string
-          task_type: string
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          agent_name?: string
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          input_data?: Json | null
-          metadata?: Json | null
-          output_data?: Json | null
-          priority?: number | null
-          started_at?: string | null
-          status?: string
-          task_name?: string
-          task_type?: string
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: []
       }
       agent_tool_call_logs: {
         Row: {
@@ -1453,45 +1243,6 @@ export type Database = {
         }
         Relationships: []
       }
-      api_endpoints: {
-        Row: {
-          category: string
-          created_at: string
-          description: string | null
-          id: string
-          is_internal: boolean
-          is_public: boolean
-          method: string
-          path: string
-          rate_limit_per_minute: number
-          updated_at: string
-        }
-        Insert: {
-          category?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_internal?: boolean
-          is_public?: boolean
-          method: string
-          path: string
-          rate_limit_per_minute?: number
-          updated_at?: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_internal?: boolean
-          is_public?: boolean
-          method?: string
-          path?: string
-          rate_limit_per_minute?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       api_keys: {
         Row: {
           allowed_endpoints: string[] | null
@@ -1740,42 +1491,6 @@ export type Database = {
           },
         ]
       }
-      asset_categories: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          display_order: number | null
-          icon: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          slug: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          icon?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          slug: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          icon?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          slug?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       background_agents: {
         Row: {
           agent_type: string
@@ -1960,42 +1675,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      batch_jobs: {
-        Row: {
-          completed_at: string | null
-          created_at: string | null
-          data: Json
-          error: string | null
-          id: string
-          priority: number | null
-          status: string
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string | null
-          data: Json
-          error?: string | null
-          id: string
-          priority?: number | null
-          status: string
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string | null
-          data?: Json
-          error?: string | null
-          id?: string
-          priority?: number | null
-          status?: string
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       blueprint_items: {
         Row: {
@@ -3093,39 +2772,6 @@ export type Database = {
         }
         Relationships: []
       }
-      category_extractions: {
-        Row: {
-          categories: Json
-          confidence_scores: Json | null
-          created_at: string | null
-          extraction_method: string | null
-          id: string
-          source_data: string
-          source_type: string
-          user_id: string | null
-        }
-        Insert: {
-          categories: Json
-          confidence_scores?: Json | null
-          created_at?: string | null
-          extraction_method?: string | null
-          id?: string
-          source_data: string
-          source_type: string
-          user_id?: string | null
-        }
-        Update: {
-          categories?: Json
-          confidence_scores?: Json | null
-          created_at?: string | null
-          extraction_method?: string | null
-          id?: string
-          source_data?: string
-          source_type?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       changelog_entries: {
         Row: {
           body_md: string
@@ -3281,134 +2927,6 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chunk_boundaries: {
-        Row: {
-          boundary_score: number
-          boundary_type: string
-          chunk_id: string
-          created_at: string | null
-          embedding_dimensions: number | null
-          id: string
-          is_product_boundary: boolean | null
-          model_name: string | null
-          model_version: string | null
-          next_chunk_id: string | null
-          processed_at: string | null
-          processing_time_ms: number | null
-          reasoning: string | null
-          semantic_similarity: number | null
-          updated_at: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          boundary_score: number
-          boundary_type: string
-          chunk_id: string
-          created_at?: string | null
-          embedding_dimensions?: number | null
-          id?: string
-          is_product_boundary?: boolean | null
-          model_name?: string | null
-          model_version?: string | null
-          next_chunk_id?: string | null
-          processed_at?: string | null
-          processing_time_ms?: number | null
-          reasoning?: string | null
-          semantic_similarity?: number | null
-          updated_at?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          boundary_score?: number
-          boundary_type?: string
-          chunk_id?: string
-          created_at?: string | null
-          embedding_dimensions?: number | null
-          id?: string
-          is_product_boundary?: boolean | null
-          model_name?: string | null
-          model_version?: string | null
-          next_chunk_id?: string | null
-          processed_at?: string | null
-          processing_time_ms?: number | null
-          reasoning?: string | null
-          semantic_similarity?: number | null
-          updated_at?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chunk_boundaries_chunk_id_fkey"
-            columns: ["chunk_id"]
-            isOneToOne: false
-            referencedRelation: "document_chunks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "chunk_boundaries_next_chunk_id_fkey"
-            columns: ["next_chunk_id"]
-            isOneToOne: false
-            referencedRelation: "document_chunks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chunk_classifications: {
-        Row: {
-          chunk_id: string
-          confidence: number
-          content_type: string
-          created_at: string | null
-          id: string
-          model_name: string | null
-          model_version: string | null
-          processed_at: string | null
-          processing_time_ms: number | null
-          reasoning: string | null
-          sub_categories: Json | null
-          updated_at: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          chunk_id: string
-          confidence: number
-          content_type: string
-          created_at?: string | null
-          id?: string
-          model_name?: string | null
-          model_version?: string | null
-          processed_at?: string | null
-          processing_time_ms?: number | null
-          reasoning?: string | null
-          sub_categories?: Json | null
-          updated_at?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          chunk_id?: string
-          confidence?: number
-          content_type?: string
-          created_at?: string | null
-          id?: string
-          model_name?: string | null
-          model_version?: string | null
-          processed_at?: string | null
-          processing_time_ms?: number | null
-          reasoning?: string | null
-          sub_categories?: Json | null
-          updated_at?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chunk_classifications_chunk_id_fkey"
-            columns: ["chunk_id"]
-            isOneToOne: false
-            referencedRelation: "document_chunks"
             referencedColumns: ["id"]
           },
         ]
@@ -3638,77 +3156,6 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chunk_validation_scores: {
-        Row: {
-          boundary_quality_score: number | null
-          chunk_id: string
-          completeness_score: number | null
-          content_quality_score: number | null
-          created_at: string | null
-          id: string
-          issues: Json | null
-          model_version: string | null
-          overall_validation_score: number
-          processing_time_ms: number | null
-          recommendations: Json | null
-          semantic_coherence_score: number | null
-          updated_at: string | null
-          validated_at: string | null
-          validation_notes: string | null
-          validation_status: string | null
-          validator_model: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          boundary_quality_score?: number | null
-          chunk_id: string
-          completeness_score?: number | null
-          content_quality_score?: number | null
-          created_at?: string | null
-          id?: string
-          issues?: Json | null
-          model_version?: string | null
-          overall_validation_score: number
-          processing_time_ms?: number | null
-          recommendations?: Json | null
-          semantic_coherence_score?: number | null
-          updated_at?: string | null
-          validated_at?: string | null
-          validation_notes?: string | null
-          validation_status?: string | null
-          validator_model?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          boundary_quality_score?: number | null
-          chunk_id?: string
-          completeness_score?: number | null
-          content_quality_score?: number | null
-          created_at?: string | null
-          id?: string
-          issues?: Json | null
-          model_version?: string | null
-          overall_validation_score?: number
-          processing_time_ms?: number | null
-          recommendations?: Json | null
-          semantic_coherence_score?: number | null
-          updated_at?: string | null
-          validated_at?: string | null
-          validation_notes?: string | null
-          validation_status?: string | null
-          validator_model?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chunk_validation_scores_chunk_id_fkey"
-            columns: ["chunk_id"]
-            isOneToOne: false
-            referencedRelation: "document_chunks"
             referencedColumns: ["id"]
           },
         ]
@@ -3975,55 +3422,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      competitor_source_promoted_urls: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          override_kind: string
-          product_id: string
-          product_url: string
-          reason: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          override_kind: string
-          product_id: string
-          product_url: string
-          reason?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          override_kind?: string
-          product_id?: string
-          product_url?: string
-          reason?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "competitor_source_promoted_urls_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_master_price_drift"
-            referencedColumns: ["operator_product_id"]
-          },
-          {
-            foreignKeyName: "competitor_source_promoted_urls_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "competitor_source_promoted_urls_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products_effective_facts"
-            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -6951,101 +6349,6 @@ export type Database = {
           },
         ]
       }
-      designer_assets: {
-        Row: {
-          category_id: string
-          created_at: string | null
-          description: string | null
-          dimensions: Json | null
-          download_count: number | null
-          glb_url: string
-          id: string
-          is_active: boolean | null
-          is_featured: boolean | null
-          name: string
-          tags: string[] | null
-          thumbnail_url: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          category_id: string
-          created_at?: string | null
-          description?: string | null
-          dimensions?: Json | null
-          download_count?: number | null
-          glb_url: string
-          id?: string
-          is_active?: boolean | null
-          is_featured?: boolean | null
-          name: string
-          tags?: string[] | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          category_id?: string
-          created_at?: string | null
-          description?: string | null
-          dimensions?: Json | null
-          download_count?: number | null
-          glb_url?: string
-          id?: string
-          is_active?: boolean | null
-          is_featured?: boolean | null
-          name?: string
-          tags?: string[] | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "designer_assets_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "asset_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      designer_materials: {
-        Row: {
-          color_hex: string | null
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          material_type: string
-          name: string
-          properties: Json | null
-          texture_url: string
-          thumbnail_url: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          color_hex?: string | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          material_type: string
-          name: string
-          properties?: Json | null
-          texture_url: string
-          thumbnail_url?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          color_hex?: string | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          material_type?: string
-          name?: string
-          properties?: Json | null
-          texture_url?: string
-          thumbnail_url?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       designer_projects: {
         Row: {
           camera_position: Json | null
@@ -7735,124 +7038,6 @@ export type Database = {
           },
         ]
       }
-      document_processing_status: {
-        Row: {
-          created_at: string | null
-          current_step: string | null
-          document_id: string | null
-          end_time: string | null
-          error_message: string | null
-          id: string
-          metadata: Json | null
-          processing_id: string
-          progress: number | null
-          start_time: string | null
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_step?: string | null
-          document_id?: string | null
-          end_time?: string | null
-          error_message?: string | null
-          id?: string
-          metadata?: Json | null
-          processing_id: string
-          progress?: number | null
-          start_time?: string | null
-          status: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          current_step?: string | null
-          document_id?: string | null
-          end_time?: string | null
-          error_message?: string | null
-          id?: string
-          metadata?: Json | null
-          processing_id?: string
-          progress?: number | null
-          start_time?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_processing_status_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "pdf_processing_results"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      document_quality_metrics: {
-        Row: {
-          average_chunk_size: number | null
-          average_coherence_score: number | null
-          average_image_quality: number | null
-          calculated_at: string | null
-          chunks_with_high_coherence: number | null
-          chunks_with_low_coherence: number | null
-          document_id: string
-          id: string
-          images_with_high_quality: number | null
-          images_with_low_quality: number | null
-          overall_quality_score: number | null
-          quality_assessment: string | null
-          total_chunks: number | null
-          total_images: number | null
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          average_chunk_size?: number | null
-          average_coherence_score?: number | null
-          average_image_quality?: number | null
-          calculated_at?: string | null
-          chunks_with_high_coherence?: number | null
-          chunks_with_low_coherence?: number | null
-          document_id: string
-          id?: string
-          images_with_high_quality?: number | null
-          images_with_low_quality?: number | null
-          overall_quality_score?: number | null
-          quality_assessment?: string | null
-          total_chunks?: number | null
-          total_images?: number | null
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          average_chunk_size?: number | null
-          average_coherence_score?: number | null
-          average_image_quality?: number | null
-          calculated_at?: string | null
-          chunks_with_high_coherence?: number | null
-          chunks_with_low_coherence?: number | null
-          document_id?: string
-          id?: string
-          images_with_high_quality?: number | null
-          images_with_low_quality?: number | null
-          overall_quality_score?: number | null
-          quality_assessment?: string | null
-          total_chunks?: number | null
-          total_images?: number | null
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_quality_metrics_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "documents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       document_series: {
         Row: {
           branch_id: string | null
@@ -8527,63 +7712,6 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: []
-      }
-      embedding_stability_metrics: {
-        Row: {
-          anomaly_detected: boolean | null
-          batch_id: string | null
-          chunk_id: string
-          consistency_score: number | null
-          created_at: string | null
-          document_id: string
-          embedding_vector: unknown
-          id: string
-          stability_score: number | null
-          updated_at: string | null
-          variance_score: number | null
-        }
-        Insert: {
-          anomaly_detected?: boolean | null
-          batch_id?: string | null
-          chunk_id: string
-          consistency_score?: number | null
-          created_at?: string | null
-          document_id: string
-          embedding_vector?: unknown
-          id?: string
-          stability_score?: number | null
-          updated_at?: string | null
-          variance_score?: number | null
-        }
-        Update: {
-          anomaly_detected?: boolean | null
-          batch_id?: string | null
-          chunk_id?: string
-          consistency_score?: number | null
-          created_at?: string | null
-          document_id?: string
-          embedding_vector?: unknown
-          id?: string
-          stability_score?: number | null
-          updated_at?: string | null
-          variance_score?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "embedding_stability_metrics_chunk_id_fkey"
-            columns: ["chunk_id"]
-            isOneToOne: true
-            referencedRelation: "document_chunks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "embedding_stability_metrics_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "documents"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       entity_template_versions: {
         Row: {
@@ -17185,44 +16313,6 @@ export type Database = {
           },
         ]
       }
-      moodboard_products: {
-        Row: {
-          added_at: string | null
-          id: string
-          moodboard_id: string
-          notes: string | null
-          position_x: number | null
-          position_y: number | null
-          product_id: string
-        }
-        Insert: {
-          added_at?: string | null
-          id?: string
-          moodboard_id: string
-          notes?: string | null
-          position_x?: number | null
-          position_y?: number | null
-          product_id: string
-        }
-        Update: {
-          added_at?: string | null
-          id?: string
-          moodboard_id?: string
-          notes?: string | null
-          position_x?: number | null
-          position_y?: number | null
-          product_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "moodboard_products_moodboard_id_fkey"
-            columns: ["moodboard_id"]
-            isOneToOne: false
-            referencedRelation: "moodboards"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       moodboard_quote_requests: {
         Row: {
           created_at: string | null
@@ -18260,33 +17350,6 @@ export type Database = {
           },
         ]
       }
-      pdf_integration_health_results: {
-        Row: {
-          check_timestamp: string
-          created_at: string | null
-          error_message: string | null
-          id: string
-          metrics: Json | null
-          status: string
-        }
-        Insert: {
-          check_timestamp: string
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          metrics?: Json | null
-          status: string
-        }
-        Update: {
-          check_timestamp?: string
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          metrics?: Json | null
-          status?: string
-        }
-        Relationships: []
-      }
       pdf_processing_results: {
         Row: {
           azure_confidence_score: number | null
@@ -18422,99 +17485,6 @@ export type Database = {
           total_tiles_extracted?: number | null
           updated_at?: string
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      performance_alerts: {
-        Row: {
-          alert_type: string
-          category: string
-          created_at: string | null
-          current_value: number
-          id: string
-          message: string
-          metric: string
-          resolved: boolean | null
-          resolved_at: string | null
-          resolved_by: string | null
-          threshold: number
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          alert_type: string
-          category: string
-          created_at?: string | null
-          current_value: number
-          id: string
-          message: string
-          metric: string
-          resolved?: boolean | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          threshold: number
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Update: {
-          alert_type?: string
-          category?: string
-          created_at?: string | null
-          current_value?: number
-          id?: string
-          message?: string
-          metric?: string
-          resolved?: boolean | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          threshold?: number
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      performance_reports: {
-        Row: {
-          alerts: Json
-          created_at: string | null
-          generated_at: string | null
-          id: string
-          insights: Json
-          metrics: Json
-          period_end: string
-          period_start: string
-          report_type: string
-          trends: Json
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          alerts?: Json
-          created_at?: string | null
-          generated_at?: string | null
-          id: string
-          insights?: Json
-          metrics?: Json
-          period_end: string
-          period_start: string
-          report_type: string
-          trends?: Json
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Update: {
-          alerts?: Json
-          created_at?: string | null
-          generated_at?: string | null
-          id?: string
-          insights?: Json
-          metrics?: Json
-          period_end?: string
-          period_start?: string
-          report_type?: string
-          trends?: Json
-          updated_at?: string | null
-          workspace_id?: string
         }
         Relationships: []
       }
@@ -19778,122 +18748,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      processing_metrics: {
-        Row: {
-          chunking_time_ms: number | null
-          chunks_generated: number | null
-          chunks_per_second: number | null
-          completed_at: string | null
-          document_id: string
-          embedding_time_ms: number | null
-          embeddings_generated: number | null
-          error_message: string | null
-          id: string
-          images_extracted: number | null
-          mivaa_processing_time_ms: number | null
-          pages_per_second: number | null
-          pages_processed: number | null
-          started_at: string | null
-          status: string | null
-          storage_time_ms: number | null
-          total_processing_time_ms: number | null
-          workspace_id: string
-        }
-        Insert: {
-          chunking_time_ms?: number | null
-          chunks_generated?: number | null
-          chunks_per_second?: number | null
-          completed_at?: string | null
-          document_id: string
-          embedding_time_ms?: number | null
-          embeddings_generated?: number | null
-          error_message?: string | null
-          id?: string
-          images_extracted?: number | null
-          mivaa_processing_time_ms?: number | null
-          pages_per_second?: number | null
-          pages_processed?: number | null
-          started_at?: string | null
-          status?: string | null
-          storage_time_ms?: number | null
-          total_processing_time_ms?: number | null
-          workspace_id: string
-        }
-        Update: {
-          chunking_time_ms?: number | null
-          chunks_generated?: number | null
-          chunks_per_second?: number | null
-          completed_at?: string | null
-          document_id?: string
-          embedding_time_ms?: number | null
-          embeddings_generated?: number | null
-          error_message?: string | null
-          id?: string
-          images_extracted?: number | null
-          mivaa_processing_time_ms?: number | null
-          pages_per_second?: number | null
-          pages_processed?: number | null
-          started_at?: string | null
-          status?: string | null
-          storage_time_ms?: number | null
-          total_processing_time_ms?: number | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "processing_metrics_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "documents"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      processing_queue: {
-        Row: {
-          completed_at: string | null
-          created_at: string | null
-          error_message: string | null
-          id: string
-          input_data: Json
-          job_type: string
-          priority: number | null
-          processing_time_ms: number | null
-          result: Json | null
-          started_at: string | null
-          status: Database["public"]["Enums"]["processing_status"] | null
-          user_id: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          input_data: Json
-          job_type: string
-          priority?: number | null
-          processing_time_ms?: number | null
-          result?: Json | null
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["processing_status"] | null
-          user_id: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          input_data?: Json
-          job_type?: string
-          priority?: number | null
-          processing_time_ms?: number | null
-          result?: Json | null
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["processing_status"] | null
-          user_id?: string
-        }
-        Relationships: []
       }
       processing_results: {
         Row: {
@@ -25596,153 +24450,6 @@ export type Database = {
         }
         Relationships: []
       }
-      quality_metrics_daily: {
-        Row: {
-          avg_chunk_quality: number | null
-          avg_image_quality: number | null
-          avg_product_quality: number | null
-          chunks_below_threshold: number | null
-          created_at: string | null
-          detection_accuracy: number | null
-          embedding_generation_failures: number | null
-          id: string
-          images_below_threshold: number | null
-          metric_date: string
-          products_below_threshold: number | null
-          total_chunks_processed: number | null
-          total_detections: number | null
-          total_embeddings_generated: number | null
-          total_images_extracted: number | null
-          total_products_created: number | null
-          workspace_id: string
-        }
-        Insert: {
-          avg_chunk_quality?: number | null
-          avg_image_quality?: number | null
-          avg_product_quality?: number | null
-          chunks_below_threshold?: number | null
-          created_at?: string | null
-          detection_accuracy?: number | null
-          embedding_generation_failures?: number | null
-          id?: string
-          images_below_threshold?: number | null
-          metric_date: string
-          products_below_threshold?: number | null
-          total_chunks_processed?: number | null
-          total_detections?: number | null
-          total_embeddings_generated?: number | null
-          total_images_extracted?: number | null
-          total_products_created?: number | null
-          workspace_id: string
-        }
-        Update: {
-          avg_chunk_quality?: number | null
-          avg_image_quality?: number | null
-          avg_product_quality?: number | null
-          chunks_below_threshold?: number | null
-          created_at?: string | null
-          detection_accuracy?: number | null
-          embedding_generation_failures?: number | null
-          id?: string
-          images_below_threshold?: number | null
-          metric_date?: string
-          products_below_threshold?: number | null
-          total_chunks_processed?: number | null
-          total_detections?: number | null
-          total_embeddings_generated?: number | null
-          total_images_extracted?: number | null
-          total_products_created?: number | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
-      quality_scoring_logs: {
-        Row: {
-          chunk_id: string | null
-          confidence: number | null
-          created_at: string | null
-          details: Json | null
-          detection_type: string | null
-          entity_id: string | null
-          event: string | null
-          id: string
-        }
-        Insert: {
-          chunk_id?: string | null
-          confidence?: number | null
-          created_at?: string | null
-          details?: Json | null
-          detection_type?: string | null
-          entity_id?: string | null
-          event?: string | null
-          id?: string
-        }
-        Update: {
-          chunk_id?: string | null
-          confidence?: number | null
-          created_at?: string | null
-          details?: Json | null
-          detection_type?: string | null
-          entity_id?: string | null
-          event?: string | null
-          id?: string
-        }
-        Relationships: []
-      }
-      query_intelligence: {
-        Row: {
-          clicked_results: string[] | null
-          created_at: string
-          entities_detected: Json | null
-          id: string
-          original_query: string
-          processed_query: string
-          project_context: Json | null
-          query_embedding: unknown
-          query_intent: string | null
-          query_type: string | null
-          results_returned: number | null
-          session_context: Json | null
-          user_context: Json | null
-          user_id: string | null
-          user_satisfaction: number | null
-        }
-        Insert: {
-          clicked_results?: string[] | null
-          created_at?: string
-          entities_detected?: Json | null
-          id?: string
-          original_query: string
-          processed_query: string
-          project_context?: Json | null
-          query_embedding?: unknown
-          query_intent?: string | null
-          query_type?: string | null
-          results_returned?: number | null
-          session_context?: Json | null
-          user_context?: Json | null
-          user_id?: string | null
-          user_satisfaction?: number | null
-        }
-        Update: {
-          clicked_results?: string[] | null
-          created_at?: string
-          entities_detected?: Json | null
-          id?: string
-          original_query?: string
-          processed_query?: string
-          project_context?: Json | null
-          query_embedding?: unknown
-          query_intent?: string | null
-          query_type?: string | null
-          results_returned?: number | null
-          session_context?: Json | null
-          user_context?: Json | null
-          user_id?: string | null
-          user_satisfaction?: number | null
-        }
-        Relationships: []
-      }
       query_understanding_cache: {
         Row: {
           created_at: string | null
@@ -26701,75 +25408,6 @@ export type Database = {
           },
         ]
       }
-      recommendation_analytics: {
-        Row: {
-          algorithms_used: Json | null
-          avg_confidence_score: number | null
-          computation_time_ms: number | null
-          confidence_distribution: Json | null
-          context: string | null
-          created_at: string | null
-          current_category: string | null
-          current_product_id: string | null
-          data_retrieval_time_ms: number | null
-          diversity_achieved: number | null
-          diversity_factor: number | null
-          generation_time_ms: number | null
-          id: string
-          ranking_time_ms: number | null
-          recommendation_id: string
-          recommendations_data: Json
-          total_recommendations: number | null
-          updated_at: string | null
-          user_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          algorithms_used?: Json | null
-          avg_confidence_score?: number | null
-          computation_time_ms?: number | null
-          confidence_distribution?: Json | null
-          context?: string | null
-          created_at?: string | null
-          current_category?: string | null
-          current_product_id?: string | null
-          data_retrieval_time_ms?: number | null
-          diversity_achieved?: number | null
-          diversity_factor?: number | null
-          generation_time_ms?: number | null
-          id?: string
-          ranking_time_ms?: number | null
-          recommendation_id: string
-          recommendations_data?: Json
-          total_recommendations?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Update: {
-          algorithms_used?: Json | null
-          avg_confidence_score?: number | null
-          computation_time_ms?: number | null
-          confidence_distribution?: Json | null
-          context?: string | null
-          created_at?: string | null
-          current_category?: string | null
-          current_product_id?: string | null
-          data_retrieval_time_ms?: number | null
-          diversity_achieved?: number | null
-          diversity_factor?: number | null
-          generation_time_ms?: number | null
-          id?: string
-          ranking_time_ms?: number | null
-          recommendation_id?: string
-          recommendations_data?: Json
-          total_recommendations?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       reseller_applications: {
         Row: {
           aade_checked_at: string | null
@@ -26839,51 +25477,6 @@ export type Database = {
           },
         ]
       }
-      response_quality_metrics: {
-        Row: {
-          coherence_score: number
-          created_at: string | null
-          factual_consistency_score: number
-          hallucination_score: number
-          id: string
-          issues_detected: string[] | null
-          overall_quality_score: number
-          quality_assessment: string
-          query: string
-          response_id: string
-          response_text: string
-          source_attribution_score: number
-        }
-        Insert: {
-          coherence_score: number
-          created_at?: string | null
-          factual_consistency_score: number
-          hallucination_score: number
-          id?: string
-          issues_detected?: string[] | null
-          overall_quality_score: number
-          quality_assessment: string
-          query: string
-          response_id: string
-          response_text: string
-          source_attribution_score: number
-        }
-        Update: {
-          coherence_score?: number
-          created_at?: string | null
-          factual_consistency_score?: number
-          hallucination_score?: number
-          id?: string
-          issues_detected?: string[] | null
-          overall_quality_score?: number
-          quality_assessment?: string
-          query?: string
-          response_id?: string
-          response_text?: string
-          source_attribution_score?: number
-        }
-        Relationships: []
-      }
       retailer_extraction_recipes: {
         Row: {
           availability_selector: string | null
@@ -26944,42 +25537,6 @@ export type Database = {
           success_count?: number
           updated_at?: string
           url_pattern?: string
-        }
-        Relationships: []
-      }
-      retrieval_quality_metrics: {
-        Row: {
-          created_at: string | null
-          id: string
-          latency_ms: number
-          mrr: number
-          precision: number
-          query: string
-          recall: number
-          relevant_chunks: number
-          retrieved_chunks: number
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          latency_ms: number
-          mrr: number
-          precision: number
-          query: string
-          recall: number
-          relevant_chunks: number
-          retrieved_chunks: number
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          latency_ms?: number
-          mrr?: number
-          precision?: number
-          query?: string
-          recall?: number
-          relevant_chunks?: number
-          retrieved_chunks?: number
         }
         Relationships: []
       }
@@ -27307,35 +25864,6 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      role_permissions: {
-        Row: {
-          created_at: string | null
-          id: string
-          permission: string
-          role_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          permission: string
-          role_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          permission?: string
-          role_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "role_permissions_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
             referencedColumns: ["id"]
           },
         ]
@@ -28108,75 +26636,6 @@ export type Database = {
           weight_profile_source?: string | null
           workspace_id?: string
           zero_results?: boolean | null
-        }
-        Relationships: []
-      }
-      search_sessions: {
-        Row: {
-          created_at: string | null
-          duration_ms: number | null
-          end_time: string | null
-          engagement_score: number | null
-          entry_point: string | null
-          exit_point: string | null
-          id: string
-          ip_address: unknown
-          recommendations_clicked: number | null
-          recommendations_viewed: number | null
-          results_clicked: number | null
-          results_viewed: number | null
-          satisfaction_score: number | null
-          search_count: number | null
-          session_id: string
-          start_time: string | null
-          updated_at: string | null
-          user_agent: string | null
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          duration_ms?: number | null
-          end_time?: string | null
-          engagement_score?: number | null
-          entry_point?: string | null
-          exit_point?: string | null
-          id?: string
-          ip_address?: unknown
-          recommendations_clicked?: number | null
-          recommendations_viewed?: number | null
-          results_clicked?: number | null
-          results_viewed?: number | null
-          satisfaction_score?: number | null
-          search_count?: number | null
-          session_id: string
-          start_time?: string | null
-          updated_at?: string | null
-          user_agent?: string | null
-          user_id: string
-          workspace_id?: string
-        }
-        Update: {
-          created_at?: string | null
-          duration_ms?: number | null
-          end_time?: string | null
-          engagement_score?: number | null
-          entry_point?: string | null
-          exit_point?: string | null
-          id?: string
-          ip_address?: unknown
-          recommendations_clicked?: number | null
-          recommendations_viewed?: number | null
-          results_clicked?: number | null
-          results_viewed?: number | null
-          satisfaction_score?: number | null
-          search_count?: number | null
-          session_id?: string
-          start_time?: string | null
-          updated_at?: string | null
-          user_agent?: string | null
-          user_id?: string
-          workspace_id?: string
         }
         Relationships: []
       }
@@ -30127,42 +28586,6 @@ export type Database = {
         }
         Relationships: []
       }
-      system_performance_metrics: {
-        Row: {
-          created_at: string | null
-          id: string
-          metric_name: string
-          metric_type: string
-          metric_unit: string | null
-          metric_value: number
-          recorded_at: string | null
-          tags: Json | null
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          metric_name: string
-          metric_type: string
-          metric_unit?: string | null
-          metric_value: number
-          recorded_at?: string | null
-          tags?: Json | null
-          workspace_id?: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          metric_name?: string
-          metric_type?: string
-          metric_unit?: string | null
-          metric_value?: number
-          recorded_at?: string | null
-          tags?: Json | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       system_settings: {
         Row: {
           created_at: string
@@ -31734,48 +30157,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_behavior_profiles: {
-        Row: {
-          computation_version: number | null
-          created_at: string | null
-          id: string
-          implicit_preferences: Json
-          interaction_patterns: Json
-          last_computed_at: string | null
-          profile_confidence: number | null
-          search_patterns: Json
-          updated_at: string | null
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          computation_version?: number | null
-          created_at?: string | null
-          id?: string
-          implicit_preferences?: Json
-          interaction_patterns?: Json
-          last_computed_at?: string | null
-          profile_confidence?: number | null
-          search_patterns?: Json
-          updated_at?: string | null
-          user_id: string
-          workspace_id?: string
-        }
-        Update: {
-          computation_version?: number | null
-          created_at?: string | null
-          id?: string
-          implicit_preferences?: Json
-          interaction_patterns?: Json
-          last_computed_at?: string | null
-          profile_confidence?: number | null
-          search_patterns?: Json
-          updated_at?: string | null
-          user_id?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       user_contact_links_audit: {
         Row: {
           action: string
@@ -31909,72 +30290,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_interaction_events: {
-        Row: {
-          click_position: number | null
-          created_at: string | null
-          dwell_time_ms: number | null
-          event_context: string | null
-          event_type: string
-          id: string
-          interaction_data: Json | null
-          page_url: string | null
-          recommendation_id: string | null
-          referrer: string | null
-          result_position: number | null
-          scroll_depth: number | null
-          search_query: string | null
-          session_id: string
-          target_category: string | null
-          target_id: string | null
-          target_type: string | null
-          user_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          click_position?: number | null
-          created_at?: string | null
-          dwell_time_ms?: number | null
-          event_context?: string | null
-          event_type: string
-          id?: string
-          interaction_data?: Json | null
-          page_url?: string | null
-          recommendation_id?: string | null
-          referrer?: string | null
-          result_position?: number | null
-          scroll_depth?: number | null
-          search_query?: string | null
-          session_id: string
-          target_category?: string | null
-          target_id?: string | null
-          target_type?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Update: {
-          click_position?: number | null
-          created_at?: string | null
-          dwell_time_ms?: number | null
-          event_context?: string | null
-          event_type?: string
-          id?: string
-          interaction_data?: Json | null
-          page_url?: string | null
-          recommendation_id?: string | null
-          referrer?: string | null
-          result_position?: number | null
-          scroll_depth?: number | null
-          search_query?: string | null
-          session_id?: string
-          target_category?: string | null
-          target_id?: string | null
-          target_type?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       user_material_interactions: {
         Row: {
           created_at: string | null
@@ -32043,39 +30358,6 @@ export type Database = {
           },
         ]
       }
-      user_notification_preferences: {
-        Row: {
-          channel_type: string
-          config: Json | null
-          created_at: string | null
-          id: string
-          is_enabled: boolean | null
-          notification_type: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          channel_type: string
-          config?: Json | null
-          created_at?: string | null
-          id?: string
-          is_enabled?: boolean | null
-          notification_type: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          channel_type?: string
-          config?: Json | null
-          created_at?: string | null
-          id?: string
-          is_enabled?: boolean | null
-          notification_type?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_notifications: {
         Row: {
           action_url: string | null
@@ -32109,33 +30391,6 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      user_preferences: {
-        Row: {
-          created_at: string | null
-          id: string
-          preferences: Json
-          updated_at: string | null
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          preferences?: Json
-          updated_at?: string | null
-          user_id: string
-          workspace_id?: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          preferences?: Json
-          updated_at?: string | null
-          user_id?: string
-          workspace_id?: string
         }
         Relationships: []
       }
@@ -33978,42 +32233,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      workspace_permissions: {
-        Row: {
-          expires_at: string | null
-          granted_at: string | null
-          granted_by: string | null
-          id: string
-          is_active: boolean | null
-          permissions: Json | null
-          role: string
-          user_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          expires_at?: string | null
-          granted_at?: string | null
-          granted_by?: string | null
-          id?: string
-          is_active?: boolean | null
-          permissions?: Json | null
-          role?: string
-          user_id?: string | null
-          workspace_id: string
-        }
-        Update: {
-          expires_at?: string | null
-          granted_at?: string | null
-          granted_by?: string | null
-          id?: string
-          is_active?: boolean | null
-          permissions?: Json | null
-          role?: string
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: []
       }
       workspace_revolut_config: {
         Row: {
