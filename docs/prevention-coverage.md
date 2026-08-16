@@ -14,6 +14,7 @@ that has silently stopped working — and this platform has shipped several:
 | `no-fail-open-in-gate` (v2) | filter removed, looked right | `catch (...)` is a **parse error** in JS *and* TS → semgrep rejected the rule and kept scanning |
 | jsx-a11y plugin | installed and configured | every rule set to `'off'` under a comment reading "off for now" |
 | edge typecheck sweeps | reported success | one exited 0 on an unresolved import, one OOM'd mid-batch, one used the wrong import maps |
+| MIVAA's 23 guard tests | all green, all well-named, several genuinely well-scoped | **scope narrower than their names.** The SSRF gate declared ONE file; `test_paid_route_metering` 3 doors in 2 files; `test_no_silent_degradation` 5 subtrees. Every finding across #14 and #15 landed in the difference. The one guard using a full-tree walk covers the class with the least evidence of defects |
 | outbound email | no alert of any kind | `default_from_email` sat on a domain Resend had dropped; **136 sends, 1 delivered** over three days in July and nobody was told. There was no guard at all — the gap was not a broken check, it was a missing one |
 
 The pattern is identical every time: **a guard that reports nothing is indistinguishable from a
@@ -282,6 +283,8 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | [tests/unit/test_page_embeddings.py](../mivaa-pdf-extractor/tests/unit/test_page_embeddings.py) | `pytest`, blocking | shape 4e + Phase-0 isolation on `page_embeddings` | **yes** — every assertion was mutation-tested against a deliberately broken copy of the code it guards |
 | [tests/unit/test_no_fallback_embedder.py](../mivaa-pdf-extractor/tests/unit/test_no_fallback_embedder.py) | `pytest`, blocking | shape 4e — a second embedding provider reappearing anywhere | **yes** — mutation-tested by editing the REAL files and running pytest, not by re-implementing the assertions. That distinction found two holes: stripping all string literals made it blind to a reintroduced API URL, and a `startswith` check missed the batch form `[[0.0] * 1024] * len(texts)` |
 | [tests/unit/test_weight_profiles.py](../mivaa-pdf-extractor/tests/unit/test_weight_profiles.py) | `pytest`, blocking | a fusion vector scoring zero on a path someone missed | **yes** — the image-only weights are pinned to their pre-page values, so the #239 carve-out proved itself non-disruptive rather than being asserted to be |
+| [tests/unit/test_ssrf_guard_coverage.py](../mivaa-pdf-extractor/tests/unit/test_ssrf_guard_coverage.py) | `pytest`, blocking | invariant 7 — any server-side fetch of a user-influenced URL that is not the guarded fetch, across the whole `app/` tree with **no allowlist** | **yes** — 2026-08-16: reverting `admin.py` alone makes it fail naming `reprocess_image_ocr()`, and it passes on the fixed tree. It also asserts `scanned > 100`, so an inert walk fails instead of reporting clean — which is precisely how its one-declared-file predecessor passed for as long as it did. `KNOWN_UNGUARDED` was **deleted**, not emptied, once its nine entries were fixed |
+| [tests/unit/test_safe_fetch_bytes.py](../mivaa-pdf-extractor/tests/unit/test_safe_fetch_bytes.py) | `pytest`, blocking | the guarded fetch itself — per-hop re-validation of every redirect and the streaming byte cap. Now the single fetch path for 11 call sites, so a weakness here is a weakness in all of them at once | **yes** — 2026-08-16, mutation-tested in both directions on the REAL file: making validation hop-blind fails 2 tests, moving the cap to after the body is read fails 2. Driven by a stub client rather than `httpx.MockTransport`, because CI installs pytest and nothing else and a third-party import would make the module uncollectable |
 | `ops.storage_paths_unregistered` | nightly | shape 4d | **yes** — reads `build_storage_reference_set()`'s own body, so it cannot drift from what the cron actually honours |
 | `ops.money_without_currency` | nightly | shape 6 | no — but all three branches were watched to fire before shipping |
 | `ops.unsent_queue_backlog` | nightly | shape 4c | no — but it fired on real production data on introduction |
@@ -304,7 +307,14 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | `ops.crm_company_embeddings_never_written` | nightly | shape 4 on the company lookalike engine (#289) — the drain cron stops and `crm_company_lookalikes` returns nothing forever, which the Market tab renders as *"nothing in your CRM stands out as similar"*: a statement about the customer's data that is really a statement about our pipeline | **yes, both halves** — fired on 2026-08-15 before the first drain (42 embeddable, **0** embedded, coverage 0%) and returned **0** rows after it (42/42), so a probe that always fires would have been caught. Uses a rate, not an exact zero, for the reason recorded above |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Fifteen of twenty-five qualify. That is the gap.
+what it found. **Twenty-two of thirty-two** qualify. That is the gap.
+
+(That sentence read "fifteen of twenty-five" until 2026-08-16, by which point the table held thirty
+rows. Recounted rather than incremented. A summary line that drifts from the table above it is a
+small instance of the thing this document is about, and the fix is to derive the number from the
+rows each time it is touched, not to trust the previous author's arithmetic. This paragraph earned
+itself immediately: the edit that added it first wrote "twenty-one", counted by hand, and was one
+short.)
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it
