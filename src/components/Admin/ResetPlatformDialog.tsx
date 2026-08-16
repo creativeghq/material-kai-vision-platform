@@ -40,8 +40,10 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
 
     try {
       // Call the reset script via Supabase Edge Function
+      // `confirm_phrase`, not `confirm: true` (#362): the typed phrase is now verified by
+      // the edge function. The check below is UX — the server no longer trusts it.
       const { data, error } = await supabase.functions.invoke('reset-platform', {
-        body: { confirm: true },
+        body: { confirm: true, confirm_phrase: 'RESET PLATFORM' },
       });
 
       if (error) throw await edgeError(error);

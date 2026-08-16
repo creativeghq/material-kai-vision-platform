@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator, isServiceRoleRequest } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -9,6 +9,11 @@ const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.ma
 const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+/** The phrase the operator must post. Kept identical to what ResetPlatformDialog asks
+ *  them to type, so the typed string is now checked by the server rather than by the
+ *  browser that a direct API call never loads. */
+const RESET_CONFIRM_PHRASE = 'RESET PLATFORM';
 
 // ============================================================
 // LOCK RULE: any row with a boolean `is_locked = true` is NEVER deleted, in
@@ -443,6 +448,9 @@ const NEVER_CLEAR = new Set<string>([
   // classifier (categories + subcategories, ai_extraction_enabled, prototype
   // embeddings). Config, not user content — must survive a reset.
   'material_categories',
+  // Who ran a reset, and whether it finished (#362). A wipe that erases the record of
+  // itself is not an audit trail — this belongs to the operator, not to any tenant.
+  'platform_reset_log',
 ]);
 
 // Tables whose primary key is NOT a uuid `id` column — the default
@@ -544,17 +552,44 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
   }
 
   try {
-    // Authenticate request - requires admin role
-    // Secret key bypasses role check
-    const auth = await authenticate(req, {
-      allowedRoles: ['admin'],
-    });
+    // AUTHORIZATION (#362). This deletes every tenant's data, so the gate has to mean
+    // "operates the platform" — and the previous one did not.
+    //
+    // It was `authenticate(req, { allowedRoles: ['admin'] })`, which resolves against
+    // `workspace_members.role` in ANY workspace. That is the per-workspace business role
+    // every tenant's own administrator holds, so any customer admin could wipe all tenants.
+    // The second operand, `!auth.success && !isAdminAccess(auth)`, could never contribute:
+    // isAdminAccess is `auth.success && level === 'secret'`, ANDed against `!auth.success`.
+    //
+    // The two things that legitimately mean platform operator are the service-role bearer
+    // and the GLOBAL account tier (`user_profiles.role_id → roles.name`). Nothing else.
+    let authMode: 'service_role' | 'platform_operator';
+    let actorId: string | null = null;
+    let actorEmail: string | null = null;
 
-    if (!auth.success && !isAdminAccess(auth)) {
-      return new Response(
-        JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+    if (isServiceRoleRequest(req)) {
+      authMode = 'service_role';
+    } else {
+      const auth = await authenticate(req);
+      if (!auth.success) {
+        return new Response(
+          JSON.stringify({ error: auth.error || 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      if (!(await isPlatformOperator(auth.supabase, auth.userId))) {
+        // 403, not 404: there is no object being enumerated here, so the id-enumeration
+        // argument for masking does not apply — and an operator hitting a genuine
+        // misconfiguration needs to be able to tell it apart from a wrong URL.
+        console.warn(`🛑 reset-platform refused for non-operator ${auth.userId}`);
+        return new Response(
+          JSON.stringify({ error: 'Platform operator role required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      authMode = 'platform_operator';
+      actorId = auth.userId ?? null;
+      actorEmail = auth.user?.email ?? null;
     }
 
     let body: Record<string, unknown>;
@@ -566,9 +601,14 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    if (!body.confirm) {
+    // The dialog has always asked the operator to type "RESET PLATFORM", and the server
+    // has always accepted `{confirm: true}` — so the phrase was decoration and a direct
+    // functions.invoke skipped it entirely. Check the phrase HERE, where it counts.
+    if (body.confirm_phrase !== RESET_CONFIRM_PHRASE) {
       return new Response(
-        JSON.stringify({ error: 'Confirmation required' }),
+        JSON.stringify({
+          error: `Confirmation required: post confirm_phrase = "${RESET_CONFIRM_PHRASE}"`,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -589,7 +629,27 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
       );
     }
 
-    console.log('🔄 Starting platform reset...');
+    // Record WHO before deleting anything (#362). Written up front on purpose: a reset
+    // that dies half way still leaves the actor behind, which is the one thing anyone
+    // will want afterwards. platform_reset_log is never in TABLES_TO_CLEAR — an audit
+    // trail a reset erases is not an audit trail.
+    let resetLogId: string | null = null;
+    try {
+      const { data: logRow } = await supabase
+        .from('platform_reset_log')
+        .insert({
+          invoked_by: actorId,
+          actor_email: actorEmail,
+          auth_mode: authMode,
+        })
+        .select('id')
+        .single();
+      resetLogId = (logRow as { id?: string } | null)?.id ?? null;
+    } catch (e: any) {
+      console.error('⚠️ Could not write platform_reset_log:', e?.message);
+    }
+
+    console.log(`🔄 Starting platform reset... (actor=${actorEmail ?? authMode})`);
     const results: any = {
       tables: [],
       storage: [],
@@ -865,13 +925,42 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     const truncatedCount = (results.truncated?.tables || []).length;
     console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows across ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} errors), KB docs cleaned: ${results.knowledge_base.deleted}, Storage: ${totalStorageDeleted} files, Truncated: ${truncatedCount} relations (incl. ${totalVecsDeleted} VECS), prompt_history trimmed: ${results.prompt_history.deleted}, server /tmp: ${results.server_tmp.ok ? 'cleaned' : 'skipped/failed'}`);
 
+    // A partial wipe is NOT a success (#362). Every step above swallows its own failure
+    // into `results` and carries on, and the response then said `success: true` regardless
+    // — so a reset that left half the platform behind reported as a clean run and the
+    // dialog said "Platform Reset Complete". The work is deliberately still attempted to
+    // the end (stopping half way is worse), but the verdict now reflects what happened.
+    const stepErrors: string[] = [];
+    if (failedTables > 0) stepErrors.push(`${failedTables} table(s) failed to clear`);
+    if (results.truncated?.error) stepErrors.push(`truncate: ${results.truncated.error}`);
+    if (results.knowledge_base?.error) stepErrors.push(`knowledge base: ${results.knowledge_base.error}`);
+    if (results.prompt_history?.error) stepErrors.push(`prompt_history: ${results.prompt_history.error}`);
+    if (results.server_tmp?.called && !results.server_tmp.ok) stepErrors.push('MIVAA /tmp cleanup failed');
+    const ok = stepErrors.length === 0;
+
+    const summary = `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), cleaned ${results.knowledge_base.deleted} unprotected KB docs, ${totalStorageDeleted} files from storage, truncated ${truncatedCount} heavy/id-less relations (incl. ${totalVecsDeleted} VECS collections), trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`;
+
+    if (resetLogId) {
+      await supabase
+        .from('platform_reset_log')
+        .update({
+          finished_at: new Date().toISOString(),
+          succeeded: ok,
+          summary: { summary, errors: stepErrors, results },
+        })
+        .eq('id', resetLogId)
+        .then(undefined, (e: any) => console.error('⚠️ Could not finalise platform_reset_log:', e?.message));
+    }
+
     return new Response(
       JSON.stringify({
-        success: true,
-        summary: `Deleted ${totalDeleted} rows from ${successfulTables}/${TABLES_TO_CLEAR.length} tables (${failedTables} failed), cleaned ${results.knowledge_base.deleted} unprotected KB docs, ${totalStorageDeleted} files from storage, truncated ${truncatedCount} heavy/id-less relations (incl. ${totalVecsDeleted} VECS collections), trimmed ${results.prompt_history.deleted} prompt_history rows, and ${results.server_tmp.ok ? 'cleaned' : 'failed to clean'} MIVAA /tmp`,
+        success: ok,
+        ...(ok ? {} : { error: `Platform reset completed with errors: ${stepErrors.join('; ')}` }),
+        summary,
+        errors: stepErrors,
         results,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      { status: ok ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error: any) {
     console.error('❌ Reset platform error:', error);

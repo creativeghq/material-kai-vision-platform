@@ -282,7 +282,11 @@ async function validateUserToken(
       const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
         adminClient.from('user_profiles').select('role_id').eq('user_id', user.id).single(),
         adminClient.from('roles').select('id, name').in('name', allowedRoles),
-        adminClient.from('workspace_members').select('role').eq('user_id', user.id).in('role', allowedRoles).limit(1),
+        // `.eq('status', 'active')` (#362): without it a REMOVED admin whose membership row
+        // still exists keeps passing every allowedRoles gate in the platform. The two
+        // sibling helpers in this file (userCanAccessWorkspace, listUserWorkspaceIds) both
+        // already filter on it; this one was the odd one out.
+        adminClient.from('workspace_members').select('role').eq('user_id', user.id).eq('status', 'active').in('role', allowedRoles).limit(1),
       ]);
 
       const allowedRoleIds = roles?.map(r => r.id) || [];
@@ -523,6 +527,32 @@ export async function userCanAccessWorkspace(
       .maybeSingle(),
   ]);
   if (mem) return true;
+  const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
+  return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
+}
+
+/**
+ * True when the user holds a GLOBAL platform-operator role — `user_profiles.role_id →
+ * roles.name` in ('admin', 'super_admin'). This is the account tier, which per CLAUDE.md is
+ * true in EVERY workspace; it is the only thing in this codebase that means "operates the
+ * platform".
+ *
+ * It is NOT `workspace_members.role = 'admin'`. That is a per-workspace business role held
+ * by every tenant's own administrator, and `authenticate({ allowedRoles: ['admin'] })`
+ * matches it in ANY workspace. `reset-platform` used that as its operator gate, which meant
+ * every customer's admin could globally wipe all tenants' data (#362). Any function whose
+ * blast radius crosses tenants must gate on THIS, or on isServiceRoleRequest.
+ */
+export async function isPlatformOperator(
+  adminClient: DbClient,
+  userId: string | null,
+): Promise<boolean> {
+  if (!userId) return false;
+  const { data: prof } = await adminClient
+    .from('user_profiles')
+    .select('roles!user_profiles_role_id_fkey(name)')
+    .eq('user_id', userId)
+    .maybeSingle();
   const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
   return !!globalRole && ['admin', 'super_admin'].includes(globalRole);
 }
