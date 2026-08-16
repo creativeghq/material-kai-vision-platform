@@ -36,6 +36,18 @@ const TYPES = join(ROOT, 'src', 'integrations', 'supabase', 'types.ts');
 
 /** Roots that hold every runtime reference to a table. */
 const SOURCE_ROOTS = ['src', 'supabase/functions', 'api', 'mivaa-pdf-extractor/app', 'scripts'];
+
+/**
+ * Files that ENUMERATE table names rather than use them. A registry mentioning a table is not a
+ * feature reading it, and counting it as one is how a dead table hides: `designer_assets` has 0
+ * rows, no reader and no writer, and still read as "referenced" purely because the reset wipe
+ * list names it. That list names 165 tables, so leaving it in the haystack would blind this gate
+ * across a third of the schema.
+ */
+const REGISTRY_FILES = [
+  join('src', 'integrations', 'supabase', 'types.ts'),
+  join('supabase', 'functions', 'reset-platform', 'index.ts'),
+];
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.py', '.sql', '.json']);
 const SKIP_DIRS = new Set(['node_modules', '__pycache__', '.git', 'dist', 'build', '.venv']);
 
@@ -55,6 +67,12 @@ const DB_ONLY: Record<string, string> = {
     'written by the tenancy audit function, read by hand during an audit',
   user_contact_links_audit:
     'trigger-adjacent audit log written by 3 SQL functions; nothing reads it from code',
+  job_alert_log: 'written by 2 SQL functions; 14 rows, the job-alert dedupe ledger',
+  agent_uploaded_files: 'referenced by 2 SQL functions',
+  product_similarity_cache: 'referenced by 1 SQL function',
+  product_usage_stats: 'referenced by 1 SQL function',
+  supplier_credit_note_items: 'referenced by 1 SQL function',
+  warehouse_coverage: 'referenced by 1 SQL function',
 };
 
 /**
@@ -64,33 +82,75 @@ const DB_ONLY: Record<string, string> = {
  * without doing one of those two things first.
  */
 const KNOWN_UNREFERENCED: Record<string, string> = {
-  asset_categories:
-    'seeded with 8 rows and abandoned; company_assets does not read it',
-  competitor_source_promoted_urls:
-    'empty; the SEO competitor path never grew the promote step',
-  email_template_versions:
-    'empty; email_templates has no version history UI or writer',
-  user_notification_preferences:
-    'empty and unread — notification preferences are collected nowhere and honoured nowhere. '
-    + 'Flows deliver to every recipient the flow names, so this table silently promises an '
-    + 'opt-out that does not exist.',
-  kb_doc_comments:
-    'has 4 RLS policies and no reader; the KB shipped without doc comments',
+  // ── DROP: a second source of truth for authorization, next to a fully derived one ──────────
+  // Capabilities are derived: workspace_members.role -> resolvePersona -> capabilities
+  // (src/auth/), pinned by workspaceRoles.test.ts. A stored permission row would out-rank or
+  // silently contradict that chain, and workspace_permissions' SELECT policy already reads
+  // `workspace_id IS NULL OR ...` — a global row would be readable by every authenticated user.
+  role_permissions: 'DROP — empty; authorization is derived in src/auth/, never stored',
+  workspace_permissions: 'DROP — empty; same, plus a workspace_id IS NULL read hole if wired',
+
+  // ── DROP: the analytics graveyard CLAUDE.md says not to build yet ───────────────────────────
+  // "Do NOT build analytics rollup tables yet ... Revisit only when it passes ~5M rows." These
+  // are those rollups, pre-built and never written. Leaving them invites someone to wire one.
+  performance_alerts: 'DROP — empty rollup; alerting is the integrity framework',
+  performance_reports: 'DROP — empty rollup; superseded by data_integrity_runs',
+  system_performance_metrics: 'DROP — empty rollup; api_usage_logs is the real metric',
+  quality_metrics_daily: 'DROP — empty rollup',
+  quality_scoring_logs: 'DROP — empty rollup',
+  response_quality_metrics: 'DROP — empty rollup',
+  retrieval_quality_metrics: 'DROP — empty rollup',
+  embedding_stability_metrics: 'DROP — empty rollup',
+  processing_metrics: 'DROP — empty rollup',
+  pdf_integration_health_results: 'DROP — empty rollup',
+  recommendation_analytics: 'DROP — empty rollup',
+  user_behavior_profiles: 'DROP — empty rollup',
+  user_interaction_events: 'DROP — empty rollup',
+  query_intelligence: 'DROP — empty rollup',
+  search_sessions: 'DROP — empty rollup',
+
+  // ── DROP: pipeline-era tables superseded by background_jobs + cache_status ──────────────────
+  document_processing_status: 'DROP — empty; background_jobs is the job record',
+  document_quality_metrics: 'DROP — empty; stage_history carries the verdict',
+  processing_queue: 'DROP — empty; background_jobs is the queue',
+  batch_jobs: 'DROP — empty; background_jobs is the queue',
+  category_extractions: 'DROP — empty; stage 4 writes products.attributes',
+  chunk_boundaries: 'DROP — empty; document_chunks carries its own boundaries',
+  chunk_classifications: 'DROP — empty; document_chunks.chunk_type_status is the verdict',
+  chunk_validation_scores: 'DROP — empty; superseded by cache_status',
+
+  // ── DROP: features that never shipped, 0 rows across the whole cluster ──────────────────────
+  agent_projects: 'DROP — empty; the agent-projects cluster never shipped',
+  agent_project_deployments: 'DROP — empty; part of the agent-projects cluster',
+  agent_project_secrets: 'DROP — empty; part of the agent-projects cluster',
+  agent_project_snapshots: 'DROP — empty; part of the agent-projects cluster',
+  agent_artifacts: 'DROP — empty; part of the agent-projects cluster',
+  agent_tasks: 'DROP — empty; agent_runs is the live record',
+  agent_inbox_messages: 'DROP — empty; inbox_messages is the live table',
+  designer_assets: 'DROP — empty; the designer feature never shipped',
+  designer_materials: 'DROP — empty; the designer feature never shipped',
+  asset_categories: 'DROP — 8 seeded rows, read only by the dead designer_assets',
+  shopping_carts: 'DROP — empty; storefront checkout is not built on it',
+  moodboard_products: 'DROP — empty; moodboard_items is the live join',
+  competitor_source_promoted_urls: 'DROP — empty; the SEO promote step was never built',
+  api_endpoints: 'DROP — 22 seeded rows, read by nothing; api_usage_logs is the real record',
+
+  // ── WIRE, do not drop: the parent feature is LIVE and the gap is user-facing ────────────────
   kb_doc_versions:
-    'has 3 RLS policies and no reader; kb_docs has no version history writer either',
-  performance_alerts:
-    'has 2 RLS policies and no reader; monitoring alerting is done by the integrity framework',
-  performance_reports:
-    'has 2 RLS policies and no reader; superseded by data_integrity_runs',
-  system_performance_metrics:
-    'has 2 RLS policies and no reader; api_usage_logs is the metric that is actually written',
+    'WIRE — kb_docs has 677 live rows and no edit history. Dropping this removes the design; '
+    + 'the honest fix is a writer in the KB save path.',
+  kb_doc_comments:
+    'WIRE — same: the KB is live, commenting is designed and unbuilt.',
+  email_template_versions:
+    'WIRE — 22 live email_templates with no version history; an admin edit is unrecoverable.',
+
+  // ── DECIDE: promises an opt-out nothing honours ─────────────────────────────────────────────
+  user_notification_preferences:
+    'DROP or WIRE — flows deliver to every recipient a flow names and consult no preference. '
+    + 'A preferences table nothing reads is worse than none: a settings UI built on it would '
+    + 'save happily and change nothing (the silent-zero shape).',
   user_preferences:
-    'has an RLS policy and no reader — user preferences are read from user_profiles instead',
-  workspace_permissions:
-    'has an RLS policy and no reader. Capability resolution is entirely derived — '
-    + 'workspace_members.role -> resolvePersona -> capabilities (src/auth/) — so a stored '
-    + 'permission row would be a SECOND source for who can do what, which is the drift shape '
-    + 'workspaceRoles.test.ts exists to prevent. Drop rather than wire.',
+    'DROP — 1 stale row; preferences are read from user_profiles',
 };
 
 function tableNames(): string[] {
@@ -116,7 +176,7 @@ function sourceHaystack(): string {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.has(entry.name)) walk(full);
-      } else if (SOURCE_EXTS.has(extname(entry.name)) && relative(ROOT, full) !== relative(ROOT, TYPES)) {
+      } else if (SOURCE_EXTS.has(extname(entry.name)) && !REGISTRY_FILES.includes(relative(ROOT, full))) {
         try {
           chunks.push(readFileSync(full, 'utf8'));
         } catch {
