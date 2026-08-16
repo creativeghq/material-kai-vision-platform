@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "Every public table/view carrying a workspace_id column — i.e. every relation whose rows",
+    "Every public table/view carrying a workspace_id column \u2014 i.e. every relation whose rows",
     "belong to one tenant. Consumed by scripts/check-tenancy-parity.mjs.",
     "",
     "Regenerate with:",
@@ -13,7 +13,7 @@
     "if the list shrinks."
   ],
   "generated_from": "information_schema.columns where column_name = 'workspace_id'",
-  "generated_at": "2026-08-13T00:00:00.000Z",
+  "generated_at": "2026-08-16T00:00:00.000Z",
   "tables": [
     "aade_lookup_log",
     "agent_memories",
@@ -240,8 +240,6 @@
     "user_material_interactions",
     "user_preferences",
     "user_websites",
-    "validation_results",
-    "validation_rules",
     "vr_worlds",
     "vw_ap_aging",
     "vw_ar_aging",

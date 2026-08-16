@@ -305,7 +305,6 @@ const TABLES_TO_CLEAR = [
   'spatial_analysis',              // Spatial analysis results
   'pdf_processing_results',        // PDF processing results
   'pdf_integration_health_results',// PDF integration health
-  'validation_results',            // Validation results
   // review_summaries (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
