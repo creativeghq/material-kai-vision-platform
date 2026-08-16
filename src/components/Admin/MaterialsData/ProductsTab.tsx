@@ -42,10 +42,22 @@ interface Product {
   source_document_id: string;
   source_type?: 'pdf_processing' | 'xml_import' | 'web_scraping' | null;
   source_job_id?: string | null;
-  // Halfvec comes back as a string via select('*'); null = never embedded
+  // Halfvec comes back as a string; null = never embedded
   // (invisible to product-level vector search until backfilled).
   text_embedding_1024?: string | null;
 }
+
+/**
+ * Exactly the fields the interface above declares (#368 follow-up).
+ *
+ * This was `select('*')`, which is every column of `products` — including `cost`,
+ * `cost_source`, `markup_percent`, `supplier_company_id` and the raw supplier feed in
+ * `attributes_raw`. The modal wrapper projects those away before render, so nothing looked
+ * wrong; they were still delivered over the wire and held in this component's state.
+ */
+const PRODUCTS_TAB_SELECT =
+  'id, name, workspace_id, metadata, created_at, source_document_id, source_type, '
+  + 'source_job_id, text_embedding_1024';
 
 interface ProductsTabProps {
   workspaceId: string;
@@ -81,7 +93,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const buildQuery = useCallback((values: FilterValues, head: boolean) => {
     let query: any = supabase
       .from('products')
-      .select(head ? 'id' : '*', { count: 'exact', head })
+      .select(head ? 'id' : PRODUCTS_TAB_SELECT, { count: 'exact', head })
       .eq('workspace_id', workspaceId);
 
     query = applyFiltersToQuery(query, groups, values);

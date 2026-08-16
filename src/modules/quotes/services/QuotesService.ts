@@ -225,6 +225,19 @@ export interface QuoteTimeline {
 // QUOTES SERVICE
 // =====================================================
 
+/**
+ * What a quote line needs to know about its product (#368 follow-up).
+ *
+ * These are the only fields the quote surfaces actually read off the embed — `id`, `name`,
+ * `sku`, `description`, `metadata` — plus `cost_currency`, which the line list uses as the
+ * display currency and which carries no amount. `cost` itself is seller-only and arrives
+ * through QUOTE_PRODUCT_SELECT_WITH_COST.
+ */
+const QUOTE_PRODUCT_SELECT = 'id, name, sku, description, metadata, cost_currency';
+
+/** The seller view adds the procurement cost, for margin and the below-cost guardrail. */
+const QUOTE_PRODUCT_SELECT_WITH_COST = `${QUOTE_PRODUCT_SELECT}, cost`;
+
 export class QuotesService {
   /**
    * Create a new quote
@@ -384,8 +397,22 @@ export class QuotesService {
 
   /**
    * Get a specific quote with its items
+   *
+   * `includeCost` is a SELLER switch (#368 follow-up). The embed used to be
+   * `product:products(*)`, and `products` carries `cost`, `cost_source`, `markup_percent`,
+   * `supplier_company_id` and the raw supplier feed in `attributes_raw`. This method backs the
+   * customer page (`/quotes/:id`, no admin gate) as well as the admin one, and `quote_items`'
+   * RLS only requires workspace membership — which a project client has. So every one of those
+   * columns was landing in the customer's browser on the page where they read their own quote.
+   * The list scrubbed cost before RENDER (`convertToDisplayProduct` sets `wholesale: 0`), which
+   * is why nothing looked wrong; the row was already over the wire.
+   *
+   * The flag narrows what the client ASKS for; it is not a server boundary — `products` RLS
+   * still answers a hand-made request from any member. A page that must not show procurement
+   * cost should not be requesting it, which is the same rule `get_product_detail` enforces on
+   * the product surface.
    */
-  async getQuote(quoteId: string): Promise<QuoteWithItems> {
+  async getQuote(quoteId: string, opts?: { includeCost?: boolean }): Promise<QuoteWithItems> {
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select('*')
@@ -396,7 +423,7 @@ export class QuotesService {
 
     const { data: items, error: itemsError } = await supabase
       .from('quote_items')
-      .select('*, product:products(*)')
+      .select(`*, product:products(${opts?.includeCost ? QUOTE_PRODUCT_SELECT_WITH_COST : QUOTE_PRODUCT_SELECT})`)
       .eq('quote_id', quoteId)
       .order('added_at', { ascending: true });
 
@@ -898,9 +925,11 @@ export class QuotesService {
     // Get items for each quote
     const quotesWithItems = await Promise.all(
       quotes.map(async (quote) => {
+        // No cost here at all: the requests inbox reads only name and sku, and
+        // `/quotes/requests` is a customer-facing route (#368 follow-up).
         const { data: items, error: itemsError } = await supabase
           .from('quote_items')
-          .select('*, product:products(*)')
+          .select(`*, product:products(${QUOTE_PRODUCT_SELECT})`)
           .eq('quote_id', quote.id)
           .order('added_at', { ascending: true });
 

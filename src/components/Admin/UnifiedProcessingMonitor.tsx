@@ -51,9 +51,12 @@ export const UnifiedProcessingMonitor: React.FC = () => {
         const pdfEmbeddings = pdfChunks;
 
         // Fetch XML metrics
+        // `id` only. This was `select('*')` with a count but no `head`, so it pulled every
+        // column of every XML-sourced product — cost, markup, supplier and the raw feed
+        // included — to build a list of ids (#368 follow-up).
         const { data: xmlProducts, count: totalXMLProducts } = await supabase
           .from('products')
-          .select('*', { count: 'exact' })
+          .select('id', { count: 'exact' })
           .eq('source_type', 'xml');
 
         const xmlProductIds = xmlProducts?.map((p: any) => p.id) || [];
@@ -75,7 +78,7 @@ export const UnifiedProcessingMonitor: React.FC = () => {
         // Fetch Web Scraping metrics
         const { data: scrapedProducts, count: totalScrapedProducts } = await supabase
           .from('products')
-          .select('*', { count: 'exact' })
+          .select('id', { count: 'exact' })
           .eq('source_type', 'web_scraping');
 
         const scrapedProductIds = scrapedProducts?.map((p: any) => p.id) || [];

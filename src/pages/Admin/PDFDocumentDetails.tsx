@@ -94,10 +94,12 @@ export const PDFDocumentDetails: React.FC = () => {
 
       if (docError) throw docError;
 
-      // Fetch products
+      // Fetch products. The four fields this page renders, not `*` — that pulled cost,
+      // markup, supplier and the raw supplier feed for every product in the document, none of
+      // which appears anywhere on the page (#368 follow-up).
       const { data: productsData } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, description, metadata')
         .eq('source_document_id', documentId);
 
       // Fetch chunks

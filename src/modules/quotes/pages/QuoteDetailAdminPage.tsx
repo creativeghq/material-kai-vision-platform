@@ -144,7 +144,10 @@ export const QuoteDetailPage: React.FC = () => {
 
     try {
       setLoading(true);
-      const data = await quotesService.getQuote(id);
+      // The seller view: margin, the retail/discount breakdown and the below-cost guardrail all
+      // need the live product cost when a line has no `cost_snapshot` yet. The customer page
+      // asks without it (#368 follow-up).
+      const data = await quotesService.getQuote(id, { includeCost: true });
       setQuote(data);
       // Initialize pricing state from loaded data
       if (data?.items) {
