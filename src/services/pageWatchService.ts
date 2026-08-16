@@ -65,6 +65,26 @@ export interface PageWatchChange {
   acknowledged_by: string | null;
 }
 
+/**
+ * The cadences a watch may run on.
+ *
+ * Not free text. Firecrawl's natural-language schedule parser accepts "every day
+ * at 09:00" and rejects "every Monday at 08:00" — which was the second example in
+ * this form's own placeholder until 2026-08-16, so following our own hint saved a
+ * watch that Firecrawl had refused to schedule. The edge function maps each of
+ * these to a cron expression; both copies are pinned equal by
+ * tests/unit/pageWatchWebhook.test.ts.
+ */
+export const PAGE_WATCH_SCHEDULES = [
+  'every hour',
+  'every 6 hours',
+  'every day at 09:00',
+  'every Monday at 09:00',
+  'the 1st of every month at 09:00',
+] as const;
+
+export type PageWatchSchedule = typeof PAGE_WATCH_SCHEDULES[number];
+
 export const PAGE_WATCH_CATEGORY_LABELS: Record<PageWatchCategory, string> = {
   supplier_terms: 'Supplier terms',
   regulatory: 'Regulatory',

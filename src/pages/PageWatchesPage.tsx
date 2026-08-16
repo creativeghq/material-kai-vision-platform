@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   pageWatchService,
   PAGE_WATCH_CATEGORY_LABELS,
+  PAGE_WATCH_SCHEDULES,
   type PageWatch,
   type PageWatchCategory,
   type PageWatchChange,
@@ -39,6 +40,24 @@ const STATUS_TONE: Record<string, string> = {
   error: 'text-rose-600 dark:text-rose-400',
   same: 'text-muted-foreground',
 };
+
+/**
+ * The judge's per-change list, which arrives in `diff_json` because git-diff mode
+ * has no structured diff of its own. Stored data is untrusted shape — narrow it
+ * rather than casting.
+ */
+function meaningfulChanges(c: PageWatchChange): { before?: string; after?: string; reason?: string }[] {
+  const raw = (c.diff_json as { meaningful_changes?: unknown } | null)?.meaningful_changes;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m): m is Record<string, unknown> => !!m && typeof m === 'object')
+    .map((m) => ({
+      before: typeof m.before === 'string' ? m.before : undefined,
+      after: typeof m.after === 'string' ? m.after : undefined,
+      reason: typeof m.reason === 'string' ? m.reason : undefined,
+    }))
+    .slice(0, 12);
+}
 
 function relative(iso: string | null): string {
   if (!iso) return 'never';
@@ -106,7 +125,10 @@ export default function PageWatchesPage() {
       setForm(EMPTY_FORM);
       setAdding(false);
       await load();
-      toast({ title: 'Watching that page', description: 'The first check runs on the next scheduled slot.' });
+      toast({
+        title: 'Watching that page',
+        description: 'Firecrawl takes a baseline snapshot within a minute or two; after that you hear about changes only.',
+      });
     } catch (e) {
       toast({
         title: 'Could not add the watch',
@@ -328,14 +350,21 @@ export default function PageWatchesPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pw-schedule">How often</Label>
-              <Input
-                id="pw-schedule" value={form.schedule_text}
-                onChange={(e) => setForm({ ...form, schedule_text: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Plain English, e.g. &quot;every day at 09:00&quot; or &quot;every Monday at 08:00&quot;. One credit per check.
-              </p>
+              <Label>How often</Label>
+              {/* A fixed list, not free text: Firecrawl rejects most natural-language
+                  cadences, and a rejected schedule means a saved watch that never runs. */}
+              <Select
+                value={form.schedule_text}
+                onValueChange={(v) => setForm({ ...form, schedule_text: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAGE_WATCH_SCHEDULES.map((sched) => (
+                    <SelectItem key={sched} value={sched}>{sched}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">One credit per check.</p>
             </div>
           </div>
           <DialogFooter>
@@ -389,6 +418,17 @@ export default function PageWatchesPage() {
                     )}
                   </div>
                   {c.judge_reason && <p className="text-sm mt-1">{c.judge_reason}</p>}
+                  {meaningfulChanges(c).map((m, i) => (
+                    // The judge's structured before/after. This is what an operator
+                    // reads first — "30 days → 14 days" — with the unified diff below
+                    // as the evidence.
+                    <p key={i} className="text-xs mt-1 text-muted-foreground">
+                      <span className="text-foreground">{m.before || '—'}</span>
+                      {' → '}
+                      <span className="text-foreground">{m.after || '—'}</span>
+                      {m.reason ? ` · ${m.reason}` : ''}
+                    </p>
+                  ))}
                   {c.error && <p className="text-sm mt-1 text-rose-600 dark:text-rose-400">{c.error}</p>}
                   {c.diff_text && (
                     // The diff is the product. Rendered as text in a <pre>, never as HTML —

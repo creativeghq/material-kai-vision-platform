@@ -24,6 +24,29 @@ import { corsHeaders } from '../_shared/cors.ts';
 const FIRECRAWL_BASE = 'https://api.firecrawl.dev';
 const MODULE_SLUG = 'page-monitoring';
 
+/**
+ * How often a watch runs. The key is what we store and show; the value is what
+ * Firecrawl is actually given.
+ *
+ * We send CRON, not the natural-language `schedule.text` the Monitoring docs
+ * advertise, because their parser rejects most of what an operator would type.
+ * "every day at 09:00" is accepted; "every Monday at 08:00" — the second example
+ * in our own placeholder text until 2026-08-16 — comes back
+ * `Unsupported schedule text`, which at create time left a saved watch that was
+ * never actually watching anything. A fixed list of cadences mapped to cron
+ * cannot fail that way.
+ *
+ * Mirrored in src/services/pageWatchService.ts and pinned equal by
+ * tests/unit/pageWatchWebhook.test.ts.
+ */
+const SCHEDULE_CRON: Record<string, string> = {
+  'every hour': '0 * * * *',
+  'every 6 hours': '0 */6 * * *',
+  'every day at 09:00': '0 9 * * *',
+  'every Monday at 09:00': '0 9 * * 1',
+  'the 1st of every month at 09:00': '0 9 1 * *',
+};
+
 const CATEGORIES = new Set(['supplier_terms', 'regulatory', 'partner_docs', 'competitor', 'other']);
 const SUBJECT_KINDS = new Set(['platform_supplier', 'crm_company']);
 
@@ -41,7 +64,22 @@ async function moduleEnabled(supabase: Db): Promise<boolean> {
   return !!(data as { enabled?: boolean } | null)?.enabled;
 }
 
-/** Shape of the monitor we ask Firecrawl to keep for one watched page. */
+/**
+ * Shape of the monitor we ask Firecrawl to keep for one watched page.
+ *
+ * VERIFIED AGAINST THE LIVE API 2026-08-16, not against the docs — the first
+ * version of this function was written from the docs and every create it ever
+ * made was rejected:
+ *
+ *   • `webhook` is a TOP-LEVEL key. Nesting it under `notification` (which is
+ *     what the Monitoring page shows) returns 400 `Unrecognized key in body`,
+ *     `path: ["notification"], keys: ["webhook"]`. `notification` carries email
+ *     and nothing else.
+ *   • `markdown` does not have to be listed alongside `changeTracking` here.
+ *     The change-tracking docs say it is required; the monitor adds it itself,
+ *     and a monitor created without it diffs correctly (checked: baseline `new`,
+ *     then `same` against the stored snapshot).
+ */
 function buildMonitorBody(args: {
   name: string;
   url: string;
@@ -53,8 +91,7 @@ function buildMonitorBody(args: {
   watchId: string;
 }) {
   return {
-    name: args.name.slice(0, 120),
-    schedule: { text: args.scheduleText, timezone: args.timezone },
+    ...monitorMutableFields(args),
     targets: [{
       type: 'scrape',
       urls: [args.url],
@@ -63,21 +100,35 @@ function buildMonitorBody(args: {
       // reads to decide whether the change matters.
       scrapeOptions: { formats: [{ type: 'changeTracking', modes: ['git-diff'] }] },
     }],
-    // Supplying a goal auto-enables Firecrawl's judge. Its verdict is advisory
-    // here — see the note on page_watch_changes.is_meaningful.
-    ...(args.goal ? { goal: args.goal } : {}),
-    notification: {
-      email: { enabled: false },
-      webhook: {
-        url: args.webhookUrl,
-        // Firecrawl does not sign webhooks. This header IS the authentication;
-        // the receiver fails closed without it.
-        headers: { 'x-firecrawl-webhook-secret': args.webhookSecret },
-        metadata: { watch_id: args.watchId },
-        events: ['monitor.page', 'monitor.check.completed'],
-      },
+    notification: { email: { enabled: false } },
+    webhook: {
+      url: args.webhookUrl,
+      // Firecrawl does not sign webhooks. This header IS the authentication;
+      // the receiver fails closed without it.
+      headers: { 'x-firecrawl-webhook-secret': args.webhookSecret },
+      metadata: { watch_id: args.watchId },
+      events: ['monitor.page', 'monitor.check.completed'],
     },
     retentionDays: 90,
+  };
+}
+
+/**
+ * The subset a PATCH may carry.
+ *
+ * PATCH accepts a partial body, so an update sends only what the operator can
+ * actually change. It deliberately does NOT resend `targets` or `webhook`: the
+ * URL is fixed for the life of a watch, and re-sending the secret on every edit
+ * widens its exposure for no gain.
+ */
+function monitorMutableFields(args: { name: string; goal: string | null; scheduleText: string; timezone: string }) {
+  return {
+    name: args.name.slice(0, 120),
+    schedule: { cron: SCHEDULE_CRON[args.scheduleText], timezone: args.timezone },
+    // Supplying a goal auto-enables Firecrawl's judge (`judgeEnabled` comes back
+    // true without us asking). Its verdict is advisory here — see the note on
+    // page_watch_changes.is_meaningful.
+    goal: args.goal,
   };
 }
 
@@ -228,6 +279,14 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
         throw new HttpError(400, e instanceof SSRFError ? `Rejected URL: ${e.message}` : 'Invalid URL');
       }
 
+      // Reject an unknown cadence rather than quietly substituting the default:
+      // a watch that runs on a schedule the operator did not choose is a lie the
+      // UI has no way to show.
+      const scheduleText = String(body.schedule_text ?? 'every day at 09:00');
+      if (!SCHEDULE_CRON[scheduleText]) {
+        throw new HttpError(400, `Unknown schedule "${scheduleText}". Pick one of: ${Object.keys(SCHEDULE_CRON).join(', ')}.`);
+      }
+
       const category = CATEGORIES.has(String(body.category)) ? String(body.category) : 'other';
       const subjectKind = SUBJECT_KINDS.has(String(body.subject_kind)) ? String(body.subject_kind) : null;
 
@@ -243,7 +302,7 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
           subject_kind: subjectKind,
           subject_id: subjectKind && typeof body.subject_id === 'string' ? body.subject_id : null,
           goal: typeof body.goal === 'string' && body.goal.trim() ? body.goal.trim().slice(0, 500) : null,
-          schedule_text: String(body.schedule_text ?? 'every day at 09:00').slice(0, 120),
+          schedule_text: scheduleText,
           timezone: String(body.timezone ?? 'Europe/Athens').slice(0, 64),
         })
         .select('*')
@@ -281,6 +340,15 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
         // lost marker is the whole point of the comment above: the operator opens the UI and
         // sees no reason why (#347 audit).
         if (markErr) console.error('[page-watches] could not mark the watch failed', markErr);
+        // 429 is not a defect in the request — Firecrawl allows ~3 monitor-API calls
+        // a minute, so adding several watches in a row trips it. Say so, and say the
+        // watch is repairable, because the row is still there and Resume relinks it.
+        if (remote.status === 429) {
+          throw new HttpError(
+            429,
+            'Firecrawl is rate-limiting monitor changes (about 3 a minute). The watch was saved but is not live yet — wait a moment and press Resume on it.',
+          );
+        }
         throw new HttpError(502, `Firecrawl did not create the monitor (HTTP ${remote.status}).`);
       }
 
@@ -302,7 +370,11 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
       if (typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim();
       if (typeof body.goal === 'string') patch.goal = body.goal.trim().slice(0, 500) || null;
       if (typeof body.schedule_text === 'string' && body.schedule_text.trim()) {
-        patch.schedule_text = body.schedule_text.trim().slice(0, 120);
+        const next = body.schedule_text.trim();
+        if (!SCHEDULE_CRON[next]) {
+          throw new HttpError(400, `Unknown schedule "${next}". Pick one of: ${Object.keys(SCHEDULE_CRON).join(', ')}.`);
+        }
+        patch.schedule_text = next;
       }
       if (typeof body.timezone === 'string' && body.timezone.trim()) patch.timezone = body.timezone.trim().slice(0, 64);
       if (typeof body.is_active === 'boolean') patch.is_active = body.is_active;
@@ -313,33 +385,71 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
       const next = (updated ?? watch) as Record<string, unknown>;
 
       const monitorId = next.firecrawl_monitor_id as string | null;
-      if (monitorId) {
-        // Pausing locally must pause upstream too, or a deactivated watch keeps
-        // billing Firecrawl credits on its schedule for a page nobody reads.
-        const remote = await firecrawl(apiKey, `/v2/monitor/${monitorId}`, {
-          method: 'PUT',
-          body: {
-            ...buildMonitorBody({
-              name: next.name as string,
-              url: next.url as string,
-              goal: (next.goal as string | null) ?? null,
-              scheduleText: next.schedule_text as string,
-              timezone: next.timezone as string,
-              webhookUrl, webhookSecret: secret,
-              watchId: next.id as string,
-            }),
-            enabled: next.is_active as boolean,
-          },
+
+      if (!monitorId) {
+        // No upstream monitor: either the create call failed (rate limit, outage) or
+        // it was removed at Firecrawl. The local row is the source of truth, so
+        // reconcile the remote toward it rather than leaving a watch that looks live
+        // in the table and is watching nothing. This is the repair path `create`
+        // points at when it fails.
+        const remote = await firecrawl(apiKey, '/v2/monitor', {
+          method: 'POST',
+          body: buildMonitorBody({
+            name: next.name as string,
+            url: next.url as string,
+            goal: (next.goal as string | null) ?? null,
+            scheduleText: next.schedule_text as string,
+            timezone: next.timezone as string,
+            webhookUrl, webhookSecret: secret,
+            watchId: next.id as string,
+          }),
         });
-        if (!remote.ok) {
-          const { error: markErr } = await supabase.from('page_watches').update({
-            last_error: `Firecrawl update failed (HTTP ${remote.status})`,
-          }).eq('id', next.id as string);
-          // This branch already returns `success: true` below, so the recorded error is the
-          // only trace that the upstream update failed. Losing it silently leaves the watch
-          // looking healthy while Firecrawl is out of sync (#347 audit).
-          if (markErr) console.error('[page-watches] could not record the upstream update failure', markErr);
+        const created = remote.ok ? monitorIdOf(remote.data) : null;
+        const { data: relinked } = await supabase
+          .from('page_watches')
+          .update(created
+            ? { firecrawl_monitor_id: created, cache_status: 'ok', last_error: null }
+            : { cache_status: 'failed', last_error: `Firecrawl would not create the monitor (HTTP ${remote.status})` })
+          .eq('id', next.id as string)
+          .select('*')
+          .single();
+        if (!created) {
+          throw new HttpError(remote.status === 429 ? 429 : 502,
+            remote.status === 429
+              ? 'Firecrawl is rate-limiting monitor changes (about 3 a minute). Try again in a moment.'
+              : `Firecrawl would not create the monitor (HTTP ${remote.status}).`);
         }
+        return json({ success: true, data: relinked ?? next });
+      }
+
+      // Pausing locally must pause upstream too, or a deactivated watch keeps
+      // billing Firecrawl credits on its schedule for a page nobody reads.
+      //
+      // VERIFIED 2026-08-16: the method is PATCH — `PUT /v2/monitor/{id}` is not a
+      // route at all ("Cannot PUT"), so the previous version of this call could not
+      // have reached Firecrawl even once. It takes a PARTIAL body, and pausing is
+      // `status: 'paused' | 'active'`; there is no `enabled` key and sending one
+      // fails the whole request with 400 `Unrecognized key in body`.
+      const remote = await firecrawl(apiKey, `/v2/monitor/${monitorId}`, {
+        method: 'PATCH',
+        body: {
+          ...monitorMutableFields({
+            name: next.name as string,
+            goal: (next.goal as string | null) ?? null,
+            scheduleText: next.schedule_text as string,
+            timezone: next.timezone as string,
+          }),
+          status: (next.is_active as boolean) ? 'active' : 'paused',
+        },
+      });
+      if (!remote.ok) {
+        const { error: markErr } = await supabase.from('page_watches').update({
+          last_error: `Firecrawl update failed (HTTP ${remote.status})`,
+        }).eq('id', next.id as string);
+        // This branch already returns `success: true` below, so the recorded error is the
+        // only trace that the upstream update failed. Losing it silently leaves the watch
+        // looking healthy while Firecrawl is out of sync (#347 audit).
+        if (markErr) console.error('[page-watches] could not record the upstream update failure', markErr);
       }
       return json({ success: true, data: next });
     }

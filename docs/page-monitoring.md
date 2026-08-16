@@ -48,6 +48,81 @@ bundling would mean a shared schedule, a shared goal, and a webhook payload we w
 back out by URL. One-to-one keeps `firecrawl_monitor_id` a key the webhook can resolve a tenant
 from — which is what the tenancy check depends on.
 
+## The Firecrawl contract, as verified against the live API
+
+Everything below was checked against `api.firecrawl.dev` on **2026-08-16**, because the
+first cut of this feature was written from the docs and shipped behind a module that was
+off — so nothing ever called it, and it was broken in three places at once. Change any of
+this only after re-checking it the same way; [tests/unit/pageWatchWebhook.test.ts](../tests/unit/pageWatchWebhook.test.ts)
+pins each one.
+
+| | What works | What the docs suggest, and why it fails |
+|---|---|---|
+| Webhook config | **top-level** `webhook: { url, headers, metadata, events }` | the Monitoring page shows it under `notification`. That returns `400 Unrecognized key in body`, so **every** create failed. `notification` carries email only. |
+| Update | `PATCH /v2/monitor/{id}`, **partial body accepted** | `PUT` is not a route at all — "Cannot PUT". |
+| Pause / resume | `status: 'paused' \| 'active'` | there is no `enabled` key; sending one fails the whole PATCH. |
+| Schedule | `schedule: { cron, timezone }` | `schedule.text` takes only a narrow set of phrases. `every day at 09:00` is accepted, `every Monday at 08:00` is `Unsupported schedule text` — so we send cron and offer a fixed list of cadences. |
+| Judge | supplying `goal` is enough | `judgeEnabled` comes back `true` on its own. |
+| `markdown` in `formats` | not required here | change-tracking docs say it is; the monitor supplies it, and diffs work without it. |
+| Delete | `DELETE /v2/monitor/{id}` → `{"success":true}` | as documented. |
+| Rate limit | **~3 monitor-API calls per minute** | undocumented. Adding several watches in quick succession 429s; `create` says so and the row stays repairable — pressing **Resume** relinks it. |
+
+**A baseline check runs shortly after a monitor is created** (about a minute), not at the
+next scheduled slot. It arrives as `status: "new"` with no diff, so the first notification
+a watch produces says *"Now watching X"* rather than pretending something changed.
+
+### The webhook payload, captured from a real delivery
+
+```jsonc
+// monitor.page
+{ "success": true, "type": "monitor.page", "id": "<checkId>", "webhookId": "…",
+  "metadata": { "watch_id": "…" },          // whatever we set at creation
+  "data": [{
+    "monitorId": "…", "checkId": "…", "url": "…",
+    "status": "new" | "changed" | "same" | "removed" | "error",
+    "previousScrapeId": "…", "currentScrapeId": "…", "error": null,
+    "isMeaningful": true,
+    "judgment": { "meaningful": true, "confidence": "high", "reason": "…",
+                  "meaningfulChanges": [{ "type": "changed", "before": "…", "after": "…", "reason": "…" }] },
+    "diff": { "text": "--- previous.md
++++ current.md
+@@ …" }
+  }] }
+```
+
+Two absences shape the handler:
+
+- **No `statusCode`.** See below — this is the feature's silent-zero hazard.
+- **No `diff.json` in git-diff mode.** The structured half of a change is
+  `judgment.meaningfulChanges`, which we store in `page_watch_changes.diff_json` under
+  `meaningful_changes` and render as `before → after` above the unified diff. Without
+  that the column could never be non-null, since JSON mode is deliberately unused.
+
+## A watch pointed at a dead page looks perfectly healthy
+
+**This is the one failure mode that will actually happen.** A supplier redesigns their site,
+the terms page starts 404ing, and Firecrawl scrapes the *error page*: check one says `new`,
+every check after says `same`, `error` is `null`, and the table says "up to date" forever.
+Verified against a live 404 and a live 503 — neither carried a single distinguishing field
+in the webhook payload.
+
+`statusCode` exists only on the check-detail endpoint, so `monitor.check.completed` spends
+one extra API call (no credits) on `GET /v2/monitor/{id}/checks/{checkId}` and marks the
+watch `cache_status = 'failed'` with *"The page returns HTTP 404 …"* when any page in the
+check came back ≥ 400. It is best-effort: the lookup shares that ~3/min budget, and a
+lookup that could not be made **leaves the previous verdict alone** rather than clearing a
+real failure with a guess.
+
+`monitor.check.completed` also fails the watch when `summary.error > 0`, which covers the
+different case where the fetch itself broke.
+
+## `same` is not recorded
+
+Most deliveries are `same` and they carry nothing — no diff, no judgment, no error. Writing
+them would make `page_watch_changes` (which has no TTL, by design) one empty row per watch
+per day and bury real changes in the operator's history. That a check ran is already on the
+watch: `last_check_at`, `last_check_status`, `cache_status`.
+
 ## Tables
 
 `page_watches` — the subject. Workspace-scoped, RLS on. Carries the URL, category
@@ -126,6 +201,10 @@ scales with the number of watches, not with usage.
    Until it is set, adding a watch fails with a 503 that says so.
 3. `FIRECRAWL_API_KEY` is already required by price monitoring; page monitoring reuses it.
 
+Cadences are a fixed list — hourly, every 6 hours, daily at 09:00, Mondays at 09:00, the
+1st of the month at 09:00 — held in `SCHEDULE_CRON` (edge) and `PAGE_WATCH_SCHEDULES`
+(client) and pinned equal by the guard test. Add one by adding it to both.
+
 ## Known gaps
 
 - **No backfill of an existing monitor.** If a monitor is created upstream by hand, nothing here
@@ -136,3 +215,8 @@ scales with the number of watches, not with usage.
   extracting into fields (a published price list, say) would want `changeTracking` in JSON mode
   and a per-field diff — deliberately not built, because the pages this feature targets have no
   such schema.
+- **The dead-page health lookup is best-effort.** It shares Firecrawl's ~3 calls/minute budget,
+  so a burst of watches finishing in the same minute will leave some health verdicts unrefreshed
+  until the next check. Batch it, or move it to a sweep, if watch counts grow.
+- **No retry queue for a rate-limited create.** The watch is saved and marked failed with a
+  message; pressing Resume relinks it. Nothing retries on its own.

@@ -35,6 +35,63 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 const WEBHOOK = 'supabase/functions/page-watch-webhook/index.ts';
 const CRUD = 'supabase/functions/page-watches/index.ts';
 
+/**
+ * The object literal a named function returns, sliced by brace depth.
+ * Regexes cannot tell "top level of this object" from "nested two deep", and the
+ * difference is exactly what Firecrawl rejects.
+ */
+function returnedObject(src: string, fnAnchor: string): string {
+  const from = src.indexOf(fnAnchor);
+  if (from === -1) throw new Error(`no ${fnAnchor} in source`);
+  const open = src.indexOf('{', src.indexOf('return {', from));
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) return src.slice(open + 1, i);
+    }
+  }
+  throw new Error(`unbalanced braces in ${fnAnchor}`);
+}
+
+/** Keys sitting at depth 0 of that object. */
+function topLevelKeysOfReturn(src: string, fnAnchor: string): string[] {
+  const body = returnedObject(src, fnAnchor);
+  const keys: string[] = [];
+  let depth = 0;
+  let line = '';
+  for (const ch of body) {
+    if (ch === '{' || ch === '[' || ch === '(') depth++;
+    else if (ch === '}' || ch === ']' || ch === ')') depth--;
+    if (ch === '\n') { line = ''; continue; }
+    line += ch;
+    if (ch === ':' && depth === 0) {
+      const m = line.match(/([A-Za-z_$][\w$]*)\s*:$/);
+      if (m) keys.push(m[1]);
+    }
+  }
+  return keys;
+}
+
+/** The text of one top-level key's value, braces balanced. */
+function objectValueOf(src: string, fnAnchor: string, key: string): string {
+  const body = returnedObject(src, fnAnchor);
+  const at = body.search(new RegExp(`(^|\n)\s*${key}\s*:`));
+  if (at === -1) return '';
+  const open = body.indexOf('{', at);
+  if (open === -1) return '';
+  let depth = 0;
+  for (let i = open; i < body.length; i++) {
+    if (body[i] === '{') depth++;
+    else if (body[i] === '}') {
+      depth--;
+      if (depth === 0) return body.slice(open, i + 1);
+    }
+  }
+  return body.slice(open);
+}
+
 /** Strip block/line comments so prose describing a rule cannot satisfy the rule. */
 function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -140,6 +197,104 @@ describe('page-watch CRUD — tenancy and spend', () => {
 
   it('builds explicit insert payloads', () => {
     expect(/\.(insert|upsert)\(\s*\{\s*\.\.\./.test(src)).toBe(false);
+  });
+});
+
+describe('the Firecrawl wire contract — pinned to what the live API accepts', () => {
+  /**
+   * WHY THESE EXIST
+   * ---------------
+   * Every one of these was got WRONG in the first version of this feature, which
+   * was written from the Monitoring docs and shipped behind a module that was off,
+   * so nothing ever exercised it. Verified against the live API on 2026-08-16:
+   *
+   *   • `webhook` is top-level. Under `notification` the create returns 400
+   *     `Unrecognized key in body` — so every watch creation failed, 100%.
+   *   • the update method is PATCH. `PUT /v2/monitor/{id}` is not a route.
+   *   • there is no `enabled` key; pausing is `status: 'paused' | 'active'`.
+   *
+   * A wrong verb and a misplaced key are both perfectly typed and perfectly
+   * reviewable. Only the provider can say they are wrong, and it only says so at
+   * runtime — which is why they are pinned here instead of trusted.
+   */
+  const src = code(read(CRUD));
+
+  it('puts the webhook config at the top level of the monitor body', () => {
+    // Brace-depth, not a regex. The first version of this assertion looked for
+    // `webhook:` inside `notification: { ... }` with [^}]* — which cannot cross the
+    // inner `}` of `{ email: { enabled: false } }`, so the very mutation it exists
+    // to catch walked straight past it.
+    const keys = topLevelKeysOfReturn(src, 'function buildMonitorBody(');
+    expect(keys, 'buildMonitorBody must send `webhook` at the top level').toContain('webhook');
+    const notification = objectValueOf(src, 'function buildMonitorBody(', 'notification');
+    expect(
+      notification.includes('webhook'),
+      'webhook is nested under notification — Firecrawl rejects the whole create with 400',
+    ).toBe(false);
+    expect(src).toMatch(/'x-firecrawl-webhook-secret'/);
+  });
+
+  it('updates the monitor with PATCH, never PUT', () => {
+    expect(/method:\s*'PUT'/.test(src), "PUT /v2/monitor/{id} is not a route — the update silently never happened").toBe(false);
+    expect(src).toMatch(/method:\s*'PATCH'/);
+  });
+
+  it('pauses with status, not with an `enabled` flag', () => {
+    expect(/\benabled:\s*(next|watch)\./.test(src), 'sending `enabled` fails the whole PATCH with 400').toBe(false);
+    expect(src).toMatch(/status:\s*\(next\.is_active as boolean\)\s*\?\s*'active'\s*:\s*'paused'/);
+  });
+
+  it('sends a cron schedule rather than a natural-language phrase', () => {
+    // Firecrawl's NL parser accepts "every day at 09:00" and rejects
+    // "every Monday at 08:00". A cadence it refuses saves a watch that never runs.
+    expect(src).toMatch(/schedule:\s*\{\s*cron:/);
+    expect(/schedule:\s*\{\s*text:/.test(src), 'natural-language schedules are not reliably accepted').toBe(false);
+  });
+
+  it('offers the same cadences on both sides of the wire', () => {
+    // Two copies, one meaning. The form must not offer a cadence the edge function
+    // will reject, and the edge function must not accept one the form cannot show.
+    const edge = code(read(CRUD));
+    const edgeKeys = [...edge.matchAll(/^\s*'([^']+)':\s*'[-0-9*/ ,]+',$/gm)].map((m) => m[1]);
+    const client = read('src/services/pageWatchService.ts');
+    const listed = client.slice(client.indexOf('PAGE_WATCH_SCHEDULES = ['));
+    const clientKeys = [...listed.slice(0, listed.indexOf(']')).matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    expect(edgeKeys.length).toBeGreaterThan(0);
+    expect(clientKeys).toEqual(edgeKeys);
+  });
+});
+
+describe('the change log records changes, and knows when the page is broken', () => {
+  const src = code(read(WEBHOOK));
+
+  it('does not write a row for an unchanged page', () => {
+    // 'same' is most deliveries and carries no diff, no judgment, no error.
+    // Storing it turns a change log with no TTL into a check log.
+    expect(src).toMatch(/if\s*\(status === 'same'\)\s*continue;/);
+  });
+
+  it('looks up the real HTTP status of the watched page', () => {
+    // A 404 or 503 page arrives as an ordinary `same` with `error: null`, and the
+    // webhook payload carries no statusCode at all — so a watch pointed at a dead
+    // URL reports "up to date" forever unless something goes and asks.
+    //
+    // Match the CALL, not the declaration — deleting the call and leaving
+    // `async function probeWatchedPageHealth` behind is the mutation that survived
+    // the first draft, and it is the same trap `secretsMatch` sprang above.
+    expect(src, 'the health probe is declared but never called').toMatch(/await probeWatchedPageHealth\(/);
+    expect(src).toMatch(/statusCode/);
+    expect(src).toMatch(/checks\/\$\{checkId\}/);
+  });
+
+  it('leaves the health verdict alone when it could not be determined', () => {
+    // The lookup is rate-limited and best-effort. Clearing a real failure because
+    // one call got a 429 is worse than not looking.
+    expect(src).toMatch(/health === null/);
+  });
+
+  it('keeps the structured before/after the judge produced, instead of dropping it', () => {
+    expect(src).toMatch(/meaningfulChanges/);
+    expect(src).toMatch(/meaningful_changes/);
   });
 });
 

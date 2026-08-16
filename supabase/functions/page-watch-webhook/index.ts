@@ -58,14 +58,39 @@ function secretsMatch(provided: string, expected: string): boolean {
   return diff === 0;
 }
 
+/**
+ * The `monitor.page` entry, as Firecrawl actually sends it (captured from a live
+ * delivery 2026-08-16, not read off the docs):
+ *
+ *   { checkId, monitorId, url, status, previousScrapeId, currentScrapeId,
+ *     error, isMeaningful, judgment, diff }
+ *
+ * Two things that are NOT in it and shape the code below:
+ *   • no `statusCode` — a page that 404s or 503s arrives as an ordinary `new`
+ *     then `same`, with `error: null`. See probeWatchedPageHealth().
+ *   • no `diff.json` in git-diff mode; the structured half of the change lives in
+ *     `judgment.meaningfulChanges`.
+ */
+interface MeaningfulChange {
+  type?: string;
+  before?: string;
+  after?: string;
+  reason?: string;
+}
+
 interface MonitorPageEntry {
   monitorId?: string;
   checkId?: string;
   url?: string;
   status?: 'same' | 'new' | 'changed' | 'removed' | 'error';
   error?: string | null;
-  isMeaningful?: boolean;
-  judgment?: { meaningful?: boolean; confidence?: string; reason?: string } | null;
+  isMeaningful?: boolean | null;
+  judgment?: {
+    meaningful?: boolean;
+    confidence?: string;
+    reason?: string;
+    meaningfulChanges?: MeaningfulChange[];
+  } | null;
   diff?: { text?: string; json?: unknown } | null;
 }
 
@@ -107,6 +132,34 @@ async function findWatch(
   return (data as WatchRow | null) ?? null;
 }
 
+/** What the notification should SAY, which is not the same for every status. */
+function notificationCopy(watchName: string, status: string, reason: string | null) {
+  switch (status) {
+    case 'new':
+      // The first check after a watch is created is a baseline, not a change.
+      // Calling it "changed" trains the operator to ignore the next one.
+      return {
+        title: `Now watching ${watchName}`,
+        body: 'The first snapshot has been taken. You will hear from this watch when the page changes.',
+      };
+    case 'removed':
+      return {
+        title: `${watchName} disappeared`,
+        body: reason || 'The page is no longer reachable at that address.',
+      };
+    case 'error':
+      return {
+        title: `${watchName} could not be checked`,
+        body: reason || 'The check failed. It will be retried on the next schedule.',
+      };
+    default:
+      return {
+        title: `${watchName} changed`,
+        body: reason || 'The page you are watching changed.',
+      };
+  }
+}
+
 async function handleMonitorPage(
   supabase: DbClient,
   entries: MonitorPageEntry[],
@@ -123,7 +176,20 @@ async function handleMonitorPage(
     }
 
     const status = STATUSES.has(e.status ?? '') ? e.status! : 'error';
+
+    // 'same' is the overwhelming majority of deliveries and carries nothing: no
+    // diff, no judgment, no error. Recording it would turn the change log into a
+    // check log — one empty row per watch per day, for a table with no TTL — and
+    // bury the actual changes in the operator's history dialog. That the check
+    // ran at all is already recorded on the watch by monitor.check.completed.
+    if (status === 'same') continue;
+
     const confidence = CONFIDENCE.has(e.judgment?.confidence ?? '') ? e.judgment!.confidence! : null;
+
+    // git-diff mode returns no `diff.json`; the structured half of the change is
+    // the judge's per-change list. Keeping it is what lets the UI say "payment
+    // terms: 30 days → 14 days" instead of only showing a unified diff.
+    const changes = Array.isArray(e.judgment?.meaningfulChanges) ? e.judgment!.meaningfulChanges! : null;
 
     // Allowlisted payload — never spread the request body into a write
     // (invariant 8). Everything below is either ours or explicitly narrowed.
@@ -139,7 +205,7 @@ async function handleMonitorPage(
       judge_confidence: confidence,
       judge_reason: e.judgment?.reason ?? null,
       diff_text: e.diff?.text ?? null,
-      diff_json: e.diff?.json ?? null,
+      diff_json: e.diff?.json ?? (changes && changes.length ? { meaningful_changes: changes } : null),
       error: e.error ?? null,
     };
     if (!row.url) continue;
@@ -163,12 +229,10 @@ async function handleMonitorPage(
     if (!inserted) continue;
     written++;
 
-    // 'same' is the common case and is not news. Only a real transition notifies.
-    if (status === 'same') continue;
-
     // The judge is ADVISORY (invariant 9): a low-confidence "not meaningful"
     // suppresses nothing, it only annotates. The row is written either way and
     // the operator sees the verdict next to the diff.
+    const copy = notificationCopy(watch.name, status, row.judge_reason ?? row.error ?? null);
     await emitFlowEvent('page_watch_changed', {
       user_id: watch.created_by,
       workspace_id: watch.workspace_id,
@@ -180,14 +244,66 @@ async function handleMonitorPage(
       is_meaningful: row.is_meaningful,
       judge_confidence: row.judge_confidence,
       judge_reason: row.judge_reason,
-      title: `${watch.name} changed`,
-      body: row.judge_reason || `The page you are watching reported "${status}".`,
+      title: copy.title,
+      body: copy.body,
       action_url: '/monitoring/pages',
       type: 'page_watch_changed',
     });
   }
 
   return written;
+}
+
+/**
+ * Ask Firecrawl what HTTP status the watched page actually returned.
+ *
+ * THIS IS THE SILENT-ZERO GUARD FOR THIS FEATURE. A watched URL that 404s or
+ * 503s does not arrive as an error: Firecrawl scrapes the error page, compares
+ * it to the previous error page, and reports `status: "same", error: null`
+ * forever. The operator sees "up to date" on a watch that has been pointed at a
+ * "Page Not Found" since the supplier redesigned their site. Verified against a
+ * live 404 and a live 503 on 2026-08-16 — neither carried any signal in the
+ * webhook payload at all.
+ *
+ * `statusCode` is only available on the check-detail endpoint, so this costs one
+ * extra API call per completed check (no Firecrawl credits). It is best-effort:
+ * the monitor API allows roughly three calls a minute, so a burst of watches
+ * finishing together will see some of these rate-limited. A lookup we could not
+ * make leaves the previous health verdict alone rather than inventing one.
+ */
+async function probeWatchedPageHealth(
+  supabase: DbClient,
+  monitorId: string,
+  checkId: string,
+): Promise<{ code: number; url: string } | null | undefined> {
+  const apiKey = await resolveSecret(supabase, 'FIRECRAWL_API_KEY');
+  if (!apiKey.value) return undefined;
+
+  let res: Response;
+  try {
+    res = await fetch(`https://api.firecrawl.dev/v2/monitor/${monitorId}/checks/${checkId}`, {
+      headers: { Authorization: `Bearer ${apiKey.value}` },
+    });
+  } catch (e) {
+    console.warn(`[page-watch-webhook] health lookup failed for check ${checkId}: ${e}`);
+    return undefined;
+  }
+  if (!res.ok) {
+    console.warn(`[page-watch-webhook] health lookup HTTP ${res.status} for check ${checkId}`);
+    return undefined;
+  }
+
+  let body: { data?: { pages?: { url?: string; statusCode?: number }[] } };
+  try {
+    body = await res.json();
+  } catch {
+    return undefined;
+  }
+
+  const pages = body.data?.pages ?? [];
+  if (!pages.length) return undefined;
+  const broken = pages.find((pg) => typeof pg.statusCode === 'number' && pg.statusCode >= 400);
+  return broken ? { code: broken.statusCode!, url: broken.url ?? '' } : null;
 }
 
 async function handleCheckCompleted(
@@ -203,17 +319,42 @@ async function handleCheckCompleted(
     // cache_status distinguishes "ran clean, nothing changed" from "the check
     // itself broke and must be retried" — the difference the price pipeline
     // learned to record the hard way.
-    const failed = e.status === 'failed';
-    const { error } = await supabase
-      .from('page_watches')
-      .update({
-        last_check_at: new Date().toISOString(),
-        last_check_status: e.status ?? null,
-        cache_status: failed ? 'failed' : 'ok',
-        last_error: failed ? `Firecrawl check ${e.checkId ?? ''} reported failed` : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', watch.id);
+    //
+    // Three different things can be wrong and only the first one is obvious:
+    //   1. the check failed outright             → e.status === 'failed'
+    //   2. a page inside it errored              → summary.error > 0
+    //   3. the page is fine but it is a 404/503  → probeWatchedPageHealth()
+    const checkFailed = e.status === 'failed';
+    const pagesErrored = Number(e.summary?.error ?? 0) > 0;
+    const health = (!checkFailed && e.monitorId && e.checkId)
+      ? await probeWatchedPageHealth(supabase, e.monitorId, e.checkId)
+      : undefined;
+
+    const failed = checkFailed || pagesErrored || !!health;
+    const reason = checkFailed
+      ? `Firecrawl check ${e.checkId ?? ''} reported failed`
+      : pagesErrored
+        ? `Firecrawl reported ${e.summary?.error} page error(s) in check ${e.checkId ?? ''}`
+        : health
+          ? `The page returns HTTP ${health.code} — this watch is comparing an error page, not the page you meant.`
+          : null;
+
+    const patch: Record<string, unknown> = {
+      last_check_at: new Date().toISOString(),
+      last_check_status: e.status ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    // `health === undefined` means we could not find out. Leave the existing
+    // verdict standing rather than clearing a real failure with a guess.
+    if (failed) {
+      patch.cache_status = 'failed';
+      patch.last_error = reason;
+    } else if (health === null) {
+      patch.cache_status = 'ok';
+      patch.last_error = null;
+    }
+
+    const { error } = await supabase.from('page_watches').update(patch).eq('id', watch.id);
 
     if (error) {
       console.error(`[page-watch-webhook] watch update failed ${watch.id}: ${error.message}`);
