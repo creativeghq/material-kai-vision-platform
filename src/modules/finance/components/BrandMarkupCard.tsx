@@ -1,7 +1,7 @@
 /**
  * per-brand markup overrides on resold catalog products. Sits alongside the
  * per-category rules (PricingRulesCard) and the blanket default_markup_pct. Precedence
- * the resolver applies: per-product → per-brand → per-category → default. This card
+ * the resolver applies: per-product → per-brand → per-supplier → per-category → default. This card
  * manages the brand-level rules only (the default markup lives on the category card).
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -12,12 +12,12 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { financeService } from '@/modules/finance/services/financeService';
+import { financeService, type PricingRuleScope } from '@/modules/finance/services/financeService';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDecimalOr } from '@/utils/decimal';
 
 interface Rule {
-  id: string; scope: 'category' | 'product' | 'brand'; target_id: string;
+  id: string; scope: PricingRuleScope; target_id: string;
   markup_pct: number | null; sell_price: number | null; currency: string;
 }
 
@@ -89,7 +89,7 @@ export const BrandMarkupCard: React.FC<{ workspaceId: string }> = ({ workspaceId
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">
           Markup turns your <strong>cost</strong> into the <strong>retail price</strong>.
-          Precedence: <strong>per-product → per-brand → per-category → default</strong>. Customer discounts then apply off retail.
+          Precedence: <strong>per-product → per-brand → per-supplier → per-category → default</strong>. Customer discounts then apply off retail.
         </p>
 
         <div className="pt-1 text-xs font-medium text-muted-foreground">Per-brand overrides</div>

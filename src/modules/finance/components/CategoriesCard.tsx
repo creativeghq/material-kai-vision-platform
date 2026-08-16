@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Plus, Trash2, Tags, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
-import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -48,11 +47,6 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
     try { await financeCategoriesService.remove(id); await load(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
-  const saveMargin = async (id: string, raw: string) => {
-    const n = raw.trim() === '' ? null : parseDecimal(raw);
-    try { await financeCategoriesService.setMargin(id, n != null && Number.isFinite(n) ? n : null); }
-    catch (err: any) { toast({ title: 'Failed to save margin', description: err?.message, variant: 'destructive' }); }
-  };
 
   return (
     <Card>
@@ -64,6 +58,13 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">Classify invoices, receipts, expenses and payments. Pick a category on each document or payment.</p>
+        {/* The per-category sell margin that used to live here was a SECOND markup system,
+            keyed on the accounting taxonomy rather than the product one, and it disagreed with
+            the `pricing_rules` ladder every other pricing path uses (#332 step 4). Margins are
+            set in Finance → Settings → Pricing, which is the one the resolver reads. */}
+        <p className="text-[11px] text-muted-foreground">
+          Sell margins are not set here — they live under <strong>Pricing</strong>, where the resolver reads them.
+        </p>
 
         {loading ? (
           <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
@@ -79,12 +80,6 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
                     ? 'Built-in "myAADE" category — every workspace has one; the default landing category for expenses synced from myDATA. Can\'t be renamed or deleted.'
                     : 'Built-in "Orders" category — every workspace has one; auto-attached to order costs. Can\'t be renamed or deleted.'}>System</span>}
                   <span className="text-[10px] capitalize text-muted-foreground">{humanizeLabel(c.kind)}</span>
-                  <div className="flex items-center gap-1" title="Default sell margin % — auto-prices received goods in this category">
-                    <input type="text" inputMode="decimal" defaultValue={c.margin_pct ?? ''} placeholder="Margin"
-                      className="h-7 w-14 rounded border border-border/60 bg-background px-1 text-right text-xs"
-                      onBlur={(e) => saveMargin(c.id, e.target.value)} />
-                    <span className="text-[10px] text-muted-foreground">%</span>
-                  </div>
                   {c.is_system
                     ? <span className="w-3.5" aria-hidden />
                     : <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></button>}

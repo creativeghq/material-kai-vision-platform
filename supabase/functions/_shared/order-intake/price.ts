@@ -34,19 +34,32 @@ export async function resolveLinePrice(
     productId: string;
     companyId: string | null;
     contactId: string | null;
+    /**
+     * The line's quantity and its unit. #332 step 1c INVERTED the earlier decision here.
+     *
+     * This call used to omit `p_quantity` on the stated grounds that `QuotesService.addItem` and
+     * `quote-tools.resolveLine` omitted it too, so intake would otherwise be the platform's only
+     * caller firing an untested pricing path. Both of those now pass it, and so does every other
+     * site, which turns the same argument the other way round: omitting it here would make order
+     * intake the only path that quotes a customer the single-unit price for a pallet order.
+     *
+     * Together or not at all — `get_product_price_break` coalesces an unconvertible unit back to
+     * the raw quantity, so a qty without its unit matches the wrong threshold.
+     */
+    quantity?: number | null;
+    unit?: string | null;
   },
 ): Promise<ResolvedPrice> {
+  const qty = args.quantity == null ? null : Number(args.quantity);
+  const hasQty = qty != null && Number.isFinite(qty) && qty > 0;
+  const breakArgs = hasQty && args.unit ? { p_quantity: qty, p_unit: args.unit } : {};
   const { data, error } = await db.rpc('get_product_price_for_workspace', {
     p_workspace_id: args.workspaceId,
     p_product_id: args.productId,
     p_company_id: args.companyId,
     p_contact_id: args.contactId,
     p_audience: 'seller',
-    // `p_quantity` is deliberately NOT passed, so an intake line prices identically to the same
-    // line typed into a quote — `QuotesService.addItem` and `quote-tools.resolveLine` both omit
-    // it. Passing it here would make order intake the platform's FIRST caller to fire quantity
-    // breaks, i.e. the first to exercise an untested pricing path, on a money quantity. That is
-    // a deliberate follow-up on #342, not something to switch on by accident.
+    ...breakArgs,
   });
   if (error) {
     console.warn('[order-intake] price resolver failed:', error.message);

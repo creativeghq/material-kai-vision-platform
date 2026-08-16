@@ -97,7 +97,12 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
     if (!workspaceId) { toast({ title: 'No workspace pricing available', description: 'This project has no workspace — ask for a quote.', variant: 'destructive' }); return; }
     setBusy(row.id);
     try {
-      const p = await projectsService.resolveProductPrice(workspaceId, row.product_id);
+      // The line's own quantity and unit, so a volume break applies to a project spec the same
+      // way it does on a quote (#332 step 1c). A project is where large quantities actually
+      // occur, so this is the surface where a missing break was most visibly wrong.
+      const p = await projectsService.resolveProductPrice(workspaceId, row.product_id, {
+        quantity: row.quantity, unit: row.unit,
+      });
       if (p.ask_for_quote) {
         await projectsService.updateProjectProduct(row.id, { price_source: 'ask_for_quote' });
         setRows(prev => prev.map(r => r.id === row.id ? { ...r, price_source: 'ask_for_quote' } : r));

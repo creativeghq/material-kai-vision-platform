@@ -104,22 +104,47 @@ async function resolveLine(
   let retailPrice: number | null = null;
   let costSnapshot: number | null = null;
   let unpriced = false;
+  // Evidence of WHICH rung priced the line. quote_items has carried this column all along;
+  // the agent path was writing lines without it, so a break that fired left no trace and
+  // `finance.quantity_breaks_never_fire` would have reported the feature dead on a workspace
+  // whose quotes all came from the agent.
+  let priceSource: string | null = null;
 
   // Catalog line without an explicit price → resolve the seller price the same way
   // QuotesService.addItem does (audience 'seller' folds in customer discounts).
   if (item.product_id && unitPrice == null) {
+    // The PRODUCT's unit, not `item.unit` — that field is for custom lines only, and the model
+    // does not supply one for a catalog line. `QuotesService.addItem` reads exactly this, which
+    // is what makes an agent-created line price identically to a hand-typed one (#332 step 1c).
+    let productUnit: string | null = null;
+    try {
+      const { data: prod } = await sb
+        .from('products').select('metadata').eq('id', item.product_id).maybeSingle();
+      const meta = (prod as { metadata?: { unit?: string } } | null)?.metadata;
+      productUnit = meta?.unit ?? null;
+    } catch { /* non-fatal — no unit simply means no break can match */ }
+
+    // Together or not at all: `get_product_price_break` does
+    // `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity sent without its
+    // unit is read as already being in base units and can match the wrong threshold — "5 pallets"
+    // firing at 5 pieces is exactly what the UoM ladder exists to prevent.
+    const breakArgs = productUnit && item.quantity > 0
+      ? { p_quantity: item.quantity, p_unit: productUnit }
+      : {};
     const { data: priced } = await sb.rpc('get_product_price_for_workspace', {
       p_workspace_id: workspaceId,
       p_product_id: item.product_id,
       p_company_id: customerCompanyId,
       p_contact_id: customerContactId,
       p_audience: 'seller',
+      ...breakArgs,
     });
     const p = (priced || {}) as Record<string, unknown>;
     unitPrice = p.suggested_sell != null ? Number(p.suggested_sell) : null;
     retailPrice = p.retail != null ? Number(p.retail) : null;
     costSnapshot = p.cost_basis != null ? Number(p.cost_basis) : null;
     unpriced = p.unpriced === true;
+    priceSource = (p.discount_source as string | null) ?? null;
   }
 
   // A catalog product the resolver can't price becomes a "call for price"
@@ -157,6 +182,7 @@ async function resolveLine(
     payload.product_id = item.product_id;
     if (retailPrice != null) payload.retail_price = retailPrice;
     if (costSnapshot != null) payload.cost_snapshot = costSnapshot;
+    if (priceSource) payload.price_source = priceSource;
   } else {
     payload.custom_product_name = item.name;
     payload.custom_product_description = item.description ?? null;

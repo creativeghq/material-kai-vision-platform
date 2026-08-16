@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, Boxes, RefreshCw, Send, Check, History, Info } from 'lucide-react';
+import { Loader2, Boxes, RefreshCw, Send, Check, History, Info, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -264,6 +264,12 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState('EUR');
   const [saving, setSaving] = useState(false);
+  /**
+   * Volume tiers (#332 step 7). A factory sells "€480/m² at 1 pallet, €450 at 5"; before this
+   * the dialog offered one number, so a tier ladder was flattened to whichever price got typed.
+   * Held as strings because they are form fields, parsed once on submit.
+   */
+  const [tiers, setTiers] = useState<Array<{ min_quantity: string; unit: string; unit_price: string }>>([]);
 
   useEffect(() => {
     if (!row) return;
@@ -274,7 +280,22 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
     setOrigin(typeof a.country_of_origin === 'string' ? a.country_of_origin : '');
     setPrice(row.list_price != null ? String(row.list_price) : '');
     setCurrency(row.list_price_currency ?? 'EUR');
+    setTiers([]);
+    void catalogMasterService.listPriceBreaks(row.id)
+      .then((bs) => setTiers(bs.map((b) => ({
+        min_quantity: String(b.min_quantity),
+        unit: b.unit ?? '',
+        unit_price: b.unit_price != null ? String(b.unit_price) : '',
+      }))))
+      // Silent: no visible tiers is the honest state when RLS hides them or the fetch fails.
+      // Publishing then replaces nothing, because submit only writes when the operator edited.
+      .catch(() => setTiers([]));
   }, [row]);
+
+  const addTier = () => setTiers((t) => [...t, { min_quantity: '', unit: '', unit_price: '' }]);
+  const setTier = (i: number, patch: Partial<{ min_quantity: string; unit: string; unit_price: string }>) =>
+    setTiers((t) => t.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const removeTier = (i: number) => setTiers((t) => t.filter((_, j) => j !== i));
 
   const submit = async () => {
     if (!row) return;
@@ -293,7 +314,22 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
       if (p != null && Number.isFinite(p) && p !== row.list_price) {
         await catalogMasterService.publishPrice(row.id, p, currency);
       }
-      if (Object.keys(facts).length === 0 && p === row.list_price) {
+      // Tiers are published as a SET: every row that carries a quantity and a price. A tier with
+      // neither is an empty form row, not an instruction, so it is dropped rather than rejected.
+      const cleanTiers = tiers
+        .map((t) => ({
+          min_quantity: Number(t.min_quantity),
+          unit: t.unit.trim() || null,
+          unit_price: t.unit_price.trim() === '' ? null : Number(t.unit_price),
+          discount_percent: null,
+          currency,
+        }))
+        .filter((t) => Number.isFinite(t.min_quantity) && t.min_quantity > 0
+          && t.unit_price != null && Number.isFinite(t.unit_price));
+      const tiersTouched = cleanTiers.length > 0 || tiers.length > 0;
+      if (tiersTouched) await catalogMasterService.publishPriceBreaks(row.id, cleanTiers);
+
+      if (Object.keys(facts).length === 0 && p === row.list_price && !tiersTouched) {
         toast({ title: 'Nothing changed' });
       } else {
         toast({
@@ -342,9 +378,39 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
               <Input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Volume tiers</Label>
+              <Button type="button" size="sm" variant="outline" className="h-7 rounded-full text-xs" onClick={addTier}>
+                Add tier
+              </Button>
+            </div>
+            {tiers.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                One flat price. Add tiers if your price drops at volume — &ldquo;from 5 pallets, €450/m²&rdquo;.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {tiers.map((t, i) => (
+                  <div key={i} className="grid grid-cols-[90px_80px_1fr_auto] items-center gap-2">
+                    <Input className="h-8 text-xs" placeholder="from qty" inputMode="decimal"
+                      value={t.min_quantity} onChange={(e) => setTier(i, { min_quantity: e.target.value })} />
+                    <Input className="h-8 text-xs" placeholder="unit"
+                      value={t.unit} onChange={(e) => setTier(i, { unit: e.target.value })} />
+                    <Input className="h-8 text-xs" placeholder={`price / unit (${currency})`} inputMode="decimal"
+                      value={t.unit_price} onChange={(e) => setTier(i, { unit_price: e.target.value })} />
+                    <button type="button" className="text-muted-foreground hover:text-destructive"
+                      onClick={() => removeTier(i)} aria-label="Remove tier">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
-            Product details replace ours everywhere immediately. Your price is sent to the operator as an
-            offer — it never changes what any customer already agreed to pay.
+            Product details replace ours everywhere immediately. Your price and tiers are sent to the operator
+            as an offer — they never change what any customer already agreed to pay.
           </p>
         </div>
         <DialogFooter>

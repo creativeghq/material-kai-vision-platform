@@ -164,9 +164,22 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       let lineTotal = Number(it.line_total || 0);
       let changed = false;
       if (reprice && it.product_id) {
+        // Quantity + unit so a volume break can apply (#332 step 1c). A reorder is precisely
+        // where this matters: the customer is repeating a quantity that may cross a threshold,
+        // and without these the "re-price at today's prices" promise quietly excluded the one
+        // discount that depends on how much they are buying.
+        //
+        // Together or not at all — `get_product_price_break` coalesces an unconvertible unit
+        // back to the raw quantity, so a qty without its unit matches the wrong threshold.
+        // Despite its name `order_items.measurement_unit_code` holds our TEXT unit label
+        // ('pcs', 'm2'), not the myDATA integer code — verified against the column's live values.
+        const lineQty = Number(it.quantity || 0);
+        const lineUnit = (it.measurement_unit_code as string | null) || null;
+        const breakArgs = lineUnit && lineQty > 0 ? { p_quantity: lineQty, p_unit: lineUnit } : {};
         const { data: pr } = await supabase.rpc('get_product_price_for_workspace', {
           p_workspace_id: src.workspace_id, p_product_id: it.product_id,
           p_company_id: src.customer_company_id, p_contact_id: src.customer_contact_id, p_audience: 'seller',
+          ...breakArgs,
         });
         const finalSell = pr && (pr as any).final_sell != null ? Number((pr as any).final_sell) : null;
         if (finalSell != null) {

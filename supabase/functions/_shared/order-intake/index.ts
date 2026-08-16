@@ -204,6 +204,10 @@ export async function runOrderIntake(
         productId: match.product_id,
         companyId: args.companyId,
         contactId: args.contactId,
+        // The quantity the customer actually asked for, in the unit they said it in, so a
+        // volume break applies to a WhatsApp order the same way it does to a typed one.
+        quantity: line.quantity,
+        unit,
       });
       unitPrice = priced.unit_price;
       unitCost = priced.unit_cost;

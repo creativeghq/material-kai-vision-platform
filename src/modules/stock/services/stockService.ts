@@ -87,6 +87,17 @@ export interface ReorderResult {
   currency?: string;
   line_total?: number;
   item_name?: string;
+  /**
+   * MOQ disclosure (#332 step 2). The round-up now only happens when `products.enforce_moq` is
+   * on, and when it does the caller is told: `quantity_requested` is what was asked for,
+   * `quantity` is what the PO will actually buy. A purchase order that silently orders more
+   * than the operator wanted is its own bug, which is why this is reported rather than assumed.
+   */
+  moq?: number | null;
+  moq_enforced?: boolean;
+  quantity_requested?: number;
+  moq_rounded?: boolean;
+  moq_message?: string | null;
 }
 
 export interface OpeningStockLine {

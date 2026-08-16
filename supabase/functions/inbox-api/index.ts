@@ -1164,6 +1164,10 @@ async function repriceItems(
       productId: item.product_id,
       companyId: intake.customer_company_id,
       contactId: intake.customer_contact_id,
+      // Re-pricing when the reviewer assigns the customer must also re-apply the volume break,
+      // or assigning a customer would silently drop a discount the draft already had.
+      quantity: item.quantity,
+      unit: item.measurement_unit_code,
     });
     out.push({
       ...item,
@@ -2602,6 +2606,8 @@ async function handleJwtAction(
           const priced = await resolveLinePrice(db, {
             workspaceId, productId,
             companyId: intake.customer_company_id, contactId: intake.customer_contact_id,
+            // The edited quantity, so changing it re-crosses (or un-crosses) a break threshold.
+            quantity, unit,
           });
           unitPrice = priced.unit_price ?? undefined;
           unitCost = priced.unit_cost;

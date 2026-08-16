@@ -200,8 +200,13 @@ export const ReceiveToWarehouseDialog: React.FC<{
           supabase.from('warehouse_pending_items').select('*')
             .eq('workspace_id', workspaceId).eq('inbound_document_id', doc.id)
             .then((r) => (r.data ?? []) as PendingProduct[], () => [] as PendingProduct[]),
-          supabase.from('finance_settings').select('default_markup_pct').eq('workspace_id', workspaceId)
-            .maybeSingle().then((r) => r.data, () => null),
+          // The MARKUP POLICY comes from SQL, never from a settings column read here (#332 step 4).
+          // This used to select `finance_settings.default_markup_pct` and multiply in the browser,
+          // which applied the ladder's LAST rung as if it were the whole ladder — a product whose
+          // brand, supplier or category carried a rule was suggested a different price here than
+          // anywhere else, and both numbers looked equally valid.
+          supabase.rpc('preview_markup_ladder_price', { p_workspace_id: workspaceId, p_cost: 100 })
+            .then((r) => r.data as { markup_pct?: number | null } | null, () => null),
           supabase.from('crm_companies').select('name').eq('workspace_id', workspaceId).limit(500)
             .then((r) => r.data ?? [], () => []),
           invoicingSetupService.listReference('vat_category').catch(() => [] as RefRow[]),
@@ -224,8 +229,13 @@ export const ReceiveToWarehouseDialog: React.FC<{
         setIncomeTypes(incTypeRef as RefRow[]);
         setProductCategories(cats as { id: string; name: string }[]);
 
-        // Workspace default markup seeds every line's margin; 0 means "operator decides".
-        const markup = settingsRes?.default_markup_pct != null ? String(settingsRes.default_markup_pct) : '';
+        // The ladder's markup for a line with no product yet, which is what every created line
+        // is. 0 / absent means "operator decides". A line matched to an EXISTING product could in
+        // principle resolve further down the ladder (its own brand/supplier/category rule); it is
+        // not asked per line here because this seed is an editable suggestion, and the authoritative
+        // price is derived again from the ladder when the product is actually priced.
+        const markup = settingsRes?.markup_pct != null && Number(settingsRes.markup_pct) > 0
+          ? String(settingsRes.markup_pct) : '';
 
         // Wholesale defaults from doc type 1.1 (sales invoice), retail from 11.1 (retail
         // receipt) — the two document types these classifications are actually used on.

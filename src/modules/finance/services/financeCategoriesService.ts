@@ -7,8 +7,6 @@ export interface FinanceCategory {
   kind: 'income' | 'expense' | 'both';
   color: string | null;
   is_active: boolean;
-  /** Default sell margin % for products in this category; auto-prices received goods. */
-  margin_pct: number | null;
   /** Protected built-in: every workspace has one of each; can't be renamed/re-kinded/deactivated/
    *  deleted. Enforced by the guard_system_finance_category DB trigger. */
   is_system: boolean;
@@ -21,7 +19,7 @@ export const financeCategoriesService = {
   async list(workspaceId: string): Promise<FinanceCategory[]> {
     const { data, error } = await supabase
       .from('finance_categories')
-      .select('id, name, kind, color, is_active, margin_pct, is_system, system_key')
+      .select('id, name, kind, color, is_active, is_system, system_key')
       .eq('workspace_id', workspaceId)
       .eq('is_active', true)
       .order('name', { ascending: true });
@@ -43,12 +41,6 @@ export const financeCategoriesService = {
     if (patch.kind !== undefined) clean.kind = patch.kind;
     if (Object.keys(clean).length === 0) return;
     const { error } = await supabase.from('finance_categories').update(clean as any).eq('id', id);
-    if (error) throw error;
-  },
-
-  /** Set the default sell margin % for a category (used to auto-price received goods). */
-  async setMargin(id: string, marginPct: number | null): Promise<void> {
-    const { error } = await supabase.from('finance_categories').update({ margin_pct: marginPct } as any).eq('id', id);
     if (error) throw error;
   },
 

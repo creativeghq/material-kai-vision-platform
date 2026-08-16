@@ -1006,6 +1006,11 @@ export const NewOrderModal: React.FC<{
         unit_cost: isSales ? it.unit_cost : (Number(it.unit_price) || 0),
         supplier_company_id: it.supplier_company_id ?? null,
         measurement_unit_code: it.unit_code,
+        // Which rung of the ladder priced this line. Evidence only — never read back to compute
+        // money. Without it the "volume price applied" badge lived in React state alone, so the
+        // moment the order saved there was no way to ask whether a configured break had ever
+        // actually reached a document (#332).
+        price_source: it.price_source ?? null,
         vat_percent: pctOf(it.vat_code),
         vat_category: parseInt(it.vat_code, 10) || undefined,
         // #347 phase 5 — carried into every branch below (create, merge, mirror-to-supplier),
@@ -2273,7 +2278,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     } finally { setSaving(false); }
   };
   const startEdit = () => {
-    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id, available: null,
+    setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id, available: null, price_source: it.price_source ?? null,
       // Read the stored identity back into the editor. `updateItems` deletes and re-inserts
       // every line, so a field missing here would be erased by an unrelated edit.
       selected_attributes: (it as any).selected_attributes ?? {},
@@ -2301,6 +2306,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         unit_cost: order.order_type === 'purchase' ? (Number(l.unit_price) || 0) : l.unit_cost,
         supplier_company_id: l.supplier_company_id ?? null,
         measurement_unit_code: l.unit_code,
+        price_source: l.price_source ?? null,
         vat_percent: pctOf(l.vat_code), vat_category: parseInt(l.vat_code, 10) || undefined,
         selected_attributes: l.selected_attributes ?? {},
         selected_size: l.selected_size ?? null,
@@ -2446,6 +2452,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       }
       const made = res.created ?? [];
       const short = res.uncovered ?? [];
+      // Say when a supplier minimum changed the quantity. Silently buying more than the operator
+      // asked for is the half of MOQ enforcement that has to be visible (#332 step 2).
+      const rounded = res.rounded ?? [];
       if (made.length === 0) {
         toast({ title: 'Nothing to order', description: res.message });
       } else {
@@ -2454,6 +2463,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           description: made.map((c) => `${c.supplier_name ?? 'Supplier'} · ${formatMoney(c.total, c.currency)}`).join(' · ')
             + (short.length > 0 ? ` — ${short.length} line(s) have no supplier and were left out.` : ''),
         });
+        if (rounded.length > 0) {
+          toast({
+            title: rounded.length === 1 ? 'One quantity raised to a supplier minimum' : `${rounded.length} quantities raised to supplier minimums`,
+            description: rounded
+              .map((r) => `${r.description ?? 'Line'}: ${r.quantity_requested} → ${r.quantity_ordered} (min ${r.moq})`)
+              .join(' · '),
+          });
+        }
       }
       onChanged();
     } catch (err: any) { toast({ title: 'Could not raise the order', description: err?.message, variant: 'destructive' }); }

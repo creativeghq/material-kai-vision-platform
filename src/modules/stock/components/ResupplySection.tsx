@@ -57,7 +57,13 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
       const r = await stockService.reorder(workspaceId, c.warehouse_item_id, c.recommended_order_qty ? { quantity: c.recommended_order_qty } : {});
       if (!r.ok) { toast({ title: 'Could not reorder', description: r.message, variant: 'destructive' }); return; }
       const channel = r.supplier_is_app_user ? 'in-app supplier (portal)' : 'supplier (email)';
-      toast({ title: 'Reorder drafted', description: `${r.quantity} ${c.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.` });
+      // Name the round-up when it happened. Quantity is the number the supplier will be asked
+      // for, and it is no longer necessarily the number we asked this function for (#332 step 2).
+      const moqNote = r.moq_rounded ? ` Raised from ${r.quantity_requested} — supplier minimum ${r.moq}.` : '';
+      toast({
+        title: r.moq_rounded ? 'Reorder drafted at the supplier minimum' : 'Reorder drafted',
+        description: `${r.quantity} ${c.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.${moqNote}`,
+      });
     } catch (err: any) { toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' }); }
     finally { setReordering(null); }
   };

@@ -49,6 +49,25 @@ interface MasterPriceOfferRow {
   updated_at: string;
 }
 
+/**
+ * One published volume tier. Mirrors `product_price_breaks`: a tier is either an explicit
+ * `unit_price` OR a `discount_percent` off the flat ask — never both (the DB CHECK enforces it).
+ * Two ways to express one number is how the sell side ended up with four derivations.
+ */
+export interface MasterPriceBreak {
+  id: string;
+  min_quantity: number;
+  unit: string | null;
+  unit_price: number | null;
+  discount_percent: number | null;
+  currency: string;
+  notes: string | null;
+}
+
+/** Same tier, as the publisher supplies it: currency and notes default server-side. */
+export type MasterPriceBreakInput =
+  Omit<MasterPriceBreak, 'id' | 'currency' | 'notes'> & { currency?: string; notes?: string | null };
+
 /** What the factory asks vs what the operator currently pays. Operator-facing. */
 export interface MasterPriceDrift {
   master_product_id: string;
@@ -162,6 +181,47 @@ export const catalogMasterService = {
       p_master_id: masterId, p_price: price, p_currency: currency,
     });
     if (error) throw error;
+  },
+
+  /**
+   * The factory's VOLUME tiers for one master product (#332 step 7).
+   *
+   * `catalog_master_price_offers` carries a single `list_price`, but factories sell in tiers
+   * ("€480/m² at 1 pallet, €450 at 5") and the sell side has modelled exactly that in
+   * `product_price_breaks` all along — so a published tier structure had nowhere to land and was
+   * silently flattened to whatever single number was typed. Same operator-only visibility as the
+   * offer itself: RLS decides per row whether the caller sees a price at all.
+   */
+  async listPriceBreaks(masterId: string): Promise<MasterPriceBreak[]> {
+    const { data, error } = await supabase
+      .from('catalog_master_price_offer_breaks')
+      .select('id, min_quantity, unit, unit_price, discount_percent, currency, notes')
+      .eq('master_product_id', masterId)
+      .order('min_quantity', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as unknown as MasterPriceBreak[];
+  },
+
+  /**
+   * Replace the tier ladder WHOLESALE. Not a merge, for the same reason composition lines are
+   * regenerated rather than carried over: a merge silently keeps a tier the factory deleted, and
+   * a stale "€450 at 5 pallets" is a price we would go on honouring.
+   */
+  async publishPriceBreaks(masterId: string, breaks: MasterPriceBreakInput[]): Promise<{ breaks: number }> {
+    const { data, error } = await supabase.rpc('publish_master_product_price_breaks', {
+      p_master_id: masterId,
+      // An explicit allowlisted literal per tier — never the caller's object spread through.
+      p_breaks: breaks.map((b) => ({
+        min_quantity: b.min_quantity,
+        unit: b.unit ?? null,
+        unit_price: b.unit_price ?? null,
+        discount_percent: b.discount_percent ?? null,
+        currency: b.currency ?? 'EUR',
+        notes: b.notes ?? null,
+      })) as never,
+    });
+    if (error) throw error;
+    return { breaks: Number((data as { breaks?: number } | null)?.breaks ?? 0) };
   },
 
   /** Operator-only: take the published ask into the operator catalog's cost. */

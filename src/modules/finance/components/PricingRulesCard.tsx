@@ -12,11 +12,11 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { financeService } from '@/modules/finance/services/financeService';
+import { financeService, type PricingRuleScope } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
 
 interface Rule {
-  id: string; scope: 'category' | 'product' | 'brand'; target_id: string;
+  id: string; scope: PricingRuleScope; target_id: string;
   markup_pct: number | null; sell_price: number | null; currency: string;
 }
 

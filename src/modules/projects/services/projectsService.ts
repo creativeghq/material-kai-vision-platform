@@ -1088,10 +1088,27 @@ class ProjectsService {
    * Role-correct price for a catalog product, via the existing pricing-hierarchy RPC.
    * Returns ask_for_quote=true when no upstream price exists for this workspace's chain.
    */
-  async resolveProductPrice(workspaceId: string, productId: string): Promise<ResolvedPrice> {
+  async resolveProductPrice(
+    workspaceId: string,
+    productId: string,
+    /**
+     * The project line's quantity and unit, so `product_price_breaks` can fire (#332 step 1c).
+     * A project specifies 240 m² of a tile; pricing it at the single-unit rate quoted the client
+     * a number the same tile would never cost on a quote or an order.
+     *
+     * Pass them TOGETHER or not at all: `get_product_price_break` does
+     * `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity with a missing or
+     * unconvertible unit is read as already being in base units and matches the wrong threshold.
+     */
+    opts?: { quantity?: number | null; unit?: string | null },
+  ): Promise<ResolvedPrice> {
+    const qty = opts?.quantity == null ? null : Number(opts.quantity);
+    const hasQty = qty != null && Number.isFinite(qty) && qty > 0;
+    const breakArgs = hasQty && opts?.unit ? { p_quantity: qty, p_unit: opts.unit } : {};
     const { data, error } = await (supabase as any).rpc('get_product_price_for_workspace', {
       p_workspace_id: workspaceId,
       p_product_id: productId,
+      ...breakArgs,
     });
     if (error) throw error;
     const r = (data || {}) as Record<string, any>;

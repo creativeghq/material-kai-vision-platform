@@ -511,7 +511,22 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const meta = pickFromMeta(p.metadata);
     let price = '';
     try {
-      const { data } = await supabase.rpc('get_product_price_for_workspace', { p_workspace_id: workspaceId, p_product_id: p.id });
+      // This call used to pass workspace + product ONLY, so an invoice line was priced at bare
+      // retail: no customer level or override, and no volume break (#332 step 1c). The same
+      // product on a quote and on an invoice for the same buyer produced different money.
+      const line = lines[idx];
+      const qty = parseDecimalOr(line?.quantity ?? '', 0);
+      const unit = meta.unit || null;
+      // Together or not at all — see the note on ordersService.resolveLinePricing.
+      const breakArgs = unit && qty > 0 ? { p_quantity: qty, p_unit: unit } : {};
+      const { data } = await supabase.rpc('get_product_price_for_workspace', {
+        p_workspace_id: workspaceId,
+        p_product_id: p.id,
+        p_company_id: customer?.type === 'company' ? customer.id : null,
+        p_contact_id: customer?.type === 'contact' ? customer.id : null,
+        p_audience: 'seller',
+        ...breakArgs,
+      });
       const row = Array.isArray(data) ? data[0] : data;
       if (row?.suggested_sell != null) price = String(row.suggested_sell);
     } catch { /* price optional */ }

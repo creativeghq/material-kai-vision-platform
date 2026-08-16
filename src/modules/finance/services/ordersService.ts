@@ -127,6 +127,8 @@ export interface OrderItem {
   unit_cost: number | null;   // snapshot cost/unit (margin before invoicing)
   supplier_company_id: string | null;  // who supplies this line (what we owe)
   measurement_unit_code: string | null;  // unit of measure (item, m2, kg…)
+  /** Which rung of the ladder priced this line. Evidence, never an input to money (#332). */
+  price_source?: string | null;
   vat_percent?: number | null;
   vat_category?: number | null;
   /** myDATA exemption cause (1–31) justifying a 0% line. Required before this line can be
@@ -188,6 +190,16 @@ export interface NewOrderItem {
   unit_cost?: number | null;  // cost/unit snapshot (from catalog or manual)
   supplier_company_id?: string | null;  // who supplies this line
   measurement_unit_code?: string | null; // unit of measure (item, m2, kg…)
+  /**
+   * The resolver's `discount_source` for this line, persisted as EVIDENCE.
+   *
+   * `quote_items` has carried this since it was written; `order_items` did not, so the "volume
+   * price applied" badge existed only in React state and vanished on save. That left the order
+   * side — the exact side where #332 found quantity breaks dead — unobservable: no probe could
+   * ask whether a configured break had ever reached a document. Never read back to compute a
+   * price; the resolver is the only thing that decides money.
+   */
+  price_source?: string | null;
   vat_percent?: number;       // per-line VAT %
   vat_category?: number;      // myDATA VAT category code (1=24%, …)
   update_warehouse?: boolean;
@@ -786,6 +798,7 @@ export const ordersService = {
         unit_cost: l.it.unit_cost ?? null,
         supplier_company_id: l.it.supplier_company_id ?? defaultSupplier,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
+        price_source: l.it.price_source ?? null,
         vat_percent: l.pct,
         vat_category: l.it.vat_category ?? null,
         net_value: l.net,
@@ -1008,6 +1021,18 @@ export const ordersService = {
     message?: string;
     created?: Array<{ order_id: string; order_number: string | null; supplier_name: string | null; currency: string; total: number; lines: number }>;
     uncovered?: Array<{ order_item_id: string; description: string; quantity: number; reason: string }>;
+    /**
+     * Lines whose quantity the supplier's MOQ pushed UP, and by how much (#332 step 2).
+     *
+     * Only populated for products with `enforce_moq` on — the round-up used to happen for every
+     * supplier that declared a minimum, whether or not the product opted in, and it happened
+     * silently. A purchase order that quietly asks for 50 when the operator needed 12 is its own
+     * bug, so the round-up now has to say so.
+     */
+    rounded?: Array<{
+      order_item_id: string; product_id: string | null; description: string | null;
+      quantity_requested: number; quantity_ordered: number; moq: number; message: string;
+    }>;
   }> {
     const { data, error } = await supabase.rpc('raise_cover_purchase_orders', { p_order_id: orderId });
     if (error) throw error;
@@ -1035,7 +1060,7 @@ export const ordersService = {
     const { data: items, error: iErr } = await supabase.from('order_items')
       // selected_* included deliberately: a reorder that drops the variant is a reorder of a
       // DIFFERENT product — same description, no size, and nothing downstream can tell.
-      .select('product_id, description, quantity, unit_price, unit_cost, measurement_unit_code, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order, selected_attributes, selected_size, selected_color')
+      .select('product_id, description, quantity, unit_price, unit_cost, measurement_unit_code, price_source, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order, selected_attributes, selected_size, selected_color')
       .eq('order_id', orderId).order('sort_order', { ascending: true });
     if (iErr) throw iErr;
 
@@ -1461,6 +1486,7 @@ export const ordersService = {
         description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price, unit_cost: l.it.unit_cost ?? null,
         supplier_company_id: l.it.supplier_company_id ?? defaultSupplier,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
+        price_source: l.it.price_source ?? null,
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
         net_value: l.net, vat_amount: l.vat, line_total: l.net, discount_pct: l.discountPct,
         update_warehouse: l.it.update_warehouse ?? true, sort_order: i,

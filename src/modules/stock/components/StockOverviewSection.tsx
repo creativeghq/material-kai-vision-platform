@@ -65,9 +65,12 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
         return;
       }
       const channel = r.supplier_is_app_user ? 'in-app supplier (portal)' : 'supplier (email)';
+      // #332 step 2: the quantity may have been raised to the supplier's minimum, and only when
+      // the product opted in via `enforce_moq`. Either way the operator is told which it was.
+      const moqNote = r.moq_rounded ? ` Raised from ${r.quantity_requested} — supplier minimum ${r.moq}.` : '';
       toast({
-        title: 'Reorder drafted',
-        description: `${r.quantity} ${it.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}. Review & send in Finance → Orders.`,
+        title: r.moq_rounded ? 'Reorder drafted at the supplier minimum' : 'Reorder drafted',
+        description: `${r.quantity} ${it.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.${moqNote} Review & send in Finance → Orders.`,
       });
     } catch (err: any) {
       toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' });

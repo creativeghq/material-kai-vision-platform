@@ -3,7 +3,15 @@
  * the inbound sync runs the cheapest AI model in the background to turn each line into a
  * clean product and queues it here. The operator reviews/edits and ✓ adds it to the
  * warehouse (matched to an existing product or created new, with cost from the invoice and
- * sale price from the category margin / workspace markup) or ✗ dismisses it.
+ * the sale price DERIVED BY THE PRICING LADDER) or ✗ dismisses it.
+ *
+ * The suggested price used to be computed here, in the browser, as
+ * `cost * (1 + finance_categories.margin_pct / 100)` — a money derivation in TypeScript and a
+ * second answer to "what margin applies", disagreeing with the `pricing_rules` ladder every
+ * other pricing path uses. So the number the operator approved could differ from the number
+ * the approval then wrote, and both looked perfectly valid. It now asks
+ * `preview_pending_item_sell_price`, which calls the SAME `_pricing_markup_ladder` that
+ * `_approve_pending_item_core` will call a moment later (#332 step 4).
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -33,6 +41,12 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   /** How supplier lines get here at all. Lives on this card because this card IS the thing it
    *  governs — as a standalone control above the stock table it read as a dropdown from nowhere. */
   const [mode, setMode] = useState<'off' | 'suggest' | 'auto'>('suggest');
+  /**
+   * The ladder's suggestion per pending row, keyed by id — SQL's answer, never ours.
+   * `null` means "asked, and the ladder has no price" (no cost yet), which is different from
+   * "not asked", and the placeholder distinguishes the two rather than showing a confident 0.
+   */
+  const [preview, setPreview] = useState<Record<string, { sell: number | null; attributed: boolean }>>({});
 
   const defaultWh = useMemo(() => warehouses.find((w) => w.is_default)?.id ?? warehouses[0]?.id ?? '', [warehouses]);
 
@@ -70,10 +84,38 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
 
   const setEdit = (id: string, patch: Partial<Edit>) => setEdits((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
 
-  const marginOf = (categoryId: string) => {
-    const c: any = categories.find((x) => x.id === categoryId);
-    return c?.margin_pct != null ? Number(c.margin_pct) : null;
-  };
+  /**
+   * Ask SQL what this line would sell for, following the edited cost.
+   *
+   * Debounced and keyed on the costs the operator has typed, so it settles on a committed value
+   * instead of firing per keystroke. Failures are silent: a missing suggestion shows no
+   * placeholder, which is honest, whereas a stale one would be a price nobody derived.
+   */
+  const costKey = items.map((it) => `${it.id}:${edits[it.id]?.unit_cost ?? ''}`).join('|');
+  useEffect(() => {
+    if (items.length === 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const next: Record<string, { sell: number | null; attributed: boolean }> = {};
+      await Promise.all(items.map(async (it) => {
+        const typed = edits[it.id]?.unit_cost ?? '';
+        const cost = typed === '' ? null : parseDecimalOr(typed, 0);
+        try {
+          const { data } = await supabase.rpc('preview_pending_item_sell_price', {
+            p_id: it.id, p_cost: cost,
+          });
+          const r = (data ?? {}) as { suggested_sell?: number | null; supplier_attributed?: boolean };
+          next[it.id] = {
+            sell: r.suggested_sell != null ? Number(r.suggested_sell) : null,
+            attributed: r.supplier_attributed === true,
+          };
+        } catch { /* no suggestion is better than a wrong one */ }
+      }));
+      if (!cancelled) setPreview(next);
+    }, 400);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costKey, items.length]);
 
   const approve = async (it: PendingProduct) => {
     const e = edits[it.id];
@@ -161,9 +203,9 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
         <div className="divide-y divide-border/40">
           {items.map((it) => {
             const e = edits[it.id]; if (!e) return null;
-            const cost = parseDecimalOr(e.unit_cost, 0);
-            const margin = e.category_id ? marginOf(e.category_id) : null;
-            const autoPrice = e.sales_price === '' && cost > 0 && margin != null && margin > 0 ? Math.round(cost * (1 + margin / 100) * 100) / 100 : null;
+            const pv = preview[it.id];
+            // The ladder's number, shown only while the operator has not typed their own.
+            const autoPrice = e.sales_price === '' ? (pv?.sell ?? null) : null;
             return (
               <div key={it.id} className="space-y-2 px-4 py-3">
                 {/* WHO invoiced this and under which document — the queue is "what my partners
@@ -171,6 +213,15 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
                   {it.inbound_document?.issuer_name && (
                     <span className="font-medium text-foreground/80">{it.inbound_document.issuer_name}</span>
+                  )}
+                  {/* Whether approving this line will KEEP the supplier. A CRM party is never
+                      created silently, so an issuer we cannot match by VAT records cost with no
+                      record of who charged it — which is what leaves multi-supplier sourcing with
+                      nothing to compare (#332 step 3). Say so before the operator approves. */}
+                  {pv && !pv.attributed && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      Supplier not in CRM — cost will be saved without it
+                    </span>
                   )}
                   {(it.inbound_document?.series || it.inbound_document?.aa) && (
                     <span className="text-muted-foreground">
@@ -209,12 +260,12 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                       placeholder={autoPrice != null ? `auto ${formatMoney(autoPrice, it.currency)}` : 'set price'} />
                   </div>
                   <div className="space-y-0.5">
-                    <label className="text-[10px] text-muted-foreground">Category {margin != null ? `(margin ${margin}%)` : ''}</label>
+                    <label htmlFor="pendingproductscard-category" className="text-[10px] text-muted-foreground">Category</label>
                     <Select value={e.category_id || '__none'} onValueChange={(v) => setEdit(it.id, { category_id: v === '__none' ? '' : v })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                      <SelectTrigger id="pendingproductscard-category" className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">— None —</SelectItem>
-                        {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}{(c as any).margin_pct != null ? ` · ${(c as any).margin_pct}%` : ''}</SelectItem>)}
+                        {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

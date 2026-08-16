@@ -130,6 +130,18 @@ export interface InvoiceWithItems extends Invoice {
   credit_notes?: CreditNote[];
 }
 
+/**
+ * The rungs of the markup ladder, in the order `_pricing_markup_ladder` tries them:
+ * product → brand → supplier → category → the workspace default.
+ *
+ * Mirrors `pricing_rules_scope_check`. It is the second copy of that vocabulary, which is the
+ * shape that killed the brand rung: the resolver read `scope='brand'` and `BrandMarkupCard`
+ * wrote it, but the CHECK only ever allowed ('category','product'), so every brand markup save
+ * raised a constraint violation and the rung could never hold a row. Guarded by
+ * tests/unit/pricingRuleScopes.test.ts — change the CHECK and this list in the same commit.
+ */
+export type PricingRuleScope = 'category' | 'product' | 'brand' | 'supplier';
+
 export type PaymentDirection = 'in' | 'out';
 /**
  * Mirrors `payments_method_check`. `iris` was added 2026-07-31: the POS offers
@@ -1128,7 +1140,7 @@ const _financeServiceCore = {
   },
 
   async listPricingRules(workspaceId: string): Promise<Array<{
-    id: string; scope: 'category' | 'product' | 'brand'; target_id: string;
+    id: string; scope: PricingRuleScope; target_id: string;
     markup_pct: number | null; sell_price: number | null; currency: string;
   }>> {
     const { data, error } = await supabase
@@ -1141,7 +1153,7 @@ const _financeServiceCore = {
   },
 
   async upsertPricingRule(input: {
-    workspaceId: string; scope: 'category' | 'product' | 'brand'; targetId: string;
+    workspaceId: string; scope: PricingRuleScope; targetId: string;
     markupPct?: number | null; sellPrice?: number | null; currency?: string;
   }): Promise<void> {
     const { error } = await supabase.from('pricing_rules').upsert({
