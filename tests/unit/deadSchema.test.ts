@@ -140,10 +140,61 @@ function sourceHaystack(): string {
   return chunks.join('\n');
 }
 
+/**
+ * How many source files each root actually contributed.
+ *
+ * An ABSENT root is indistinguishable, to the scan, from a root that references nothing — and
+ * this check's whole verdict is "nothing references it". That is not hypothetical: `walk()`
+ * swallows a missing directory, `mivaa-pdf-extractor` is a git submodule, and CI checked out the
+ * parent repo without it. So `mivaa-pdf-extractor/app` was EMPTY in CI and populated on every dev
+ * box, and the scan declared 39 live tables dead — every table MIVAA owns. Four of them had been
+ * written by the daily job-search cron that same morning. The suite was green locally and red in
+ * CI, and unlike the `docLinks` case (where CI was right and the dev box was lying), here the dev
+ * box was right and CI was blind.
+ *
+ * A scanner that cannot see its haystack must SAY SO rather than convict everything in it.
+ */
+function rootFileCounts(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const root of SOURCE_ROOTS) {
+    let n = 0;
+    const walk = (dir: string) => {
+      let entries: ReturnType<typeof readdirSync>;
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) walk(join(dir, e.name)); }
+        else if (SOURCE_EXTS.has(extname(e.name))) n += 1;
+      }
+    };
+    walk(join(ROOT, root));
+    counts[root] = n;
+  }
+  return counts;
+}
+
 describe('dead schema', () => {
   const names = tableNames();
   const hay = sourceHaystack();
   const unreferenced = names.filter((n) => !new RegExp(`\\b${n}\\b`).test(hay));
+
+  /**
+   * Runs before the verdict, because the verdict is worthless without it. Named per root so the
+   * failure says WHICH one is missing instead of leaving the next person to rediscover that a
+   * submodule was never checked out.
+   */
+  it('every source root is actually present and populated', () => {
+    const counts = rootFileCounts();
+    const empty = SOURCE_ROOTS.filter((r) => counts[r] === 0);
+    expect(
+      empty,
+      `Source root(s) missing or empty: ${empty.join(', ')}.\n`
+      + 'This check convicts a table when NOTHING references it, so an unreadable root makes it '
+      + 'report every table that root owns as dead. `mivaa-pdf-extractor` is a git submodule — if '
+      + 'it is the empty one, the checkout needs `submodules: recursive` (it is a public repo, so '
+      + 'the default token suffices). Counts: '
+      + SOURCE_ROOTS.map((r) => `${r}=${counts[r]}`).join(', '),
+    ).toEqual([]);
+  });
 
   it('no NEW table is reachable from nothing', () => {
     const known = new Set([...Object.keys(DB_ONLY), ...Object.keys(KNOWN_UNREFERENCED)]);

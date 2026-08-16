@@ -266,6 +266,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # `deadSchema.test.ts` scans `mivaa-pdf-extractor/app` as one of its source roots, and
+          # without this that directory is EMPTY here while being populated on every dev box.
+          # The scan then finds no Python reference to any table MIVAA owns and reports 39 live
+          # tables as dead — including four the daily job-search cron had written that morning.
+          # Green locally, red in CI, and the red was wrong. MIVAA is public, so the default
+          # token is enough.
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
