@@ -36,6 +36,12 @@ export const ProductPricePanel: React.FC<{ productId: string }> = ({ productId }
         supabase.from('product_prices').select('list_price, unit')
           .eq('workspace_id', activeWorkspaceId).eq('product_id', productId).maybeSingle(),
       ]);
+      // supabase-js RESOLVES on an RLS denial instead of throwing, so `row.error` has to be
+      // checked by hand. Discarding it made a failed read indistinguishable from "no explicit
+      // list price set": the field fell back to the markup-derived retail, and saving then wrote
+      // that figure back as an explicit `list_price` — pinning the price and quietly taking the
+      // product off the markup ladder.
+      if (row.error) throw row.error;
       setPrice(p);
       setRetail(row.data?.list_price != null ? String(row.data.list_price) : (p?.retail != null ? String(p.retail) : ''));
       setUnit(row.data?.unit ?? '');

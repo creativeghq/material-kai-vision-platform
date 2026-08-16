@@ -86,8 +86,18 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
           </div>
         )}
         <div className="w-24 text-right text-sm tabular-nums">
+          {/* A schedule line is a COUNT. It contributes nothing to the section total or the plan
+              subtotal — the plan counts, the quote prices — so putting an amount in the money
+              column showed the operator a figure that appears in no total beside it. The public
+              calculator already renders these as quantity + unit; this now matches. `material_cost`
+              NULL still means "not priced yet", never 0. */}
           {it.is_schedule
-            ? <span className="text-muted-foreground text-xs">{it.material_cost != null ? money(Number(it.material_cost) * Number(it.quantity ?? 0), currency) : 'to price'}</span>
+            ? (
+              <span className="text-muted-foreground text-xs">
+                {Number(it.quantity ?? 0)} {it.unit || 'pcs'}
+                {it.material_cost == null && <span className="ml-1 opacity-70">· to price</span>}
+              </span>
+            )
             : money(it.line_total, currency)}
         </div>
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={busy} onClick={() => onDelete(it.id)}>
