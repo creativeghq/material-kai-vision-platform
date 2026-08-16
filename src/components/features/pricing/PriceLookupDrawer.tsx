@@ -71,8 +71,25 @@ export interface PriceLookupMatch {
 }
 
 export interface PriceConfirmPayload {
+  /**
+   * The EFFECTIVE unit price the operator confirmed — the one number this drawer commits to.
+   * It is whatever is in the price field at confirm time, which is seeded from the proposal's
+   * `final_unit_price` (already discount-inclusive) and freely editable after that.
+   *
+   * There used to be a second field, `discount_price`, re-derived here as
+   * `proposal.list_price × (1 − discount_percent/100)`. That was a second derivation of this
+   * same quantity and the two disagreed in both directions: it ignored an operator edit of the
+   * price field, and being unrounded it produced 67.00000000000001 where this reads 67 — enough
+   * for `QuoteItemsList`'s `discounted_price !== unit_price` test to render a discount badge
+   * striking through 67 to show 67.00. Consumers take THIS number; nothing recomputes it.
+   */
   unit_price: number;
-  discount_price: number | null;
+  /**
+   * The pre-discount reference from the proposal, when the KB supplied one and it is genuinely
+   * above the confirmed price. Null when the confirmed price IS the list price. For display and
+   * for a quote's struck-through original only — never a base to re-derive `unit_price` from.
+   */
+  list_price: number | null;
   discount_percent: number | null;
   currency: string;
   unit: string | null;
@@ -247,7 +264,11 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
       setLoading(false);
       setStatus('');
     }
-  }, [productName, sku, manufacturer, reset, toast]);
+    // `activeWorkspaceId` belongs here: it is read in the body, and `react-hooks/exhaustive-deps`
+    // is OFF in this repo's eslint config, so nothing else catches its absence. Without it the
+    // callback keeps the workspace that was active when it was last memoized, and a lookup after
+    // a workspace switch searches the previous tenant's pricing documents.
+  }, [activeWorkspaceId, productName, sku, manufacturer, reset, toast]);
 
   const runAILookup = useCallback(async () => {
     reset();
@@ -462,9 +483,12 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
     setCommitting(true);
     try {
       const discount_percent = parsedDiscount != null && !Number.isNaN(parsedDiscount) ? parsedDiscount : null;
-      const discount_price = proposal?.list_price && discount_percent != null
-        ? Number(proposal.list_price) * (1 - discount_percent / 100)
-        : null;
+      // The pre-discount reference, carried through as-is. Only meaningful when it is actually
+      // ABOVE the confirmed price — a proposal whose list equals its final is not a discount, and
+      // passing it on as one is what made quote lines render a struck-through price identical to
+      // the price beside it.
+      const proposalList = proposal?.list_price != null ? Number(proposal.list_price) : null;
+      const list_price = proposalList != null && proposalList > parsedPrice ? proposalList : null;
 
       const source_doc_ids = proposal?.source_doc_ids || matches.map((m) => m.doc_id).filter((id): id is string => !!id);
       // Provenance tag for audit. Shape: kb:<mode>:<linkId>
@@ -481,7 +505,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
 
       const payload: PriceConfirmPayload = {
         unit_price: parsedPrice,
-        discount_price,
+        list_price,
         discount_percent,
         currency: finalCurrency || 'EUR',
         unit: finalUnit || null,
@@ -497,34 +521,59 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
       // Optionally upsert to product_prices for the ACTIVE workspace — used when
       // triggered from the product detail page (per-workspace catalog price).
       if (commitToProductPrices && productId && activeWorkspaceId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // The error MUST be destructured and thrown. supabase-js RESOLVES on an RLS denial
-          // rather than throwing, so discarding it let a rejected write flow straight into the
-          // "Price confirmed" toast below and close the drawer — the user saw a price they
-          // believed was saved, the catalog was unchanged, and no second signal existed
-          // anywhere. The enclosing try/catch could not help: nothing threw. The other two
-          // product_prices call sites both check.
-          const { error: priceErr } = await supabase.from('product_prices').upsert(
-            {
-              workspace_id: activeWorkspaceId,
-              product_id: productId,
-              list_price: proposal?.list_price ?? null,
-              discount_price,
-              discount_percent,
-              currency: payload.currency,
-              unit: payload.unit,
-              source_kb_doc_ids: payload.source_doc_ids,
-              source_snippet: matches[0]?.snippet ?? null,
-              price_lookup_call_id: priceLookupCallId,
-              confirmed_by: user.id,
-              confirmed_at: new Date().toISOString(),
-              notes: notes || null,
-            },
-            { onConflict: 'workspace_id,product_id' },
+        // Both halves matter. `getUser()`'s error was discarded and the `if (user)` had no
+        // `else`, so an expired session meant no write, no error, and the "Price confirmed"
+        // toast below firing anyway — the same outcome the upsert's error check was added to
+        // stop, reached through the one door that fix did not cover.
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (userErr || !userData?.user) {
+          throw new Error(
+            `Could not save the catalog price: not signed in${userErr ? ` (${userErr.message})` : ''}`,
           );
-          if (priceErr) throw new Error(`Could not save the catalog price: ${priceErr.message}`);
         }
+        const user = userData.user;
+
+        // The catalog row must be internally coherent: `discount_price` is GENERATED from
+        // `list_price` and `discount_percent`, so storing the proposal's list next to a price the
+        // operator overrode would derive a third number agreeing with neither. Keep the pair only
+        // when it reproduces the confirmed price; otherwise the override IS the price.
+        const derived = list_price != null && discount_percent != null
+          ? Math.round(list_price * (1 - discount_percent / 100) * 100) / 100
+          : null;
+        const coherent = derived != null && Math.abs(derived - parsedPrice) < 0.005;
+
+        // The error MUST be destructured and thrown. supabase-js RESOLVES on an RLS denial
+        // rather than throwing, so discarding it let a rejected write flow straight into the
+        // "Price confirmed" toast below and close the drawer — the user saw a price they
+        // believed was saved, the catalog was unchanged, and no second signal existed
+        // anywhere. The enclosing try/catch could not help: nothing threw. The other two
+        // product_prices call sites both check.
+        const { error: priceErr } = await supabase.from('product_prices').upsert(
+          {
+            workspace_id: activeWorkspaceId,
+            product_id: productId,
+            // Never NULL. This used to be `proposal?.list_price ?? null`, so a quick-mode pick or
+            // a proposal without a list wrote a catalog row with no price at all — the one thing
+            // the button exists to do.
+            list_price: coherent ? list_price : parsedPrice,
+            discount_percent: coherent ? discount_percent : null,
+            // discount_price is GENERATED ALWAYS in Postgres — sending it raises 428C9.
+            currency: payload.currency,
+            unit: payload.unit,
+            source_kb_doc_ids: payload.source_doc_ids,
+            source_snippet: matches[0]?.snippet ?? null,
+            price_lookup_call_id: priceLookupCallId,
+            confirmed_by: user.id,
+            confirmed_at: new Date().toISOString(),
+            notes: notes || null,
+          },
+          // The unique index is (workspace_id, product_id, variant_key) NULLS NOT DISTINCT. Naming
+          // only the first two is not a narrower match, it is 42P10 "no unique or exclusion
+          // constraint matching the ON CONFLICT specification" — every save failed, which is why
+          // product_prices held a single row platform-wide.
+          { onConflict: 'workspace_id,product_id,variant_key' },
+        );
+        if (priceErr) throw new Error(`Could not save the catalog price: ${priceErr.message}`);
       }
 
       await onConfirm?.(payload);

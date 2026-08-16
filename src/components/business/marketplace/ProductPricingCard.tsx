@@ -5,7 +5,7 @@
  *  - root operator → the catalog base price every downstream tier inherits;
  *  - a dealer on their OWN product → their sell price to the tier below.
  *
- * Writes product_prices (UNIQUE workspace_id,product_id → upsert) + products.supply_mode.
+ * Writes product_prices (UNIQUE workspace_id,product_id,variant_key → upsert) + products.supply_mode.
  * Only rendered for the price-owner (root, or the product's owning workspace) and only to
  * a supplier-capable user. For an operator-catalog product seen by a downstream dealer the
  * read-only WorkspaceCostBadge already shows their resolved cost, so this card stays hidden.
@@ -85,9 +85,13 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
           currency,
           unit: unit || null,
           discount_percent: dp,
-          discount_price: lp != null && dp != null ? Math.round(lp * (1 - dp / 100) * 100) / 100 : null,
+          // discount_price is GENERATED ALWAYS from list_price + discount_percent — sending it
+          // raises 428C9. It was derived here, in marketplacePricingService and in
+          // PriceLookupDrawer, and the three copies did not agree on rounding.
           confirmed_at: new Date().toISOString(),
-        }, { onConflict: 'workspace_id,product_id' });
+          // (workspace_id, product_id, variant_key) is the only unique index. The two-column form
+          // is 42P10, not a narrower match — this save failed 100% of the time.
+        }, { onConflict: 'workspace_id,product_id,variant_key' });
       if (priceErr) throw priceErr;
 
       // supply_mode is a product-level flag; only the product owner / root sets it.
