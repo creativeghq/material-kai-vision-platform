@@ -3410,7 +3410,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         // otherwise the quantity-break repricer would overwrite the number the
                         // operator just accepted, which is the conflict price_auto exists for.
                         setEditItem(i, {
-                          unit_price: payload.discount_price ?? payload.unit_price,
+                          // `payload.unit_price` IS the confirmed effective price. This used to
+                          // prefer `payload.discount_price`, a second derivation of the same
+                          // quantity from the proposal's list — so an operator who edited the
+                          // price got the recomputed one instead, and `order_items.unit_price`
+                          // is unconstrained `numeric`, which stored its float tail verbatim.
+                          unit_price: payload.unit_price,
                           price_auto: false,
                           price_source: 'kb_confirmed',
                         });

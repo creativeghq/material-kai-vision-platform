@@ -762,9 +762,16 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
           customerContactId={customerContactId}
           onConfirm={async (payload) => {
             if (!onUpdateItem) return;
+            // A quote line keeps the original in `unit_price` and the effective price in
+            // `discounted_price`; everything renders `discounted_price ?? unit_price` and strikes
+            // the former through when they differ. So the confirmed price is the DISCOUNTED half
+            // whenever the proposal had a higher list, and the ONLY half otherwise. Writing the
+            // confirmed price to `unit_price` and a re-derived copy to `discounted_price` — which
+            // is what this did — struck through 67 to show 67.00 off a float tail.
+            const hasList = payload.list_price != null && payload.list_price > payload.unit_price;
             await onUpdateItem(lookupItem.id, {
-              unit_price: payload.unit_price,
-              discounted_price: payload.discount_price ?? null,
+              unit_price: hasList ? (payload.list_price as number) : payload.unit_price,
+              discounted_price: hasList ? payload.unit_price : null,
               notes: payload.notes ?? lookupItem.notes ?? undefined,
               price_source: payload.price_source ?? null,
               price_lookup_call_id: payload.price_lookup_call_id ?? null,
