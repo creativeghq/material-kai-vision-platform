@@ -90,8 +90,13 @@ suite('fiscal derivations · quote → invoice → receipt → settlement', () =
 
   /** A quote whose STORED totals are deliberately stale — the state after an upsell is accepted. */
   async function seedQuoteWithAcceptedUpsell() {
+    // Seeded as `quoted` and accepted at the END, which is the real lifecycle and now the only
+    // one that works: #358 PQ-12 latched the child tables of a decided quote
+    // (`user_can_write_quote` → status not in accepted/rejected), so inserting a line under an
+    // already-accepted quote raises "issue a revision instead of editing it". Creating the quote
+    // accepted and then adding lines was never a state the application could produce.
     const q = await svc.from('quotes').insert({
-      workspace_id: ws, user_id: A.id, status: 'accepted', vat_rate: 24,
+      workspace_id: ws, user_id: A.id, status: 'quoted', vat_rate: 24,
       // Stored columns describe the quote BEFORE the upsell was accepted — that staleness is the
       // POINT of the fixture, and `get_quote_totals` is what must see past it.
       //
@@ -120,6 +125,15 @@ suite('fiscal derivations · quote → invoice → receipt → settlement', () =
       quote_id: quoteId, upsell_id: upsellId, customer_accepted: true,
     });
     if (up.error) throw new Error(`seed quote upsell: ${up.error.message}`);
+
+    // Now decide it. `quote_items.pricing_status` defaults to 'priced', so the
+    // `_reject_accept_with_unpriced_lines` gate passes; the flip also materialises an order via
+    // `quote_accepted_create_order`, which is what acceptance does in production and what the
+    // teardown below already cleans up.
+    const acc = await svc.from('quotes')
+      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+      .eq('id', quoteId);
+    if (acc.error) throw new Error(`accept quote: ${acc.error.message}`);
     return quoteId;
   }
 
