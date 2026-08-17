@@ -65,8 +65,13 @@ export interface ContactExt {
 }
 
 async function call<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
+  // #356 `RE-13`. Spread FIRST so the trusted values win: `{ action, workspace_id, ...extra }`
+  // let a caller's `extra.action` or `extra.workspace_id` override them. Not a vulnerability —
+  // the server re-verifies `workspace_id` against `userCanAccessWorkspace` and 404s on mismatch,
+  // and overriding `action` only redirects the caller's own request under their own permissions
+  // — but the precedence is backwards and reads as if the caller is in charge.
   const { data, error } = await supabase.functions.invoke('real-estate-api', {
-    body: { action, workspace_id: workspaceId, ...extra },
+    body: { ...extra, action, workspace_id: workspaceId },
   });
   if (error) throw await edgeError(error);
   return data as T;
@@ -75,7 +80,9 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
 /** `real-estate-calendar` is its own function (per-user Google OAuth), so it needs its own caller. */
 async function callCalendar<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('real-estate-calendar', {
-    body: { action, workspace_id: workspaceId, ...extra },
+    // Same precedence as `call` above (#356 `RE-13`) — this is the second wrapper and it had the
+    // same shape, which is exactly why the finding is worth a guard rather than a one-line fix.
+    body: { ...extra, action, workspace_id: workspaceId },
   });
   if (error) throw await edgeError(error);
   return data as T;

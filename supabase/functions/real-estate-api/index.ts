@@ -17,6 +17,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
+import { assertSameWorkspace, assertAllSameWorkspace } from '../_shared/same-workspace.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import {
   checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm,
@@ -228,6 +229,14 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
   const requireManage = () => {
     if (!access.canManage) throw new HttpError(403, 'You need the listings-manage role for this action.');
   };
+  /**
+   * #356 `RE-5`. `canView` is granted to EVERY active workspace member — the listings are a
+   * shared team asset, which is deliberate. What followed from it was not: the routes below
+   * inherited that grant and return seller and buyer PII, KYC state and rent ledgers, so a
+   * warehouse or accountant user in the same workspace could read them. Listings are shared;
+   * the people attached to them are not.
+   */
+  const requireManageForPii = requireManage;
 
   // Agent scoping: a non-broker (realestate_agent) owns a listing when they're its listing agent
   // or its creator; "open_for_all" makes a listing VIEWABLE (not editable) by all agents. Brokers see all.
@@ -322,15 +331,34 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
         const property = await loadProperty(id);
-        const [{ data: photos }, { data: inquiries }, { data: viewings }, { data: priceHistory }, { data: openHouses }, { data: documents }] = await Promise.all([
+        // #356 `RE-2`. `open_for_all` is documented as making a listing VIEWABLE, not shared, and
+        // the two are not the same grant: inquiries and viewings carry the other agent's buyer
+        // PII — lead names, emails, phones, enquiry text — and documents and price history are
+        // the listing's private commercial file. A colleague who can see the listing gets the
+        // listing; the lead book stays with the agent who owns it (or a broker, who sees all).
+        const owns = ownsProperty(property);
+        const [{ data: photos }, { data: openHouses }] = await Promise.all([
           supabase.from('property_photos').select('*').eq('property_id', id).order('sort_order'),
-          supabase.from('property_inquiries').select('*').eq('property_id', id).order('created_at', { ascending: false }),
-          supabase.from('property_viewings').select('*').eq('property_id', id).order('scheduled_at', { ascending: false }),
-          supabase.from('property_price_history').select('*').eq('property_id', id).order('changed_at', { ascending: false }),
           supabase.from('property_open_houses').select('*').eq('property_id', id).order('starts_at'),
-          supabase.from('property_documents').select('*').eq('property_id', id).order('created_at', { ascending: false }),
         ]);
-        return json({ property, can_edit: ownsProperty(property), photos: photos ?? [], inquiries: inquiries ?? [], viewings: viewings ?? [], price_history: priceHistory ?? [], open_houses: openHouses ?? [], documents: documents ?? [] });
+        let inquiries: unknown[] = [], viewings: unknown[] = [], priceHistory: unknown[] = [], documents: unknown[] = [];
+        if (owns) {
+          const [inq, vw, ph, docs] = await Promise.all([
+            supabase.from('property_inquiries').select('*').eq('property_id', id).order('created_at', { ascending: false }),
+            supabase.from('property_viewings').select('*').eq('property_id', id).order('scheduled_at', { ascending: false }),
+            supabase.from('property_price_history').select('*').eq('property_id', id).order('changed_at', { ascending: false }),
+            supabase.from('property_documents').select('*').eq('property_id', id).order('created_at', { ascending: false }),
+          ]);
+          inquiries = inq.data ?? []; viewings = vw.data ?? [];
+          priceHistory = ph.data ?? []; documents = docs.data ?? [];
+        }
+        return json({
+          property, can_edit: owns, photos: photos ?? [], open_houses: openHouses ?? [],
+          inquiries, viewings, price_history: priceHistory, documents,
+          // Stated rather than implied: an empty array because you may not see them is not the
+          // same as an empty array because there are none, and the UI should not present it as such.
+          leads_withheld: !owns,
+        });
       }
 
       case 'create-property': {
@@ -754,7 +782,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── AML / KYC (#281 gap 10) ────────────────────────────────────────
       case 'kyc-status': {
+        requireManageForPii(); // #356 RE-5: AML/KYC state is not a shared-team-asset read.
         const contactId = String(body.contact_id ?? '');
+        // The contact is named in the body and joined below — same check as RE-4.
+        await assertSameWorkspace(supabase, 'crm_contacts', body.contact_id, workspaceId, 'contact');
         const { data, error } = await supabase.rpc('property_kyc_status', {
           p_workspace_id: workspaceId, p_contact_id: contactId || null,
         });
@@ -1033,8 +1064,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
               .eq('workspace_id', workspaceId).eq('reference_code', ref).maybeSingle();
             existing = data;
           }
-          // An agent may not overwrite another agent's listing through the importer either.
-          if (existing && !access.isBroker && !canViewProperty(existing)) {
+          // #356 `RE-3`. This tested canViewProperty, but `open_for_all` grants VIEW — so an
+          // agent importing a row carrying another agent's reference code rewrote that agent's
+          // price and details. Overwriting is an edit; it takes the edit grant.
+          if (existing && !access.isBroker && !ownsProperty(existing)) {
             results.push({ row: i + 1, reference_code: ref, action: 'skipped', errors: ['a listing with this reference belongs to another agent'] });
             continue;
           }
@@ -1599,9 +1632,12 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── Offers (competing bids per property) ───────────────────────────
       case 'list-offers': {
+        // Same class as the four RE-5 routes and found beside them: offers join the buyer
+        // contact and return name + email, reached through a plain view grant.
+        requireManageForPii();
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        await loadProperty(id);
+        await loadEditable(id);
         const { data, error } = await supabase.from('property_offers')
           .select('*, buyer:crm_contacts!property_offers_buyer_contact_id_fkey ( id, name, email )')
           .eq('property_id', id).eq('workspace_id', workspaceId).order('created_at', { ascending: false });
@@ -1613,6 +1649,8 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const id = String(body.property_id ?? '');
         if (!id || body.amount == null) return json({ error: 'property_id and amount are required' }, 400);
         await loadEditable(id);
+        // #356 `RE-4`: prove the buyer contact is ours before storing it (see upsert-tenancy).
+        await assertSameWorkspace(supabase, 'crm_contacts', body.buyer_contact_id, workspaceId, 'contact');
         const { data, error } = await supabase.from('property_offers').insert({
           workspace_id: workspaceId, property_id: id, amount: Number(body.amount), currency: body.currency ?? 'EUR',
           buyer_contact_id: body.buyer_contact_id ?? null, buyer_name: body.buyer_name ?? null, terms: body.terms ?? null,
@@ -1769,6 +1807,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── Seller leads (vendors) — crm_contacts flagged seller via the RE extension ──
       case 'list-sellers': {
+        requireManageForPii(); // #356 RE-5: seller name/email/phone + their property valuation.
         const { data, error } = await supabase.from('property_contacts_ext')
           .select('crm_contact_id, owned_property_address, owned_property_value, owned_property_equity, contact:crm_contacts!property_contacts_ext_crm_contact_id_fkey ( id, name, email, phone, lead_status, lead_score, lead_source, created_at )')
           .eq('workspace_id', workspaceId).eq('contact_role', 'seller');
@@ -1793,6 +1832,8 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const contactId = String(body.crm_contact_id ?? '');
         if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        // #356 `RE-4`.
+        await assertSameWorkspace(supabase, 'crm_contacts', contactId, workspaceId, 'contact');
         const row: Record<string, unknown> = {
           workspace_id: workspaceId, crm_contact_id: contactId,
           label: body.label ?? null, criteria: body.criteria ?? {}, is_active: body.is_active ?? true,
@@ -1832,9 +1873,12 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       case 'buyers-for-property': {
         // The inverse: which active saved searches would match this listing (buyer leads for it).
+        requireManageForPii(); // #356 RE-5: returns buyer names and emails.
         const id = String(body.property_id ?? '');
         if (!id) return json({ error: 'property_id is required' }, 400);
-        const p = await loadProperty(id);
+        // The buyer book belongs to the agent who owns the listing, not to everyone who may
+        // VIEW it — `open_for_all` is a view grant (RE-2).
+        const p = await loadEditable(id);
         const { data: reqs } = await supabase.from('property_buyer_requirements')
           .select('*, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )')
           .eq('workspace_id', workspaceId).eq('is_active', true);
@@ -1855,8 +1899,15 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       case 'get-contact-ext': {
         const contactId = String(body.crm_contact_id ?? '');
         if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
-        const { data } = await supabase.from('property_contacts_ext').select('*').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId).maybeSingle();
-        return json({ ext: data ?? null });
+        const [{ data }, { data: valuations }] = await Promise.all([
+          supabase.from('property_contacts_ext').select('*').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId).maybeSingle(),
+          // #356 `RE-12`: stored history nobody can read is not an audit trail.
+          supabase.from('property_contact_valuations')
+            .select('value, equity, address, source, valued_at, created_by')
+            .eq('crm_contact_id', contactId).eq('workspace_id', workspaceId)
+            .order('valued_at', { ascending: false }).limit(20),
+        ]);
+        return json({ ext: data ?? null, valuations: valuations ?? [] });
       }
 
       case 'upsert-contact-ext': {
@@ -1866,10 +1917,37 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const contactId = String(body.crm_contact_id ?? '');
         if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
+        // #356 `RE-4`: the extension is keyed on the contact, so an unchecked id writes a row
+        // against another tenant's contact and hands it back on the next join.
+        await assertSameWorkspace(supabase, 'crm_contacts', contactId, workspaceId, 'contact');
         const EXT_WRITABLE = ['contact_role', 'pre_approval_status', 'pre_approval_amount', 'lender', 'budget_min', 'budget_max', 'owned_property_value', 'owned_property_address', 'owned_property_equity'];
         const row = { ...pick(body, EXT_WRITABLE), crm_contact_id: contactId, workspace_id: workspaceId };
+        // #356 `RE-12`. `owned_property_value` is an overwrite-style column, so a revaluation
+        // replaced the previous figure with no record of what it was, who set it, or when — and
+        // it is a number people make decisions against. Read the current figure before writing so
+        // an actual CHANGE can be recorded; the column keeps serving reads, the history explains
+        // how it got there.
+        const { data: prevExt } = await supabase.from('property_contacts_ext')
+          .select('owned_property_value, owned_property_equity, owned_property_address')
+          .eq('crm_contact_id', contactId).eq('workspace_id', workspaceId).maybeSingle();
         const { data, error } = await supabase.from('property_contacts_ext').upsert(row, { onConflict: 'crm_contact_id' }).select('*').single();
         if (error) throw new HttpError(400, error.message);
+        const beforeVal = (prevExt as { owned_property_value?: number | null } | null)?.owned_property_value ?? null;
+        const afterVal = (data as { owned_property_value?: number | null } | null)?.owned_property_value ?? null;
+        if (Number(beforeVal ?? NaN) !== Number(afterVal ?? NaN) && afterVal != null) {
+          // Best-effort: the valuation is already saved and refusing the write because its audit
+          // row failed would be the worse trade. Logged, never silent.
+          const { error: histErr } = await supabase.from('property_contact_valuations').insert({
+            workspace_id: workspaceId,
+            crm_contact_id: contactId,
+            value: afterVal,
+            equity: (data as { owned_property_equity?: number | null }).owned_property_equity ?? null,
+            address: (data as { owned_property_address?: string | null }).owned_property_address ?? null,
+            source: 'agent_update',
+            created_by: userId,
+          });
+          if (histErr) console.error('[real-estate-api] valuation history insert failed:', histErr.message);
+        }
         return json({ ext: data });
       }
 
@@ -1946,8 +2024,24 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         await loadEditable(propertyId); // owner-or-broker on the underlying listing
         if (body.rent_amount == null || !body.start_date) return json({ error: 'rent_amount and start_date are required' }, 400);
         const payload = pick(body, ['tenant_contact_id', 'landlord_contact_id', 'rent_amount', 'currency', 'rent_frequency', 'deposit', 'start_date', 'end_date', 'status', 'notes']);
+        // #356 `RE-4`: the contacts named in the body must belong to this workspace. Both halves
+        // were individually valid — a real workspace, a real contact — and never checked against
+        // each other, so a foreign contact's name/email/phone came back on the next joined read.
+        await assertAllSameWorkspace(
+          supabase, 'crm_contacts',
+          [payload.tenant_contact_id as string | null, payload.landlord_contact_id as string | null],
+          workspaceId, 'contact',
+        );
         const tenancyId = String(body.tenancy_id ?? '');
         if (tenancyId) {
+          // #356 `RE-1`. The authorisation above is on the PROPERTY from the body; the update
+          // below targets a TENANCY. Passing a property you own plus another agent's tenancy_id
+          // therefore rewrote their rent, tenant, landlord and dates. Authorise the object that
+          // is about to be mutated: load the tenancy, then check ITS property.
+          const { data: target } = await supabase.from('property_tenancies')
+            .select('id, property_id').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!target) return json({ error: 'not found' }, 404);
+          await loadEditable(String((target as { property_id: string }).property_id));
           const { data, error } = await supabase.from('property_tenancies').update(payload).eq('id', tenancyId).eq('workspace_id', workspaceId).select('*').single();
           if (error) throw new HttpError(400, error.message);
           return json({ tenancy: data });
@@ -1959,8 +2053,15 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'list-rent-charges': {
+        requireManageForPii(); // #356 RE-5: a rent ledger is not a shared-team-asset read.
         const tenancyId = String(body.tenancy_id ?? '');
         if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        // ...and the tenancy itself was never checked against the caller, so any tenancy id in
+        // the workspace returned its ledger. Authorise through the tenancy's own property.
+        const { data: ten } = await supabase.from('property_tenancies')
+          .select('id, property_id').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!ten) return json({ error: 'not found' }, 404);
+        await loadEditable(String((ten as { property_id: string }).property_id));
         const { data, error } = await supabase.from('property_rent_charges')
           .select('*').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId).order('due_date', { ascending: true });
         if (error) throw new HttpError(400, error.message);

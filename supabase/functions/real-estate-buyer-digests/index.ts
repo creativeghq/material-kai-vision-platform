@@ -48,14 +48,25 @@ serve(withApiLogging('real-estate-buyer-digests', async (req) => {
     if (!email || (r as any).contact?.marketing_consent !== true) { skipped++; continue; }
     const since = r.last_digest_at ?? '1970-01-01T00:00:00Z';
     // New public/active listings in this agency since the last digest.
-    const { data: listings } = await supabase.from('properties')
+    const { data: listings, error: listErr } = await supabase.from('properties')
       .select('id, title, price, currency, town, bedrooms, property_type, transaction_type, region, bathrooms, public_listing_token, published_at, created_at')
       .eq('workspace_id', r.workspace_id).eq('is_public', true).eq('listing_status', 'active')
       .or(`published_at.gte.${since},created_at.gte.${since}`).limit(100);
+    // #356 `RE-7`. This error was discarded, so a failed query read as "nothing new" — and the
+    // window was then stamped forward on the strength of it. supabase-js resolves rather than
+    // throwing on a denial, so the failure looked exactly like a quiet day.
+    if (listErr) {
+      console.error(`[buyer-digest] listings query failed for requirement ${r.id}:`, listErr.message);
+      failed++;
+      continue; // window NOT advanced — this requirement is retried next run
+    }
     const fresh = (listings ?? []).filter((p: any) => matchesCriteria(r.criteria, p));
-    // Always stamp so we advance the window even when there's nothing new.
-    await supabase.from('property_buyer_requirements').update({ last_digest_at: nowIso }).eq('id', r.id);
-    if (fresh.length === 0) { skipped++; continue; }
+    // Nothing to send is a real outcome, so the window advances: there is no delivery to protect.
+    if (fresh.length === 0) {
+      await supabase.from('property_buyer_requirements').update({ last_digest_at: nowIso }).eq('id', r.id);
+      skipped++;
+      continue;
+    }
 
     const portal = `${appUrl}/buyer/${r.portal_token}`;
     const items = fresh.slice(0, 8).map((p: any) => `
@@ -77,8 +88,20 @@ serve(withApiLogging('real-estate-buyer-digests', async (req) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
         body: JSON.stringify({ action: 'send', to: email, subject: `${fresh.length} new propert${fresh.length === 1 ? 'y' : 'ies'} matching your search`, html, emailType: 'transactional', tags: { feature: 'buyer_digest', requirement_id: r.id }, workspace_id: r.workspace_id }),
       });
-      if (res.ok) emailed++; else failed++;
-    } catch { failed++; }
+      if (res.ok) {
+        // Stamp ONLY after a confirmed send. Previously the window moved before the email was
+        // attempted, so a day of email-api being down meant those buyers never received those
+        // listings — not on retry, not ever, because `since` had already passed them.
+        await supabase.from('property_buyer_requirements').update({ last_digest_at: nowIso }).eq('id', r.id);
+        emailed++;
+      } else {
+        console.error(`[buyer-digest] send failed for requirement ${r.id}: HTTP ${res.status}`);
+        failed++;
+      }
+    } catch (e) {
+      console.error(`[buyer-digest] send threw for requirement ${r.id}:`, e);
+      failed++;
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, requirements: (reqs ?? []).length, emailed, skipped, failed }), { headers: { 'Content-Type': 'application/json' } });

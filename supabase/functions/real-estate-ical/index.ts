@@ -39,8 +39,11 @@ Deno.serve(withApiLogging('real-estate-ical', async (req) => {
     if (!token || token.length < 20) return json({ error: 'Unauthorized' }, 401);
 
     const { data: property } = await supabase.from('properties')
-      .select('id, title').eq('ical_token', token).maybeSingle();
+      .select('id, title, ical_token_expires_at').eq('ical_token', token).maybeSingle();
     if (!property) return json({ error: 'Unauthorized' }, 401);
+    // #356 `RE-10`. NULL = never expires (every token issued before that finding).
+    const icalExp = (property as { ical_token_expires_at?: string | null }).ical_token_expires_at;
+    if (icalExp && new Date(icalExp).getTime() <= Date.now()) return json({ error: 'Unauthorized' }, 401);
 
     // Only what a channel needs to stop selling a night. Cancelled bookings release their nights,
     // so they are excluded exactly as the database constraint excludes them.

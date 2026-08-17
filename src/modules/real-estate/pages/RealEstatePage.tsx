@@ -845,13 +845,21 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
   useEffect(() => { load(); }, [load]);
   if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No completed sales yet. Close one from a listing’s Offers tab → “Complete sale & commission”.</div>;
-  const totalCommission = rows.reduce((t, s) => t + Number(s.commission_base ?? 0), 0);
-  const ccy = rows[0]?.currency ?? 'EUR';
+  // #356 `RE-11`. This summed `commission_base` across every row and then labelled the total
+  // with `rows[0].currency`, so a €5,000 and a £4,000 commission rendered as "€9,000" — a number
+  // that is not true in any currency. Money is only additive within one currency, so the total is
+  // grouped and each is shown in its own; one currency (the ordinary case) is unchanged.
+  const commissionByCurrency = rows.reduce<Record<string, number>>((acc, s) => {
+    const cur = s.currency ?? 'EUR';
+    acc[cur] = (acc[cur] ?? 0) + Number(s.commission_base ?? 0);
+    return acc;
+  }, {});
+  const commissionEntries = Object.entries(commissionByCurrency).sort((a, b) => b[1] - a[1]);
   return (
     <div className="space-y-4">
       <Card><CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 p-4">
         <div><div className="text-[11px] text-muted-foreground">Completed</div><div className="text-base font-semibold">{rows.length}</div></div>
-        <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-500">{money(totalCommission, ccy)}</div></div>
+        <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-500">{commissionEntries.length === 0 ? money(0, 'EUR') : commissionEntries.map(([cur, amt]) => money(amt, cur)).join(' · ')}</div></div>
         <div><div className="text-[11px] text-muted-foreground">Invoiced</div><div className="text-base font-semibold">{rows.filter((s) => s.invoice_id).length}/{rows.length}</div></div>
       </CardContent></Card>
       <Card><CardContent className="p-0"><div className="divide-y divide-border">

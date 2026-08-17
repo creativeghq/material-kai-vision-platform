@@ -128,9 +128,19 @@ export async function buildCompsReport(supabase: any, args: {
 export async function buildVendorReport(supabase: any, property: any): Promise<any> {
   const [{ data: perfRows }, { data: viewings }, { data: vendor }] = await Promise.all([
     supabase.rpc('get_property_performance', { p_property_ids: [property.id] }),
+    // #356 `RE-8`. `feedback` is the agent's own note on the viewing and goes into an email
+    // addressed to the VENDOR. It is written as an internal record — "Maria Papadopoulos,
+    // +30…, max budget 350k" is a realistic note — so quoting it verbatim hands one client's
+    // contact details and negotiating position to another. HTML-escaping it, which this path
+    // already did correctly, is not the same as being allowed to say it.
+    //
+    // Sharing is therefore explicit and per viewing: nothing is quoted unless somebody ticked
+    // `share_with_vendor` on that row. Default false, so the safe state is the one you get by
+    // doing nothing.
     supabase.from('property_viewings')
       .select('scheduled_at, status, feedback')
       .eq('property_id', property.id).eq('status', 'completed').not('feedback', 'is', null)
+      .eq('share_with_vendor', true)
       .order('scheduled_at', { ascending: false }).limit(6),
     property.vendor_contact_id
       ? supabase.from('crm_contacts').select('id, name, email').eq('id', property.vendor_contact_id).maybeSingle()
@@ -265,7 +275,38 @@ export async function createRentInvoiceForCharge(supabase: any, args: {
     quantity: 1, unit_price: args.amount, net_value: args.amount, vat_amount: 0, line_total: args.amount,
   });
   if (itErr) throw new Error(itErr.message);
-  await supabase.from('property_rent_charges').update({ invoice_id: invoiceId }).eq('id', args.chargeId).eq('workspace_id', args.workspaceId);
+  // #356 `RE-6`. The caller selects charges where `invoice_id IS NULL`, so two cron runs can
+  // both see the same charge as uninvoiced and both get this far. This link used to be
+  // unconditional and its result discarded: the last write won and the loser's invoice stayed
+  // behind — orphaned, unreferenced by any charge, and still a payable draft.
+  //
+  // The claim is therefore conditional on the charge still being unlinked, and the result is
+  // checked. Losing the race is not an error; it means somebody else already invoiced this
+  // charge, so the invoice this call just built is withdrawn and the winner's id is returned.
+  const { data: claimed, error: claimErr } = await supabase
+    .from('property_rent_charges')
+    .update({ invoice_id: invoiceId })
+    .eq('id', args.chargeId)
+    .eq('workspace_id', args.workspaceId)
+    .is('invoice_id', null)
+    .select('id');
+  if (claimErr) throw new Error(`could not link the charge to its invoice: ${claimErr.message}`);
+
+  if (!claimed || claimed.length === 0) {
+    // Withdraw the losing draft rather than leaving a payable document nothing points at.
+    await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
+    await supabase.from('invoices').delete().eq('id', invoiceId);
+    const { data: winner } = await supabase.from('property_rent_charges')
+      .select('invoice_id').eq('id', args.chargeId).eq('workspace_id', args.workspaceId).maybeSingle();
+    const winningId = (winner as { invoice_id?: string | null } | null)?.invoice_id ?? null;
+    if (!winningId) {
+      // Unlinked and unclaimable: the row moved out from under us (deleted, or its workspace
+      // changed). Say so — silently returning a deleted invoice's id would be worse.
+      throw new Error('rent charge could not be claimed and carries no invoice');
+    }
+    return winningId;
+  }
+
   return invoiceId;
 }
 

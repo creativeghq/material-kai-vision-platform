@@ -92,12 +92,24 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
   }
 
   // ── Buyer portal — a saved search's shareable matches page + favourites + viewing request.
+  const tokenLive = (row: { [k: string]: unknown } | null, col: string): boolean => {
+    if (!row) return false;
+    const exp = row[col];
+    // NULL means "never expires" — every token issued before #356 RE-10 is null, and dating them
+    // retroactively would break links agents have already sent.
+    if (exp === null || exp === undefined) return true;
+    return new Date(String(exp)).getTime() > Date.now();
+  };
+
   async function loadRequirement(token: string): Promise<any> {
     if (!token) throw new HttpError(400, 'token is required');
     const { data } = await supabase.from('property_buyer_requirements')
-      .select('id, workspace_id, crm_contact_id, label, criteria, is_active, digest_enabled')
+      .select('id, workspace_id, crm_contact_id, label, criteria, is_active, digest_enabled, portal_token_expires_at')
       .eq('portal_token', token).maybeSingle();
+    // #356 `RE-10`: an expired token is a 404, same as a revoked or fictional one — a distinct
+    // "expired" reply would confirm the token had once been real.
     if (!data || data.is_active === false) throw new HttpError(404, 'not found');
+    if (!tokenLive(data, 'portal_token_expires_at')) throw new HttpError(404, 'not found');
     return data;
   }
   if (action === 'buyer-portal') {
@@ -127,10 +139,11 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
   async function loadTenancy(token: string): Promise<any> {
     if (!token) throw new HttpError(400, 'token is required');
     const { data } = await supabase.from('property_tenancies')
-      .select('id, workspace_id, property_id, status, rent_amount, rent_frequency, currency, start_date, end_date, deposit, tenant_contact_id')
+      .select('id, workspace_id, property_id, status, rent_amount, rent_frequency, currency, start_date, end_date, deposit, tenant_contact_id, portal_token_expires_at')
       .eq('portal_token', token).maybeSingle();
     // A revoked token (set to null) simply stops resolving — same 404 as one that never existed.
     if (!data) throw new HttpError(404, 'not found');
+    if (!tokenLive(data, 'portal_token_expires_at')) throw new HttpError(404, 'not found'); // #356 RE-10
     return data;
   }
 
@@ -415,7 +428,13 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
         }));
       } catch { /* best-effort */ }
     }
-    return json({ estimate, range_low: low, range_high: high, currency: 'EUR', comps_count: perSqm.length, median_per_sqm: medianPerSqm });
+    // #356 `RE-9`. The comps set deliberately includes non-public, under-offer and sold stock,
+    // because a valuation built only from live public listings is not a valuation — that part is
+    // right. The leak is in the RESPONSE: `comps_count` and `median_per_sqm` are exactly the two
+    // numbers that let an anonymous prober vary town / type / area and reconstruct the agency's
+    // private book, one bucket at a time. The estimate and its range answer the seller's question
+    // without exposing the set behind it.
+    return json({ estimate, range_low: low, range_high: high, currency: 'EUR' });
   }
 
   const token = String(body?.token ?? '').trim();
@@ -426,6 +445,7 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     .select('*').eq('public_listing_token', token).eq('is_public', true).eq('listing_status', 'active').maybeSingle();
   if (error) throw new HttpError(400, error.message);
   if (!property) return json({ error: 'not found' }, 404);
+  if (!tokenLive(property, 'public_listing_token_expires_at')) return json({ error: 'not found' }, 404); // #356 RE-10
 
   if (action === 'get') {
     // Signed URLs for the private property-media bucket (1h).
