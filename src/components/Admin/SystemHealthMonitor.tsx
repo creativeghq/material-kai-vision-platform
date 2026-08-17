@@ -109,6 +109,42 @@ interface HealthStatus {
   timestamp: string;
 }
 
+/**
+ * Cloudflare's three surfaces. Each is checked a different way because each fails differently, and
+ * two of them can be genuinely unmeasurable — so `unknown` is a real state here, never rounded up
+ * to healthy. That rounding is `AD-1`, the Vercel light that was green whether Vercel was up or not.
+ */
+interface CloudflareCheck {
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  latency_ms?: number;
+  message?: string;
+  error?: string;
+  detail?: Record<string, unknown>;
+}
+
+interface CloudflareHealth {
+  status: CloudflareCheck['status'];
+  /** Bot gate on every public form. The probe grades our SECRET, not just reachability. */
+  turnstile: CloudflareCheck;
+  /** MX for the receiving domain. The inbound Worker has no fetch handler and cannot be pinged. */
+  email_routing: CloudflareCheck;
+  /** Cloudflare API: token valid + the inbound Worker actually deployed. */
+  workers: CloudflareCheck;
+  /**
+   * Delivery OUTCOMES over the last week. Deliberately not folded into `status`: zero inbound mail
+   * on a low-volume receiving domain is a legitimate quiet, and the MX check above is what says
+   * whether mail COULD have arrived. Shown so an operator can tell those apart.
+   */
+  inbound_delivery: {
+    window_days: number;
+    received: number;
+    failed: number;
+    by_outcome: Record<string, number>;
+    last_received: string | null;
+    addresses: number;
+  } | null;
+}
+
 interface ExternalServiceStatus {
   name: string;
   status: 'healthy' | 'unhealthy' | 'unknown';
@@ -147,6 +183,8 @@ export const SystemHealthMonitor: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [externalServices, setExternalServices] = useState<ExternalServiceStatus[]>([]);
   const [providers, setProviders] = useState<ProviderHealth[]>([]);
+  // `null` = the edge check did not report a Cloudflare section at all — unknown, not absent.
+  const [cloudflare, setCloudflare] = useState<CloudflareHealth | null>(null);
   // `null` = the provider-health RPC did not answer. Distinct from `[]` ("it answered, nothing to
   // report"): read as an empty list, an RPC failure hides every provider outage AND leaves the
   // overall verdict green. (#365 AD-4)
@@ -211,6 +249,8 @@ export const SystemHealthMonitor: React.FC = () => {
       const embeddingsResult  = edgeResults?.embeddings  ?? null;
       const aiServicesResult  = edgeResults?.ai_services ?? null;
       const vercelResult      = edgeResults?.vercel      ?? null;
+      const cloudflareResult  = (edgeResults?.cloudflare ?? null) as CloudflareHealth | null;
+      setCloudflare(cloudflareResult);
 
       // Use /health/detailed if available, otherwise build from basic /health.
       const detailedAvailable = !!(detailedResponse && detailedResponse.ok);
@@ -279,11 +319,17 @@ export const SystemHealthMonitor: React.FC = () => {
       // degraded — this is what "everything healthy" was previously blind to.
       const providerDown = providersAvailable
         && (providerRows as ProviderHealth[]).some((p) => p.status === 'unhealthy');
+      // Cloudflare sits in front of inbound mail and every public form, so a hard failure there is
+      // a real outage even when everything behind it is fine — a dead MX means customer mail is
+      // being refused at SMTP time with nothing in this platform to show for it.
+      const cloudflareDown = cloudflareResult?.status === 'unhealthy';
+      const cloudflareDegraded = cloudflareResult?.status === 'degraded';
       const degraded = openaiResult?.status === 'unhealthy' || hfResult?.status === 'unhealthy'
-        || voyageResult?.status === 'unhealthy' || providerDown;
+        || voyageResult?.status === 'unhealthy' || providerDown || cloudflareDown || cloudflareDegraded;
       // Checks that did not run cannot vote healthy. `unknown` outranks `healthy` and yields to a
       // real failure, so a board with unmeasured subsystems never reads as all-clear.
-      const anyUnknown = !edgeResults || !detailedAvailable || !providersAvailable;
+      const anyUnknown = !edgeResults || !detailedAvailable || !providersAvailable
+        || !cloudflareResult || cloudflareResult.status === 'unknown';
       if (criticalDown) {
         data.overall_status = 'unhealthy';
       } else if (degraded) {
@@ -659,6 +705,108 @@ export const SystemHealthMonitor: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cloudflare — the edge in front of inbound mail and every public form.
+          Three surfaces, three methods, because only one of them can be pinged. */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Cloudflare
+              </CardTitle>
+              <CardDescription>
+                Turnstile, Email Routing and the inbound Worker
+              </CardDescription>
+            </div>
+            {getStatusBadge(cloudflare?.status ?? 'unknown')}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!cloudflare ? (
+            <p className="text-sm text-muted-foreground">
+              The health check did not report a Cloudflare section — unknown, not healthy.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {([
+                  { key: 'turnstile', label: 'Turnstile', icon: '🛡️', check: cloudflare.turnstile },
+                  { key: 'email_routing', label: 'Email Routing (MX)', icon: '📬', check: cloudflare.email_routing },
+                  { key: 'workers', label: 'Inbound Worker', icon: '⚙️', check: cloudflare.workers },
+                ] as const).map(({ key, label, icon, check }) => (
+                  <div key={key} className="flex flex-col gap-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <span className="text-lg">{icon}</span>{label}
+                      </span>
+                      {getStatusBadge(check?.status ?? 'unknown')}
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      {check?.latency_ms != null && check.latency_ms > 0 && (
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{check.latency_ms}ms</span>
+                      )}
+                      {check?.message && <p>{check.message}</p>}
+                      {check?.error && <p className="text-destructive">{check.error}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Delivery outcomes. The Worker has no fetch handler, so this — what came out of it
+                  — is the only direct evidence it ran at all. Kept out of the status above on
+                  purpose: quiet is not the same as broken, and the MX check separates them. */}
+              <div className="rounded-lg border p-3">
+                <p className="text-sm font-medium mb-1">Inbound delivery</p>
+                {!cloudflare.inbound_delivery ? (
+                  <p className="text-xs text-muted-foreground">
+                    Not measured — the delivery-outcome query did not answer. This is unknown, not zero.
+                  </p>
+                ) : cloudflare.inbound_delivery.addresses === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No inbound addresses exist yet, so nothing could arrive even with the MX, the Worker
+                    and the webhook all healthy. Not a fault.
+                  </p>
+                ) : (
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>
+                      <span className="font-medium text-foreground">
+                        {cloudflare.inbound_delivery.received.toLocaleString()}
+                      </span>{' '}
+                      message{cloudflare.inbound_delivery.received === 1 ? '' : 's'} in the last{' '}
+                      {cloudflare.inbound_delivery.window_days} days across{' '}
+                      {cloudflare.inbound_delivery.addresses.toLocaleString()} address
+                      {cloudflare.inbound_delivery.addresses === 1 ? '' : 'es'}
+                      {cloudflare.inbound_delivery.failed > 0 && (
+                        <span className="text-destructive">
+                          {' '}· {cloudflare.inbound_delivery.failed} failed
+                        </span>
+                      )}
+                    </p>
+                    {cloudflare.inbound_delivery.last_received && (
+                      <p>Last received {formatDate(cloudflare.inbound_delivery.last_received, { withTime: true })}</p>
+                    )}
+                    {Object.keys(cloudflare.inbound_delivery.by_outcome).length > 0 && (
+                      <p>
+                        {Object.entries(cloudflare.inbound_delivery.by_outcome)
+                          .map(([outcome, n]) => `${outcome}: ${n}`)
+                          .join(' · ')}
+                      </p>
+                    )}
+                    {cloudflare.inbound_delivery.received === 0 && (
+                      <p>
+                        Nothing arrived in the window. With the MX check above healthy this reads as a
+                        quiet mailbox rather than a broken one — but it is the number to watch.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* AI Services Health */}
       {health.ai_services && (
