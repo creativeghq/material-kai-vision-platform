@@ -26,6 +26,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { stripComments } from '../helpers/stripComments';
 
 const ROOT = join(__dirname, '..', '..');
@@ -148,3 +149,85 @@ function readdirSyncSafe(dir: string) {
     return [];
   }
 }
+
+/**
+ * The reason the agent could not see the image at all.
+ *
+ * agent-chat built Anthropic's NATIVE image block — `{type:'image', source:{...}}` — for the last
+ * user message. @langchain/anthropic 1.3.10, the version agent-chat pins, drops it:
+ * `_formatContentBlocks` is a GENERATOR and its branch for a native image block says
+ * `return contentPart` instead of `yield contentPart`. A `return` in a generator emits nothing
+ * (every `for...of`/spread discards the return value) and TERMINATES the generator, so the image
+ * never reached the API and every block after it was thrown away too.
+ *
+ * Consequences, none of which raised anything: agent vision never worked for anyone; attaching an
+ * image and a PDF in the same turn silently lost the PDF (documents are pushed after images); and
+ * the model answered from the text alone, which is why "update the date and the name" on an
+ * attached certificate came back as a question about which quote or CRM record was meant.
+ *
+ * Upstream fixed it in 1.5.2 (`yield`). We do not depend on that: `image_url` is handled by the
+ * branch above, which yields, and `_formatImage` turns a data: URL into a base64 block and an
+ * http(s) URL into a url block — the same two blocks we were hand-building. Identical in both
+ * versions.
+ *
+ * RUNTIME, against the pinned package. A static "does the source say image_url" check would pass
+ * just as happily against a library that had changed underneath it — and the whole failure here
+ * was a silent library behaviour, not a visible mistake in our source.
+ */
+describe('multimodal blocks actually survive the LangChain conversion', () => {
+  const DENO = join(FUNCS, 'agent-chat', 'node_modules', '.deno');
+  const load = async () => {
+    const inputs: any = await import(
+      /* @vite-ignore */ pathToFileURL(join(DENO, '@langchain+anthropic@1.3.10', 'node_modules', '@langchain', 'anthropic', 'dist', 'utils', 'message_inputs.js')).href
+    );
+    const core: any = await import(
+      /* @vite-ignore */ pathToFileURL(join(DENO, '@langchain+core@1.1.15', 'node_modules', '@langchain', 'core', 'dist', 'messages', 'index.js')).href
+    );
+    return { convert: inputs._convertMessagesToAnthropicPayload, HumanMessage: core.HumanMessage };
+  };
+
+  const BLOCKS = [
+    { type: 'text', text: 'update the date and the name' },
+    { type: 'image_url', image_url: { url: 'https://example.com/source.png' } },
+    { type: 'document', source: { type: 'url', url: 'https://example.com/spec.pdf' } },
+  ];
+
+  it('an attached image reaches the payload as an image block', async () => {
+    const { convert, HumanMessage } = await load();
+    const out = convert([new HumanMessage({ content: BLOCKS })]).messages[0].content;
+    const kinds = out.map((b: any) => b.type);
+    expect(
+      kinds,
+      'the image did not survive — the model would answer from the text alone and sound confused '
+      + 'about a request whose whole subject is the picture',
+    ).toContain('image');
+  });
+
+  it('a document attached ALONGSIDE an image is not swallowed with it', async () => {
+    const { convert, HumanMessage } = await load();
+    const out = convert([new HumanMessage({ content: BLOCKS })]).messages[0].content;
+    // This is the part a "does the image work" check misses: the old bug terminated the
+    // generator, so the block ORDER decided what else got lost.
+    expect(out.map((b: any) => b.type)).toEqual(['text', 'image', 'document']);
+  });
+
+  it('the native block shape is still the trap it was — do not go back to it', async () => {
+    const { convert, HumanMessage } = await load();
+    for (const source of [
+      { type: 'url', url: 'https://example.com/source.png' },
+      { type: 'base64', media_type: 'image/png', data: 'AAAA' },
+    ]) {
+      const out = convert([new HumanMessage({ content: [
+        { type: 'text', text: 't' },
+        { type: 'image', source },
+      ] })]).messages[0].content;
+      // If this ever starts returning the image, the pinned library has been upgraded past the
+      // `return`/`yield` bug — at which point delete this case, not the two above it.
+      expect(
+        out.map((b: any) => b.type),
+        `the pinned @langchain/anthropic now passes a native ${source.type} image block through. `
+        + 'That is good news; this case has outlived its purpose and should be removed.',
+      ).toEqual(['text']);
+    }
+  });
+});

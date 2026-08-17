@@ -2495,25 +2495,32 @@ async function executeAgent(
       if (idx === lastUserMsgIndex && (images.length > 0 || hasDocuments)) {
         const content: any[] = [];
         if (msg.content?.trim()) content.push({ type: 'text', text: msg.content });
+        // `image_url`, NOT Anthropic's native `{type:'image', source:{...}}`.
+        //
+        // The native block is what this used to build, and @langchain/anthropic 1.3.10 —
+        // the version agent-chat pins — DROPS it. `_formatContentBlocks` is a generator, and
+        // its branch for a native image block reads:
+        //
+        //     } else if (_isAnthropicImageBlockParam(contentPart)) return contentPart;
+        //
+        // `return` in a generator does not emit anything: the value is discarded by every
+        // `for...of`/spread that consumes it, AND the generator terminates. So the image never
+        // reached the API, and every content block AFTER it was thrown away too — attaching an
+        // image and a PDF in the same turn silently lost the PDF, because documents are pushed
+        // below. The predicate matches BOTH source shapes, so base64 and url were equally dead:
+        // agent vision has never worked, for anyone, since this code was written.
+        //
+        // Nothing surfaced it. The request succeeded, the model answered from the text alone,
+        // and the answer to "update the date and the name" on an attached certificate was a
+        // reasonable-sounding question about which quote or CRM record was meant.
+        //
+        // `image_url` goes through the branch above it, which yields, and whose `_formatImage`
+        // turns a data: URL into a base64 block and an http(s) URL into a url block — exactly
+        // the two blocks we were hand-building. Upstream fixed the `return` in 1.5.2, but this
+        // shape is handled identically in both versions, so it is correct either way and does
+        // not wait on a LangChain bump in the one function the edge typecheck gate cannot check.
         for (const img of images) {
-          if (img.startsWith('data:')) {
-            // data URL: "data:image/jpeg;base64,/9j/4AAQ..."
-            // Convert to Anthropic native base64 block (required for @langchain/anthropic v1.x)
-            const commaIdx = img.indexOf(',');
-            const header = img.slice(0, commaIdx); // "data:image/jpeg;base64"
-            const data = img.slice(commaIdx + 1);  // raw base64 string
-            const mediaType = header.slice(5, header.indexOf(';')); // "image/jpeg"
-            content.push({
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data },
-            });
-          } else {
-            // HTTP URL — pass as url source
-            content.push({
-              type: 'image',
-              source: { type: 'url', url: img },
-            });
-          }
+          content.push({ type: 'image_url', image_url: { url: img } });
         }
         // PDF document blocks — Opus reads these natively (no OCR pipeline). Enables
         // "read this quote/invoice/spec and rebuild/summarize it" straight from chat.
