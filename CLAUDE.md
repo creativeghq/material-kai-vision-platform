@@ -16,6 +16,7 @@
 
 ## Workflow Rules
 - **SQL / migrations**: ALWAYS apply via `mcp__supabase__apply_migration` (DDL) or `mcp__supabase__execute_sql`. NEVER create a local `supabase/migrations/*.sql` file. Run `mcp__supabase__get_advisors(security)` after any DDL.
+- **After a migration that DROPS a column or makes one GENERATED, run `npm run schema:writers`.** The migration is live the moment you apply it and the code that writes that column is not — Postgres refuses a non-DEFAULT write to a generated column and PostgREST refuses an unknown one, so every stale writer is a hard runtime error from that second onward. On 2026-08-17 one such migration left three plpgsql functions, an edge function and two test fixtures behind; the edge one returned `not_found` with HTTP 200 on every shared quote link, and each was found separately by something breaking. `schema:writers` lints the whole checkout against the live column registry, `lint_plpgsql_errors()` covers the SQL side, and both run post-deploy as smoke checks — but the guard is only *preventive* if you run it when you apply the migration.
 - **MIVAA is a different repository** (`creativeghq/mivaa-pdf-extractor`, single-branch `main`). Backend changes get committed and pushed *there*, not here. Editing the submodule working copy without pushing to that repo ships nothing.
 - **Git**: commit and push straight to `origin/main`. No feature branches. Pushed = done.
 - **GitHub**: `gh` commands run without asking for permission. Repo: `creativeghq/material-kai-vision-platform`.

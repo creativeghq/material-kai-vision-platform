@@ -29,14 +29,33 @@ suite('quote-public-share · anonymous token surface', () => {
   // public_share_token is a UUID column — a padded string fails at insert with 22P02.
   const newToken = () => crypto.randomUUID();
 
+  // The shared page's money is DERIVED (`get_quote_totals`), not read off the quote row — #358
+  // PQ-6, so the page a customer signs cannot show a figure the invoice will disagree with.
+  //
+  // So the fixture has to seed a real LINE, not a stamped `grand_total`. It used to stamp
+  // `grand_total: 1234.56` with no `quote_items` at all, which asserted nothing about the
+  // derivation and started failing the moment the function switched to it (`expected +0 to be
+  // 1234.56` — the derived total of a quote with no lines is correctly zero).
+  //
+  // 1 × 1234.56 at vat_rate 0 derives grand_total 1234.56, so the expectations below are unchanged
+  // and now actually exercise the path the customer sees.
+  const SHARED_TOTAL = 1234.56;
+
   const seedQuote = async (over: Record<string, unknown>) => {
     const { data, error } = await svc.from('quotes').insert({
       workspace_id: ws, user_id: owner.id, name: `E2E Quote ${rid}`,
       // valid_status CHECK: draft|submitted|quoted|accepted|rejected|expired — 'sent' is not one.
-      status: 'quoted', currency: 'EUR', grand_total: 1234.56,
+      status: 'quoted', currency: 'EUR', vat_rate: 0,
       ...over,
     }).select('id, public_share_token').single();
     if (error) throw new Error(`seed quote: ${error.message}`);
+
+    // No `line_total`: GENERATED ALWAYS from coalesce(discounted_price, unit_price) * quantity.
+    const { error: itemErr } = await svc.from('quote_items').insert({
+      quote_id: data.id, quantity: 1, unit_price: SHARED_TOTAL,
+      custom_product_name: `E2E line ${rid}`, pricing_status: 'priced',
+    });
+    if (itemErr) throw new Error(`seed quote item: ${itemErr.message}`);
     return data;
   };
 
@@ -84,7 +103,7 @@ suite('quote-public-share · anonymous token surface', () => {
     const { body } = await share({ token: sharedToken });
     expect(body.not_found).toBeFalsy();
     expect(body.quote?.id).toBe(sharedQuote);
-    expect(Number(body.quote?.grand_total)).toBe(1234.56);
+    expect(Number(body.quote?.grand_total)).toBe(SHARED_TOTAL);
   });
 
   it('refuses to accept without a real signer name', async () => {

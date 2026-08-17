@@ -92,23 +92,34 @@ suite('fiscal derivations · quote → invoice → receipt → settlement', () =
   async function seedQuoteWithAcceptedUpsell() {
     const q = await svc.from('quotes').insert({
       workspace_id: ws, user_id: A.id, status: 'accepted', vat_rate: 24,
-      // Stored columns describe the quote BEFORE the upsell was accepted. `extras_total` is the
-      // only thing recalculateQuoteExtrasTotal writes, which is correct — get_quote_totals is
-      // meant to be the single derivation.
-      subtotal: 1000, vat_amount: 240, grand_total: 1240, extras_total: 200,
+      // Stored columns describe the quote BEFORE the upsell was accepted — that staleness is the
+      // POINT of the fixture, and `get_quote_totals` is what must see past it.
+      //
+      // `extras_total` is NOT seeded: it stopped being a stored column in #358 PQ-6 and is now
+      // derived from the accepted `quote_upsells` row below (price 200). Seeding it was what broke
+      // this fixture — PostgREST answers "Could not find the 'extras_total' column of 'quotes' in
+      // the schema cache", which throws before a single assertion runs.
+      subtotal: 1000, vat_amount: 240, grand_total: 1240,
       cash_discount_pct: 0, paid_upfront: false, currency: 'EUR',
       customer_contact_id: contact,
     }).select('id').single();
     if (q.error) throw new Error(`seed quote: ${q.error.message}`);
     const quoteId = q.data.id;
 
-    await svc.from('quote_items').insert({
-      quote_id: quoteId, quantity: 2, unit_price: 500, line_total: 1000,
+    // No `line_total`: it is GENERATED ALWAYS from coalesce(discounted_price, unit_price) *
+    // quantity, and Postgres rejects any non-DEFAULT write to it. 2 × 500 derives the same 1000.
+    const li = await svc.from('quote_items').insert({
+      quote_id: quoteId, quantity: 2, unit_price: 500,
       custom_product_name: `E2E line ${rid}`,
     });
-    await svc.from('quote_upsells').insert({
+    // Checked, like every other seed here. Unchecked, this insert failed silently and the suite
+    // went on to assert derived totals against a quote with no lines on it — which reads as a
+    // broken derivation rather than a broken fixture.
+    if (li.error) throw new Error(`seed quote item: ${li.error.message}`);
+    const up = await svc.from('quote_upsells').insert({
       quote_id: quoteId, upsell_id: upsellId, customer_accepted: true,
     });
+    if (up.error) throw new Error(`seed quote upsell: ${up.error.message}`);
     return quoteId;
   }
 

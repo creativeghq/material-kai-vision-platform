@@ -241,6 +241,29 @@ await check('db.plpgsql-lint', ['DB_KEY'], async () => {
   return `${json.length} known-broken (no new regressions)`;
 });
 
+// 4b. Does this checkout still agree with the live schema?
+//
+//   `db.plpgsql-lint` above asks the same question of SQL functions and answers it well — it is
+//   what caught `add_configuration_to_quote` inserting a `line_total` that had just become
+//   GENERATED. Nothing asked it of the other three kinds of writer, so the same migration also
+//   left an edge function selecting a dropped column (every shared quote link returned not_found,
+//   with a 200) and two test fixtures seeding one, and each was found separately by breaking.
+//
+//   Scans `.from().select()/.insert()/.update()` across the edge functions, src, the integration
+//   tests and api/, against `schema_column_registry()`. See scripts/schema-writers.mjs — including
+//   why the baseline it carries is shrink-only and what is currently on it.
+await check('db.schema-writers', ['DB_KEY'], async () => {
+  const { run } = await import('../schema-writers.mjs');
+  const { problems, stale, known, checked, skipped } = await run();
+  assert(stale.length === 0,
+    `KNOWN_DRIFT has ${stale.length} entry(ies) matching nothing — delete them: ${stale.join(' | ')}`);
+  assert(problems.length === 0,
+    `${problems.length} new schema/code disagreement(s): `
+    + problems.slice(0, 6).map((p) => `${p.file}:${p.line} ${p.problem}`).join(' | ')
+    + (problems.length > 6 ? ` (+${problems.length - 6} more)` : ''));
+  return `${checked} column refs ok (${skipped} unparseable, ${known} known drift)`;
+});
+
 // 5. The price-monitoring cron path — the exact endpoint that 500'd on the .or_ dep drift.
 await check('mivaa.price-cron-refresh', ['MIVAA_CRON_SECRET'], async () => {
   const { res, json } = await http(`${MIVAA}/api/v1/price-monitoring/tracked-queries/cron-refresh?limit=1`, {
