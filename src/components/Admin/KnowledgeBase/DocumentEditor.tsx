@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
+import { scanForInjectionPhrasing } from './injectionReview';
 import { Save, Eye, Code, Settings2, ExternalLink, Search as SearchIcon, Plus, Trash2, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -64,6 +65,7 @@ interface DocumentEditorProps {
   onClose: () => void;
 }
 
+
 export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   documentId,
   onClose,
@@ -82,6 +84,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('edit');
 
   const { toast } = useToast();
@@ -99,21 +102,49 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   }, [documentId, workspaceId]);
 
+  /**
+   * Which workspace this document is filed under (#365 `AD-42`).
+   *
+   * Was `.from('workspaces').select('id').limit(1).maybeSingle()` — no filter, no ORDER BY, no
+   * reference to the caller. "Whichever workspace Postgres returned first", which for a
+   * multi-workspace operator is not a choice and is not even stable between calls: `LIMIT 1`
+   * without an ORDER BY has no defined winner. A knowledge-base document could be authored into
+   * one tenant and saved into another, and nothing on the screen named either.
+   *
+   * Resolved from the caller's own active membership instead, deterministically ordered — the
+   * same rule the SEO handlers use — and the resolved name is shown so the operator can SEE
+   * which tenant they are writing to rather than infer it.
+   */
   const loadWorkspace = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: workspaces } = await supabase
-        .from('workspaces')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
+      const { data: membership, error } = await supabase
+        .from('workspace_members')
+        .select('workspace_id, joined_at, workspaces(name)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: false })
+        .limit(1);
 
-      if (workspaces) {
-        setWorkspaceId(workspaces.id);
-        setDocument((prev) => ({ ...prev, workspace_id: workspaces.id }));
+      if (error) {
+        console.error('Failed to resolve workspace:', error);
+        return;
       }
+      const row = (membership ?? [])[0] as
+        | { workspace_id: string; workspaces?: { name?: string } | null }
+        | undefined;
+      if (!row) {
+        // No active membership. Leaving workspaceId null is correct — the save path is gated on
+        // it, so nothing is written to an arbitrary tenant.
+        console.warn('[DocumentEditor] no active workspace membership for this user');
+        return;
+      }
+
+      setWorkspaceId(row.workspace_id);
+      setWorkspaceName(row.workspaces?.name ?? null);
+      setDocument((prev) => ({ ...prev, workspace_id: row.workspace_id }));
     } catch (error) {
       console.error('Failed to load workspace:', error);
     }
@@ -186,6 +217,24 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   };
 
   const handleSave = async () => {
+    // Look at the stored text before it becomes something the agent will be handed. Never blocks:
+    // a document ABOUT prompt injection legitimately contains every pattern, so the operator
+    // decides. It only guarantees they were shown. (#365 AD-37)
+    const injectionFindings = scanForInjectionPhrasing(
+      `${document.content_markdown ?? ''}\n${document.content ?? ''}\n${document.summary ?? ''}`,
+    );
+    if (injectionFindings.length > 0) {
+      const agentReadable = document.visibility !== 'private';
+      const ok = window.confirm(
+        `This document contains ${injectionFindings.length} passage(s) that read as INSTRUCTIONS to a model rather than as information:\n\n` +
+        injectionFindings.slice(0, 6).map((f) => `• ${f.label}\n  "${f.excerpt.slice(0, 120)}"`).join('\n\n') +
+        '\n\nKnowledge-base content is retrieved and replayed into future agent turns' +
+        (agentReadable ? ', and this document is agent-readable.' : '.') +
+        '\n\nSave anyway?',
+      );
+      if (!ok) return;
+    }
+
     if (!document.title || !document.content) {
       toast({
         title: 'Validation Error',
@@ -336,6 +385,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             <DialogTitle className="font-bold flex items-center gap-2">
               {documentId ? 'Edit Document' : 'Create New Document'}
               {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              {/* NAME the tenant being written to. Resolving it correctly is half the fix; the
+                  other half is that the operator can see it — an implicit workspace the screen
+                  never states is still a guess, just a better-ordered one. (#365 AD-42) */}
+              {workspaceName && (
+                <span className="ml-auto text-xs font-normal text-muted-foreground">
+                  Workspace: <span className="text-foreground">{workspaceName}</span>
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
         </div>

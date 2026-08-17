@@ -55,6 +55,14 @@ interface UnifiedAITestResponse {
 
 // Response standardization utility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/**
+ * Ceiling on sandbox input. Every run here is a real, billed model call, and the box had no limit
+ * and no counter — so pasting a catalogue in was charged in full with nothing on screen suggesting
+ * a bound existed. Generous enough for a genuine specification, small enough that a mis-paste is
+ * cheap. (#365 AD-22)
+ */
+const SANDBOX_MAX_CHARS = 8000;
+
 const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
   // Handle standardized response format
   if (rawResponse.success !== undefined && rawResponse.data) {
@@ -720,10 +728,15 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                     <label htmlFor="aitestingpanel-test-text" className="text-sm font-medium">Test Text</label>
                     <Textarea id="aitestingpanel-test-text"
                       value={multiModalTestText}
-                      onChange={(e) => setMultiModalTestText(e.target.value)}
+                      maxLength={SANDBOX_MAX_CHARS}
+                      onChange={(e) => setMultiModalTestText(e.target.value.slice(0, SANDBOX_MAX_CHARS))}
                       placeholder="Enter material description or specification text..."
                       rows={4}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {multiModalTestText.length.toLocaleString()} / {SANDBOX_MAX_CHARS.toLocaleString()} characters
+                      {multiModalTestText.length >= SANDBOX_MAX_CHARS && ' — truncated; this runs a real paid model call'}
+                    </p>
                   </div>
                   <Button
                     onClick={() => testMultiModalAnalysis('text_analysis')}

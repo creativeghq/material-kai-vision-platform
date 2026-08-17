@@ -391,10 +391,33 @@ export const MetadataManagement: React.FC = () => {
 
       if (updateError) throw updateError;
 
-      toast({
-        title: 'Success',
-        description: `Field "${item.field_name}" deleted`,
-      });
+      // Removing the last product that carries a field does NOT remove the canonical values
+      // derived from it — `facet_canonical_values` is gold, rebuilt from silver, and rows there
+      // can be locked or golden. Deleting them from here would be a second derivation path with
+      // no way back. So: check, and TELL the operator, rather than silently leaving orphans or
+      // silently destroying curated values. (#365 AD-41)
+      //
+      // Clean today: 21 canonical rows across 2 facets, 0 outside the registry. This keeps it
+      // that way by making the moment it stops being true visible.
+      const { count: remaining } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .not(`metadata->>${item.field_name}`, 'is', null);
+
+      if ((remaining ?? 0) === 0) {
+        toast({
+          title: `Field "${item.field_name}" deleted — last use`,
+          description:
+            `No product carries "${item.field_name}" any more. Any canonical values derived from ` +
+            'it are now unreferenced; they are not removed automatically because they may be ' +
+            'locked or curated. Re-run facet canonicalisation if you want them cleared.',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `Field "${item.field_name}" deleted`,
+        });
+      }
       loadMetadata();
     } catch (error) {
       toast({

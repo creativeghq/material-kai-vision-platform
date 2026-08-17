@@ -110,6 +110,62 @@ const TARGET_FIELDS: Array<{ value: string; label: string; required: boolean }> 
 // Targets that, when mapped, count as "auto-mapped" so we can collapse them.
 const KNOWN_TARGETS = new Set(TARGET_FIELDS.map((t) => t.value));
 
+/**
+ * `metadata` is a legitimate target — it is the JSONB catch-all every unmapped tag lands in.
+ * Everything else must be in TARGET_FIELDS.
+ */
+const ALLOWED_TARGETS = new Set([...KNOWN_TARGETS, 'metadata']);
+
+/**
+ * Columns a SUPPLIER'S XML may never name, whatever a mapping says (#365 `AD-34`, invariant 8).
+ *
+ * The mapping saved here is applied by the importer to build a product row, so a target outside
+ * TARGET_FIELDS is a mass-assignment vector wearing a dropdown: the operator maps a tag, or an
+ * upstream suggestion maps one for them, and supplier-controlled text lands in a trust field.
+ * These are the names that decide what something costs, who owns it and whether it is trusted —
+ * all server-set, none of them a supplier's to state.
+ *
+ * Belt and braces with ALLOWED_TARGETS: that one bounds the set positively, this one makes the
+ * refusal legible if TARGET_FIELDS ever grows a name it should not have.
+ */
+const NEVER_MAPPABLE = new Set([
+  'id', 'workspace_id', 'user_id', 'created_by', 'updated_by',
+  'cost', 'cost_source', 'markup_percent', 'supplier_company_id',
+  'status', 'is_verified', 'is_locked', 'credits', 'role',
+  'attributes_raw',
+]);
+
+/**
+ * Narrow a mapping to what may actually be written, and drop any source tag the file does not
+ * contain (#365 `AD-35`).
+ *
+ * A mapping whose SOURCE does not exist reads as complete in this panel and resolves to nothing at
+ * import time — the required field is "mapped", the value is absent, and the import proceeds. That
+ * is the same silence as an unmapped field, arrived at from the opposite direction.
+ */
+function sanitizeMappings(
+  mappings: Record<string, string>,
+  detected: DetectedField[],
+): { clean: Record<string, string>; droppedTargets: string[]; droppedSources: string[] } {
+  const known = new Set(detected.map((f) => f.xml_field));
+  const clean: Record<string, string> = {};
+  const droppedTargets: string[] = [];
+  const droppedSources: string[] = [];
+  for (const [xmlField, target] of Object.entries(mappings ?? {})) {
+    if (!target) continue;
+    if (!known.has(xmlField)) { droppedSources.push(xmlField); continue; }
+    if (NEVER_MAPPABLE.has(target) || !ALLOWED_TARGETS.has(target)) {
+      droppedTargets.push(`${xmlField} → ${target}`);
+      // Not silently discarded: routed to `metadata`, where the value is preserved as data and
+      // cannot become a trust field.
+      clean[xmlField] = 'metadata';
+      continue;
+    }
+    clean[xmlField] = target;
+  }
+  return { clean, droppedTargets, droppedSources };
+}
+
 type GapState =
   | { kind: 'present' }
   | { kind: 'partial'; coverage_pct: number; present_count: number; total_rows: number }
@@ -248,6 +304,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(suggestedMappings);
   const [manualValues, setManualValues] = useState<Record<string, string>>({});
+  const [sanitizeNotice, setSanitizeNotice] = useState<{ targets: string[]; sources: string[] }>({ targets: [], sources: [] });
   const [templateName, setTemplateName] = useState('');
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -277,8 +334,18 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
   // Sync mappings if the parent re-runs detection (e.g. user re-uploads).
   useEffect(() => {
-    setFieldMappings(suggestedMappings);
-  }, [suggestedMappings]);
+    // Suggestions arrive from the orchestrator, i.e. from a parse of the supplier's own file.
+    // They were applied wholesale. Sanitise them the same way an operator's own choices are.
+    const { clean, droppedTargets, droppedSources } = sanitizeMappings(suggestedMappings, detectedFields);
+    if (droppedTargets.length > 0) {
+      console.warn('[XMLFieldMapping] suggestions targeting non-mappable fields, routed to metadata:', droppedTargets);
+    }
+    if (droppedSources.length > 0) {
+      console.warn('[XMLFieldMapping] suggestions naming tags absent from this file, dropped:', droppedSources);
+    }
+    setSanitizeNotice({ targets: droppedTargets, sources: droppedSources });
+    setFieldMappings(clean);
+  }, [suggestedMappings, detectedFields]);
 
   const targetGaps = useMemo(
     () => buildTargetGaps(detectedFields, fieldMappings, totalRows),
@@ -373,7 +440,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             workspace_id: workspaceId,
             xml_content: b64,
             category,
-            field_mappings: fieldMappings,
+            field_mappings: sanitizeMappings(fieldMappings, detectedFields).clean,
             manual_values: manualValues,
             generate_preview: true,
           },
@@ -408,7 +475,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
           .insert({
             workspace_id: workspaceId,
             template_name: templateName,
-            field_mappings: fieldMappings,
+            field_mappings: sanitizeMappings(fieldMappings, detectedFields).clean,
             sample_structure: detectedFields,
             mapping_confidence: detectedFields.reduce(
               (acc, field) => ({ ...acc, [field.xml_field]: field.confidence }),
@@ -434,7 +501,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             category,
             xml_content: b64,
             source_name: xmlFile?.name || 'xml_url_import',
-            field_mappings: fieldMappings,
+            field_mappings: sanitizeMappings(fieldMappings, detectedFields).clean,
             manual_values: manualValues,
             mapping_template_id: templateId,
           },
@@ -641,6 +708,31 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+          {(sanitizeNotice.targets.length > 0 || sanitizeNotice.sources.length > 0) && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                {sanitizeNotice.targets.length > 0 && (
+                  <p>
+                    <span className="font-medium">
+                      {sanitizeNotice.targets.length} suggested mapping(s) named a field a supplier file may not set
+                    </span>{' '}
+                    — routed to <code>metadata</code> so the value is kept as data instead:{' '}
+                    {sanitizeNotice.targets.join(', ')}
+                  </p>
+                )}
+                {sanitizeNotice.sources.length > 0 && (
+                  <p>
+                    <span className="font-medium">
+                      {sanitizeNotice.sources.length} suggested mapping(s) named a tag this file does not contain
+                    </span>{' '}
+                    — dropped, because a mapping that resolves to nothing reads as complete and imports blank:{' '}
+                    {sanitizeNotice.sources.join(', ')}
+                  </p>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
 
         {/* Gap rows (excluding already-clean targets) */}
         <div className="space-y-2">
