@@ -148,18 +148,31 @@ async function getDbUnitPricing(supabase: DbClient): Promise<Record<string, Unit
   if (!_dbUnitPriceFetch) {
     _dbUnitPriceFetch = (async () => {
       try {
+        // BOTH non-token billing shapes. `per_generation` rows keep their rate in
+        // `cost_per_generation` and mean "one call, one price"; `per_unit` rows keep it in
+        // `cost_per_unit` and are multiplied by images or seconds. Reading only `per_unit`
+        // would have resolved all 14 Replicate `per_generation` models to null and logged
+        // every one of them at a null cost — the same silent gap this resolver exists to
+        // close, freshly dug one row over.
         const { data, error } = await supabase
           .from('ai_model_pricing')
-          .select('model_key, cost_per_unit, unit_label, markup_multiplier')
-          .eq('billing_type', 'per_unit')
+          .select('model_key, billing_type, cost_per_unit, cost_per_generation, unit_label, markup_multiplier')
+          .in('billing_type', ['per_unit', 'per_generation'])
           .eq('is_active', true);
         if (error || !data) return _dbUnitPriceCache?.data || {};
         const map: Record<string, UnitPrice> = {};
         for (const r of data) {
           const key = String(r.model_key || '').toLowerCase();
-          if (key) map[key] = {
-            perUnit: Number(r.cost_per_unit) || 0,
-            unitLabel: String(r.unit_label || 'unit'),
+          if (!key) continue;
+          const perGeneration = r.billing_type === 'per_generation';
+          const rate = Number(perGeneration ? r.cost_per_generation : r.cost_per_unit) || 0;
+          // A rate of 0 on a billable row is a misconfiguration, not a free model — it is what
+          // `firecrawl-scrape` looked like with its money in the wrong column. Skip it so the
+          // caller logs a null cost and warns, rather than recording a confident $0.00.
+          if (rate <= 0) continue;
+          map[key] = {
+            perUnit: rate,
+            unitLabel: String(r.unit_label || (perGeneration ? 'generation' : 'unit')),
             markup: Number(r.markup_multiplier) || DEFAULT_MARKUP,
           };
         }

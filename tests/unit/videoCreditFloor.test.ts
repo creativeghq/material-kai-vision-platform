@@ -28,6 +28,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const GENERATOR = 'supabase/functions/generate-interior-video-v2/index.ts';
+const SOCIAL_VIDEO = 'supabase/functions/generate-social-video/index.ts';
+const CREDIT_UTILS = 'supabase/functions/_shared/credit-utils.ts';
 const PICKER = 'src/components/features/ai/ProgressiveImageGrid.tsx';
 const CATALOG = 'src/components/features/ai/agentToolsCatalog.ts';
 const TOOL = 'supabase/functions/_shared/tools/background-tools.ts';
@@ -134,5 +136,61 @@ describe('every surface advertises the price the generator actually charges', ()
 
   it('the agent tool description quotes the charged price', () => {
     expect(read(TOOL)).toContain('veo-2 50cr');
+  });
+});
+
+describe('the second copy of the video prices agrees with the first', () => {
+  // `generate-social-video` keeps its own CREDIT_COSTS. For veo-2 it delegates to
+  // generate-interior-video-v2 and never charges from its own map — but the map still feeds the
+  // "insufficient credits, required: N" message, so a stale entry quotes a price nobody charges,
+  // and it goes live the moment anyone removes the delegation. Two files, one number, nothing
+  // keeping them equal: check it.
+  const primary = parseNumericMap(read(GENERATOR), 'CREDIT_COSTS');
+  const social = parseNumericMap(read(SOCIAL_VIDEO), 'CREDIT_COSTS');
+
+  it('parses both maps', () => {
+    expect(Object.keys(primary).length).toBeGreaterThan(0);
+    expect(Object.keys(social).length).toBeGreaterThan(0);
+  });
+
+  it('agrees on every model both files price', () => {
+    // The two files spell Kling differently ('kling-v3.0' vs 'kling-3.0') because one is the
+    // generator's model key and the other is the Replicate slug. Compare on a normalised name
+    // so the check is about the PRICE, not the spelling.
+    const norm = (k: string) => k.replace('kling-v3.0', 'kling-3.0');
+    const primaryByNorm = Object.fromEntries(Object.entries(primary).map(([k, v]) => [norm(k), v]));
+    for (const [model, credits] of Object.entries(social)) {
+      const other = primaryByNorm[norm(model)];
+      if (other === undefined) continue;
+      expect(credits, `${model}: generate-social-video says ${credits}, generate-interior-video-v2 says ${other}`).toBe(other);
+    }
+  });
+});
+
+describe('a billable service is never priced at zero by accident', () => {
+  const src = read(CREDIT_UTILS);
+
+  it('a missing price is reported, not swallowed', () => {
+    // `apollo-competitors` was billed in code with no ai_model_pricing row. The debit returned
+    // `success: false`, the call site discarded the result, and every competitor search ran for
+    // free — the only trace a console line. Callers that ignore the result are the norm here,
+    // so the helper has to raise it itself.
+    expect(src).toContain('unpriced_service');
+    expect(src).toContain('NOTHING WAS CHARGED');
+  });
+
+  it('a zero price says so instead of passing silently', () => {
+    // `firecrawl-scrape` had its rate in cost_per_generation while billing_type said per_unit,
+    // so cost_per_unit read 0: every scrape free AND unlogged, because the zero branch returns
+    // before the ai_usage_logs insert.
+    const i = src.indexOf('if (creditsToDebit <= 0)');
+    expect(i, 'the zero-credit branch moved').toBeGreaterThan(-1);
+    expect(src.slice(i, i + 900)).toMatch(/console\.(warn|error)/);
+  });
+
+  it('the fallback table carries the priciest model', () => {
+    // Veo was absent while Kling and Runway were present, so a DB outage dropped only the most
+    // expensive model's cost to null.
+    expect(src).toMatch(/'veo-2':\s*\{\s*cost_per_unit:\s*0\.35/);
   });
 });

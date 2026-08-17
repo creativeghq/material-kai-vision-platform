@@ -158,8 +158,8 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "stable-diffusion-3",
     "tier": "standard",
-    "status": "active",
-    "enabled": true,
+    "status": "dead",
+    "enabled": false,
     "sort_order": 60
   },
   {
@@ -479,7 +479,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
       ],
       "needs_prompt": true
     },
-    "pricing_key": null,
+    "pricing_key": "veo-2",
     "tier": "premium",
     "status": "active",
     "enabled": true,

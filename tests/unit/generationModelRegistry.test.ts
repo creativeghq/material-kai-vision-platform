@@ -173,7 +173,10 @@ describe('generation model registry', () => {
         'marble-1.0-draft',      // WorldLabs rate not public
         'marble-1.1',            // WorldLabs rate not public
         'proplabs-virtual-staging',
-        'veo-2',
+        // 'veo-2' priced 2026-08-17 — its ai_model_pricing row exists and is active, and the
+        // registry now points at it. This list is SHRINK-ONLY: an entry leaves when a real figure
+        // is obtained, and one may only be ADDED for a model whose rate the provider genuinely
+        // does not publish.
       ].sort(),
     );
   });

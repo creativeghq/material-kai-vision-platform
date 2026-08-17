@@ -14,6 +14,7 @@
 import type { DbClient } from './supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER } from './pricing-constants.ts';
+import { captureException } from './sentry.ts';
 
 // ── DB-backed external service pricing with in-memory cache ──
 interface ServicePricing {
@@ -46,6 +47,11 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   // 'kling-1.6-pro' and 'wan2.1-i2v' removed 2026-08-12 (issue #4) — both models 404 upstream,
   // so no call can reach these prices. Their ai_model_pricing rows are deactivated to match.
   'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
+  // Veo is priced per SECOND and clamped to 8s by generate-interior-video-v2, so a full clip is
+  // $2.80 — by some distance the most expensive thing this platform can be asked to make. It was
+  // absent here while its siblings were present, so a DB outage silently dropped Veo's cost to
+  // null while Kling and Runway kept theirs (#363 follow-up).
+  'veo-2':                { cost_per_unit: 0.35,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
   'social-caption':       { cost_per_unit: 0.002,  unit: 'generation',  markup_multiplier: MARKUP_MULTIPLIER },
   'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER },
 };
@@ -130,7 +136,16 @@ export async function debitExternalServiceCredits(
     const pricingMap = await getPricingMap(supabase);
     const pricing = pricingMap[serviceName];
     if (!pricing) {
-      console.error(`[credit-utils] Unknown service: ${serviceName}`);
+      // Loud, because the callers are not listening. Several sites `await` this and discard the
+      // result, so an unpriced key made the paid work happen and charged nothing, with the only
+      // trace a console line nobody reads (`apollo-competitors` did exactly this — billed in
+      // code, no row in ai_model_pricing, every competitor search free). A missing price is a
+      // configuration bug, not a free tier.
+      console.error(`[credit-utils] Unknown service: ${serviceName} — NOTHING WAS CHARGED`);
+      void captureException(new Error(`Unpriced billable service: ${serviceName}`), {
+        tags: { function: 'credit-utils', error_type: 'unpriced_service' },
+        extra: { service: serviceName, operation_type: operationType, units, user_id: userId },
+      });
       return { success: false, credits_debited: 0, raw_cost_usd: 0, billed_cost_usd: 0, error: `Unknown service: ${serviceName}` };
     }
 
@@ -139,6 +154,18 @@ export async function debitExternalServiceCredits(
     const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
     if (creditsToDebit <= 0) {
+      // Zero is a legitimate price for a genuinely free service (`zernio-publish`), and it is
+      // also what a misconfigured row looks like — `firecrawl-scrape` carried its rate in
+      // `cost_per_generation` while `billing_type` said `per_unit`, so `cost_per_unit` read 0
+      // and every scrape was free AND unlogged, because this early return sits BEFORE the
+      // ai_usage_logs insert below. The two cases are indistinguishable from here, so say so
+      // rather than pass silently: a free call that should have cost money leaves a trace, and
+      // a genuinely free one leaves a harmless line.
+      console.warn(
+        `[credit-utils] ${serviceName} priced at 0 — charging nothing and writing no usage row. ` +
+        `If this service is not actually free, its ai_model_pricing row is misconfigured ` +
+        `(check that the rate is in cost_per_unit, not cost_per_generation).`,
+      );
       return { success: true, credits_debited: 0, raw_cost_usd: 0, billed_cost_usd: 0 };
     }
 

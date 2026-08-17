@@ -72,9 +72,14 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
 type VideoModel = 'kling-3.0' | 'veo-2';
 
+// `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
+// generate-interior-video-v2, which debits its own CREDIT_COSTS. This entry is only read by the
+// insufficient-credits preflight message, so a stale number quotes the customer a price nobody
+// charges. It sat at 30 after the generator moved to 50 — the same value in two files with no
+// mechanism keeping them equal, which is why the floor test now checks both.
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'kling-3.0':     20,
-  'veo-2':         30,
+  'veo-2':         50,
 };
 
 const REPLICATE_MODELS: Record<string, string> = {
