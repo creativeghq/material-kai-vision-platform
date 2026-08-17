@@ -144,6 +144,87 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       if (!ent.ok) return ent.response;
     }
 
+    // ── Idempotency (#361 `EG-8`) ────────────────────────────────────────────────────────
+    //
+    // This handler is one long synchronous request: research alone debits 18 credits and fires
+    // six DataForSEO calls, then the writer and the analyzer each run a model, and the whole
+    // thing takes minutes. Nothing linked one attempt to the next, so a caller whose connection
+    // timed out and retried — or an agent tool invoked twice — ran the entire pipeline again
+    // and paid for all of it again. Two guards, both BEFORE the article row and every debit:
+    //
+    //   1. An explicit `idempotency_key` returns the run it already started.
+    //   2. Failing that, an in-flight run for the same keyword is returned rather than
+    //      duplicated. This is the retry case specifically: the first attempt is still going,
+    //      the caller has simply stopped waiting for it.
+    //
+    // Neither blocks a deliberate re-run: a finished article is not in-flight, so asking for
+    // the same keyword again tomorrow starts a fresh one, as it should.
+    const idempotencyKey = typeof body.idempotency_key === 'string' && body.idempotency_key.trim()
+      ? body.idempotency_key.trim().slice(0, 200)
+      : null;
+
+    if (idempotencyKey) {
+      const { data: prior } = await supabase
+        .from('seo_articles')
+        .select('id, status, progress_percentage, current_stage')
+        .eq('user_id', userId)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+      if (prior) {
+        console.log(`[seo-pipeline] idempotency_key ${idempotencyKey} → existing article ${prior.id}`);
+        return jsonResponse({
+          success: true,
+          deduplicated: true,
+          data: {
+            article_id: prior.id,
+            status: prior.status,
+            progress_percentage: prior.progress_percentage,
+            current_stage: prior.current_stage,
+          },
+        });
+      }
+    }
+
+    // In-flight guard. Bounded by age as well as status: a run that died mid-request leaves its
+    // row in a non-terminal status forever (the catch only fires when the isolate survives), and
+    // without the window that stuck row would block the keyword permanently — trading a
+    // double-charge for a feature that never works again, which is the worse failure.
+    const IN_FLIGHT_WINDOW_MS = 30 * 60 * 1000;
+    // Two `neq`s rather than `.not('status', 'in', '(…)')`: the negated-in spelling is easy to
+    // get subtly wrong, and a rejected filter here does not fail loudly — PostgREST returns an
+    // error, supabase-js resolves, and the guard just silently stops finding anything. Excluding
+    // the two TERMINAL states also means a stage added later is treated as in-flight, which is
+    // the direction that keeps the guard working.
+    const { data: running, error: inFlightErr } = await supabase
+      .from('seo_articles')
+      .select('id, status, progress_percentage, current_stage, created_at')
+      .eq('user_id', userId)
+      .eq('target_keyword', body.target_keyword)
+      .neq('status', 'completed')
+      .neq('status', 'failed')
+      .gte('created_at', new Date(Date.now() - IN_FLIGHT_WINDOW_MS).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (inFlightErr) {
+      // Never silently: an unreadable guard is a guard that is not running, and the cost of
+      // that is a duplicated paid pipeline.
+      console.error('[seo-pipeline] in-flight duplicate check failed:', inFlightErr.message);
+    }
+    const inFlight = running?.[0];
+    if (inFlight) {
+      console.log(`[seo-pipeline] "${body.target_keyword}" already running as ${inFlight.id} — not starting a second`);
+      return jsonResponse({
+        success: true,
+        deduplicated: true,
+        data: {
+          article_id: inFlight.id,
+          status: inFlight.status,
+          progress_percentage: inFlight.progress_percentage,
+          current_stage: inFlight.current_stage,
+        },
+      });
+    }
+
     // Resolve the connected website this article belongs to — explicit body.website_id
     // when the agent picked one, else the workspace's default site. Also feeds the
     // interlink page-matcher below so suggestions come from the same site.
@@ -158,6 +239,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         workspace_id: workspaceId,
         website_id: websiteId,
         target_keyword: body.target_keyword,
+        idempotency_key: idempotencyKey,
         content_type: body.content_brief?.contentType || 'guide',
         content_brief: body.content_brief || null,
         status: 'researching',
@@ -615,8 +697,10 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 
 /**
  * The REAL columns on `seo_articles` (verified against information_schema).
- * `id`, `user_id`, `workspace_id` and `created_at` are deliberately excluded — identity
- * is never rewritten by the pipeline.
+ * `id`, `user_id`, `workspace_id`, `created_at` and `idempotency_key` are deliberately
+ * excluded — identity is never rewritten by the pipeline. `idempotency_key` in particular is
+ * set once at insert and must stay that way: a key that can be moved onto another row is not
+ * a deduplication key, it is a way to hand a caller somebody else's article (#361 `EG-8`).
  *
  * This exists because the pipeline was writing 15+ fields that are not columns
  * (`html_content`, `meta_title`, `article_plan`, `overall_score`, `credits_used`,

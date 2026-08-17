@@ -61,6 +61,11 @@ async function signedBytes(supabase: any, path: string): Promise<Uint8Array | nu
     if (!data?.signedUrl) return null;
     const res = await fetch(data.signedUrl);
     if (!res.ok) return null;
+    // `data.signedUrl` was minted three lines above by our OWN storage client, for a path
+    // in our own bucket. The host is Supabase, not anything a caller chose, so there is no
+    // address for the guard to validate. Suppressed here rather than by carving `signedUrl`
+    // out of the rule: a variable is not trustworthy because of its name.
+    // nosemgrep: no-unguarded-download-of-user-url
     return new Uint8Array(await res.arrayBuffer());
   } catch { return null; }
 }

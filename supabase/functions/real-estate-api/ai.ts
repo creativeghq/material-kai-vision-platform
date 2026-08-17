@@ -170,6 +170,9 @@ export async function analyzePropertyPhotos(
     if (!s?.signedUrl) continue;
     const res = await fetch(s.signedUrl);
     if (!res.ok) continue;
+    // Same as brochure-realestate.ts: `s.signedUrl` was minted two lines above by our own
+    // storage client, for a path in our own bucket.
+    // nosemgrep: no-unguarded-download-of-user-url
     const bytes = new Uint8Array(await res.arrayBuffer());
     const mediaType = bytes[0] === 0x89 && bytes[1] === 0x50 ? 'image/png' : 'image/jpeg';
     // deno base64

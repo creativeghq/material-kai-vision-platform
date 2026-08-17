@@ -224,3 +224,71 @@ describe('EG-21 — a failed analytics write is reported, not swallowed', () => 
       .toMatch(/recorded: false/);
   });
 });
+
+// ── EG-8: a retry must not re-run a pipeline that bills at every stage ──────────────────────
+describe('EG-8 — the SEO pipeline deduplicates a repeated request', () => {
+  const src = codeOnly(read('seo-api/handlers/pipeline.ts'));
+
+  it('honours an explicit idempotency key', () => {
+    expect(src, 'the idempotency key is gone — a retry starts and bills a second full run')
+      .toContain('idempotency_key');
+    expect(src, 'a matched key no longer returns the earlier run').toMatch(/deduplicated: true/);
+  });
+
+  it('refuses to start a second run while one is already in flight', () => {
+    expect(src, 'the in-flight duplicate guard is gone').toContain('IN_FLIGHT_WINDOW_MS');
+    // Bounded by age: a run whose isolate died leaves a non-terminal row forever, and an
+    // unbounded guard would block that keyword permanently.
+    expect(src, 'the in-flight guard lost its age bound and can now wedge a keyword')
+      .toMatch(/gte\('created_at'/);
+  });
+
+  it('both checks run before the article row and every debit', () => {
+    const keyAt = src.indexOf('const idempotencyKey');
+    const inFlightAt = src.indexOf('IN_FLIGHT_WINDOW_MS');
+    const insertAt = src.indexOf("from('seo_articles')\n      .insert(");
+    expect(keyAt).toBeGreaterThan(-1);
+    expect(inFlightAt).toBeGreaterThan(-1);
+    expect(insertAt, 'the article insert was not found — this case cannot see what it guards')
+      .toBeGreaterThan(-1);
+    expect(keyAt, 'the key is read after the run has already been created').toBeLessThan(insertAt);
+    expect(inFlightAt, 'the in-flight check runs after the run has already been created')
+      .toBeLessThan(insertAt);
+  });
+
+  it('does not silently skip the guard when the lookup fails', () => {
+    // A rejected filter resolves rather than throwing in supabase-js, so an unreadable guard
+    // is a guard that is not running — and the cost is a duplicated paid pipeline.
+    expect(src, 'the in-flight lookup error is discarded again').toContain('inFlightErr');
+  });
+
+  it('the key cannot be moved onto another row by an update', () => {
+    const allowlist = src.slice(src.indexOf('const ARTICLE_COLUMNS'));
+    expect(
+      allowlist.slice(0, allowlist.indexOf(']')),
+      'idempotency_key became updatable — a key that can be reassigned hands a caller ' +
+        "somebody else's article",
+    ).not.toContain('idempotency_key');
+  });
+});
+
+// ── The SSRF rule must see a URL that arrives on a row, not just a bare identifier ──────────
+describe('EG-18 — the semgrep SSRF rule matches member-expression URLs', () => {
+  it('the metavariable regex accepts row.field forms', () => {
+    const yml = readFileSync(
+      join(__dirname, '..', '..', '.github', 'semgrep-security.yml'), 'utf8',
+    );
+    const rule = yml.slice(yml.indexOf('no-unguarded-download-of-user-url'));
+    const m = /regex: (\S+)/.exec(rule);
+    expect(m, 'the URL metavariable regex is gone').not.toBeNull();
+    const re = new RegExp(m![1]);
+    // The three real call sites this rule failed to see.
+    for (const sample of ['it.design_image_url', 'webhook.url', 'job.source_url', 'imageUrl']) {
+      expect(re.test(sample), `the SSRF rule no longer matches ${sample}`).toBe(true);
+    }
+    // And it still does not fire on things that are not URLs.
+    for (const sample of ['payload', 'supabase', 'body']) {
+      expect(re.test(sample), `the SSRF rule now matches ${sample}, which is noise`).toBe(false);
+    }
+  });
+});

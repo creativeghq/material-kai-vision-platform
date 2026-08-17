@@ -394,7 +394,18 @@ rules:
               - pattern: await fetch($URL, ...)
           - metavariable-regex:
               metavariable: $URL
-              regex: ^[A-Za-z_$][A-Za-z0-9_$]*(?:[Uu][Rr][LlIi]|[Hh][Rr][Ee][Ff]|[Ss][Rr][Cc])$
+              # Bare identifiers (`imageUrl`) AND member accesses on a row
+              # (`it.design_image_url`, `webhook.url`, `job.source_url`). Only the bare form was
+              # matched, which is why this rule stayed silent on #361 `EG-18` — a raw
+              # `fetch(it.design_image_url)` in generate-purchase-sheet-pdf — and on the two
+              # further sites the same sweep then found in notification-dispatcher and
+              # scheduled-import-runner. A URL arriving on a database row is MORE
+              # attacker-influenced than a local, not less: it was written there by a supplier
+              # feed, an agent tool, or a tenant's settings form.
+              # The `.` lives inside the character class rather than in a repeated
+              # `(?:\.name)*` group on purpose: with the group, `webhook.url` cannot match,
+              # because the group consumes the `u` of `url` and leaves the suffix nothing.
+              regex: ^[A-Za-z_$][A-Za-z0-9_$.]*(?:[Uu][Rr][LlIi]|[Hh][Rr][Ee][Ff]|[Ss][Rr][Cc])$
           # Exempt the URL that came OUT of the guard. This has to be expressed on the source
           # rather than as a `pattern-sanitizer`, because the tainted value here is the RESPONSE
           # — sanitizing the url would never touch it. Binding the same $URL metavariable makes
@@ -410,3 +421,15 @@ rules:
       - pattern-either:
           - pattern: $RES.arrayBuffer()
           - pattern: $RES.blob()
+          # `.text()` is deliberately NOT a sink, and it was tried. It is the same unbounded
+          # read with a different return type, so on paper it belongs here — but measured
+          # against this codebase it produced 8 findings and every one was a false positive:
+          # our own Sentry DSN, our own MIVAA and Python backend URLs, storage signed URLs we
+          # minted a line earlier, a fixed pinterest.com oembed endpoint, an upload URL from a
+          # provider's authenticated reply. Almost everything that reads `.text()` is reading a
+          # response to a call we chose to make. Eight permanent suppressions in a blocking
+          # ruleset that currently sits at zero findings is a worse instrument than the rule
+          # not covering that half — suppressions are where real findings go to hide.
+          # The `.text()` shape is covered instead by the stored-URL sweep in
+          # tests/unit/imageFetchGuard.test.ts, which keys on where the URL came FROM and so
+          # distinguishes `job.source_url` from `sentryUrl` without needing an exemption list.
