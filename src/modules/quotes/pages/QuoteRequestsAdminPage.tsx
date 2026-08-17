@@ -72,6 +72,13 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [quoteRequests, setQuoteRequests] = useState<QuoteWithItems[]>([]);
+  /**
+   * PQ-8. A failed load must not render as an empty inbox. This is the incoming-work queue: a
+   * sales team reading "No quote requests found" concludes there is nothing waiting and stops
+   * looking. The toast is gone by then — it is a notification, not a state — so the surface has
+   * to carry the failure itself. Same pattern as finance/DocumentsPage.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
@@ -116,10 +123,12 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const loadQuoteRequests = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await quotesService.getQuoteRequests();
       setQuoteRequests(data);
     } catch (error) {
       console.error('Error loading quote requests:', error);
+      setLoadError(error instanceof Error ? error.message : 'Unknown error');
       toast({
         title: 'Error',
         description: 'Failed to load quote requests',
@@ -518,7 +527,19 @@ export const QuoteRequestsAdmin: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredQuoteRequests.length === 0 ? (
+              {loadError ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-3">
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                      <span>
+                        Could not load quote requests — <span className="opacity-80">{loadError}</span>.
+                        This list is <strong>not</strong> a statement that there are none.
+                      </span>
+                      <Button size="sm" variant="outline" onClick={() => void loadQuoteRequests()}>Retry</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredQuoteRequests.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No quote requests found

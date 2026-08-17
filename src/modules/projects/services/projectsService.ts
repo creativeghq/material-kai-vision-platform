@@ -483,7 +483,15 @@ class ProjectsService {
     if (opts.companyId) clauses.push(`client_company_id.eq.${opts.companyId}`);
     if (contactIds.length) clauses.push(`client_contact_id.in.(${contactIds.join(',')})`);
 
-    const { data, error } = await (supabase as any)
+    // PQ-5: scope to the ACTIVE workspace, like listProjects above. Without it this asked only
+    // "which projects name this client?", so a user who belongs to two workspaces saw the other
+    // one's projects for the same company or contact — CRM parties are shared across a tenant, so
+    // a client id is not a tenant boundary. RLS still bounds the answer to workspaces the caller
+    // belongs to; this narrows it to the one they are actually looking at.
+    const { data: { user } } = await supabase.auth.getUser();
+    const activeWorkspaceId = user ? getActiveWorkspaceId(user.id) : null;
+
+    let query = (supabase as any)
       .from('projects')
       .select(`
         *,
@@ -492,6 +500,9 @@ class ProjectsService {
       `)
       .or(clauses.join(','))
       .order('last_activity_at', { ascending: false });
+    if (activeWorkspaceId) query = query.eq('workspace_id', activeWorkspaceId);
+
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []) as ProjectWithClient[];
   }
