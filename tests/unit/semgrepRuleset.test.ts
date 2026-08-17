@@ -187,9 +187,18 @@ describe('semgrep security ruleset', () => {
       expect(rule.message, `rule ${rule.id} has no message`).toBeTruthy();
       expect(rule.severity, `rule ${rule.id} has no severity`).toBeTruthy();
       expect(rule.languages, `rule ${rule.id} has no languages`).toBeTruthy();
+      // A taint rule (`mode: taint`) carries pattern-sources/pattern-sinks instead of a
+      // top-level pattern, and needs BOTH — sources with no sink match nothing, and a sink
+      // with no source matches everything. Checking only for `pattern` would have called
+      // `no-unguarded-download-of-user-url` unmatchable while it was in fact working.
+      const isTaint = rule.mode === 'taint';
       expect(
-        'pattern' in rule || 'pattern-either' in rule || 'patterns' in rule,
-        `rule ${rule.id} has no pattern — it can never match`,
+        isTaint
+          ? 'pattern-sources' in rule && 'pattern-sinks' in rule
+          : 'pattern' in rule || 'pattern-either' in rule || 'patterns' in rule,
+        isTaint
+          ? `taint rule ${rule.id} needs both pattern-sources and pattern-sinks`
+          : `rule ${rule.id} has no pattern — it can never match`,
       ).toBe(true);
     }
   });

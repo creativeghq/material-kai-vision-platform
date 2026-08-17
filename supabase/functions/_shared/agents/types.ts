@@ -68,6 +68,15 @@ export interface AgentRunContext {
   /** Parsed input data for this run */
   input:            Record<string, unknown>;
   workspaceId:      string | null;
+  /**
+   * The user this run is acting FOR — the verified JWT caller when there is one, otherwise the
+   * `dispatched_by` recorded by whoever queued the run (#363 `EE-9`).
+   *
+   * Attribution and billing only. It is NOT a capability and must never widen what a run can
+   * reach: `workspaceId` above is the authorization boundary. Null means genuinely nobody — a
+   * cron-triggered agent running on a schedule — never "we had one and did not pass it".
+   */
+  actingUserId?:    string | null;
   mivaaGatewayUrl:  string;
   mivaaApiKey:      string;
   anthropicApiKey:  string;

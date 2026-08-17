@@ -243,23 +243,69 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
 }
 
 
+/**
+ * Stuck XML imports.
+ *
+ * Liveness is decided by `last_heartbeat` and `current_slow_operation` — NOT by `updated_at`
+ * (#363 `EE-10`/`EE-12`). `updated_at` answers "when did any column last change", which for a
+ * job that is running steadily without writing progress is simply the time it started. The old
+ * filter therefore judged a healthy long import stale at 30 minutes, and because
+ * `recoverXmlJob` resets `progress: 0` and restarts from scratch (XML import has no checkpoint
+ * resume), a live job was restarted underneath its own worker — twice more on the next two
+ * ticks, and then written off as `failed` by `markAsFailed`, which fed a wrong number into
+ * every downstream count and alert. The PDF path next door has always read the heartbeat and
+ * honoured the slow-op marker; XML was the one that did not, which is the same defect confirmed
+ * in the MIVAA recovery service (creativeghq/mivaa-pdf-extractor#12).
+ *
+ * `updated_at` survives only as the fallback for a job with no heartbeat at all — an import
+ * that died before its first beat, or one queued by an older writer. `coalesce`-style fallback
+ * in SQL would be cleaner than the two-query shape below, but PostgREST cannot express
+ * "coalesce(last_heartbeat, updated_at) < X" as a filter, so the null case is a second query
+ * rather than a silent omission.
+ */
 async function detectStuckXmlJobs(supabase: any): Promise<StuckJob[]> {
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-  const { data, error } = await supabase
+  const base = () => supabase
     .from('background_jobs')
     .select('*')
     .eq('status', 'processing')
     .eq('job_type', 'xml_import')
-    .lt('updated_at', thirtyMinutesAgo)
     .limit(100);
 
-  if (error) {
-    console.error('[AutoRecoveryCron] Error detecting stuck XML jobs:', error);
+  const [beating, neverBeat] = await Promise.all([
+    base().lt('last_heartbeat', thirtyMinutesAgo),
+    // No heartbeat ever written — fall back to updated_at, which is all there is to go on.
+    base().is('last_heartbeat', null).lt('updated_at', thirtyMinutesAgo),
+  ]);
+
+  if (beating.error || neverBeat.error) {
+    console.error(
+      '[AutoRecoveryCron] Error detecting stuck XML jobs:',
+      beating.error || neverBeat.error,
+    );
     return [];
   }
 
-  return (data || []).map((job: any) => ({
+  const candidates = [...(beating.data || []), ...(neverBeat.data || [])];
+  if (candidates.length === 0) return [];
+
+  return candidates.filter((job: any) => {
+    // Honour current_slow_operation exactly as the PDF path does: a stage that declared itself
+    // legitimately slow is not stuck until it overruns its own declared ceiling (+2 min grace).
+    const slowOp = job.current_slow_operation;
+    if (!slowOp || !slowOp.started_at) return true;
+    const age = (Date.now() - new Date(slowOp.started_at).getTime()) / 1000;
+    const cap = slowOp.expected_max_seconds || 300;
+    if (age <= cap + 120) {
+      console.log(
+        `[AutoRecoveryCron] Skipping XML job ${job.id}: slow_op '${slowOp.operation}' ` +
+        `age=${age.toFixed(0)}s within cap=${cap}+120`,
+      );
+      return false;
+    }
+    return true;
+  }).map((job: any) => ({
     id: job.id,
     type: 'xml_import' as const,
     status: job.status,

@@ -382,6 +382,19 @@ export async function debitAgentChatTurn(
  * Refund a previously-debited agent turn when the agent failed before
  * producing any output (hard pre-stream error). NOT called once streaming
  * has started — by then the spend is irrecoverable.
+ *
+ * IDEMPOTENT (#363 `EE-7`), and only because `debitTransactionId` is passed. The refund names
+ * the debit it reverses in `refunds_transaction_id`, and a partial unique index on
+ * `credit_transactions` (`credit_transactions_one_refund_per_debit_idx`) rejects a second
+ * refund for the same debit. Previously nothing tied a refund to its debit, so two error paths
+ * reaching the same turn credited the balance twice, and a double refund looks exactly like a
+ * legitimate one — a positive amount on a valid row.
+ *
+ * The rejection surfaces as a unique-violation error from the RPC, which is logged, not thrown:
+ * "this turn was already refunded" is the correct outcome, not a failure the caller must handle.
+ * `debitTransactionId` is nullable because `debit_credits` can return a null id on the pooled
+ * path; with no id there is nothing to key on and the old non-idempotent behaviour applies, so
+ * callers must still not invoke this twice on that path.
  */
 export async function refundAgentChatTurn(
   supabase: DbClient,
@@ -389,6 +402,7 @@ export async function refundAgentChatTurn(
   agentId: string,
   reason: string,
   metadata: Record<string, unknown> = {},
+  debitTransactionId?: string | null,
 ): Promise<void> {
   const credits = getAgentTurnCost(agentId);
   if (credits <= 0) return;
@@ -398,10 +412,22 @@ export async function refundAgentChatTurn(
     p_amount: credits,
     p_operation_type: 'agent_chat_turn_refund',
     p_description: `agent-chat ${agentId} refund: ${reason}`,
-    p_metadata: { ...metadata, agent_id: agentId, refund_reason: reason },
+    p_metadata: {
+      ...metadata,
+      agent_id: agentId,
+      refund_reason: reason,
+      ...(debitTransactionId ? { refunds_transaction_id: debitTransactionId } : {}),
+    },
     p_workspace_id: null,
   });
   if (error) {
+    // 23505 = the idempotency index did its job: this debit was already refunded. Everything
+    // else is a real failure worth the same warning it always got.
+    const alreadyRefunded = /duplicate key|23505|one_refund_per_debit/i.test(error.message || '');
+    if (alreadyRefunded) {
+      console.log(`[credit-utils] Refund already applied for ${userId} agent=${agentId} — skipped`);
+      return;
+    }
     console.warn(`[credit-utils] Refund failed for ${userId} agent=${agentId}: ${error.message}`);
   }
 }

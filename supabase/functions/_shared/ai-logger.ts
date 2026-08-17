@@ -125,6 +125,121 @@ export async function resolveTokenPrice(
   return null;
 }
 
+// ── DB-driven PER-UNIT pricing overlay ────────────────────────
+// The image and video models are not billed per token — they are billed per image or per
+// second of output, which is why `resolveTokenPrice` above has nothing to say about them and
+// why every image/video call went to the provider without an `ai_usage_logs` row (#363 `EE-2`).
+// Same table, same markup column, different `billing_type`.
+//
+// There is deliberately NO hardcoded fallback table here. A token model with no row can fall
+// back to a published list price that changes slowly; a per-unit price is a number somebody
+// has to verify against the provider's page, and guessing one writes a plausible wrong cost
+// into the billing record. `null` means "not priced yet" and the caller logs the spend with a
+// null cost plus a warning, so `ops.silent_zero` can see the gap instead of a confident zero.
+export interface UnitPrice { perUnit: number; unitLabel: string; markup: number }
+let _dbUnitPriceCache: { data: Record<string, UnitPrice>; expiresAt: number } | null = null;
+let _dbUnitPriceFetch: Promise<Record<string, UnitPrice>> | null = null;
+let _genModelPricingKeyCache: { data: Record<string, string | null>; expiresAt: number } | null = null;
+let _genModelPricingKeyFetch: Promise<Record<string, string | null>> | null = null;
+
+async function getDbUnitPricing(supabase: DbClient): Promise<Record<string, UnitPrice>> {
+  const now = Date.now();
+  if (_dbUnitPriceCache && _dbUnitPriceCache.expiresAt > now) return _dbUnitPriceCache.data;
+  if (!_dbUnitPriceFetch) {
+    _dbUnitPriceFetch = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ai_model_pricing')
+          .select('model_key, cost_per_unit, unit_label, markup_multiplier')
+          .eq('billing_type', 'per_unit')
+          .eq('is_active', true);
+        if (error || !data) return _dbUnitPriceCache?.data || {};
+        const map: Record<string, UnitPrice> = {};
+        for (const r of data) {
+          const key = String(r.model_key || '').toLowerCase();
+          if (key) map[key] = {
+            perUnit: Number(r.cost_per_unit) || 0,
+            unitLabel: String(r.unit_label || 'unit'),
+            markup: Number(r.markup_multiplier) || DEFAULT_MARKUP,
+          };
+        }
+        _dbUnitPriceCache = { data: map, expiresAt: Date.now() + DB_PRICE_TTL_MS };
+        return map;
+      } catch {
+        return _dbUnitPriceCache?.data || {};
+      } finally {
+        _dbUnitPriceFetch = null;
+      }
+    })();
+  }
+  return _dbUnitPriceFetch;
+}
+
+/** `generation_models.id` → its `pricing_key` FK (null when the model has no verified cost). */
+async function getGenerationModelPricingKeys(supabase: DbClient): Promise<Record<string, string | null>> {
+  const now = Date.now();
+  if (_genModelPricingKeyCache && _genModelPricingKeyCache.expiresAt > now) return _genModelPricingKeyCache.data;
+  if (!_genModelPricingKeyFetch) {
+    _genModelPricingKeyFetch = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('generation_models')
+          .select('id, slug, pricing_key');
+        if (error || !data) return _genModelPricingKeyCache?.data || {};
+        const map: Record<string, string | null> = {};
+        for (const r of data) {
+          const pk = r.pricing_key ? String(r.pricing_key).toLowerCase() : null;
+          const id = String(r.id || '').toLowerCase();
+          const slug = String(r.slug || '').toLowerCase();
+          if (id) map[id] = pk;
+          // Some callers hold the provider slug rather than the registry id.
+          if (slug && !(slug in map)) map[slug] = pk;
+        }
+        _genModelPricingKeyCache = { data: map, expiresAt: Date.now() + DB_PRICE_TTL_MS };
+        return map;
+      } catch {
+        return _genModelPricingKeyCache?.data || {};
+      } finally {
+        _genModelPricingKeyFetch = null;
+      }
+    })();
+  }
+  return _genModelPricingKeyFetch;
+}
+
+/**
+ * THE per-unit price derivation for the edge runtime — images and video seconds.
+ *
+ * Resolution goes through `generation_models.pricing_key`, which is the FK that already exists
+ * precisely so routing and money stay separate: the registry says which model to call, the
+ * pricing table says what it costs, and neither restates the other. `pricing_key = null` is a
+ * deliberate statement ("no verified cost for this model") and returns null here rather than
+ * falling through to a name-similar row — `veo-2` carries exactly that today.
+ *
+ * Only if the caller's string is not a registry id/slug do we try it as an `ai_model_pricing`
+ * key directly, for the per-unit rows that have no generation_models entry at all (the Anthropic
+ * vision and third-party service rows). Matching is EXACT at both steps: the per-unit keys are
+ * near-identical to each other (`kling-3.0` vs `kling-1.6-pro`, `gemini-3-pro-image` vs
+ * `gemini-3.1-flash-image`) and a substring hit across them bills one model at another's rate.
+ */
+export async function resolveUnitPrice(
+  supabase: DbClient,
+  modelKey: string,
+): Promise<UnitPrice | null> {
+  const key = modelKey.toLowerCase();
+  try {
+    const genKeys = await getGenerationModelPricingKeys(supabase);
+    const pricing = await getDbUnitPricing(supabase);
+    if (key in genKeys) {
+      const pk = genKeys[key];
+      return pk ? (pricing[pk] ?? null) : null;
+    }
+    return pricing[key] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 interface ConfidenceBreakdown {
   model_confidence: number;
   completeness: number;

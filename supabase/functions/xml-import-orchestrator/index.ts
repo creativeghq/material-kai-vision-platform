@@ -68,8 +68,32 @@ const xmlParser = new XMLParser({
 
 type XmlNode = Record<string, any>;
 
+// A DOCTYPE declaration is refused outright (#363 `EE-15`).
+//
+// Supplier XML is the platform's largest untrusted-input surface, and a DOCTYPE's internal
+// subset is the only place a document may declare its own entities. That is the billion-laughs
+// vector: a handful of nested `<!ENTITY>` definitions expand to gigabytes inside a 256 MB
+// isolate, and the expansion happens AFTER the MAX_XML_BYTES check, so a 25 MB document that
+// passes the size cap can still exhaust memory. fast-xml-parser 4.5.0 takes `processEntities`
+// as a plain boolean and offers none of the expansion limits (`maxTotalExpansions`,
+// `maxExpandedLength`) that later majors added, so there is no configuration that bounds it.
+//
+// Rejecting the DOCTYPE rather than setting `processEntities: false` is deliberate: turning
+// entity processing off would also stop decoding `&amp;`/`&lt;`, which real supplier feeds use
+// constantly, silently corrupting product names. Predefined entities and numeric character
+// references need no DOCTYPE, so refusing one costs legitimate feeds nothing while removing
+// custom entities entirely — including any EXTERNAL entity declaration, which closes classic
+// XXE by construction regardless of what a future parser version chooses to resolve.
+const DOCTYPE_RE = /<!DOCTYPE/i;
+
 /** Parse an XML string into a plain-object tree with lowercased tag names. */
 function parseXmlDoc(xmlString: string): XmlNode {
+  if (DOCTYPE_RE.test(xmlString)) {
+    throw new Error(
+      'XML parsing error: DOCTYPE declarations are not accepted. Custom entity definitions are ' +
+      'a denial-of-service and external-entity vector; product feeds do not need them.',
+    );
+  }
   try {
     return xmlParser.parse(xmlString);
   } catch (e: any) {
@@ -333,6 +357,47 @@ function detectXMLFields(xmlContent: string): {
  * file, NOT this function. The dictionary is shared across edge functions
  * and gets first crack at every field.
  */
+/**
+ * The forced tool for the residual-field classifier (invariant 9).
+ *
+ * `mappings` is an ARRAY of objects rather than a field→suggestion map because a JSON Schema
+ * cannot constrain the VALUES of arbitrary keys — with a map, `confidence` and `mapping` are
+ * unvalidated whatever the schema says, which is most of what the schema is for here.
+ */
+const FIELD_MAPPING_TOOL = {
+  name: 'record_field_mappings',
+  description:
+    'Record the destination for each XML field. Return one entry per field you were asked ' +
+    'about, and no entries for fields you were not asked about.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      mappings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            xml_field: { type: 'string', description: 'The XML tag name, exactly as given.' },
+            mapping: {
+              type: 'string',
+              description:
+                'Destination product field, or "metadata" when it belongs in the attributes blob.',
+            },
+            confidence: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description: 'How confident you are, 0..1.',
+            },
+          },
+          required: ['xml_field', 'mapping', 'confidence'],
+        },
+      },
+    },
+    required: ['mappings'],
+  },
+} as const;
+
 async function suggestFieldMappings(
   fieldSamples: Map<string, FieldDetection>,
   anthropicApiKey: string,
@@ -438,6 +503,16 @@ async function suggestFieldMappings(
         model: 'claude-haiku-4-5',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
+        // Real tool_use with a FORCED tool_choice (#363 `EE-16`, invariant 9). This
+        // classifier's verdict decides which product column every unrecognised supplier tag
+        // writes into, so it drives a DB write and may not be parsed out of prose. What this
+        // replaces was free-form text plus `content.match(/\{[\s\S]*\}/)` — a salvage regex
+        // that takes the first `{` to the last `}` and hopes. That greedy span happily
+        // swallows a preamble's example JSON, and any shape that parses is accepted: a
+        // confidence of "high", a mapping of `null`, an object where a number belongs. Same
+        // defect class as document_classifier.py and consensus_validator.py in mivaa#12.
+        tools: [FIELD_MAPPING_TOOL],
+        tool_choice: { type: 'tool', name: FIELD_MAPPING_TOOL.name },
       }),
     });
 
@@ -449,23 +524,34 @@ async function suggestFieldMappings(
     }
 
     const data = await response.json();
-    const content = data.content[0].text;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('No JSON found in Claude response');
+    const toolUse = (data.content || []).find(
+      (b: any) => b?.type === 'tool_use' && b?.name === FIELD_MAPPING_TOOL.name,
+    );
+    if (!toolUse?.input?.mappings || !Array.isArray(toolUse.input.mappings)) {
+      // With a forced tool_choice this should be unreachable; if it happens the model refused
+      // or the API shape changed, and either way there is no verdict — say so and fall back to
+      // the dictionary rather than digging a JSON object out of whatever came back.
+      console.error('No tool_use block in Claude response for xml_field_mapper');
       await refundMapping();
       applyDefaults();
       return suggestions;
     }
 
-    const aiMappings = JSON.parse(jsonMatch[0]);
-    for (const [xmlField, suggestion] of Object.entries(aiMappings)) {
+    for (const entry of toolUse.input.mappings as Array<Record<string, unknown>>) {
+      const xmlField = typeof entry?.xml_field === 'string' ? entry.xml_field : null;
       // Only accept AI verdicts for fields that were actually in the residual
       // — guards against the model hallucinating mappings for fields we
       // already resolved confidently via the dictionary.
-      if (residualFields.includes(xmlField)) {
-        suggestions.set(xmlField, suggestion as MappingSuggestion);
-      }
+      if (!xmlField || !residualFields.includes(xmlField)) continue;
+      const mapping = typeof entry.mapping === 'string' ? entry.mapping : null;
+      if (!mapping) continue;
+      // The schema constrains confidence to 0..1; clamp anyway, because a number that is out
+      // of range downstream silently reorders which suggestion wins.
+      const rawConfidence = Number(entry.confidence);
+      const confidence = Number.isFinite(rawConfidence)
+        ? Math.min(1, Math.max(0, rawConfidence))
+        : 0.5;
+      suggestions.set(xmlField, { mapping, confidence });
     }
 
     // Backfill anything the AI didn't return (rare, but possible if it skips

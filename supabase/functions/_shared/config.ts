@@ -1,6 +1,8 @@
 // Shared configuration for PDF Integration Edge Functions
 // This file contains common configuration, types, and utilities used across all Edge Functions
 
+import { getTrustedClientIp } from './client-ip.ts';
+
 export interface EdgeFunctionConfig {
   // Service Configuration
   mivaaBaseUrl: string;
@@ -137,25 +139,20 @@ export const Utils = {
       .replace(/^_|_$/g, '');
   },
 
-  // Get client IP address
-  getClientIP: (req: Request): string => {
-    const forwarded = req.headers.get('x-forwarded-for');
-    if (forwarded) {
-      return forwarded.split(',')[0].trim();
-    }
-
-    const realIP = req.headers.get('x-real-ip');
-    if (realIP) {
-      return realIP;
-    }
-
-    const cfConnectingIP = req.headers.get('cf-connecting-ip');
-    if (cfConnectingIP) {
-      return cfConnectingIP;
-    }
-
-    return '127.0.0.1';
-  },
+  /**
+   * Trusted client IP. Delegates to the canonical helper — do NOT re-derive one here.
+   *
+   * This used to read `x-forwarded-for.split(',')[0]` first, which is the exact thing
+   * invariant 10 forbids: the leftmost XFF hop is whatever the caller chose to prepend, so
+   * any per-IP quota keyed on it is defeated by rotating one header (#363 `EE-5`; the same
+   * mechanism confirmed live in `hr-careers`). `cf-connecting-ip` is set by Cloudflare and
+   * overwrites anything the client sends, so it is the one value here that is not spoofable.
+   *
+   * It had zero callers when this was fixed, which is why it never caused an incident — and
+   * exactly why it was worth correcting rather than deleting: the next person to reach for
+   * "get the client IP" finds one that is right.
+   */
+  getClientIP: (req: Request): string => getTrustedClientIp(req),
 
   // Create standardized error responses
   createErrorResponse: (
@@ -299,98 +296,20 @@ export class RateLimiter {
 
 // Authentication utilities
 export class AuthUtils {
-  static async checkAuthentication(req: Request, supabase: any): Promise<{
-    success: boolean;
-    userId?: string;
-    workspaceId?: string;
-    error?: string;
-  }> {
-    const authHeader = req.headers.get('authorization');
-    const apiKey = req.headers.get('x-api-key');
-
-    // Check API key authentication
-    if (apiKey && apiKey.startsWith('kai_')) {
-      try {
-        // Validate API key against database
-        const { data: apiKeyData, error: apiKeyError } = await supabase
-          .from('api_keys')
-          .select(`
-            id,
-            user_id,
-            workspace_id,
-            is_active,
-            expires_at,
-            rate_limit_per_minute,
-            last_used_at
-          `)
-          .eq('key_hash', apiKey)
-          .eq('is_active', true)
-          .single();
-
-        if (apiKeyError || !apiKeyData) {
-          return { success: false, error: 'Invalid API key' };
-        }
-
-        // Check if API key has expired
-        if (apiKeyData.expires_at && new Date(apiKeyData.expires_at) < new Date()) {
-          return { success: false, error: 'API key has expired' };
-        }
-
-        // Update last used timestamp.
-        // Was also writing `usage_count: supabase.raw('usage_count + 1')` — two bugs in one
-        // line: `api_keys` has no `usage_count` column, and `supabase.raw()` does not exist
-        // in supabase-js v2. The statement was rejected outright, so `last_used_at` never
-        // landed either and there was no way to tell a dead partner key from a busy one.
-        const { error: touchErr } = await supabase
-          .from('api_keys')
-          .update({ last_used_at: new Date().toISOString() })
-          .eq('id', apiKeyData.id);
-        if (touchErr) {
-          console.error('[config] failed to stamp api_keys.last_used_at:', touchErr.message);
-        }
-
-        return {
-          success: true,
-          userId: apiKeyData.user_id,
-          workspaceId: apiKeyData.workspace_id,
-        };
-      } catch (error) {
-        return { success: false, error: 'API key validation failed' };
-      }
-    }
-
-    // Check JWT authentication
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-
-        if (error || !user) {
-          return { success: false, error: 'Invalid authentication token' };
-        }
-
-        // Get user's default workspace
-        const { data: workspaceData } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .single();
-
-        return {
-          success: true,
-          userId: user.id,
-          workspaceId: workspaceData?.workspace_id,
-        };
-      } catch (error) {
-        return { success: false, error: 'Authentication verification failed' };
-      }
-    }
-
-    return { success: false, error: 'Authentication required' };
-  }
+  // `checkAuthentication` was REMOVED here (#363 `EE-6`).
+  //
+  // It was a second, older authentication path living alongside `_shared/auth.ts`'s
+  // `authenticate()`, and it gave a weaker guarantee: its JWT branch looked up the caller's
+  // first active workspace with `.single()`, and when the user had NO active membership the
+  // lookup errored, `workspaceData` came back null — and it returned `{ success: true }` with
+  // `workspaceId: undefined` anyway. A caller that trusted the success flag and then filtered
+  // on an undefined workspace id is filtering on nothing.
+  //
+  // The inventory the audit asked for came back empty: zero callers outside this file. So the
+  // fix is deletion rather than repair — a duplicate auth path that nothing uses is a trap
+  // waiting for the next person who greps for "checkAuthentication" and finds it looking
+  // official. Use `authenticate()` from `_shared/auth.ts`; for the workspace binding a handler
+  // actually needs, use `userCanAccessWorkspace()`.
 
   // New method to check workspace membership
   static async checkWorkspaceMembership(

@@ -156,8 +156,17 @@ export async function fetchImageGuardedOrNull(
   }
 }
 
-/** Read the body, aborting the moment it exceeds `maxBytes`. */
-async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> {
+/**
+ * Read the body, aborting the moment it exceeds `maxBytes`.
+ *
+ * Exported because a few call sites legitimately need the CAP without the URL guard — a
+ * download whose URL came back from a provider's own API response to our authenticated
+ * request, where there is no user-influenced host to validate but the response is still
+ * somebody else's bytes arriving in a 256 MB isolate (#363 `EE-4`). Reach for
+ * `fetchBinaryGuarded` unless that is genuinely the situation; an unguarded fetch plus this is
+ * strictly weaker, and the missing half is the half that matters when the URL is influenced.
+ */
+export async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> {
   if (!res.body) {
     // No stream to meter (some runtimes/mocks). Fall back to a buffered read and
     // check after — still bounded in practice by the Content-Length check above.

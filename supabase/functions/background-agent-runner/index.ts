@@ -188,6 +188,35 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // The run must belong to the agent that was named (#363 `EE-9`, invariant 1).
+    //
+    // `agent_id` and `run_id` were previously trusted as an unrelated pair: the membership check
+    // above validates the caller against `agent_id`'s workspace, and then this lookup fetched
+    // ANY run by id. So a caller who legitimately administers one workspace could pass their own
+    // agent_id together with another tenant's run_id and the runner would execute using that
+    // run's stored `input_data` — its task_prompt and its conversation_id — then write the
+    // status, output and error back onto the victim's `agent_runs` row and post the finished
+    // report into the victim's chat conversation. Cross-tenant read, cross-tenant write, and a
+    // message injected into someone else's conversation, all from two ids in one body.
+    //
+    // Both halves are checked because they can disagree independently: `agent_id` binds the run
+    // to the agent the caller was authorized against, and `workspace_id` catches a run whose
+    // agent has since moved. 404 rather than 403 on mismatch, so the response cannot be used to
+    // probe which run ids exist.
+    const runRecord = existingRun as AgentRunRecord & { workspace_id?: string | null };
+    if (
+      runRecord.agent_id !== agent_id ||
+      (runRecord.workspace_id ?? null) !== (agentConfig.workspace_id ?? null)
+    ) {
+      console.warn(
+        `[background-agent-runner] run_id ${run_id} does not belong to agent ${agent_id} ` +
+        `(run.agent_id=${runRecord.agent_id}, run.workspace_id=${runRecord.workspace_id})`,
+      );
+      return new Response(JSON.stringify({ error: 'run_id not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     run = existingRun as AgentRunRecord;
   } else {
     const { data: newRun, error: createErr } = await supabase
@@ -227,12 +256,28 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     ? { ...agentConfig.config, ...run.input_data }
     : { ...agentConfig.config, ...(input_data || {}) };
 
+  // WHO this run is acting for (#363 `EE-9`). The dispatching user's id is recorded by
+  // `dispatch_background_task` as `input_data.dispatched_by`, and until now nothing read it:
+  // the runner executed under the service role with no notion of an acting user at all, and
+  // the KAI task agent billed `background_agents.created_by` — the person who created the
+  // agent, who is often not the person who dispatched the task. Prefer the JWT caller when
+  // there is one (it is verified); fall back to the recorded dispatcher for the service-role
+  // dispatch paths, where there is no JWT to read.
+  //
+  // This is identity for attribution and billing, NOT a capability. It must never be used to
+  // widen what the run can reach — the workspace binding above already decides that.
+  const actingUserId: string | null =
+    authedUserId ??
+    ((run.input_data as Record<string, unknown> | null)?.dispatched_by as string | undefined) ??
+    null;
+
   const ctx: AgentRunContext = {
     supabase,
     agentConfig:     agentConfig as BackgroundAgentRecord,
     run,
     input:           effectiveInput,
     workspaceId:     agentConfig.workspace_id,
+    actingUserId,
     mivaaGatewayUrl: MIVAA_GATEWAY_URL,
     mivaaApiKey:     MIVAA_API_KEY,
     anthropicApiKey: ANTHROPIC_API_KEY(),

@@ -13,6 +13,14 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 
+// Per-request extraction ceilings (#363 `EE-17`). One Sonnet vision pass per PDF is the cost
+// lever, but memory is the hard limit: each PDF is fully buffered AND base64-encoded before it
+// is sent. These bound the request; the per-PDF cap additionally stops one oversized file from
+// consuming the whole budget on its own.
+const MAX_PDFS_PER_REQUEST = 10;
+const MAX_PDF_BYTES = 24 * 1024 * 1024;       // per file
+const MAX_TOTAL_PDF_BYTES = 60 * 1024 * 1024; // across the whole request
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
@@ -113,6 +121,17 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     if (!body.catalog_id || !Array.isArray(body.source_pdf_ids) || body.source_pdf_ids.length === 0) {
       return jsonResponse({ success: false, error: 'catalog_id and source_pdf_ids are required' }, 400);
     }
+    // Bound the request BEFORE any bytes move (#363 `EE-17`). `source_pdf_ids` was checked only
+    // for being a non-empty array, so a caller could name any number of PDFs and this function
+    // would download, buffer and base64-encode every one of them in a 256 MB isolate. Base64 is
+    // 4/3 the size of the source and the encoded string is held alongside the raw bytes, so the
+    // real ceiling is roughly 2.4× the PDF total — reached long before anything else complains.
+    if (body.source_pdf_ids.length > MAX_PDFS_PER_REQUEST) {
+      return jsonResponse({
+        success: false,
+        error: `Too many source PDFs: ${body.source_pdf_ids.length} (max ${MAX_PDFS_PER_REQUEST}). Split the request.`,
+      }, 400);
+    }
     if (!body.query?.trim()) return jsonResponse({ success: false, error: 'query is required' }, 400);
 
     const maxResults = Math.min(40, Math.max(1, body.max_results || 12));
@@ -172,6 +191,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
 
     const allCandidates: Candidate[] = [];
     const errors: string[] = [];
+    let totalPdfBytes = 0;
 
     for (const pdf of pdfs) {
       let pdfCharged = false;
@@ -186,6 +206,27 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
           await markPdfStatus(supabase, pdf.id, 'failed', `Download failed: ${dlErr?.message ?? 'no file at storage path'}`);
           continue;
         }
+        // `blob.size` is known before the bytes are materialised, so an oversized file is
+        // rejected without ever being read into the isolate.
+        const blobSize = (blob as Blob).size;
+        if (blobSize > MAX_PDF_BYTES) {
+          errors.push(`too large: ${pdf.id}`);
+          await markPdfStatus(
+            supabase, pdf.id, 'failed',
+            `PDF is ${(blobSize / 1024 / 1024).toFixed(1)} MB, over the ${MAX_PDF_BYTES / 1024 / 1024} MB limit`,
+          );
+          continue;
+        }
+        if (totalPdfBytes + blobSize > MAX_TOTAL_PDF_BYTES) {
+          errors.push(`request byte budget exhausted before: ${pdf.id}`);
+          await markPdfStatus(
+            supabase, pdf.id, 'failed',
+            `Skipped: the request's ${MAX_TOTAL_PDF_BYTES / 1024 / 1024} MB total budget was already used. Split the request.`,
+          );
+          continue;
+        }
+        totalPdfBytes += blobSize;
+
         const bytes = new Uint8Array(await (blob as Blob).arrayBuffer());
         const base64 = base64Encode(bytes);
 

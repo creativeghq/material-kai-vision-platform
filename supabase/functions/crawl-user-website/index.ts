@@ -25,6 +25,11 @@ const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1
 const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || '';
 
 const MAX_SITEMAP_DEPTH = 3;
+// A sitemap is an attacker-influenced document fetched from an attacker-influenced host, so its
+// size is not ours to assume (#363 `EE-14`). 10 MB is far beyond any real sitemap (the sitemaps
+// spec caps them at 50 MB / 50k URLs, and index files are tiny) and small enough that a
+// deliberately endless response cannot exhaust the isolate.
+const MAX_SITEMAP_BYTES = 10 * 1024 * 1024;
 const MAX_PAGES_HARD_CAP = 1000;
 const FIRECRAWL_CONCURRENCY = 4;
 const PREVIEW_SAMPLE_SIZE = 5;
@@ -112,7 +117,10 @@ async function fetchText(url: string, timeoutMs = 15_000): Promise<string | null
         continue;
       }
       if (!res.ok) return null;
-      return await res.text();
+      // Cap WHILE reading, not after (#363 `EE-14`). `await res.text()` pulls the whole body into
+      // memory before anything can object, so a check on the resulting string is a check that has
+      // already lost. Content-Length is a claim the server makes and can simply omit.
+      return await readCappedText(res, MAX_SITEMAP_BYTES);
     }
     return null; // too many redirects
   } catch {
@@ -122,12 +130,63 @@ async function fetchText(url: string, timeoutMs = 15_000): Promise<string | null
   }
 }
 
+/** Read a response body as text, aborting the moment it exceeds `maxBytes`. */
+async function readCappedText(res: Response, maxBytes: number): Promise<string | null> {
+  if (!res.body) {
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length > maxBytes) return null;
+    return new TextDecoder().decode(buf);
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        console.warn(`[crawl-user-website] response exceeded ${maxBytes} bytes — discarded`);
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.byteLength; }
+  return new TextDecoder().decode(out);
+}
+
+/**
+ * Find the site's sitemap.
+ *
+ * The robots.txt `Sitemap:` directive is content from the crawled site, so the URL it names is
+ * attacker-controlled and need not even be on the same host. It is validated HERE, before it is
+ * returned to a caller that will store it (#363 `EE-19`) — `fetchText` would have rejected it
+ * later, but "later" was after `user_websites.sitemap_url` had already been written.
+ */
 async function discoverSitemapUrl(siteUrl: string): Promise<string | null> {
   const base = siteUrl.replace(/\/+$/, '');
   const robots = await fetchText(`${base}/robots.txt`);
   if (robots) {
     const m = robots.match(/^\s*Sitemap:\s*(\S+)/im);
-    if (m) return m[1].trim();
+    if (m) {
+      const declared = m[1].trim();
+      try {
+        // Resolve relative to the site and re-validate: this value is going to be persisted.
+        const abs = new URL(declared, `${base}/`).toString();
+        await assertSafeUrl(abs);
+        return abs;
+      } catch {
+        console.warn(`[crawl-user-website] robots.txt declared an unusable sitemap: ${declared}`);
+        // Fall through to the conventional paths rather than returning a URL we would refuse.
+      }
+    }
   }
   for (const path of ['/sitemap.xml', '/sitemap_index.xml', '/sitemap-index.xml']) {
     const text = await fetchText(`${base}${path}`);
@@ -175,6 +234,18 @@ async function firecrawlScrape(url: string): Promise<ScrapeResult> {
   const firecrawlKey = FIRECRAWL_API_KEY();
   if (!firecrawlKey) {
     return { url, title: null, description: null, content_excerpt: null, http_status: null, error: 'FIRECRAWL_API_KEY not configured' };
+  }
+  // The URL came out of a `<loc>` in a document the crawled site wrote, so the target set is
+  // chosen by the site being crawled, not by us (#363 `EE-13`). Handing it to Firecrawl
+  // unchecked outsources the fetch — a request we paid for, aimed wherever the sitemap
+  // pointed, including hosts the SSRF guard exists to refuse. Validate before we spend.
+  try {
+    await assertSafeUrl(url);
+  } catch (e: any) {
+    return {
+      url, title: null, description: null, content_excerpt: null, http_status: null,
+      error: `blocked by URL guard: ${e?.message || 'unsafe URL'}`,
+    };
   }
   try {
     const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
@@ -233,6 +304,7 @@ async function previewWebsite(
   error?: string;
 }> {
   let sitemapUrl = website.sitemap_url;
+  const discovered = !sitemapUrl;
   if (!sitemapUrl) {
     sitemapUrl = await discoverSitemapUrl(website.url);
     if (!sitemapUrl) {
@@ -241,12 +313,18 @@ async function previewWebsite(
       }).eq('id', website.id);
       return { ok: false, sitemap_url: null, pages_discovered: 0, capped_at: 0, sample: [], error: 'sitemap not found' };
     }
-    await supabase.from('user_websites').update({ sitemap_url: sitemapUrl }).eq('id', website.id);
   }
 
   const urls = await collectSitemapUrls(sitemapUrl, MAX_PAGES_HARD_CAP);
   if (urls.length === 0) {
     return { ok: false, sitemap_url: sitemapUrl, pages_discovered: 0, capped_at: 0, sample: [], error: 'sitemap empty' };
+  }
+  // Persist AFTER it has proven usable, never before (#363 `EE-19`). The old order stored the
+  // discovered URL and then validated it, so a hostile robots.txt could leave an unusable — and
+  // previously unvalidated — target sitting in `user_websites.sitemap_url`, surviving the
+  // rejection and waiting for any later consumer that does not re-check it.
+  if (discovered) {
+    await supabase.from('user_websites').update({ sitemap_url: sitemapUrl }).eq('id', website.id);
   }
 
   const sample = sampleEvenly(urls, PREVIEW_SAMPLE_SIZE);
@@ -274,6 +352,7 @@ async function crawlOneWebsite(
   const cap = Math.min(max_pages || 50, MAX_PAGES_HARD_CAP);
 
   let sitemapUrl = website.sitemap_url;
+  const discovered = !sitemapUrl;
   if (!sitemapUrl) {
     sitemapUrl = await discoverSitemapUrl(siteUrl);
     if (!sitemapUrl) {
@@ -283,7 +362,6 @@ async function crawlOneWebsite(
       }).eq('id', websiteId);
       return { ok: false, pages_indexed: 0, pages_discovered: 0, error: 'sitemap not found' };
     }
-    await supabase.from('user_websites').update({ sitemap_url: sitemapUrl }).eq('id', websiteId);
   }
 
   const urls = await collectSitemapUrls(sitemapUrl, cap);
@@ -294,39 +372,64 @@ async function crawlOneWebsite(
     }).eq('id', websiteId);
     return { ok: false, pages_indexed: 0, pages_discovered: 0, error: 'sitemap empty' };
   }
+  // Store only once the sitemap has actually yielded URLs (#363 `EE-19`).
+  if (discovered) {
+    await supabase.from('user_websites').update({ sitemap_url: sitemapUrl }).eq('id', websiteId);
+  }
 
   const crawlStartedAt = new Date().toISOString();
   const scrapes = await chunkedScrape(urls);
 
   let indexed = 0;
+  // Upsert failures were previously discarded — `upsert(...)` was called and its `error` never
+  // read, so a crawl in which every single write was rejected still returned ok:true, cleared
+  // `last_crawl_error` and stamped `last_crawled_at` (#363 `EE-18`). Zero pages written looks
+  // identical to a site with nothing new, which is the silent-zero shape: count the failures and
+  // let them decide the verdict.
+  let writeFailures = 0;
+  const firstWriteError: string[] = [];
+  const recordWrite = (error: { message?: string } | null) => {
+    if (!error) return;
+    writeFailures += 1;
+    if (firstWriteError.length === 0) firstWriteError.push(error.message || 'unknown write error');
+  };
+
   for (const s of scrapes) {
     if (s.error || !s.content_excerpt) {
-      await supabase.from('user_website_pages').upsert({
+      const { error: upsertErr } = await supabase.from('user_website_pages').upsert({
         website_id: websiteId, user_id: userId, url: s.url,
         title: s.title, description: s.description, content_excerpt: s.content_excerpt,
         keywords: [], embedding: null, http_status: s.http_status,
         last_seen_in_sitemap: crawlStartedAt, fetched_at: new Date().toISOString(), is_active: true,
       }, { onConflict: 'website_id,url' });
+      recordWrite(upsertErr);
       continue;
     }
 
     const embedSource = [s.title || '', s.description || '', s.content_excerpt || ''].filter(Boolean).join('\n\n');
     const embedding = await embedDocument(embedSource);
 
-    await supabase.from('user_website_pages').upsert({
+    const { error: upsertErr } = await supabase.from('user_website_pages').upsert({
       website_id: websiteId, user_id: userId, url: s.url,
       title: s.title, description: s.description, content_excerpt: s.content_excerpt,
       keywords: [], embedding: embedding as any, http_status: s.http_status,
       last_seen_in_sitemap: crawlStartedAt, fetched_at: new Date().toISOString(), is_active: true,
     }, { onConflict: 'website_id,url' });
+    recordWrite(upsertErr);
 
-    if (embedding) indexed += 1;
+    if (embedding && !upsertErr) indexed += 1;
   }
 
-  await supabase.from('user_website_pages')
-    .update({ is_active: false })
-    .eq('website_id', websiteId)
-    .lt('last_seen_in_sitemap', crawlStartedAt);
+  // Deactivating pages that vanished from the sitemap is only correct if this crawl actually
+  // saw the sitemap through. After widespread write failures the `last_seen_in_sitemap` stamps
+  // are missing, so this sweep would retire pages that are still live.
+  const allWritesFailed = writeFailures > 0 && writeFailures === scrapes.length;
+  if (!allWritesFailed) {
+    await supabase.from('user_website_pages')
+      .update({ is_active: false })
+      .eq('website_id', websiteId)
+      .lt('last_seen_in_sitemap', crawlStartedAt);
+  }
 
   const { count } = await supabase
     .from('user_website_pages')
@@ -334,13 +437,25 @@ async function crawlOneWebsite(
     .eq('website_id', websiteId)
     .eq('is_active', true);
 
+  const writeError = writeFailures > 0
+    ? `${writeFailures}/${scrapes.length} pages failed to save: ${firstWriteError[0]}`
+    : null;
+
   await supabase.from('user_websites').update({
     last_crawled_at: new Date().toISOString(),
-    last_crawl_error: null,
+    last_crawl_error: writeError,
     page_count: count || indexed,
   }).eq('id', websiteId);
 
-  return { ok: true, pages_indexed: indexed, pages_discovered: urls.length };
+  if (writeError) console.error(`[crawl-user-website] ${websiteId}: ${writeError}`);
+
+  // Partial write failure is reported, not hidden; total failure is not a successful crawl.
+  return {
+    ok: !allWritesFailed,
+    pages_indexed: indexed,
+    pages_discovered: urls.length,
+    ...(writeError ? { error: writeError } : {}),
+  };
 }
 
 Deno.serve(withApiLogging('crawl-user-website', async (req) => {

@@ -197,23 +197,39 @@ export async function authenticate(
       }
 
       if (allowAnon) {
+        // An anonymous caller gets an ANON-KEY client, so RLS genuinely applies with no user
+        // context — which is what the original comment here claimed was already true of the
+        // service-role client. It was not: service-role bypasses RLS unconditionally.
+        //
+        // Safe to change rather than merely document, because `allowAnon` is passed by ZERO
+        // callers today — this branch is unreachable. Fixing it means the option is correct the
+        // first time someone reaches for it, instead of handing an anonymous request a key that
+        // ignores every policy.
+        //
+        // A missing SUPABASE_ANON_KEY FAILS the request (#363 `EE-8`). The previous
+        // `?? adminClient` kept the branch working when the key was unset, at the cost of
+        // quietly handing an anonymous caller full service-role authority — a misconfiguration
+        // silently converting into the most privileged outcome available. There is no correct
+        // way to serve an anonymous request without the anon key, so say so.
+        const anonClient = rlsBoundClient(null);
+        if (!anonClient) {
+          return {
+            success: false,
+            level: 'none',
+            user: null,
+            userId: null,
+            error: 'Anonymous access is unavailable: SUPABASE_ANON_KEY is not configured',
+            supabase: adminClient,
+          };
+        }
         return {
           success: true,
           level: 'anon',
           user: null,
           userId: null,
           error: null,
-          // An anonymous caller now gets an ANON-KEY client, so RLS genuinely applies with no
-          // user context — which is what the original comment here claimed was already true of
-          // the service-role client. It was not: service-role bypasses RLS unconditionally.
-          //
-          // Safe to change rather than merely document, because `allowAnon` is passed by ZERO
-          // callers today — this branch is currently unreachable. Fixing it now means the option
-          // is correct the first time someone reaches for it, instead of handing an anonymous
-          // request a key that ignores every policy. Falls back to the admin client only if
-          // SUPABASE_ANON_KEY is unset, which would otherwise break the branch outright.
-          supabase: rlsBoundClient(null) ?? adminClient,
-          supabaseAsUser: rlsBoundClient(null),
+          supabase: anonClient,
+          supabaseAsUser: anonClient,
         };
       }
 

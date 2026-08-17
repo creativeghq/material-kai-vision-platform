@@ -348,3 +348,65 @@ rules:
       - pattern: new Date(Date.now() - $N).toISOString().slice(0, 10)
       - pattern: new Date(Date.now() + $N).toISOString().split('T')[0]
       - pattern: new Date(Date.now() - $N).toISOString().split('T')[0]
+
+  # ── SSRF · unguarded server-side DOWNLOAD from a URL we did not choose (invariant 7) ──
+  #
+  # This class has now been found NINE times across two repos in FOUR different implementations
+  # (#363 `EE-4`): the catalog PDF and quote image paths, MIVAA's aiohttp downloader, Pinterest
+  # import, the moodboard sheet renderer, tenant webhooks, the flow-engine HTTP action, the
+  # purchase-sheet PDF, and the AI client's own image ingestion. Every one looked correct in
+  # isolation, because a fetch that returns bytes looks the same whether the host was checked
+  # or not.
+  #
+  # The rule is scoped to DOWNLOADS — a fetch whose body is read as bytes — and that scoping is
+  # what makes it usable. Matching "fetch a variable" instead flags all 253 fetches in this
+  # tree, overwhelmingly polls and POSTs against fixed provider endpoints held in a constant,
+  # and a rule with a 22-in-23 false-positive rate gets annotated into silence. Reading bytes
+  # back is the actual defect shape: it is where the response body is unbounded, and it is what
+  # every one of the nine sites was doing.
+  #
+  # `assertSafeUrl` is a sanitizer, so guarding the URL first clears the finding — which is why
+  # the correctly-guarded sites (generate-vr-world, pinterest-api, workspace-webhook-dispatcher)
+  # do not fire and did not need annotating.
+  #
+  # The fix is `fetchImageGuarded` / `fetchBinaryGuarded` from `_shared/fetch-image.ts`, which
+  # also caps the read; `assertSafeUrl` + `redirect: 'error'` is the minimum.
+  - id: no-unguarded-download-of-user-url
+    languages: [typescript, javascript]
+    severity: ERROR
+    mode: taint
+    message: >
+      SSRF (invariant 7, #363 EE-4): server-side download from a URL this runtime did not
+      choose. A bare fetch() follows redirects into link-local/private space and
+      arrayBuffer()/blob() reads an unbounded body into a 256 MB isolate. Use
+      `fetchImageGuarded` / `fetchBinaryGuarded` from `_shared/fetch-image.ts`, or call
+      `assertSafeUrl()` from `_shared/ssrf-guard.ts` first and pass `redirect: 'error'`.
+    paths:
+      include:
+        - "supabase/functions/**"
+      exclude:
+        - "supabase/functions/_shared/fetch-image.ts"
+        - "supabase/functions/_shared/ssrf-guard.ts"
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: await fetch($URL)
+              - pattern: await fetch($URL, ...)
+          - metavariable-regex:
+              metavariable: $URL
+              regex: ^[A-Za-z_$][A-Za-z0-9_$]*(?:[Uu][Rr][LlIi]|[Hh][Rr][Ee][Ff]|[Ss][Rr][Cc])$
+          # Exempt the URL that came OUT of the guard. This has to be expressed on the source
+          # rather than as a `pattern-sanitizer`, because the tainted value here is the RESPONSE
+          # — sanitizing the url would never touch it. Binding the same $URL metavariable makes
+          # the exemption exact: it clears `safeUrl = await assertSafeUrl(x); fetch(safeUrl)`
+          # and nothing else, not merely "a file that mentions assertSafeUrl somewhere".
+          - pattern-not-inside: |
+              $URL = await assertSafeUrl(...)
+              ...
+          - pattern-not-inside: |
+              const $URL = await assertSafeUrl(...)
+              ...
+    pattern-sinks:
+      - pattern-either:
+          - pattern: $RES.arrayBuffer()
+          - pattern: $RES.blob()

@@ -2925,6 +2925,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Refund on hard pre-stream crash. Once streaming starts, no refund:
     // Anthropic + tool spend has already happened on our side.
     let partnerTurnDebitedCredits = 0;
+    let partnerTurnDebitTxnId: string | null = null;
     if (isPartner) {
       const debit = await debitAgentChatTurn(
         auth.supabase,
@@ -2942,6 +2943,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
         );
       }
       partnerTurnDebitedCredits = debit.credits_debited;
+      // Keep the debit's transaction id so a refund can name what it reverses (#363 `EE-7`).
+      partnerTurnDebitTxnId = debit.transaction_id ?? null;
     }
 
     // Get last user message
@@ -2967,13 +2970,20 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Chunk types that stream BEFORE any upstream (Anthropic/tool) spend — pure orchestration
     // noise. Keeping partner-refund eligibility alive across these lets a pre-spend crash refund.
     const NON_SPEND_CHUNK_TYPES = new Set(['status', 'heartbeat', 'iteration', 'agent_routed']);
+    // Latched (#363 `EE-7`). The DB index is the real guarantee — it rejects a second refund for
+    // the same debit whatever the caller does — and this flag simply avoids making the round trip
+    // to discover that. Belt and braces on purpose: the flag protects THIS function, the index
+    // protects every refund path including ones added later by someone who never read this.
+    let partnerTurnRefunded = false;
     const refundIfNotConsumed = async (reason: string) => {
       if (!isPartner || hasStreamedRealContent || partnerTurnDebitedCredits <= 0) return;
+      if (partnerTurnRefunded) return;
+      partnerTurnRefunded = true;
       try {
         await refundAgentChatTurn(auth.supabase, userId!, agentId, reason, {
           api_key_id: auth.apiKey?.api_key_id,
           conversation_id,
-        });
+        }, partnerTurnDebitTxnId);
       } catch (e) {
         console.warn('Partner turn refund failed:', e);
       }

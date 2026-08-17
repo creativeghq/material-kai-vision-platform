@@ -46,8 +46,8 @@ import { createKlingAI } from 'npm:@ai-sdk/klingai';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
-import { resolveTokenPrice } from './ai-logger.ts';
-import { fetchImageGuarded } from './fetch-image.ts';
+import { resolveTokenPrice, resolveUnitPrice } from './ai-logger.ts';
+import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
 // Every call through generateWithGemini / generateWithClaude is automatically
@@ -135,6 +135,70 @@ async function _logTrackedCall(opts: {
   }
 }
 
+/**
+ * The billing record for a call that is priced PER UNIT rather than per token — every image
+ * and every video this client produces (#363 `EE-2`).
+ *
+ * Before this, `generateImageWithGemini`, `generateMultiImageWithGemini`, `generateVideoWithVeo`,
+ * `generateVideoWithKling`, `generateImageWithGrok` and `editImageWithGrok` all called the
+ * provider and returned bytes without writing an `ai_usage_logs` row at all. The spend was real
+ * and the ledger did not know it happened, so every per-workspace cost view, the cost dashboard
+ * and any budget built on them under-reported by the whole value of image and video generation.
+ * The text paths had been logging since they were written; nothing made the image paths visibly
+ * different, which is why the gap survived — a missing row looks exactly like an unused feature.
+ *
+ * An unpriced model logs with `raw_cost_usd = null` and warns, matching `_logTrackedCall`: a
+ * null cost is a gap in `ai_model_pricing` that `ops.silent_zero` can surface, whereas a 0 is a
+ * claim that the call was free. Veo has no row today and must not be given a guessed one.
+ */
+async function _logUnitCall(opts: {
+  task: string;
+  /** `ai_model_pricing.model_key` — must match exactly, not the display name. */
+  modelKey: string;
+  /** Images generated, or seconds of video. */
+  units: number;
+  latencyMs: number;
+  errorMessage?: string;
+  userId?: string;
+  workspaceId?: string;
+}): Promise<void> {
+  if (!_logSupabase) return;
+  try {
+    const price = await resolveUnitPrice(_logSupabase, opts.modelKey);
+    if (!price) {
+      console.warn(`[ai-client] no per-unit price row for "${opts.modelKey}" — cost logged as null`);
+    }
+    // A failed call produced no units, so it costs nothing — but it still gets a row, so a
+    // provider outage is visible as attempts-with-no-output rather than as silence.
+    const billableUnits = opts.errorMessage ? 0 : opts.units;
+    const rawCost = price ? price.perUnit * billableUnits : null;
+    const markup = price?.markup ?? _MARKUP;
+    const billedCost = rawCost === null ? null : rawCost * markup;
+
+    await _logSupabase.from('ai_usage_logs').insert({
+      user_id: opts.userId ?? null,
+      workspace_id: opts.workspaceId ?? null,
+      operation_type: opts.task,
+      model_name: opts.modelKey,
+      input_tokens: 0,
+      output_tokens: 0,
+      raw_cost_usd: rawCost,
+      billed_cost_usd: billedCost,
+      markup_multiplier: markup,
+      input_cost_usd: null,
+      output_cost_usd: null,
+      metadata: {
+        billing_type: 'per_unit',
+        units: billableUnits,
+        unit_label: price?.unitLabel ?? null,
+        ...(opts.errorMessage ? { error_message: opts.errorMessage } : {}),
+      },
+    });
+  } catch (e) {
+    console.warn('[ai-client] _logUnitCall failed (non-fatal):', e);
+  }
+}
+
 // ── Provider instances ──
 // Lazy: constructed on FIRST USE (not at module load) so that platform_secrets values
 // bootstrapped into Deno.env inside the request handler are reflected in apiKey.
@@ -192,6 +256,24 @@ const klingai = new Proxy(function () {}, {
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-8';
+
+// ── Billing identity for the per-unit models ───────────────────────────────
+// `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They
+// differ, and that is the whole reason these constants exist rather than reusing `modelId`:
+// the KlingAI SDK wants 'kling-v3.0-i2v', Veo's raw API wants 'veo-2.0-generate-001', and
+// xAI's endpoint wants the slug 'grok-imagine-image-quality' — none of which is a key the
+// pricing table knows. The registry maps id → pricing_key → rate; passing the provider string
+// straight through would resolve to no row and silently log every image and video at null cost,
+// which is the same shape as the bug this replaces. The Gemini image models are the exception:
+// their provider id and registry id are the same string, so they pass `modelId` directly.
+// Ceiling for a provider-returned video download. A Veo clip is single-digit MB; this leaves
+// generous headroom while keeping the read bounded well inside the isolate's 256 MB, with room
+// for the base64 copy that follows it.
+const MAX_VIDEO_DOWNLOAD_BYTES = 48 * 1024 * 1024;
+
+const VEO_PRICING_MODEL_ID = 'veo-2';
+const KLING_PRICING_MODEL_ID = 'kling-v3.0';
+const GROK_PRICING_MODEL_ID = 'xai-aurora';
 
 // ── Types ──
 export interface AIGenerateConfig {
@@ -566,14 +648,23 @@ export interface GeminiImageResult {
   model: GeminiImageModel;
 }
 
+/** Attribution + task label for the per-unit (image/video) billing rows. Same contract as
+ *  `AIGenerateConfig` — null means "no owner", never "we had one and did not pass it". */
+export interface UnitBillingConfig {
+  task?: string;
+  userId?: string;
+  workspaceId?: string;
+}
+
 export async function generateImageWithGemini(
   prompt: string | { text: string; images: (Uint8Array | string)[] },
-  config?: {
+  config?: UnitBillingConfig & {
     model?: GeminiImageModel;
     aspectRatio?: ImageAspectRatio;
   },
 ): Promise<GeminiImageResult> {
   const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image';
+  const _start = Date.now();
 
   // Any prompt with images must go through the raw Gemini generateContent API.
   // The Vercel AI SDK generateImage() is text-to-image only — it does not support
@@ -581,20 +672,44 @@ export async function generateImageWithGemini(
   // the room from scratch (causing positions to change). Route ALL image-containing
   // prompts through generateMultiImageWithGemini which uses responseModalities correctly.
   if (typeof prompt === 'object' && prompt.images.length >= 1) {
-    return generateMultiImageWithGemini(prompt, { model: modelId });
+    // `...config` FIRST: spreading it after `model` lets a caller who passes an explicit
+    // `model: undefined` overwrite the resolved id with undefined.
+    return generateMultiImageWithGemini(prompt, { ...config, model: modelId });
   }
 
-  const { image } = await generateImage({
-    model: google.image(modelId),
-    prompt: prompt as any,
-    aspectRatio: config?.aspectRatio ?? '16:9',
-  });
+  try {
+    const { image } = await generateImage({
+      model: google.image(modelId),
+      prompt: prompt as any,
+      aspectRatio: config?.aspectRatio ?? '16:9',
+    });
 
-  return {
-    base64: image.base64,
-    mimeType: image.mediaType ?? 'image/png',
-    model: modelId,
-  };
+    void _logUnitCall({
+      task: config?.task ?? 'gemini_image_generation',
+      modelKey: modelId,
+      units: 1,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      base64: image.base64,
+      mimeType: image.mediaType ?? 'image/png',
+      model: modelId,
+    };
+  } catch (err) {
+    void _logUnitCall({
+      task: config?.task ?? 'gemini_image_generation',
+      modelKey: modelId,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
 }
 
 /**
@@ -606,9 +721,10 @@ export async function generateImageWithGemini(
  */
 async function generateMultiImageWithGemini(
   prompt: { text: string; images: (Uint8Array | string)[] },
-  config: { model: GeminiImageModel },
+  config: UnitBillingConfig & { model: GeminiImageModel },
 ): Promise<GeminiImageResult> {
   if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
+  const _start = Date.now();
 
   /** Safe base64 encoder that doesn't blow the call stack on large Uint8Arrays */
   const toBase64 = (bytes: Uint8Array): string => {
@@ -631,11 +747,15 @@ async function generateMultiImageWithGemini(
       const base64 = img.slice(commaIdx + 1);
       return { inlineData: { mimeType, data: base64 } };
     }
-    // URL — fetch and inline
-    const res = await fetch(img);
-    const buf = new Uint8Array(await res.arrayBuffer());
-    const mimeType = res.headers.get('content-type') || 'image/jpeg';
-    return { inlineData: { mimeType, data: toBase64(buf) } };
+    // URL — fetch and inline, through the shared SSRF guard (invariant 7, #363 `EE-4`).
+    // These URLs arrive from tool calls and stored product/moodboard rows, so this runtime
+    // resolves and fetches a URL on somebody else's say-so. The bare `fetch(img)` this
+    // replaces followed redirects, so a public URL could 302 to 169.254.169.254, and read
+    // the whole body with `arrayBuffer()` before anything looked at its size. The guard is
+    // https-only, refuses redirects, rejects private/link-local targets, and caps the read
+    // against bytes actually delivered rather than the Content-Length claim.
+    const { bytes, mimeType } = await fetchImageGuarded(img);
+    return { inlineData: { mimeType, data: toBase64(bytes) } };
   };
 
   // Build content parts with explicit labels before each image so Gemini knows
@@ -673,6 +793,15 @@ async function generateMultiImageWithGemini(
 
   if (!response.ok) {
     const err = await response.text();
+    void _logUnitCall({
+      task: config.task ?? 'gemini_image_generation',
+      modelKey: config.model,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: `HTTP ${response.status}`,
+      userId: config.userId,
+      workspaceId: config.workspaceId,
+    });
     throw new Error(`Gemini multi-image generation failed: ${err}`);
   }
 
@@ -701,6 +830,15 @@ async function generateMultiImageWithGemini(
     );
   }
 
+  void _logUnitCall({
+    task: config.task ?? 'gemini_image_generation',
+    modelKey: config.model,
+    units: 1,
+    latencyMs: Date.now() - _start,
+    userId: config.userId,
+    workspaceId: config.workspaceId,
+  });
+
   return {
     base64: imagePart.inlineData.data,
     mimeType: imagePart.inlineData.mimeType,
@@ -719,7 +857,7 @@ export interface VeoVideoResult {
 
 export async function generateVideoWithVeo(
   prompt: string,
-  config?: {
+  config?: UnitBillingConfig & {
     model?: VeoModel;
     aspectRatio?: '16:9' | '9:16' | '1:1';
     durationSeconds?: number;
@@ -729,6 +867,8 @@ export async function generateVideoWithVeo(
   },
 ): Promise<VeoVideoResult> {
   const modelId: VeoModel = config?.model ?? 'veo-2.0-generate-001';
+  const _start = Date.now();
+  const seconds = config?.durationSeconds ?? 8;
 
   // Image-to-video: use raw Google API (the AI SDK experimental_generateVideo
   // does not support image conditioning — it silently does text-to-video only).
@@ -736,21 +876,47 @@ export async function generateVideoWithVeo(
     return generateVideoWithVeoRaw(prompt, config.imageUrl, modelId, config);
   }
 
-  // Text-to-video via AI SDK
-  const { video } = await generateVideo({
-    model: google.video(modelId),
-    prompt,
-    aspectRatio: config?.aspectRatio ?? '16:9',
-    durationSeconds: config?.durationSeconds ?? 8,
-    resolution: config?.resolution ?? '1280x720',
-    pollTimeoutMs: 600000,
-  } as any);
+  try {
+    // Text-to-video via AI SDK
+    const { video } = await generateVideo({
+      model: google.video(modelId),
+      prompt,
+      aspectRatio: config?.aspectRatio ?? '16:9',
+      durationSeconds: seconds,
+      resolution: config?.resolution ?? '1280x720',
+      pollTimeoutMs: 600000,
+    } as any);
 
-  return {
-    base64: (video as any).base64,
-    mimeType: (video as any).mimeType ?? 'video/mp4',
-    model: modelId,
-  };
+    // `veo-2` is the generation_models id; its pricing_key is deliberately NULL — nobody has
+    // verified a per-second rate for it — so this logs the call with a null cost and a warning
+    // rather than a guessed number. The row still exists, which is the point: `ops.silent_zero`
+    // can see "video generated, cost unknown", and a missing price row is a fixable gap.
+    void _logUnitCall({
+      task: config?.task ?? 'veo_video_generation',
+      modelKey: VEO_PRICING_MODEL_ID,
+      units: seconds,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      base64: (video as any).base64,
+      mimeType: (video as any).mimeType ?? 'video/mp4',
+      model: modelId,
+    };
+  } catch (err) {
+    void _logUnitCall({
+      task: config?.task ?? 'veo_video_generation',
+      modelKey: VEO_PRICING_MODEL_ID,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
 }
 
 /**
@@ -762,9 +928,20 @@ async function generateVideoWithVeoRaw(
   prompt: string,
   imageUrl: string,
   modelId: VeoModel,
-  config?: { aspectRatio?: string; durationSeconds?: number; resolution?: string },
+  config?: UnitBillingConfig & { aspectRatio?: string; durationSeconds?: number; resolution?: string },
 ): Promise<VeoVideoResult> {
   if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
+  const _start = Date.now();
+  const billSeconds = config?.durationSeconds ?? 8;
+  const logVeo = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'veo_video_generation',
+    modelKey: VEO_PRICING_MODEL_ID,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
+  });
 
   // Fetch source image → base64, through the shared SSRF guard (invariant 7, #365 `AD-27` —
   // the thirteenth site of this shape). `imageUrl` reaches here from a tool call, so it is a URL
@@ -839,6 +1016,7 @@ async function generateVideoWithVeoRaw(
 
       // Prefer inline base64, fall back to downloading from URI
       if (sample.video.encodedVideo) {
+        void logVeo(billSeconds);
         return { base64: sample.video.encodedVideo, mimeType: sample.video.mimeType ?? 'video/mp4', model: modelId };
       }
 
@@ -847,13 +1025,24 @@ async function generateVideoWithVeoRaw(
         const videoFetchUrl = sample.video.uri.includes('?')
           ? `${sample.video.uri}&key=${GOOGLE_API_KEY()}`
           : `${sample.video.uri}?key=${GOOGLE_API_KEY()}`;
+        // Not `fetchBinaryGuarded` here, deliberately: this URI comes back from Google's own
+        // API in response to our authenticated request, so there is no user-influenced host
+        // to validate, and the guard's `redirect: 'error'` would break the download outright
+        // — these endpoints 302 to a storage CDN as a matter of course.
+        //
+        // The half that DOES apply is the cap. `await vidRes.arrayBuffer()` read a video of
+        // unbounded length into a 256 MB isolate and then base64-encoded it, adding another
+        // third on top, with nothing between the response and OOM. `readCapped` is the same
+        // metering `fetchBinaryGuarded` uses, aborting the read the moment it overruns
+        // rather than checking a Content-Length the server is free to omit or lie about.
         const vidRes = await fetch(videoFetchUrl);
         if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status}): ${await vidRes.text()}`);
-        const vidBytes = new Uint8Array(await vidRes.arrayBuffer());
+        const vidBytes = await readCapped(vidRes, MAX_VIDEO_DOWNLOAD_BYTES);
         let vidBinary = '';
         for (let i = 0; i < vidBytes.length; i += chunk) {
           vidBinary += String.fromCharCode(...vidBytes.subarray(i, i + chunk));
         }
+        void logVeo(billSeconds);
         return { base64: btoa(vidBinary), mimeType: 'video/mp4', model: modelId };
       }
 
@@ -861,6 +1050,7 @@ async function generateVideoWithVeoRaw(
     }
   }
 
+  void logVeo(0, 'timed out waiting for video generation');
   throw new Error('Veo: timed out waiting for video generation');
 }
 
@@ -873,7 +1063,7 @@ export interface KlingVideoResult {
 
 export async function generateVideoWithKling(
   prompt: string,
-  config?: {
+  config?: UnitBillingConfig & {
     /** Default: 'kling-v3.0-i2v' */
     model?: string;
     /** Source image URL for image-to-video */
@@ -886,31 +1076,58 @@ export async function generateVideoWithKling(
   },
 ): Promise<KlingVideoResult> {
   const modelId = config?.model ?? 'kling-v3.0-i2v';
+  const _start = Date.now();
+  const seconds = config?.durationSeconds ?? 5;
 
   const visionPrompt: any = config?.imageUrl
     ? { image: config.imageUrl, text: prompt }
     : prompt;
 
-  const { video } = await generateVideo({
-    // KlingAIProvider is NOT callable — it exposes video()/videoModel(). Calling it
-    // directly (klingai(modelId)) threw a TypeError on every invocation.
-    model: klingai.video(modelId),
-    prompt: visionPrompt,
-    durationSeconds: config?.durationSeconds ?? 5,
-    aspectRatio: config?.aspectRatio ?? '16:9',
-    providerOptions: {
-      klingai: {
-        mode: config?.mode ?? 'pro',
+  try {
+    const { video } = await generateVideo({
+      // KlingAIProvider is NOT callable — it exposes video()/videoModel(). Calling it
+      // directly (klingai(modelId)) threw a TypeError on every invocation.
+      model: klingai.video(modelId),
+      prompt: visionPrompt,
+      durationSeconds: seconds,
+      aspectRatio: config?.aspectRatio ?? '16:9',
+      providerOptions: {
+        klingai: {
+          mode: config?.mode ?? 'pro',
+        },
       },
-    },
-    pollTimeoutMs: 600_000,
-  } as any);
+      pollTimeoutMs: 600_000,
+    } as any);
 
-  return {
-    base64: (video as any).base64,
-    mimeType: (video as any).mimeType ?? 'video/mp4',
-    model: modelId,
-  };
+    // KLING_PRICING_MODEL_ID, not `modelId`: the string this client hands the KlingAI SDK
+    // ('kling-v3.0-i2v') is neither the generation_models id nor an ai_model_pricing key, and
+    // resolution here is exact on purpose — `kling-3.0` and `kling-1.6-pro` are different rates.
+    void _logUnitCall({
+      task: config?.task ?? 'kling_video_generation',
+      modelKey: KLING_PRICING_MODEL_ID,
+      units: seconds,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      base64: (video as any).base64,
+      mimeType: (video as any).mimeType ?? 'video/mp4',
+      model: modelId,
+    };
+  } catch (err) {
+    void _logUnitCall({
+      task: config?.task ?? 'kling_video_generation',
+      modelKey: KLING_PRICING_MODEL_ID,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
 }
 
 // ── Grok (xAI Aurora): Image generation + editing ──────────────────────────
@@ -933,11 +1150,21 @@ export interface GrokImageResult {
  */
 export async function generateImageWithGrok(
   prompt: string,
-  config?: { model?: string },
+  config?: UnitBillingConfig & { model?: string },
 ): Promise<GrokImageResult> {
   if (!XAI_API_KEY()) throw new Error('XAI_API_KEY not set');
 
   const modelId = config?.model ?? GROK_IMAGE_MODEL;
+  const _start = Date.now();
+  const logGrok = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'grok_image_generation',
+    modelKey: GROK_PRICING_MODEL_ID,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
+  });
 
   const response = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
@@ -955,13 +1182,18 @@ export async function generateImageWithGrok(
 
   if (!response.ok) {
     const err = await response.text();
+    void logGrok(0, `HTTP ${response.status}`);
     throw new Error(`Grok image generation failed (${response.status}): ${err}`);
   }
 
   const data = await response.json();
   const b64 = data.data?.[0]?.b64_json;
-  if (!b64) throw new Error('Grok: no image in generation response');
+  if (!b64) {
+    void logGrok(0, 'no image in generation response');
+    throw new Error('Grok: no image in generation response');
+  }
 
+  void logGrok(1);
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
@@ -975,7 +1207,7 @@ export async function generateImageWithGrok(
 export async function editImageWithGrok(
   prompt: string,
   imageBytes: Uint8Array,
-  config?: {
+  config?: UnitBillingConfig & {
     model?: string;
     /** Binary PNG mask: white = change, black = keep unchanged */
     maskBytes?: Uint8Array;
@@ -986,6 +1218,16 @@ export async function editImageWithGrok(
 
   const modelId = config?.model ?? GROK_IMAGE_MODEL;
   const mimeType = config?.imageMimeType ?? 'image/jpeg';
+  const _start = Date.now();
+  const logGrok = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'grok_image_edit',
+    modelKey: GROK_PRICING_MODEL_ID,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
+  });
 
   const form = new FormData();
   form.append('model', modelId);
@@ -1006,13 +1248,18 @@ export async function editImageWithGrok(
 
   if (!response.ok) {
     const err = await response.text();
+    void logGrok(0, `HTTP ${response.status}`);
     throw new Error(`Grok image edit failed (${response.status}): ${err}`);
   }
 
   const data = await response.json();
   const b64 = data.data?.[0]?.b64_json;
-  if (!b64) throw new Error('Grok: no image in edit response');
+  if (!b64) {
+    void logGrok(0, 'no image in edit response');
+    throw new Error('Grok: no image in edit response');
+  }
 
+  void logGrok(1);
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 

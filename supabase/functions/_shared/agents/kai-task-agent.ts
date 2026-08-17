@@ -117,7 +117,7 @@ export class KaiTaskAgent implements AgentRunner {
     const {
       supabase, agentConfig, run, input,
       workspaceId, mivaaGatewayUrl, mivaaApiKey, anthropicApiKey,
-      log, heartbeat,
+      actingUserId, log, heartbeat,
     } = ctx;
 
     const taskPrompt     = String(input.task_prompt ?? '');
@@ -162,7 +162,12 @@ export class KaiTaskAgent implements AgentRunner {
     // ── Meter the run (invariant #10) ──────────────────────────────────────────
     // Reserve a ceiling before the Opus loop; block if the triggering admin can't afford it.
     // Keyed on the agent's creator + their workspace pool. Settled to actual cost after the run.
-    const billUserId = (agentConfig.created_by ?? undefined) as string | undefined;
+    // Bill the user who DISPATCHED the task, falling back to the agent's creator (#363 `EE-9`).
+    // The runner previously had no acting user at all, so every dispatched task was charged to
+    // whoever created the background agent — one person's balance paying for another's work,
+    // with both inside the same workspace so nothing looked wrong. `dispatch_background_task`
+    // has always recorded `dispatched_by`; it just had no way to reach here.
+    const billUserId = (actingUserId ?? agentConfig.created_by ?? undefined) as string | undefined;
     const billWorkspaceId = (agentConfig.workspace_id ?? undefined) as string | undefined;
     const reserve = await reserveCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, 'kai_task_agent');
     if (!reserve.ok) {
@@ -203,7 +208,7 @@ export class KaiTaskAgent implements AgentRunner {
         runId:        run.id,
         agentId:      agentConfig.id,
         agentType:    this.agentType,
-        userId:       agentConfig.created_by,
+        userId:       billUserId ?? agentConfig.created_by,
         workspaceId:  agentConfig.workspace_id,
         model,
         inputTokens:  result.inputTokens,
