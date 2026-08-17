@@ -173,6 +173,35 @@ const MODULE_SERVICES: Record<string, { name: string; url: string; category: str
   ],
 };
 
+/**
+ * The deployed frontend itself. `SystemHealthMonitor` used to render Vercel as a hard-coded
+ * `{ status: 'healthy', message: 'Platform operational' }` — a health indicator that was green
+ * whether Vercel was up or down (#365 `AD-1`). A HEAD against the app's own origin is the check
+ * that light was always claiming to be.
+ *
+ * Any HTTP response means the deployment is serving. Only a network-level failure — DNS, TLS,
+ * timeout, a Vercel outage — is unhealthy. A 5xx is reported as degraded rather than healthy,
+ * because the edge answered but the app did not.
+ */
+async function checkVercel(): Promise<ExternalResult & { message?: string }> {
+  const url = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
+  const start = Date.now();
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(8000) });
+    const latency_ms = Date.now() - start;
+    if (res.status >= 500) {
+      return { status: 'unhealthy', latency_ms, http_status: res.status, error: `Deployment returned ${res.status}` };
+    }
+    return { status: 'healthy', latency_ms, http_status: res.status, message: `Serving ${url} (${res.status})` };
+  } catch (e) {
+    return {
+      status: 'unhealthy',
+      latency_ms: Date.now() - start,
+      error: e instanceof Error ? e.message : 'Unreachable',
+    };
+  }
+}
+
 async function checkExternalService(url: string): Promise<ExternalResult> {
   const start = Date.now();
   try {
@@ -233,7 +262,7 @@ serve(withApiLogging('health-check', async (req) => {
 
   const [
     claude, openai, slig, paddleocr, voyage_ai,
-    embeddings, ai_services,
+    embeddings, ai_services, vercel,
     ...externalResults
   ] = await Promise.all([
     checkClaude(),
@@ -243,6 +272,7 @@ serve(withApiLogging('health-check', async (req) => {
     checkVoyageAI(),
     checkPythonEndpoint('/api/embeddings/health'),
     checkPythonEndpoint('/api/v1/ai-services/health'),
+    checkVercel(),
     ...externalChecks,
   ]);
 
@@ -255,7 +285,7 @@ serve(withApiLogging('health-check', async (req) => {
 
   return new Response(JSON.stringify({
     claude, openai, slig, paddleocr, voyage_ai,
-    embeddings, ai_services,
+    embeddings, ai_services, vercel,
     external,
     timestamp: new Date().toISOString(),
   }), {

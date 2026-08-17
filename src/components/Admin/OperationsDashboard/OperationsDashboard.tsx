@@ -145,10 +145,12 @@ const OperationsDashboardInner: React.FC = () => {
   const [agentChatTotal, setAgentChatTotal] = useState(0);
   // Single all-time aggregate row feeding the summary tiles.
   const [agentStats, setAgentStats] = useState<AgentChatStats | null>(null);
+  // Which data-processing sources failed to load this pass. Non-empty means the tiles below are
+  // not measurements. (#365 AD-7)
+  const [processingSourcesUnavailable, setProcessingSourcesUnavailable] = useState<string[]>([]);
   const [dataProcessingStats, setDataProcessingStats] = useState<DataProcessingStats>({
     pdf: { total: 0, completed: 0, failed: 0, processing: 0, avgProcessingTime: 0 },
     xml: { total: 0, completed: 0, failed: 0, processing: 0, totalProducts: 0 },
-    scraping: { total: 0, completed: 0, failed: 0, processing: 0, totalPages: 0 },
   });
   const [loading, setLoading] = useState(true);
   const [extServiceData, setExtServiceData] = useState<ExternalServiceUsageData | null>(null);
@@ -324,12 +326,17 @@ const OperationsDashboardInner: React.FC = () => {
 
       // Fetch Data Processing Stats (PDF, XML, Scraping)
       console.log('🔄 Fetching data processing stats...');
-      const [pdfJobs, xmlJobs, scrapingSessions] = await Promise.all([
+      // Only auth failures were handled explicitly below; every OTHER error fell through to
+      // `pdfJobs.data || []`, so a broken query rendered as a pipeline that processed nothing.
+      // Zero and "could not read" are the two answers an operations dashboard most needs to keep
+      // apart. (#365 AD-7)
+      // The web-scrape→product path was removed and `scraping_sessions` dropped. The stub that
+      // used to sit here fed an empty array to a card so it would "render zeros, not an error" —
+      // which left an operations dashboard permanently showing a subsystem at zero, i.e. exactly
+      // the signal operators are trained to investigate. The card is gone instead. (#365 AD-12)
+      const [pdfJobs, xmlJobs] = await Promise.all([
         supabase.from('background_jobs').select('*').eq('job_type', 'pdf_processing'),
         supabase.from('data_import_jobs').select('*'),
-        // Web-scrape→product path removed; scraping_sessions table dropped. Keep
-        // the result shape so the legacy stats card renders zeros, not an error.
-        Promise.resolve({ data: [] as any[], error: null }),
       ]);
 
       // Check for auth errors in data processing queries
@@ -351,19 +358,12 @@ const OperationsDashboardInner: React.FC = () => {
         });
         return;
       }
-      if (scrapingSessions.error && (scrapingSessions.error.message?.includes('JWT') || scrapingSessions.error.message?.includes('401'))) {
-        console.error('❌ Auth error fetching scraping sessions:', scrapingSessions.error);
-        toast({
-          title: 'Session Expired',
-          description: 'Your session has expired. Please refresh the page and log in again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       console.log('📊 PDF Jobs:', pdfJobs.data?.length || 0, pdfJobs.error);
       console.log('📊 XML Jobs:', xmlJobs.data?.length || 0, xmlJobs.error);
-      console.log('📊 Scraping Sessions:', scrapingSessions.data?.length || 0, scrapingSessions.error);
+      setProcessingSourcesUnavailable([
+        ...(pdfJobs.error ? ['PDF processing jobs'] : []),
+        ...(xmlJobs.error ? ['XML import jobs'] : []),
+      ]);
 
       // Calculate PDF stats
       const pdfData = pdfJobs.data || [];
@@ -380,10 +380,6 @@ const OperationsDashboardInner: React.FC = () => {
       const xmlData = xmlJobs.data || [];
       const totalXmlProducts = xmlData.reduce((sum, j) => sum + (j.total_products || 0), 0);
 
-      // Calculate Scraping stats
-      const scrapingData = scrapingSessions.data || [];
-      const totalScrapingPages = scrapingData.reduce((sum, s) => sum + (s.total_pages || 0), 0);
-
       const processingStats = {
         pdf: {
           total: pdfData.length,
@@ -398,13 +394,6 @@ const OperationsDashboardInner: React.FC = () => {
           failed: xmlData.filter(j => j.status === 'failed').length,
           processing: xmlData.filter(j => j.status === 'processing').length,
           totalProducts: totalXmlProducts,
-        },
-        scraping: {
-          total: scrapingData.length,
-          completed: scrapingData.filter(s => s.status === 'completed').length,
-          failed: scrapingData.filter(s => s.status === 'failed').length,
-          processing: scrapingData.filter(s => s.status === 'processing' || s.status === 'scraping').length,
-          totalPages: totalScrapingPages,
         },
       };
 
@@ -1532,11 +1521,20 @@ const OperationsDashboardInner: React.FC = () => {
             {/* Page Header */}
             <SectionHeader
               title="Data Processing Pipeline"
-              subtitle="Real-time monitoring of PDF processing, XML imports, and web scraping operations. Track job status, success rates, processing times, and data volumes across all import sources."
+              subtitle="Real-time monitoring of PDF processing and XML imports. Track job status, success rates, processing times, and data volumes across all import sources."
             />
 
+            {/* A source that failed to load leaves its tiles at zero, which reads as an idle
+                pipeline rather than a broken query. Say which one. (#365 AD-7) */}
+            {processingSourcesUnavailable.length > 0 && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-2 text-xs text-destructive">
+                <span className="font-semibold">Could not read {processingSourcesUnavailable.join(' and ')}.</span>{' '}
+                The figures below are not measurements — treat them as unknown, not as zero.
+              </div>
+            )}
+
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="dashboard-card">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
@@ -1567,20 +1565,6 @@ const OperationsDashboardInner: React.FC = () => {
                 </div>
               </div>
 
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
-                    <Activity className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground font-medium">Web Scraping</div>
-                    <div className="text-2xl font-bold text-foreground">{dataProcessingStats.scraping.total}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {dataProcessingStats.scraping.totalPages} pages scraped
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Detailed Processing Tables */}
@@ -1592,7 +1576,7 @@ const OperationsDashboardInner: React.FC = () => {
                     <Activity className="h-4 w-4" />
                     Processing Jobs Monitor
                   </CardTitle>
-                  <CardDescription>Real-time monitoring of all processing pipelines (PDF, XML, Web Scraping)</CardDescription>
+                  <CardDescription>Real-time monitoring of all processing pipelines (PDF, XML)</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <UnifiedProcessingMonitor />
@@ -1659,59 +1643,6 @@ const OperationsDashboardInner: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Old Web Scraping Stats - Keep for reference */}
-            <Card className="hidden">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Web Scraping Sessions (Old Stats)
-                </CardTitle>
-                <CardDescription>Legacy web scraping statistics</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-5 gap-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">Total Sessions</div>
-                      <div className="text-2xl font-bold">{dataProcessingStats.scraping.total}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Completed</div>
-                      <div className="text-2xl font-bold text-green-600">{dataProcessingStats.scraping.completed}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Failed</div>
-                      <div className="text-2xl font-bold text-red-600">{dataProcessingStats.scraping.failed}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Active</div>
-                      <div className="text-2xl font-bold text-blue-600">{dataProcessingStats.scraping.processing}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Pages Scraped</div>
-                      <div className="text-2xl font-bold text-green-600">{dataProcessingStats.scraping.totalPages}</div>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="text-sm font-medium text-muted-foreground mb-2">Recent Sessions</div>
-                    {dataProcessingStats.scraping.total === 0 ? (
-                      <div className="bg-gray-50 rounded-lg p-6 text-center">
-                        <Activity className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-                        <p className="text-sm text-gray-600">No scraping sessions yet</p>
-                        <p className="text-xs text-gray-400 mt-1">Sessions will appear here once web scraping is initiated</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="text-xs text-muted-foreground">
-                          {dataProcessingStats.scraping.completed} completed • {dataProcessingStats.scraping.failed} failed • {dataProcessingStats.scraping.processing} active
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Processing Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
               <Card>
@@ -1751,22 +1682,6 @@ const OperationsDashboardInner: React.FC = () => {
                       className="h-2"
                     />
                   </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Web Scraping</span>
-                      <span className="font-semibold">
-                        {dataProcessingStats.scraping.total > 0
-                          ? Math.round((dataProcessingStats.scraping.completed / dataProcessingStats.scraping.total) * 100)
-                          : 0}%
-                      </span>
-                    </div>
-                    <Progress
-                      value={dataProcessingStats.scraping.total > 0
-                        ? (dataProcessingStats.scraping.completed / dataProcessingStats.scraping.total) * 100
-                        : 0}
-                      className="h-2"
-                    />
-                  </div>
                 </CardContent>
               </Card>
 
@@ -1782,10 +1697,6 @@ const OperationsDashboardInner: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total Products (XML)</span>
                     <span className="font-semibold">{formatNumber(dataProcessingStats.xml.totalProducts)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total Pages (Scraping)</span>
-                    <span className="font-semibold">{formatNumber(dataProcessingStats.scraping.totalPages)}</span>
                   </div>
                 </CardContent>
               </Card>

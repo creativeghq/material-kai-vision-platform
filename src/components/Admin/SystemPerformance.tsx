@@ -128,6 +128,10 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       claude_avg_time: 0,
     },
   });
+  // Whether `admin_processing_job_stats` answered. Its failure used to be logged and then
+  // swallowed into `js = {}`, so every tile read 0 — and 0% error rate renders GREEN. A broken
+  // RPC produced a perfect board. (#365 AD-6)
+  const [jobStatsAvailable, setJobStatsAvailable] = useState(true);
   // One page of rows for the table, fetched with an exact count.
   const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([]);
   const [processingJobsPage, setProcessingJobsPage] = useState(1);
@@ -306,6 +310,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
         'admin_processing_job_stats',
       );
       if (jobStatsError) console.error('Error fetching processing job stats:', jobStatsError);
+      setJobStatsAvailable(!jobStatsError && !!jobStats);
       const js = (jobStats || {}) as {
         total_jobs?: number;
         success_rate?: number;
@@ -355,6 +360,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
       setDocumentMetrics(docMetrics);
     } catch (error) {
       console.error('Error fetching performance data:', error);
+      // The tiles keep whatever they held; mark them unmeasured so they are not read as a
+      // healthy zero. (#365 AD-6)
+      setJobStatsAvailable(false);
       toast({
         title: 'Error',
         description: 'Failed to fetch performance data',
@@ -409,6 +417,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     description,
     trend,
     status,
+    unmeasured,
   }: {
     title: string;
     value: string | number;
@@ -416,26 +425,34 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     description: string;
     trend?: number;
     status?: 'good' | 'warning' | 'error';
+    /** The source did not answer. Renders "—" in a neutral tone instead of a scored zero. */
+    unmeasured?: boolean;
   }) => (
     <div className="dashboard-card">
       <div className="flex items-center gap-2 mb-2">
         <Icon
           className="h-4 w-4"
           style={{
-            color: status === 'good'
-              ? 'hsl(142 71% 45%)'
-              : status === 'warning'
-                ? 'hsl(38 92% 50%)'
-                : status === 'error'
-                  ? 'hsl(0 84% 60%)'
-                  : 'hsl(var(--primary))',
+            color: unmeasured
+              ? 'hsl(var(--muted-foreground))'
+              : status === 'good'
+                ? 'hsl(142 71% 45%)'
+                : status === 'warning'
+                  ? 'hsl(38 92% 50%)'
+                  : status === 'error'
+                    ? 'hsl(0 84% 60%)'
+                    : 'hsl(var(--primary))',
           }}
         />
         <p className="text-xs text-muted-foreground">{title}</p>
       </div>
-      <div className="text-2xl font-bold">{value}</div>
+      <div className={`text-2xl font-bold${unmeasured ? ' text-muted-foreground' : ''}`}>
+        {unmeasured ? '—' : value}
+      </div>
       <div className="flex items-center justify-between mt-1">
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-xs text-muted-foreground">
+          {unmeasured ? 'Not measured — the stats query failed' : description}
+        </p>
         {trend !== undefined && (
           <Badge
             className={`text-xs ${trend > 0 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
@@ -497,6 +514,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             icon={Server}
             description="Total processing jobs, all time"
             status="good"
+            unmeasured={!jobStatsAvailable}
           />
           <MetricCard
             title="Success Rate"
@@ -510,6 +528,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                   ? 'warning'
                   : 'error'
             }
+            unmeasured={!jobStatsAvailable}
           />
           <MetricCard
             title="Avg Processing Time"
@@ -523,6 +542,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                   ? 'warning'
                   : 'error'
             }
+            unmeasured={!jobStatsAvailable}
           />
           <MetricCard
             title="Error Rate"
@@ -536,6 +556,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                   ? 'warning'
                   : 'error'
             }
+            unmeasured={!jobStatsAvailable}
           />
         </div>
 

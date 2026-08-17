@@ -69,10 +69,17 @@ import { statusTone } from '@/utils/statusTone';
 import { onEnterOrSpace } from '@/utils/a11y';
 import { formatNumber } from '@/utils/decimal';
 
+/** Rows pulled per job source. Both sources are merged and filtered client-side, so this is a
+ *  hard bound on what every metric on the screen is computed over — disclosed, never silent. */
+const JOB_FETCH_CAP = 500;
+
 export const AsyncJobQueueMonitor: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [metrics, setMetrics] = useState<QueueMetrics | null>(null);
+  // What the tiles below were actually computed over. `total: null` means the server count could
+  // not be read — reported as unknown rather than assumed equal. (#365 AD-8)
+  const [jobCoverage, setJobCoverage] = useState<{ fetched: number; total: number | null }>({ fetched: 0, total: null });
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -367,22 +374,36 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         // Fetch background jobs (PDF, Web Scraping, Product Discovery, Image Embedding Regeneration)
         supabase
           .from('background_jobs')
-          .select('*')
+          // `count: 'exact'` is the disclosure, not an optimisation: every headline number on this
+          // screen — pending, failed, success rate — is reduced client-side over whatever this
+          // query returned. Capped at 500 with no count, a queue with 900 jobs reported the most
+          // recent 500 as if it were the whole queue, and a truncated count on an operations
+          // dashboard is worse than an error because it looks authoritative. (#365 AD-8)
+          .select('*', { count: 'exact' })
           .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload', 'image_embedding_regeneration'])
           .order('created_at', { ascending: false })
           // Both job sources are merged and filtered per-tab client-side, so server-side paging
           // isn't available here; the cap is raised instead so pagination isn't paging a truncation.
-          .limit(500),
+          .limit(JOB_FETCH_CAP),
         // XML import jobs from data_import_jobs
         supabase
           .from('data_import_jobs')
-          .select('*')
+          .select('*', { count: 'exact' })
           .order('created_at', { ascending: false })
-          .limit(500),
+          .limit(JOB_FETCH_CAP),
       ]);
 
-      const { data: bgJobsData, error: bgJobsError } = bgJobsRes;
-      const { data: xmlJobsData, error: xmlJobsError } = xmlJobsRes;
+      const { data: bgJobsData, error: bgJobsError, count: bgJobsCount } = bgJobsRes;
+      const { data: xmlJobsData, error: xmlJobsError, count: xmlJobsCount } = xmlJobsRes;
+
+      // How many rows exist versus how many these metrics were computed over.
+      const fetchedTotal = (bgJobsData?.length || 0) + (xmlJobsData?.length || 0);
+      const serverTotal =
+        bgJobsCount === null || bgJobsCount === undefined ||
+        xmlJobsCount === null || xmlJobsCount === undefined
+          ? null
+          : bgJobsCount + xmlJobsCount;
+      setJobCoverage({ fetched: fetchedTotal, total: serverTotal });
 
       if (bgJobsError) throw bgJobsError;
 
@@ -1457,6 +1478,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
         {/* Embedding coverage — backfill-agent health at a glance */}
         <EmbeddingBackfillCard />
+
+        {/* The tiles below are reduced client-side over the fetched page, not over the queue.
+            Say so whenever those two differ. (#365 AD-8) */}
+        {jobCoverage.total !== null && jobCoverage.total > jobCoverage.fetched && (
+          <Alert className="border-yellow-500/30 bg-yellow-500/10">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-sm">
+              <span className="font-semibold">
+                Counts cover the {jobCoverage.fetched.toLocaleString()} most recent jobs of{' '}
+                {jobCoverage.total.toLocaleString()}.
+              </span>{' '}
+              Totals, success rates and averages below are computed over that page only — they are
+              not queue-wide figures.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Overview Metrics - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

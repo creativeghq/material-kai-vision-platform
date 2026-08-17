@@ -34,7 +34,11 @@ import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 
 interface AIServiceHealth {
-  status: 'healthy' | 'unhealthy';
+  // `unknown` is a first-class state, not a rounding of `healthy`. An unreachable check is the
+  // single most important thing a health surface can say, and this dashboard said `healthy`
+  // (Vercel) or `unhealthy` ("Check unavailable" — a claim about the service, from a failure of
+  // the checker) instead. (#365 AD-1/AD-3)
+  status: 'healthy' | 'unhealthy' | 'unknown';
   message?: string;
   response_time_ms?: number;
   latency_ms?: number;
@@ -44,7 +48,13 @@ interface AIServiceHealth {
 }
 
 interface HealthStatus {
-  overall_status: 'healthy' | 'degraded' | 'unhealthy';
+  overall_status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  /**
+   * Whether `/health/detailed` answered. When it did not, `job_monitor`, `query_metrics` and
+   * `circuit_breaker` below are NOT measurements — they are the shape with nothing in it, and the
+   * UI must not render them as a clean bill of health.
+   */
+  detailed_available: boolean;
   database: {
     healthy: boolean;
     connection_test_ms: number;
@@ -72,7 +82,7 @@ interface HealthStatus {
   job_monitor: {
     monitor_running: boolean;
     stuck_jobs_count: number;
-    health: 'healthy' | 'degraded' | 'unhealthy';
+    health: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
   };
   query_metrics: {
     total_queries: number;
@@ -82,7 +92,7 @@ interface HealthStatus {
     max_query_time_ms: number;
   };
   circuit_breaker: {
-    state: 'closed' | 'open' | 'half_open';
+    state: 'closed' | 'open' | 'half_open' | 'unknown';
     failure_count: number;
   };
   ai_services?: {
@@ -137,11 +147,21 @@ export const SystemHealthMonitor: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [externalServices, setExternalServices] = useState<ExternalServiceStatus[]>([]);
   const [providers, setProviders] = useState<ProviderHealth[]>([]);
+  // `null` = the provider-health RPC did not answer. Distinct from `[]` ("it answered, nothing to
+  // report"): read as an empty list, an RPC failure hides every provider outage AND leaves the
+  // overall verdict green. (#365 AD-4)
+  const [providersUnavailable, setProvidersUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Staleness (#365 AD-5). Without these a panel shows its last good load forever while every
+  // refresh behind it fails — the operator reads a green board that stopped being measured.
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null);
+  const [lastAttemptAt, setLastAttemptAt] = useState<number | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchHealth = async (forceRefresh: boolean = false) => {
+    setLastAttemptAt(Date.now());
     try {
       setLoading(true);
       setError(null);
@@ -166,9 +186,13 @@ export const SystemHealthMonitor: React.FC = () => {
         supabase.functions.invoke('health-check').then(({ data }) => data).catch(() => null),
         // Third-party provider uptime from real usage outcomes (catches 402/outage
         // that reachability pings miss — e.g. DataForSEO balance depleted).
-        supabase.rpc('get_provider_health', { p_window_minutes: 360 }).then(({ data }) => data ?? []).catch(() => []),
+        supabase.rpc('get_provider_health', { p_window_minutes: 360 })
+          .then(({ data, error: rpcError }) => (rpcError ? null : (data ?? [])))
+          .catch(() => null),
       ]);
-      setProviders((providerRows as ProviderHealth[]) || []);
+      const providersAvailable = providerRows !== null;
+      setProvidersUnavailable(!providersAvailable);
+      setProviders(providersAvailable ? ((providerRows as ProviderHealth[]) || []) : []);
 
       // The MIVAA backend being down must NOT blank the whole health page — a
       // health dashboard's job is to SHOW which dependency is down, including
@@ -186,14 +210,21 @@ export const SystemHealthMonitor: React.FC = () => {
       const voyageResult      = edgeResults?.voyage_ai   ?? null;
       const embeddingsResult  = edgeResults?.embeddings  ?? null;
       const aiServicesResult  = edgeResults?.ai_services ?? null;
+      const vercelResult      = edgeResults?.vercel      ?? null;
 
-      // Use /health/detailed if available, otherwise build from basic /health
+      // Use /health/detailed if available, otherwise build from basic /health.
+      const detailedAvailable = !!(detailedResponse && detailedResponse.ok);
       let data: HealthStatus;
-      if (detailedResponse && detailedResponse.ok) {
-        data = await detailedResponse.json();
+      if (detailedAvailable) {
+        data = { ...(await detailedResponse!.json()), detailed_available: true };
       } else {
+        // The detailed source is unreachable. Every field it would have filled is UNKNOWN — it is
+        // not "the job monitor is running with 0 stuck jobs and the circuit breaker is closed",
+        // which is what this branch used to assert. An unreachable health source is itself the
+        // most important thing to display. (#365 AD-3)
         data = {
-          overall_status: 'healthy',
+          overall_status: 'unknown',
+          detailed_available: false,
           database: {
             healthy: supabaseHealthy,
             connection_test_ms: 0,
@@ -203,9 +234,9 @@ export const SystemHealthMonitor: React.FC = () => {
             uptime_seconds: 0,
             performance: { avg_query_time_ms: 0, max_query_time_ms: 0, slow_query_count: 0, slow_query_threshold_ms: 500 },
           },
-          job_monitor: { monitor_running: true, stuck_jobs_count: 0, health: 'healthy' },
+          job_monitor: { monitor_running: false, stuck_jobs_count: 0, health: 'unknown' },
           query_metrics: { total_queries: 0, slow_queries: 0, slow_query_percentage: 0, avg_query_time_ms: 0, max_query_time_ms: 0 },
-          circuit_breaker: { state: 'closed', failure_count: 0 },
+          circuit_breaker: { state: 'unknown', failure_count: 0 },
           timestamp: healthData.timestamp || new Date().toISOString(),
         };
       }
@@ -215,50 +246,57 @@ export const SystemHealthMonitor: React.FC = () => {
       data.database.healthy = supabaseHealthy;
 
       // Build AI service statuses from real API key verification (edge function)
-      // and direct Supabase check — not the Python backend's broken config view
+      // and direct Supabase check — not the Python backend's broken config view.
+      //
+      // A missing result is `unknown`, not `unhealthy`: "the checker did not run" and "the service
+      // is down" call for different responses, and reporting the first as the second is how an
+      // operator gets trained to ignore the board. (#365 AD-3)
+      const fromCheck = (
+        r: { status?: string; latency_ms?: number; message?: string; error?: string } | null,
+      ): AIServiceHealth => (
+        r
+          ? { status: r.status === 'healthy' ? 'healthy' : 'unhealthy', latency_ms: r.latency_ms, message: r.message, error: r.error }
+          : { status: 'unknown', error: 'Check did not run' }
+      );
+
       data.ai_services = {
-        claude: claudeResult
-          ? { status: claudeResult.status, latency_ms: claudeResult.latency_ms, message: claudeResult.message, error: claudeResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
-        chatgpt: openaiResult
-          ? { status: openaiResult.status, latency_ms: openaiResult.latency_ms, message: openaiResult.message, error: openaiResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
-        slig: hfResult
-          ? { status: hfResult.status, latency_ms: hfResult.latency_ms, message: hfResult.message, error: hfResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
-        paddleocr: paddleResult
-          ? { status: paddleResult.status, latency_ms: paddleResult.latency_ms, message: paddleResult.message, error: paddleResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
-        voyage_ai: voyageResult
-          ? { status: voyageResult.status, latency_ms: voyageResult.latency_ms, message: voyageResult.message, error: voyageResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
-        embeddings: embeddingsResult
-          ? { status: embeddingsResult.status, latency_ms: embeddingsResult.latency_ms, message: embeddingsResult.message, error: embeddingsResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
-        ai_services: aiServicesResult
-          ? { status: aiServicesResult.status, latency_ms: aiServicesResult.latency_ms, message: aiServicesResult.message, error: aiServicesResult.error }
-          : { status: 'unhealthy', error: 'Check unavailable' },
+        claude: fromCheck(claudeResult),
+        chatgpt: fromCheck(openaiResult),
+        slig: fromCheck(hfResult),
+        paddleocr: fromCheck(paddleResult),
+        voyage_ai: fromCheck(voyageResult),
+        embeddings: fromCheck(embeddingsResult),
+        ai_services: fromCheck(aiServicesResult),
         supabase: { status: supabaseHealthy ? 'healthy' : 'unhealthy', message: supabaseHealthy ? 'Database connected' : 'Connection failed' },
-        vercel: { status: 'healthy', message: 'Platform operational' },
+        // Was hard-coded `{ status: 'healthy', message: 'Platform operational' }` — green whether
+        // Vercel was up or down. `health-check` now HEADs the app's own origin. (#365 AD-1)
+        vercel: fromCheck(vercelResult),
       };
 
-      // Derive overall status from real checks
+      // Derive overall status from real checks.
       const criticalDown = !supabaseHealthy || !backendReachable || claudeResult?.status === 'unhealthy';
       // A third-party provider being down (e.g. DataForSEO 402) drops overall to
       // degraded — this is what "everything healthy" was previously blind to.
-      const providerDown = Array.isArray(providerRows)
+      const providerDown = providersAvailable
         && (providerRows as ProviderHealth[]).some((p) => p.status === 'unhealthy');
       const degraded = openaiResult?.status === 'unhealthy' || hfResult?.status === 'unhealthy'
         || voyageResult?.status === 'unhealthy' || providerDown;
+      // Checks that did not run cannot vote healthy. `unknown` outranks `healthy` and yields to a
+      // real failure, so a board with unmeasured subsystems never reads as all-clear.
+      const anyUnknown = !edgeResults || !detailedAvailable || !providersAvailable;
       if (criticalDown) {
         data.overall_status = 'unhealthy';
       } else if (degraded) {
         data.overall_status = 'degraded';
+      } else if (anyUnknown) {
+        data.overall_status = 'unknown';
       } else {
         data.overall_status = 'healthy';
       }
 
       setHealth(data);
+      setLastSuccessAt(Date.now());
+      setRefreshError(null);
 
       // External services come from the edge function (real HTTP status codes, no CORS)
       if (edgeResults?.external) {
@@ -275,6 +313,9 @@ export const SystemHealthMonitor: React.FC = () => {
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch health status';
+      // Keep whatever was last loaded on screen, but record that this refresh failed so the
+      // staleness banner can say the board is no longer being measured. (#365 AD-5)
+      setRefreshError(errorMsg);
       setError(errorMsg);
       console.error('Health check error:', err);
       toast({
@@ -303,7 +344,9 @@ export const SystemHealthMonitor: React.FC = () => {
       case 'unhealthy':
         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Unhealthy</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        // Not measured. Deliberately NOT green and NOT red — an operator has to be able to tell
+        // "this is fine" from "nobody looked". (#365 AD-3)
+        return <Badge variant="outline"><MinusCircle className="h-3 w-3 mr-1" />Not measured</Badge>;
     }
   };
 
@@ -316,7 +359,7 @@ export const SystemHealthMonitor: React.FC = () => {
       case 'half_open':
         return <Badge className="bg-yellow-500">Half-Open (Testing)</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline"><MinusCircle className="h-3 w-3 mr-1" />Not measured</Badge>;
     }
   };
 
@@ -367,8 +410,61 @@ export const SystemHealthMonitor: React.FC = () => {
 
   if (!health) return null;
 
+  const staleFor = lastAttemptAt && lastSuccessAt && lastAttemptAt > lastSuccessAt
+    ? Date.now() - lastSuccessAt
+    : 0;
+  const staleMinutes = Math.round(staleFor / 60000);
+
   return (
     <div className="space-y-4">
+      {/* A refresh failed and what is on screen is the LAST GOOD load. Without this the board
+          keeps showing its last measurement forever while every refresh behind it fails — the
+          most misleading state a health surface can be in. (#365 AD-5) */}
+      {refreshError && (
+        <Card className="border-yellow-500/50">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium">These readings are stale — the last refresh failed.</p>
+                <p className="text-muted-foreground">
+                  Showing the load from {lastSuccessAt ? formatDate(new Date(lastSuccessAt).toISOString(), { withTime: true }) : 'an earlier session'}
+                  {staleMinutes > 0 ? ` (${staleMinutes} min ago)` : ''}. Refresh error: {refreshError}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Subsystems whose source did not answer. They are rendered below with zeros because that
+          is the shape of the data — this says the zeros are not measurements. (#365 AD-3/AD-4) */}
+      {(!health.detailed_available || providersUnavailable) && (
+        <Card className="border-muted-foreground/30">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <MinusCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium">Some subsystems could not be measured.</p>
+                <ul className="text-muted-foreground list-disc pl-4">
+                  {!health.detailed_available && (
+                    <li>
+                      The detailed health endpoint did not answer — job monitor, query performance
+                      and circuit breaker below are <strong>unknown</strong>, not zero.
+                    </li>
+                  )}
+                  {providersUnavailable && (
+                    <li>
+                      Provider uptime could not be read — a provider outage would not show here.
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Overall Status */}
       <Card>
         <CardHeader>
@@ -476,7 +572,9 @@ export const SystemHealthMonitor: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Monitor Running</span>
-              {health.job_monitor.monitor_running ? (
+              {!health.detailed_available ? (
+                <Badge variant="outline">Not measured</Badge>
+              ) : health.job_monitor.monitor_running ? (
                 <Badge className="bg-green-500">Active</Badge>
               ) : (
                 <Badge variant="destructive">Stopped</Badge>
@@ -484,8 +582,8 @@ export const SystemHealthMonitor: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Stuck Jobs</span>
-              <span className={`text-sm font-medium ${health.job_monitor.stuck_jobs_count > 0 ? 'text-destructive' : ''}`}>
-                {health.job_monitor.stuck_jobs_count}
+              <span className={`text-sm font-medium ${health.detailed_available && health.job_monitor.stuck_jobs_count > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {health.detailed_available ? health.job_monitor.stuck_jobs_count : '—'}
               </span>
             </div>
           </CardContent>
@@ -500,27 +598,36 @@ export const SystemHealthMonitor: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Queries</span>
-              <span className="text-sm font-medium">{formatNumber(health.query_metrics.total_queries)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Avg Query Time</span>
-              <span className="text-sm font-medium">{health.query_metrics.avg_query_time_ms.toFixed(1)}ms</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Max Query Time</span>
-              <span className="text-sm font-medium">{health.query_metrics.max_query_time_ms.toFixed(1)}ms</span>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Slow Queries</span>
-                <span className={`text-sm font-medium ${health.query_metrics.slow_query_percentage > 10 ? 'text-yellow-600' : ''}`}>
-                  {health.query_metrics.slow_queries} ({health.query_metrics.slow_query_percentage.toFixed(1)}%)
-                </span>
-              </div>
-              <Progress value={health.query_metrics.slow_query_percentage} className="h-2" />
-            </div>
+            {!health.detailed_available ? (
+              <p className="text-sm text-muted-foreground">
+                Not measured — the detailed health endpoint did not answer. These figures would all
+                read 0, which is indistinguishable from a database serving no queries at all.
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Queries</span>
+                  <span className="text-sm font-medium">{formatNumber(health.query_metrics.total_queries)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Avg Query Time</span>
+                  <span className="text-sm font-medium">{health.query_metrics.avg_query_time_ms.toFixed(1)}ms</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Max Query Time</span>
+                  <span className="text-sm font-medium">{health.query_metrics.max_query_time_ms.toFixed(1)}ms</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Slow Queries</span>
+                    <span className={`text-sm font-medium ${health.query_metrics.slow_query_percentage > 10 ? 'text-yellow-600' : ''}`}>
+                      {health.query_metrics.slow_queries} ({health.query_metrics.slow_query_percentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <Progress value={health.query_metrics.slow_query_percentage} className="h-2" />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -539,14 +646,15 @@ export const SystemHealthMonitor: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Failure Count</span>
-              <span className={`text-sm font-medium ${health.circuit_breaker.failure_count > 0 ? 'text-yellow-600' : ''}`}>
-                {health.circuit_breaker.failure_count}
+              <span className={`text-sm font-medium ${health.detailed_available && health.circuit_breaker.failure_count > 0 ? 'text-yellow-600' : 'text-muted-foreground'}`}>
+                {health.detailed_available ? health.circuit_breaker.failure_count : '—'}
               </span>
             </div>
             <div className="text-xs text-muted-foreground mt-2">
               {health.circuit_breaker.state === 'closed' && 'All systems operational'}
               {health.circuit_breaker.state === 'open' && 'Database protection active - failing fast'}
               {health.circuit_breaker.state === 'half_open' && 'Testing database recovery'}
+              {health.circuit_breaker.state === 'unknown' && 'State unknown — the detailed health endpoint did not answer'}
             </div>
           </CardContent>
         </Card>
@@ -752,7 +860,15 @@ export const SystemHealthMonitor: React.FC = () => {
       )}
 
       {/* Third-Party Provider Uptime — from real usage outcomes (catches 402/outages) */}
-      {providers.length > 0 && (
+      {providersUnavailable && (
+        <Card className="border-muted-foreground/30">
+          <CardContent className="pt-4 text-sm text-muted-foreground">
+            Provider uptime could not be read (<code>get_provider_health</code> did not answer).
+            This section is unknown, not empty — a provider outage would not appear here.
+          </CardContent>
+        </Card>
+      )}
+      {!providersUnavailable && providers.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -127,13 +127,10 @@ export interface DataProcessingStats {
     processing: number;
     totalProducts: number;
   };
-  scraping: {
-    total: number;
-    completed: number;
-    failed: number;
-    processing: number;
-    totalPages: number;
-  };
+  // No `scraping`: the web-scrape→product path was removed and `scraping_sessions` dropped, so
+  // the dashboard's scraping card was fed an empty array purely to keep rendering zeros. A
+  // permanently-zero subsystem on an operations board is the signal operators are trained to
+  // investigate — the card is deleted rather than stubbed. (#365 AD-12)
 }
 
 export interface AIUsageLog {

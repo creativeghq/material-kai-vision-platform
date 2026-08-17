@@ -98,8 +98,13 @@ interface MetadataItem {
   created_at: string;
 }
 
+/** Rows scanned per load. Every statistic on this screen is reduced over this many products. */
+const PRODUCT_FETCH_CAP = 1000;
+
 interface MetadataStatistics {
   total_products: number;
+  /** Exact server count of products carrying metadata; null when it could not be read. */
+  total_products_in_db: number | null;
   total_metadata_fields: number;
   unique_fields: number;
   most_common_fields: Array<{ field: string; count: number }>;
@@ -172,11 +177,14 @@ export const MetadataManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      const { data: products, error } = await supabase
+      // The cap is real and the statistics below are computed over whatever it returns, so ask
+      // for the exact count too. Without it "1,000 products / 8,400 fields" reads as the whole
+      // catalogue when it may be the first thousand rows of it. (#365 AD-40)
+      const { data: products, error, count: productsWithMetadata } = await supabase
         .from('products')
-        .select('id, name, metadata, source_document_id, created_at')
+        .select('id, name, metadata, source_document_id, created_at', { count: 'exact' })
         .not('metadata', 'is', null)
-        .limit(1000);
+        .limit(PRODUCT_FETCH_CAP);
 
       if (error) throw error;
       if (!products) {
@@ -253,6 +261,9 @@ export const MetadataManagement: React.FC = () => {
       setMetadata(items);
       setStatistics({
         total_products: products.length,
+        // What EXISTS, versus what the numbers above describe. `null` when the count could not be
+        // read — unknown, not equal.
+        total_products_in_db: productsWithMetadata ?? null,
         total_metadata_fields: items.length,
         unique_fields: Object.keys(fieldCounts).length,
         most_common_fields: Object.entries(fieldCounts)
@@ -478,6 +489,19 @@ export const MetadataManagement: React.FC = () => {
           </TabsList>
 
           <TabsContent value="metadata" className="mt-6 space-y-6">
+        {/* The statistics below describe the scanned page, not the catalogue. Disclose the gap
+            rather than letting a truncated total read as authoritative. (#365 AD-40) */}
+        {statistics && statistics.total_products_in_db !== null
+          && statistics.total_products_in_db > statistics.total_products && (
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-2 text-xs text-yellow-600">
+            <span className="font-semibold">
+              Scanned the first {statistics.total_products.toLocaleString()} of{' '}
+              {statistics.total_products_in_db.toLocaleString()} products with metadata.
+            </span>{' '}
+            Field counts, unique fields and the most-common list below cover that page only.
+          </div>
+        )}
+
         {/* Statistics Cards */}
         {statistics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -487,7 +511,11 @@ export const MetadataManagement: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Total Products</p>
               </div>
               <div className="text-2xl font-bold">{statistics.total_products}</div>
-              <p className="text-xs text-muted-foreground mt-1">With metadata</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {statistics.total_products_in_db !== null && statistics.total_products_in_db > statistics.total_products
+                  ? `Scanned of ${statistics.total_products_in_db.toLocaleString()} with metadata`
+                  : 'With metadata'}
+              </p>
             </div>
 
             <div className="dashboard-card">

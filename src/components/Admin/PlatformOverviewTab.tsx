@@ -83,7 +83,13 @@ function EmptyState({ message = 'No data yet for this period' }: { message?: str
 
 export function PlatformOverviewTab() {
   const [loading, setLoading] = useState(true);
+  // WHY the placeholder figures are on screen, not just THAT they are. Both paths used to raise
+  // the same "no live platform activity found yet" banner, so a failed query told the operator
+  // NOTHING HAS HAPPENED when the truth was WE COULD NOT READ ANYTHING — opposite responses.
+  // (#365 AD-2)
   const [isDemoData, setIsDemoData] = useState(false);
+  const [demoReason, setDemoReason] = useState<'empty' | 'load_failed'>('empty');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Quotes & Users ────────────────────────────────────────────
   const [quoteFunnel, setQuoteFunnel] = useState<{ status: string; count: number }[]>([]);
@@ -402,7 +408,13 @@ export function PlatformOverviewTab() {
       ]);
 
       const total = (quotes ?? []).length;
-      if (!total && !(profiles ?? []).length) { loadDemoPlatformData(); setLoading(false); return; }
+      if (!total && !(profiles ?? []).length) {
+        setDemoReason('empty');
+        setLoadError(null);
+        loadDemoPlatformData();
+        setLoading(false);
+        return;
+      }
 
       // Quotes funnel
       const funnelMap = new Map<string, number>();
@@ -838,8 +850,11 @@ export function PlatformOverviewTab() {
       setNotifTrend(Array.from(nWkMap.entries()).map(([week, d]) => ({ week, ...d })));
 
       setIsDemoData(false);
+      setLoadError(null);
     } catch (err) {
       console.error('PlatformOverviewTab load error:', err);
+      setDemoReason('load_failed');
+      setLoadError(err instanceof Error ? err.message : String(err));
       loadDemoPlatformData();
     } finally {
       setLoading(false);
@@ -941,9 +956,19 @@ export function PlatformOverviewTab() {
   return (
     <div className="space-y-4">
       {isDemoData && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-600 flex items-center gap-2">
-          <span className="font-semibold">Demo data</span> — no live platform activity found yet.
-        </div>
+        demoReason === 'load_failed' ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-2 text-xs text-destructive flex flex-wrap items-center gap-2">
+            <span className="font-semibold">Placeholder data — the platform could not be read.</span>
+            <span>
+              Every figure below is a stand-in, not a measurement. This is a read failure, not an
+              empty platform.{loadError ? ` (${loadError})` : ''}
+            </span>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-600 flex items-center gap-2">
+            <span className="font-semibold">Demo data</span> — the queries ran and found no live platform activity yet.
+          </div>
+        )
       )}
 
       {/* ─── 1. Quotes & User Activity ──────────────────────────── */}
