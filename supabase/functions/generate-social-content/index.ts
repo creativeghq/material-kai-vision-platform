@@ -138,6 +138,10 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
         0.9,
         { model_confidence: 0.9, completeness: 0.9, consistency: 0.9, validation: 0.9 },
         'use_ai_result',
+        undefined,
+        undefined,
+        // Name the tenant the spend belongs to (#365 AD-15).
+        { userId, workspaceId: workspace_id ?? null },
       );
     } catch (logErr) {
       console.warn('[generate-social-content] Logger failed:', logErr);

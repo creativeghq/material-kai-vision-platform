@@ -47,6 +47,7 @@ import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 import { resolveTokenPrice } from './ai-logger.ts';
+import { fetchImageGuarded } from './fetch-image.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
 // Every call through generateWithGemini / generateWithClaude is automatically
@@ -765,11 +766,12 @@ async function generateVideoWithVeoRaw(
 ): Promise<VeoVideoResult> {
   if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
 
-  // Fetch source image → base64
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error(`Failed to fetch source image: ${imgRes.status}`);
-  const imgBytes = new Uint8Array(await imgRes.arrayBuffer());
-  const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+  // Fetch source image → base64, through the shared SSRF guard (invariant 7, #365 `AD-27` —
+  // the thirteenth site of this shape). `imageUrl` reaches here from a tool call, so it is a URL
+  // this runtime resolves on behalf of whoever asked: a bare fetch followed 302s, had no size
+  // cap, and would happily read `169.254.169.254`. The guard is https-only, refuses redirects,
+  // rejects private/link-local targets and caps the read against bytes actually delivered.
+  const { bytes: imgBytes, mimeType } = await fetchImageGuarded(imageUrl);
 
   // Safe base64 encoder (avoids call-stack overflow on large images)
   let binary = '';

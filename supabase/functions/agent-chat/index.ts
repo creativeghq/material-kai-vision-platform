@@ -3186,6 +3186,10 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               job_id: conversation_id || undefined,
               task: `agent_chat_${agentId}`,
               model: finalResult.usage.modelName,
+              // Both were in scope the whole time and neither reached the row — `ai_call_logs`
+              // has carried these columns since it was created (#365 AD-15).
+              user_id: userId,
+              workspace_id: workspaceId,
               input_tokens: finalResult.usage.inputTokens,
               output_tokens: finalResult.usage.outputTokens,
               latency_ms: Date.now() - executeStartTime,

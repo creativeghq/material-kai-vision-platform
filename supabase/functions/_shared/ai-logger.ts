@@ -132,10 +132,27 @@ interface ConfidenceBreakdown {
   validation: number;
 }
 
+/**
+ * WHO a call was made for. `ai_call_logs` has carried `user_id` and `workspace_id` columns all
+ * along and this logger had no way to fill them — the shape simply had no fields for identity, so
+ * every row landed unattributed (#365 `AD-15`). Four main-repo commits have since fixed CALLERS
+ * that spent without naming a tenant; this is the signature that made it possible.
+ *
+ * Set once on the logger (`new AICallLogger(url, key, { userId, workspaceId })`) or per call.
+ */
+export interface AICallAttribution {
+  userId?: string | null;
+  workspaceId?: string | null;
+}
+
 interface AICallLogData {
   job_id?: string;
   task: string;
   model: string;
+  user_id?: string | null;
+  workspace_id?: string | null;
+  /** Why a call that cost money was not billed — never left blank on a failure row. */
+  unbilled_reason?: string | null;
   input_tokens?: number;
   output_tokens?: number;
   cost?: number;
@@ -151,9 +168,16 @@ interface AICallLogData {
 
 export class AICallLogger {
   private supabase: DbClient;
+  private attribution: AICallAttribution;
 
-  constructor(supabaseUrl: string, supabaseKey: string) {
+  constructor(supabaseUrl: string, supabaseKey: string, attribution: AICallAttribution = {}) {
     this.supabase = createClient(supabaseUrl, supabaseKey);
+    this.attribution = attribution;
+  }
+
+  /** Late-bind the acting identity — for a long-lived logger created before the request is read. */
+  setAttribution(attribution: AICallAttribution): void {
+    this.attribution = { ...this.attribution, ...attribution };
   }
 
   /**
@@ -209,6 +233,10 @@ export class AICallLogger {
         job_id: data.job_id || null,
         task: data.task,
         model: data.model,
+        // Per-call attribution wins; the logger's default fills in for callers that set it once.
+        user_id: data.user_id ?? this.attribution.userId ?? null,
+        workspace_id: data.workspace_id ?? this.attribution.workspaceId ?? null,
+        unbilled_reason: data.unbilled_reason ?? null,
         input_tokens: data.input_tokens || null,
         output_tokens: data.output_tokens || null,
         cost: cost || null,
@@ -235,6 +263,52 @@ export class AICallLogger {
   }
 
   /**
+   * Log a call that FAILED or timed out (#365 `AD-16`).
+   *
+   * Every helper on this class reads `response.usage`, so it can only describe a call that came
+   * back. A provider call that 500s, times out or is refused for quota still cost latency, still
+   * may have cost money upstream, and is the single most useful row to have when a metric goes to
+   * zero — and there was no way to write it. MIVAA had the same gap and closed it in `a85f8a5`.
+   *
+   * `unbilled_reason` is set so the row is self-describing: a zero cost here means "the call
+   * failed", never "the call was free".
+   */
+  async logFailedCall(
+    task: string,
+    model: string,
+    error: unknown,
+    latencyMs: number,
+    opts: {
+      jobId?: string;
+      attribution?: AICallAttribution;
+      inputTokens?: number;
+      outputTokens?: number;
+      requestData?: unknown;
+      unbilledReason?: string;
+    } = {},
+  ): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error ?? 'unknown error');
+    await this.logAICall({
+      job_id: opts.jobId,
+      task,
+      model,
+      user_id: opts.attribution?.userId,
+      workspace_id: opts.attribution?.workspaceId,
+      // Tokens are usually unknown on a failure. 0 is the honest value here — the call produced
+      // nothing — and `unbilled_reason` is what distinguishes it from a free success.
+      input_tokens: opts.inputTokens ?? 0,
+      output_tokens: opts.outputTokens ?? 0,
+      cost: 0,
+      latency_ms: latencyMs,
+      action: 'fallback_to_rules',
+      fallback_reason: message.slice(0, 500),
+      request_data: opts.requestData ?? null,
+      error_message: message.slice(0, 2000),
+      unbilled_reason: opts.unbilledReason ?? 'call_failed',
+    });
+  }
+
+  /**
    * Log Claude API call
    */
   async logClaudeCall(
@@ -246,7 +320,8 @@ export class AICallLogger {
     confidenceBreakdown?: ConfidenceBreakdown,
     action?: 'use_ai_result' | 'fallback_to_rules',
     jobId?: string,
-    fallbackReason?: string
+    fallbackReason?: string,
+    attribution?: AICallAttribution,
   ): Promise<void> {
     const inputTokens = response.usage?.input_tokens || 0;
     const outputTokens = response.usage?.output_tokens || 0;
@@ -255,6 +330,8 @@ export class AICallLogger {
       job_id: jobId,
       task,
       model,
+      user_id: attribution?.userId,
+      workspace_id: attribution?.workspaceId,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       latency_ms: latencyMs,
@@ -278,7 +355,8 @@ export class AICallLogger {
     confidenceBreakdown?: ConfidenceBreakdown,
     action?: 'use_ai_result' | 'fallback_to_rules',
     jobId?: string,
-    fallbackReason?: string
+    fallbackReason?: string,
+    attribution?: AICallAttribution,
   ): Promise<void> {
     const inputTokens = response.usage?.prompt_tokens || 0;
     const outputTokens = response.usage?.completion_tokens || 0;
@@ -287,6 +365,8 @@ export class AICallLogger {
       job_id: jobId,
       task,
       model,
+      user_id: attribution?.userId,
+      workspace_id: attribution?.workspaceId,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       latency_ms: latencyMs,
@@ -306,12 +386,15 @@ export class AICallLogger {
     model: string,
     inputTokens: number,
     latencyMs: number,
-    jobId?: string
+    jobId?: string,
+    attribution?: AICallAttribution,
   ): Promise<void> {
     await this.logAICall({
       job_id: jobId,
       task,
       model,
+      user_id: attribution?.userId,
+      workspace_id: attribution?.workspaceId,
       input_tokens: inputTokens,
       output_tokens: 0,
       latency_ms: latencyMs,
@@ -324,7 +407,11 @@ export class AICallLogger {
 /**
  * Create AI logger instance
  */
-export function createAILogger(supabaseUrl: string, supabaseKey: string): AICallLogger {
-  return new AICallLogger(supabaseUrl, supabaseKey);
+export function createAILogger(
+  supabaseUrl: string,
+  supabaseKey: string,
+  attribution: AICallAttribution = {},
+): AICallLogger {
+  return new AICallLogger(supabaseUrl, supabaseKey, attribution);
 }
 

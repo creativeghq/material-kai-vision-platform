@@ -343,8 +343,23 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       selectQ = applyFiltersToQuery(selectQ, filterGroups, values);
       const { data: candidates, error: selErr } = await selectQ;
       if (selErr) throw selErr;
+      // The operator confirmed against `totalCount` (the exact server count). If the candidate
+      // fetch came back short — PostgREST's `db-max-rows` cap, a filter the count and the select
+      // disagree on — the delete silently covers less than what was confirmed, and the operator
+      // reads "done". Say so instead. (#365 AD-39)
+      const fetched = (candidates ?? []).length;
+      if (fetched < matchCount) {
+        toast({
+          title: 'Refusing to delete a partial set',
+          description:
+            `${matchCount} document(s) matched but only ${fetched} could be read back, so this ` +
+            'would delete part of what you confirmed. Narrow the filters and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
       const deletable = (candidates ?? []).filter((d: any) => !isDocLocked(d as KBDocument));
-      const skipped = (candidates ?? []).length - deletable.length;
+      const skipped = fetched - deletable.length;
       if (deletable.length === 0) {
         toast({
           title: 'All matching docs are locked',
@@ -379,6 +394,23 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
   const handleBulkUpdate = async (patch: { visibility?: 'public' | 'private'; status?: 'draft' | 'published' | 'archived' }) => {
     if (selectedIds.size === 0) return;
+
+    // `status: 'published'` and `visibility: 'public'` are the two settings that make a document
+    // internet-readable — `kb_docs_public_read` grants anon SELECT on published + public rows in a
+    // public category. Both were applied the instant the dropdown changed, so a mis-click
+    // published every selected document with no confirmation and no undo. (#365 AD-38)
+    const goesPublic = patch.status === 'published' || patch.visibility === 'public';
+    if (goesPublic) {
+      const n = selectedIds.size;
+      const what = patch.status === 'published' ? 'Publish' : 'Make public';
+      const ok = window.confirm(
+        `${what} ${n} document${n === 1 ? '' : 's'}?\n\n` +
+        'A document that is both published and public, in a public category, is readable by ' +
+        'anyone on the internet without signing in.',
+      );
+      if (!ok) return;
+    }
+
     setBulkBusy(true);
     try {
       const { error } = await supabase
