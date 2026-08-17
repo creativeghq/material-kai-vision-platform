@@ -1,4 +1,5 @@
 import { PDFDocument, PDFImage, PDFPage, rgb } from 'pdf-lib';
+import { formatMoney } from '../_shared/money.ts';
 import {
   CONTENT_TOP_Y,
   CONTENT_W,
@@ -1107,7 +1108,7 @@ export function buildFfeSchedule(
       it.install || '—',
       it.delivery || '—',
       String(it.qty),
-      it.price != null ? `€${it.price.toFixed(2)}` : '—',
+      formatMoney(it.price, it.currency || 'EUR'),
     ];
     for (let c = 0; c < cells.length; c++) {
       page.drawText(truncate(cells[c], Math.floor(colDefs[c].width / 5)), {

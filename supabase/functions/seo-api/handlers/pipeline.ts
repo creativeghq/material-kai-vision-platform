@@ -12,6 +12,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { escapeHtml } from '../../_shared/html.ts';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -390,8 +391,14 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       detailedReport: {},
     };
 
-    // Query existing platform articles for interlinking
-    const { data: existingArticlesRaw } = await supabase
+    // Query existing platform articles for interlinking.
+    //
+    // Scoped to the WORKSPACE, not just the author. A user who belongs to two workspaces was
+    // being offered their own articles from the other one as interlink targets — titles, slugs
+    // and target keywords from a tenant this article has nothing to do with, surfaced in a
+    // deliverable (#361 `EG-7`). `user_id` stays as well: with no workspace resolved (a user
+    // with no membership) the author is the only boundary there is.
+    let existingQuery = supabase
       .from('seo_articles')
       // `overall_score` is not a column and was never read from this result anyway — its
       // presence alone got the select rejected, so existingArticlesRaw was always null and
@@ -399,7 +406,9 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       .select('id, title, slug, target_keyword')
       .eq('user_id', userId)
       .eq('status', 'completed')
-      .neq('id', articleId)
+      .neq('id', articleId);
+    if (workspaceId) existingQuery = existingQuery.eq('workspace_id', workspaceId);
+    const { data: existingArticlesRaw } = await existingQuery
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -434,12 +443,15 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     let suggestedLinks = extractInternalLinks(finalMarkdown);
     let existingArticlesFinal = existingArticles;
     if (relatedSearches.length > 0) {
-      const { data: relatedMatchesRaw } = await supabase
+      let relatedQuery = supabase
         .from('seo_articles')
         .select('id, title, slug, target_keyword')
         .eq('user_id', userId)
         .eq('status', 'completed')
-        .neq('id', articleId)
+        .neq('id', articleId);
+      // Same workspace scoping as the query above — this one feeds the same suggestion list.
+      if (workspaceId) relatedQuery = relatedQuery.eq('workspace_id', workspaceId);
+      const { data: relatedMatchesRaw } = await relatedQuery
         // was `overall_score` (not a column) — the real one is `seo_score`, which the final
         // update writes from the same analysis.overallScore value.
         .order('seo_score', { ascending: false })
@@ -706,9 +718,44 @@ async function updateArticle(
   }
 }
 
-/** Basic markdown → HTML conversion */
+/**
+ * Schemes an `<a href>` in generated article HTML may carry.
+ *
+ * React 18 still renders a `javascript:` href (it warns, it does not block — #358), and this
+ * HTML is the deliverable an operator pastes into their CMS, where nothing warns at all.
+ */
+const SAFE_HREF_RE = /^(?:https?:\/\/|mailto:|tel:|[./#?])/i;
+
+/**
+ * URL for the `href` of a converted markdown link, or `#` when it is not one we will emit.
+ *
+ * The value arrives already HTML-escaped (see `markdownToHtml`), which is what makes a plain
+ * prefix test sufficient: an entity-encoded evasion like `&#106;avascript:` has had its `&`
+ * escaped to `&amp;` and reaches the browser as literal text, not as a scheme.
+ */
+function safeHref(escapedUrl: string): string {
+  // Strip whitespace and control characters, which browsers historically ignore INSIDE a
+  // scheme (`java<TAB>script:` is read as `javascript:`), before deciding what it is.
+  const probe = escapedUrl.replace(/[^\x21-\x7e]/g, '');
+  return SAFE_HREF_RE.test(probe) ? escapedUrl : '#';
+}
+
+/**
+ * Basic markdown → HTML conversion.
+ *
+ * The input is NOT trusted. It is model output, and the model was given Google's AI Overview
+ * text, the current featured snippet, PAA answers and competitor headings — all authored by
+ * whoever ranks for the watched query. This used to interpolate that straight into HTML: raw
+ * `<script>` in the markdown passed through untouched, and `[x](javascript:…)` became a live
+ * href (#361 `EG-6`, invariant 11).
+ *
+ * So the source is escaped ONCE, up front, with the canonical escaper — every tag emitted
+ * below is then a tag this function wrote, and every character that came from the model is
+ * text. The remaining hole after escaping is the one attribute we emit, which `safeHref`
+ * closes.
+ */
 function markdownToHtml(markdown: string): string {
-  let html = markdown;
+  let html = escapeHtml(markdown);
 
   // Headings
   html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
@@ -723,8 +770,12 @@ function markdownToHtml(markdown: string): string {
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // Links. `$2` is already escaped, so it is safe as an attribute VALUE; `safeHref` is what
+  // decides whether it is a URL we are willing to emit at all.
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_m, text: string, url: string) => `<a href="${safeHref(url)}">${text}</a>`,
+  );
 
   // Horizontal rule — must run BEFORE the list rule, which would otherwise read
   // `---` as a bullet, and before paragraph wrapping, which would emit `<p>---</p>`.

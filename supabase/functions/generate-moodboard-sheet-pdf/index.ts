@@ -186,8 +186,10 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     // Ownership check on user-JWT path. Service-role calls bypass this
     // because the upstream tool already verified moodboard ownership before
     // inserting the row.
+    // 404, not 403 — a 403 confirms the id exists, which is an enumeration oracle over other
+    // tenants' sheet ids. Same rule create-sheet.ts already follows (#361 `EG-15`).
     if (!auth.isService && auth.userId && sheet.created_by !== auth.userId) {
-      return jsonResponse({ success: false, error: 'Not authorized for this sheet' }, 403);
+      return jsonResponse({ success: false, error: 'Sheet not found' }, 404);
     }
 
     // sheet.data can embed quote_id / product_ids / included_sheet_ids
@@ -377,7 +379,12 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     pdfDoc.setCreator('Material Kai');
 
     const pdfBytes = await pdfDoc.save();
-    const storagePath = `moodboard-output/${sheet.moodboard_id}/sheet-${sheetId}.pdf`;
+    // Versioned path. This was a FIXED path written with `upsert: true`, so re-rendering a sheet
+    // overwrote the exact object a client was already holding a signed link to — they opened the
+    // link they were sent and silently got different content (#361 `EG-13`). A new render is a
+    // new object; the row points at the current one and `storage-orphan-cleanup-cron` reaps the
+    // superseded ones, since `pdf_storage_path` is what `build_storage_reference_set()` reads.
+    const storagePath = `moodboard-output/${sheet.moodboard_id}/sheet-${sheetId}-${Date.now()}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from('pdf-documents')
@@ -396,7 +403,11 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       .update({
         status: 'ready',
         pdf_storage_path: storagePath,
-        pdf_url: signed?.signedUrl ?? null,
+        // NOT the signed URL. `pdf-documents` is private, so a persisted URL is a 7-day
+        // credential that expires in place — the row keeps claiming a link that no longer
+        // works, and re-deriving it from the path is free (#361 `EG-12`, storage rule).
+        // Cleared rather than left, so an old stored URL cannot outlive this render.
+        pdf_url: null,
         pdf_generated_at: new Date().toISOString(),
         page_count: pageCount,
       })
@@ -503,7 +514,7 @@ async function buildClientViewPdf(
 
     if (!auth.isService && auth.userId) {
       const owns = view.created_by === auth.userId || project?.user_id === auth.userId;
-      if (!owns) return jsonResponse({ success: false, error: 'Not authorized for this client view' }, 403);
+      if (!owns) return jsonResponse({ success: false, error: 'Client view not found' }, 404);
     }
 
     if (!regenerate && view.pdf_storage_path && view.pdf_generation_status === 'completed') {
@@ -516,10 +527,37 @@ async function buildClientViewPdf(
     await supabase.from('project_client_views').update({ pdf_generation_status: 'generating' }).eq('id', viewId);
 
     const sheetIds: string[] = Array.isArray(view.sheet_ids) ? view.sheet_ids : [];
-    const sheets = await fetchSheets(supabase, sheetIds);
+
+    // ── Tenancy binding for everything the deck embeds (#361 `EG-11`) ──────────────────────
+    //
+    // The single-sheet path above threads a caller scope into every embedded fetch; this one
+    // called `fetchSheets` / `fetchProductChips` / `fetchQuoteFfeItems` with no scope at all,
+    // on the service role. `sheet_ids` and the sheets' own `product_ids` / `quote_id` are just
+    // ids on a row — a view pointing at another tenant's sheet rendered it, with that tenant's
+    // products and quote FF&E prices, into a CLIENT-FACING deck.
+    //
+    // Scope to the deck's OWNER rather than to the caller, because that is the invariant that
+    // holds for every entry point: this function is also invoked service-role by
+    // `moodboard-sheet-share` on behalf of an anonymous link holder, where there is no caller
+    // identity to scope by and the artifact is at its most exposed. A deck may contain its
+    // owner's material and nothing else.
+    const ownerId = view.created_by || project?.user_id;
+    let ownerWorkspaceIds: string[] = [];
+    if (ownerId) {
+      const { data: mems } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', ownerId);
+      ownerWorkspaceIds = (mems || []).map((m: { workspace_id: string }) => m.workspace_id);
+    }
+    // Unresolved owner → withhold. A deck we cannot attribute is one we cannot scope, and
+    // serving on a maybe is how this class of bug survives.
+    const deckScopeUserId = ownerId ?? '00000000-0000-0000-0000-000000000000';
+    const deckQuoteScope = { userId: deckScopeUserId, workspaceIds: ownerWorkspaceIds };
+
+    const sheets = await fetchSheets(supabase, sheetIds, deckScopeUserId);
     sheets.sort((a, b) => sheetIds.indexOf(a.id) - sheetIds.indexOf(b.id));
 
-    const ownerId = view.created_by || project?.user_id;
     // A client view is always project-scoped → brand under that project's workspace.
     const branding = ownerId
       ? await fetchOwnerBranding(supabase, ownerId, (project as { workspace_id?: string } | null)?.workspace_id)
@@ -556,8 +594,8 @@ async function buildClientViewPdf(
         pdfDoc, fonts,
         { ...td, sheet_label: sheetLabel(sheets[i].sheet_type) },
         sheets[i], i + 2, sheets.length + 1,
-        (ids) => fetchProductChips(supabase, ids),
-        (qid) => fetchQuoteFfeItems(supabase, qid),
+        (ids) => fetchProductChips(supabase, ids, ownerWorkspaceIds),
+        (qid) => fetchQuoteFfeItems(supabase, qid, deckQuoteScope),
       );
     }
     const pageCount = sheets.length + 1;
@@ -567,7 +605,9 @@ async function buildClientViewPdf(
     pdfDoc.setCreator('Material Kai');
 
     const pdfBytes = await pdfDoc.save();
-    const storagePath = `client-view-output/${view.project_id}/cv-${viewId}.pdf`;
+    // Versioned for the same reason as the sheet path above (#361 `EG-13`) — and more sharply
+    // here: a client view is the artifact whose link is actually mailed to a client.
+    const storagePath = `client-view-output/${view.project_id}/cv-${viewId}-${Date.now()}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from('pdf-documents')
       .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });

@@ -120,6 +120,12 @@ export interface FfeItem {
   delivery: string | null;
   qty: number;
   price?: number | null;
+  /**
+   * ISO code from the owning quote. The renderer hard-coded a € and every FF&E schedule
+   * printed euro regardless — on a document handed to a client (#361 `EG-14`). Null only when
+   * the quote could not be read, in which case the row prints no price rather than guessing.
+   */
+  currency?: string | null;
 }
 
 // area_breakdown — a single composited "design breakdown" board (one A3 page)

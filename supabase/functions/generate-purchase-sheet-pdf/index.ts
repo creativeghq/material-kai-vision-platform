@@ -26,6 +26,7 @@ import { escapeHtml } from '../_shared/html.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -64,6 +65,13 @@ interface Body {
   items?: PurchaseItem[];
   project_name?: string;
   mode?: 'per_item' | 'schedule' | 'both' | 'order';
+  /**
+   * Print `unit_cost` (the SUPPLIER cost) on the per-item spec pages. Off by default:
+   * the sheet is handed out as a specification and the endpoint returns a 7-day signed
+   * link, so cost has to be asked for rather than arrive by accident (#361 `EG-16`).
+   * Purchase-ORDER mode (`order_id`) is unaffected — a PO's subject IS the cost.
+   */
+  include_costs?: boolean;
   title?: string;
   // ---- purchase-order mode (send-to-supplier) ----
   // When set, renders a purchase ORDER (orders.order_type='purchase') + its
@@ -87,6 +95,7 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
 
   const body = (await req.json().catch(() => ({}))) as Body;
   const mode = body.mode || 'both';
+  const includeCosts = body.include_costs === true;
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   // Read items under the caller's RLS unless it's a service-role call.
@@ -143,12 +152,12 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
     for (const it of items) {
       const prefix = it.item_type === 'window' ? 'W' : it.item_type === 'door' ? 'D' : 'X';
       counters[prefix] = (counters[prefix] || 0) + 1;
-      await drawOrderSheet(pdf, font, bold, it, projectName, `${prefix}-${counters[prefix]}`);
+      await drawOrderSheet(pdf, font, bold, it, projectName, `${prefix}-${counters[prefix]}`, includeCosts);
     }
   }
   if (mode === 'per_item' || mode === 'both') {
     for (let i = 0; i < items.length; i++) {
-      await drawItemPage(pdf, font, bold, items[i], i + 1, projectName);
+      await drawItemPage(pdf, font, bold, items[i], i + 1, projectName, includeCosts);
     }
   }
 
@@ -430,7 +439,7 @@ function captionLines(it: PurchaseItem): string[] {
 // table on the right + a drawing-number block. This is what you'd send a
 // fabricator to ORDER one item.
 // =====================================================================
-async function drawOrderSheet(pdf: PDFDocument, font: any, bold: any, it: PurchaseItem, projectName: string, tag: string) {
+async function drawOrderSheet(pdf: PDFDocument, font: any, bold: any, it: PurchaseItem, projectName: string, tag: string, includeCosts: boolean) {
   const W = 841.89, H = 595.28, M = 40;
   const page = pdf.addPage([W, H]);
   const typeWord = it.item_type === 'door' ? 'DOOR' : it.item_type === 'window' ? 'WINDOW' : 'ITEM';
@@ -469,7 +478,7 @@ async function drawOrderSheet(pdf: PDFDocument, font: any, bold: any, it: Purcha
     ['Tag', tag],
     ['Type', it.name || '—'],
     ['Location', it.room_name || '—'],
-    ...specRows(it),
+    ...specRows(it, includeCosts),
   ];
   for (const [label, value] of rows) {
     page.drawText(label.toUpperCase(), { x: sx, y: sy, size: 8, font, color: GRAY });
@@ -496,6 +505,7 @@ async function drawItemPage(
   it: PurchaseItem,
   index: number,
   projectName: string,
+  includeCosts: boolean,
 ) {
   const W = 595.28, H = 841.89, M = 42;
   const page = pdf.addPage([W, H]);
@@ -532,7 +542,7 @@ async function drawItemPage(
   let sy = imgTop - 6;
   page.drawText(truncate(it.name, 40), { x: specX, y: sy, size: 12, font: bold, color: INK });
   sy -= 22;
-  for (const [label, value] of specRows(it)) {
+  for (const [label, value] of specRows(it, includeCosts)) {
     page.drawText(label.toUpperCase(), { x: specX, y: sy, size: 8, font, color: GRAY });
     const v = truncate(value, 26);
     page.drawText(v, { x: specX + specW - textW(bold, v, 9), y: sy, size: 9, font: bold, color: INK });
@@ -558,7 +568,7 @@ async function drawItemPage(
 }
 
 // ---- per-item helpers ----
-function specRows(it: PurchaseItem): [string, string][] {
+function specRows(it: PurchaseItem, includeCosts: boolean): [string, string][] {
   const d = it.details || {};
   const rows: [string, string][] = [];
   const push = (l: string, v: any, suffix = '') => { if (v != null && v !== '') rows.push([l, `${v}${suffix}`]); };
@@ -583,7 +593,14 @@ function specRows(it: PurchaseItem): [string, string][] {
     for (const [k, v] of Object.entries(d)) push(cap(k.replace(/_/g, ' ')), v);
   }
   push('Quantity', it.quantity ?? 1);
-  if (it.unit_cost != null) rows.push(['Unit price', money(Number(it.unit_cost), it.currency || 'EUR')]);
+  // `unit_cost` is what WE pay the supplier, not what the customer pays. It was labelled
+  // "Unit price" and printed by default, so an operator generating the default purchase
+  // specification saw a figure that reads as customer-facing and could forward the 7-day link
+  // as a spec sheet (#361 `EG-16`). Two changes: the label says what the number is, and the
+  // number only appears when the caller asked for it.
+  if (includeCosts && it.unit_cost != null) {
+    rows.push(['Supplier cost', money(Number(it.unit_cost), it.currency || 'EUR')]);
+  }
   return rows;
 }
 
@@ -686,12 +703,18 @@ function textW(font: any, t: string, size: number): number { return font.widthOf
 function truncate(s: string, n: number): string { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 function cap(s: string): string { s = String(s ?? ''); return s ? s[0].toUpperCase() + s.slice(1) : s; }
 const money = (n: number, cur: string) => formatMoney(n, cur);
+/**
+ * Image bytes for a stored `design_image_url`.
+ *
+ * Was `fetch(url)` + `res.arrayBuffer()`: no scheme check, no SSRF guard, redirects followed,
+ * no content-type check and no size cap (#361 `EG-18`). It was the eighth site of that shape
+ * and the only one that hand-rolled its own rather than calling the shared helper — which is
+ * why fixing `fetchImageBytesFromUrl` did not close it. There is one guarded, bounded way to
+ * fetch an image from a URL and this is a caller of it, not a ninth copy.
+ */
 async function fetchBytes(url: string): Promise<Uint8Array | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return new Uint8Array(await res.arrayBuffer());
-  } catch { return null; }
+  const img = await fetchImageGuardedOrNull(url);
+  return img?.bytes ?? null;
 }
 async function embedImage(pdf: PDFDocument, bytes: Uint8Array): Promise<any | null> {
   try { return await pdf.embedJpg(bytes); } catch { /* try png */ }
@@ -780,12 +803,27 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
     subtotal: Number(order.subtotal_net || 0),
     vat: Number(order.vat_amount || 0),
     total: Number(order.total || 0),
-    lines: items.map((it: any) => ({
-      description: it.description || '—',
-      qty: Number(it.quantity || 0),
-      unitCost: Number(it.unit_cost ?? it.unit_price ?? 0),
-      lineTotal: Number(it.line_total ?? (Number(it.quantity || 0) * Number(it.unit_cost ?? it.unit_price ?? 0))),
-    })),
+    // The header prints the STORED `subtotal_net` / `vat_amount` / `total`, so the lines must
+    // print the stored `line_total` and nothing else. The fallback here re-derived
+    // `quantity * unit_cost` whenever `line_total` was null or stale — a second derivation of a
+    // money quantity, in the renderer, which is the one place forbidden to derive. After a
+    // discount, currency or tax edit that produced a document whose lines did not add up to its
+    // own total, with no error anywhere (#361 `EG-20`). A missing line total is a data defect:
+    // fail, rather than print a plausible number onto a document sent to a supplier.
+    lines: items.map((it: any) => {
+      if (it.line_total === null || it.line_total === undefined) {
+        throw new HttpError(
+          422,
+          `Order line "${it.description ?? '(unnamed)'}" has no stored line_total — reprice the order before sending it.`,
+        );
+      }
+      return {
+        description: it.description || '—',
+        qty: Number(it.quantity || 0),
+        unitCost: Number(it.unit_cost ?? it.unit_price ?? 0),
+        lineTotal: Number(it.line_total),
+      };
+    }),
   });
   const bytes = await pdf.save();
   const pageCount = pdf.getPageCount();

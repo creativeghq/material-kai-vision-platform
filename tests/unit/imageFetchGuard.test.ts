@@ -139,4 +139,42 @@ describe('every server-side image fetch goes through it', () => {
         'defect this guard exists to stop:\n  ' + offenders.join('\n  '),
     ).toEqual([]);
   });
+
+  // The sweep above keys on the function's NAME, and that is exactly how the eighth site
+  // survived it: `generate-purchase-sheet-pdf` called its copy `fetchBytes`, so a test looking
+  // for `fetchImage*` reported the codebase clean while a raw, redirect-following, uncapped
+  // `fetch(it.design_image_url)` sat in it (#361 `EG-18`). A list of the names somebody already
+  // thought of is not coverage.
+  //
+  // So this one keys on where the URL CAME FROM instead. `fetch(mivaaUrl)` is this runtime
+  // calling a service it chose; `fetch(item.design_image_url)` is this runtime resolving a host
+  // out of a database row that a model, a supplier feed or a user put there. Only the second is
+  // invariant 7, and a property access ending in url/href/src is what distinguishes them.
+  it('no edge function fetches a stored URL field directly', () => {
+    // `x.image_url`, `row.design_image_url`, `c.href`, `p.src` — but not a local `mivaaUrl`.
+    const STORED_URL_FIELD = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.(?:\w*_)?(?:url|uri|href|src)$/i;
+    const offenders: string[] = [];
+
+    for (const file of walk(FUNCS)) {
+      if (file === HELPER) continue;
+      const src = codeOnly(read(file));
+      // The file already delegates or guards — nothing to prove.
+      if (/\bfetchImageGuarded(OrNull)?\b|\bfetchBinaryGuarded\b|\bassertSafeUrl\b/.test(src)) continue;
+
+      const re = /\bfetch\s*\(\s*([A-Za-z_$][\w$.]*)\s*[,)]/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(src))) {
+        if (!STORED_URL_FIELD.test(m[1])) continue;
+        offenders.push(`${file.replace(ROOT, '').replace(/\\/g, '/')}: fetch(${m[1]})`);
+      }
+    }
+
+    const unique = [...new Set(offenders)];
+    expect(
+      unique,
+      'a stored URL is being fetched server-side with no SSRF guard. The host comes out of a ' +
+        'row, so it is chosen by whoever wrote the row. Use fetchImageGuarded / ' +
+        'fetchBinaryGuarded from _shared/fetch-image.ts:\n  ' + unique.join('\n  '),
+    ).toEqual([]);
+  });
 });

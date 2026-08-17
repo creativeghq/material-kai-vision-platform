@@ -661,16 +661,67 @@ async function importGrid(
     throw new HttpError(400, `No row carried a usable goods code (${skipped} rows skipped)`);
   }
 
+  // Completeness is recorded SEPARATELY from progress (#361 `EG-19`).
+  //
+  // `taric_upsert_batch` stamps `imported_at` on every row it writes, so after twelve of
+  // twenty-five batches the newest `imported_at` in the table is seconds old — and the
+  // staleness probe, which read `max(imported_at)`, went quiet while the nomenclature was half
+  // old and half new with stale parent links. The partial failure REPAIRED the signal that
+  // existed to catch it. So this run opens as `running`, and only reaches `completed` after
+  // every batch AND the parent rebuild have succeeded; anything else lands as `failed`, with
+  // the reason, where an admin can see it.
+  const { data: runRow } = await supabase
+    .from('taric_import_runs')
+    .insert({
+      source,
+      status: 'running',
+      rows_in_file: rows.length - 1,
+      rows_parsed: parsed.length,
+      rows_skipped: skipped,
+    })
+    .select('id')
+    .single();
+  const runId: string | null = (runRow as { id?: string } | null)?.id ?? null;
+
+  const failRun = async (message: string) => {
+    if (!runId) return;
+    await supabase
+      .from('taric_import_runs')
+      .update({ status: 'failed', error_message: message.slice(0, 2000), completed_at: new Date().toISOString() })
+      .eq('id', runId);
+  };
+
   let upserted = 0;
-  for (let i = 0; i < parsed.length; i += BATCH_SIZE) {
-    const batch = parsed.slice(i, i + BATCH_SIZE);
-    const { data, error } = await supabase.rpc('taric_upsert_batch', { p_rows: batch });
-    if (error) throw new Error(`taric_upsert_batch failed at row ${i}: ${error.message}`);
-    upserted += Number(data ?? 0);
+  let linkedCount = 0;
+  try {
+    for (let i = 0; i < parsed.length; i += BATCH_SIZE) {
+      const batch = parsed.slice(i, i + BATCH_SIZE);
+      const { data, error } = await supabase.rpc('taric_upsert_batch', { p_rows: batch });
+      if (error) throw new Error(`taric_upsert_batch failed at row ${i}: ${error.message}`);
+      upserted += Number(data ?? 0);
+    }
+
+    const { data: linked, error: parentErr } = await supabase.rpc('taric_rebuild_parents');
+    if (parentErr) throw new Error(`taric_rebuild_parents failed: ${parentErr.message}`);
+    linkedCount = Number(linked ?? 0);
+  } catch (err) {
+    await failRun(err instanceof Error ? err.message : String(err));
+    throw err;
   }
 
-  const { data: linked, error: parentErr } = await supabase.rpc('taric_rebuild_parents');
-  if (parentErr) throw new Error(`taric_rebuild_parents failed: ${parentErr.message}`);
+  // Past here the import IS complete. This write is the only thing that makes the reference
+  // data count as fresh.
+  if (runId) {
+    await supabase
+      .from('taric_import_runs')
+      .update({
+        status: 'completed',
+        rows_upserted: upserted,
+        parents_linked: linkedCount,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', runId);
+  }
 
   const { count } = await supabase
     .from('taric_codes').select('code', { count: 'exact', head: true }).eq('declarable', true);
@@ -682,7 +733,7 @@ async function importGrid(
     rows_parsed: parsed.length,
     rows_upserted: upserted,
     rows_skipped: skipped,
-    parents_linked: Number(linked ?? 0),
+    parents_linked: linkedCount,
     columns: Object.fromEntries(
       Object.entries(cols).map(([f, idx]) => [f, headers[idx as number]]),
     ) as Partial<Record<Field, string>>,
@@ -691,15 +742,28 @@ async function importGrid(
 }
 
 async function stats(supabase: any) {
-  const [{ count: total }, { count: declarable }, { data: latest }] = await Promise.all([
+  const [{ count: total }, { count: declarable }, { data: latest }, { data: lastRun }] = await Promise.all([
     supabase.from('taric_codes').select('code', { count: 'exact', head: true }),
     supabase.from('taric_codes').select('code', { count: 'exact', head: true }).eq('declarable', true),
     supabase.from('taric_codes').select('imported_at').order('imported_at', { ascending: false }).limit(1),
+    supabase.from('taric_import_runs').select('status, started_at, completed_at, error_message')
+      .order('started_at', { ascending: false }).limit(1),
   ]);
+  const { data: lastOk } = await supabase
+    .from('taric_import_runs')
+    .select('completed_at')
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1);
   return {
     total: total ?? 0,
     declarable: declarable ?? 0,
-    last_import: latest?.[0]?.imported_at ?? null,
+    // `last_import` is the last COMPLETED import. `newest_row` is the old field under an
+    // honest name — a partial import advances it, so it answers "when was anything last
+    // written", not "when was the nomenclature last whole" (#361 `EG-19`).
+    last_import: lastOk?.[0]?.completed_at ?? null,
+    newest_row: latest?.[0]?.imported_at ?? null,
+    last_attempt: lastRun?.[0] ?? null,
   };
 }
 

@@ -10,6 +10,11 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { readCapped } from '../_shared/fetch-image.ts';
+
+/** Ceiling on a supplier XML feed. The largest real one seen is ~12 MB. */
+const MAX_FEED_BYTES = 64 * 1024 * 1024;
 
 interface ScheduledJob {
   id: string;
@@ -75,15 +80,28 @@ serve(withApiLogging('scheduled-import-runner', async (req) => {
 
     for (const job of scheduledJobs as ScheduledJob[]) {
       try {
-        // Fetch XML from source URL (30s timeout)
+        // Fetch XML from source URL (30s timeout).
+        //
+        // `job.source_url` is a stored supplier feed URL — a host chosen by whoever configured
+        // the job, resolved by this runtime. Unguarded it reaches RFC1918 space and the cloud
+        // metadata endpoint, `redirect: 'follow'` re-opens that after any check, and
+        // `.text()` read whatever the far end sent into a 256 MB isolate with no ceiling
+        // (invariant 7). Found by the sweep added for #361 `EG-18`.
+        const safeSourceUrl = await assertSafeUrl(job.source_url, { allowSchemes: ['https:', 'http:'] });
         const fetchController = new AbortController();
         const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000);
-        const xmlResponse = await fetch(job.source_url, { signal: fetchController.signal }).finally(() => clearTimeout(fetchTimeout));
+        const xmlResponse = await fetch(safeSourceUrl, {
+          signal: fetchController.signal,
+          redirect: 'error',
+        }).finally(() => clearTimeout(fetchTimeout));
         if (!xmlResponse.ok) {
           throw new Error(`Failed to fetch XML: ${xmlResponse.statusText}`);
         }
 
-        const xmlContent = await xmlResponse.text();
+        // Bounded read. `readCapped` aborts the stream the moment the cap is passed, so peak
+        // memory does not depend on what the supplier's server decides to send.
+        const xmlBytes = await readCapped(xmlResponse, MAX_FEED_BYTES);
+        const xmlContent = new TextDecoder().decode(xmlBytes);
         const xmlBase64 = btoa(xmlContent);
 
         // Call xml-import-orchestrator to create new import job

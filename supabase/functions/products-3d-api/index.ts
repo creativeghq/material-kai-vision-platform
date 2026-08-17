@@ -23,6 +23,7 @@
  *   • product → one published product: media, gross price, and its glb/gltf/usdz models
  */
 import { serviceClient } from '../_shared/supabase-client.ts';
+import { captureException } from '../_shared/sentry.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import {
   authenticateEmbedKey, embedJson, intersectIdFilters, type EmbedKeyContext,
@@ -837,9 +838,23 @@ Deno.serve(withApiLogging((req) => {
         origin: req.headers.get('Origin') ?? null,
       },
     });
-    // Report the failure but never 500 the widget over telemetry.
-    if (insErr) console.error('[products-3d-api] event insert failed', insErr.message);
-    return embedJson({ ok: true }, 200, cors);
+    // Never 500 the widget over telemetry — a visitor's page must not break because an
+    // analytics row would not write. But `console.error` + `{ ok: true }` meant an RLS or
+    // schema regression left merchant analytics at exactly zero indefinitely while every
+    // widget call reported success, which is the platform's dominant failure shape
+    // (`ops.silent_zero`, #361 `EG-21`). Two changes: the error is CAPTURED rather than
+    // logged into a stream nobody reads, and the response says plainly that the event was
+    // not recorded, so a caller (and a smoke test) can tell the difference.
+    if (insErr) {
+      console.error('[products-3d-api] event insert failed', insErr.message);
+      void captureException(new Error(`3D embed analytics insert failed: ${insErr.message}`), {
+        tags: { function_name: 'products-3d-api', action: 'track_event' },
+        extra: { event_type: eventType, product_id: productId, workspace_id: workspaceId },
+        fingerprint: ['products-3d-api', 'analytics-insert-failed'],
+      });
+      return embedJson({ ok: true, recorded: false }, 200, cors);
+    }
+    return embedJson({ ok: true, recorded: true }, 200, cors);
   }
 
   return embedJson({ error: `Unknown action: ${action}` }, 400, cors);

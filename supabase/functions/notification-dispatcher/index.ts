@@ -4,6 +4,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { createClient } from '@supabase/supabase-js';
 import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
 // Deno-native Web Push (RFC 8291 payload encryption + RFC 8292 VAPID). Uses only
@@ -258,7 +259,14 @@ async function sendWebhooks(
 
           const whController = new AbortController();
           const whTimeout = setTimeout(() => whController.abort(), 15_000);
-          const response = await fetch(webhook.url, {
+          // Guarded at DELIVERY time (invariant 7). `webhook.url` is tenant-configured, and
+          // DNS behind a stored hostname can be re-pointed at an internal address long after
+          // the row was written — so validating on save is not enough. `redirect: 'error'`
+          // below matters for the same reason: a public URL can 302 to an address nothing
+          // checked. Mirrors `workspace-webhook-dispatcher`, which already does this; this
+          // call site is the copy that did not. Found by the sweep added for #361 `EG-18`.
+          const safeWebhookUrl = await assertSafeUrl(webhook.url, { allowSchemes: ['https:', 'http:'] });
+          const response = await fetch(safeWebhookUrl, {
             method: 'POST',
             headers,
             body: JSON.stringify(payload),

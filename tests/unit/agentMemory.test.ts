@@ -155,7 +155,14 @@ describe('provenance and traces exist', () => {
 describe('no substitute embedder', () => {
   it('uses the platform voyage-4 helper and nothing else', () => {
     expect(memoryCode).toContain('generateStandardEmbedding');
-    expect(memoryCode).toContain("embedding_model: 'voyage-4'");
+    // The stored `embedding_model` is read FROM the generator, not written as a literal here.
+    // This asserted the literal `embedding_model: 'voyage-4'` until 5200cfa4 (#365) replaced it
+    // with `embeddingModelName()`, which resolves `EMBEDDING_CONFIG.model` — so the label can no
+    // longer disagree with the model that actually produced the vector, which is the thing this
+    // case exists to protect. Pinning the literal now pins the WRONG half: it would pass while
+    // the generator was swapped underneath it.
+    expect(memoryCode).toMatch(/embedding_model:\s*await embeddingModelName\(\)/);
+    expect(memoryCode).toContain('EMBEDDING_CONFIG.model');
     expect(memoryCode).not.toMatch(/openai|text-embedding-ada|OpenAIEmbeddings/i);
   });
 

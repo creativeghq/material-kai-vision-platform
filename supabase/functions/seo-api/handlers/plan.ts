@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { serpBlock, serpValue } from './untrusted.ts';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -257,21 +258,22 @@ function buildPlanningUserPrompt(
 ): string {
   const secondaries = research.recommendedSecondaries
     .slice(0, 10)
-    .map((k) => `${k.term} (vol: ${k.searchVolume}, KD: ${k.keywordDifficulty ?? '?'})`)
+    .map((k) => `${serpValue(k.term, 120)} (vol: ${k.searchVolume}, KD: ${k.keywordDifficulty ?? '?'})`)
     .join('\n  ');
 
   const competitorHeadings = research.serpInsights
     .slice(0, 5)
-    .map((c) => `- #${c.position} "${c.title}" (${c.domain})`)
+    .map((c) => `- #${c.position} "${serpValue(c.title, 300)}" (${serpValue(c.domain, 120)})`)
     .join('\n');
 
-  const gaps = research.contentGapOpportunities.slice(0, 10).join('\n  - ');
+  const gaps = research.contentGapOpportunities.slice(0, 10).map((g) => serpValue(g, 300)).join('\n  - ');
 
-  const paaList = research.paaQuestions.slice(0, 10).join('\n  - ');
+  const paaList = research.paaQuestions.slice(0, 10).map((q) => serpValue(q, 300)).join('\n  - ');
 
   const lsiTerms = research.clusters
     .flatMap((c) => c.lsiKeywords)
     .slice(0, 20)
+    .map((t) => serpValue(t, 120))
     .join(', ');
 
   const signals = research.serpSignals;
@@ -279,8 +281,8 @@ function buildPlanningUserPrompt(
     ? `
 
 === GOOGLE'S AI OVERVIEW (current generative answer) ===
-${signals.aiOverviewText}
-Cited sources: ${(signals.aiOverviewReferences || []).map((r) => r.domain || r.url).filter(Boolean).slice(0, 8).join(', ') || 'none'}
+${serpValue(signals.aiOverviewText, 2000)}
+Cited sources: ${(signals.aiOverviewReferences || []).map((r) => serpValue(r.domain || r.url, 120)).filter(Boolean).slice(0, 8).join(', ') || 'none'}
 Brand mentioned in AI Overview: ${signals.aiOverviewBrandMentioned ? 'YES' : 'NO'}`
     : '';
 
@@ -288,8 +290,8 @@ Brand mentioned in AI Overview: ${signals.aiOverviewBrandMentioned ? 'YES' : 'NO
     ? `
 
 === FEATURED SNIPPET TO OUTRANK (position 0) ===
-Currently held by: ${signals.featuredSnippetTarget.domain || 'unknown'}
-Current snippet: "${signals.featuredSnippetTarget.description}"
+Currently held by: ${serpValue(signals.featuredSnippetTarget.domain, 120) || 'unknown'}
+Current snippet: "${serpValue(signals.featuredSnippetTarget.description, 600)}"
 Goal: write a 40-60 word answer in a single paragraph immediately after a matching H2 to displace this.`
     : '';
 
@@ -297,7 +299,7 @@ Goal: write a 40-60 word answer in a single paragraph immediately after a matchi
     ? `
 
 === GOOGLE'S RELATED SEARCHES (intent cluster) ===
-  - ${signals.relatedSearches.slice(0, 10).join('\n  - ')}
+  - ${signals.relatedSearches.slice(0, 10).map((t) => serpValue(t, 200)).join('\n  - ')}
 These are queries Google groups with the primary keyword by user intent. Cover them as subsections or H3s.`
     : '';
 
@@ -308,7 +310,7 @@ These are queries Google groups with the primary keyword by user intent. Cover t
 === PAA WITH CURRENT TOP-ANSWER SNIPPETS ===
 ${paaAnswers
   .slice(0, 8)
-  .map((a) => `- Q: ${a.question}${a.answerSnippet ? `\n  Current top answer: "${a.answerSnippet}"` : ''}`)
+  .map((a) => `- Q: ${serpValue(a.question, 300)}${a.answerSnippet ? `\n  Current top answer: "${serpValue(a.answerSnippet, 600)}"` : ''}`)
   .join('\n')}
 Target each as an FAQ entry, write a tighter answer than the current one shown.`
     : '';
@@ -319,7 +321,7 @@ Target each as an FAQ entry, write a tighter answer than the current one shown.`
 === KEYWORD INTENT CLASSIFICATION ===
 ${Object.entries(signals.keywordIntents)
   .slice(0, 10)
-  .map(([k, v]) => `- ${k}: ${v}`)
+  .map(([k, v]) => `- ${serpValue(k, 120)}: ${serpValue(v, 60)}`)
   .join('\n')}
 Match the article's structure to the dominant intent of the primary keyword.`
     : '';
@@ -332,7 +334,7 @@ ${topic}
 === PRIMARY KEYWORD ===
 ${targetKeyword} (volume: ${research.recommendedPrimary.searchVolume}, KD: ${research.recommendedPrimary.keywordDifficulty ?? '?'})
 
-=== TOP SECONDARY KEYWORDS ===
+${serpBlock(`=== TOP SECONDARY KEYWORDS ===
   ${secondaries}
 
 === LSI TERMS ===
@@ -346,7 +348,7 @@ ${competitorHeadings}
 
 === PEOPLE ALSO ASK ===
   - ${paaList}
-${aiOverviewSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}
+${aiOverviewSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}`)}
 
 === TOTAL ADDRESSABLE VOLUME ===
 ${research.totalAddressableVolume} monthly searches across all related keywords

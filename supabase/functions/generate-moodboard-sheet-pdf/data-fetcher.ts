@@ -248,12 +248,13 @@ export async function fetchQuoteFfeItems(
 ): Promise<FfeItem[]> {
   // Verify the caller owns the quote before reading its items,
   // else an embedded foreign quote_id would leak that tenant's FF&E pricing.
+  const { data: quoteRow } = await supabase
+    .from('quotes')
+    .select('user_id, workspace_id, currency')
+    .eq('id', quoteId)
+    .maybeSingle();
   if (scope) {
-    const { data: q } = await supabase
-      .from('quotes')
-      .select('user_id, workspace_id')
-      .eq('id', quoteId)
-      .maybeSingle();
+    const q = quoteRow;
     const ownsQuote = !!q && (
       (q as any).user_id === scope.userId ||
       (scope.workspaceIds.length > 0 && scope.workspaceIds.includes((q as any).workspace_id))
@@ -285,6 +286,7 @@ export async function fetchQuoteFfeItems(
     delivery: row.delivery_date ?? null,
     qty: row.quantity ?? 1,
     price: row.unit_price ?? null,
+    currency: (quoteRow as { currency?: string | null } | null)?.currency ?? null,
   }));
 }
 

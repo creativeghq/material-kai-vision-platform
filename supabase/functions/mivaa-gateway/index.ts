@@ -177,16 +177,111 @@ const MIVAA_ENDPOINTS = {
   'openapi_json': { path: '/openapi.json', method: 'GET' },  // OpenAPI schema
 };
 
+/** Hard cap on a forwarded multipart upload. */
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Every `{param}` an endpoint template can carry. Also the exclusion list for query-string
+ * and body construction further down, so one list cannot drift from the other.
+ */
+const PATH_PARAM_KEYS = [
+  'job_id', 'document_id', 'session_id', 'doc_id', 'product_id',
+  'stage', 'category', 'prompt_id', 'entity_id', 'image_id',
+  'factory_name', 'task_type', 'model_name',
+] as const;
+
+/**
+ * Resolve an endpoint template against the payload, URL-encoding every value.
+ *
+ * Only `factory_name` was encoded; the other twelve were interpolated raw. That let a
+ * non-admin call `rag_get_job` with `job_id = "../../../admin/system/metrics?x="`: the
+ * template `/api/rag/documents/job/{job_id}` does not start with `/api/admin`, so the admin
+ * guard passed, and the resolved path then normalised to `/api/admin/system/metrics` and was
+ * sent to MIVAA under the gateway's privileged credential (#361 `EG-1`). Encoding turns the
+ * `../` into `..%2F`, which is a path SEGMENT rather than a traversal.
+ */
+function substitutePathParams(template: string, payload: Record<string, unknown> | null): string {
+  let out = template;
+  for (const key of PATH_PARAM_KEYS) {
+    const token = `{${key}}`;
+    if (!out.includes(token)) continue;
+    const raw = payload?.[key];
+    if (raw === undefined || raw === null || raw === '') continue;
+    out = out.split(token).join(encodeURIComponent(String(raw)));
+  }
+  return out;
+}
+
+/**
+ * Collapse `.` / `..` segments the way a URL parser will before MIVAA's router sees the path.
+ *
+ * The authorization decision has to be made on the path that will actually be REQUESTED, not
+ * on the string we happen to hold — that gap is the whole of `EG-1`. Encoding above already
+ * closes it; this is the second half, so a future edit that reintroduces a raw substitution
+ * fails the guard instead of slipping past it.
+ */
+function normalizePath(path: string): string {
+  const rawPath = path.split(/[?#]/)[0];
+  const out: string[] = [];
+  for (const seg of rawPath.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') { out.pop(); continue; }
+    out.push(seg);
+  }
+  return '/' + out.join('/');
+}
+
+/** True when the RESOLVED path lands anywhere under MIVAA's admin subtree. */
+function isAdminPath(path: string): boolean {
+  return normalizePath(path).startsWith('/api/admin');
+}
+
 /**
  * Handle file upload for RAG processing
  * Forwards multipart/form-data to MIVAA RAG upload endpoint
  */
-async function handleFileUpload(req: Request): Promise<Response> {
+async function handleFileUpload(
+  req: Request,
+  ctx: { isAdmin: boolean; userId: string | null },
+): Promise<Response> {
   try {
     console.log('📦 Processing file upload for RAG');
 
+    // Reject an oversized body BEFORE `req.formData()` reads it into the isolate. The header is
+    // a CLAIM, but it is the only signal available ahead of the parse, and the parse is the
+    // unbounded step: previously this path had no cap at all (#361 `EG-2`).
+    const claimedLength = Number(req.headers.get('content-length') ?? NaN);
+    if (Number.isFinite(claimedLength) && claimedLength > MAX_UPLOAD_BYTES) {
+      return new Response(
+        JSON.stringify({ error: 'Upload too large', max_bytes: MAX_UPLOAD_BYTES }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Get the form data from the request
     const formData = await req.formData();
+
+    // Tenancy binding (invariant 1). This forwards a privileged credential to MIVAA, whose
+    // /api/rag/* routes are excluded from its own JWT middleware and trust a body-supplied
+    // workspace_id. The JSON path has verified membership since the round-3 audit; multipart
+    // returned above the auth block entirely, so a spoofed `workspace_id` form field was
+    // never checked against anything (#361 `EG-2`).
+    const claimedWorkspace = formData.get('workspace_id');
+    if (!ctx.isAdmin && ctx.userId && typeof claimedWorkspace === 'string' && claimedWorkspace) {
+      const wsCheck = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY());
+      const { data: wsMember } = await wsCheck
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', ctx.userId)
+        .eq('workspace_id', claimedWorkspace)
+        .maybeSingle();
+      if (!wsMember) {
+        return new Response(
+          JSON.stringify({ error: 'You are not a member of the requested workspace' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
 
     // Log form data fields (without file content)
     console.log('📋 Form fields:');
@@ -325,15 +420,30 @@ async function handleFileUpload(req: Request): Promise<Response> {
  * Handle job status check
  * Forwards to MIVAA job status endpoint
  */
-async function handleJobStatus(jobId: string): Promise<Response> {
+async function handleJobStatus(
+  jobId: string,
+  req: Request,
+  ctx: { isAdmin: boolean },
+): Promise<Response> {
   try {
     console.log(`🔍 Checking job status for: ${jobId}`);
 
-    const statusUrl = `${MIVAA_SERVICE_URL()}/api/rag/documents/job/${jobId}`;
+    // jobId is already stripped to [A-Za-z0-9-] by the caller, so it cannot carry a traversal
+    // segment; encode anyway so this stays correct if that filter is ever loosened.
+    const statusUrl = `${MIVAA_SERVICE_URL()}/api/rag/documents/job/${encodeURIComponent(jobId)}`;
+
+    // /api/rag/* is excluded from MIVAA's own JWT middleware and resolves the caller in-handler
+    // via get_optional_workspace_context, so forwarding the real user JWT is what makes MIVAA
+    // enforce ownership on the job. Same rule as the JSON rag path. Admin-secret and cron
+    // callers (no user JWT) keep the service key.
+    const callerAuth = req.headers.get('authorization');
+    const forwardedAuth = (!ctx.isAdmin && callerAuth && callerAuth.startsWith('Bearer '))
+      ? callerAuth
+      : `Bearer ${MIVAA_API_KEY()}`;
 
     const response = await fetch(statusUrl, {
       headers: {
-        'Authorization': `Bearer ${MIVAA_API_KEY()}`,
+        'Authorization': forwardedAuth,
       },
     });
 
@@ -414,6 +524,22 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     const url = new URL(req.url);
     const contentType = req.headers.get('content-type') || '';
 
+    // --- AUTH FIRST, for every shape of request ---
+    // This block used to sit BELOW the job-status and multipart branches, so both returned
+    // before anything authenticated them: `handleFileUpload` forwarded the privileged MIVAA
+    // credential for a caller with no JWT at all, and job-status read MIVAA the same way
+    // (#361 `EG-2`, `EG-3`). Nothing here reads the body, so authenticating up front costs the
+    // multipart path nothing — `req.formData()` still gets an unconsumed stream.
+    const auth = await authenticate(req);
+    const isAdmin = isAdminAccess(auth);
+
+    if (!isAdmin && (!auth.success || !auth.userId)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Handle job status check via URL path
     // Example: /job-status/abc-123-def
     if (url.pathname.startsWith('/job-status/')) {
@@ -423,13 +549,13 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      return await handleJobStatus(jobId);
+      return await handleJobStatus(jobId, req, { isAdmin });
     }
 
     // Handle multipart/form-data for file uploads (RAG upload endpoint)
     if (contentType.includes('multipart/form-data')) {
       console.log('🚀 MIVAA Gateway: Handling multipart/form-data file upload');
-      return await handleFileUpload(req);
+      return await handleFileUpload(req, { isAdmin, userId: auth.userId ?? null });
     }
 
     // Handle regular JSON requests
@@ -438,17 +564,6 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     console.log(`🚀 MIVAA Gateway Request: ${action}`, payload);
     console.log(`📋 MIVAA Service URL: ${MIVAA_SERVICE_URL()}`);
     console.log(`🔑 MIVAA API Key configured: ${!!Deno.env.get('MIVAA_API_KEY')}`);
-
-    // --- AUTH (all actions, not just billable) ---
-    const auth = await authenticate(req);
-    const isAdmin = isAdminAccess(auth);
-
-    if (!isAdmin && (!auth.success || !auth.userId)) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required', action }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
 
     // Cross-tenant guard: this gateway forwards the platform SERVICE key to MIVAA, and MIVAA's
     // /api/rag/* routes trust the body `workspace_id` for the `service=mivaa` identity without
@@ -486,13 +601,30 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       );
     }
 
+    const endpoint = MIVAA_ENDPOINTS[action];
+
+    // Resolve path parameters BEFORE the authorization gate below. The gate used to test
+    // `endpoint.path` — the TEMPLATE — while substitution happened afterwards, unencoded, so
+    // the string it authorized and the string that was sent were different strings (#361
+    // `EG-1`). Resolving first also puts it ahead of the credit debit, so a request that is
+    // about to be refused never charges for the privilege.
+    let finalPath = substitutePathParams(endpoint.path, payload ?? null);
+
+    // Encoding cannot leave a bare `..` segment; this fails loudly if one ever appears again.
+    if (finalPath.split(/[/?#]/).includes('..')) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid path parameter', action }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // platform-admin actions (path under /api/admin) must require an
     // admin/super_admin role. Previously the only gate was "authenticated", so ANY
     // logged-in user could invoke admin_delete_job / admin_cleanup_data /
     // admin_backup_data / admin_prompts_update etc. under the gateway's trusted
     // MIVAA identity. Admin-secret (trusted backend) callers are exempt; everyone else
     // is re-checked for the role and 403'd if they lack it.
-    if (!isAdmin && MIVAA_ENDPOINTS[action].path.startsWith('/api/admin')) {
+    if (!isAdmin && isAdminPath(finalPath)) {
       const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
       if (!adminAuth.success) {
         return new Response(
@@ -567,60 +699,10 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       }
     }
 
-    let endpoint = MIVAA_ENDPOINTS[action];
-    let finalPath = endpoint.path;
-
-    // Handle path parameters
-    if (payload && payload.job_id && finalPath.includes('{job_id}')) {
-      finalPath = finalPath.replace('{job_id}', payload.job_id);
-    }
-    if (payload && payload.document_id && finalPath.includes('{document_id}')) {
-      finalPath = finalPath.replace('{document_id}', payload.document_id);
-    }
-    if (payload && payload.session_id && finalPath.includes('{session_id}')) {
-      finalPath = finalPath.replace('{session_id}', payload.session_id);
-    }
-    // Knowledge Base path parameters
-    if (payload && payload.doc_id && finalPath.includes('{doc_id}')) {
-      finalPath = finalPath.replace('{doc_id}', payload.doc_id);
-    }
-    if (payload && payload.product_id && finalPath.includes('{product_id}')) {
-      finalPath = finalPath.replace('{product_id}', payload.product_id);
-    }
-    // Admin prompts path parameters
-    if (payload && payload.stage && finalPath.includes('{stage}')) {
-      finalPath = finalPath.replace('{stage}', payload.stage);
-    }
-    if (payload && payload.category && finalPath.includes('{category}')) {
-      finalPath = finalPath.replace('{category}', payload.category);
-    }
-    if (payload && payload.prompt_id && finalPath.includes('{prompt_id}')) {
-      finalPath = finalPath.replace('{prompt_id}', payload.prompt_id);
-    }
-    // Entity and image path parameters
-    if (payload && payload.entity_id && finalPath.includes('{entity_id}')) {
-      finalPath = finalPath.replace('{entity_id}', payload.entity_id);
-    }
-    if (payload && payload.image_id && finalPath.includes('{image_id}')) {
-      finalPath = finalPath.replace('{image_id}', payload.image_id);
-    }
-    if (payload && payload.factory_name && finalPath.includes('{factory_name}')) {
-      finalPath = finalPath.replace('{factory_name}', encodeURIComponent(payload.factory_name));
-    }
-    if (payload && payload.task_type && finalPath.includes('{task_type}')) {
-      finalPath = finalPath.replace('{task_type}', payload.task_type);
-    }
-    if (payload && payload.model_name && finalPath.includes('{model_name}')) {
-      finalPath = finalPath.replace('{model_name}', payload.model_name);
-    }
-
     // Handle query parameters for GET requests
-    // Exclude path parameters from query string
-    const pathParamKeys = [
-      'job_id', 'document_id', 'session_id', 'doc_id', 'product_id',
-      'stage', 'category', 'prompt_id', 'entity_id', 'image_id',
-      'factory_name', 'task_type', 'model_name'
-    ];
+    // Exclude path parameters from query string; `PATH_PARAM_KEYS` is the one list, shared with
+    // `substitutePathParams` above, so the two cannot disagree about what is a path parameter.
+    const pathParamKeys: readonly string[] = PATH_PARAM_KEYS;
     if (endpoint.method === 'GET' && payload && Object.keys(payload).length > 0) {
       const queryParams = new URLSearchParams();
       Object.entries(payload).forEach(([key, value]) => {

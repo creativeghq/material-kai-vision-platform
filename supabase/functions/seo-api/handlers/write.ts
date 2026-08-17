@@ -9,6 +9,7 @@
  */
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
+import { serpBlock, serpValue } from './untrusted.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
@@ -285,10 +286,10 @@ State this explicitly wherever our data is cited — one clause is enough ("meas
  */
 async function buildSerpSignalsWriterBlock(supabase: DbClient, signals?: SerpSignalBlob): Promise<string> {
   if (!signals) return '';
-  let block = '\n\n=== SERP-AWARE WRITING TARGETS ===';
+  let block = '=== SERP-AWARE WRITING TARGETS ===';
 
   if (signals.aiOverviewText) {
-    block += `\n\n**AI Overview text Google currently shows:**\n"${signals.aiOverviewText.slice(0, 800)}"`;
+    block += `\n\n**AI Overview text Google currently shows:**\n"${serpValue(signals.aiOverviewText, 800)}"`;
     if (signals.aiOverviewBrandMentioned === false) {
       block += `\nGoal: write paragraphs Google's AI would prefer to cite over the current sources. Use direct-answer first sentence, statistics with attribution, and structured definitions. Match the tone but go deeper.`;
     } else {
@@ -297,29 +298,33 @@ async function buildSerpSignalsWriterBlock(supabase: DbClient, signals?: SerpSig
   }
 
   if (signals.featuredSnippetTarget?.description) {
-    block += `\n\n**Featured snippet to displace** (currently held by ${signals.featuredSnippetTarget.domain || 'unknown'}):\n"${signals.featuredSnippetTarget.description}"\nThe TL;DR block's lead sentence MUST answer the same question more concisely (40–60 words) so Google considers replacing the current snippet.`;
+    block += `\n\n**Featured snippet to displace** (currently held by ${serpValue(signals.featuredSnippetTarget.domain, 120) || 'unknown'}):\n"${serpValue(signals.featuredSnippetTarget.description, 600)}"\nThe TL;DR block's lead sentence MUST answer the same question more concisely (40–60 words) so Google considers replacing the current snippet.`;
   }
 
   const paaAnswers = signals.paaAnswers || [];
   if (paaAnswers.length) {
     block += `\n\n**PAA answers currently shown by Google** — write tighter answers than these for the matching FAQ entries:`;
     for (const a of paaAnswers.slice(0, 6)) {
-      block += `\n- Q: ${a.question}`;
+      block += `\n- Q: ${serpValue(a.question, 300)}`;
       if (a.answerSnippet) {
-        block += `\n  Current answer: "${a.answerSnippet.slice(0, 240)}"`;
+        block += `\n  Current answer: "${serpValue(a.answerSnippet, 240)}"`;
       }
     }
   }
 
   if (signals.relatedSearches?.length) {
-    block += `\n\n**Related searches Google clusters with this query** (use as natural cross-references in body, not forced):\n${signals.relatedSearches.slice(0, 8).map((t) => `- ${t}`).join('\n')}`;
+    block += `\n\n**Related searches Google clusters with this query** (use as natural cross-references in body, not forced):\n${signals.relatedSearches.slice(0, 8).map((t) => `- ${serpValue(t, 200)}`).join('\n')}`;
   }
 
   if (signals.knowledgeGraphPresent === false) {
     block += await getToolPrompt(supabase, 'seo_writer_no_knowledge_panel');
   }
 
-  return block;
+  // Everything above is Google's rendering of pages we do not control: the AI Overview
+  // paragraph, the snippet a competitor currently holds, the answers Google shows under PAA.
+  // It went into the writer prompt raw, so a competitor page could address the writer directly
+  // (#361 `EG-5`, invariant 9). Fenced and labelled as data.
+  return serpBlock(block);
 }
 
 async function buildWritingUserPrompt(
@@ -334,7 +339,7 @@ async function buildWritingUserPrompt(
     : '   (no FAQs provided — generate 4–6 reasonable questions matching search intent)';
 
   return renderPromptTemplate(await getGenerationPrompt(supabase, 'seo_writer_user'), { outline: outline, featured_snippet_target: (plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description)
-  ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description}"\n`
+  ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${serpValue(plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description, 600)}"\n`
   : '', faq_list: faqList, primary_keyword: plan.primaryKeyword, secondary_keywords: plan.secondaryKeywords.join(', '), lsi_keywords: plan.lsiKeywords.join(', '), target_word_count: plan.targetWordCount });
 }
 
