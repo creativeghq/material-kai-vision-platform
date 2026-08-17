@@ -59,10 +59,19 @@ const ID_SOURCES: { file: string; extract: (src: string) => string[] }[] = [
   },
   {
     // The video model dropdown — the exact surface that offered a 404 model at 12 credits.
+    // Anchored on the VIDEO_MODEL_OPTIONS declaration rather than on the JSX: the list was
+    // hoisted out of the render when the picker and the generator's CREDIT_COSTS had to be
+    // reconciled (#363 follow-up), and an extractor pinned to `].map(vm =>` matched nothing
+    // afterwards. This test caught that itself, because it asserts its own extractor found
+    // something — keep that property when moving this anchor again.
     file: 'src/components/features/ai/ProgressiveImageGrid.tsx',
     extract: (src) => {
-      const block = src.match(/\{ value: 'veo-2',[\s\S]*?\]\.map\(vm =>/)?.[0] ?? '';
-      return [...block.matchAll(/value: '([^']+)'/g)].map((m) => m[1]);
+      const block = src.match(/const VIDEO_MODEL_OPTIONS[\s\S]*?\n\];/)?.[0] ?? '';
+      return [...block.matchAll(/value: '([^']+)'/g)]
+        .map((m) => m[1])
+        // 'auto' is a routing instruction to the generator, not a model id, so it has no
+        // registry row to find.
+        .filter((id) => id !== 'auto');
     },
   },
 ];

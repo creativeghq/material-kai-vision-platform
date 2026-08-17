@@ -2617,7 +2617,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // z.enum — the drift guard resolves this key against it, not against
           // generate_vr_world.model, by matching the offered values.
           { key: 'model', label: 'Model', kind: 'select', default: 'veo-2', options: [
-            { value: 'veo-2', label: 'Veo 2 — 30 credits' },
+            { value: 'veo-2', label: 'Veo 2 — 50 credits' },
             { value: 'kling-v3.0', label: 'Kling v3.0 — 20 credits' },
             { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 credits' },
           ] },

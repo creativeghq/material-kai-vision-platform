@@ -20,6 +20,32 @@ import { onEnterOrSpace } from '@/utils/a11y';
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { imageUrlToBase64 } from '@/utils/imageToBase64';
+/**
+ * Video models and what they cost, in one place.
+ *
+ * These MUST match `CREDIT_COSTS` in `generate-interior-video-v2` — that map is what the
+ * generator actually debits; this is only what the picker advertises. They are checked against
+ * each other by tests/unit/videoCreditFloor.test.ts, because a picker showing one price while
+ * the generator charges another is a support ticket, not a compile error.
+ *
+ * `auto` has no credits: the model is chosen server-side from the video type, so the price is
+ * not known until then.
+ */
+const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
+  value: string; label: string; description: string; credits?: number;
+}> = [
+  { value: 'auto', label: 'Auto', description: 'Best model selected automatically' },
+  // `value` MUST match generate-interior-video-v2's VideoModel keys exactly. It used to emit
+  // 'kling-3.0' and 'wan2.1-i2v', neither of which the generator knows: CREDIT_COSTS[model]
+  // came back undefined, debit_credits was called with p_amount undefined, a generation_videos
+  // row was written with credits_used undefined, and the run then threw "Unknown model" and
+  // refunded undefined credits. Wan's price was also advertised at 10 while the generator
+  // charged 12.
+  { value: 'veo-2', label: 'Veo 2', description: 'Google Veo 2 — high quality', credits: 50 },
+  { value: 'kling-v3.0', label: 'Kling 3.0', description: 'Kling 3.0 — cinematic + audio', credits: 20 },
+  { value: 'runway-gen4-turbo', label: 'Runway Gen-4', description: 'Runway Gen-4 — premium output', credits: 40 },
+];
+
 interface ModelResult {
   model_id: string;
   model_name: string;
@@ -1143,19 +1169,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-64">
                           <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Used Model</DropdownMenuLabel>
-                          {[
-                            { value: 'auto',              label: 'Auto',           description: 'Best model selected automatically' },
-                            // `value` MUST match generate-interior-video-v2's VideoModel keys
-                            // exactly. It used to emit 'kling-3.0' and 'wan2.1-i2v', neither of
-                            // which the generator knows: CREDIT_COSTS[model] came back undefined,
-                            // debit_credits was called with p_amount undefined, a generation_videos
-                            // row was written with credits_used undefined, and the run then threw
-                            // "Unknown model" and refunded undefined credits. Wan's price was also
-                            // advertised at 10 while the generator charges 12.
-                            { value: 'veo-2',             label: 'Veo 2',          description: 'Google Veo 2 — high quality',        credits: 30 },
-                            { value: 'kling-v3.0',        label: 'Kling 3.0',     description: 'Kling 3.0 — cinematic + audio',      credits: 20 },
-                            { value: 'runway-gen4-turbo', label: 'Runway Gen-4',   description: 'Runway Gen-4 — premium output',      credits: 40 },
-                          ].map(vm => (
+                          {VIDEO_MODEL_OPTIONS.map(vm => (
                             <DropdownMenuItem key={vm.value} onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }} className="gap-1.5">
                               <Check className={cn('w-3 h-3 flex-shrink-0', videoModel === vm.value ? 'opacity-100' : 'opacity-0')} />
                               <div className="flex-1 min-w-0">
@@ -1180,7 +1194,14 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                 <div className="font-medium text-xs">{vt.label}</div>
                                 <div className="text-[11px] text-muted-foreground">{vt.description}</div>
                               </div>
-                              <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">30 cr</span>
+                              {/* Priced by the selected MODEL, not by the style — every style row
+                                  read a hardcoded "30 cr", so choosing Kling showed 30 and charged
+                                  20, and choosing Runway showed 30 and charged 40. */}
+                              {VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits != null && (
+                                <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">
+                                  {VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits} cr
+                                </span>
+                              )}
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuContent>

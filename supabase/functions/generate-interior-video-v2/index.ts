@@ -5,7 +5,7 @@
  * Routes to the best model based on video_type or explicit model override.
  *
  * Models:
- *   veo-2           → 30 credits (Google, cinematic walkthroughs)
+ *   veo-2           → 50 credits (Google, cinematic walkthroughs)
  *   kling-v3.0      → 20 credits (native SDK, cinematic + audio)
  *   (budget tier vacant — wan2.1-i2v-720p was deleted upstream by Replicate; see issue #4)
  *   runway-gen4-turbo → 40 credits (Replicate, premium quality)
@@ -42,8 +42,23 @@ type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
+// Every price here must cover the provider bill for a MAX-LENGTH clip of that model, because
+// MAX_DURATION_SECONDS below is what the caller can actually ask for and the fee is flat.
+//
+// The arithmetic, using the rates in `ai_model_pricing` and the platform's declared 1.5x markup,
+// against the WORST credit price we sell (the premium pack, ~$0.085/credit — a credit bought
+// cheaper still has to cover the same bill):
+//
+//   veo-2              8s x $0.35/s = $2.80 -> x1.5 = $4.20 -> >= 50 credits
+//   kling-v3.0        10s x $0.10/s = $1.00 -> x1.5 = $1.50 -> >= 18 credits (20 charged)
+//   runway-gen4-turbo 10s x $0.15/s = $1.50 -> x1.5 = $2.25 -> >= 27 credits (40 charged)
+//
+// veo-2 was 30. A full 8-second clip cost $2.80 and earned about $2.70, so the platform paid
+// customers to use its most expensive model — and nothing surfaced it, because a flat fee is a
+// valid number and the provider cost was not in `ai_usage_logs` at all until #363 `EE-2` put it
+// there. Pinned by tests/unit/videoCreditFloor.test.ts.
 const CREDIT_COSTS: Record<VideoModel, number> = {
-  'veo-2':              30,
+  'veo-2':              50,
   'kling-v3.0':         20,
   'runway-gen4-turbo':  40,
 };
