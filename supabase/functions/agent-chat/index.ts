@@ -459,7 +459,14 @@ function createAgentGraph(
       try {
         const logRows = toolCalls.map((toolCall: any, i: number) => {
           const settled = toolSettled[i];
-          const success = settled.status === 'fulfilled';
+          // `fulfilled` only means the tool did not THROW. Nearly every tool here reports its
+          // own failures by RETURNING `{success:false, error}` — a returned refusal is the
+          // normal path, not the exceptional one — so keying the log on the promise state
+          // recorded them all as successes. A `generate_gemini` call that bailed in 1ms
+          // because it had no reference image logged `success:true, error_message:null`, and
+          // the conversation it failed in reads as 4/4 healthy tool calls on any dashboard
+          // built over this table. Honour the payload's own verdict.
+          let success = settled.status === 'fulfilled';
           let resultCount: number | null = null;
           let zeroResult = false;
           let resultSummary: any = null;
@@ -469,6 +476,10 @@ function createAgentGraph(
             try {
               const tr = (settled as any).value.toolResult;
               const parsed = typeof tr === 'string' ? JSON.parse(tr) : tr;
+              if (parsed && typeof parsed === 'object' && parsed.success === false) {
+                success = false;
+                errorMessage = typeof parsed.error === 'string' ? parsed.error : 'tool reported success:false';
+              }
               // Try to extract a result count from common shapes
               if (Array.isArray(parsed?.results)) {
                 resultCount = parsed.results.length;
@@ -1137,9 +1148,11 @@ async function executeAgent(
 
   // Resolve toolkits → tool IDs. alwaysOn clusters (core, calculators) are always included.
   const toolkitToolIds = new Set<string>();
+  const activeToolkitIds: string[] = [];
   for (const [id, def] of Object.entries(TOOLKIT_CLUSTERS)) {
     if (def.alwaysOn || (selectedToolkits || []).includes(id)) {
       for (const t of def.tool_ids) toolkitToolIds.add(t);
+      activeToolkitIds.push(id);
     }
   }
   // Always make load_toolkit available so the agent can request more clusters
@@ -1181,6 +1194,33 @@ async function executeAgent(
       }
       return urls;
     });
+
+  // Images the user UPLOADED on an EARLIER turn.
+  //
+  // `images` is this turn's uploads only, and `conversationImages` above is generated output
+  // only — so an image the user attached one turn ago was reachable by nothing. The user would
+  // attach a photo, the agent would answer, the user would say "now change the date on it", and
+  // `generate_gemini(mode:'image-edit')` would find no reference and return "no image available"
+  // in ~1ms — after which the agent truthfully reported that no image had been received and the
+  // user re-uploaded the identical file. Two full Opus turns, ~27 credits, to arrive back where
+  // the first upload already was.
+  //
+  // Kept as its own list rather than merged into `conversationImages`: that array means "images
+  // this agent MADE", several tools take `.at(-1)` of it as "the thing we were last working on",
+  // and an upload is not that.
+  const priorUploadedImages: string[] = messages
+    .filter((m: any) => m.role === 'user')
+    .flatMap((m: any) => {
+      const raw = m.images ?? m.metadata?.attachedImages;
+      return Array.isArray(raw) ? raw.filter((u: unknown) => typeof u === 'string' && u) : [];
+    });
+
+  // What the image tools should treat as "the user's image". This turn's uploads win; when the
+  // user attached nothing this turn we fall back to what they attached before. Deliberately NOT
+  // used for vision blocks, tool binding, or model routing — those must keep keying off a real
+  // upload on THIS turn, or every subsequent turn would re-bill the image and `visual_search`
+  // would bind forever after a single photo.
+  const toolImages: string[] = images.length > 0 ? images : priorUploadedImages.slice(-1);
 
   // Collect material results from search tool calls
   let collectedProducts: any[] = [];
@@ -1232,6 +1272,42 @@ async function executeAgent(
     systemPrompt += formatSkillsForSystemPrompt(agentId);
   } catch (skillErr) {
     console.warn('⚠️ Could not load skills metadata:', skillErr);
+  }
+
+  // Which toolkits are ALREADY bound.
+  //
+  // `load_toolkit` advertises every loadable cluster and says nothing about which are already
+  // live, so the agent spends a tool call — and an extra model round trip — re-loading a
+  // toolkit it could already call. In the trace that prompted this, `generation` was active
+  // from the first message and the agent still called `load_toolkit('generation')` before
+  // reaching `generate_gemini`.
+  if (activeToolkitIds.length > 0) {
+    systemPrompt += `\n\n[CONTEXT] Toolkits already loaded for this turn: ${activeToolkitIds.join(', ')}. `
+      + `Their tools are bound and callable right now — do NOT call load_toolkit for any of them. `
+      + `Use load_toolkit only for a cluster that is not in that list.`;
+  }
+
+  // What the user has ATTACHED, said in words.
+  //
+  // The line below has existed for generated images since forever; the equivalent for uploads
+  // did not, and an attached image is only present as a vision content block on the last user
+  // message. That is enough for "what colour is this sofa" and not enough for an instruction
+  // whose object is the image: given a photo plus "update the date and the name", the agent
+  // loaded the DOCUMENTS toolkit and asked whether this was a quote, a contract or a CRM
+  // contact — reasonable words for a request it read as an ERP edit, and a wasted turn.
+  //
+  // Naming the attachment (and where the tools will find it) is what makes the difference
+  // between "some record" and "the file in front of you".
+  if (images.length > 0) {
+    systemPrompt += `\n\n[CONTEXT] The user attached ${images.length} image(s) to THIS message. `
+      + `They are already loaded as the reference for the image tools — call generate_gemini `
+      + `(mode=image-edit for a targeted change, redesign/copy-style for a room) with no `
+      + `referenceImageUrl and the attached image is used automatically. If the user's instruction `
+      + `describes changing something, the thing they mean is the attached image, not a database record.`;
+  } else if (priorUploadedImages.length > 0) {
+    systemPrompt += `\n\n[CONTEXT] The user attached an image EARLIER in this conversation and has not `
+      + `attached a new one on this turn. It is still available to the image tools as the default `
+      + `reference — do NOT tell the user no image was received, and do not ask them to re-upload.`;
   }
 
   // If there are previously generated images in the conversation, remind the agent to use them for follow-up edits
@@ -2064,9 +2140,9 @@ async function executeAgent(
     // edit instructions, so they'd just produce off-prompt full redesigns.
     const GEMINI_ONLY_MODES = ['floor-plan-render', 'copy-style', 'floor-plan-text', 'image-edit'];
     if (!generationMode || !GEMINI_ONLY_MODES.includes(generationMode)) {
-      tools.push(create3DGenerationTool(userId, workspaceId, onChunk, images, conversationImages));
+      tools.push(create3DGenerationTool(userId, workspaceId, onChunk, toolImages, conversationImages));
     }
-    tools.push(createGeminiGenerationTool(userId, workspaceId, images, conversationImages, onChunk, pinnedMaterialImages, generationMode, conversation_id ?? undefined));
+    tools.push(createGeminiGenerationTool(userId, workspaceId, toolImages, conversationImages, onChunk, pinnedMaterialImages, generationMode, conversation_id ?? undefined));
     tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
     tools.push(createGenerationStatusTool());
   }
@@ -2597,6 +2673,7 @@ async function promoteTurnToMemory(
   userInput: string,
   agentResponse: string,
   conversationId?: string | null,
+  turnDidWork = true,
 ) {
   const result = await longTermMemory.promote({
     userId,
@@ -2605,13 +2682,14 @@ async function promoteTurnToMemory(
     userInput,
     agentResponse,
     conversationId: conversationId ?? null,
+    turnDidWork,
   });
 
   if (result.usage && result.usage.totalTokens > 0) {
     await logAgentUsage(userId, workspaceId, `${agentId}:memory`, {
       ...result.usage,
       turnCount: 1,
-    });
+    }, [], { conversationId: conversationId ?? null });
   }
 
   if (result.promoted > 0) {
@@ -2651,7 +2729,13 @@ async function logAgentUsage(
     modelName: string;
     turnCount: number;
   },
-  toolsCalled: Array<{ name: string; duration_ms?: number }> = []
+  toolsCalled: Array<{ name: string; duration_ms?: number }> = [],
+  // `log_agent_usage` has taken both of these since it was written and this caller passed
+  // neither, so every row landed with conversation_id NULL and latency_ms NULL — 100% of
+  // them. The cost of a conversation could not be asked of the table that records it, and the
+  // latency column sat empty next to a `responseTimeMs` the frontend was already storing in
+  // message metadata (two places, one of them blank: the shape CLAUDE.md warns about).
+  attribution: { conversationId?: string | null; latencyMs?: number | null } = {},
 ) {
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
@@ -2662,12 +2746,14 @@ async function logAgentUsage(
       const { data, error } = await supabase.rpc('log_agent_usage', {
         p_user_id: userId,
         p_workspace_id: workspaceId,
+        p_conversation_id: attribution.conversationId ?? null,
         p_agent_type: agentType,
         p_turn_number: usage.turnCount,
         p_model_name: usage.modelName,
         p_input_tokens: usage.inputTokens,
         p_output_tokens: usage.outputTokens,
-        p_tools_called: toolsCalled
+        p_tools_called: toolsCalled,
+        p_latency_ms: attribution.latencyMs ?? null,
       });
 
       if (error) {
@@ -3142,7 +3228,10 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // and not one promoted memory, with nothing logged either way, because the work never
           // got to fail. The payments webhook already used this pattern for the same reason.
           void runInBackground(
-            promoteTurnToMemory(userId, workspaceId, agentId, userInput, finalResult.text, conversation_id),
+            promoteTurnToMemory(
+              userId, workspaceId, agentId, userInput, finalResult.text, conversation_id,
+              (finalResult.toolResults?.length ?? 0) > 0,
+            ),
             'agent-memory',
           );
 
@@ -3188,7 +3277,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               workspaceId,
               agentId,
               finalResult.usage,
-              toolsCalled
+              toolsCalled,
+              { conversationId: conversation_id, latencyMs: Date.now() - executeStartTime },
             ).catch(err => console.error('❌ Background usage logging failed:', err));
 
             // Log to unified ai_call_logs table (fire-and-forget)
@@ -3242,7 +3332,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                 void logAgentUsage(userId, workspaceId, `${agentId}:next_steps`, {
                   ...proposal.usage,
                   turnCount: 1,
-                });
+                }, [], { conversationId: conversation_id });
               }
             } catch (nextStepsErr) {
               console.error('❌ next-steps generation failed:', nextStepsErr);

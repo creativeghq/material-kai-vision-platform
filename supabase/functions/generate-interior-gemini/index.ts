@@ -47,6 +47,7 @@ import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
+import { assertEditableSource } from '../_shared/image-edit-gate.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
@@ -519,6 +520,34 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const uploadCtx: Partial<SessionPathCtx> = { userId: resolvedUserId, conversationId: body.conversation_id };
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
   const mode: GenerationMode = body.mode ?? detectMode(body);
+
+  // ── What may be edited (see _shared/image-edit-gate.ts) ──────────────────────────────
+  // This function is the chokepoint for every image the platform alters: the agent's
+  // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
+  // and generate-vr-world all land here. The gate goes HERE and not in the agent's prompt
+  // because three of those five callers never involve a model turn at all.
+  //
+  // Above the debit on purpose: a blocked edit must not cost the user credits.
+  //
+  // Only the modes that transform a SUPPLIED image. text-to-image and floor-plan-text invent
+  // an image from words and have no source to classify.
+  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render'];
+  if (EDIT_MODES.includes(mode) && body.reference_image_url) {
+    // An image this platform generated is exempt — we made it, and re-classifying every
+    // "warmer lighting" on our own render would tax the normal design loop for nothing.
+    // Recognised by its storage path, not by the caller's word for it.
+    const isOurs = /\/generation-images\/.*\/gen\//.test(body.reference_image_url);
+    const gate = await assertEditableSource(
+      supabase,
+      body.reference_image_url,
+      body.edit_instruction ?? body.prompt ?? '',
+      isOurs,
+    );
+    if (!gate.allowed) {
+      console.warn(`[generate-interior-gemini] edit refused (${gate.documentKind ?? 'unknown'}) user=${resolvedUserId} mode=${mode}`);
+      return jsonResponse({ success: false, error: gate.message, refused: true }, 422);
+    }
+  }
   // Single source for provider + price (see _shared/generation-routing.ts): credits
   // are keyed off the label of the model that actually runs, so the two can't drift.
   const routing = resolveGenerationRouting(mode, body.model_tier);

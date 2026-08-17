@@ -1,8 +1,3 @@
-import type { DbClient } from './supabase-client.ts';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { createClient } from '@supabase/supabase-js';
-import { getToolPrompt } from './prompt-utils.ts';
-import { MARKUP_MULTIPLIER } from './pricing-constants.ts';
 
 /**
  * Shared MIVAA Embedding Utilities for Supabase Functions
@@ -108,58 +103,14 @@ function validateConfig(): void {
  * @throws Error if embedding generation fails
  */
 /**
- * Fire-and-forget write to ai_usage_logs for embedding calls.
- * Estimates tokens from text length (1 token ≈ 4 chars).
+ * There is deliberately NO embedding usage-logger here.
+ *
+ * There used to be: this file wrote its own `ai_usage_logs` row for every embedding. It never
+ * actually fired, because `generateStandardEmbedding` 404'd on every call from the day it was
+ * written — so the double-count it would have caused stayed hidden too. `/api/embeddings/clip-text`
+ * on MIVAA bills the call it makes, and takes `workspace_id` to attribute it. One call, one
+ * billing row, derived where the spend happens.
  */
-async function _logEmbeddingUsage(
-  text: string,
-  latencyMs: number,
-  operationType: string,
-  jobId?: string,
-  /**
-   * Who the embedding was for. This row is the billing record and it carried NEITHER id — not
-   * even a user — so it was owned by nobody: invisible to per-tenant cost views and to this
-   * table's own `auth.uid() = user_id OR is_workspace_admin(workspace_id)` policy, which cannot
-   * match when both are null. Optional because some callers genuinely have no tenant (a query
-   * embedding on a public search path); null must keep meaning "no owner", never "we had one".
-   */
-  owner?: { userId?: string | null; workspaceId?: string | null },
-): Promise<void> {
-  try {
-    const supabaseUrl = getEnv('SUPABASE_URL');
-    const serviceKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceKey) return;
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const estimatedTokens = Math.ceil(text.length / 4);
-    const costPer1M = 0.06; // voyage-4
-    const rawCost = (estimatedTokens / 1_000_000) * costPer1M;
-    const billedCost = rawCost * MARKUP_MULTIPLIER;
-
-    const { error } = await supabase.from('ai_usage_logs').insert({
-      user_id: owner?.userId ?? null,
-      workspace_id: owner?.workspaceId ?? null,
-      operation_type: operationType,
-      model_name: 'voyage-4',
-      input_tokens: estimatedTokens,
-      output_tokens: 0,
-      input_cost_usd: rawCost,
-      output_cost_usd: 0,
-      raw_cost_usd: rawCost,
-      markup_multiplier: MARKUP_MULTIPLIER,
-      billed_cost_usd: billedCost,
-      job_id: jobId || null,
-      metadata: { latency_ms: latencyMs, source: 'edge_function' },
-    });
-    // Not blocking, but never silent: this row IS the billing record. A swallowed failure here
-    // is the exact silent-zero shape CLAUDE.md documents (stamp_job_refresh_cost referenced a
-    // missing column, the exception was eaten, and billing sat at 0 for months while embeddings
-    // kept running). Logging it is what lets ops.silent_zero and a log grep see the gap.
-    if (error) console.error('[embedding-utils] ai_usage_logs insert failed — usage unbilled:', error.message);
-  } catch (e) {
-    console.error('[embedding-utils] ai_usage_logs insert threw — usage unbilled:', e);
-  }
-}
 
 export async function generateStandardEmbedding(
   text: string,
@@ -174,7 +125,6 @@ export async function generateStandardEmbedding(
   const truncatedText = text.length > 8000 ? text.substring(0, 8000) : text;
 
   let lastError: Error | null = null;
-  const startTime = Date.now();
 
   // Retry logic
   for (let attempt = 1; attempt <= EMBEDDING_CONFIG.maxRetries; attempt++) {
@@ -184,7 +134,20 @@ export async function generateStandardEmbedding(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), MIVAA_CONFIG.timeout);
 
-      const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/mivaa/gateway`, {
+      // POST the MIVAA ROUTE, not the gateway envelope. This used to send
+      // `{action:'generate_embedding'}` to `${gatewayUrl}/api/mivaa/gateway` — but
+      // `/api/mivaa/gateway` is the shape of the SUPABASE EDGE proxy, not a path MIVAA
+      // serves, and `generate_embedding` is not in that proxy's action map either. So the
+      // call 404'd on every attempt, from every caller, since it was written: agent
+      // long-term memory recall silently degraded to its recency fallback on every turn
+      // (100% of `agent_memories` rows have `embedding IS NULL`), and each turn paid ~3s of
+      // retries for it. Nothing failed loudly because every caller treats "no embedding" as
+      // a degradation rather than an error.
+      //
+      // `/api/embeddings/clip-text` is the voyage-4 TEXT endpoint despite the name — the
+      // CLIP one is `/clip-image`. `verify_internal_access` on it accepts the `mk_` platform
+      // key as a Bearer token, which is what MIVAA_API_KEY holds.
+      const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/embeddings/clip-text`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${MIVAA_CONFIG.apiKey}`,
@@ -192,13 +155,13 @@ export async function generateStandardEmbedding(
           'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
         },
         body: JSON.stringify({
-          action: 'generate_embedding',
-          payload: {
-            text: truncatedText,
-            model: EMBEDDING_CONFIG.model,
-            dimensions: EMBEDDING_CONFIG.dimensions,
-            input_type: inputType, // Add input_type for Voyage AI
-          },
+          text: truncatedText,
+          model: EMBEDDING_CONFIG.model,
+          dimensions: EMBEDDING_CONFIG.dimensions,
+          input_type: inputType, // Add input_type for Voyage AI
+          // Attribution only, never authorization — the route says so explicitly. Passing it
+          // is also what lets MIVAA own the billing row (see the note on _logEmbeddingUsage).
+          workspace_id: logCtx?.workspaceId ?? null,
         }),
         signal: controller.signal,
       });
@@ -207,15 +170,22 @@ export async function generateStandardEmbedding(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        throw new Error(`MIVAA embedding error: ${response.status} - ${errorData.detail || errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
       if (!result.success) {
-        throw new Error(`MIVAA embedding error: ${result.error?.message || 'Unknown error'}`);
+        throw new Error(`MIVAA embedding error: ${result.error || 'Unknown error'}`);
       }
 
-      const embedding = result.data.embedding;
+      const embedding = result.embedding;
+
+      // A non-array here means the route answered in a shape we do not understand. Say so
+      // rather than letting `.length` read `undefined` and fall through as a dimension
+      // mismatch — the two are different bugs and only one of them is retryable.
+      if (!Array.isArray(embedding)) {
+        throw new Error(`MIVAA embedding error: response carried no embedding array (got ${typeof embedding})`);
+      }
 
       // Validate embedding dimensions
       if (embedding.length !== EMBEDDING_CONFIG.dimensions) {
@@ -224,16 +194,11 @@ export async function generateStandardEmbedding(
 
       console.log(`✅ Embedding generated via MIVAA successfully: ${embedding.length} dimensions`);
 
-      // Fire-and-forget usage logging — never blocks the caller
-      const elapsedMs = Date.now() - startTime;
-      _logEmbeddingUsage(
-        truncatedText,
-        elapsedMs,
-        logCtx?.operationType ?? `embedding:${inputType}`,
-        logCtx?.jobId,
-        { userId: logCtx?.userId, workspaceId: logCtx?.workspaceId },
-      ).catch(() => {});
-
+      // NO ai_usage_logs write here. `/api/embeddings/clip-text` bills its own call — it
+      // takes `workspace_id` for exactly that, and audit #12 fixed the attribution on that
+      // row. Writing a second row from this side would double-count every embedding the
+      // moment this call started working again, which is the "one derivation per money
+      // quantity" rule in CLAUDE.md applied to spend: MIVAA makes the call, MIVAA bills it.
       return embedding;
 
     } catch (error) {
@@ -358,94 +323,19 @@ export function validateEmbedding(embedding: number[]): boolean {
 }
 
 /**
- * Generate semantic analysis for images using MIVAA (Claude Vision)
+ * `generateSemanticAnalysis` was here and has been deleted.
  *
- * @param imageData - Base64 image data or image URL
- * @param analysisType - Type of analysis to perform
- * @returns Promise<string> - Generated semantic description
+ * It POSTed `{action:'semantic_analysis'}` at `${gatewayUrl}` + the edge proxy's own path — the
+ * same wrong URL `generateStandardEmbedding` carried, so it 404'd on every attempt. It also
+ * named an action the `mivaa-gateway` map does not define, and it had NO callers: dead code that
+ * could not have worked if something had called it.
+ *
+ * Nothing needs restoring here. Vision in this platform is Anthropic-only and goes through the
+ * real ingestion path (`tools=[VISION_ANALYSIS_TOOL]` + forced `tool_choice`); a second,
+ * gateway-shaped vision helper on the side is exactly the drift CLAUDE.md keeps warning about.
+ * The `SemanticAnalysisRequest` / `SemanticAnalysisResponse` interfaces above are kept — they
+ * describe the MIVAA route's wire shape and cost nothing.
  */
-export async function generateSemanticAnalysis(
-  imageData: string,
-  analysisType: string = 'material_identification',
-  supabase?: DbClient,
-): Promise<string> {
-  if (!MIVAA_CONFIG.apiKey) {
-    throw new Error('MIVAA_API_KEY environment variable is required');
-  }
-
-  if (!supabase) {
-    throw new Error('Supabase client is required for loading prompt from database');
-  }
-
-  // Load prompt from database (editable via /admin/ai-configs)
-  const prompt = await getToolPrompt(supabase, 'semantic_analysis');
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= MIVAA_CONFIG.maxRetries; attempt++) {
-    try {
-      console.log(`🔄 Generating semantic analysis via MIVAA (attempt ${attempt}/${MIVAA_CONFIG.maxRetries})`);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), MIVAA_CONFIG.timeout);
-
-      const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/mivaa/gateway`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${MIVAA_CONFIG.apiKey}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
-        },
-        body: JSON.stringify({
-          action: 'semantic_analysis',
-          payload: {
-            image_data: imageData,
-            analysis_type: analysisType,
-            prompt: prompt,
-            options: {
-              temperature: 0.1,
-              max_tokens: 200,
-            },
-          },
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(`MIVAA semantic analysis error: ${result.error?.message || 'Unknown error'}`);
-      }
-
-      console.log('✅ Semantic analysis generated via MIVAA successfully');
-      return result.data.analysis;
-
-    } catch (error) {
-      lastError = error as Error;
-      console.error(`❌ MIVAA semantic analysis attempt ${attempt} failed:`, error);
-
-      // Don't retry on certain errors
-      if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('403')) {
-          throw error; // Authentication errors shouldn't be retried
-        }
-      }
-
-      // Wait before retrying (except on last attempt)
-      if (attempt < MIVAA_CONFIG.maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, MIVAA_CONFIG.retryDelay * attempt));
-      }
-    }
-  }
-
-  throw new Error(`Failed to generate semantic analysis via MIVAA after ${MIVAA_CONFIG.maxRetries} attempts. Last error: ${lastError?.message}`);
-}
 
 /**
  * Get current embedding configuration info

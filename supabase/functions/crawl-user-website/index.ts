@@ -15,13 +15,13 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { chargeCronUser } from '../_shared/cron-billing.ts';
 import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // Lazy reads so platform_secrets bootstrap (run at handler entry) is honored.
 const FIRECRAWL_API_KEY = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
-const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || '';
 
 const MAX_SITEMAP_DEPTH = 3;
@@ -58,24 +58,32 @@ async function getUserIdFromJwt(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
-async function embedDocument(text: string): Promise<number[] | null> {
-  if (!MIVAA_API_KEY()) return null;
-  const truncated = text.length > 8000 ? text.slice(0, 8000) : text;
+/**
+ * Embed one page, or null if the embedder is unavailable.
+ *
+ * This was a hand-rolled second copy of `generateStandardEmbedding` — same voyage-4 call,
+ * same 1024-dim check, and the same wrong URL: it POSTed the SUPABASE EDGE proxy's request
+ * shape (`{action}` to `/api/mivaa/gateway`) at the MIVAA host, which does not serve that
+ * path. It 404'd on every page ever crawled, and because every failure funnels into `null`
+ * here, the only symptom was `user_website_pages.embedding` being null forever while the
+ * crawl reported success. Calling the shared helper fixes the path and removes the copy.
+ *
+ * Still returns null rather than throwing — a page without a vector is a degraded row, not a
+ * failed crawl — but it LOGS now. A swallowed embedder outage is indistinguishable from a
+ * site with nothing worth embedding.
+ */
+async function embedDocument(text: string, workspaceId: string | null): Promise<number[] | null> {
+  if (!MIVAA_API_KEY()) {
+    console.warn('[crawl-user-website] MIVAA_API_KEY unset — pages indexed without embeddings');
+    return null;
+  }
   try {
-    const res = await fetch(`${MIVAA_GATEWAY_URL()}/api/mivaa/gateway`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${MIVAA_API_KEY()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'generate_embedding',
-        payload: { text: truncated, model: 'voyage-4', dimensions: 1024, input_type: 'document' },
-      }),
+    return await generateStandardEmbedding(text, 'document', {
+      operationType: 'crawl_user_website_page',
+      workspaceId,
     });
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => null);
-    if (!json?.success || !Array.isArray(json.data?.embedding)) return null;
-    if (json.data.embedding.length !== 1024) return null;
-    return json.data.embedding;
-  } catch {
+  } catch (e) {
+    console.error('[crawl-user-website] embedding failed — page stored without a vector:', e);
     return null;
   }
 }
@@ -346,9 +354,9 @@ async function previewWebsite(
 
 async function crawlOneWebsite(
   supabase: DbClient,
-  website: { id: string; user_id: string; url: string; sitemap_url: string | null; max_pages: number },
+  website: { id: string; user_id: string; workspace_id: string | null; url: string; sitemap_url: string | null; max_pages: number },
 ): Promise<{ ok: boolean; pages_indexed: number; pages_discovered: number; error?: string }> {
-  const { id: websiteId, user_id: userId, url: siteUrl, max_pages } = website;
+  const { id: websiteId, user_id: userId, workspace_id: workspaceId, url: siteUrl, max_pages } = website;
   const cap = Math.min(max_pages || 50, MAX_PAGES_HARD_CAP);
 
   let sitemapUrl = website.sitemap_url;
@@ -407,7 +415,7 @@ async function crawlOneWebsite(
     }
 
     const embedSource = [s.title || '', s.description || '', s.content_excerpt || ''].filter(Boolean).join('\n\n');
-    const embedding = await embedDocument(embedSource);
+    const embedding = await embedDocument(embedSource, workspaceId);
 
     const { error: upsertErr } = await supabase.from('user_website_pages').upsert({
       website_id: websiteId, user_id: userId, url: s.url,

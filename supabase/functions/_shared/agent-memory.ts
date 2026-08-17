@@ -298,11 +298,34 @@ export class AgentMemory {
     userInput: string;
     agentResponse: string;
     conversationId?: string | null;
+    /**
+     * Did this turn actually DO anything — did any tool run? A turn that ran no tool and
+     * answered with a question is the agent saying it does not yet understand the request.
+     * See the guard below for why that turn must not be distilled.
+     */
+    turnDidWork?: boolean;
   }): Promise<PromotionResult> {
     const empty: PromotionResult = { promoted: 0, superseded: 0, skipped: 0, embedded: 0, usage: null };
 
     const userInput = (args.userInput ?? '').trim();
     if (userInput.length < MIN_INPUT_CHARS) return empty;
+
+    // Do not distil a turn the agent did not understand.
+    //
+    // No tool ran and the reply asks the user a question: the agent has told us, in its own
+    // words, that it does not yet know what this turn was about. The distiller does not get
+    // that hint — it sees a user message and a reply and dutifully extracts something. From
+    // "update the date and the name" + "which record do you mean?" it wrote the durable-for-
+    // 30-days fact *"Associated with name <X> and date <Y> in a work context"*, reason
+    // "context unclear but may be relevant". That is not a memory, it is the residue of a
+    // misunderstanding, and it will be recalled into later turns as though it were established.
+    //
+    // Skipping costs nothing real: when the user clarifies, the NEXT turn carries the same
+    // facts and lands properly. Cheaper too — no Haiku call on a turn with nothing in it.
+    if (args.turnDidWork === false && /\?/.test(args.agentResponse ?? '')) {
+      console.log('[agent-memory] promotion skipped: clarifying turn (no tool ran, reply asks a question)');
+      return empty;
+    }
 
     const apiKey = (await resolveSecret(this.supabase as any, 'ANTHROPIC_API_KEY')).value;
     if (!apiKey) {

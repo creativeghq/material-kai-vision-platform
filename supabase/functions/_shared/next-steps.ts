@@ -222,6 +222,22 @@ export async function proposeNextSteps(
       };
     })
     .filter((s) => s.label.length > 0 && s.label.length <= 40 && s.prompt.length > 0)
+    // A step whose prompt still has a FILL-ME-IN slot in it is not a step.
+    //
+    // The prompt is sent VERBATIM when the button is clicked, so a placeholder the model left
+    // behind goes to the agent exactly as written. A real one shipped: after the agent said it
+    // could not see an attached image, it offered "Share image URL instead" →
+    // `"Here's the public URL to the image that needs editing: <UNKNOWN>"`. Clicking it sends
+    // the agent a sentence promising a URL and then not containing one.
+    //
+    // The schema already says "the message that gets sent verbatim"; this is the check that the
+    // model obeyed it. Angle-bracket slots only — `<UNKNOWN>`, `<URL>`, `<insert name>` — never
+    // a bare word, because a legitimate prompt can contain almost any word.
+    .filter((s) => {
+      if (!/<[^<>]{1,40}>/.test(s.prompt)) return true;
+      console.warn(`[next-steps] dropped a step whose prompt still had a placeholder: ${s.prompt.slice(0, 120)}`);
+      return false;
+    })
     .slice(0, MAX_STEPS);
 
   return { steps, usage };
