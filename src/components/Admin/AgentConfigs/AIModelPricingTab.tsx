@@ -58,14 +58,23 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   other: 'Other',
 };
 
-/** One `ai_usage_logs.model_name` and whether `ai_model_pricing` knows about it. */
+/** One `ai_usage_logs.model_name` and how `ai_model_pricing` prices it — if it does. */
 interface UsageCoverageRow {
   model_key: string;
   calls: number;
   billed_usd: number;
   last_used_at: string | null;
+  /**
+   * `exact`    — the model has its own row.
+   * `fallback` — it prices only because a DIFFERENT key is a substring of it, which is what
+   *              `resolveTokenPrice` falls back to. Works today; renaming either side silently
+   *              unprices the model with nothing raising.
+   * `none`     — nothing matches. This is "no verified cost", which the platform never guesses at.
+   */
+  pricing: 'exact' | 'fallback' | 'none';
+  /** The key it actually resolved through, for the `fallback` case. */
+  resolved_via: string | null;
   has_pricing_row: boolean;
-  pricing_active: boolean;
 }
 
 /** The numeric columns this tab may edit. Everything else on the row is set elsewhere. */
@@ -117,6 +126,7 @@ export const AIModelPricingTab: React.FC = () => {
   const [editValues, setEditValues] = useState<Partial<Record<PriceField, string>>>({});
   const [usageByModelKey, setUsageByModelKey] = useState<Record<string, number>>({});
   const [unpriced, setUnpriced] = useState<UsageCoverageRow[] | null>(null);
+  const [fallbackPriced, setFallbackPriced] = useState<UsageCoverageRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showInactive, setShowInactive] = useState(false);
@@ -151,7 +161,8 @@ export const AIModelPricingTab: React.FC = () => {
     }
     const rows = data.models;
     setUsageByModelKey(Object.fromEntries(rows.map((r) => [r.model_key, Number(r.calls) || 0])));
-    setUnpriced(rows.filter((r) => !r.has_pricing_row));
+    setUnpriced(rows.filter((r) => r.pricing === 'none'));
+    setFallbackPriced(rows.filter((r) => r.pricing === 'fallback'));
   };
 
   const loadPricing = async () => {
@@ -388,12 +399,14 @@ export const AIModelPricingTab: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              {unpriced.length} model{unpriced.length === 1 ? '' : 's'} with usage but no pricing row
+              {unpriced.length} model{unpriced.length === 1 ? '' : 's'} with usage and no price
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              These appear in <code>ai_usage_logs</code> over the last year and have no row here, so
-              nothing in this table governs what they cost. A missing price means no verified cost —
-              never a guessed one.
+              These appear in <code>ai_usage_logs</code> over the last year and match no row here —
+              not exactly, and not by the substring fallback the resolver uses either. Nothing in
+              this table governs what they cost. A missing price means no verified cost, never a
+              guessed one; the ones billing $0.00 across hundreds of calls are most likely genuinely
+              free and worth a $0 row saying so.
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -420,6 +433,45 @@ export const AIModelPricingTab: React.FC = () => {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Models that price only through the resolver's substring fallback. Not an alarm — they
+          bill correctly today — but the coupling is invisible and one rename away from silence. */}
+      {fallbackPriced.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {fallbackPriced.length} model{fallbackPriced.length === 1 ? '' : 's'} priced by name match, not by their own row
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              These bill correctly, but only because another key is a substring of their name —
+              the fallback in <code>resolveTokenPrice</code>. Rename either side and the model loses
+              its price silently. Give them their own row to make the link explicit.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model key</TableHead>
+                  <TableHead>Prices through</TableHead>
+                  <TableHead className="text-right">Calls</TableHead>
+                  <TableHead className="text-right">Billed</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fallbackPriced.map((row) => (
+                  <TableRow key={row.model_key}>
+                    <TableCell className="font-mono text-xs">{row.model_key}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{row.resolved_via}</TableCell>
+                    <TableCell className="text-right text-xs">{Number(row.calls).toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-xs">{formatPrice(Number(row.billed_usd), 4)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
