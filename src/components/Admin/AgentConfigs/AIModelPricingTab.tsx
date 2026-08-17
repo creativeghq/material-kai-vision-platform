@@ -58,11 +58,65 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   other: 'Other',
 };
 
+/** One `ai_usage_logs.model_name` and whether `ai_model_pricing` knows about it. */
+interface UsageCoverageRow {
+  model_key: string;
+  calls: number;
+  billed_usd: number;
+  last_used_at: string | null;
+  has_pricing_row: boolean;
+  pricing_active: boolean;
+}
+
+/** The numeric columns this tab may edit. Everything else on the row is set elsewhere. */
+type PriceField =
+  | 'input_price_per_million'
+  | 'output_price_per_million'
+  | 'hourly_rate_usd'
+  | 'cost_per_generation'
+  | 'cost_per_unit'
+  | 'markup_multiplier';
+
+const PRICE_FIELD_LABELS: Record<PriceField, string> = {
+  input_price_per_million: 'Input price',
+  output_price_per_million: 'Output price',
+  hourly_rate_usd: 'Hourly rate',
+  cost_per_generation: 'Cost per generation',
+  cost_per_unit: 'Cost per unit',
+  markup_multiplier: 'Markup',
+};
+
+/**
+ * Parse one edited price field. Mirrors the `ai_model_pricing_costs_sane` /
+ * `ai_model_pricing_markup_positive` CHECK constraints so the operator gets a message instead of a
+ * Postgres error — the DB is the enforcement, this is the explanation.
+ *
+ * `markup_multiplier` is the one field where 0 is rejected rather than allowed: a zero markup
+ * bills every AI call in the platform at nothing, forever, with no error anywhere.
+ */
+function parsePriceField(field: PriceField, raw: string): { value: number } | { error: string } {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { error: `${PRICE_FIELD_LABELS[field]} cannot be blank.` };
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) return { error: `${PRICE_FIELD_LABELS[field]} must be a number.` };
+  if (value < 0) return { error: `${PRICE_FIELD_LABELS[field]} cannot be negative.` };
+  if (field === 'markup_multiplier' && value <= 0) {
+    return { error: 'Markup must be greater than 0 — a zero markup bills all usage at nothing.' };
+  }
+  return { value };
+}
+
 export const AIModelPricingTab: React.FC = () => {
   const [pricing, setPricing] = useState<ModelPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<Partial<ModelPricing>>({});
+  // Raw input STRINGS, not numbers. `parseFloat('')` is NaN and Postgres `numeric` accepts NaN, so
+  // the previous `onChange={… parseFloat(e.target.value)}` stored NaN the moment a field was
+  // cleared — after which every cost derived from this row was NaN, silently. Parsing is deferred
+  // to save, where it can refuse. (#365 AD-31)
+  const [editValues, setEditValues] = useState<Partial<Record<PriceField, string>>>({});
+  const [usageByModelKey, setUsageByModelKey] = useState<Record<string, number>>({});
+  const [unpriced, setUnpriced] = useState<UsageCoverageRow[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showInactive, setShowInactive] = useState(false);
@@ -71,7 +125,34 @@ export const AIModelPricingTab: React.FC = () => {
 
   useEffect(() => {
     loadPricing();
+    loadUsageCoverage();
   }, []);
+
+  /**
+   * Which models are actually being CHARGED FOR, and which of those this table has never heard of.
+   * The platform rule is that a missing price means "no verified cost, never a guess" — a pricing
+   * surface that cannot show the gap makes that rule unenforceable by the person responsible for
+   * it (#365 AD-33). Also feeds the "this model already has logged usage" warning on save.
+   */
+  const loadUsageCoverage = async () => {
+    // Cast: get_ai_model_usage_coverage returns jsonb and is not in the generated types
+    // (types:generate has no token locally and CI never regenerates).
+    const { data, error } = await (supabase.rpc as unknown as (
+      fn: string, args: Record<string, unknown>,
+    ) => Promise<{ data: { models?: UsageCoverageRow[] } | null; error: unknown }>)(
+      'get_ai_model_usage_coverage', { p_days: 365 },
+    );
+    if (error || !data?.models) {
+      // Leave `unpriced` at null — the panel then says the check could not run, rather than
+      // rendering an empty list that reads as "everything is priced".
+      console.warn('[AIModelPricingTab] usage-coverage lookup failed:', error);
+      setUnpriced(null);
+      return;
+    }
+    const rows = data.models;
+    setUsageByModelKey(Object.fromEntries(rows.map((r) => [r.model_key, Number(r.calls) || 0])));
+    setUnpriced(rows.filter((r) => !r.has_pricing_row));
+  };
 
   const loadPricing = async () => {
     try {
@@ -113,13 +194,12 @@ export const AIModelPricingTab: React.FC = () => {
   const startEditing = (model: ModelPricing) => {
     setEditingId(model.id);
     setEditValues({
-      input_price_per_million: model.input_price_per_million,
-      output_price_per_million: model.output_price_per_million,
-      hourly_rate_usd: model.hourly_rate_usd,
-      cost_per_generation: model.cost_per_generation,
-      cost_per_unit: model.cost_per_unit,
-      markup_multiplier: model.markup_multiplier,
-      auto_update_enabled: model.auto_update_enabled,
+      input_price_per_million: String(model.input_price_per_million ?? ''),
+      output_price_per_million: String(model.output_price_per_million ?? ''),
+      hourly_rate_usd: String(model.hourly_rate_usd ?? ''),
+      cost_per_generation: String(model.cost_per_generation ?? ''),
+      cost_per_unit: String(model.cost_per_unit ?? ''),
+      markup_multiplier: String(model.markup_multiplier ?? ''),
     });
   };
 
@@ -128,15 +208,51 @@ export const AIModelPricingTab: React.FC = () => {
     setEditValues({});
   };
 
+  /** Live per-field validity, so a bad value is visible before the operator presses save. */
+  const isFieldInvalid = (field: PriceField): boolean => {
+    const raw = editValues[field];
+    if (raw === undefined) return false;
+    return 'error' in parsePriceField(field, raw);
+  };
+
   const saveEditing = async () => {
     if (!editingId) return;
+    const model = pricing.find((m) => m.id === editingId);
+    if (!model) return;
+
+    // Build an explicit, validated patch. Never spread the edit state into the write: it is
+    // untrusted form input and this table is the platform's single USD source.
+    const patch: Partial<Record<PriceField, number>> = {};
+    for (const [field, raw] of Object.entries(editValues) as [PriceField, string][]) {
+      const parsed = parsePriceField(field, raw);
+      if ('error' in parsed) {
+        toast({ title: 'Invalid price', description: parsed.error, variant: 'destructive' });
+        return;
+      }
+      patch[field] = parsed.value;
+    }
+    if (Object.keys(patch).length === 0) return;
+
+    // Editing a price in place also re-values every past call of this model, because cost
+    // reporting recomputes from the current row (#365 AD-32). Say so before it happens.
+    const loggedCalls = usageByModelKey[model.model_key] ?? 0;
+    if (loggedCalls > 0) {
+      const ok = window.confirm(
+        `${model.model_name} already has ${loggedCalls.toLocaleString()} logged call(s).
+
+` +
+        'Cost reporting recomputes from the current row, so changing this price also changes ' +
+        'what those past calls are reported to have cost. Continue?',
+      );
+      if (!ok) return;
+    }
 
     try {
       setSaving(true);
       const { error } = await supabase
         .from('ai_model_pricing')
         .update({
-          ...editValues,
+          ...patch,
           last_verified_at: new Date().toISOString(),
         })
         .eq('id', editingId);
@@ -260,6 +376,51 @@ export const AIModelPricingTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Models being billed that this table has never heard of. Rendered before the summary
+          cards on purpose: the counts below only describe rows that EXIST. (#365 AD-33) */}
+      {unpriced === null ? (
+        <Card>
+          <CardContent className="pt-4 text-sm text-muted-foreground">
+            Could not check which models are missing a pricing row — this list is unknown, not empty.
+          </CardContent>
+        </Card>
+      ) : unpriced.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {unpriced.length} model{unpriced.length === 1 ? '' : 's'} with usage but no pricing row
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              These appear in <code>ai_usage_logs</code> over the last year and have no row here, so
+              nothing in this table governs what they cost. A missing price means no verified cost —
+              never a guessed one.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model key</TableHead>
+                  <TableHead className="text-right">Calls</TableHead>
+                  <TableHead className="text-right">Billed</TableHead>
+                  <TableHead>Last used</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unpriced.map((row) => (
+                  <TableRow key={row.model_key}>
+                    <TableCell className="font-mono text-xs">{row.model_key}</TableCell>
+                    <TableCell className="text-right text-xs">{Number(row.calls).toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-xs">{formatPrice(Number(row.billed_usd), 4)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{formatDate(row.last_used_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
@@ -416,16 +577,20 @@ export const AIModelPricingTab: React.FC = () => {
                           <Input
                             type="number"
                             step="0.0001"
-                            value={editValues.cost_per_unit ?? model.cost_per_unit}
-                            onChange={e => setEditValues({ ...editValues, cost_per_unit: parseFloat(e.target.value) })}
+                            min="0"
+                            value={editValues.cost_per_unit ?? ''}
+                            onChange={e => setEditValues({ ...editValues, cost_per_unit: e.target.value })}
+                            aria-invalid={isFieldInvalid('cost_per_unit')}
                             className="w-20 h-7 text-right"
                           />
                         ) : (
                           <Input
                             type="number"
                             step="0.01"
-                            value={editValues.input_price_per_million ?? model.input_price_per_million}
-                            onChange={e => setEditValues({ ...editValues, input_price_per_million: parseFloat(e.target.value) })}
+                            min="0"
+                            value={editValues.input_price_per_million ?? ''}
+                            onChange={e => setEditValues({ ...editValues, input_price_per_million: e.target.value })}
+                            aria-invalid={isFieldInvalid('input_price_per_million')}
                             className="w-20 h-7 text-right"
                           />
                         )
@@ -441,8 +606,10 @@ export const AIModelPricingTab: React.FC = () => {
                         <Input
                           type="number"
                           step="0.01"
-                          value={editValues.output_price_per_million ?? model.output_price_per_million}
-                          onChange={e => setEditValues({ ...editValues, output_price_per_million: parseFloat(e.target.value) })}
+                          min="0"
+                          value={editValues.output_price_per_million ?? ''}
+                          onChange={e => setEditValues({ ...editValues, output_price_per_million: e.target.value })}
+                          aria-invalid={isFieldInvalid('output_price_per_million')}
                           className="w-20 h-7 text-right"
                         />
                       ) : (
@@ -454,8 +621,10 @@ export const AIModelPricingTab: React.FC = () => {
                         <Input
                           type="number"
                           step="0.01"
-                          value={editValues.markup_multiplier ?? model.markup_multiplier}
-                          onChange={e => setEditValues({ ...editValues, markup_multiplier: parseFloat(e.target.value) })}
+                          min="0.01"
+                          value={editValues.markup_multiplier ?? ''}
+                          onChange={e => setEditValues({ ...editValues, markup_multiplier: e.target.value })}
+                          aria-invalid={isFieldInvalid('markup_multiplier')}
                           className="w-16 h-7 text-right"
                         />
                       ) : (
