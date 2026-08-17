@@ -148,6 +148,14 @@ describe('schema-writer lint · coverage is visible, not silent', () => {
 });
 
 describe('schema-writer lint · the baseline is shrink-only', () => {
+  it('is empty — every finding from the first run was fixed, not exempted', () => {
+    // Not a style preference. All 33 problems the guard found on its first run were real runtime
+    // errors and all were repaired, so there is nothing legitimate to exempt. A line reappearing
+    // here means someone made a build pass instead of making the code right; the mechanism stays
+    // for a migration that genuinely needs a staged fix, but the default is zero.
+    expect([...KNOWN_DRIFT]).toEqual([]);
+  });
+
   it('has no duplicate entries', () => {
     expect(KNOWN_DRIFT.size).toBe([...KNOWN_DRIFT].length);
   });

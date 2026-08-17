@@ -531,8 +531,11 @@ export const MarketTrendsTab: React.FC = () => {
     try {
       const twoYearsAgo = new Date(); twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
       const { data: monthData } = await supabase
-        .from('moodboard_items').select('created_at')
-        .gte('created_at', twoYearsAgo.toISOString()).limit(5000);
+        // moodboard_items timestamps on `added_at`, not `created_at` — both the projection AND
+        // the range filter, which is why this returned nothing and the seasonality chart was
+        // permanently empty. Aliased back to `created_at` so buildMonthlyTrend's contract holds.
+        .from('moodboard_items').select('created_at:added_at')
+        .gte('added_at', twoYearsAgo.toISOString()).limit(5000);
       setMonthlyTrend(buildMonthlyTrend(monthData ?? []));
     } catch (e) { console.error('Seasonal load failed:', e); }
   };

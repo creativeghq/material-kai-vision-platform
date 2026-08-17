@@ -3,7 +3,10 @@
  *
  * Allows users to import Pinterest pins into a moodboard.
  * Phase 1: Paste a pin URL → extract image → add to moodboard → auto-match materials
- * Phase 2: OAuth board browsing (shown when connected)
+ * Board browsing was removed: it required Pinterest OAuth tokens in `social_accounts`,
+ * whose token columns are gone (the table now belongs to Zernio). Zernio brokers the
+ * account connection but exposes no board/pin read API, so there is nothing to browse
+ * through. URL import needs no account and is what actually fills a moodboard.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -27,10 +30,9 @@ import {
   ExternalLink,
   Plus,
   Search,
-  ArrowLeft,
   Package,
 } from 'lucide-react';
-import { pinterestService, PinterestPin, PinterestBoard, PinterestImportResult } from '@/services/pinterestService';
+import { pinterestService, PinterestPin, PinterestImportResult } from '@/services/pinterestService';
 
 interface PinterestImportModalProps {
   isOpen: boolean;
@@ -63,16 +65,9 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
   const [bulkResults, setBulkResults] = useState<{ imported: number; failed: number } | null>(null);
 
   // OAuth state
-  const [connected, setConnected] = useState(false);
-  const [boards, setBoards] = useState<PinterestBoard[]>([]);
-  const [selectedBoard, setSelectedBoard] = useState<PinterestBoard | null>(null);
-  const [boardPins, setBoardPins] = useState<PinterestPin[]>([]);
-  const [loadingBoards, setLoadingBoards] = useState(false);
-  const [loadingPins, setLoadingPins] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      checkConnection();
       // Reset state
       setPinUrl('');
       setExtractedPin(null);
@@ -81,29 +76,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
     }
   }, [isOpen]);
 
-  const checkConnection = async () => {
-    try {
-      const status = await pinterestService.getConnectionStatus();
-      setConnected(status.connected);
-      if (status.connected) {
-        loadBoards();
-      }
-    } catch {
-      // Pinterest not connected, that's fine
-    }
-  };
 
-  const loadBoards = async () => {
-    try {
-      setLoadingBoards(true);
-      const data = await pinterestService.getBoards();
-      setBoards(data);
-    } catch {
-      // OAuth boards not available
-    } finally {
-      setLoadingBoards(false);
-    }
-  };
 
   // ── URL Extract ──
 
@@ -169,27 +142,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
 
   // ── Board browsing (Phase 2) ──
 
-  const handleSelectBoard = async (board: PinterestBoard) => {
-    setSelectedBoard(board);
-    try {
-      setLoadingPins(true);
-      const data = await pinterestService.getBoardPins(board.id);
-      setBoardPins(data.pins);
-    } catch (_err) {
-      toast({ title: 'Error', description: 'Failed to load board pins', variant: 'destructive' });
-    } finally {
-      setLoadingPins(false);
-    }
-  };
 
-  const handleConnectPinterest = async () => {
-    try {
-      const authUrl = await pinterestService.getAuthUrl();
-      window.open(authUrl, '_blank', 'width=600,height=700');
-    } catch (_err) {
-      toast({ title: 'Error', description: 'Failed to start Pinterest connection', variant: 'destructive' });
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -378,85 +331,6 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
             </div>
           )}
 
-          {/* Divider with "or" */}
-          {connected && (
-            <>
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                <div className="relative flex justify-center text-xs"><span className="bg-background px-2 text-muted-foreground">or browse your boards</span></div>
-              </div>
-
-              {/* Board Browser (Phase 2) */}
-              {selectedBoard ? (
-                <div className="space-y-3">
-                  <button onClick={() => { setSelectedBoard(null); setBoardPins([]); }} className="flex items-center gap-1 text-xs text-primary hover:underline">
-                    <ArrowLeft className="h-3 w-3" /> Back to boards
-                  </button>
-                  <p className="text-sm font-medium">{selectedBoard.name}</p>
-                  {loadingPins ? (
-                    <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[45vh] sm:max-h-64 overflow-y-auto">
-                      {boardPins.map((pin, i) => (
-                        <button
-                          key={i}
-                          onClick={async () => {
-                            try {
-                              await pinterestService.importPin(pin.source_url, moodboardId, true);
-                              toast({ title: 'Pin imported', description: pin.title || 'Pin added to moodboard' });
-                              onImportComplete?.();
-                            } catch { /* handled by service */ }
-                          }}
-                          className="aspect-square rounded-lg overflow-hidden bg-muted relative group"
-                        >
-                          {/* The pin thumbnail IS the content here — with no alt the picker reads as a list of
-    URLs. */}
-                          {pin.image_url && <img src={pin.image_url} alt={pin.title || 'Pinterest pin'} className="w-full h-full object-cover" />}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                            <Plus className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : loadingBoards ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-              ) : boards.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                  {boards.map(board => (
-                    <button
-                      key={board.id}
-                      onClick={() => handleSelectBoard(board)}
-                      className="flex items-center gap-2 p-2 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-                        {/* Decorative: the board name is rendered in the sibling block. */}
-                        {board.image_url ? <img src={board.image_url} alt="" className="w-full h-full object-cover" /> : <Image className="w-full h-full p-2 text-muted-foreground" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium truncate">{board.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{board.pin_count} pins</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </>
-          )}
-
-          {/* Connect Pinterest (when not connected) */}
-          {!connected && (
-            <div className="border-t pt-3 mt-3">
-              <p className="text-xs text-muted-foreground mb-2">
-                Connect your Pinterest account to browse boards directly
-              </p>
-              <Button variant="outline" size="sm" className="rounded-full" onClick={handleConnectPinterest}>
-                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                Connect Pinterest account
-              </Button>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

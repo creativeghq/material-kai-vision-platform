@@ -111,12 +111,14 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
         // pause/edit it without a code change.
         supabase
           .from('products')
-          .select('user_id')
+          // `created_by` — products has no `user_id`, so this returned an error and the
+          // "Material Reviewed" notification never got a recipient.
+          .select('created_by')
           .eq('id', productId)
           .maybeSingle()
           .then(({ data: product }) => {
             const ownerUserId =
-              product?.user_id && product.user_id !== currentUserId ? product.user_id : null;
+              product?.created_by && product.created_by !== currentUserId ? product.created_by : null;
             flowEventService.emit('material_reviewed', {
               product_id: productId,
               user_id: currentUserId, // reviewer (documented trigger semantics)

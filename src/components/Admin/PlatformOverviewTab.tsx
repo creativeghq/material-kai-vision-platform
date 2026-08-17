@@ -388,7 +388,7 @@ export function PlatformOverviewTab() {
         // where the column is `services_requested` and there is NO `status` at all. The funnel
         // that consumed `status` is removed below rather than faked. (audit #270)
         supabase.from('profile_contact_requests').select('id,services_requested,created_at').gte('created_at', ago12.toISOString()),
-        supabase.from('agent_runs').select('created_at,status,execution_time_ms,credits_debited,background_agents(agent_type)').gte('created_at', ago12.toISOString()),
+        supabase.from('agent_runs').select('created_at,status,duration_ms,credits_debited,background_agents(agent_type)').gte('created_at', ago12.toISOString()),
         // vr_worlds has no `quality_preset` and no `credits_used` — the tier is `model` and
         // the charge is `credits_charged`. moodboard_items timestamps on `added_at`, not
         // `created_at` (both the projection AND the range filter).
@@ -519,7 +519,7 @@ export function PlatformOverviewTab() {
         if (agTypeWeekMap.has(l)) { const m = agTypeWeekMap.get(l)!; m.set(agType, (m.get(agType) ?? 0) + 1); }
         agStatusMap.set(ar.status, (agStatusMap.get(ar.status) ?? 0) + 1);
         if (agSuccMap.has(l)) { ar.status === 'completed' ? agSuccMap.get(l)!.completed++ : ['failed','timed_out'].includes(ar.status) && agSuccMap.get(l)!.failed++; }
-        if (ar.execution_time_ms) { const e = agTimeMap.get(agType) ?? { sum: 0, count: 0 }; e.sum += ar.execution_time_ms; e.count++; agTimeMap.set(agType, e); }
+        if (ar.duration_ms) { const e = agTimeMap.get(agType) ?? { sum: 0, count: 0 }; e.sum += ar.duration_ms; e.count++; agTimeMap.set(agType, e); }
         agCredMap.set(agType, (agCredMap.get(agType) ?? 0) + (ar.credits_debited ?? 0));
       });
       const agTypesArr = Array.from(allAgTypes);

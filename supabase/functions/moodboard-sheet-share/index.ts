@@ -232,7 +232,10 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       const { data: items } = quoteServable
         ? await supabase
             .from('quote_items')
-            .select('room, name, dimensions, quantity, unit_price, line_total, custom_product_name, products(name)')
+            // No bare `name` — quote_items has none. The label is the embedded product's name,
+            // or the custom line's own. Selecting the missing column failed the whole query, so
+            // a shared sheet's F&E schedule came back empty.
+            .select('room, dimensions, quantity, unit_price, line_total, custom_product_name, products(name)')
             .eq('quote_id', view.quote_id)
             .order('added_at', { ascending: true })
         : { data: null };
@@ -244,7 +247,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         grand_total: q?.grand_total != null ? Number(q.grand_total) : null,
         items: (items || []).map((it: any) => ({
           room: it.room ?? null,
-          name: it.products?.name || it.custom_product_name || it.name || 'Item',
+          name: it.products?.name || it.custom_product_name || 'Item',
           dimensions: it.dimensions ?? null,
           quantity: it.quantity ?? 1,
           unit_price: it.unit_price != null ? Number(it.unit_price) : null,

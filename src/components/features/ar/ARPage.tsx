@@ -59,7 +59,10 @@ const ARPage: React.FC = () => {
           // Fallback: try document_images table
           const { data: imgData, error: imgError } = await supabase
             .from('document_images')
-            .select('id, description, image_url, metadata')
+            // `caption` / `contextual_name` — document_images has no `description`, so this
+            // fallback query failed and the AR page reported "Product not found" instead of
+            // rendering the image it had just resolved.
+            .select('id, caption, contextual_name, image_url, metadata')
             .eq('id', productId)
             .maybeSingle();
 
@@ -73,7 +76,7 @@ const ARPage: React.FC = () => {
 
           setProduct({
             id: imgData.id,
-            name: imgData.description || 'Material',
+            name: imgData.caption || imgData.contextual_name || 'Material',
             image_url: imgData.image_url,
             metadata: imgData.metadata as ProductData['metadata'],
           });

@@ -114,9 +114,12 @@ export async function resolveBrandingWorkspaceId(
   if (userId) {
     const { data } = await supabase
       .from('workspace_members')
-      .select('workspace_id, created_at')
+      // `joined_at`, not `created_at` — workspace_members has no created_at, so both the
+      // projection and the ordering named a column that is not there and the query returned
+      // nothing. Membership order is by when they joined, which is what this wanted.
+      .select('workspace_id, joined_at')
       .eq('user_id', userId)
-      .order('created_at', { ascending: true })
+      .order('joined_at', { ascending: true })
       .limit(1);
     const wsId = (data as Array<{ workspace_id?: string }> | null)?.[0]?.workspace_id;
     if (wsId) return wsId;

@@ -17,13 +17,6 @@ export interface PinterestPin {
   source_url: string;
 }
 
-export interface PinterestBoard {
-  id: string;
-  name: string;
-  description?: string;
-  pin_count: number;
-  image_url?: string;
-}
 
 export interface PinterestImportResult {
   success: boolean;
@@ -38,11 +31,6 @@ export interface PinterestImportResult {
   error?: string;
 }
 
-export interface PinterestConnection {
-  connected: boolean;
-  username?: string;
-  connected_at?: string;
-}
 
 // ── Edge function caller ──────────────────────────────────────
 
@@ -104,83 +92,27 @@ export async function importPinsBulk(
   );
 }
 
-// ── Phase 2: OAuth board browsing ─────────────────────────────
-
-/**
- * Get the Pinterest OAuth authorization URL
- */
-export async function getAuthUrl(): Promise<string> {
-  const data = await callEdgeFunction<{ success: boolean; auth_url: string }>(
-    'pinterest-api',
-    { action: 'get_auth_url' },
-  );
-  return data.auth_url;
-}
-
-/**
- * Complete OAuth callback with authorization code
- */
-export async function completeOAuth(code: string, state: string): Promise<void> {
-  await callEdgeFunction('pinterest-api', { action: 'callback', code, state });
-}
-
-/**
- * Check if user has a connected Pinterest account
- */
-export async function getConnectionStatus(): Promise<PinterestConnection> {
-  const { data } = await supabase
-    .from('social_accounts')
-    .select('account_name, created_at')
-    .eq('platform', 'pinterest')
-    .maybeSingle();
-
-  return {
-    connected: !!data,
-    username: data?.account_name ?? undefined,
-    connected_at: data?.created_at ?? undefined,
-  };
-}
-
-/**
- * Get user's Pinterest boards (requires OAuth)
- */
-export async function getBoards(): Promise<PinterestBoard[]> {
-  const data = await callEdgeFunction<{ success: boolean; boards: PinterestBoard[] }>(
-    'pinterest-api',
-    { action: 'get_boards' },
-  );
-  return data.boards;
-}
-
-/**
- * Get pins from a Pinterest board (requires OAuth)
- */
-export async function getBoardPins(
-  boardId: string,
-  bookmark?: string,
-): Promise<{ pins: PinterestPin[]; bookmark?: string }> {
-  const data = await callEdgeFunction<{ success: boolean; pins: PinterestPin[]; bookmark?: string }>(
-    'pinterest-api',
-    { action: 'get_board_pins', board_id: boardId, bookmark },
-  );
-  return { pins: data.pins, bookmark: data.bookmark };
-}
-
-/**
- * Disconnect Pinterest account
- */
-export async function disconnect(): Promise<void> {
-  await callEdgeFunction('pinterest-api', { action: 'disconnect' });
-}
+// ── Pinterest account CONNECTION lives with Zernio, not here ──────────────
+//
+// The OAuth board-browsing half that used to sit here (getAuthUrl / completeOAuth /
+// getConnectionStatus / getBoards / getBoardPins / disconnect) has been removed. It read and wrote
+// `social_accounts.access_token` / `refresh_token` / `token_expires_at` / `platform_account_id` /
+// `account_name` — columns that no longer exist, because that table was reshaped for Zernio
+// (`zernio_account_id`, `handle`, `display_name`). Every one of those calls had been failing; the
+// modal caught the error and showed an empty board list, so it looked like "no boards" rather than
+// "this is broken".
+//
+// Connecting a Pinterest ACCOUNT is a solved problem elsewhere: Zernio is the OAuth broker, it
+// already lists `pinterest` in SUPPORTED_PLATFORMS, and it already owns `social_accounts`. Board
+// and pin BROWSING is not something Zernio offers — its API is profiles / accounts / usage /
+// webhooks / inbox / media, with no token passthrough — so that capability would need a direct
+// Pinterest app and token storage again. Deliberately not reinstated.
+//
+// Importing pins by URL, below, needs no account connection and is what actually populates a
+// moodboard.
 
 export const pinterestService = {
   extractPin,
   importPin,
   importPinsBulk,
-  getAuthUrl,
-  completeOAuth,
-  getConnectionStatus,
-  getBoards,
-  getBoardPins,
-  disconnect,
 };

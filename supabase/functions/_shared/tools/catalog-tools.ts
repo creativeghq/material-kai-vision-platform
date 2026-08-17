@@ -685,15 +685,33 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
         let currency = input.material.currency || null;
 
         if (input.material.price_source === 'catalog_product' && input.material.price_source_ref) {
-          const { data: prod } = await supabase
-            .from('products')
-            .select('name, description, base_price, currency')
-            .eq('id', input.material.price_source_ref)
-            .eq('workspace_id', catalog.workspace_id)
-            .maybeSingle();
-          if (prod) {
-            if (price == null) price = prod.base_price ?? null;
-            if (!currency) currency = prod.currency || null;
+          // `products` has neither `base_price` nor `currency` — it carries `cost` / `cost_currency`,
+          // which is what we PAY, not what we sell for. The old query named both missing columns, so
+          // PostgREST rejected it and a catalog material sourced from a product never picked up a
+          // price at all.
+          //
+          // Reading `cost` instead would be worse than the bug: it would publish the cost basis to a
+          // customer as the price. The sell price has exactly one derivation in this platform —
+          // `_pricing_markup_ladder`, reached through `get_product_price_for_workspace` — and
+          // CLAUDE.md is explicit that TypeScript formats it rather than re-deriving it. No customer
+          // is in scope here (a catalog is published, not quoted to one party), so the ladder is
+          // asked with no company/contact and answers with the workspace's own list price.
+          const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
+            p_workspace_id: catalog.workspace_id,
+            p_product_id: input.material.price_source_ref,
+            p_company_id: null,
+            p_contact_id: null,
+            p_audience: 'buyer',
+          });
+          const pr = priced as { final_sell?: number | null; retail?: number | null; currency?: string | null; unpriced?: boolean } | null;
+          // `final_sell` before `retail`: on the buyer audience the ladder returns both, and
+          // final_sell is retail with any applicable discount already applied — publishing the
+          // pre-discount number would quote the customer a price they are not being offered.
+          // `unpriced` is the ladder saying it has no answer. Leave the price null in that case —
+          // a material with no price renders as "on request", which is true; a zero would not be.
+          if (pr && pr.unpriced !== true) {
+            if (price == null) price = pr.final_sell ?? pr.retail ?? null;
+            if (!currency) currency = pr.currency || null;
           }
         }
         if (input.material.price_source === 'price_monitoring' && input.material.price_source_ref) {

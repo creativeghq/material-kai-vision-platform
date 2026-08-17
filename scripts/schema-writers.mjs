@@ -77,20 +77,31 @@ export async function fetchRegistry() {
     body: '{}',
   });
   if (!res.ok) throw new Error(`schema_column_registry → ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const rows = await res.json();
-  if (!Array.isArray(rows) || rows.length === 0) throw new Error('schema_column_registry returned nothing');
+  const payload = await res.json();
+  const tables = payload?.tables;
+  if (!tables || typeof tables !== 'object') throw new Error('schema_column_registry returned no tables object');
 
   /** table → Set(column) */
   const columns = new Map();
   /** table → Set(column) that Postgres computes itself */
   const generated = new Map();
-  for (const r of rows) {
-    if (!columns.has(r.table_name)) columns.set(r.table_name, new Set());
-    columns.get(r.table_name).add(r.column_name);
-    if (r.is_generated || r.is_identity) {
-      if (!generated.has(r.table_name)) generated.set(r.table_name, new Set());
-      generated.get(r.table_name).add(r.column_name);
-    }
+  for (const [table, spec] of Object.entries(tables)) {
+    columns.set(table, new Set(spec.columns ?? []));
+    if (spec.generated?.length) generated.set(table, new Set(spec.generated));
+  }
+
+  // A registry that arrives INCOMPLETE does not fail — it describes a smaller database, and every
+  // table missing from it is skipped by the lint, so the guard finds less and looks healthier.
+  // That is exactly what happened when this was a set-returning function: PostgREST's row cap
+  // truncated 7,600 rows, the check passed locally on a whole registry and reported 17 of its 26
+  // baseline entries as "matching nothing" in CI. The reference data has to be checked like
+  // anything else, so an implausibly small schema is an error rather than a quiet pass.
+  const MIN_TABLES = 300;
+  if (columns.size < MIN_TABLES) {
+    throw new Error(
+      `schema_column_registry returned only ${columns.size} tables (expected >= ${MIN_TABLES}). `
+      + 'Refusing to lint against a partial schema — every missing table would be silently skipped.',
+    );
   }
   return { columns, generated };
 }
@@ -295,7 +306,12 @@ export function extractUsages(src, file) {
     // comment in it runs past any fixed cap, `balanced()` then never finds its closing brace, and
     // the whole insert is written off as "unparseable" — which is how a fixture writing a dropped
     // column sat right in front of this guard and produced nothing.
-    const nextFrom = src.slice(m.index + m[0].length).search(/\.from\(\s*['"`]/);
+    // ANY `.from(` ends the window, including `.from(targetTable)` with a variable. Only matching
+    // a QUOTED one meant an unquoted chain was invisible as a boundary, so the window ran past it
+    // and blamed the NEXT chain's columns on this table — `from(targetTable).select('total')` in
+    // ordersService reported as `payments.total`, which is a column neither of them has.
+    // `Array.from(` is excluded: it is not a query and truncating there would lose real coverage.
+    const nextFrom = src.slice(m.index + m[0].length).search(/(?<!Array)\.from\(/);
     const end = m.index + m[0].length + (nextFrom === -1 ? WINDOW : Math.min(nextFrom, WINDOW));
     const window = src.slice(m.index, end);
     const maskedWindow = masked.slice(m.index, end);
@@ -356,50 +372,21 @@ export function scanRepo(root = ROOT) {
 export const problemKey = (p) => `${p.file}|${p.table}.${p.column}|${p.kind}`;
 
 /**
- * Pre-existing drift, from this guard's first run (2026-08-17). SHRINK-ONLY — the same bargain
- * `.github/edge-typecheck-baseline.json` makes, and for the same reason: a guard that ships red is
- * a guard somebody turns off, and one that ships with its findings deleted is a guard that hides
- * them. Every entry here is a REAL runtime error waiting for its code path to be exercised. Fix
- * one, delete its line; never add a line to make a build pass.
+ * EMPTY, and it should stay that way.
  *
- * The standout: `social_accounts` has no `access_token`, `refresh_token`, `token_expires_at`,
- * `platform_account_id` or `account_name`, so every write in the Pinterest OAuth handler names a
- * column that is not there — the integration cannot have worked since the table was reshaped.
- * The rest are renames the writer never followed (`agent_runs.updated_at`, now `completed_at`;
- * `execution_time_ms`, now `duration_ms`; `moodboard_items.created_at`, now `added_at`).
+ * This guard's first run found 33 problems across 26 call sites — every one a real runtime error
+ * waiting for its code path, and every one now fixed rather than exempted. Among them: sixteen
+ * `ai_usage_logs.api_provider` inserts that had been failing silently on the billing table, a
+ * Pinterest OAuth flow writing five columns that no longer existed, an `agent_runs` zombie-recovery
+ * UPDATE that never ran, and four read paths (AR page, seasonality chart, F&E schedule, review
+ * notifications) querying columns that had been renamed out from under them.
  *
- * A key here that no longer matches anything FAILS the run. Shrink-only has to be enforced or it
- * is just a wish: a stale entry is an exemption nobody granted, sitting ready to hide the next
- * real finding that happens to land on the same file and column.
+ * It is kept as a mechanism because a real migration may legitimately need a staged fix — but it is
+ * shrink-only and enforced: an entry matching nothing FAILS the run, so a stale exemption cannot
+ * sit here absorbing the next genuine finding on the same file and column. Adding a line to make a
+ * build pass is the one thing it is not for.
  */
-export const KNOWN_DRIFT = new Set([
-  'src/components/Admin/PlatformOverviewTab.tsx|agent_runs.execution_time_ms|read',
-  'src/components/analytics/MarketTrendsTab/MarketTrendsTab.tsx|moodboard_items.created_at|read',
-  'src/components/features/ar/ARPage.tsx|document_images.description|read',
-  'src/components/features/social/MaterialReviews.tsx|products.user_id|read',
-  'src/modules/finance/components/CustomerFinanceRulesCard.tsx|user_profiles.credit_limit|write',
-  'src/modules/finance/components/CustomerFinanceRulesCard.tsx|user_profiles.min_order_value|write',
-  'src/modules/finance/components/CustomerFinanceRulesCard.tsx|user_profiles.payment_terms_days|write',
-  'src/modules/finance/components/CustomerFinanceRulesCard.tsx|user_profiles.responsible_sales_user_ids|write',
-  'src/modules/finance/services/ordersService.ts|payments.total|read',
-  'src/services/pinterestService.ts|social_accounts.account_name|read',
-  'supabase/functions/_shared/tools/catalog-tools.ts|products.base_price|read',
-  'supabase/functions/_shared/tools/catalog-tools.ts|products.currency|read',
-  'supabase/functions/auto-recovery-cron/index.ts|agent_runs.updated_at|write',
-  'supabase/functions/finance-fiscal-offline-recovery/index.ts|finance_settings.fiscal_error|write',
-  'supabase/functions/finance-fiscal-offline-recovery/index.ts|finance_settings.fiscal_mark|write',
-  'supabase/functions/finance-fiscal-offline-recovery/index.ts|finance_settings.fiscal_status|write',
-  'supabase/functions/generate-moodboard-sheet-pdf/data-fetcher.ts|workspace_members.created_at|read',
-  'supabase/functions/moodboard-sheet-share/index.ts|quote_items.name|read',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.access_token|read',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.access_token|write',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.account_name|write',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.platform_account_id|write',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.refresh_token|read',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.refresh_token|write',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.token_expires_at|read',
-  'supabase/functions/pinterest-api/handlers/oauth.ts|social_accounts.token_expires_at|write',
-]);
+export const KNOWN_DRIFT = new Set([]);
 
 export async function run() {
   const registry = await fetchRegistry();

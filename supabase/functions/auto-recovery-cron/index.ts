@@ -472,9 +472,11 @@ async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
       await supabase
         .from('agent_runs')
         .update({
+          // No `updated_at` — `agent_runs` has never had one, so naming it made Postgres reject
+          // the whole UPDATE and this zombie-recovery write did nothing at all. `last_heartbeat`
+          // is the liveness column the recovery sweep actually reads.
           status: 'processing',
           last_heartbeat: nowIso,
-          updated_at: nowIso,
         })
         .eq('id', job.id)
         .eq('status', 'pending');
