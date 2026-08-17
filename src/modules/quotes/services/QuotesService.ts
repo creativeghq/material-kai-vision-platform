@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { productDetailService } from '@/services/productDetailService';
 
 // =====================================================
 // INTERFACES
@@ -242,15 +243,13 @@ export interface QuoteTimeline {
 /**
  * What a quote line needs to know about its product (#368 follow-up).
  *
- * These are the only fields the quote surfaces actually read off the embed — `id`, `name`,
- * `sku`, `description`, `metadata` — plus `cost_currency`, which the line list uses as the
- * display currency and which carries no amount. `cost` itself is seller-only and arrives
- * through QUOTE_PRODUCT_SELECT_WITH_COST.
+ * These are the only fields the quote surfaces actually read off the embed. The cost columns are
+ * NOT among them and cannot be: `authenticated` has no SELECT privilege on `products.cost` /
+ * `cost_currency` at all since #358, so naming one here would fail the whole embed rather than
+ * over-share. The seller's cost arrives through `productDetailService.costs()`, which gates on
+ * `is_workspace_sell_side` — the same treatment the per-line `cost_snapshot` got.
  */
-const QUOTE_PRODUCT_SELECT = 'id, name, sku, description, metadata, cost_currency';
-
-/** The seller view adds the procurement cost, for margin and the below-cost guardrail. */
-const QUOTE_PRODUCT_SELECT_WITH_COST = `${QUOTE_PRODUCT_SELECT}, cost`;
+const QUOTE_PRODUCT_SELECT = 'id, name, sku, description, metadata';
 
 export class QuotesService {
   /**
@@ -436,15 +435,21 @@ export class QuotesService {
 
     const { data: items, error: itemsError } = await supabase
       .from('quote_items')
-      .select(`*, product:products(${opts?.includeCost ? QUOTE_PRODUCT_SELECT_WITH_COST : QUOTE_PRODUCT_SELECT})`)
+      .select(`*, product:products(${QUOTE_PRODUCT_SELECT})`)
       .eq('quote_id', quoteId)
       .order('added_at', { ascending: true });
 
     if (itemsError) throw itemsError;
 
+    // Two cost basifications, both sell-side-gated at the database: what this LINE was quoted at
+    // (frozen on acceptance) and what the product costs TODAY. The seller view needs the second
+    // for a line that has no snapshot yet; a customer asking for either gets an empty map.
     const costByItemId = opts?.includeCost
       ? await this.getQuoteItemCosts(quoteId)
       : new Map<string, number>();
+    const productCosts = opts?.includeCost
+      ? await productDetailService.costs((items ?? []).map((it) => it.product_id))
+      : new Map();
 
     // Fetch images for all products in this quote
     const productIds = (items || [])
@@ -477,6 +482,8 @@ export class QuotesService {
       product: item.product ? {
         ...item.product,
         image_url: productImageMap[item.product.id] || item.product.image_url,
+        cost: productCosts.get(item.product.id)?.cost ?? null,
+        cost_currency: productCosts.get(item.product.id)?.cost_currency ?? null,
       } : item.product,
     }));
 

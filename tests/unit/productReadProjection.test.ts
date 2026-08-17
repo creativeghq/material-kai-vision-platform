@@ -106,6 +106,44 @@ describe('reads of the products table are projected', () => {
     ).toEqual([]);
   });
 
+  it('nothing names a withheld cost column in a products read', () => {
+    // #358 made this enforceable rather than advisory: `authenticated` has no SELECT privilege on
+    // `products.cost`, `cost_currency`, `cost_updated_at`, `cost_source`, `markup_percent` or
+    // `attributes_raw` at all, and `get_product_costs` is the only browser-reachable path to them.
+    // Naming one in a select or an embed no longer over-shares — it fails the WHOLE query with
+    // "permission denied for column", taking the surface with it. This test is here so that shows
+    // up in CI rather than on the screen of whoever opens the page.
+    const WITHHELD = ['cost', 'cost_currency', 'cost_updated_at', 'cost_source', 'markup_percent', 'attributes_raw'];
+    const offenders: string[] = [];
+    for (const { rel, src } of FILES) {
+      if (rel.endsWith('productDetailService.ts')) continue; // the RPC wrapper names them in types
+      // Direct reads, and embeds of products inside another table's select.
+      const re = /(\.from\(\s*['"]products['"]\s*\)[^;]{0,240}?\.select\(\s*[`'"]([^`'"]*)|[:(]\s*products\s*\(\s*([^)]*)\))/g;
+      for (const m of src.matchAll(re)) {
+        const cols = (m[2] ?? m[3] ?? '').split(',').map((c) => c.trim().split(':').pop()!.trim());
+        const bad = WITHHELD.filter((w) => cols.includes(w));
+        if (bad.length) {
+          const line = src.slice(0, m.index).split('\n').length;
+          offenders.push(`${rel}:${line} — ${bad.join(', ')}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'These name a column `authenticated` cannot select, so the query returns a permission error '
+      + 'rather than data. Read the cost basis through productDetailService.costs(), which calls '
+      + 'get_product_costs and gates on is_workspace_sell_side.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('the cost basis is reachable only through the gated RPC', () => {
+    const svc = FILES.find((f) => f.rel.endsWith('services/productDetailService.ts'));
+    expect(svc, 'productDetailService.ts not found').toBeTruthy();
+    expect(svc!.src, 'the gated cost read is gone — nothing can show margin').toContain('get_product_costs');
+    // A failed or withheld read is an EMPTY map: cost unknown, rendered as a dash. Never zeros.
+    expect(svc!.src, 'a failed cost read no longer returns an empty map').toMatch(/return new Map\(\)/);
+  });
+
   it('the customer quote page does not ask for cost; the seller page does', () => {
     // Both pages call the same service method. The difference has to stay visible, because the
     // failure mode is silent in both directions: drop it on the admin page and the below-cost
@@ -118,6 +156,10 @@ describe('reads of the products table are projected', () => {
 
     expect(admin!.src, 'the seller view needs the live cost for margin and the guardrail')
       .toMatch(/getQuote\([^)]*includeCost:\s*true/);
+    // …and `includeCost` must still reach the gated RPC, not a column on the embed (#358).
+    const quotes = FILES.find((f) => f.rel.endsWith('services/QuotesService.ts'));
+    expect(quotes!.src, 'QuotesService no longer resolves the product cost through the gated RPC')
+      .toMatch(/productDetailService\.costs\(/);
     expect(customer!.src, 'the customer view must not ask for cost')
       .not.toMatch(/includeCost/);
   });

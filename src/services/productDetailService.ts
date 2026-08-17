@@ -34,6 +34,15 @@ export interface ProductDetail extends Partial<Product> {
   cost_currency?: string | null;
 }
 
+/** The cost basis of one product, as `get_product_costs` returns it. */
+export interface ProductCost {
+  cost: number | null;
+  cost_currency: string | null;
+  cost_source: string | null;
+  cost_updated_at: string | null;
+  markup_percent: number | null;
+}
+
 export const productDetailService = {
   /**
    * Returns null when the product does not exist OR the caller may not see it — deliberately
@@ -48,5 +57,38 @@ export const productDetailService = {
     if (error) throw error;
     if (!data) return null;
     return data as unknown as ProductDetail;
+  },
+
+  /**
+   * The cost basis for a set of products, keyed by product id.
+   *
+   * `products.cost`, `cost_currency`, `cost_source`, `cost_updated_at` and `markup_percent` are
+   * not selectable from `products` by `authenticated` at all (#358) — this RPC is the only path
+   * the browser has to them, and it gates per row on `is_workspace_sell_side`.
+   *
+   * A product the caller is not sell-side for is ABSENT from the map, and a failed read returns
+   * an empty one. Both mean "cost unknown"; neither means "cost is zero". Render a dash.
+   */
+  async costs(productIds: Array<string | null | undefined>): Promise<Map<string, ProductCost>> {
+    const ids = [...new Set(productIds.filter(Boolean))] as string[];
+    if (ids.length === 0) return new Map();
+    const { data, error } = await supabase.rpc('get_product_costs' as never, {
+      p_product_ids: ids,
+    } as never);
+    if (error) {
+      console.error('[productDetailService] get_product_costs failed - cost is unknown, not zero:', error);
+      return new Map();
+    }
+    const out = new Map<string, ProductCost>();
+    for (const row of (data ?? []) as Array<ProductCost & { product_id: string }>) {
+      out.set(row.product_id, {
+        cost: row.cost != null ? Number(row.cost) : null,
+        cost_currency: row.cost_currency ?? null,
+        cost_source: row.cost_source ?? null,
+        cost_updated_at: row.cost_updated_at ?? null,
+        markup_percent: row.markup_percent != null ? Number(row.markup_percent) : null,
+      });
+    }
+    return out;
   },
 };

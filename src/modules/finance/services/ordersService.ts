@@ -288,6 +288,7 @@ export type OrderLinkTarget =
   | { kind: 'cost_of_order'; orderId: string; projectId: string | null; label: string };
 
 import { round2 as r2 } from '@/utils/decimal';
+import { productDetailService } from '@/services/productDetailService';
 
 /**
  * Apply an order-level discount ('percent' or a flat 'amount') across the lines. The SAME effective
@@ -1548,14 +1549,17 @@ export const ordersService = {
      */
     quantity?: number | null; unit?: string | null;
   }): Promise<LinePricing> {
-    const [{ data: prod }, available] = await Promise.all([
-      supabase.from('products').select('cost, supplier_company_id').eq('id', opts.productId).maybeSingle(),
+    // `cost` is not selectable from `products` by the browser (#358) — it comes from the
+    // sell-side-gated RPC. `supplier_company_id` still is, and is read here directly.
+    const [{ data: prod }, costs, available] = await Promise.all([
+      supabase.from('products').select('supplier_company_id').eq('id', opts.productId).maybeSingle(),
+      productDetailService.costs([opts.productId]),
       this.getAvailableStock([opts.productId], opts.workspaceId).then((m) => m.get(opts.productId) ?? null),
     ]);
     // NB: products.measurement_unit_code is the integer myDATA code, NOT our text unit label
     // (item/m²/…), so we don't seed the line's unit from it — the user picks it.
     const unit: string | null = null;
-    const cost = prod?.cost != null ? Number(prod.cost) : null;
+    const cost = costs.get(opts.productId)?.cost ?? null;
     const supplier = (prod?.supplier_company_id as string | null) ?? null;
     if (opts.orderType === 'purchase') {
       // A purchase line pays cost, and `product_price_breaks` is sell-side by construction

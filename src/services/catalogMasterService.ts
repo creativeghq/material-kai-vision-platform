@@ -234,9 +234,13 @@ export const catalogMasterService = {
 
   /** Operator review queue: published asks that differ from what we currently pay. */
   async priceDrift(onlyNeedsReview = true): Promise<MasterPriceDrift[]> {
-    let q = supabase.from('catalog_master_price_drift').select('*');
-    if (onlyNeedsReview) q = q.eq('needs_review', true);
-    const { data, error } = await q.order('list_price_updated_at', { ascending: false, nullsFirst: false });
+    // Was a view. It reads `products.cost`, which the browser cannot select since #358, and it had
+    // no caller guard of its own — every authenticated user could read the platform suppliers'
+    // published list prices. The RPC gates on the sell side of the root workspace and returns an
+    // empty set to anyone else, ordered by the offer's own updated_at.
+    const { data, error } = await supabase.rpc('get_catalog_master_price_drift' as never, {
+      p_only_needs_review: onlyNeedsReview,
+    } as never);
     if (error) throw error;
     return (data ?? []) as unknown as MasterPriceDrift[];
   },

@@ -14,6 +14,7 @@ import React, { useEffect, useState } from 'react';
 import { Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
+import { productDetailService } from '@/services/productDetailService';
 
 interface CostRow {
   cost: number | null;
@@ -31,15 +32,22 @@ export const ProductCostCard: React.FC<{ productId: string }> = ({ productId }) 
   useEffect(() => {
     let live = true;
     (async () => {
-      const { data } = await supabase
-        .from('products')
-        .select('cost, cost_currency, supply_mode, external_sku, ' +
-          'supplier:crm_companies!products_supplier_company_id_fkey(name), ' +
-          'brand:crm_companies!products_brand_company_id_fkey(name)')
-        .eq('id', productId)
-        .maybeSingle();
+      // `cost` / `cost_currency` are not selectable from `products` by the browser (#358): the
+      // card renders for the sell side, and `get_product_costs` is what decides that. An absent
+      // entry means "not yours to see", so the card simply does not render its cost line.
+      const [{ data }, costs] = await Promise.all([
+        supabase
+          .from('products')
+          .select('supply_mode, external_sku, ' +
+            'supplier:crm_companies!products_supplier_company_id_fkey(name), ' +
+            'brand:crm_companies!products_brand_company_id_fkey(name)')
+          .eq('id', productId)
+          .maybeSingle(),
+        productDetailService.costs([productId]),
+      ]);
       if (!live) return;
-      setRow((data ?? null) as unknown as CostRow);
+      const c = costs.get(productId);
+      setRow(data ? ({ ...data, cost: c?.cost ?? null, cost_currency: c?.cost_currency ?? null } as unknown as CostRow) : null);
       setLoading(false);
     })();
     return () => { live = false; };

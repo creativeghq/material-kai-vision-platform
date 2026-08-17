@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
 import { findCompetitors, type CompetitorOrg } from '@/services/companyEnrichService';
 import { marketCheck, trackProduct, untrackProduct, type MarketStats } from '@/services/priceMonitoringApi';
+import { productDetailService } from '@/services/productDetailService';
 
 /** The seed identity the Market tab reads off the company row. */
 export interface CompanyMarketSeed {
@@ -855,12 +856,22 @@ const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId, wor
       // The error was discarded too, so a failure rendered as an empty catalogue.
       let pq = supabase
         .from('products')
-        .select('id, name, cost, cost_currency')
+        // `cost` / `cost_currency` come from get_product_costs below — not selectable here (#358).
+        .select('id, name')
         .eq('brand_company_id', companyId);
       if (workspaceId) pq = pq.eq('workspace_id', workspaceId);
       const { data, error } = await pq.order('name').limit(60);
       if (error) console.error('[CompanyMarketTab] product load failed:', error.message);
-      const rows = (error ? [] : (data as ProductRow[])) ?? [];
+      const base = (error ? [] : (data as ProductRow[])) ?? [];
+      // The cost basis is sell-side-gated at the database (#358). A product whose workspace the
+      // caller is not sell-side in comes back without one — cost unknown, rendered as a dash,
+      // never as zero.
+      const costs = base.length ? await productDetailService.costs(base.map((r) => r.id)) : new Map();
+      const rows = base.map((r) => ({
+        ...r,
+        cost: costs.get(r.id)?.cost ?? null,
+        cost_currency: costs.get(r.id)?.cost_currency ?? null,
+      }));
       if (cancelled) return;
       setProducts(rows);
       if (rows.length) {
