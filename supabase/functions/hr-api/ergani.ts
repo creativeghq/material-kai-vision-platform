@@ -14,6 +14,7 @@
 //    could NOT fill, so the operator reviews and completes it before anything reaches the Ministry.
 //    A fully-built `document` may always be passed to bypass the builder entirely.
 import { corsHeaders } from '../_shared/cors.ts';
+import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import {
@@ -492,6 +493,10 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
             .update({ status: 'submitted', ergani_protocol: res.protocol })
             .eq('id', String(body.schedule_id)).eq('workspace_id', workspaceId);
         }
+        // #356 `RE-4` generalised: `employee_id` is a body-supplied FK into hr_employees and is
+        // stored on the ΕΡΓΑΝΗ submission audit row, which is later joined for display. The sibling
+        // module (labour.ts) already proves the employee with `assertEmployee`; this path did not.
+        await assertSameWorkspace(supabase, 'hr_employees', body?.employee_id, workspaceId, 'employee');
         await audit(ctx, {
           submission_type: code, entity_type: body?.entity_type ?? null, entity_id: body?.entity_id ?? null,
           employee_id: body?.employee_id ?? null, environment: creds.environment, status: 'submitted',

@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
+import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { trackShipment, refreshShipment, type TrackInput } from '../_shared/shipping/shipsgo.ts';
 import { getFreightQuote, type SearatesCreds, type QuoteParams } from '../_shared/shipping/searates.ts';
@@ -259,6 +260,12 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         const name = String(body?.name ?? '').trim();
         if (!warehouseId) return json({ error: 'warehouse_id is required' }, 400);
         if (!name) return json({ error: 'name is required' }, 400);
+        // #356 `RE-4` generalised. Both ids come from the request body and were stored
+        // unchecked: a warehouse item in THIS workspace could point at another tenant's product
+        // (which carries cost, supplier links and pricing) or at their warehouse. The row's own
+        // workspace_id is correct, which is why nothing looked wrong — the FK is the leak.
+        await assertSameWorkspace(usr, 'warehouses', warehouseId, workspaceId, 'warehouse');
+        await assertSameWorkspace(usr, 'products', body?.product_id, workspaceId, 'product');
         const fields = pick(body, ITEM_WRITABLE);
         // Every column here must exist on warehouse_items. PostgREST rejects the WHOLE
         // statement on one unknown name, so `barcode`, `cpv_code`, `taric_code` and the

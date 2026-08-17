@@ -320,13 +320,27 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     // to the env / platform_secrets default; every tenant uses its own codes.
     const creds = await resolveAadeCredentials(admin, body.workspace_id ?? null);
 
+    // #356 `RE-4` generalised. `company_id` is a body-supplied FK into crm_companies. Resolved
+    // ONCE here, against the workspace this request already proved the caller belongs to, so the
+    // audit row can never name another tenant's company. A foreign id is dropped rather than
+    // rejected: this is a best-effort audit log and refusing the whole lookup over a bad
+    // provenance field would be the worse trade.
+    const { data: coRow } = body.company_id
+      ? await admin.from('crm_companies').select('id')
+          .eq('id', String(body.company_id)).eq('workspace_id', body.workspace_id ?? '').maybeSingle()
+      : { data: null };
+    const safeCompanyId = (coRow as { id?: string } | null)?.id ?? null;
+
     // Best-effort internal audit. AADE notifies the looked-up ΑΦΜ's TAXISnet inbox on every
     // live ('aade') call — this is OUR record of who/when/why/which VAT. Never blocks the response.
     const logLookup = async (source: 'aade' | 'cache', validAfm: boolean | null) => {
       try {
         await admin.from('aade_lookup_log').insert({
           looked_up_afm: rawAfm,
-          company_id: body.company_id ?? null,
+        // #356 `RE-4` generalised: `company_id` is a body-supplied FK into crm_companies,
+        // stored on an audit row that is later joined for display. The workspace is verified
+        // above; the company was not, so an audit entry could name another tenant's company.
+          company_id: safeCompanyId,
           workspace_id: body.workspace_id ?? null,
           requested_by: user.id,
           reason: body.reason ?? null,

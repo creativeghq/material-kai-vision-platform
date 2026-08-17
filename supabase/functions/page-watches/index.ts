@@ -20,6 +20,7 @@ import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 
 const FIRECRAWL_BASE = 'https://api.firecrawl.dev';
 const MODULE_SLUG = 'page-monitoring';
@@ -289,6 +290,10 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
 
       const category = CATEGORIES.has(String(body.category)) ? String(body.category) : 'other';
       const subjectKind = SUBJECT_KINDS.has(String(body.subject_kind)) ? String(body.subject_kind) : null;
+      // #356 `RE-4` generalised: the subject is a body-supplied FK into a workspace-scoped table.
+      if (subjectKind && typeof body.subject_id === 'string') {
+        await assertSameWorkspace(supabase, 'tech_radar_subjects', body.subject_id, workspaceId, 'subject');
+      }
 
       // Allowlisted insert — no spreading of the request body (invariant 8).
       const { data: created, error: insErr } = await supabase
