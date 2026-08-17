@@ -123,6 +123,27 @@ export interface CreditDebitResult {
  * 4. Calls the debit_credits router RPC (pools when a workspaceId is passed + funded)
  * 5. Inserts a row into ai_usage_logs for tracking
  */
+/**
+ * Optional provenance for the `ai_usage_logs` row this debit writes.
+ *
+ * `ai_usage_logs` carries `job_id` and `module_slug` columns and this writer set NEITHER, which is
+ * why 5,192 rows — the majority of the table — carry no module and no job. The columns were not
+ * missing; the signature had nowhere to put them, exactly like the `workspace_id` gap fixed on
+ * 2026-08-12 and `AICallLogData` in `ai-logger.ts` (#365 `AD-15`). A caller with the ids in scope
+ * four lines above the debit still had no way to pass them.
+ *
+ * Both stay OPTIONAL because plenty of spend genuinely has no job: an interactive tool call is not
+ * a background job, and inventing an id would be worse than a null.
+ */
+export interface UsageProvenance {
+  /** `background_jobs.id` when this spend belongs to one. NOT a conversation id. */
+  jobId?: string | null;
+  /** Which module's budget this belongs to — the same slug the cron/billing registry uses. */
+  moduleSlug?: string | null;
+  /** `products.id` when the spend is attributable to one product. */
+  productId?: string | null;
+}
+
 export async function debitExternalServiceCredits(
   supabase: DbClient,
   userId: string,
@@ -131,6 +152,7 @@ export async function debitExternalServiceCredits(
   units: number = 1,
   metadata?: Record<string, unknown>,
   workspaceId?: string | null,
+  provenance: UsageProvenance = {},
 ): Promise<CreditDebitResult> {
   try {
     const pricingMap = await getPricingMap(supabase);
@@ -197,6 +219,10 @@ export async function debitExternalServiceCredits(
       // against nobody — invisible to per-tenant cost views and to this table's own
       // `is_workspace_admin(workspace_id)` policy.
       workspace_id: workspaceId ?? null,
+      // Provenance the table has always had columns for and this writer never filled.
+      job_id: provenance.jobId ?? null,
+      module_slug: provenance.moduleSlug ?? null,
+      product_id: provenance.productId ?? null,
       operation_type: operationType,
       model_name: serviceName,
       api_provider: serviceName.split('-')[0],
@@ -498,9 +524,10 @@ export async function debitOrRefuse(
   units: number = 1,
   metadata?: Record<string, unknown>,
   workspaceId?: string | null,
+  provenance: UsageProvenance = {},
 ): Promise<string | null> {
   const result = await debitExternalServiceCredits(
-    supabase, userId, serviceName, operationType, units, metadata, workspaceId,
+    supabase, userId, serviceName, operationType, units, metadata, workspaceId, provenance,
   );
   if (result.success) return null;
   console.warn(`[credit-utils] refusing ${serviceName}/${operationType} for ${userId}: ${result.error}`);

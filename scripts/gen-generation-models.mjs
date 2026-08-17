@@ -28,14 +28,14 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fingerprintRows, PROJECTION_COLUMNS } from './lib/projectionFingerprint.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, '..', 'src', 'config', 'generationModels.generated.ts');
 
-const COLUMNS = [
-  'id', 'display_name', 'capability', 'sub_capability', 'provider', 'slug', 'version',
-  'adapter', 'input_requirements', 'pricing_key', 'tier', 'status', 'enabled', 'sort_order',
-];
+// One definition, shared with the guard test — a second copy here is how the file and the
+// check that validates it would drift apart.
+const COLUMNS = PROJECTION_COLUMNS;
 
 async function fetchRows() {
   const url = process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
@@ -59,6 +59,7 @@ async function fetchRows() {
   }
   return res.json();
 }
+
 
 function serialize(rows) {
   // Sort by sort_order then id so the file is stable regardless of how the rows arrived. An
@@ -107,6 +108,21 @@ export interface GenerationModelRow {
 
 export const GENERATION_MODELS: readonly GenerationModelRow[] = ${JSON.stringify(picked, null, 2)} as const;
 
+/**
+ * SHA-256 of the rows above, as the GENERATOR emitted them.
+ *
+ * The nightly \`dic_detect__generation_registry_projection_stale\` catches the database moving
+ * without a regeneration. It cannot catch the opposite — this FILE being edited by hand — because
+ * it compares the recorded projection against the live table and never sees the file. CI cannot
+ * compare the file to the table either: \`generation_models\` is authenticated-only and no workflow
+ * carries a service-role key.
+ *
+ * So the file carries its own checksum. \`tests/unit/generationModelRegistry.test.ts\` recomputes it
+ * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
+ * Between the two, both directions of drift are covered without a secret in CI.
+ */
+export const PROJECTION_FINGERPRINT = '${fingerprintRows(picked)}';
+
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
   GENERATION_MODELS.map((m) => m.id),
@@ -121,6 +137,64 @@ export function selectableModels(capability?: GenerationModelRow['capability']) 
 `;
 }
 
+
+/**
+ * Tell the database what we just wrote into the committed file.
+ *
+ * This is the half of the drift check that cannot live in CI. `gen:all` does not run this script
+ * and cannot: `generation_models` is authenticated-only, so the anon key in CI cannot read it, and
+ * no workflow carries a service-role key. So nothing compares the committed projection against its
+ * source, and it can drift indefinitely with every check green — which it did, until `veo-2` was
+ * spotted by hand on 2026-08-17 showing `pricing_key: null` ("no verified cost exists") while the
+ * table had it pointed at a live $0.35/unit row.
+ *
+ * Recording it here means the comparison happens where the credentials already are: nightly, in
+ * `dic_detect__generation_registry_projection_stale`. Change the table without regenerating and it
+ * fires. Hand-edit the file and tests/unit/generationModelRegistry.test.ts fires instead.
+ *
+ * Best-effort by design — a failure to record must not stop the file being written, because a
+ * written file with no record degrades to "the detector says stale", which is the safe direction.
+ */
+async function recordProjection(rows) {
+  const url = process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    console.warn('! no service-role key — projection NOT recorded; the nightly check will report it stale');
+    return;
+  }
+
+  // The exact shape the file received, sorted identically, so the detector compares like with
+  // like. `generation_models_projection_now()` builds the same object server-side.
+  const sorted = [...rows].sort(
+    (a, b) => (a.sort_order - b.sort_order) || String(a.id).localeCompare(String(b.id)),
+  );
+  const picked = sorted.map((r) => Object.fromEntries(COLUMNS.map((c) => [c, r[c] ?? null])));
+
+  const res = await fetch(`${url}/rest/v1/generation_models_projection`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify({
+      id: true,
+      rows: picked,
+      row_count: picked.length,
+      generated_at: new Date().toISOString(),
+      generated_by: process.env.USER || process.env.USERNAME || 'unknown',
+    }),
+  });
+
+  if (!res.ok) {
+    console.warn(`! could not record the projection (${res.status}): ${await res.text()}`);
+    console.warn('  the file is written; the nightly drift check will report it stale until this succeeds');
+    return;
+  }
+  console.log('✓ recorded the projection for the nightly drift check');
+}
+
 const flagIdx = process.argv.indexOf('--from-json');
 const rows = flagIdx !== -1
   ? JSON.parse(readFileSync(process.argv[flagIdx + 1], 'utf8'))
@@ -133,3 +207,5 @@ if (!Array.isArray(rows) || rows.length === 0) {
 
 writeFileSync(OUT, serialize(rows), 'utf8');
 console.log(`✎ wrote ${OUT} — ${rows.length} models`);
+
+await recordProjection(rows);

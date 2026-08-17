@@ -556,6 +556,21 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
   }
 ] as const;
 
+/**
+ * SHA-256 of the rows above, as the GENERATOR emitted them.
+ *
+ * The nightly `dic_detect__generation_registry_projection_stale` catches the database moving
+ * without a regeneration. It cannot catch the opposite — this FILE being edited by hand — because
+ * it compares the recorded projection against the live table and never sees the file. CI cannot
+ * compare the file to the table either: `generation_models` is authenticated-only and no workflow
+ * carries a service-role key.
+ *
+ * So the file carries its own checksum. `tests/unit/generationModelRegistry.test.ts` recomputes it
+ * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
+ * Between the two, both directions of drift are covered without a secret in CI.
+ */
+export const PROJECTION_FINGERPRINT = '9b51ef4992e30be6b5765983b7dbdb5c';
+
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
   GENERATION_MODELS.map((m) => m.id),

@@ -187,6 +187,9 @@ export async function openSpendGate(
   const refusal = await debitOrRefuse(
     sb, userId, DATAFORSEO_SERVICE, opType, units,
     { kind, reserve: true, ceiling_units: units }, workspaceId,
+    // Name the module. `ai_usage_logs.module_slug` exists and this writer left it null on 5,192
+    // rows, which is what makes "what is the SEO toolkit costing us" unanswerable.
+    { moduleSlug: 'seo-toolkit' },
   );
   if (refusal) {
     let message = 'Not enough credits to run this SEO lookup. Please top up.';

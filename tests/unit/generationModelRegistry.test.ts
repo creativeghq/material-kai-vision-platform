@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import {
   GENERATION_MODELS,
   GENERATION_MODEL_IDS,
+  PROJECTION_FINGERPRINT,
   selectableModels,
 } from '../../src/config/generationModels.generated';
 
@@ -220,5 +221,45 @@ describe('generation model registry', () => {
     // change gets waved through in review.
     const orders = GENERATION_MODELS.map((m) => m.sort_order);
     expect([...orders]).toEqual([...orders].sort((a, b) => a - b));
+  });
+
+  it('has not been hand-edited — the rows still match the fingerprint the generator wrote', async () => {
+    // THE HALF CI CAN ACTUALLY CHECK.
+    //
+    // Two directions of drift exist for this file and each needs its own guard, because neither
+    // side can see the other:
+    //
+    //   database moves, file not regenerated → caught nightly by
+    //     `dic_detect__generation_registry_projection_stale`, which compares what the generator
+    //     RECORDED against the live table. It never sees this file.
+    //   file edited by hand                  → caught here. CI cannot compare against the table
+    //     (`generation_models` is authenticated-only and no workflow carries a service-role key),
+    //     so the file carries its own checksum instead.
+    //
+    // Recomputed with the GENERATOR's own function, imported rather than copied — a second
+    // definition of "how the fingerprint is formed" is exactly how the two would drift apart.
+    const { fingerprintRows } = await import('../../scripts/lib/projectionFingerprint.mjs');
+    const picked = GENERATION_MODELS.map((m) => ({
+      id: m.id,
+      display_name: m.display_name,
+      capability: m.capability,
+      sub_capability: m.sub_capability,
+      provider: m.provider,
+      slug: m.slug,
+      version: m.version,
+      adapter: m.adapter,
+      input_requirements: m.input_requirements,
+      pricing_key: m.pricing_key,
+      tier: m.tier,
+      status: m.status,
+      enabled: m.enabled,
+      sort_order: m.sort_order,
+    }));
+    expect(
+      fingerprintRows(picked),
+      'generationModels.generated.ts was edited by hand. It is a projection of the ' +
+      '`generation_models` table — change the table, then run ' +
+      '`SUPABASE_SERVICE_ROLE_KEY=... npm run models:generate` and commit the result.',
+    ).toBe(PROJECTION_FINGERPRINT);
   });
 });
