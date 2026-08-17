@@ -20,6 +20,7 @@ import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
+import { contractContentHash, SIGNED_FIELDS } from '../_shared/contract-hash.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -28,10 +29,23 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 const CONTEXTS = ['hr', 'finance', 'project', 'realestate'];
 // Fields a caller may write (no status / token / workspace / created_by — those are server-set).
-const WRITABLE = [
-  'contract_type', 'title', 'body_markdown', 'currency', 'value',
-  'effective_date', 'expiry_date', 'counterparty_name', 'counterparty_email',
-] as const;
+// The editable fields ARE the signed fields — one list, in _shared/contract-hash.ts. Keeping a
+// second copy here is how the hash would come to cover something a user can change without it
+// (#356 `RC-1`).
+const WRITABLE = SIGNED_FIELDS;
+/**
+ * Statuses after which a contract's TERMS are settled (#356 `RC-1`).
+ *
+ * `update` had no status gate at all, so `value`, `body_markdown`, the dates and the
+ * counterparty stayed editable after signature — and since the PDF re-rendered from live data
+ * onto a fixed path, editing a signed contract silently replaced the signed artifact with new
+ * terms carrying the old signature block. Nobody could answer "what was signed?".
+ *
+ * `expired` is deliberately NOT here: an expiry is a date passing, not an agreement, so a
+ * lapsed draft may still be corrected and re-sent.
+ */
+const IMMUTABLE_STATUSES = ['signed', 'void'] as const;
+
 const SUBJECT_COLS = ['hr_employee_id', 'customer_company_id', 'supplier_company_id', 'order_id', 'quote_id', 'project_id', 'property_id'] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {
@@ -59,7 +73,10 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
 
     const { data: c } = await service
       .from('contracts')
-      .select('id, workspace_id, title, body_markdown, status, counterparty_name, effective_date, expiry_date, sign_token_expires_at, created_by, context')
+      // Every field in SIGNED_FIELDS is selected here because the signature is hashed over them
+      // (#356 `RC-1`). Hashing a column that was never selected would silently hash `undefined`
+      // and produce a binding that verifies against nothing.
+      .select('id, workspace_id, title, body_markdown, status, counterparty_name, counterparty_email, contract_type, currency, value, effective_date, expiry_date, sign_token_expires_at, created_by, context')
       .eq('sign_token', token)
       .maybeSingle();
 
@@ -99,9 +116,15 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
 
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
     const ua = req.headers.get('user-agent')?.slice(0, 400) ?? null;
+    // What is being signed, hashed over the substantive terms exactly as they stand right now
+    // (#356 `RC-1`). Without this the signature row said who and when and nothing about WHAT, so
+    // a later edit to `value` reattached this signature to different terms with no way to tell.
+    const signedHash = await contractContentHash(c as unknown as Record<string, unknown>);
+
     const { error: sigErr } = await service.from('contract_signatures').insert({
       contract_id: c.id,
       workspace_id: c.workspace_id,
+      signed_content_sha256: signedHash,
       signer_name: signerName,
       signer_email: typeof body?.signer_email === 'string' ? body.signer_email.slice(0, 200) : null,
       // Single-signer design: the person signing via the token IS the counterparty. Stamp it so the
@@ -235,9 +258,24 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     if (!id) return json({ error: 'id is required' }, 400);
     const patch = pick(body, WRITABLE);
     if (Object.keys(patch).length === 0) return json({ error: 'nothing to update' }, 400);
-    const { data, error } = await asUser.from('contracts').update(patch).eq('id', id).eq('workspace_id', workspaceId).select().maybeSingle();
+    // Status is part of the WHERE clause, not a read-then-write: a check done first would leave
+    // a window in which the counterparty signs between the read and the update, which is exactly
+    // the case that matters. 0 rows back then means "not found OR already settled", and the
+    // follow-up read below is what tells those apart for the error message only.
+    let uq = asUser.from('contracts').update(patch).eq('id', id).eq('workspace_id', workspaceId);
+    for (const st of IMMUTABLE_STATUSES) uq = uq.neq('status', st);
+    const { data, error } = await uq.select().maybeSingle();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
-    if (!data) return json({ error: 'not found' }, 404);
+    if (!data) {
+      const { data: existing } = await asUser.from('contracts')
+        .select('status').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!existing) return json({ error: 'not found' }, 404);
+      return json({
+        error: `This contract is ${existing.status} and its terms can no longer be changed. `
+          + 'Void it and raise a new one if the terms need to differ.',
+        status: existing.status,
+      }, 409);
+    }
     return json({ contract: data });
   }
 
@@ -246,11 +284,24 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     if (!id) return json({ error: 'id is required' }, 400);
     const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, '');
     const expires = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
-    const { data, error } = await asUser.from('contracts')
+    // #356 `RC-2`: minting a fresh token for an already-signed contract reopens it for signature,
+    // which is what made `RC-1` reachable through the ordinary UI rather than only by direct API
+    // call. Same compare-and-swap shape as `update`.
+    let sq = asUser.from('contracts')
       .update({ status: 'sent', sign_token: token, sign_token_expires_at: expires, sent_at: new Date().toISOString() })
-      .eq('id', id).eq('workspace_id', workspaceId).select().maybeSingle();
+      .eq('id', id).eq('workspace_id', workspaceId);
+    for (const st of IMMUTABLE_STATUSES) sq = sq.neq('status', st);
+    const { data, error } = await sq.select().maybeSingle();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
-    if (!data) return json({ error: 'not found' }, 404);
+    if (!data) {
+      const { data: existing } = await asUser.from('contracts')
+        .select('status').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!existing) return json({ error: 'not found' }, 404);
+      return json({
+        error: `This contract is ${existing.status} and cannot be sent for signature again.`,
+        status: existing.status,
+      }, 409);
+    }
 
     // Actually email the counterparty the signing link (the whole point of "send"). Best-effort — the
     // token/link is still returned so the caller can copy it if the email can't go out. Transactional
@@ -285,9 +336,27 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
   if (action === 'void') {
     const id = String(body?.id ?? '');
     if (!id) return json({ error: 'id is required' }, 400);
-    const { data, error } = await asUser.from('contracts').update({ status: 'void', sign_token: null }).eq('id', id).eq('workspace_id', workspaceId).select().maybeSingle();
+    // #356 `RC-2`. A SIGNED contract is a concluded agreement; erasing it to 'void' would drop
+    // the executed document out of every status-filtered list while its signatures stayed on
+    // file. Terminating a signed agreement is a business act with its own paperwork, not a
+    // status flip. Voiding an already-void contract is simply a no-op worth reporting.
+    let vq = asUser.from('contracts').update({ status: 'void', sign_token: null })
+      .eq('id', id).eq('workspace_id', workspaceId);
+    for (const st of IMMUTABLE_STATUSES) vq = vq.neq('status', st);
+    const { data, error } = await vq.select().maybeSingle();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
-    if (!data) return json({ error: 'not found' }, 404);
+    if (!data) {
+      const { data: existing } = await asUser.from('contracts')
+        .select('status').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!existing) return json({ error: 'not found' }, 404);
+      return json({
+        error: existing.status === 'signed'
+          ? 'This contract is signed. A concluded agreement cannot be voided — record its '
+            + 'termination instead.'
+          : `This contract is already ${existing.status}.`,
+        status: existing.status,
+      }, 409);
+    }
     return json({ contract: data });
   }
 

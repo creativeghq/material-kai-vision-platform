@@ -8,6 +8,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { contractContentHash } from '../_shared/contract-hash.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
@@ -109,10 +110,29 @@ Deno.serve(withApiLogging('generate-contract-pdf', async (req) => {
     y -= 18;
     drawText('Signatures', 13, bold, ink, 6);
     if (sigs && sigs.length > 0) {
+      // Does this document still say what the signatory agreed to? The hash is taken over the
+      // same canonical terms `contracts-api` hashed at signing time (#356 `RC-1`). Printing the
+      // verdict is the point: before this, an edited contract re-rendered with the original
+      // signature block and looked exactly like the signed original.
+      const currentHash = await contractContentHash(c as unknown as Record<string, unknown>);
       for (const s of sigs) {
         const when = s.signed_at ? new Date(s.signed_at).toISOString().slice(0, 10) : '—';
         drawText(`${s.signer_name || 'Signer'}${s.signer_email ? ` <${s.signer_email}>` : ''}`, 11, bold, ink, 3);
-        drawText(`Signed ${when}${s.ip ? ` · IP ${s.ip}` : ''}${s.signer_role ? ` · ${s.signer_role}` : ''}`, 9, font, muted, 8);
+        drawText(`Signed ${when}${s.ip ? ` · IP ${s.ip}` : ''}${s.signer_role ? ` · ${s.signer_role}` : ''}`, 9, font, muted, 3);
+        const sigHash = (s as { signed_content_sha256?: string | null }).signed_content_sha256;
+        if (!sigHash) {
+          // Signatures taken before RC-1 shipped carry no binding and never will. Saying so is
+          // honest; printing nothing would let an unverifiable document read as a verified one.
+          drawText('Content binding: not recorded (signed before content binding was introduced)', 8.5, font, muted, 8);
+        } else if (sigHash === currentHash) {
+          drawText(`Content verified · sha256 ${sigHash.slice(0, 16)}…`, 8.5, font, muted, 8);
+        } else {
+          drawText(
+            'WARNING: the terms above have CHANGED since this signature was given. '
+            + `Signed content sha256 ${sigHash.slice(0, 16)}… · current ${currentHash.slice(0, 16)}…`,
+            8.5, bold, rgb(0.7, 0.1, 0.1), 8,
+          );
+        }
       }
     } else if (c.status === 'signed') {
       drawText('Signed (no signature record found).', 10, font, muted);
@@ -122,12 +142,56 @@ Deno.serve(withApiLogging('generate-contract-pdf', async (req) => {
 
     const bytes = await pdf.save();
 
-    // Store (overwrite) + return a fresh signed URL. Private bucket → never persist the URL.
-    const path = `contract-output/${contractId}.pdf`;
-    const up = await svc.storage.from('pdf-documents').upload(path, bytes, { contentType: 'application/pdf', upsert: true });
-    if (up.error) throw new HttpError(500, `Storage upload failed: ${up.error.message}`);
+    // WHERE this is written depends on whether it is evidence (#356 `RC-1`).
+    //
+    // It used to be one fixed path with `upsert: true` for every render, so regenerating a
+    // signed contract destroyed the signed artifact — the only copy of what the counterparty
+    // received — and anyone holding the earlier link silently got the new terms instead.
+    //
+    // A signed contract therefore gets an immutable object, written ONCE. If one already
+    // exists, this returns it rather than rendering over it: re-reading a concluded agreement
+    // must not be able to change it. A draft keeps the old overwrite behaviour, because a draft
+    // is a working copy and nobody has agreed to it.
+    const isSigned = c.status === 'signed';
+    const existingSignedPath = (c as { signed_pdf_path?: string | null }).signed_pdf_path ?? null;
+
+    let path: string;
+    let immutable = false;
+
+    if (isSigned && existingSignedPath) {
+      path = existingSignedPath;
+      immutable = true;
+    } else if (isSigned) {
+      // Content-addressed, so re-signing genuinely different terms cannot collide with this one.
+      const stamp = await contractContentHash(c as unknown as Record<string, unknown>);
+      path = `contract-output/${contractId}/signed-${stamp.slice(0, 16)}.pdf`;
+      const up = await svc.storage.from('pdf-documents')
+        .upload(path, bytes, { contentType: 'application/pdf', upsert: false });
+      // A collision means a concurrent render already wrote this exact content — same bytes,
+      // same path, so the existing object is the correct answer and the loser simply uses it.
+      if (up.error && !/exists/i.test(up.error.message)) {
+        throw new HttpError(500, `Storage upload failed: ${up.error.message}`);
+      }
+      // Record it so this branch is taken from now on, and so build_storage_reference_set()
+      // protects the object from storage-orphan-cleanup-cron. Failing to record it would leave
+      // the evidence unreferenced and therefore reapable, so this is not best-effort.
+      const { error: pathErr } = await svc.from('contracts')
+        .update({ signed_pdf_path: path }).eq('id', contractId).is('signed_pdf_path', null);
+      if (pathErr) throw new HttpError(500, `Could not record the signed PDF path: ${pathErr.message}`);
+      immutable = true;
+    } else {
+      path = `contract-output/${contractId}/draft.pdf`;
+      const up = await svc.storage.from('pdf-documents')
+        .upload(path, bytes, { contentType: 'application/pdf', upsert: true });
+      if (up.error) throw new HttpError(500, `Storage upload failed: ${up.error.message}`);
+    }
+
+    // Private bucket → never persist the URL, always re-sign on read.
     const signed = await svc.storage.from('pdf-documents').createSignedUrl(path, 7 * 24 * 3600);
     if (signed.error || !signed.data?.signedUrl) throw new HttpError(500, `Could not sign the PDF URL: ${signed.error?.message ?? 'unknown'}`);
 
-    return json({ success: true, url: signed.data.signedUrl, storage_path: path, page_count: pdf.getPageCount() });
+    return json({
+      success: true, url: signed.data.signedUrl, storage_path: path,
+      immutable, page_count: pdf.getPageCount(),
+    });
 }));
