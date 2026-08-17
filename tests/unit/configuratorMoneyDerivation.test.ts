@@ -23,6 +23,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 
@@ -47,7 +48,7 @@ function walk(target: string, out: string[] = []): string[] {
 
 /** Strip comments so prose describing the rule doesn't trip the scanner. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 const FILES = CONFIGURATOR_PATHS.flatMap((p) => walk(p))

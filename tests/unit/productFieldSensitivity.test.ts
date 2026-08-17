@@ -36,11 +36,12 @@ import {
   labelForField,
   sectionsForCategory,
 } from '../../src/services/fieldRegistryService';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 const blankComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
+  sharedBlankComments(src);
 
 const MODAL = 'src/components/features/products/ProductDetailModal.tsx';
 const REGISTRY_SERVICE = 'src/services/fieldRegistryService.ts';

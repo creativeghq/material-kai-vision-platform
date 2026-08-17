@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const FUNCS = join(__dirname, '..', '..', 'supabase', 'functions');
 const read = (rel: string) => readFileSync(join(FUNCS, rel), 'utf8');
@@ -22,7 +23,7 @@ const read = (rel: string) => readFileSync(join(FUNCS, rel), 'utf8');
  * delimiter and deletes everything to the next close.
  */
 function codeOnly(src: string): string {
-  return src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  return sharedStripComments(src);
 }
 
 // ── EG-5: SERP text is competitor-authored and must reach the model fenced ──────────────────

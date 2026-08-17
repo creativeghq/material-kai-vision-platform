@@ -24,13 +24,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 /** Strip comments so prose describing the old shape never counts as the old shape. */
 const blankComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
+  sharedBlankComments(src);
 
 const CATALOG_SERVICE = 'src/services/catalogMasterService.ts';
 const PRICING_SERVICE = 'src/services/supplierPricingService.ts';

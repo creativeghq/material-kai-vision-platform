@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const root = process.cwd();
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
@@ -39,9 +40,7 @@ const CATALOG_EXTRACT = 'supabase/functions/catalog-extract-from-pdfs/index.ts';
  * and the guard has then taught you to remove the explanation.
  */
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  return sharedStripComments(src);
 }
 
 /** Body of a top-level `export async function NAME(` / `async function NAME(` up to the next one. */

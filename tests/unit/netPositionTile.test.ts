@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import {
   netPositionDirection, netPositionTotal, netPositionVisible,
 } from '@/modules/finance/utils/netPosition';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 type T = {
   customerOutstanding?: number; heldCredit?: number;
@@ -153,7 +154,7 @@ describe('the closing balance on artefacts that leave the building', () => {
     const labels = src.match(/const LABELS[\s\S]*?\n\};/);
     expect(labels, 'LABELS block moved — update this guard').not.toBeNull();
     // Strip comments: the block explains WHY the owing wording went, and saying so is not a relapse.
-    const strings = labels![0].replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const strings = sharedStripComments(labels![0]);
     expect(strings).not.toMatch(OWING);
     for (const lang of ['closing: \'Υπόλοιπο λογαριασμού\'', 'closing: \'Account balance\'']) {
       expect(strings).toContain(lang);

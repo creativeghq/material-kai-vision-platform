@@ -40,6 +40,7 @@ import {
   toVectorLiteral,
   type RecalledMemory,
 } from '../../supabase/functions/_shared/agent-memory.ts';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const MEMORY_MODULE = join(ROOT, 'supabase/functions/_shared/agent-memory.ts');
@@ -50,7 +51,7 @@ const agentChatSrc = readFileSync(AGENT_CHAT, 'utf8');
 
 /** Strip comments so the prose describing the old bug doesn't satisfy — or trip — a scanner. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 const memoryCode = stripComments(memorySrc);

@@ -28,6 +28,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -94,7 +95,7 @@ function objectValueOf(src: string, fnAnchor: string, key: string): string {
 
 /** Strip block/line comments so prose describing a rule cannot satisfy the rule. */
 function code(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 describe('page-watch webhook — the unsigned-callback boundary', () => {

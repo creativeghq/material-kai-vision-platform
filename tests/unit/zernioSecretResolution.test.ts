@@ -20,6 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const FUNCTIONS_DIR = join(__dirname, '..', '..', 'supabase', 'functions');
 
@@ -45,9 +46,7 @@ function walk(dir: string): string[] {
 
 /** Strip comments so prose and error copy never trip the scan. */
 function code(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 // Read the tree ONCE — 172 edge functions, and re-reading per assertion made this the
@@ -337,7 +336,14 @@ describe('social lands in the inbox, and public stays public', () => {
     // A comment reply goes out under our own post to the whole audience. An agent replying
     // unprompted is broadcasting on its own initiative, and a tool that returns a real balance
     // is one sentence from publishing it.
-    expect(handler.code).toMatch(/allowAgent: false,\s*\/\/ never auto-answer in public/);
+    // Anchored on the CODE, not on the comment beside it. This used to match
+    // `allowAgent: false,\s*// never auto-answer in public` — which passed only because the
+    // stripper of the day removed full-line comments and left trailing ones, so the assertion
+    // was really checking that somebody had written a particular sentence. Rewording the
+    // comment would have broken it; deleting `allowAgent: false` and keeping the comment
+    // would not have. The rule is that the PUBLIC comment thread is created with the agent
+    // off, so that is what is pinned: the flag, in the call that builds the comments thread.
+    expect(handler.code).toMatch(/allowAgent: false,[\s\S]{0,400}?externalKey: `comments:/);
     expect(inboxApi.code).toContain('publicThread');
     expect(inboxApi.code).toMatch(/&& !publicThread\)/);
     expect(inboxApi.code).toMatch(/posted PUBLICLY as a comment/);

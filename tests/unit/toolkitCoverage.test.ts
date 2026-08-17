@@ -58,6 +58,7 @@ import { deriveAutoFields } from '@/components/features/ai/toolAutoFields';
 import { TOOL_MANIFEST } from '@/components/features/ai/toolManifest.generated';
 // @ts-expect-error — plain ESM script, no types; tests/ is outside tsconfig anyway.
 import { generate, generateToolkitClusters } from '../../scripts/gen-tool-manifest.mjs';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const AGENT_CHAT = join(ROOT, 'supabase/functions/agent-chat/index.ts');
@@ -606,7 +607,7 @@ describe('quick-start → chat sentence', () => {
   }
 
   /** Comments describe the FORMAT ("?quickstart=<toolkit>:<label>"); they are not links. */
-  const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const stripComments = (s: string) => sharedStripComments(s);
 
   it('every deterministic quick-start renders a sentence, not a button caption', () => {
     const bad: string[] = [];

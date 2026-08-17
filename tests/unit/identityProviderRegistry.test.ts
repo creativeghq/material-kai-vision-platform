@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 // on import in the node test environment. The rules worth guarding all live in providers.ts.
 import { IDENTITY_PROVIDERS, providerFor, providersFor } from '@/services/identity/providers';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 /**
  * The identity-provider registry (#329) replaced a hardcoded `if country === 'EL' … else if EU …`
@@ -71,7 +72,7 @@ describe('business-identity provider registry (#329)', () => {
     // The whole point. If a caller reintroduces `=== 'EL'` to decide WHERE to verify, the
     // registry is decoration and adding a country silently misses that call site.
     const src = readFileSync('src/components/business/crm/CompanyIdentityLookup.tsx', 'utf8');
-    const stripped = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+    const stripped = sharedStripComments(src);
     // Placeholder/label text may still mention Greece; a COMPARISON is what must be gone.
     expect(
       /(countryCode|cc)\s*===\s*'(EL|GR)'\s*&&/.test(stripped),

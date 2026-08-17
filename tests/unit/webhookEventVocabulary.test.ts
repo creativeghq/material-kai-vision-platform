@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 /**
  * Every event a tenant can subscribe an outbound webhook to (#330) must be a real
@@ -23,7 +24,7 @@ const UNION_FILE = 'src/services/flows/types.ts';
 const LIST_FILE = 'supabase/functions/_shared/webhook-events.ts';
 
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 function readTriggerUnion(): Set<string> {

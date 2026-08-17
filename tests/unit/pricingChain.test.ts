@@ -29,6 +29,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
@@ -67,7 +68,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** Strip comments so prose describing the old bug doesn't count as the bug. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 const FILES = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)))

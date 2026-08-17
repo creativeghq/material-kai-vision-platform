@@ -27,6 +27,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const ORDERS_SERVICE = join(ROOT, 'src/modules/finance/services/ordersService.ts');
@@ -35,7 +36,7 @@ const LINK_PICKER = join(ROOT, 'src/modules/finance/components/OrderLinkPicker.t
 
 /** Strip comments so prose describing the rule doesn't satisfy a check about the code. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 const read = (p: string) => stripComments(readFileSync(p, 'utf8'));

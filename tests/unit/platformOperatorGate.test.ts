@@ -22,6 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const RESET = join(ROOT, 'supabase', 'functions', 'reset-platform', 'index.ts');
@@ -32,9 +33,7 @@ const read = (p: string) => readFileSync(p, 'utf8');
 /** Body of a named function/handler region, comments stripped, so a rule cannot be
  *  satisfied by prose that merely mentions the right identifier. */
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 describe('#362 — a platform-wide wipe requires a platform operator', () => {

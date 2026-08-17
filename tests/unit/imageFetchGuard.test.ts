@@ -31,6 +31,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = join(__dirname, '..', '..');
 const FUNCS = join(ROOT, 'supabase', 'functions');
@@ -40,9 +41,7 @@ const read = (p: string) => readFileSync(p, 'utf8');
 
 /** Source with comments stripped, so prose describing the old bug is not read as code. */
 function codeOnly(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 function walk(dir: string, out: string[] = []): string[] {

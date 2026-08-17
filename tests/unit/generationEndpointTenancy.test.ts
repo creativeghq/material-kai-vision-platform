@@ -36,13 +36,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = join(__dirname, '..', '..');
 const FUNCS = join(ROOT, 'supabase', 'functions');
 
 /** Source with comments stripped, so prose describing the old bug is not read as code. */
 function codeOnly(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 const read = (rel: string) => codeOnly(readFileSync(join(FUNCS, rel), 'utf8'));
 

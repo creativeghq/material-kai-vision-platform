@@ -21,12 +21,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace(/\r\n/g, '\n');
 
 /** Strip comments so prose describing the banned pattern is not mistaken for the pattern. */
 const stripComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  sharedStripComments(src);
 
 const CRON = 'supabase/functions/asset-service-reminders-cron/index.ts';
 const API = 'supabase/functions/customer-assets-api/index.ts';

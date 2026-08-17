@@ -22,6 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const SRC = readFileSync(join(process.cwd(), 'src/embed/materialkai-builder.ts'), 'utf8');
 
@@ -77,7 +78,7 @@ describe('the embed builder prices only exact matches', () => {
     //
     // Comments are stripped first. The rule is about CODE, and prose trips it constantly: a line
     // ending in the word "price" followed by the next line's `//` reads as `price /` to the regex.
-    const code = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+    const code = sharedStripComments(SRC);
     const bad = [...code.matchAll(/\bprice\s*[*/+-]|[*/+-]\s*\bprice\b/g)].map((m) => m[0]);
     expect(bad, 'money arithmetic in the widget: ' + bad.join(', ')).toEqual([]);
   });

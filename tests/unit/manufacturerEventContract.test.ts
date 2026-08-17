@@ -24,6 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = join(__dirname, '..', '..');
 
@@ -147,7 +148,7 @@ describe('manufacturer_analytics_events event_type contract', () => {
     const src = readFileSync(join(ROOT, 'src/services/manufacturerAnalyticsService.ts'), 'utf8');
     // Comments are stripped first: the header documents WHY the service must not send a
     // workspace_id, and matching that prose would fail the test for explaining itself.
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const code = sharedStripComments(src);
     // A client-asserted workspace_id would let a caller attribute engagement to a tenant it does
     // not belong to (security invariant 1). A BEFORE INSERT trigger derives it from the product.
     expect(

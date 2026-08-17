@@ -28,10 +28,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { projectIdentity, rankIdentityOptions } from '@/services/lineIdentityRules';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace(/\r\n/g, '\n');
 const blankComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
+  sharedBlankComments(src);
 
 const ORDERS_SERVICE = 'src/modules/finance/services/ordersService.ts';
 const PICKER = 'src/components/business/lines/LineIdentityPicker.tsx';

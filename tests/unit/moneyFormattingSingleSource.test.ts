@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { formatMoney, formatNumber } from '@/utils/decimal';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 /**
  * One money formatter, one locale (#329).
@@ -40,9 +41,7 @@ function offenders(): string[] {
   for (const file of walk(SCAN_ROOT)) {
     const rel = relative(process.cwd(), file).split('\\').join('/');
     if (rel === CANONICAL) continue;
-    const src = readFileSync(file, 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^[ \t]*\/\/.*$/gm, '');
+    const src = sharedStripComments(readFileSync(file, 'utf8'));
     // `Intl.NumberFormat(...)` whose options declare a currency style. Matched across newlines
     // because several of the originals were wrapped.
     const re = /Intl\.NumberFormat\s*\([^)]*style\s*:\s*'currency'/gs;

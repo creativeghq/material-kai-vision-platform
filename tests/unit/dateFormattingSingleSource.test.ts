@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { formatDate } from '@/utils/datetime';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 /**
  * Dates render through one formatter, in one locale (#329).
@@ -51,9 +52,7 @@ function offenders(): string[] {
   for (const file of walk(SCAN_ROOT)) {
     const rel = relative(process.cwd(), file).split('\\').join('/');
     if (rel === CANONICAL || rel in ALLOWED) continue;
-    const src = readFileSync(file, 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^[ \t]*\/\/.*$/gm, '');
+    const src = sharedStripComments(readFileSync(file, 'utf8'));
     // (a) `new Date(…).toLocale*String()` with NO arguments — the plain browser-locale form.
     if (/new Date\([^;]*?\)\.toLocale(Date)?String\(\s*\)/.test(src)) { found.push(rel); continue; }
     // (b) An explicit options object but `undefined` / `[]` as the LOCALE. The shape is

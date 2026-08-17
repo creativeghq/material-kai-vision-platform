@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 /**
  * Every emitted flow event must exist in the `TriggerType` union (#263 item 4).
@@ -58,7 +59,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** Strip comments so prose naming an old event name doesn't register as an emit. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 interface Emit { event: string; file: string; line: number }

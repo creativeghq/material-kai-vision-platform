@@ -38,6 +38,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
@@ -61,9 +62,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** Blank out comments while PRESERVING line numbers, so a documented example URL is not a link. */
 function blankComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/^([ \t]*)\/\/.*$/gm, (_m, indent: string) => indent);
+  return sharedBlankComments(src);
 }
 
 const SOURCE_ROOTS = ['src', 'supabase/functions'];

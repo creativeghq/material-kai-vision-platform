@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DOCUMENT_ENTITY_TYPES } from '@/services/documentDeliveryTypes';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace(/\r\n/g, '\n');
 
@@ -36,7 +37,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace
  * to explain why it must not be read, and a naive scan flags its own warning.
  */
 const readCode = (p: string) =>
-  read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  sharedStripComments(read(p));
 
 /**
  * The live values of both CHECK constraints, transcribed from the applied migrations

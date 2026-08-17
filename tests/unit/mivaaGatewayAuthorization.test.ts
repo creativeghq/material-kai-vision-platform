@@ -23,6 +23,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const GATEWAY = join(
   __dirname, '..', '..', 'supabase', 'functions', 'mivaa-gateway', 'index.ts',
@@ -38,7 +39,7 @@ const GATEWAY = join(
  * nothing to fail on, which is the worst way for a guard to be wrong.
  */
 function codeOnly(src: string): string {
-  return src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  return sharedStripComments(src);
 }
 
 const src = codeOnly(readFileSync(GATEWAY, 'utf8'));

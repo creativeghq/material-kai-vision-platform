@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
@@ -26,7 +27,7 @@ const types = read('src/integrations/supabase/types.ts');
 
 /** Comments describe the history on purpose; only real call sites count. */
 const stripComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+  sharedStripComments(src).replace(/\{\s*\}/g, '');
 
 /** `recordPayment` is the single funnel — every payment in the app is created through it. */
 function recordPaymentBody(src: string): string {

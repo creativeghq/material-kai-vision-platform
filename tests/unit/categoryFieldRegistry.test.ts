@@ -44,13 +44,14 @@ import { join, relative, sep } from 'node:path';
 
 import { CATEGORY_KEYS } from '../../src/lib/categoryVocab.generated';
 import { UPLOAD_CATEGORIES, resolveUploadCategory } from '../../src/lib/categoryFieldRegistry';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 /** Strip comments so prose describing the old shape never counts as the old shape. */
 const blankComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
+  sharedBlankComments(src);
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];

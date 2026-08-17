@@ -18,13 +18,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const SERVICE = 'src/services/crmActivitiesService.ts';
 
 /** Strip comments so prose describing the old bug doesn't trip the scanner. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 const source = stripComments(readFileSync(join(ROOT, SERVICE), 'utf8'));

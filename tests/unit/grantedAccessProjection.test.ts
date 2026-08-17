@@ -30,11 +30,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const FUNCS = join(__dirname, '..', '..', 'supabase', 'functions');
 
 function codeOnly(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 const read = (rel: string) => codeOnly(readFileSync(join(FUNCS, rel), 'utf8'));
 

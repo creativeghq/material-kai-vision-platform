@@ -29,6 +29,7 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 
@@ -46,7 +47,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** Strip comments so prose describing the old shape never counts as the old shape. */
 const blankComments = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
+  sharedBlankComments(src);
 
 const FILES = walk(join(ROOT, 'src')).map((f) => ({
   rel: relative(ROOT, f).split(sep).join('/'),

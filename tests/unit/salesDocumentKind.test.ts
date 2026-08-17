@@ -26,6 +26,7 @@ import {
   salesDocumentKindFor,
   salesDocumentKindLabel,
 } from '../../src/modules/finance/utils/salesDocumentKind';
+import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ['src/modules/finance', 'src/modules/quotes', 'src/pages/Admin'];
@@ -43,7 +44,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** Strip comments so prose describing the old bug doesn't trip the scanner. */
 function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  return sharedStripComments(src);
 }
 
 describe('the rule itself', () => {
