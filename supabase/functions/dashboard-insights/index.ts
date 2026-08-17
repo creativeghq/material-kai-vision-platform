@@ -70,14 +70,26 @@ interface Snapshot {
 }
 
 
-// ── Stats gathering (each block is independently fault-tolerant) ──────────────
-async function gatherSnapshot(admin: SB, userId: string, workspaceId: string): Promise<Snapshot> {
-  const now = Date.now();
-  const in7d = new Date(now + 7 * 864e5).toISOString();
-  const todayStart = new Date(new Date().toISOString().slice(0, 10)).toISOString();
-  const since30d = new Date(now - 30 * 864e5).toISOString();
+// ── Stats gathering ─────────────────────────────────────────────────
+//
+// ONE call to `dashboard_workspace_snapshot`, derived in SQL (#364 EX-5, EX-10, EX-11).
+//
+// This was six independent PostgREST reads, each ending in `.catch(() => {})`, each leaving its
+// field at the zero it was initialised to. That is the silent-zero shape on the surface whose
+// entire purpose is noticing change: every query could fail and the panel would still render a
+// confident "your workspace is looking healthy" — and then CACHE it for fifteen days, so the
+// failure outlived its cause. Two of them were also capped at 1000 rows, and the task block had
+// no workspace filter at all.
+//
+// One call means one failure signal. `degraded` is what a partial answer looks like now, and the
+// caller refuses to cache a long TTL over it.
 
-  const snap: Snapshot = {
+async function gatherSnapshot(
+  admin: SB,
+  userId: string,
+  workspaceId: string,
+): Promise<{ snapshot: Snapshot; degraded: boolean }> {
+  const fallback: Snapshot = {
     workspace_name: 'your workspace',
     generated_for: new Date().toISOString().slice(0, 10),
     projects: { active: 0, total: 0, next: [] },
@@ -87,123 +99,23 @@ async function gatherSnapshot(admin: SB, userId: string, workspaceId: string): P
     quotes: { open: 0, recent_30d: 0 },
   };
 
-  const tasks: Array<Promise<unknown>> = [];
-
-  // Workspace name
-  tasks.push(
-    admin
-      .from('workspaces')
-      .select('name')
-      .eq('id', workspaceId)
-      .maybeSingle()
-      .then(({ data }: { data: { name?: string } | null }) => {
-        if (data?.name) snap.workspace_name = data.name;
-      })
-      .catch(() => {}),
-  );
-
-  // Projects (active list + totals)
-  tasks.push(
-    admin
-      .from('projects')
-      .select('name, status, deadline')
-      .eq('workspace_id', workspaceId)
-      .in('status', ['planning', 'in_progress', 'on_hold'])
-      .order('deadline', { ascending: true, nullsFirst: false })
-      .limit(50)
-      .then(({ data }: { data: Array<{ name: string; status: string; deadline: string | null }> | null }) => {
-        const rows = data ?? [];
-        snap.projects.active = rows.length;
-        snap.projects.next = rows.slice(0, 3);
-      })
-      .catch(() => {}),
-  );
-  tasks.push(
-    admin
-      .from('projects')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .then(({ count }: { count: number | null }) => {
-        snap.projects.total = count ?? 0;
-      })
-      .catch(() => {}),
-  );
-
-  // Finance — outstanding AR
-  tasks.push(
-    admin
-      .from('invoices')
-      .select('amount_due, due_at, status, currency')
-      .eq('workspace_id', workspaceId)
-      .in('status', ['issued', 'partially_paid', 'overdue'])
-      .limit(1000)
-      .then(({ data }: { data: Array<{ amount_due: number | null; due_at: string | null; status: string; currency: string }> | null }) => {
-        const rows = data ?? [];
-        let total = 0;
-        let overdue = 0;
-        for (const r of rows) {
-          total += Number(r.amount_due ?? 0);
-          if (r.status === 'overdue' || (r.due_at && new Date(r.due_at).getTime() < now)) overdue++;
-          if (r.currency) snap.finance.currency = r.currency;
-        }
-        snap.finance.outstanding_total = Math.round(total * 100) / 100;
-        snap.finance.outstanding_count = rows.length;
-        snap.finance.overdue_count = overdue;
-      })
-      .catch(() => {}),
-  );
-
-  // Tasks assigned to the caller
-  tasks.push(
-    admin
-      .from('project_tasks')
-      .select('due_date, status')
-      .eq('assignee_id', userId)
-      .in('status', ['todo', 'in_progress', 'blocked'])
-      .limit(500)
-      .then(({ data }: { data: Array<{ due_date: string | null; status: string }> | null }) => {
-        const rows = data ?? [];
-        snap.tasks.open_total = rows.length;
-        for (const r of rows) {
-          if (!r.due_date) continue;
-          if (r.due_date < todayStart) snap.tasks.overdue++;
-          else if (r.due_date <= in7d) snap.tasks.due_soon++;
-        }
-      })
-      .catch(() => {}),
-  );
-
-  // Inbox — open threads in the workspace
-  tasks.push(
-    admin
-      .from('inbox_threads')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'open')
-      .then(({ count }: { count: number | null }) => {
-        snap.inbox.open_threads = count ?? 0;
-      })
-      .catch(() => {}),
-  );
-
-  // Quotes — open + recent
-  tasks.push(
-    admin
-      .from('quotes')
-      .select('status, created_at')
-      .eq('workspace_id', workspaceId)
-      .limit(1000)
-      .then(({ data }: { data: Array<{ status: string; created_at: string }> | null }) => {
-        const rows = data ?? [];
-        const closed = new Set(['accepted', 'rejected', 'expired', 'cancelled', 'converted']);
-        snap.quotes.open = rows.filter((r) => !closed.has((r.status || '').toLowerCase())).length;
-        snap.quotes.recent_30d = rows.filter((r) => r.created_at >= since30d).length;
-      })
-      .catch(() => {}),
-  );
-
-  await Promise.allSettled(tasks);
-  return snap;
+  try {
+    const { data, error } = await admin.rpc('dashboard_workspace_snapshot', {
+      p_workspace_id: workspaceId,
+      p_user_id: userId,
+    });
+    if (error) throw new Error(error.message);
+    const snap = (Array.isArray(data) ? data[0] : data) as Snapshot | null;
+    // A null/!object result is a failure, not "an empty workspace" — the two look identical in
+    // the rendered panel, which is exactly why this has to be distinguished here.
+    if (!snap || typeof snap !== 'object' || !snap.finance || !snap.tasks) {
+      throw new Error('snapshot RPC returned no usable payload');
+    }
+    return { snapshot: snap, degraded: false };
+  } catch (err) {
+    console.error('[dashboard-insights] snapshot failed — serving a DEGRADED panel:', err);
+    return { snapshot: fallback, degraded: true };
+  }
 }
 
 // ── AI prompt ─────────────────────────────────────────────────────────────────
@@ -340,7 +252,7 @@ serve(
       }
     }
 
-    const snapshot = await gatherSnapshot(admin, userId, workspaceId);
+    const { snapshot, degraded } = await gatherSnapshot(admin, userId, workspaceId);
 
     // ── Credit metering: debit before the Haiku call (only reached on a cache
     // miss — a warm cache returned above). If the caller is out of credits we
@@ -363,7 +275,26 @@ serve(
     let insights: Insights;
     let model: string | null = null;
     let source: 'ai' | 'fallback' = 'ai';
-    if (!charged) {
+    if (degraded) {
+      // Do not narrate numbers we could not read. The deterministic builder's empty-state copy
+      // ("add materials to your catalog...") is honest about knowing nothing; an LLM handed a
+      // wall of zeros writes a confident, wrong summary instead. Refund the debit — nothing
+      // was generated.
+      if (charged) {
+        try {
+          await admin.rpc('refund_credits', {
+            p_user_id: userId,
+            p_amount: INSIGHTS_CREDIT_COST,
+            p_operation_type: 'dashboard_insights_refund',
+            p_description: 'Dashboard AI insights refund (snapshot unavailable)',
+            p_metadata: { workspace_id: workspaceId },
+            p_workspace_id: workspaceId,
+          });
+        } catch (e) { console.warn('[dashboard-insights] refund failed:', e); }
+      }
+      insights = buildFallbackInsights(snapshot);
+      source = 'fallback';
+    } else if (!charged) {
       // No credits (or debit failed) → deterministic fallback, no charge.
       insights = buildFallbackInsights(snapshot);
       source = 'fallback';
@@ -398,6 +329,8 @@ serve(
       }
     }
 
+    // A degraded panel is cached at the SHORT TTL like any other fallback, so the next visit
+    // re-reads instead of showing a stale set of zeros for a fortnight (#364 EX-10).
     const ttlMs = source === 'ai' ? CACHE_TTL_DAYS * 864e5 : FALLBACK_TTL_HOURS * 36e5;
     const generatedAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
@@ -421,6 +354,6 @@ serve(
       console.error('[dashboard-insights] cache upsert failed:', err);
     }
 
-    return json({ insights, model, source, generated_at: generatedAt, expires_at: expiresAt, cached: false });
+    return json({ insights, model, source, degraded, generated_at: generatedAt, expires_at: expiresAt, cached: false });
   }),
 );

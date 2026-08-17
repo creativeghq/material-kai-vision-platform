@@ -139,9 +139,18 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
       const prev = row ? (row[SLOT_COL[slot]] as string | null) : null;
       const patch: Record<string, unknown> = { workspace_id: activeWorkspaceId, [SLOT_COL[slot]]: null, updated_at: new Date().toISOString() };
       if (slot === 'cover') { patch.cover_width = null; patch.cover_height = null; }
-      await (supabase as any).from('workspace_pdf_templates').upsert(patch, { onConflict: 'workspace_id' });
+      // The DB write comes FIRST and its error is CHECKED (#364 EX-17). The result used to be
+      // discarded and the file deleted regardless, so an RLS denial or a dropped connection left
+      // the row still pointing at an object that no longer existed — and every quote, catalog and
+      // proforma rendered from then on went looking for a deleted file. `onPick` two functions up
+      // already gets this ordering right. Clearing first is the safe direction: a failed removal
+      // only orphans a file, which storage-orphan-cleanup-cron reaps.
+      const { error: dbErr } = await (supabase as any).from('workspace_pdf_templates').upsert(patch, { onConflict: 'workspace_id' });
+      if (dbErr) throw dbErr;
       if (prev) await supabase.storage.from(BUCKET).remove([prev]).catch(() => {});
       await load();
+    } catch (e: any) {
+      toast({ title: 'Could not clear the image', description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
       setBusy(null);
     }

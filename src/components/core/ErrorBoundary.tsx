@@ -175,7 +175,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private renderFallbackUI = () => {
     const { level = 'component', name } = this.props;
-    const { error } = this.state;
+    const { error, errorId } = this.state;
 
     const canRetry = this.retryCount < this.maxRetries;
     const isPageLevel = level === 'page';
@@ -209,7 +209,21 @@ export class ErrorBoundary extends Component<Props, State> {
                   ? 'An error occurred while loading this page.'
                   : `An error occurred in the ${name || 'component'}.`}
             </p>
-            {error && (
+            {/*
+              The error MESSAGE is not shown in production (#364 EX-16). Whatever an exception
+              happens to carry — a Postgres detail line, a fragment of the failing query, a row
+              id, occasionally a customer's name out of a validation error — was rendered
+              verbatim to whoever hit the crash, including a public-page visitor. It is still
+              captured by Sentry and by `logger.error` above, which is where it belongs and who
+              can act on it; the screen gets the id that finds it. In development the full
+              message, stack and component stack are right below in `renderErrorDetails`.
+            */}
+            {errorId && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Reference: <span className="font-mono">{errorId}</span>
+              </p>
+            )}
+            {process.env.NODE_ENV === 'development' && error && (
               <p className="mt-2 text-sm font-mono bg-muted p-2 rounded">
                 {error.message}
               </p>

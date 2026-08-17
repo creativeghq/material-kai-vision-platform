@@ -36,9 +36,23 @@ const ASSET_WRITABLE = [
   'installed_on', 'location_note', 'notes', 'project_id', 'room_id', 'supplier_company_id',
 ] as const;
 
+/**
+ * `document_bucket` / `document_path` are DELIBERATELY ABSENT (#364 EX-2).
+ *
+ * They were writable here, and `warranty.document_url` / `warranty.delete_document` then handed
+ * whatever they contained to the SERVICE-ROLE storage client to sign and to remove. A caller who
+ * owned one warranty row could therefore set `{document_bucket: 'pdf-documents', document_path:
+ * 'invoices/<someone else>/...'}` and get back a signed URL for any object in any bucket — or
+ * delete it. Ownership of the ROW was checked; nothing checked that the row pointed at an object
+ * the row was entitled to.
+ *
+ * The pair is now written in exactly one place: `warranty.upload_document`, from a path this
+ * function derives, and read back only through `warrantyObjectRef`, which re-checks that shape
+ * before the service role touches it.
+ */
 const WARRANTY_WRITABLE = [
   'kind', 'provider_company_id', 'provider_name', 'policy_number', 'starts_on', 'ends_on',
-  'coverage_notes', 'document_bucket', 'document_path', 'remind_days_before',
+  'coverage_notes', 'remind_days_before',
 ] as const;
 
 const PLAN_WRITABLE = [
@@ -69,6 +83,32 @@ function safeFilename(name: string): string {
   const base = (name.split(/[\\/]/).pop() || 'document').trim();
   const cleaned = base.replace(/[^A-Za-z0-9._-]/g, '_').replace(/^\.+/, '').slice(-80);
   return cleaned || 'document';
+}
+
+/** The path `warranty.upload_document` writes, and the only shape the reads below will act on. */
+function warrantyObjectPath(workspaceId: string, assetId: string, warrantyId: string, filename: string): string {
+  return `warranties/${workspaceId}/${assetId}/${warrantyId}-${safeFilename(filename)}`;
+}
+
+/**
+ * Resolve a stored warranty document to a (bucket, path) the SERVICE ROLE may act on — or null.
+ *
+ * Belt to `WARRANTY_WRITABLE`'s braces (#364 EX-2). The columns are no longer client-writable,
+ * but rows written before this fix still carry whatever was set then, and a stored value is
+ * untrusted input the moment it is handed to a privileged client. So the bucket must be OUR
+ * bucket and the path must sit under this workspace's own warranties prefix; anything else is
+ * treated as "no document" rather than signed or deleted.
+ */
+function warrantyObjectRef(
+  row: { document_bucket: string | null; document_path: string | null },
+  workspaceId: string,
+): { bucket: string; path: string } | null {
+  const path = row.document_path;
+  if (!path) return null;
+  if (row.document_bucket && row.document_bucket !== WARRANTY_BUCKET) return null;
+  if (path.includes('..')) return null;
+  if (!path.startsWith(`warranties/${workspaceId}/`)) return null;
+  return { bucket: WARRANTY_BUCKET, path };
 }
 
 const ASSET_SELECT =
@@ -313,7 +353,7 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
       }
 
       const row = w as { asset_id: string; document_bucket: string | null; document_path: string | null };
-      const path = `warranties/${workspaceId}/${row.asset_id}/${warrantyId}-${safeFilename(String(body.filename ?? 'certificate'))}`;
+      const path = warrantyObjectPath(workspaceId, row.asset_id, warrantyId, String(body.filename ?? 'certificate'));
 
       const { error: upErr } = await service.storage.from(WARRANTY_BUCKET)
         .upload(path, bytes, { contentType, upsert: true });
@@ -321,9 +361,10 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
 
       // Replacing a certificate: drop the old object, but only after the new one landed, and
       // never let a failed cleanup lose the new path — an orphan is cheap, a lost row is not.
-      if (row.document_path && row.document_path !== path) {
-        await service.storage.from(row.document_bucket || WARRANTY_BUCKET)
-          .remove([row.document_path]).catch(() => { /* reaped by the orphan cron */ });
+      const previous = warrantyObjectRef(row, workspaceId);
+      if (previous && previous.path !== path) {
+        await service.storage.from(previous.bucket)
+          .remove([previous.path]).catch(() => { /* reaped by the orphan cron */ });
       }
 
       const { data: updated, error } = await db.from('customer_asset_warranties')
@@ -341,11 +382,12 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
         .select('document_bucket, document_path')
         .eq('id', warrantyId).eq('workspace_id', workspaceId).maybeSingle();
       const row = w as { document_bucket: string | null; document_path: string | null } | null;
-      if (!row || !row.document_path) throw new HttpError(404, 'not found');
+      const ref = row ? warrantyObjectRef(row, workspaceId) : null;
+      if (!ref) throw new HttpError(404, 'not found');
 
       const { data: signed, error } = await service.storage
-        .from(row.document_bucket || WARRANTY_BUCKET)
-        .createSignedUrl(row.document_path, SIGNED_URL_TTL_SECONDS);
+        .from(ref.bucket)
+        .createSignedUrl(ref.path, SIGNED_URL_TTL_SECONDS);
       if (error || !signed?.signedUrl) throw new HttpError(400, error?.message || 'could not sign the document');
       return json({ url: signed.signedUrl, expires_in: SIGNED_URL_TTL_SECONDS });
     }
@@ -358,6 +400,7 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
         .eq('id', warrantyId).eq('workspace_id', workspaceId).maybeSingle();
       const row = w as { document_bucket: string | null; document_path: string | null } | null;
       if (!row) throw new HttpError(404, 'not found');
+      const ref = warrantyObjectRef(row, workspaceId);
 
       // Clear the row first. If the object removal fails the file is merely orphaned and the
       // cleanup cron takes it; clearing second could leave a row pointing at a deleted object.
@@ -365,9 +408,11 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
         .update({ document_bucket: null, document_path: null })
         .eq('id', warrantyId).eq('workspace_id', workspaceId);
       if (error) throw new HttpError(400, error.message);
-      if (row.document_path) {
-        await service.storage.from(row.document_bucket || WARRANTY_BUCKET)
-          .remove([row.document_path]).catch(() => { /* reaped by the orphan cron */ });
+      // Only an object under this workspace's own warranties prefix is removed. A row carrying a
+      // path from anywhere else is cleared and left alone rather than obeyed.
+      if (ref) {
+        await service.storage.from(ref.bucket)
+          .remove([ref.path]).catch(() => { /* reaped by the orphan cron */ });
       }
       return json({ success: true });
     }

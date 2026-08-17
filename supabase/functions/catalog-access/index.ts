@@ -46,22 +46,66 @@ interface RequestBody {
   metadata?: Record<string, any>;
 }
 
-// Option A — workspace identity is canonical in finance_settings. Branding is resolved
-// from the catalog's OWN workspace_id (same as the quote path resolves quote.workspace_id) —
-// NOT by guessing the owner's primary membership, which gives the wrong company's branding
-// for a multi-membership owner sharing a catalog. The owner-membership guess is kept only as
-// a legacy fallback for catalog rows created before workspace_id was populated.
-async function resolveOwnerBranding(supabase: any, workspaceId: string | null, ownerUserId: string): Promise<{ logo_url: string | null; company_name: string | null; contact_line: string | null }> {
+// Workspace identity is canonical in finance_settings, and the workspace is the CATALOG's own —
+// `presentation_catalogs.workspace_id`, never a guess at the owner's primary membership. A
+// multi-workspace owner sharing a catalog otherwise gets another company's branding on it.
+async function resolveOwnerBranding(supabase: any, workspaceId: string | null): Promise<{ logo_url: string | null; company_name: string | null; contact_line: string | null }> {
   const empty = { logo_url: null, company_name: null, contact_line: null };
-  let wsId: string | null = workspaceId ?? null;
-  if (!wsId && ownerUserId) {
-    const { data: members } = await supabase.from('workspace_members').select('workspace_id, role').eq('user_id', ownerUserId).eq('status', 'active').limit(50);
-    wsId = (members?.find((m: any) => m.role === 'owner') ?? members?.find((m: any) => m.role === 'admin') ?? members?.[0])?.workspace_id ?? null;
-  }
-  if (!wsId) return empty;
-  const { data: fs } = await supabase.from('finance_settings').select('business_name, business_logo_path, branding_contact_line').eq('workspace_id', wsId).maybeSingle();
+  if (!workspaceId) return empty;
+  const { data: fs } = await supabase.from('finance_settings').select('business_name, business_logo_path, branding_contact_line').eq('workspace_id', workspaceId).maybeSingle();
   const logo_url = fs?.business_logo_path ? supabase.storage.from('generation-images').getPublicUrl(fs.business_logo_path).data.publicUrl : null;
   return { logo_url, company_name: fs?.business_name ?? null, contact_line: fs?.branding_contact_line ?? null };
+}
+
+/**
+ * What an email-gated VIEWER may see of a catalog (#364 EX-4).
+ *
+ * The grant is row-level — "this email may read this catalog" — but the row is not what the
+ * page renders. `verify` used to return `cover_data`, `body_data` and `back_cover_data` as the
+ * raw jsonb the builder wrote, so every material also carried `provenance` (the source PDF id
+ * and page it was lifted from), `price_source` / `price_source_ref`, `image_source_ref` (a
+ * product id or the supplier URL an image was scraped from) and `specs_raw`. None of that is on
+ * the page; all of it is internal, and jsonb accepts whatever a future writer adds.
+ *
+ * So this is an ALLOWLIST, keyed to what PublicCatalogPage actually renders, not a denylist of
+ * the internal keys we happen to know about today.
+ */
+function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | null) {
+  const sections = Array.isArray(catalog.body_data?.sections) ? catalog.body_data.sections : [];
+  return {
+    id: catalog.id,
+    slug: catalog.slug,
+    title: catalog.title,
+    subtitle: catalog.subtitle,
+    description: catalog.description,
+    cover_data: {
+      cover_image_url: catalog.cover_data?.cover_image_url ?? null,
+      date: catalog.cover_data?.date ?? null,
+    },
+    body_data: {
+      sections: sections.map((section: any) => ({
+        id: section?.id ?? null,
+        title: section?.title ?? null,
+        intro: section?.intro ?? null,
+        materials: (Array.isArray(section?.materials) ? section.materials : []).map((m: any) => ({
+          id: m?.id ?? null,
+          name: m?.name ?? null,
+          description: m?.description ?? null,
+          image_url: m?.image_url ?? null,
+          price: m?.price ?? null,
+          currency: m?.currency ?? null,
+          // `specs` IS the spec block the card prints. `specs_raw` — the unparsed extraction
+          // output it was derived from — is not.
+          specs: m?.specs ?? {},
+        })),
+      })),
+    },
+    back_cover_data: {
+      closing_message: catalog.back_cover_data?.closing_message ?? null,
+      contact_line: catalog.back_cover_data?.contact_line ?? null,
+    },
+    pdf_url: pdfUrl,
+  };
 }
 
 Deno.serve(withApiLogging('catalog-access', async (req) => {
@@ -86,7 +130,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         .maybeSingle();
       if (!catalog) return jsonResponse({ error: 'Not found' }, 404);
 
-      const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null, catalog.owner_user_id);
+      const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null);
 
       return jsonResponse({
         title: catalog.title,
@@ -107,31 +151,21 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
 
       const { data: catalog } = await supabase
         .from('presentation_catalogs')
-        .select('id, status, owner_user_id')
+        .select('id, status, owner_user_id, workspace_id')
         .eq('slug', slug)
         .maybeSingle();
       if (!catalog || catalog.status !== 'published') {
         return jsonResponse({ granted_access: false });
       }
 
-      // Resolve the catalog owner's workspace so CRM lookups are scoped
-      let ownerWorkspaceId: string | null = null;
-      if (catalog.owner_user_id) {
-        const { data: mem } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', catalog.owner_user_id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        ownerWorkspaceId = mem?.workspace_id ?? null;
-      }
-
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
       const ua = req.headers.get('user-agent') || null;
 
-      const match = await resolveEmailMatch(supabase, catalog.id, email, ownerWorkspaceId);
+      // Scope every membership / CRM lookup to the CATALOG's workspace (#364 EX-3). This used
+      // to be the owner's EARLIEST active membership: for a multi-workspace owner it decided
+      // who may read a catalog using a different tenant's contact list entirely — the same
+      // first-workspace mistake as `CM-22` in #359, except here it is the access decision.
+      const match = await resolveEmailMatch(supabase, catalog.id, email, catalog.workspace_id ?? null);
 
       const tokenStr = match.granted ? generateToken() : null;
       const expiresAt = match.granted ? new Date(Date.now() + TOKEN_TTL_MS).toISOString() : null;
@@ -273,20 +307,8 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       // Immediate revocation: a 30-day cookie token must not outlive the access that
       // produced it. Re-validate that the email STILL matches (grant revoked, CRM contact
       // removed, or workspace membership lost since the token was minted) using the SAME
-      // resolution as the original `request` grant, so legit viewers keep access.
-      let recheckWorkspaceId: string | null = null;
-      if (catalog.owner_user_id) {
-        const { data: mem } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', catalog.owner_user_id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        recheckWorkspaceId = mem?.workspace_id ?? null;
-      }
-      const recheck = await resolveEmailMatch(supabase, catalog.id, log.email, recheckWorkspaceId);
+      // resolution — and the same workspace — as the original `request` grant.
+      const recheck = await resolveEmailMatch(supabase, catalog.id, log.email, catalog.workspace_id ?? null);
       if (!recheck.granted) {
         return jsonResponse({ granted_access: false, reason: 'access_revoked' });
       }
@@ -314,22 +336,12 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         ? (await supabase.storage.from('pdf-documents').createSignedUrl(catalogPdfPath, 604800))?.data?.signedUrl ?? catalog.pdf_url
         : catalog.pdf_url;
 
-      const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null, catalog.owner_user_id);
+      const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null);
 
       return jsonResponse({
         granted_access: true,
         email: log.email,
-        catalog: {
-          id: catalog.id,
-          slug: catalog.slug,
-          title: catalog.title,
-          subtitle: catalog.subtitle,
-          description: catalog.description,
-          cover_data: catalog.cover_data,
-          body_data: catalog.body_data,
-          back_cover_data: catalog.back_cover_data,
-          pdf_url: catalogPdfUrl,
-        },
+        catalog: projectCatalogForViewer(catalog, catalogPdfUrl),
         branding: {
           logo_url: branding.logo_url,
           company_name: branding.company_name,
@@ -354,13 +366,22 @@ interface MatchResult {
   grantId: string | null;
 }
 
-async function resolveEmailMatch(supabase: any, catalogId: string, email: string, ownerWorkspaceId?: string | null): Promise<MatchResult> {
-  // Check 1: platform user who is a member of the catalog owner's workspace
-  if (ownerWorkspaceId) {
+/**
+ * `workspaceId` is the CATALOG's workspace and is REQUIRED for the membership and CRM checks.
+ *
+ * The old signature made it optional, and the unscoped branches were not a degraded mode — they
+ * were a different, much wider rule: any platform user's email anywhere on the instance matched,
+ * and the CRM lookups searched every tenant's contacts and companies. Absent a workspace we now
+ * fall through to the per-catalog `catalog_email_grants` allowlist, which is scoped by
+ * construction. Fail closed: an unresolved tenant withholds access, it does not widen it.
+ */
+async function resolveEmailMatch(supabase: any, catalogId: string, email: string, workspaceId: string | null): Promise<MatchResult> {
+  if (workspaceId) {
+    // Check 1: platform user who is a member of the catalog's workspace
     const { data: members } = await supabase
       .from('workspace_members')
       .select('user_id')
-      .eq('workspace_id', ownerWorkspaceId)
+      .eq('workspace_id', workspaceId)
       .eq('status', 'active');
     const memberIds = (members || []).map((m: any) => m.user_id);
     if (memberIds.length > 0) {
@@ -375,32 +396,20 @@ async function resolveEmailMatch(supabase: any, catalogId: string, email: string
         return { granted: true, kind: 'platform_user', userId: profile.user_id, crmContactId: null, crmCompanyId: null, grantId: null };
       }
     }
-  } else {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('user_id')
-      .ilike('email', email)
-      .limit(1)
-      .maybeSingle();
-    if (profile?.user_id) {
-      return { granted: true, kind: 'platform_user', userId: profile.user_id, crmContactId: null, crmCompanyId: null, grantId: null };
+
+    // Check 2: CRM contact in the catalog's workspace
+    const { data: contact } = await supabase.from('crm_contacts').select('id')
+      .ilike('email', email).eq('workspace_id', workspaceId).limit(1).maybeSingle();
+    if (contact?.id) {
+      return { granted: true, kind: 'crm_contact', userId: null, crmContactId: contact.id, crmCompanyId: null, grantId: null };
     }
-  }
 
-  // Check 2: CRM contact in the catalog owner's workspace
-  const contactQuery = supabase.from('crm_contacts').select('id').ilike('email', email).limit(1);
-  if (ownerWorkspaceId) contactQuery.eq('workspace_id', ownerWorkspaceId);
-  const { data: contact } = await contactQuery.maybeSingle();
-  if (contact?.id) {
-    return { granted: true, kind: 'crm_contact', userId: null, crmContactId: contact.id, crmCompanyId: null, grantId: null };
-  }
-
-  // Check 3: CRM company in the catalog owner's workspace
-  const companyQuery = supabase.from('crm_companies').select('id').ilike('email', email).limit(1);
-  if (ownerWorkspaceId) companyQuery.eq('workspace_id', ownerWorkspaceId);
-  const { data: company } = await companyQuery.maybeSingle();
-  if (company?.id) {
-    return { granted: true, kind: 'crm_company', userId: null, crmContactId: null, crmCompanyId: company.id, grantId: null };
+    // Check 3: CRM company in the catalog's workspace
+    const { data: company } = await supabase.from('crm_companies').select('id')
+      .ilike('email', email).eq('workspace_id', workspaceId).limit(1).maybeSingle();
+    if (company?.id) {
+      return { granted: true, kind: 'crm_company', userId: null, crmContactId: null, crmCompanyId: company.id, grantId: null };
+    }
   }
 
   const { data: grant } = await supabase

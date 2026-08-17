@@ -17,6 +17,8 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { checkCreditBalance, getServicePricing } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { captureException } from '../_shared/sentry.ts';
+import { fetchBinaryGuarded } from '../_shared/fetch-image.ts';
+import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 /**
  * Download a finished Replicate video into our own bucket and return the public URL.
@@ -37,12 +39,17 @@ async function storeVideo(
   filename: string,
 ): Promise<string | null> {
   try {
-    const res = await fetch(videoUrl);
-    if (!res.ok) return null;
-    const arrayBuffer = await res.arrayBuffer();
+    // Through the shared guard (#364 EX-7): this was a bare `fetch(videoUrl)` with redirects
+    // followed and no size cap, reading whatever the far end sent into the isolate. 200 MB
+    // ceiling — a 10s clip is single-digit MB.
+    const { bytes } = await fetchBinaryGuarded(videoUrl, {
+      maxBytes: 200 * 1024 * 1024,
+      contentTypePrefix: 'video/',
+      timeoutMs: 45_000,
+    });
     const { data, error } = await supabase.storage
       .from('generation-images')
-      .upload(`social/${filename}`, arrayBuffer, { contentType: 'video/mp4', upsert: true });
+      .upload(`social/${filename}`, bytes, { contentType: 'video/mp4', upsert: true });
     if (error) {
       console.error('[generate-social-video] storage upload failed:', error.message);
       return null;
@@ -168,6 +175,18 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
 
   if (!source_image_url) return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
 
+  // Invariant 7 (#364 EX-7). `source_image_url` is handed to Replicate (and forwarded to
+  // generate-interior-video-v2 for veo-2), which fetches it from THEIR network. Validate before
+  // it leaves rather than at whichever call site downloads something first.
+  try {
+    await assertSafeUrl(source_image_url, { allowSchemes: ['https:'] });
+  } catch (e) {
+    return jsonResponse(
+      { success: false, error: e instanceof SSRFError ? `Rejected image URL: ${e.message}` : 'Invalid image URL' },
+      400,
+    );
+  }
+
   const creditCost = CREDIT_COSTS[model as VideoModel] ?? 15;
 
   // ③ Create prediction
@@ -279,6 +298,20 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       const videoUrl = rawVideoUrl
         ? await storeVideo(supabase, rawVideoUrl, `video-${Date.now()}.mp4`)
         : null;
+
+      // A `succeeded` prediction with no usable output, or an output we could not store, is a
+      // FAILURE — not a success carrying `video_url: null` (#364 EX-12). The old code fell
+      // straight through: it kept the 20 credits, wrote an ai_usage_logs row for a video that
+      // does not exist, told the caller `status: 'completed'`, and left the post with no video.
+      // Refund and say so.
+      if (!videoUrl) {
+        console.error('[generate-social-video] Replicate succeeded but delivered no storable video');
+        await refundCredits();
+        return jsonResponse(
+          { success: false, error: 'The model returned no usable video; credits refunded.' },
+          502,
+        );
+      }
 
       if (post_id && videoUrl) {
         const { data: existingPost } = await supabase

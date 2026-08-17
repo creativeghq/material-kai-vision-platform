@@ -17,6 +17,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -165,12 +166,17 @@ async function storeImage(
   filename: string,
 ): Promise<string> {
   if (imageData.startsWith('http')) {
-    const imgRes = await fetch(imageData);
-    const arrayBuffer = await imgRes.arrayBuffer();
+    // Through the shared guard (#364 EX-7): this was a bare `fetch(imageData)` with redirects
+    // followed, no `res.ok` check and no size cap, so an error page was uploaded as `image/webp`
+    // and served to the user as their generated image.
+    const { bytes } = await fetchImageGuarded(imageData, { maxBytes: 32 * 1024 * 1024 });
     const { data, error } = await supabase.storage
       .from('generation-images')
-      .upload(`social/${filename}`, arrayBuffer, { contentType: 'image/webp', upsert: true });
-    if (error) return imageData;
+      .upload(`social/${filename}`, bytes, { contentType: 'image/webp', upsert: true });
+    // Returning `imageData` here handed back the PROVIDER's URL, which expires within the hour —
+    // the caller then persisted an expiring link onto social_posts.image_urls and the picture was
+    // gone by the time the post published. Throw instead; the caller refunds and reports.
+    if (error) throw new Error(`Storage upload failed: ${error.message}`);
     const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
     return urlData.publicUrl;
   }
@@ -181,7 +187,7 @@ async function storeImage(
     const { data, error } = await supabase.storage
       .from('generation-images')
       .upload(`social/${filename}`, bytes, { contentType: 'image/png', upsert: true });
-    if (error) return imageData;
+    if (error) throw new Error(`Storage upload failed: ${error.message}`);
     const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
     return urlData.publicUrl;
   }

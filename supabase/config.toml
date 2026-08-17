@@ -47,9 +47,6 @@ verify_jwt = false
 [functions.mivaa-gateway]
 verify_jwt = false
 
-[functions.pdf-batch-process]
-verify_jwt = false
-
 [functions.xml-import-orchestrator]
 verify_jwt = false
 

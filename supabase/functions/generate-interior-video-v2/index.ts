@@ -24,6 +24,10 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { fetchBinaryGuarded } from '../_shared/fetch-image.ts';
+import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -93,9 +97,15 @@ async function uploadVideoToStorage(
   if (isBase64 && typeof videoData === 'string') {
     bytes = Uint8Array.from(atob(videoData), c => c.charCodeAt(0));
   } else if (typeof videoData === 'string') {
-    // Download URL
-    const res = await fetch(videoData);
-    bytes = new Uint8Array(await res.arrayBuffer());
+    // Download the provider's output through the shared guard (#364 EX-7). This was a bare
+    // `fetch(videoData)` with no SSRF guard, no `res.ok` check and no size cap: a redirect or an
+    // error page came back as bytes, went into the bucket as `video/mp4`, and was handed to the
+    // user as their finished video. 200 MB ceiling — a 10s clip is single-digit MB.
+    bytes = (await fetchBinaryGuarded(videoData, {
+      maxBytes: 200 * 1024 * 1024,
+      contentTypePrefix: 'video/',
+      timeoutMs: 45_000,
+    })).bytes;
   } else {
     bytes = new Uint8Array(videoData);
   }
@@ -163,8 +173,9 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
   const body = await req.json();
   let userId: string;
+  const isServiceCall = token === supabaseServiceKey && !!body.user_id;
 
-  if (token === supabaseServiceKey && body.user_id) {
+  if (isServiceCall) {
     // Internal server-to-server call (from agent-chat edge function)
     userId = body.user_id;
   } else {
@@ -186,8 +197,31 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     before_image_url,
   } = body;
 
+  // Invariant 1 (#364 EX-1). `workspace_id` comes from the body and then routes the debit,
+  // stamps `generation_videos` and stamps the `ai_usage_logs` row that this tenant's admins
+  // read through `is_workspace_admin(workspace_id)`. 404, not 403 — no id enumeration.
+  if (!isServiceCall && workspace_id
+    && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) {
+    return jsonResponse({ success: false, error: 'Not found' }, 404);
+  }
+
   if (!source_image_url) {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
+  }
+
+  // Invariant 7 (#364 EX-7). These URLs are handed to Replicate / Veo / Kling, which fetch them
+  // from THEIR network — and the Veo and Kling branches also make us fetch them ourselves. A
+  // provider fetching an internal address on our behalf is the same primitive as fetching it
+  // here, so validate before either happens rather than at whichever call site fetches first.
+  try {
+    await assertSafeUrl(source_image_url, { allowSchemes: ['https:'] });
+    if (before_image_url) await assertSafeUrl(before_image_url, { allowSchemes: ['https:'] });
+  } catch (e) {
+    // Do not echo the URL or the upstream status — that makes the error a response oracle.
+    return jsonResponse(
+      { success: false, error: e instanceof SSRFError ? `Rejected image URL: ${e.message}` : 'Invalid image URL' },
+      400,
+    );
   }
 
   // Resolve model. `requestedModel` is client-supplied, so reject an unknown key
@@ -229,20 +263,38 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     }
     const units = pricing?.unit === 'second' ? actualSeconds : 1;
     const rawCostUsd = pricing ? pricing.cost_per_unit * units : null;
-    await supabase.from('ai_usage_logs').insert({
-      user_id: userId,
-      workspace_id: workspace_id ?? null,
-      operation_type: 'interior_video_generation_v2',
-      model_name: key,
-      credits_debited: creditCost,
-      raw_cost_usd: rawCostUsd,
-      billed_cost_usd: rawCostUsd === null ? null : rawCostUsd * pricing!.markup_multiplier,
-      markup_multiplier: pricing?.markup_multiplier ?? null,
-      metadata: {
-        model: resolvedModel, video_type, billing_type: 'per_unit',
-        units, unit: pricing?.unit ?? null,
-      },
-    }).then(() => {}, () => {});
+    // Billing row: never throw (the credits are debited and the paid call already happened),
+    // but never silent either. `.then(() => {}, () => {})` discarded the outcome — the
+    // `stamp_job_refresh_cost` shape, where spend is charged to a tenant and reported against
+    // nobody while every health signal stays green (#364 EX-14). try/catch covers both failure
+    // modes: supabase-js RESOLVES with `{ error }` on an RLS denial and REJECTS on transport.
+    try {
+      const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+        user_id: userId,
+        workspace_id: workspace_id ?? null,
+        operation_type: 'interior_video_generation_v2',
+        model_name: key,
+        credits_debited: creditCost,
+        raw_cost_usd: rawCostUsd,
+        billed_cost_usd: rawCostUsd === null ? null : rawCostUsd * pricing!.markup_multiplier,
+        markup_multiplier: pricing?.markup_multiplier ?? null,
+        metadata: {
+          model: resolvedModel, video_type, billing_type: 'per_unit',
+          units, unit: pricing?.unit ?? null,
+        },
+      });
+      if (usageErr) throw usageErr;
+    } catch (usageErr) {
+      console.error('[generate-interior-video-v2] ai_usage_logs insert FAILED — spend is unattributed', usageErr);
+      await captureException(
+        usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)),
+        {
+          tags: { area: 'billing', operation: 'interior_video_generation_v2' },
+          extra: { user_id: userId, workspace_id: workspace_id ?? null, credits: creditCost },
+          fingerprint: ['ai-usage-log-write-failed', 'interior_video_generation_v2'],
+        },
+      );
+    }
   };
 
   // ① Debit credits upfront

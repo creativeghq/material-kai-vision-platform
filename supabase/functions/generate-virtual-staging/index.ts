@@ -19,6 +19,8 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -162,7 +164,7 @@ Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
       return jsonResponse({ success: false, error: 'user_id required for internal calls' }, 400);
     }
     userId = rawBody.user_id;
-    return await handleRequest(supabase, rawBody, userId);
+    return await handleRequest(supabase, rawBody, userId, true);
   }
 
   // User JWT validation
@@ -180,16 +182,36 @@ Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
     return jsonResponse({ success: false, error: 'Invalid JSON body' }, 400);
   }
 
-  return await handleRequest(supabase, body, userId);
+  return await handleRequest(supabase, body, userId, false);
 }));
 
 async function handleRequest(
   supabase: DbClient,
   body: VirtualStagingRequest,
   userId: string,
+  isServiceCall: boolean,
 ): Promise<Response> {
+  // Invariant 1 (#364 EX-1). `workspace_id` comes from the body and then routes the debit and
+  // stamps the `ai_usage_logs` row this tenant's admins read through
+  // `is_workspace_admin(workspace_id)`. 404, not 403 — no workspace-id enumeration.
+  if (!isServiceCall && body.workspace_id
+    && !(await userCanAccessWorkspace(supabase, userId, body.workspace_id))) {
+    return jsonResponse({ success: false, error: 'Not found' }, 404);
+  }
+
   if (!body.source_image_url) {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
+  }
+  // Invariant 7 (#364 EX-7). `source_image_url` is handed to Replicate, which fetches it from
+  // THEIR network — the same primitive as fetching it here, so it is validated before it leaves
+  // rather than only where we happen to download the output.
+  try {
+    await assertSafeUrl(body.source_image_url, { allowSchemes: ['https:'] });
+  } catch (e) {
+    return jsonResponse(
+      { success: false, error: e instanceof SSRFError ? `Rejected image URL: ${e.message}` : 'Invalid image URL' },
+      400,
+    );
   }
   if (!body.room) {
     return jsonResponse({ success: false, error: 'room is required' }, 400);

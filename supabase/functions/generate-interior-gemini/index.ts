@@ -43,6 +43,8 @@ import {
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
+import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -475,6 +477,42 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
     }
     resolvedUserId = user.id;
+  }
+
+  // Invariant 1 (#364 EX-1). `body.workspace_id` decides which pool is debited, which workspace
+  // the `generation_3d` row belongs to, and which admins can read the `ai_usage_logs` row through
+  // its `is_workspace_admin(workspace_id)` policy. Unverified, any signed-in user could name a
+  // workspace they have never belonged to and write generation history and cost rows into it.
+  // `debit_credits` already falls back to the personal wallet for a non-member, so this was never
+  // credit theft — but the ROWS still landed in the victim's tenant, visible to their admins.
+  // 404, not 403: a distinguishable "not yours" answer turns this into a workspace-id oracle.
+  // Service-role callers are exempt: they are the platform itself (agent-chat, products-3d-api,
+  // MIVAA), they derive the pair server-side, and they could write the rows directly anyway.
+  if (!isServiceCall && body.workspace_id
+    && !(await userCanAccessWorkspace(supabase, resolvedUserId, body.workspace_id))) {
+    return jsonResponse({ success: false, error: 'Not found' }, 404);
+  }
+
+  // Invariant 7 (#364 EX-7). Validate EVERY inbound image URL here, at the input, rather than
+  // relying on `fetchImageBuffer` — because `redesign` and `copy-style` hand
+  // `reference_image_url` straight to `callFluxDepthPro`, i.e. to Replicate, which fetches it
+  // from THEIR network before anything here ever downloads it. A provider fetching an internal
+  // address on our behalf is the same primitive as fetching it ourselves. Validating at the
+  // input means a new mode cannot reintroduce the gap by forgetting to fetch first.
+  try {
+    for (const candidate of [
+      body.reference_image_url,
+      body.style_reference_url,
+      ...(body.material_images ?? []).slice(0, 14),
+    ]) {
+      if (candidate) await assertSafeUrl(candidate, { allowSchemes: ['https:'] });
+    }
+  } catch (e) {
+    // Never echo the URL or the upstream status — that turns the error into a response oracle.
+    return jsonResponse(
+      { success: false, error: e instanceof SSRFError ? `Rejected image URL: ${e.message}` : 'Invalid image URL' },
+      400,
+    );
   }
 
   const jobId = crypto.randomUUID();

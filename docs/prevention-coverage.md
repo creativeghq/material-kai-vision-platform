@@ -331,6 +331,51 @@ and never what crossed the wire.
 - **Ruled out:** column-level `REVOKE SELECT (cost, …) ON products FROM authenticated` would close the class in one statement regardless of call site. Privileges are per **role**, and admins read cost through the same `authenticated` role, so it would break the surfaces that need it.
 - **Blind spot:** the client half of the render side only covers the walker in this one modal, and the read-side guard is source text — a wide read assembled at runtime from a variable is invisible to it. Narrowing what a page ASKS for is also not a server boundary: `products` RLS still answers a hand-made request from any member.
 
+### 11. Grant that answers WHO, response that answers WHAT
+Audit #364 found three instances at once, and the reason they read as correct is that the check
+that ran was genuinely the right check — for a different question.
+
+`catalog-access` proves an email may see a catalog, then returns `cover_data` / `body_data` /
+`back_cover_data` as the raw jsonb the builder wrote: every material carrying `provenance` (the
+source PDF id and page it was lifted from), `price_source_ref`, `image_source_ref` (a product id,
+or the supplier URL an image was scraped from) and `specs_raw`. None of it renders. jsonb also
+accepts whatever a future writer adds, so a denylist would have been a list of the keys somebody
+already thought of.
+
+`customer-assets-api` proves the caller owns a warranty ROW, then hands that row's
+`document_bucket` / `document_path` — both client-writable through `warranty.save` — to the
+**service-role** storage client to sign and to remove. Owning one warranty was enough to read, or
+delete, any object in any bucket. RLS never saw it: the row was legitimately theirs.
+
+The third is the scoping half. The same function resolved its CRM and membership lookups against
+the catalog OWNER's earliest active workspace membership rather than the catalog's own
+`workspace_id` — the `CM-22` first-workspace shape from #359, except here it decides who may read.
+With no workspace resolved it fell through to an UNSCOPED lookup: any platform user's email on the
+instance matched, and the CRM searches spanned every tenant. A filter that widens when it cannot
+resolve its scope is the fallback-fires-invisibly shape again.
+
+- **Guarded by:** [tests/unit/grantedAccessProjection.test.ts](../tests/unit/grantedAccessProjection.test.ts) — the viewer payload is built from a named allowlist, no unscoped `crm_*` / `user_profiles` lookup survives, and the privileged storage handle is re-derived (`warrantyObjectRef`: our bucket, this workspace's prefix) rather than read off the row.
+- **Why the read side is re-checked as well as the write side:** rows written before the fix still carry whatever was set then. Removing the columns from the allowlist alone would leave every existing row exploitable, which is the difference between closing a hole and closing the way it was dug.
+- **Blind spot:** source text. A projection assembled at runtime, or a fourth surface that signs a stored path, is invisible to it.
+
+### 12. Body-supplied tenant on a service-role write — bounded by SQL, still cross-tenant
+`workspace_id` arrives in the request body of every paid generation endpoint and then decides which
+credit pool is debited, which workspace owns the `generation_3d` / `generation_videos` / `vr_worlds`
+row, and which admins can read the `ai_usage_logs` row through its `is_workspace_admin(workspace_id)`
+policy. Five of eight had no membership check (#364 EX-1).
+
+**What makes this worth a section rather than a line:** it reads as Critical in the application code
+and is bounded in SQL. `debit_credits` detects the non-member case and falls back to the caller's
+personal wallet, so it was never credit theft — the attacker paid, and the ROWS landed in a
+stranger's tenant, on their cost dashboard and in their generation history. That is the fourth time
+in one engagement a finding's real severity was set by a guard one layer down, and it is an argument
+for reading the SQL before writing the severity, not for leaving the check out.
+
+- **Guarded by:** [tests/unit/generationEndpointTenancy.test.ts](../tests/unit/generationEndpointTenancy.test.ts) — every listed generator calls `userCanAccessWorkspace` and answers 404 (never 403 — a distinguishable "not yours" is a workspace-id oracle), plus a sweep that fails when a NEW `generate-*` function both debits credits and reads a body workspace id without appearing in the list.
+- **The sweep is the point.** EX-1 was reported against `generate-interior-gemini` in an earlier sweep and closed nowhere, while four siblings had the identical shape and three others had already been fixed. A hand-kept list of call sites is a list of the sites somebody already looked at.
+- **Also covered there:** the provider hop (a body URL handed to Replicate / Veo / Kling is fetched from THEIR network before we download anything, so it is validated at the input, not at the download), the provider-output download (`fetchBinaryGuarded` — these were bare `fetch().arrayBuffer()`, so a redirect or an HTML error page went into the bucket as an mp4), a `succeeded` prediction with no output returning `success: true`, and an `ai_usage_logs` insert ending in `.then(() => {}, () => {})`.
+
+
 ---
 
 ## Mechanism inventory

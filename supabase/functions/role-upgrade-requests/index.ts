@@ -347,48 +347,53 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
       const body = rawBody as ReviewBody & { action: string };
       if (!body.request_id) return jsonResponse({ error: 'request_id required' }, 400);
 
-      const { data: request } = await supabase
-        .from('role_upgrade_requests')
-        .select('id, user_id, requested_role_id, status, roles:requested_role_id(name)')
-        .eq('id', body.request_id)
-        .maybeSingle();
+      // ONE call, ONE transaction, and the latch lives in the RPC's UPDATE ... WHERE
+      // status = 'pending' (#364 EX-15). The old shape read the status, then wrote the request
+      // row, then wrote user_profiles as a separate statement: a failure between the two left a
+      // request marked approved whose applicant was never promoted — and the status guard then
+      // 409'd every retry, so it could not be repaired. Two concurrent approvals also both got
+      // through, sending the applicant two of everything.
+      const { data: reviewRows, error: reviewErr } = await supabase.rpc('review_role_upgrade_request', {
+        p_request_id: body.request_id,
+        p_reviewer_id: user.id,
+        p_approve: action === 'approve',
+        p_admin_note: body.admin_note?.trim() || null,
+      });
+      if (reviewErr) {
+        // 42501 is the RPC's own "not an operator" — the isAdmin() check above already covers
+        // the normal path, so this only fires if the two ever disagree.
+        return jsonResponse({ error: reviewErr.code === '42501' ? 'Forbidden' : reviewErr.message },
+          reviewErr.code === '42501' ? 403 : 500);
+      }
+      const review = (Array.isArray(reviewRows) ? reviewRows[0] : reviewRows) as {
+        claimed: boolean;
+        applicant_id: string | null;
+        requested_role_id: string | null;
+        requested_role_name: string | null;
+        current_status: string | null;
+      } | null;
 
-      if (!request) return jsonResponse({ error: 'request_not_found' }, 404);
-      if (request.user_id === user.id) return jsonResponse({ error: 'Cannot approve or reject your own request' }, 403);
-      if (request.status !== 'pending') {
-        return jsonResponse({ error: 'already_reviewed', message: `Request is already ${request.status}.` }, 409);
+      if (!review?.claimed) {
+        if (!review?.current_status) return jsonResponse({ error: 'request_not_found' }, 404);
+        return jsonResponse(
+          { error: 'already_reviewed', message: `Request is already ${review.current_status}.` },
+          409,
+        );
       }
 
+      // Everything below is notification only — the decision and the promotion are already
+      // committed together, so a failure here cannot leave the two out of step.
       const { data: applicant } = await supabase
         .from('user_profiles')
         .select('email, full_name')
-        .eq('user_id', request.user_id)
+        .eq('user_id', review.applicant_id!)
         .maybeSingle();
 
-      // deno-lint-ignore no-explicit-any
-      const requestedRoleName = (request as any).roles?.name as string;
+      const requestedRoleName = review.requested_role_name ?? 'member';
       const requestedRoleLabel = requestedRoleName.charAt(0).toUpperCase() + requestedRoleName.slice(1);
       const actionUrl = `${PUBLIC_APP_URL}/`;
 
       if (action === 'approve') {
-        const { error: updateErr } = await supabase
-          .from('role_upgrade_requests')
-          .update({
-            status: 'approved',
-            admin_note: body.admin_note?.trim() || null,
-            reviewed_by: user.id,
-            reviewed_at: new Date().toISOString(),
-          })
-          .eq('id', body.request_id);
-        if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
-
-        // Promote the user
-        const { error: roleErr } = await supabase
-          .from('user_profiles')
-          .update({ role_id: request.requested_role_id, updated_at: new Date().toISOString() })
-          .eq('user_id', request.user_id);
-        if (roleErr) return jsonResponse({ error: roleErr.message }, 500);
-
         if (applicant?.email) {
           await sendEmail(supabase, applicant.email, `Your ${requestedRoleLabel} application was approved`, 'role_upgrade_request.approved', {
             user_name: applicant.full_name || applicant.email,
@@ -401,7 +406,7 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
 
         // Delivered by the "Role Upgrade Approved" flow (Flows dashboard).
         emitFlowEvent('role_upgrade_approved', {
-          user_id: request.user_id,
+          user_id: review.applicant_id!,
           type: 'role_upgrade_approved',
           title: `You are now a ${requestedRoleLabel}`,
           body: 'Your application has been approved.',
@@ -413,18 +418,7 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
         return jsonResponse({ success: true, status: 'approved' });
       }
 
-      // reject
-      const { error: updateErr } = await supabase
-        .from('role_upgrade_requests')
-        .update({
-          status: 'rejected',
-          admin_note: body.admin_note?.trim() || null,
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', body.request_id);
-      if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
-
+      // reject — already committed by the RPC above; only the notifications remain.
       if (applicant?.email) {
         await sendEmail(supabase, applicant.email, `Update on your ${requestedRoleLabel} application`, 'role_upgrade_request.rejected', {
           user_name: applicant.full_name || applicant.email,
@@ -437,7 +431,7 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
 
       // Delivered by the "Role Upgrade Rejected" flow (Flows dashboard).
       emitFlowEvent('role_upgrade_rejected', {
-        user_id: request.user_id,
+        user_id: review.applicant_id!,
         type: 'role_upgrade_rejected',
         title: `Your ${requestedRoleLabel} application`,
         body: body.admin_note?.trim() || 'Your application was not approved at this time.',

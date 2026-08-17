@@ -13,12 +13,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -78,8 +79,9 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
 
   let userId: string;
   let body: GenerateVRRequest;
+  const isServiceCall = token === supabaseServiceKey;
 
-  if (token === supabaseServiceKey) {
+  if (isServiceCall) {
     try {
       body = await req.json();
     } catch {
@@ -103,6 +105,17 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
   }
 
   const wsId = body.workspace_id ?? null;
+
+  // Invariant 1 (#364 EX-1). `wsId` comes straight from the request body and then routes the
+  // credit debit, stamps the `vr_worlds` row and the `ai_usage_logs` row. Unverified, a user can
+  // plant a world and a cost line in a tenant they have never belonged to — both tables are read
+  // back by that tenant's members. 404, not 403: do not confirm a workspace id exists.
+  // Service-role callers are exempt; they derive the pair server-side (see the same note in
+  // generate-interior-gemini).
+  if (!isServiceCall && wsId && !(await userCanAccessWorkspace(supabase, userId, wsId))) {
+    return jsonResponse({ success: false, error: 'Not found' }, 404);
+  }
+
   let vrWorldId: string | null = null;
 
   try {
@@ -141,17 +154,35 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     const rawCostUsd = worldPricing ? worldPricing.cost_per_unit : null;
     const billedCostUsd = worldPricing ? rawCostUsd! * worldPricing.markup_multiplier : null;
 
-    await supabase.from('ai_usage_logs').insert({
-      user_id: userId,
-      workspace_id: wsId,
-      operation_type: 'vr_generation',
-      model_name: model,
-      credits_debited: creditCost,
-      raw_cost_usd: rawCostUsd,
-      billed_cost_usd: billedCostUsd,
-      markup_multiplier: worldPricing?.markup_multiplier ?? null,
-      metadata: { model, billing_type: 'per_unit', units: 1 },
-    }).then(() => {}, () => {});
+    // Billing row: never throw (the credits are debited and the paid call is about to happen),
+    // but never silent either. `.then(() => {}, () => {})` discarded the outcome — spend charged
+    // to a tenant and reported against nobody, with every health signal still green (#364 EX-14).
+    // try/catch covers both failure modes: supabase-js RESOLVES with `{ error }` on an RLS denial
+    // and REJECTS on transport.
+    try {
+      const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+        user_id: userId,
+        workspace_id: wsId,
+        operation_type: 'vr_generation',
+        model_name: model,
+        credits_debited: creditCost,
+        raw_cost_usd: rawCostUsd,
+        billed_cost_usd: billedCostUsd,
+        markup_multiplier: worldPricing?.markup_multiplier ?? null,
+        metadata: { model, billing_type: 'per_unit', units: 1 },
+      });
+      if (usageErr) throw usageErr;
+    } catch (usageErr) {
+      console.error('[generate-vr-world] ai_usage_logs insert FAILED — spend is unattributed', usageErr);
+      await captureException(
+        usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)),
+        {
+          tags: { area: 'billing', operation: 'vr_generation' },
+          extra: { user_id: userId, workspace_id: wsId, credits: creditCost },
+          fingerprint: ['ai-usage-log-write-failed', 'vr_generation'],
+        },
+      );
+    }
 
     // Build display name from prompt
     const displayName = body.prompt.length > 60
@@ -232,8 +263,15 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     // Step 4: Extract asset URLs
     const assets = extractAssetUrls(world);
 
-    // Step 5: Update record with completed data
-    await supabase
+    // Step 5: Update record with completed data.
+    //
+    // The error is CHECKED (#364 EX-13). This was a bare `await` and the response below is built
+    // from local variables, so a failed write returned `success: true, status: 'completed'` to a
+    // caller whose row was still sitting at `generating` with no asset URLs — the world existed
+    // only in that one HTTP response, and the poller never saw it finish. Throwing lands in the
+    // catch below, which marks the row failed and refunds. The asset URLs are lost either way;
+    // what changes is that the user is told, and paid back.
+    const { error: completeError } = await supabase
       .from('vr_worlds')
       .update({
         world_id: world.id,
@@ -249,6 +287,9 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq('id', vrWorldId);
+    if (completeError) {
+      throw new Error(`Failed to save completed VR world: ${completeError.message}`);
+    }
 
     console.log(`[generate-vr-world] Record ${vrWorldId} completed successfully`);
 

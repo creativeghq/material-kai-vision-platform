@@ -96,6 +96,49 @@ function matchProperty(sites: any[], domain: string): string | null {
   return urls.find((u) => { try { return domainOf(u) === domain; } catch { return false; } }) || null;
 }
 
+/** The bare domain a Search Console property covers — `sc-domain:x` and `https://x/` both give x. */
+function propertyDomain(property: string): string {
+  const p = (property || '').trim();
+  return p.toLowerCase().startsWith('sc-domain:')
+    ? p.slice('sc-domain:'.length).replace(/^www\./i, '').toLowerCase()
+    : domainOf(p).toLowerCase();
+}
+
+/**
+ * Is `property` a property this connected website may legitimately claim?
+ *
+ * DERIVED, not asserted (#364 EX-8). `set_property` used to write whatever string arrived in the
+ * body: a member could bind their website row to any property their Google account happened to
+ * reach — an agency or ex-employer account often reaches several — and from then on
+ * `gsc_performance` filled with a different site's search data under this website's id, which is
+ * what every SEO surface downstream reports on. Nothing anywhere said the two were unrelated.
+ *
+ * Two conditions, both required:
+ *   1. the property is in the OAuth account's own `sites.list` — Google's answer to "what may
+ *      this token see", so the check cannot be satisfied by asserting it here; and
+ *   2. it covers the website's domain, either exactly or as a parent (a `sc-domain:example.com`
+ *      property legitimately covers `shop.example.com`).
+ *
+ * `siteUnverifiedUser` is rejected: Search Console lists properties a user has merely been shown,
+ * with no verified relationship to the site.
+ */
+function propertyClaimError(sites: any[], property: string, websiteUrl: string): string | null {
+  const entry = (sites || []).find((s) => s?.siteUrl === property);
+  if (!entry) {
+    return 'That property is not available to the connected Google account. Pick one from the list.';
+  }
+  if (String(entry.permissionLevel || '') === 'siteUnverifiedUser') {
+    return 'The connected Google account is not a verified owner or user of that property.';
+  }
+  const site = domainOf(websiteUrl).toLowerCase();
+  const prop = propertyDomain(property);
+  if (!prop || !site) return 'Could not compare that property against this website\'s domain.';
+  if (prop !== site && !site.endsWith(`.${prop}`)) {
+    return `That property covers ${prop}, which is not this website (${site}).`;
+  }
+  return null;
+}
+
 // ── Google token helpers ─────────────────────────────────────────────────────────
 async function exchangeCode(code: string): Promise<any> {
   const body = new URLSearchParams({
@@ -353,6 +396,16 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
       case 'set_property': {
         const property = String(body?.property || '');
         if (!property) return json({ error: 'property required' }, 400);
+
+        // Verify against Google before storing (#364 EX-8) — the OAuth account must actually
+        // hold the property, and the property must cover this website's domain.
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ error: 'Not connected' }, 400);
+        const sites = await listSites(await validAccessToken(supabase, conn));
+        const claimErr = propertyClaimError(sites, property, website.url);
+        if (claimErr) return json({ error: claimErr }, 403);
+
         const { error } = await supabase.from('website_gsc_connections')
           .update({ property, last_sync_error: null, updated_at: new Date().toISOString() }).eq('website_id', websiteId);
         if (error) return json({ error: error.message }, 400);

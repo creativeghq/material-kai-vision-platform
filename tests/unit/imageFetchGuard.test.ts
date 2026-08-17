@@ -78,6 +78,24 @@ describe('the shared image fetch helper', () => {
     const src = codeOnly(read(HELPER));
     expect(src, "http:// is permitted by default again").toMatch(/allowSchemes\s*\?\?\s*\['https:'\]/);
   });
+
+  // Same machinery, image content-type rule off — for the provider-output VIDEO downloads. They
+  // were each hand-rolling `fetch(url).arrayBuffer()`, which is how a redirect or an HTML error
+  // page ended up in the bucket as an mp4 and was handed to the user as their finished video
+  // (#364 EX-7). A second copy is a second strength, which is the whole reason this file exists.
+  it('exposes the non-image variant off the same guard', () => {
+    const src = codeOnly(read(HELPER));
+    expect(src, 'fetchBinaryGuarded is gone — the video downloads have nothing to delegate to')
+      .toMatch(/export async function fetchBinaryGuarded/);
+    const bin = src.slice(src.indexOf('export async function fetchBinaryGuarded'));
+    expect(bin, 'the binary variant no longer validates the URL').toContain('assertSafeUrl');
+    expect(bin, 'the binary variant follows redirects again').toContain("redirect: 'error'");
+    expect(bin, 'the binary variant no longer bounds the read').toContain('readCapped');
+    // The image helper must be built ON the binary one, not beside it.
+    const img = src.slice(src.indexOf('export async function fetchImageGuarded'));
+    expect(img.slice(0, img.indexOf('\n}')), 'fetchImageGuarded stopped delegating and forked again')
+      .toContain('fetchBinaryGuarded');
+  });
 });
 
 describe('every server-side image fetch goes through it', () => {

@@ -112,7 +112,6 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'page-watch-webhook', label: 'page-watch-webhook', sublabel: 'Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff.' },
   { id: 'page-watches', label: 'page-watches', sublabel: 'CRUD for watched pages, mirrored to Firecrawl monitors.' },
   { id: 'parse-supplier-cost-list', label: 'parse-supplier-cost-list', sublabel: 'Parse a KB doc supplier cost list and apply costs to matching products' },
-  { id: 'pdf-batch-process', label: 'pdf-batch-process', sublabel: 'Queue, status-check, and cancel batch PDF extraction jobs' },
   { id: 'pinterest-api', label: 'pinterest-api', sublabel: 'Pinterest pin import and OAuth board browsing for moodboard population.' },
   { id: 'platform-secrets-admin', label: 'platform-secrets-admin', sublabel: 'CRUD for the platform_secrets key store (admin/super_admin only)' },
   { id: 'products-3d-api', label: 'products-3d-api', sublabel: 'Public product + 3D model read for the website embed SDK (embed-key authenticated)' },
