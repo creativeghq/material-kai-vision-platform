@@ -10,6 +10,8 @@
  *     hands the invitee finance/CRM/warehouse capabilities the inviter never intended.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   WORKSPACE_INVITE_ROLES, WORKSPACE_MEMBER_ROLES, WORKSPACE_ROLE_META, ROLE_MODULE_SLUGS,
   workspaceRoleLabel, type WorkspaceMemberRole,
@@ -69,6 +71,59 @@ describe('workspace role catalog', () => {
     }
   });
 
+  it('the workspace role beats EVERY account tier, for every role', () => {
+    // #358 PQ-1. Five roles (`client`, `accountant`, `sales`, `employee`, `realestate_agent`)
+    // resolved BELOW the account-tier switch, so a user carrying `supplier` / `dealer` /
+    // `factory` / `architect` and invited as a CLIENT came out a `dealer` — finance.manage,
+    // crm.view, warehouse.manage, network.manage and pricing.manage, shown to the customer.
+    // The single-role test above passes `accountRole: null`, which is exactly why it never fired.
+    const TIERS = [null, 'user', 'supplier', 'dealer', 'factory', 'architect', 'admin'];
+    for (const role of WORKSPACE_MEMBER_ROLES) {
+      // owner/admin resolve from the WORKSPACE's rank, not the user's tier — checked separately.
+      if (role === 'owner' || role === 'admin') continue;
+      for (const accountRole of TIERS) {
+        const persona = resolvePersona({
+          isPlatformOperator: false, rank: null, workspaceRole: role, accountRole,
+        });
+        expect(
+          persona,
+          `"${role}" + account tier "${accountRole}" resolved to "${persona}" — the workspace role must win`,
+        ).toBe(PERSONA_BY_ROLE[role]);
+      }
+    }
+  });
+
+  it('no scoped workspace role can reach a workspace-management capability through a tier', () => {
+    // The consequence, stated directly: whatever tier a customer or an invited specialist carries,
+    // they never come out holding the keys to the workspace.
+    const SCOPED = WORKSPACE_MEMBER_ROLES.filter((r) => r !== 'owner' && r !== 'admin' && r !== 'member');
+    for (const role of SCOPED) {
+      for (const accountRole of ['supplier', 'architect', 'factory', 'admin']) {
+        const persona = resolvePersona({
+          isPlatformOperator: false, rank: 'dealer', workspaceRole: role, accountRole,
+        });
+        for (const cap of NEVER_FOR_TEAM_ROLES) {
+          expect(
+            PERSONA_CAPABILITIES[persona],
+            `"${role}" + tier "${accountRole}" resolved to "${persona}", which holds ${cap}`,
+          ).not.toContain(cap);
+        }
+      }
+    }
+  });
+
+  it('every scoped role is in the map rather than an `if` below the tier switch', () => {
+    // The structural half: the fix is only durable while the map is exhaustive. A role added later
+    // with a hand-written branch would pass the behavioural tests above only until someone moved it.
+    const src = readFileSync(join(__dirname, '..', '..', 'src', 'auth', 'capabilities.ts'), 'utf8');
+    const map = src.slice(src.indexOf('const TEAM_ROLE_PERSONA'), src.indexOf('export function resolvePersona'));
+    for (const role of WORKSPACE_MEMBER_ROLES) {
+      if (role === 'owner' || role === 'admin' || role === 'member') continue;
+      expect(map, `"${role}" is not in TEAM_ROLE_PERSONA — it resolves below the account-tier switch`)
+        .toMatch(new RegExp(`\\b${role}:`));
+    }
+  });
+
   it('a sales_manager invite is not downgraded by a "sales" account tier', () => {
     // resolvePersona checks accountRole before the workspace-role fallbacks, so sales_manager has
     // to win explicitly — otherwise an invited manager whose account tier is `sales` becomes a rep.
@@ -84,6 +139,9 @@ describe('workspace role catalog', () => {
     const expected: Partial<Record<WorkspaceMemberRole, string>> = {
       hr: 'hr', hr_manager: 'hr', employee: 'hr',
       warehouse: 'stock', marketing: 'email-marketing', realestate_agent: 'real-estate',
+      // #358 PQ-10: all three portals are paid modules and none of them declared it, so the
+      // invite form offered an accountant a Finance portal the workspace had not bought.
+      accountant: 'sales-finance', sales: 'quotes', sales_manager: 'quotes',
     };
     for (const [role, slug] of Object.entries(expected)) {
       expect(WORKSPACE_ROLE_META[role as WorkspaceMemberRole].requiresModule,

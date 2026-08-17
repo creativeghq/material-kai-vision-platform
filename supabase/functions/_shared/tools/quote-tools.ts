@@ -84,6 +84,8 @@ interface ResolvedLine {
    */
   line_total: number | null;
   label: string;
+  /** Procurement cost the resolver returned, written to `quote_item_costs` after the insert. */
+  cost_snapshot: number | null;
 }
 
 /**
@@ -170,7 +172,8 @@ async function resolveLine(
     quantity: item.quantity,
     unit_price: callForPrice ? null : round2(unitPrice as number),
     discounted_price: item.discounted_price != null ? round2(item.discounted_price) : null,
-    line_total: lineTotal,
+    // `line_total` is a generated column — SQL derives it from the prices above and the quantity.
+    // `lineTotal` below is only what this tool REPORTS back to the model (#358 PQ-6).
     pricing_status: callForPrice ? 'call_for_price' : 'priced',
     added_from: 'agent',
     room: item.room ?? null,
@@ -181,7 +184,6 @@ async function resolveLine(
   if (item.product_id) {
     payload.product_id = item.product_id;
     if (retailPrice != null) payload.retail_price = retailPrice;
-    if (costSnapshot != null) payload.cost_snapshot = costSnapshot;
     if (priceSource) payload.price_source = priceSource;
   } else {
     payload.custom_product_name = item.name;
@@ -190,7 +192,7 @@ async function resolveLine(
     payload.custom_unit = item.unit || 'pcs';
     if (item.image_url) payload.custom_image_url = item.image_url;
   }
-  return { payload, line_total: lineTotal, label };
+  return { payload, line_total: lineTotal, label, cost_snapshot: costSnapshot };
 }
 
 /** create_quote */
@@ -289,6 +291,10 @@ export const createCreateQuoteTool = (
         //    so we never leave a half-built empty quote lying around.
         const rollback = async () => { await sb.from('quotes').delete().eq('id', quoteId); };
         const payloads: Record<string, unknown>[] = [];
+        // Parallel to `payloads`: the cost basis for each line, written to `quote_item_costs`
+        // after the insert. It is NOT a column on quote_items any more — that row is readable by
+        // the customer and RLS cannot withhold a column (#358 PQ-2).
+        const costBases: Array<number | null> = [];
         // Compact per-line summary for the canvas card's line-items accordion
         // (the branded PDF already shows full detail; this surfaces it as data too).
         const lineSummaries: Array<{ label: string; line_total: number; pricing_status?: string; room?: string | null }> = [];
@@ -307,6 +313,7 @@ export const createCreateQuoteTool = (
             return JSON.stringify({ success: false, error: resolved.error });
           }
           payloads.push(resolved.payload);
+          costBases.push(resolved.cost_snapshot);
           lineSummaries.push({
             label: resolved.label,
             line_total: resolved.line_total ?? 0,
@@ -316,10 +323,27 @@ export const createCreateQuoteTool = (
           subtotal += resolved.line_total ?? 0; // call-for-price lines contribute 0 to the total
         }
         if (payloads.length > 0) {
-          const { error: itemsErr } = await sb.from('quote_items').insert(payloads);
+          const { data: inserted, error: itemsErr } = await sb.from('quote_items').insert(payloads).select('id');
           if (itemsErr) {
             await rollback();
             return JSON.stringify({ success: false, error: `Failed to add items: ${itemsErr.message}` });
+          }
+          const costRows = (inserted ?? [])
+            .map((row: { id: string }, i: number) => ({
+              quote_item_id: row.id,
+              quote_id: quoteId,
+              workspace_id: workspaceId,
+              cost_snapshot: costBases[i],
+              cost_snapshot_currency: 'EUR',
+              cost_snapshot_at: new Date().toISOString(),
+              cost_snapshot_source: 'price_resolver',
+            }))
+            .filter((r) => r.cost_snapshot != null);
+          if (costRows.length > 0) {
+            // Additive: a quote that priced correctly is not rolled back because the margin
+            // record did not land. It is logged, not swallowed.
+            const { error: costErr } = await sb.from('quote_item_costs').insert(costRows);
+            if (costErr) console.error('[quote-tools] quote_item_costs insert failed:', costErr.message);
           }
         }
 

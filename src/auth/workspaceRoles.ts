@@ -63,16 +63,19 @@ export const WORKSPACE_ROLE_META: Record<WorkspaceMemberRole, WorkspaceRoleMeta>
     label: 'Accountant',
     portal: 'Finance portal',
     description: 'Finance only: view invoices/bills/reports, record payments, submit to myDATA. No settings, pricing, CRM or new documents.',
+    requiresModule: 'sales-finance',
   },
   sales: {
     label: 'Sales Rep',
     portal: 'Sales portal',
     description: 'Builds quotes and orders for their own customers. Sees only their own book. No finance, pricing or settings.',
+    requiresModule: 'quotes',
   },
   sales_manager: {
     label: 'Sales Manager',
     portal: 'Sales portal (team-wide)',
     description: 'Everything a rep can do, across the WHOLE team’s quote book, including cost and margin. Still no finance settings, pricing rules or team management.',
+    requiresModule: 'quotes',
   },
   // HR mirrors the Sales pair: a staff tier that reads, a manager tier that runs it. Before these
   // existed the ONLY way to let someone run HR was making them a workspace admin — which also
@@ -126,7 +129,7 @@ export const WORKSPACE_ROLE_META: Record<WorkspaceMemberRole, WorkspaceRoleMeta>
  * exhaustive. Guarded by tests/unit/workspaceRoles.test.ts: a role whose `requiresModule` is missing
  * here would be offered for a module the workspace has not enabled.
  */
-export const ROLE_MODULE_SLUGS = ['hr', 'stock', 'email-marketing', 'real-estate'] as const;
+export const ROLE_MODULE_SLUGS = ['hr', 'stock', 'email-marketing', 'real-estate', 'quotes', 'sales-finance'] as const;
 export type RoleModuleSlug = typeof ROLE_MODULE_SLUGS[number];
 
 /** Display label for any stored role value, including legacy/unknown ones. */

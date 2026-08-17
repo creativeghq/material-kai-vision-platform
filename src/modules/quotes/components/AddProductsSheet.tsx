@@ -52,7 +52,7 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { ScrollArea } from '@/components/core/ui/scroll-area';
-import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
+import { parseDecimal, parseDecimalOr, formatMoney } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
@@ -131,6 +131,8 @@ interface AddProductsSheetProps {
   customerCompanyId?: string | null;
   /** B2C / private customer of the parent quote — passed through to PriceLookupDrawer. */
   customerContactId?: string | null;
+  /** The parent quote's currency. The custom-line price is entered and totalled in it. */
+  currency?: string | null;
 }
 
 export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
@@ -141,6 +143,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   onProductsAdded,
   customerCompanyId,
   customerContactId,
+  currency,
 }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
@@ -694,7 +697,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor="cp-price">Unit Price (€)</Label>
+                      <Label htmlFor="cp-price">Unit Price ({currency || 'EUR'})</Label>
                       <Button
                         type="button"
                         variant="ghost"
@@ -767,7 +770,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                   <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Line Total</span>
                     <span className="font-semibold text-primary">
-                      €{(parseDecimalOr(customForm.unit_price, 0) * customForm.quantity).toFixed(2)}
+                      {formatMoney(parseDecimalOr(customForm.unit_price, 0) * customForm.quantity, currency || 'EUR')}
                     </span>
                   </div>
                 )}

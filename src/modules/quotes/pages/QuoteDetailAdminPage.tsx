@@ -471,7 +471,6 @@ export const QuoteDetailPage: React.FC = () => {
           id: item.id,
           unit_price: unitPrice,
           discounted_price: discountedPrice,
-          line_total: effectivePrice * item.quantity,
         };
       });
       // Persist the paid-upfront flag first so saveItemPrices applies the cash discount.
@@ -746,7 +745,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Extras Total</p>
-                <p className="text-lg font-semibold">€{extrasTotal.toFixed(2)}</p>
+                <p className="text-lg font-semibold">{formatMoney(extrasTotal, quote.currency)}</p>
               </div>
             </div>
           </div>
@@ -893,6 +892,7 @@ export const QuoteDetailPage: React.FC = () => {
           {/* Items Tab */}
           <TabsContent value="items" className="mt-5">
             <QuoteItemsList
+              currency={quote.currency}
               items={quote.items || []}
               variant="detailed"
               showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
@@ -1069,7 +1069,7 @@ export const QuoteDetailPage: React.FC = () => {
                                   )}
                                 </td>
                                 <td className="p-3 text-right text-sm font-semibold">
-                                  €{lineTotal.toFixed(2)}
+                                  {formatMoney(lineTotal, quote.currency)}
                                 </td>
                               </tr>
                             );
@@ -1592,6 +1592,7 @@ export const QuoteDetailPage: React.FC = () => {
       {/* Add Products Sheet */}
       {id && (
         <AddProductsSheet
+          currency={quote?.currency}
           quoteId={id}
           open={isAddProductsOpen}
           onOpenChange={setIsAddProductsOpen}

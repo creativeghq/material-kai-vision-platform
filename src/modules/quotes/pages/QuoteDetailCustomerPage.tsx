@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '../services/QuotesService';
+import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline, QuoteTotals } from '../services/QuotesService';
 import { AddProductsSheet } from '../components/AddProductsSheet';
 import { QuoteItemsList } from '../components/QuoteItemsList';
 import { QuoteApprovalsCard } from '../components/QuoteApprovalsCard';
@@ -38,6 +38,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
+  // The DERIVED money. Null means the derivation could not be read — rendered as a dash, never 0.
+  const [totals, setTotals] = useState<QuoteTotals | null>(null);
   const [updatingUpsell, setUpdatingUpsell] = useState<string | null>(null);
   const [acceptingQuote, setAcceptingQuote] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
@@ -59,14 +61,16 @@ export const QuoteDetailCustomerPage: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [quoteData, upsells, timeline] = await Promise.all([
+      const [quoteData, upsells, timeline, quoteTotals] = await Promise.all([
         quotesService.getQuote(id),
         quotesService.getQuoteUpsells(id),
         quotesService.getQuoteTimeline(id),
+        quotesService.getQuoteTotals(id),
       ]);
       setQuote(quoteData);
       setQuoteUpsells(upsells);
       setQuoteTimeline(timeline);
+      setTotals(quoteTotals);
 
       // Look up an open invoice for this quote so we can render the Pay-now action.
       if (quoteData?.status === 'accepted') {
@@ -235,16 +239,11 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   const itemCount = quote.items?.length || quote.total_items || 0;
 
-  // Calculate extras total from accepted upsells (using custom price × quantity if available)
-  const acceptedExtrasTotal = quoteUpsells.reduce((sum, qu) => {
-    if (qu.customer_accepted !== true) return sum;
-    const price = qu.metadata?.custom_price ?? qu.upsell?.price ?? 0;
-    const quantity = qu.metadata?.quantity ?? 1;
-    return sum + (price * quantity);
-  }, 0);
-
-  // Use stored extras_total from quote if available, otherwise calculate
-  const extrasTotal = quote.extras_total ?? acceptedExtrasTotal;
+  // The accepted-extras total comes from `get_quote_totals`, the same derivation the invoice and
+  // the admin page read. This page used to run its OWN reduce over the upsells and fall back to a
+  // cached `quotes.extras_total`, so the customer and the operator could see different numbers on
+  // the same quote (#358 PQ-6).
+  const extrasTotal = totals?.extras_total ?? null;
 
   // Check for pending upsells (not yet decided)
   const pendingUpsells = quoteUpsells.filter(u => u.customer_accepted === null || u.customer_accepted === undefined);
@@ -435,7 +434,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Extras Total</p>
-                  <p className="text-lg font-semibold">€{(quote.extras_total || 0).toFixed(2)}</p>
+                  <p className="text-lg font-semibold">{formatMoney(extrasTotal, quote.currency)}</p>
                 </div>
               </div>
             </div>
@@ -479,6 +478,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
           <TabsContent value="items" className="mt-5">
             <QuoteItemsList
+              currency={quote.currency}
               items={quote.items || []}
               showAddButton={quote.status === 'draft'}
               onAddProducts={() => setShowAddProducts(true)}
@@ -657,7 +657,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                     <div className="mt-6 pt-4 border-t">
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Accepted Extras Total:</span>
-                        <span className="text-2xl font-bold text-green-600">€{extrasTotal.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-green-600">{formatMoney(extrasTotal, quote.currency)}</span>
                       </div>
                     </div>
                   </div>
@@ -720,6 +720,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
       {/* Add Products Sheet */}
       <AddProductsSheet
+        currency={quote?.currency}
         open={showAddProducts}
         onOpenChange={setShowAddProducts}
         quoteId={quote.id}

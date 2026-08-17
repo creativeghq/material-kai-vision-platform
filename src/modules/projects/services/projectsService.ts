@@ -4,6 +4,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { assertSameWorkspace } from '@/utils/workspaceScope';
 import { parsePlanGeometry, type PlanGeometry } from '@/utils/planGeometry';
 
 /**
@@ -215,6 +216,9 @@ export interface ProjectFinanceRow {
 export interface ProjectFinanceSummary {
   receivables: ProjectFinanceRow[];
   payables: ProjectFinanceRow[];
+  /** The currencies actually behind `totals`. More than one means the sums mix money — the tiles
+   *  say so rather than labelling everything EUR (#358 PQ-11). Same contract as ProjectPnl. */
+  currencies: string[];
   totals: {
     receivable_total: number;
     receivable_due: number;
@@ -403,10 +407,17 @@ class ProjectsService {
    * (`_user_is_active_project_collaborator`, which honours `revoked_at`/`expires_at`), so an
    * explicit owner filter here was narrower than the policy and hid every project shared with
    * you — the collaborator feature existed but nothing shared ever reached this list.
+   *
+   * It DOES scope by the active workspace (#358 PQ-5). RLS bounds this to "mine + shared with
+   * me", which for a user who belongs to several tenants is every one of their workspaces at
+   * once — so switching workspace changed nothing on this screen. The one thing that must not be
+   * dropped is a project shared with you: it lives in the OWNER's workspace, and you can see it
+   * because you were invited, not because of which workspace you are in.
    */
   async listProjects(opts: { status?: ProjectStatus | 'active' } = {}): Promise<ProjectWithClient[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
+    const activeWorkspaceId = getActiveWorkspaceId(user.id);
 
     let query = (supabase as any)
       .from('projects')
@@ -416,6 +427,12 @@ class ProjectsService {
         client_contact:crm_contacts(id, name, first_name, last_name, email)
       `)
       .order('last_activity_at', { ascending: false });
+
+    // "In this workspace, or shared with me." With no active workspace resolved there is no scope
+    // to apply and RLS's own bound (mine + collaborated) stands.
+    if (activeWorkspaceId) {
+      query = query.or(`workspace_id.eq.${activeWorkspaceId},user_id.neq.${user.id}`);
+    }
 
     if (opts.status === 'active') {
       query = query.not('status', 'in', '("completed","archived")');
@@ -501,11 +518,21 @@ class ProjectsService {
       throw new Error('A project can have a client company OR a client contact, not both.');
     }
 
+    // Default to the workspace the user is actually working in, rather than storing NULL and
+    // leaving every downstream tenancy check with nothing to test (#358 PQ-5).
+    const workspaceId = input.workspace_id ?? getActiveWorkspaceId(user.id) ?? null;
+    // Two ids each individually valid, never checked against each other (#358 PQ-4). The DB
+    // trigger is the enforcement; this is here so the operator gets a sentence, not a 23514.
+    await assertSameWorkspace(workspaceId, [
+      { table: 'crm_companies', id: input.client_company_id, label: 'client company' },
+      { table: 'crm_contacts', id: input.client_contact_id, label: 'client contact' },
+    ]);
+
     const { data: project, error } = await (supabase as any)
       .from('projects')
       .insert({
         user_id: user.id,
-        workspace_id: input.workspace_id ?? null,
+        workspace_id: workspaceId,
         name: input.name,
         description: input.description ?? null,
         client_company_id: input.client_company_id ?? null,
@@ -539,6 +566,15 @@ class ProjectsService {
   async updateProject(id: string, input: UpdateProjectInput): Promise<Project> {
     if (input.client_company_id && input.client_contact_id) {
       throw new Error('A project can have a client company OR a client contact, not both.');
+    }
+    // Re-binding the client is the same cross-workspace hazard as creating it (#358 PQ-4).
+    if (input.client_company_id || input.client_contact_id) {
+      const { data: current } = await (supabase as any)
+        .from('projects').select('workspace_id').eq('id', id).maybeSingle();
+      await assertSameWorkspace((current as { workspace_id: string | null } | null)?.workspace_id, [
+        { table: 'crm_companies', id: input.client_company_id, label: 'client company' },
+        { table: 'crm_contacts', id: input.client_contact_id, label: 'client contact' },
+      ]);
     }
     const { data, error } = await (supabase as any)
       .from('projects')
@@ -853,12 +889,16 @@ class ProjectsService {
 
     // Pull every accepted-quote item in this project that has a room_id set.
     // !inner join filter ensures we only get items whose parent quote is accepted + in this project.
-    const { data: items } = await (supabase as any)
+    // The error was discarded here, so a failed read reported every room as zero spent — which
+    // on a budget screen reads as good news (#358 PQ-6). It throws now; the caller renders the
+    // failure instead of a number nobody measured.
+    const { data: items, error: itemsError } = await (supabase as any)
       .from('quote_items')
       .select('room_id, line_total, quote_id, quote:quotes!inner(project_id, status)')
       .eq('quote.project_id', projectId)
       .eq('quote.status', 'accepted')
       .not('room_id', 'is', null);
+    if (itemsError) throw itemsError;
 
     const rollup = new Map<string, { actual_amount: number; quotes: Set<string>; items: number }>();
     for (const it of (items || []) as Array<{ room_id: string; line_total: number | null; quote_id: string }>) {
@@ -1130,7 +1170,13 @@ class ProjectsService {
   async getProjectFinanceSummary(projectId: string): Promise<ProjectFinanceSummary> {
     const { data, error } = await (supabase as any).rpc('get_project_finance_summary', { p_project_id: projectId });
     if (error) throw error;
-    return (data || { receivables: [], payables: [], totals: { receivable_total: 0, receivable_due: 0, payable_total: 0, payable_due: 0 } }) as ProjectFinanceSummary;
+    const row = (data || {}) as Partial<ProjectFinanceSummary>;
+    return {
+      receivables: row.receivables ?? [],
+      payables: row.payables ?? [],
+      currencies: row.currencies ?? [],
+      totals: row.totals ?? { receivable_total: 0, receivable_due: 0, payable_total: 0, payable_due: 0 },
+    };
   }
 
   /** Job costing for a project. Read-only view over `get_project_pnl` — see ProjectPnl. */
@@ -1161,39 +1207,72 @@ class ProjectsService {
   }
 
   /**
-   * Finance documents for the project's client/supplier that are NOT yet attached to
-   * any project — the candidate list for the "attach" picker. Scoped to the project's
-   * client contact/company (invoices + receivable manual entries) and, for payables,
-   * to all unattached supplier bills + payable manual entries in the workspace.
+   * Finance documents that are NOT yet attached to any project — the candidate list for the
+   * "attach" picker.
+   *
+   * Both sides are scoped to the PROJECT's workspace. RLS bounds these to every workspace the
+   * caller belongs to, so for a multi-workspace user the picker was offering another tenant's
+   * documents and attaching one would have moved it across the boundary.
+   *
+   * Receivables are scoped to the project's client. Payables cannot be — a project buys from
+   * whoever supplies it — but "every unattached supplier bill in the workspace" is not a
+   * candidate list either (#358 PQ-13). Each row is flagged `related`: its supplier already
+   * appears on this project's purchase orders or purchase items. The picker leads with those and
+   * keeps the rest behind a labelled divider, so a genuinely new supplier is still attachable
+   * without the list pretending everything is a candidate.
    */
   async listAttachableFinance(projectId: string): Promise<{ receivables: any[]; payables: any[] }> {
     const project = await this.getProject(projectId);
     const contactId = project?.client_contact_id ?? null;
     const companyId = project?.client_company_id ?? null;
+    const workspaceId = project?.workspace_id ?? null;
+    // No workspace means no scope to apply, and a picker that widens when it cannot resolve its
+    // scope is the failure this fix exists to remove.
+    if (!workspaceId) return { receivables: [], payables: [] };
 
     // Voided docs are deletions — never offer them as attachable to a project.
     const invQ = (supabase as any)
       .from('invoices')
       .select('id, internal_number, total, amount_due, status, currency, issued_at, due_at')
+      .eq('workspace_id', workspaceId)
       .is('project_id', null).neq('status', 'void');
     if (companyId) invQ.eq('customer_company_id', companyId);
     else if (contactId) invQ.eq('customer_contact_id', contactId);
 
     const billQ = (supabase as any)
       .from('supplier_bills')
-      .select('id, supplier_bill_number, total, amount_due, status, currency, issued_at, due_at')
+      .select('id, supplier_bill_number, supplier_company_id, total, amount_due, status, currency, issued_at, due_at')
+      .eq('workspace_id', workspaceId)
       .is('project_id', null).neq('status', 'void');
 
-    const [inv, bills] = await Promise.all([invQ, billQ]);
+    const ordersQ = (supabase as any)
+      .from('orders')
+      .select('supplier_company_id')
+      .eq('project_id', projectId)
+      .not('supplier_company_id', 'is', null);
+
+    const itemsQ = (supabase as any)
+      .from('project_purchase_items')
+      .select('supplier_company_id')
+      .eq('project_id', projectId)
+      .not('supplier_company_id', 'is', null);
+
+    const [inv, bills, orders, items] = await Promise.all([invQ, billQ, ordersQ, itemsQ]);
     if (inv.error) throw inv.error;
     if (bills.error) throw bills.error;
 
+    const projectSuppliers = new Set<string>([
+      ...((orders.data || []) as Array<{ supplier_company_id: string }>).map((r) => r.supplier_company_id),
+      ...((items.data || []) as Array<{ supplier_company_id: string }>).map((r) => r.supplier_company_id),
+    ]);
+
     const recv = [
-      ...(inv.data || []).map((i: any) => ({ kind: 'invoice', id: i.id, label: i.internal_number, total: i.total, amount_due: i.amount_due, status: i.status, currency: i.currency, issued_at: i.issued_at })),
+      ...(inv.data || []).map((i: any) => ({ kind: 'invoice', id: i.id, label: i.internal_number, total: i.total, amount_due: i.amount_due, status: i.status, currency: i.currency, issued_at: i.issued_at, related: true })),
     ];
     const pay = [
-      ...(bills.data || []).map((b: any) => ({ kind: 'supplier_bill', id: b.id, label: b.supplier_bill_number, total: b.total, amount_due: b.amount_due, status: b.status, currency: b.currency, issued_at: b.issued_at })),
+      ...(bills.data || []).map((b: any) => ({ kind: 'supplier_bill', id: b.id, label: b.supplier_bill_number, total: b.total, amount_due: b.amount_due, status: b.status, currency: b.currency, issued_at: b.issued_at, related: !!b.supplier_company_id && projectSuppliers.has(b.supplier_company_id) })),
     ];
+    pay.sort((a, b) => Number(b.related) - Number(a.related));
     return { receivables: recv, payables: pay };
   }
 
@@ -1615,8 +1694,26 @@ class ProjectsService {
 
   // ---------- CRM LOOKUP (for the wizard) ----------
 
+  /**
+   * The wizard's CRM lookups, scoped to the ACTIVE workspace.
+   *
+   * RLS scopes these to every workspace the caller belongs to, which for a multi-workspace user
+   * is several tenants at once — so the ClientPicker could offer, and the project could then
+   * store, a party from a different workspace (#358 PQ-4). The scope is required, not
+   * best-effort: with no active workspace resolved the picker returns nothing rather than
+   * quietly widening to everything.
+   */
+  private async activeWorkspaceOrNull(): Promise<string | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    return getActiveWorkspaceId(user.id) ?? null;
+  }
+
   async searchCompanies(query: string, limit = 10) {
-    const q = (supabase as any).from('crm_companies').select('id, name, email').limit(limit);
+    const ws = await this.activeWorkspaceOrNull();
+    if (!ws) return [];
+    const q = (supabase as any).from('crm_companies').select('id, name, email')
+      .eq('workspace_id', ws).limit(limit);
     if (query.trim()) q.ilike(CRM_SEARCH_COLUMN, foldedLike(query));
     q.order('name', { ascending: true });
     const { data, error } = await q;
@@ -1625,7 +1722,10 @@ class ProjectsService {
   }
 
   async searchProducts(query: string, limit = 12) {
-    const q = (supabase as any).from('products').select('id, name, sku').limit(limit);
+    const ws = await this.activeWorkspaceOrNull();
+    if (!ws) return [];
+    const q = (supabase as any).from('products').select('id, name, sku')
+      .eq('workspace_id', ws).limit(limit);
     if (query.trim()) q.or(`name.ilike.%${query}%,sku.ilike.%${query}%`);
     q.order('name', { ascending: true });
     const { data, error } = await q;
@@ -1634,11 +1734,12 @@ class ProjectsService {
   }
 
   async searchContacts(query: string, limit = 10) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    const ws = await this.activeWorkspaceOrNull();
+    if (!ws) return [];
     const q = (supabase as any)
       .from('crm_contacts')
       .select('id, name, first_name, last_name, email')
+      .eq('workspace_id', ws)
       .limit(limit);
     if (query.trim()) q.ilike(CRM_SEARCH_COLUMN, foldedLike(query));
     q.order('name', { ascending: true });

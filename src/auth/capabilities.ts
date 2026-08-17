@@ -152,76 +152,88 @@ export interface PersonaInputs {
 }
 
 /**
- * Workspace TEAM roles → their scoped persona. One entry per functional role added after the
- * account-tier model; checked ahead of the account tier in `resolvePersona`.
+ * Workspace TEAM roles → their scoped persona. EXHAUSTIVE over every scoped role in
+ * `WORKSPACE_MEMBER_ROLES`; checked ahead of the account tier in `resolvePersona`.
  *
- * The older scoped roles (`client`, `accountant`, `sales`, `employee`, `realestate_agent`) are
- * deliberately NOT here: they resolve AFTER the account-tier switch and moving them would change
- * who wins for existing users (e.g. account tier `finance` + workspace role `sales`). Their
- * precedence is preserved as-is in the chain below.
+ * Five of these (`client`, `accountant`, `sales`, `employee`, `realestate_agent`) used to sit
+ * BELOW the account-tier switch as individual `if`s, on the theory that moving them would change
+ * who wins for an existing user. It changed who won in the wrong direction: a user carrying a
+ * global tier of `supplier`/`dealer`/`factory`/`architect` and invited into a workspace as a
+ * CLIENT resolved to `dealer` — finance.manage, crm.view, warehouse.manage, network.manage and
+ * pricing.manage, handed to the customer (#358 PQ-1). The `if`s each carried a comment about
+ * preceding the `staff` fallback; the hazard was the switch ABOVE them.
+ *
+ * The only roles NOT here are `owner`/`admin` (whose persona depends on the workspace's rank) and
+ * `member` (the plain-staff fallback). Guarded by tests/unit/workspaceRoles.test.ts, which fails
+ * when a role in the catalog has no entry here.
  */
 const TEAM_ROLE_PERSONA: Record<string, Persona> = {
+  sales: 'sales',
   sales_manager: 'sales_manager',
   hr: 'hr_staff',
   hr_manager: 'hr_manager',
   warehouse: 'warehouse_staff',
   marketing: 'marketing_staff',
+  accountant: 'accountant',
+  employee: 'employee',
+  realestate_agent: 'realestate_agent',
+  client: 'end_user',
 };
 
 /**
- * Resolve the single persona. The account role (set under Users) is the primary tier;
- * `operator` is granted ONLY by root-workspace ownership (never by account role) so a
- * tenant can never become a platform operator. Account role falls back to the legacy
- * workspace-derived persona for plain `user`/unset (no regression for existing users).
+ * Resolve the single persona.
+ *
+ * THE ORDER IS THE POINT (#358 PQ-1). The WORKSPACE role decides who you are here; the global
+ * account tier only answers when there is no workspace role to read. It used to be the other way
+ * round for five roles — `client`, `accountant`, `sales`, `employee`, `realestate_agent` sat as
+ * individual `if`s BELOW the account-tier switch — so a user carrying a tier of
+ * `supplier`/`dealer`/`factory`/`architect` and invited into a workspace as a CLIENT resolved to
+ * `dealer` and was shown finance, CRM, warehouse, network and pricing. Each of those `if`s carried
+ * a comment about preceding the `staff` fallback; the hazard was the switch above them.
+ *
+ * `operator` is granted ONLY by root-workspace ownership, never by an account role, so a tenant
+ * can never become a platform operator.
  */
 export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole }: PersonaInputs): Persona {
   if (isPlatformOperator) return 'operator';
 
-  // Functional TEAM roles. These win over the account-tier switch below: being invited to run HR in
-  // this workspace is more specific than whatever global tier you happen to carry, and without this
-  // a user whose tier is `sales` would be downgraded to a plain rep despite being invited as the
-  // manager. Safe to check first — every value here was introduced after the account-tier switch, so
-  // no existing membership carries one.
-  // Adding a role? Put it HERE, not in a new `if`. A workspace role with no branch falls through to
-  // `staff` and silently inherits finance/CRM/warehouse — the failure this whole model prevents.
-  const teamPersona = TEAM_ROLE_PERSONA[workspaceRole ?? ''];
+  const role = workspaceRole ?? '';
+
+  // 1. Scoped TEAM roles — the exhaustive map. What you were invited to BE in this workspace is
+  //    more specific than whatever global tier you happen to carry: a client is a client here even
+  //    if they sell materials somewhere else.
+  //    Adding a role? Put it in TEAM_ROLE_PERSONA, not in a new `if`.
+  const teamPersona = TEAM_ROLE_PERSONA[role];
   if (teamPersona) return teamPersona;
 
-  // Account role drives the tenant tiers. 'admin'/'super_admin' here do NOT grant
-  // operator (multi-tenancy) — only root-workspace ownership above does.
+  // 2. Running this workspace. `rank` is the workspace's own marketplace rank, not the user's tier.
+  if (role === 'owner' || role === 'admin') {
+    if (rank === 'architect') return 'architect';
+    // Dealer rank, root rank but not the platform operator, or unknown — a dealer-level business.
+    return 'dealer';
+  }
+
+  // 3. A plain team member of a business node. Deliberately BEFORE the account tier: being a
+  //    supplier elsewhere does not make you an administrator of this workspace.
+  if (role === 'member') return 'staff';
+
+  // 4. No workspace role at all (membership not resolved / a user outside any workspace). Only
+  //    here does the global account tier speak.
+  //    NOTHING functional belongs in this switch. `public.roles` is the GLOBAL account tier — a
+  //    value set by a platform operator and true in EVERY workspace the user belongs to — so it
+  //    holds only `supplier` / `architect` (the tiers role_upgrade_requests accepts), `admin`, and
+  //    the `user` baseline. "Sales", "finance", "runs HR", "warehouse team" are per-workspace facts
+  //    and live ONLY in workspace_members.role. `sales` and `finance` were removed from this switch
+  //    on 2026-07-31 along with their rows.
   switch (accountRole) {
     case 'supplier':
     case 'dealer':   // legacy alias
     case 'factory':  // legacy alias → supplier tier
       return 'dealer';
     case 'architect': return 'architect';
-    // NOTHING functional belongs here. `public.roles` is the GLOBAL account tier — a value set by a
-    // platform operator and true in EVERY workspace the user belongs to — so it holds only
-    // `supplier` / `architect` (the tiers role_upgrade_requests accepts), `admin`, and the `user`
-    // baseline. "Sales", "finance", "runs HR", "warehouse team" are per-workspace facts and live
-    // ONLY in workspace_members.role (see TEAM_ROLE_PERSONA above), set from Profile → Team.
-    // `sales` and `finance` were removed from this switch on 2026-07-31 along with their rows.
   }
 
-  const role = workspaceRole ?? '';
-  if (role === 'client') return 'end_user';
-  if (role === 'accountant') return 'accountant';
-  // Invited employee — HR self-service only. Must precede the member/staff fallback so an
-  // 'employee' role never inherits staff finance/CRM/warehouse capabilities.
-  if (role === 'employee') return 'employee';
-  // Invited property agent — Real Estate portal only. Before the member/staff fallback so a
-  // 'realestate_agent' role never inherits staff finance/warehouse capabilities.
-  if (role === 'realestate_agent') return 'realestate_agent';
-  // Invited sales rep — Sales portal only. Must come BEFORE the member/staff fallback,
-  // otherwise a 'sales' role falls through to 'staff' and wrongly inherits finance/CRM/invoice.
-  if (role === 'sales') return 'sales';
-  if (role === 'owner' || role === 'admin') {
-    if (rank === 'dealer') return 'dealer';
-    if (rank === 'architect') return 'architect';
-    // Root rank but not the platform operator, or unknown — treat as a dealer-level business.
-    return 'dealer';
-  }
-  // member / anything else = team staff of a business node.
+  // 5. Anything else = team staff of a business node.
   return 'staff';
 }
 

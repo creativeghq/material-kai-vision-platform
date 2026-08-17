@@ -353,7 +353,7 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
         custom_unit: it.unit ?? null,
         quantity: qty,
         unit_price: Number(rate ?? 0),
-        line_total: lineTotal,
+        // `quote_items.line_total` is generated (qty x price) — never sent (#358 PQ-6).
         room: it.parent_id ? sectionLabel[it.parent_id] ?? null : null,
         dimensions: rate == null
           ? `${qty}${it.unit ? ` ${it.unit}` : ''} — needs a price`
@@ -372,7 +372,6 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
       custom_unit: it.unit ?? null,
       quantity: 1,
       unit_price: lineTotal,
-      line_total: lineTotal,
       room: it.parent_id ? sectionLabel[it.parent_id] ?? null : null,
       dimensions: dimsText,
       notes: it.notes ?? null,

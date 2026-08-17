@@ -20,7 +20,6 @@ export interface Quote {
   status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
   status_tag_id?: string;
   total_items: number;
-  extras_total?: number; // Total of accepted upsells (price × quantity)
   notes?: string;
   custom_request_text?: string; // Custom text request instead of products
   expires_at: string;
@@ -72,6 +71,7 @@ export interface QuoteItem {
   // Pricing fields
   unit_price?: number;
   discounted_price?: number;
+  /** DERIVED in SQL (generated column) — read it, never send it. #358 PQ-6. */
   line_total?: number;
   // FF&E fields
   room?: string;
@@ -80,6 +80,20 @@ export interface QuoteItem {
   dimensions?: string;
   installation_requirements?: string;
   delivery_date?: string;
+}
+
+/** The derived money on a quote — the shape `public.get_quote_totals` returns. */
+export interface QuoteTotals {
+  quote_id: string;
+  subtotal: number;
+  cash_discount_pct: number;
+  discount: number;
+  price_after_discount: number;
+  extras_total: number;
+  taxable_base: number;
+  vat_rate: number;
+  vat_amount: number;
+  grand_total: number;
 }
 
 export interface QuoteWithItems extends Quote {
@@ -407,10 +421,9 @@ export class QuotesService {
    * The list scrubbed cost before RENDER (`convertToDisplayProduct` sets `wholesale: 0`), which
    * is why nothing looked wrong; the row was already over the wire.
    *
-   * The flag narrows what the client ASKS for; it is not a server boundary — `products` RLS
-   * still answers a hand-made request from any member. A page that must not show procurement
-   * cost should not be requesting it, which is the same rule `get_product_detail` enforces on
-   * the product surface.
+   * Per-line `cost_snapshot` is no longer a column on `quote_items` at all — it lives in
+   * `quote_item_costs`, whose RLS answers only the sell side (#358 PQ-2). `includeCost` decides
+   * whether to go and ask for it; a customer asking gets an empty set, not a filtered row.
    */
   async getQuote(quoteId: string, opts?: { includeCost?: boolean }): Promise<QuoteWithItems> {
     const { data: quote, error: quoteError } = await supabase
@@ -428,6 +441,10 @@ export class QuotesService {
       .order('added_at', { ascending: true });
 
     if (itemsError) throw itemsError;
+
+    const costByItemId = opts?.includeCost
+      ? await this.getQuoteItemCosts(quoteId)
+      : new Map<string, number>();
 
     // Fetch images for all products in this quote
     const productIds = (items || [])
@@ -456,6 +473,7 @@ export class QuotesService {
     // Attach images to products
     const itemsWithImages = (items || []).map(item => ({
       ...item,
+      cost_snapshot: costByItemId.get(item.id) ?? null,
       product: item.product ? {
         ...item.product,
         image_url: productImageMap[item.product.id] || item.product.image_url,
@@ -466,6 +484,52 @@ export class QuotesService {
       ...quote,
       items: itemsWithImages,
     };
+  }
+
+  /**
+   * THE money on a quote, derived — subtotal, the cash discount, accepted extras, the taxable
+   * base, VAT and the grand total.
+   *
+   * `public.get_quote_totals(uuid[])` is the single source (CLAUDE.md, "one derivation per money
+   * quantity"). Read it rather than the cached `quotes.subtotal` / `vat_amount` / `grand_total`
+   * columns: those are restamped by `reprice_quote_items` and are stale between repricings — the
+   * cached `extras_total` was removed outright because its writer missed the delete path.
+   *
+   * Returns null when the derivation could not be read. A caller must render that as "unknown",
+   * never as zero.
+   */
+  async getQuoteTotals(quoteId: string): Promise<QuoteTotals | null> {
+    const { data, error } = await (supabase as any).rpc('get_quote_totals', { p_quote_ids: [quoteId] });
+    if (error) {
+      console.error('[QuotesService] get_quote_totals failed - totals are unknown, not zero:', error);
+      return null;
+    }
+    const row = Array.isArray(data) ? data[0] : null;
+    return (row as QuoteTotals | undefined) ?? null;
+  }
+
+  /**
+   * Per-line procurement cost for a quote, keyed by quote_item id.
+   *
+   * `quote_item_costs` is gated on `is_workspace_sell_side(workspace_id)`, so this returns an
+   * EMPTY map — not an error — for a customer or a project collaborator. That is the point: the
+   * seller's cost basis is withheld by the database, not by whether a component asked for it.
+   */
+  async getQuoteItemCosts(quoteId: string): Promise<Map<string, number>> {
+    const { data, error } = await (supabase as any)
+      .from('quote_item_costs')
+      .select('quote_item_id, cost_snapshot')
+      .eq('quote_id', quoteId);
+    // A failed read is "cost unknown", never "cost is zero" — the caller renders a dash.
+    if (error) {
+      console.error('[QuotesService] quote_item_costs read failed - margin is unknown, not zero:', error);
+      return new Map();
+    }
+    const map = new Map<string, number>();
+    for (const row of (data ?? []) as Array<{ quote_item_id: string; cost_snapshot: number | null }>) {
+      if (row.cost_snapshot != null) map.set(row.quote_item_id, Number(row.cost_snapshot));
+    }
+    return map;
   }
 
   /**
@@ -583,12 +647,16 @@ export class QuotesService {
     // "call for price" (rendered as such, excluded from totals, RFQ-able upstream)
     // instead of a silently-broken NULL-priced line.
     let pricingStatus: 'priced' | 'call_for_price' = 'priced';
+    // Needed after the try block: the cost basis is written to `quote_item_costs`, which is
+    // scoped by workspace (#358 PQ-2).
+    let quoteWorkspaceId: string | null = null;
     try {
       const { data: quote } = await supabase
         .from('quotes')
         .select('workspace_id, customer_company_id, customer_contact_id')
         .eq('id', data.quote_id)
         .single();
+      quoteWorkspaceId = quote?.workspace_id ?? null;
       if (quote?.workspace_id) {
         // Pass the quote's customer so the resolver applies their pricing-level discount.
         // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
@@ -652,8 +720,7 @@ export class QuotesService {
         delivery_date: data.delivery_date || null,
         custom_unit: customUnit,
         unit_price: unitPrice,
-        line_total: unitPrice != null ? Math.round(unitPrice * qtyNow * 100) / 100 : null,
-        cost_snapshot: costSnapshot,
+        // `line_total` is a generated column — SQL derives it from the price and the quantity.
         retail_price: retailPrice,
         pricing_status: pricingStatus,
       } as any)
@@ -661,6 +728,20 @@ export class QuotesService {
       .single();
 
     if (error) throw error;
+
+    // The procurement cost lives beside the line, in a table only the sell side can read — the
+    // quote_items ROW is readable by the customer and RLS cannot withhold a column (#358 PQ-2).
+    if (costSnapshot != null && quoteWorkspaceId) {
+      await (supabase as any).from('quote_item_costs').upsert({
+        quote_item_id: item.id,
+        quote_id: data.quote_id,
+        workspace_id: quoteWorkspaceId,
+        cost_snapshot: costSnapshot,
+        cost_snapshot_currency: 'EUR',
+        cost_snapshot_at: new Date().toISOString(),
+        cost_snapshot_source: 'price_resolver',
+      }, { onConflict: 'quote_item_id' });
+    }
 
     flowEventService.emit('product_added_to_quote', {
       quote_id: data.quote_id,
@@ -707,7 +788,6 @@ export class QuotesService {
         custom_image_url: data.custom_image_url || null,
         quantity: qty,
         unit_price: unitPrice,
-        line_total: unitPrice != null ? Math.round(unitPrice * qty * 100) / 100 : null,
         selected_size: data.selected_size || null,
         selected_color: data.selected_color || null,
         notes: data.notes || null,
@@ -749,7 +829,9 @@ export class QuotesService {
       price_lookup_call_id?: string | null;
     },
   ): Promise<QuoteItem> {
-    // Recalculate line_total when pricing or quantity changes.
+    // A quantity change re-runs the pricing engine (a new quantity can cross a volume break).
+    // The LINE TOTAL is not computed here and never was ours to compute — it is a generated
+    // column derived from the prices below (#358 PQ-6).
     const payload: Record<string, any> = { ...data };
     if (data.unit_price !== undefined || data.discounted_price !== undefined || data.quantity !== undefined) {
       const { data: current } = await supabase
@@ -759,8 +841,6 @@ export class QuotesService {
         .single();
       if (current) {
         const qty = data.quantity ?? current.quantity ?? 1;
-        let unitPrice = data.unit_price !== undefined ? data.unit_price : current.unit_price;
-        let discountedPrice = data.discounted_price !== undefined ? data.discounted_price : current.discounted_price;
 
         // Option B: a quantity change (without an explicit price edit) ALWAYS re-runs the
         // engine so the line stays correct (e.g. crossing a volume threshold), overwriting any
@@ -794,8 +874,8 @@ export class QuotesService {
               // than on an order.
               const recomputed = p?.suggested_sell != null ? Number(p.suggested_sell) : null;
               if (recomputed != null) {
-                unitPrice = recomputed;
-                discountedPrice = null;       // engine price replaces any prior per-line discount
+                // The engine price replaces any prior per-line discount. Only the payload is
+                // written — the line total that follows from these two is derived in SQL.
                 payload.unit_price = recomputed;
                 payload.discounted_price = null;
                 // Keep the pre-discount retail anchor in sync with the same resolver call, else the
@@ -805,9 +885,6 @@ export class QuotesService {
             }
           } catch { /* non-fatal — keep the existing price */ }
         }
-
-        const effectivePrice = discountedPrice ?? unitPrice;
-        payload.line_total = effectivePrice != null ? Math.round(Number(effectivePrice) * qty * 100) / 100 : null;
       }
     }
 
@@ -1273,82 +1350,42 @@ export class QuotesService {
   }
 
   /**
-   * Update customer acceptance of upsell and recalculate quote extras_total
+   * The customer's decision on one extra.
+   *
+   * Goes through `set_quote_upsell_decision` rather than a direct UPDATE: the row also carries
+   * `metadata.custom_price` and `metadata.quantity`, which is what `get_quote_totals` prices the
+   * extra from. A customer holding UPDATE on that row could re-price their own upsell. The RPC
+   * writes `customer_accepted` + `decided_at` and nothing else (#358 PQ-2).
+   *
+   * There is no `extras_total` to restamp any more: `get_quote_totals` derives it from the
+   * accepted upsells every time it is asked, so removing an accepted extra can no longer leave an
+   * overstated cached total behind (#358 PQ-6).
    */
   async updateUpsellAcceptance(
     quoteUpsellId: string,
     accepted: boolean,
   ): Promise<QuoteUpsell> {
-    // First update the upsell acceptance
-    const { data, error } = await supabase
-      .from('quote_upsells')
-      .update({
-        customer_accepted: accepted,
-        decided_at: new Date().toISOString(),
-      })
-      .eq('id', quoteUpsellId)
-      .select('*, upsell:upsells(*)')
-      .single();
-
-    if (error) throw error;
-
-    // Recalculate extras_total for the quote
-    await this.recalculateQuoteExtrasTotal(data.quote_id);
-
-    return data;
+    return this.setUpsellDecision(quoteUpsellId, accepted);
   }
 
-  /**
-   * Recalculate and update the extras_total for a quote
-   * Only includes accepted upsells, using custom_price from metadata if available
-   */
-  async recalculateQuoteExtrasTotal(quoteId: string): Promise<number> {
-    // Get all quote upsells with their upsell details
-    const quoteUpsells = await this.getQuoteUpsells(quoteId);
-
-    // Calculate total from accepted upsells only
-    const extrasTotal = quoteUpsells.reduce((sum, qu) => {
-      // Only count accepted upsells
-      if (qu.customer_accepted !== true) return sum;
-
-      // Get price: use custom_price from metadata if available, otherwise use default upsell price
-      const metadata = qu.metadata as { custom_price?: number; quantity?: number } | null;
-      const price = metadata?.custom_price ?? qu.upsell?.price ?? 0;
-      const quantity = metadata?.quantity ?? 1;
-
-      return sum + (price * quantity);
-    }, 0);
-
-    // Update the quote with new extras_total
-    const { error } = await supabase
-      .from('quotes')
-      .update({ extras_total: extrasTotal })
-      .eq('id', quoteId);
-
-    if (error) throw error;
-
-    return extrasTotal;
-  }
-
-  /**
-   * Reset upsell decision (set customer_accepted back to null)
-   */
+  /** Reset an upsell decision (back to undecided). */
   async resetUpsellDecision(quoteUpsellId: string): Promise<QuoteUpsell> {
-    const { data, error } = await supabase
-      .from('quote_upsells')
-      .update({
-        customer_accepted: null,
-        decided_at: null,
-      })
-      .eq('id', quoteUpsellId)
-      .select('*, upsell:upsells(*)')
-      .single();
+    return this.setUpsellDecision(quoteUpsellId, null);
+  }
 
+  private async setUpsellDecision(quoteUpsellId: string, accepted: boolean | null): Promise<QuoteUpsell> {
+    const { error } = await (supabase as any).rpc('set_quote_upsell_decision', {
+      p_quote_upsell_id: quoteUpsellId,
+      p_accepted: accepted,
+    });
     if (error) throw error;
 
-    // Recalculate extras_total for the quote
-    await this.recalculateQuoteExtrasTotal(data.quote_id);
-
+    const { data, error: readErr } = await supabase
+      .from('quote_upsells')
+      .select('*, upsell:upsells(*)')
+      .eq('id', quoteUpsellId)
+      .single();
+    if (readErr) throw readErr;
     return data;
   }
 
@@ -1946,10 +1983,34 @@ export class QuotesService {
       .eq('quote_id', sourceQuoteId);
 
     if (items && items.length > 0) {
-      const rows = items.map((it: any) => {
-        const { id, quote_id, added_at, ...rest } = it;
-        return { ...rest, quote_id: newQuote.id };
-      });
+      // An explicit projection, not `...rest`: `line_total` is a generated column (the insert
+      // would be rejected) and spreading a whole row into a write is mass assignment.
+      const rows = items.map((it: any) => ({
+        quote_id: newQuote.id,
+        product_id: it.product_id ?? null,
+        quantity: it.quantity,
+        notes: it.notes ?? null,
+        added_from: it.added_from ?? 'manual',
+        selected_size: it.selected_size ?? null,
+        selected_color: it.selected_color ?? null,
+        selected_attributes: it.selected_attributes ?? {},
+        unit_price: it.unit_price ?? null,
+        discounted_price: it.discounted_price ?? null,
+        retail_price: it.retail_price ?? null,
+        pricing_status: it.pricing_status ?? 'priced',
+        price_source: it.price_source ?? null,
+        custom_product_name: it.custom_product_name ?? null,
+        custom_product_description: it.custom_product_description ?? null,
+        custom_sku: it.custom_sku ?? null,
+        custom_unit: it.custom_unit ?? null,
+        custom_image_url: it.custom_image_url ?? null,
+        room: it.room ?? null,
+        room_id: it.room_id ?? null,
+        dimensions: it.dimensions ?? null,
+        installation_requirements: it.installation_requirements ?? null,
+        delivery_date: it.delivery_date ?? null,
+        product_configuration_id: it.product_configuration_id ?? null,
+      }));
       const { error: itemsErr } = await (supabase as any).from('quote_items').insert(rows);
       if (itemsErr) throw itemsErr;
     }

@@ -27,6 +27,39 @@ import {
 
 type View = 'snags' | 'log';
 
+/**
+ * Site photos live in a PRIVATE bucket now (#358 PQ-9), so a render needs a signed URL rather
+ * than a string built from the path. One batch call per list, re-signed whenever the paths change.
+ * A path that could not be signed is absent from the map and shows a placeholder — never a
+ * hard-coded public URL, which is what this replaced.
+ */
+function useSignedPhotos(paths: string[]): Record<string, string> {
+  const key = paths.join('|');
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    if (!key) { setUrls({}); return; }
+    siteService.photoUrls(key.split('|')).then((m) => { if (!cancelled) setUrls(m); });
+    return () => { cancelled = true; };
+  }, [key]);
+  return urls;
+}
+
+const PhotoStrip: React.FC<{ paths: string[]; urls: Record<string, string>; alt: (i: number) => string }> = ({ paths, urls, alt }) => (
+  <div className="mt-2 flex flex-wrap gap-2">
+    {paths.map((p, i) => (urls[p] ? (
+      <a key={p} href={urls[p]} target="_blank" rel="noreferrer">
+        {/* The alt is the LINK's accessible name too — empty made this a nameless link, i.e.
+            "link" is all a screen reader could announce. */}
+        <img src={urls[p]} alt={alt(i)} loading="lazy"
+          className="h-16 w-16 rounded-md object-cover border border-white/10" />
+      </a>
+    ) : (
+      <div key={p} className="h-16 w-16 rounded-md border border-white/10 bg-muted/40" aria-hidden />
+    )))}
+  </div>
+);
+
 const severityTone = (s: SnagSeverity) =>
   s === 'critical' ? 'text-destructive'
     : s === 'high' ? 'text-amber-400'
@@ -97,6 +130,7 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
   }), [snags, roomFilter, showClosed]);
 
   const openCount = snags.filter((s) => !SNAG_CLOSED_STATUSES.includes(s.status)).length;
+  const photoUrls = useSignedPhotos(useMemo(() => visible.flatMap((s) => s.photo_paths ?? []), [visible]));
 
   const setStatus = async (snag: ProjectSnag, status: SnagStatus) => {
     setSnags((list) => list.map((s) => (s.id === snag.id ? { ...s, status } : s)));
@@ -173,16 +207,7 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
                     </div>
                     {s.description && <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>}
                     {s.photo_paths.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {s.photo_paths.map((p, i) => (
-                          <a key={p} href={siteService.photoUrl(p)} target="_blank" rel="noreferrer">
-                            {/* The alt is the LINK's accessible name too — empty made this a
-                                nameless link, i.e. "link" is all a screen reader could announce. */}
-                            <img src={siteService.photoUrl(p)} alt={`Snag photo ${i + 1}: ${s.title}`} loading="lazy"
-                              className="h-16 w-16 rounded-md object-cover border border-white/10" />
-                          </a>
-                        ))}
-                      </div>
+                      <PhotoStrip paths={s.photo_paths} urls={photoUrls} alt={(i) => `Snag photo ${i + 1}: ${s.title}`} />
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -329,6 +354,7 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
   const [logs, setLogs] = useState<ProjectSiteLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const photoUrls = useSignedPhotos(useMemo(() => logs.flatMap((l) => l.photo_paths ?? []), [logs]));
 
   const load = useCallback(async () => {
     try { setLoading(true); setLogs(await siteService.listSiteLogs(projectId)); }
@@ -376,14 +402,7 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
                     </div>
                     {l.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{l.notes}</p>}
                     {l.photo_paths.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {l.photo_paths.map((p, i) => (
-                          <a key={p} href={siteService.photoUrl(p)} target="_blank" rel="noreferrer">
-                            <img src={siteService.photoUrl(p)} alt={`Site visit photo ${i + 1} — ${l.log_date}`} loading="lazy"
-                              className="h-16 w-16 rounded-md object-cover border border-white/10" />
-                          </a>
-                        ))}
-                      </div>
+                      <PhotoStrip paths={l.photo_paths} urls={photoUrls} alt={(i) => `Site visit photo ${i + 1} — ${l.log_date}`} />
                     )}
                   </div>
                   {isOwner && (

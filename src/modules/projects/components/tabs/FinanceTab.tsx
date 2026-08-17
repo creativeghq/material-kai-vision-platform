@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useNavigate } from 'react-router-dom';
 import {
-  Loader2, Plus, ArrowDownLeft, ArrowUpRight, Link2Off, FileText,
+  Loader2, Plus, ArrowDownLeft, ArrowUpRight, Link2Off, FileText, AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -71,6 +71,10 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
   if (loading || !summary) return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   const t = summary.totals;
+  // The RPC reports which currencies are behind the totals. More than one means the tiles add
+  // different money — say so rather than stamping EUR on it (#358 PQ-11).
+  const mixed = summary.currencies.length > 1;
+  const currency = summary.currencies[0] ?? 'EUR';
 
   const Section: React.FC<{
     title: string; icon: React.ReactNode; rows: ProjectFinanceRow[];
@@ -85,8 +89,8 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm font-medium">{money(total, 'EUR')}</p>
-              <p className="text-[11px] text-muted-foreground">{money(due, 'EUR')} due</p>
+              <p className="text-sm font-medium">{money(total, currency)}</p>
+              <p className="text-[11px] text-muted-foreground">{money(due, currency)} due</p>
             </div>
             <Button size="sm" variant="outline" className="rounded-full" onClick={() => setPicker(kind)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Attach
@@ -138,16 +142,24 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
         onChanged={() => setCostToken((t) => t + 1)}
       />
 
+      {mixed && (
+        <p className="flex items-start gap-2 text-xs text-amber-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          This project mixes {summary.currencies.join(', ')}. The totals below add different
+          currencies together and are indicative only.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <Card className="dashboard-card"><CardContent className="p-4">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><ArrowDownLeft className="h-3 w-3" /> Receivable due</p>
-          <p className="text-xl font-medium mt-1">{money(t.receivable_due, 'EUR')}</p>
-          <p className="text-xs text-muted-foreground">of {money(t.receivable_total, 'EUR')} billed</p>
+          <p className="text-xl font-medium mt-1">{money(t.receivable_due, currency)}</p>
+          <p className="text-xs text-muted-foreground">of {money(t.receivable_total, currency)} billed</p>
         </CardContent></Card>
         <Card className="dashboard-card"><CardContent className="p-4">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><ArrowUpRight className="h-3 w-3" /> Payable due</p>
-          <p className="text-xl font-medium mt-1">{money(t.payable_due, 'EUR')}</p>
-          <p className="text-xs text-muted-foreground">of {money(t.payable_total, 'EUR')} billed</p>
+          <p className="text-xl font-medium mt-1">{money(t.payable_due, currency)}</p>
+          <p className="text-xs text-muted-foreground">of {money(t.payable_total, currency)} billed</p>
         </CardContent></Card>
       </div>
 
@@ -216,8 +228,16 @@ const AttachDialog: React.FC<{
           </p>
         ) : (
           <div className="max-h-72 overflow-auto rounded-md border border-white/10 divide-y divide-white/8">
-            {candidates.map((c) => (
-              <div key={`${c.kind}-${c.id}`} className="p-3 flex items-center gap-2">
+            {candidates.map((c, i) => (
+              <React.Fragment key={`${c.kind}-${c.id}`}>
+                {/* Candidates for THIS project lead; everything else in the workspace sits behind a
+                    labelled divider rather than being presented as equally relevant (#358 PQ-13). */}
+                {direction === 'payable' && !c.related && (i === 0 || candidates[i - 1]?.related) && (
+                  <p className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground bg-muted/30">
+                    Other unattached bills in this workspace
+                  </p>
+                )}
+              <div className="p-3 flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{c.label || c.id.slice(0, 8)}</p>
                   <p className="text-xs text-muted-foreground">{KIND_LABEL[c.kind] || c.kind} · {c.status}</p>
@@ -227,6 +247,7 @@ const AttachDialog: React.FC<{
                   {busy === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Attach'}
                 </Button>
               </div>
+              </React.Fragment>
             ))}
           </div>
         )}

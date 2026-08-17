@@ -151,6 +151,22 @@ export interface FormatMoneyOptions {
   fallback?: string;
 }
 
+/**
+ * Just the currency SYMBOL, for an input prefix where the operator types the number themselves
+ * and `formatMoney` would format it out from under them. Lives here rather than beside the input,
+ * because a second `Intl.NumberFormat({ style: 'currency' })` in the codebase is the drift this
+ * module exists to prevent (#329). Falls back to the code itself for an unknown currency.
+ */
+export function currencySymbol(currency = 'EUR'): string {
+  try {
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency', currency: currency || 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0,
+    }).formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
 export function formatMoney(
   value: number | null | undefined,
   currency = 'EUR',

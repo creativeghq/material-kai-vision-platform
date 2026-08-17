@@ -55,6 +55,8 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   const { enabled: stockEnabled } = useModule('stock');
   const { enabled: emailMarketingEnabled } = useModule('email-marketing');
   const { enabled: realEstateEnabled } = useModule('real-estate');
+  const { enabled: quotesEnabled } = useModule('quotes');
+  const { enabled: salesFinanceEnabled } = useModule('sales-finance');
 
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
@@ -72,7 +74,9 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
     stock: stockEnabled,
     'email-marketing': emailMarketingEnabled,
     'real-estate': realEstateEnabled,
-  }), [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled]);
+    quotes: quotesEnabled,
+    'sales-finance': salesFinanceEnabled,
+  }), [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled, quotesEnabled, salesFinanceEnabled]);
 
   const offerableRoles = useMemo(() => WORKSPACE_INVITE_ROLES.filter((r) => {
     const slug = WORKSPACE_ROLE_META[r].requiresModule as RoleModuleSlug | undefined;

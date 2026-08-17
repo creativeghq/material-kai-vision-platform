@@ -1,15 +1,28 @@
 /**
  * Snags (punch list) + site visit log — WS4 (#285).
  *
- * Photos are stored as `generation-images` OBJECT PATHS on an array column, never as URLs
- * (pipeline convention 7 — persisted URLs expire, re-deriving is free). Both arrays are registered
- * in `build_storage_reference_set()`, so `storage-orphan-cleanup-cron` leaves the blobs alone.
+ * Photos are stored as OBJECT PATHS on an array column, never as URLs (pipeline convention 7 —
+ * persisted URLs expire, re-deriving is free). Both arrays are registered in
+ * `build_storage_reference_set()`, so `storage-orphan-cleanup-cron` leaves the blobs alone.
  * Deleting a snag drops its paths out of that set and the cron reclaims them — cleanup is GC-based,
  * not trigger-based (docs/storage-buckets.md).
+ *
+ * They live in the PRIVATE bucket. They used to go to `generation-images` and be rendered through
+ * `getPublicUrl()` — a defect photo of the inside of a client's home, and the dated site log that
+ * is "internal only and has no collaborator read policy at all", served to anyone holding the URL
+ * with no session at all (#358 PQ-9). Same treatment as real-estate `property-media`: private
+ * bucket, signed URL minted per read. Routing is path-based, so the feature identity is the
+ * top-level `project-site/` folder, not the bucket name (docs/storage-buckets.md).
  */
 import { supabase } from '@/integrations/supabase/client';
 
-const SITE_PHOTO_BUCKET = 'generation-images';
+const SITE_PHOTO_BUCKET = 'pdf-documents';
+const SITE_PHOTO_PREFIX = 'project-site';
+/** Signed-URL lifetime for a rendered photo. Matches property-media's 1h. */
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+/** Upload guards. The bucket accepts far more than this surface should send. */
+const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 export type SnagStatus = 'open' | 'in_progress' | 'fixed' | 'verified' | 'wont_fix';
 export type SnagSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -75,8 +88,17 @@ async function uploadPhotos(prefix: string, files: File[]): Promise<string[]> {
   if (!user) throw new Error('Not authenticated');
   const paths: string[] = [];
   for (const file of files) {
+    // Validated before the upload, not after: a 300 MB video named .jpg is a storage bill and a
+    // render nobody asked for (#358 PQ-9). The message names the file — with a multi-select the
+    // operator otherwise cannot tell which one was rejected.
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      throw new Error(`"${file.name}" is a ${file.type || 'unknown'} file — site photos must be JPEG, PNG, WebP or HEIC.`);
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      throw new Error(`"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_PHOTO_BYTES / 1024 / 1024} MB.`);
+    }
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const path = `u/${user.id}/${prefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
+    const path = `${SITE_PHOTO_PREFIX}/${prefix}/${user.id}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
     const { data, error } = await supabase.storage.from(SITE_PHOTO_BUCKET).upload(path, file, { upsert: false });
     if (error || !data) throw error ?? new Error('Upload failed');
     paths.push(data.path);
@@ -85,9 +107,26 @@ async function uploadPhotos(prefix: string, files: File[]): Promise<string[]> {
 }
 
 export const siteService = {
-  /** Public URL for a stored photo path. Derived on read; never persisted. */
-  photoUrl(path: string): string {
-    return supabase.storage.from(SITE_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+  /**
+   * Short-lived signed URLs for stored photo paths, keyed by path. Derived on read; never
+   * persisted. A path that cannot be signed is simply absent from the map — the caller renders a
+   * placeholder rather than a broken image.
+   */
+  async photoUrls(paths: string[]): Promise<Record<string, string>> {
+    const unique = [...new Set(paths.filter(Boolean))];
+    if (unique.length === 0) return {};
+    const { data, error } = await supabase.storage
+      .from(SITE_PHOTO_BUCKET)
+      .createSignedUrls(unique, SIGNED_URL_TTL_SECONDS);
+    if (error) {
+      console.error('[siteService] could not sign site photo URLs:', error);
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const row of data ?? []) {
+      if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
+    }
+    return out;
   },
 
   // ---------- snags ----------

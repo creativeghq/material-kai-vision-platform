@@ -82,12 +82,15 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
   quote: {
     label: 'Quote',
     plural: 'Quotes',
-    description: 'A ready-made proposal — sections, line items, margin and deposit terms.',
+    description: 'A ready-made proposal — sections, line items and deposit terms.',
     sourceTable: 'quotes',
     capability: 'quotes.use',
     moduleSlug: 'quotes',
     captureFields: [
-      'name', 'notes', 'custom_request_text', 'currency', 'vat_rate', 'margin_pct',
+      // Deliberately absent: the applied markup. It lives in `quote_costs`, which only the sell
+      // side can read (#358 PQ-2) — and a stored template payload is untrusted input, so a
+      // capture field is also an apply field.
+      'name', 'notes', 'custom_request_text', 'currency', 'vat_rate',
       'deposit_pct', 'cash_discount_pct',
     ],
     captureChildren: [{
@@ -105,7 +108,6 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       { key: 'name', label: 'Default quote name', kind: 'text' },
       { key: 'notes', label: 'Notes', kind: 'textarea' },
       { key: 'vat_rate', label: 'VAT rate (%)', kind: 'number' },
-      { key: 'margin_pct', label: 'Margin (%)', kind: 'number' },
       { key: 'deposit_pct', label: 'Deposit (%)', kind: 'number' },
     ],
   },

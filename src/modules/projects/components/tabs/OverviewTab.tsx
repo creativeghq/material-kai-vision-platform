@@ -46,11 +46,16 @@ const daysUntil = (date: string | null) => {
 export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true }) => {
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>([]);
+  const [roomBudgetFailed, setRoomBudgetFailed] = useState(false);
   const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
 
   useEffect(() => {
     projectsService.listRooms(project.id).then(setRooms).catch(() => {});
-    projectsService.getRoomBudgetSummary(project.id).then(setRoomBudget).catch(() => {});
+    // A failed rollup is "spend unknown", never "nothing spent" — an empty array renders every
+    // room at zero against its budget, which reads as good news (#358 PQ-6).
+    projectsService.getRoomBudgetSummary(project.id)
+      .then((rows) => { setRoomBudget(rows); setRoomBudgetFailed(false); })
+      .catch((err) => { console.error('[OverviewTab] room budget rollup failed:', err); setRoomBudgetFailed(true); });
     projectsService.listTasks(project.id).then(setTasks).catch(() => {});
   }, [project.id]);
 
@@ -212,7 +217,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
         </Card>
       )}
 
-      {hasMeaningfulRoomBudget && isOwner && (
+      {roomBudgetFailed && isOwner && (
+        <Card className="dashboard-card lg:col-span-2">
+          <CardContent className="py-6 text-sm text-amber-400">
+            Budget by room could not be loaded. Spend against each room is unknown — this is not
+            the same as nothing having been spent.
+          </CardContent>
+        </Card>
+      )}
+
+      {hasMeaningfulRoomBudget && isOwner && !roomBudgetFailed && (
         <Card className="dashboard-card lg:col-span-2">
           <CardHeader>
             <CardTitle className="font-medium flex items-center gap-2">

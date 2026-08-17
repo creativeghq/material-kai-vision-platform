@@ -128,7 +128,6 @@ export interface QuoteTemplatePayload {
   custom_request_text?: string | null;
   currency?: string | null;
   vat_rate?: number | null;
-  margin_pct?: number | null;
   deposit_pct?: number | null;
   cash_discount_pct?: number | null;
   quote_items?: Record<string, unknown>[];
@@ -150,7 +149,6 @@ export const quoteAdapter: TemplateAdapter<QuoteTemplatePayload> = {
         custom_request_text: str(payload.custom_request_text),
         currency: str(payload.currency) ?? 'EUR',
         vat_rate: payload.vat_rate != null ? num(payload.vat_rate) : null,
-        margin_pct: payload.margin_pct != null ? num(payload.margin_pct) : null,
         deposit_pct: depositPct(payload.deposit_pct),
         cash_discount_pct: payload.cash_discount_pct != null ? num(payload.cash_discount_pct) : null,
         project_id: ctx.projectId ?? null,

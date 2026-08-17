@@ -94,7 +94,7 @@ class QuotePDFService {
    */
   async saveItemPrices(
     quoteId: string,
-    items: { id: string; unit_price: number; discounted_price?: number | null; line_total: number }[],
+    items: { id: string; unit_price: number; discounted_price?: number | null }[],
     vatRate: number,
   ): Promise<{ success: boolean; error?: string }> {
     // ONE statement, ONE transaction, and the totals come back DERIVED.
@@ -110,13 +110,15 @@ class QuotePDFService {
     //    financeService.getActiveCashDiscountPct, and folded in no extras at all.
     // reprice_quote_items applies every line or none, then restamps the quote from
     // get_quote_totals() — the single SQL source. TypeScript no longer derives any of it.
+    //  - #358 PQ-6: it still SENT `line_total`, so the server stored the number the browser had
+    //    computed. `quote_items.line_total` is now a generated column and the payload carries
+    //    only the two prices the operator actually typed.
     const { data, error } = await supabase.rpc('reprice_quote_items', {
       p_quote_id: quoteId,
       p_items: items.map((i) => ({
         id: i.id,
         unit_price: i.unit_price,
         discounted_price: i.discounted_price ?? null,
-        line_total: i.line_total,
       })),
       p_vat_rate: vatRate,
     });

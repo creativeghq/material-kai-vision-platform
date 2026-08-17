@@ -77,6 +77,10 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
   const [page, setPage] = useState(1);
   const [inbox, setInbox] = useState<UnquotedRequest[]>([]);
+  // A failed load is NOT an empty inbox. The section below renders only when there are rows, so a
+  // read error read as "nothing is waiting" — which a sales team acts on by doing nothing (#358
+  // PQ-8). The failure gets its own visible state.
+  const [inboxError, setInboxError] = useState<string | null>(null);
 
   // Slide-out panels state
   const [showTimelinePanel, setShowTimelinePanel] = useState(false);
@@ -99,10 +103,14 @@ export const QuoteRequestsAdmin: React.FC = () => {
   // Keyed on the workspace: the inbox is workspace-scoped, and on first paint activeWorkspaceId is
   // still resolving, so loading it alongside the rest would query with undefined and show nothing.
   useEffect(() => {
-    if (!activeWorkspaceId) { setInbox([]); return; }
+    if (!activeWorkspaceId) { setInbox([]); setInboxError(null); return; }
     quotesService.listUnquotedRequests(activeWorkspaceId)
-      .then(setInbox)
-      .catch((e) => console.error('Error loading incoming requests:', e));
+      .then((rows) => { setInbox(rows); setInboxError(null); })
+      .catch((e) => {
+        console.error('Error loading incoming requests:', e);
+        setInbox([]);
+        setInboxError(e instanceof Error ? e.message : 'Could not load incoming requests.');
+      });
   }, [activeWorkspaceId]);
 
   const loadQuoteRequests = async () => {
@@ -361,6 +369,13 @@ export const QuoteRequestsAdmin: React.FC = () => {
           section every day teaches people to skip past it, and then it is invisible again on the
           day it is not empty.
         */}
+        {inboxError && (
+          <div className="dashboard-card p-4 mb-4 text-sm text-amber-400">
+            Incoming requests could not be loaded ({inboxError}). This is not the same as there
+            being none waiting — reload before assuming the inbox is empty.
+          </div>
+        )}
+
         {inbox.length > 0 && (
           <>
             <SectionHeader

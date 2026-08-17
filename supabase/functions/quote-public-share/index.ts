@@ -44,7 +44,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // Validate the token + that sharing is currently enabled.
   const { data: quote, error } = await supabase
     .from('quotes')
-    .select('id, name, quote_number, status, currency, subtotal, vat_rate, vat_amount, grand_total, extras_total, cash_discount_pct, expires_at, created_at, pdf_storage_path, public_share_enabled, customer_company_id, customer_contact_id, workspace_id')
+    .select('id, name, quote_number, status, currency, vat_rate, cash_discount_pct, expires_at, created_at, pdf_storage_path, public_share_enabled, customer_company_id, customer_contact_id, workspace_id')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -58,6 +58,14 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     .select('id, product_id, quantity, selected_size, selected_color, unit_price, discounted_price, line_total, custom_product_name, custom_unit, room, dimensions, products ( name, sku )')
     .eq('quote_id', quote.id)
     .order('added_at', { ascending: true });
+
+  // The one derivation of this quote's money. Fetched here rather than at render time because the
+  // signature hash below has to cover the SAME numbers the signer was shown (#358 PQ-6).
+  const { data: totalsRows } = await supabase.rpc('get_quote_totals', { p_quote_ids: [quote.id] });
+  const totals = (Array.isArray(totalsRows) ? totalsRows[0] : null) as {
+    subtotal?: number; cash_discount_pct?: number; extras_total?: number;
+    vat_rate?: number; vat_amount?: number; grand_total?: number;
+  } | null;
 
   const items = (rawItems ?? []).map((it: any) => {
     const product = it.products;
@@ -108,8 +116,8 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     }
     const canonical = JSON.stringify({
       id: quote.id,
-      grand_total: quote.grand_total,
-      subtotal: quote.subtotal,
+      grand_total: totals?.grand_total ?? null,
+      subtotal: totals?.subtotal ?? null,
       items: (rawItems ?? []).map((it: any) => [it.id, it.line_total]),
     });
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
@@ -348,12 +356,16 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       signed_by,
       signed_at,
       currency: quote.currency || 'EUR',
-      subtotal: quote.subtotal != null ? Number(quote.subtotal) : null,
-      vat_rate: quote.vat_rate != null ? Number(quote.vat_rate) : null,
-      vat_amount: quote.vat_amount != null ? Number(quote.vat_amount) : null,
-      grand_total: quote.grand_total != null ? Number(quote.grand_total) : null,
-      extras_total: quote.extras_total != null ? Number(quote.extras_total) : null,
-      cash_discount_pct: quote.cash_discount_pct != null ? Number(quote.cash_discount_pct) : 0,
+      // DERIVED, not the stamped columns on the quote row: `get_quote_totals` is the single source
+      // for quote money, and the row's cached copies are only as fresh as the last reprice. The
+      // page a customer signs must not show a figure the invoice will disagree with (#358 PQ-6).
+      subtotal: totals?.subtotal != null ? Number(totals.subtotal) : null,
+      vat_rate: totals?.vat_rate != null ? Number(totals.vat_rate) : (quote.vat_rate != null ? Number(quote.vat_rate) : null),
+      vat_amount: totals?.vat_amount != null ? Number(totals.vat_amount) : null,
+      grand_total: totals?.grand_total != null ? Number(totals.grand_total) : null,
+      extras_total: totals?.extras_total != null ? Number(totals.extras_total) : null,
+      cash_discount_pct: totals?.cash_discount_pct != null ? Number(totals.cash_discount_pct)
+        : (quote.cash_discount_pct != null ? Number(quote.cash_discount_pct) : 0),
       prices_vat_inclusive,
       expires_at: quote.expires_at,
       created_at: quote.created_at,

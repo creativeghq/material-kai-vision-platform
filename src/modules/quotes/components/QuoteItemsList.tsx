@@ -16,7 +16,7 @@ import {
 } from '@/utils/productMetadata';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { usePermissions } from '@/hooks/usePermissions';
-import { parseDecimal } from '@/utils/decimal';
+import { parseDecimal, formatMoney, currencySymbol } from '@/utils/decimal';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
@@ -28,8 +28,9 @@ const extractSizeFromNotes = (notes?: string | null): string | null => {
   return match ? match[1].trim() : null;
 };
 
-const fmtPrice = (v: number | undefined | null) =>
-  v != null ? `€${Number(v).toFixed(2)}` : '—';
+// The canonical money formatter, given the QUOTE's currency. This was `€${v.toFixed(2)}` — a
+// local twin that stamped euros on every line of a quote priced in anything else (#358 PQ-11).
+const fmtPrice = (v: number | undefined | null, currency: string) => formatMoney(v, currency);
 
 interface QuoteItemsListProps {
   items: QuoteItemWithProduct[];
@@ -59,6 +60,8 @@ interface QuoteItemsListProps {
   customerContactId?: string | null;
   /** Reload the items after an upstream RFQ is sent (lines flip to awaiting_supplier). */
   onRefresh?: () => void | Promise<void>;
+  /** The parent quote's currency. Every figure on a line is in it — never assumed to be EUR. */
+  currency?: string | null;
 }
 
 // Convert quote product to display product format.
@@ -132,7 +135,9 @@ const PriceCell: React.FC<{
   placeholder?: string;
   onSave: (v: number | null) => void;
   highlight?: boolean;
-}> = ({ value, editable, onSave, highlight }) => {
+  /** The quote's currency — the prefix and the read-only rendering both use it. */
+  currency: string;
+}> = ({ value, editable, onSave, highlight, currency }) => {
   const [local, setLocal] = useState(value != null ? String(value) : '');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -144,7 +149,7 @@ const PriceCell: React.FC<{
   if (!editable) {
     return (
       <span className={`text-sm ${highlight ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
-        {fmtPrice(value)}
+        {fmtPrice(value, currency)}
       </span>
     );
   }
@@ -152,7 +157,7 @@ const PriceCell: React.FC<{
   return (
     <div className="flex items-center justify-end">
       <div className="relative">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">€</span>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{currencySymbol(currency)}</span>
         <Input
           ref={inputRef}
           type="text"
@@ -188,7 +193,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   customerCompanyId,
   customerContactId,
   onRefresh,
+  currency: quoteCurrency,
 }) => {
+  // Every figure on a line is in the QUOTE's currency. Defaulted, not assumed: a caller that has
+  // not been given one still renders consistently, and the ones that have pass it (#358 PQ-11).
+  const currency = quoteCurrency || 'EUR';
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
@@ -503,23 +512,25 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 <PriceCell
                                   value={item.unit_price}
                                   editable
+                                  currency={currency}
                                   onSave={v => handlePriceSave(item.id, 'unit_price', v)}
                                 />
                                 <PriceCell
                                   value={(item as any).discounted_price}
                                   editable
                                   placeholder="Disc."
+                                  currency={currency}
                                   onSave={v => handlePriceSave(item.id, 'discounted_price', v)}
                                   highlight={hasDiscount}
                                 />
                               </div>
                             ) : hasDiscount ? (
                               <div>
-                                <span className="text-xs text-muted-foreground line-through">{fmtPrice(item.unit_price)}</span>
-                                <div className="text-sm font-semibold text-primary">{fmtPrice((item as any).discounted_price)}</div>
+                                <span className="text-xs text-muted-foreground line-through">{fmtPrice(item.unit_price, currency)}</span>
+                                <div className="text-sm font-semibold text-primary">{fmtPrice((item as any).discounted_price, currency)}</div>
                               </div>
                             ) : (
-                              <span className="text-sm">{fmtPrice(item.unit_price)}</span>
+                              <span className="text-sm">{fmtPrice(item.unit_price, currency)}</span>
                             )}
                             {/* seller-only breakdown: retail anchor, discount off retail, margin (ex-VAT). */}
                             {editPricing && (() => {
@@ -530,7 +541,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               const off = retail != null && final != null && retail > 0 ? Math.round((1 - final / retail) * 100) : null;
                               const marginPct = cost != null && final != null && cost > 0 ? Math.round(((final - cost) / cost) * 100) : null;
                               const parts: string[] = [];
-                              if (retail != null && off != null && off > 0) parts.push(`Retail ${fmtPrice(retail)} · ${off}% off`);
+                              if (retail != null && off != null && off > 0) parts.push(`Retail ${fmtPrice(retail, currency)} · ${off}% off`);
                               if (showMargin && marginPct != null) parts.push(`margin ${marginPct}%`);
                               if (parts.length === 0) return null;
                               return (
@@ -578,11 +589,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                         {showPricing && (
                           <td className="px-4 py-3 text-right">
                             <span className="text-sm font-semibold">
-                              {callForPrice ? '—' : fmtPrice(displayTotal)}
+                              {callForPrice ? '—' : fmtPrice(displayTotal, currency)}
                             </span>
                             {hasDiscount && item.unit_price != null && (
                               <div className="text-xs text-muted-foreground line-through">
-                                {fmtPrice(Number(item.unit_price) * item.quantity)}
+                                {fmtPrice(Number(item.unit_price) * item.quantity, currency)}
                               </div>
                             )}
                             {/* internal-only per-line margin: (price − cost) × qty. */}
@@ -595,7 +606,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               const below = marginValue < 0;
                               return (
                                 <div className={`mt-0.5 text-[10px] ${below ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                  {below ? 'below cost ' : 'margin '}{fmtPrice(marginValue)}{marginPct != null ? ` · ${marginPct}%` : ''}
+                                  {below ? 'below cost ' : 'margin '}{fmtPrice(marginValue, currency)}{marginPct != null ? ` · ${marginPct}%` : ''}
                                 </div>
                               );
                             })()}

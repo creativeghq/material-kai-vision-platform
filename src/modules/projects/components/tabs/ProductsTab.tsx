@@ -83,7 +83,12 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
 
   const saveSold = async (id: string, value: string) => {
     const sold = value.trim() === '' ? null : Number(value);
-    if (sold != null && !Number.isFinite(sold)) return;
+    // A price is a non-negative number or it is nothing. "-50" and "1e9" are both valid `number`s,
+    // which is exactly why nothing downstream catches them (#358 PQ-14).
+    if (sold != null && (!Number.isFinite(sold) || sold < 0)) {
+      toast({ title: 'Enter a price of 0 or more', variant: 'destructive' });
+      return;
+    }
     setBusy(id);
     try {
       await projectsService.updateProjectProduct(id, { sold_price: sold });
@@ -193,7 +198,7 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
               <div className="w-[120px]">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Sold</Label>
                 <Input
-                  type="number" step="0.01" defaultValue={r.sold_price ?? ''}
+                  type="number" min="0" step="0.01" defaultValue={r.sold_price ?? ''}
                   className="h-8" placeholder="—"
                   onBlur={(e) => { if (String(r.sold_price ?? '') !== e.target.value) saveSold(r.id, e.target.value); }}
                 />
@@ -268,21 +273,30 @@ const AddProductDialog: React.FC<{
   }, []);
 
   const add = async () => {
+    const sold = soldPrice.trim() === '' ? null : Number(soldPrice);
+    if (sold != null && (!Number.isFinite(sold) || sold < 0)) {
+      toast({ title: 'Enter a sold price of 0 or more', variant: 'destructive' }); return;
+    }
+    // Quantity was `Number(qty) || 1`, which turned "-3" into -3 and "0" into 1 — a line that
+    // subtracts from the project, or one that silently disagrees with what was typed.
+    const quantity = Number(qty);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      toast({ title: 'Quantity must be greater than zero', variant: 'destructive' }); return;
+    }
     setBusy(true);
     try {
-      const sold = soldPrice.trim() === '' ? null : Number(soldPrice);
       if (tab === 'catalog') {
         if (!picked) { toast({ title: 'Pick a product', variant: 'destructive' }); setBusy(false); return; }
         await projectsService.addProjectProduct({
           project_id: projectId, workspace_id: workspaceId, product_id: picked.id,
-          quantity: Number(qty) || 1, sold_price: sold,
+          quantity, sold_price: sold,
         });
       } else {
         if (!customName.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); setBusy(false); return; }
         await projectsService.addProjectProduct({
           project_id: projectId, workspace_id: workspaceId,
           custom_name: customName.trim(), custom_sku: customSku.trim() || null,
-          quantity: Number(qty) || 1, sold_price: sold, price_source: 'manual',
+          quantity, sold_price: sold, price_source: 'manual',
         });
       }
       toast({ title: 'Product added' });
@@ -342,8 +356,8 @@ const AddProductDialog: React.FC<{
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1"><Label>Quantity</Label><Input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Sold price (optional)</Label><Input type="number" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder="—" /></div>
+          <div className="space-y-1"><Label>Quantity</Label><Input type="number" min="1" step="1" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Sold price (optional)</Label><Input type="number" min="0" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder="—" /></div>
         </div>
 
         <DialogFooter>
