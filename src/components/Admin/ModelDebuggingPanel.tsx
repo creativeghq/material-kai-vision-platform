@@ -37,6 +37,7 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 // Relocated here from its orphaned /admin/3d-suggestions route.
 import { MaterialSuggestionsPanel } from './MaterialSuggestionsPanel';
 import { formatDate } from '@/utils/datetime';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ModelLog {
   id: string;
@@ -279,76 +280,91 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
     }
   };
 
-  const testModel = async (modelName: string) => {
+  /**
+   * Read the REAL probe result for these models. (#365 AD-24)
+   *
+   * What this replaced: a 2-second `setTimeout`, after which the panel wrote
+   * `status: 'working'`, `successRate: 100` and `avgDuration: Math.random() * 10 + 3` into its
+   * own state, persisted that to localStorage, and raised a toast reading "test completed
+   * successfully". No request was made to anything. The duration was a random number presented as
+   * a measurement, and the 100% was a success rate for a test that never ran — on the screen an
+   * operator opens specifically to find out whether a model is broken.
+   *
+   * It was also a duplicate. `model-health-check-agent` genuinely probes these models and writes
+   * `generation_models.last_probe_at / last_probe_status / last_probe_error`, and
+   * `GenerationProviderHealth` already renders it. So this panel now reads the same source
+   * instead of inventing a second, fictional one — and when a model has never been probed it says
+   * exactly that rather than calling it working.
+   */
+  const refreshProbeStatus = async () => {
     setIsLoading(true);
     try {
-      // This would call the actual 3D generation API
-      // For now, we'll simulate the test
-      toast({
-        title: 'Testing Model',
-        description: `Starting test for ${modelName}...`,
-      });
+      const { data, error } = await supabase
+        .from('generation_models')
+        .select('id, display_name, last_probe_at, last_probe_status, last_probe_error');
+      if (error) throw error;
 
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      type ProbeRow = {
+        id: string;
+        last_probe_at: string | null;
+        last_probe_status: string | null;
+        last_probe_error: string | null;
+      };
+      const byId = new Map<string, ProbeRow>(
+        ((data ?? []) as unknown as ProbeRow[]).map((r) => [String(r.id), r]),
+      );
 
-      // Update model status (this would be based on actual API response)
       setModels((prev) => {
-        const updated = prev.map((model) =>
-          model.name === modelName
-            ? {
-                ...model,
-                status: 'working' as const,
-                lastTested: new Date().toISOString(),
-                successRate: 100,
-                avgDuration: Math.random() * 10 + 3,
-                recentLogs: [
-                  {
-                    id: Date.now().toString(),
-                    timestamp: new Date().toISOString(),
-                    model: modelName,
-                    status: 'success' as const,
-                    duration: Math.random() * 10 + 3,
-                  },
-                  ...model.recentLogs.slice(0, 4),
-                ],
-              }
-            : model,
-        );
-        // Save to localStorage
+        const updated = prev.map((model) => {
+          const probe = byId.get(model.name);
+          if (!probe) {
+            // No registry row at all. Not "untested" as an optimistic default — this panel does
+            // not know what this model is.
+            return { ...model, status: 'untested' as const, lastTested: undefined, successRate: undefined, avgDuration: undefined };
+          }
+          const probeStatus = probe.last_probe_status;
+          const probedAt = probe.last_probe_at;
+          return {
+            ...model,
+            status: !probedAt ? ('untested' as const)
+              : probeStatus === 'ok' ? ('working' as const)
+              : ('failing' as const),
+            lastTested: probedAt ?? undefined,
+            // Deliberately left undefined. The probe records an outcome, not a success RATE or a
+            // duration, and inventing either is what this fix removes.
+            successRate: undefined,
+            avgDuration: undefined,
+            recentLogs: probedAt
+              ? [{
+                  id: `${model.name}-${probedAt}`,
+                  timestamp: probedAt,
+                  model: model.name,
+                  status: (probeStatus === 'ok' ? 'success' : 'error') as 'success' | 'error',
+                  errorMessage: probe.last_probe_error ?? undefined,
+                }]
+              : [],
+          };
+        });
         localStorage.setItem('model-debugging-status', JSON.stringify(updated));
         return updated;
       });
 
+      const neverProbed = ((data ?? []) as unknown as ProbeRow[]).filter((r) => !r.last_probe_at).length;
       toast({
-        title: 'Test Complete',
-        description: `${modelName} test completed successfully`,
+        title: 'Probe status refreshed',
+        description: neverProbed > 0
+          ? `${neverProbed} model(s) have never been probed — shown as untested, not as working.`
+          : 'Showing the latest recorded probe for each model.',
       });
-    } catch {
+    } catch (e) {
       toast({
-        title: 'Test Failed',
-        description: `Failed to test ${modelName}`,
+        title: 'Could not read probe status',
+        description: e instanceof Error ? e.message : 'Unknown error',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const testAllModels = async () => {
-    setIsLoading(true);
-    toast({
-      title: 'Testing All Models',
-      description: 'Running comprehensive test suite...',
-    });
-
-    // Simulate testing all models
-    for (const model of models) {
-      await testModel(model.name);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-
-    setIsLoading(false);
   };
 
   const copyToClipboard = (text: string) => {
@@ -389,15 +405,15 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
         {/* Header Actions */}
         <div className="flex justify-end">
           <Button
-            onClick={testAllModels}
-            onKeyDown={(e) => e.key === 'Enter' && testAllModels()}
+            onClick={refreshProbeStatus}
+            onKeyDown={(e) => e.key === 'Enter' && refreshProbeStatus()}
             disabled={isLoading}
             className="flex items-center gap-2"
           >
             <RefreshCw
               className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
             />
-            Test all models
+            Refresh probe status
           </Button>
         </div>
 
@@ -585,9 +601,9 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                           <div className="flex gap-2">
                             <Button
                               className="h-8 px-3 text-sm flex items-center gap-1"
-                              onClick={() => testModel(model.name)}
+                              onClick={() => refreshProbeStatus()}
                               onKeyDown={(e) =>
-                                e.key === 'Enter' && testModel(model.name)
+                                e.key === 'Enter' && refreshProbeStatus()
                               }
                               disabled={isLoading}
                             >

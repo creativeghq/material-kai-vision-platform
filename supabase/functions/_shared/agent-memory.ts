@@ -440,7 +440,13 @@ export class AgentMemory {
       if (!vec) continue;
       const { error } = await this.supabase
         .from('agent_memories')
-        .update({ embedding: toVectorLiteral(vec), embedding_model: 'voyage-4', updated_at: new Date().toISOString() })
+        // `embedding_model` is read FROM the generator, never asserted here. It used to be the
+        // literal 'voyage-4' regardless of what actually produced the vector, so the day the
+        // embedder changes, every row would keep claiming a space it is no longer in — and a
+        // same-dimension model is the same SHAPE in a different SPACE, which ranks confidently
+        // and wrongly with nothing raising. The column has to be able to disagree with our
+        // expectation, or it is decoration. (#365 AD-18)
+        .update({ embedding: toVectorLiteral(vec), embedding_model: await embeddingModelName(), updated_at: new Date().toISOString() })
         .eq('id', row.id);
       if (error) console.warn('[agent-memory] embedding write failed:', error.message);
       else embedded++;
@@ -489,6 +495,25 @@ export class AgentMemory {
 }
 
 // ── pure helpers (exported for the guard test) ────────────────────────────────
+
+/**
+ * The model that ACTUALLY produced our vectors, read from the embedding layer's own config rather
+ * than restated here. Restating it is the bug: the two copies cannot disagree loudly, so the day
+ * the embedder changes the column keeps asserting the old space.
+ *
+ * Dynamically imported for the same reason `embed()` is — embedding-utils captures MIVAA_API_KEY
+ * at module load, and agent-chat's initRuntime() runs before secrets are bootstrapped. Falls back
+ * to null rather than to a guess: an unknown model recorded as 'voyage-4' is exactly the assertion
+ * this is removing.
+ */
+async function embeddingModelName(): Promise<string | null> {
+  try {
+    const { EMBEDDING_CONFIG } = await import('./embedding-utils.ts');
+    return EMBEDDING_CONFIG.model ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** pgvector literal. `[0.1,0.2,…]` — the only accepted text form for halfvec. */
 export function toVectorLiteral(vec: number[]): string {

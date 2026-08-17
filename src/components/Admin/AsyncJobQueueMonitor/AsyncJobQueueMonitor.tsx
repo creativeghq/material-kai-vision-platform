@@ -230,8 +230,50 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   // Fetch job details with checkpoints
+  /**
+   * Recorded AI spend for the open job. `null` = not loaded yet, `[]` = loaded and there is none.
+   * The distinction is the whole point: an empty array renders "no spend recorded" rather than
+   * $0.0000, because those mean different things. (#365 AD-11)
+   */
+  interface JobSpendRow {
+    model_name: string;
+    calls: number;
+    billed_usd: number;
+    input_tokens: number;
+    output_tokens: number;
+    failed: number;
+  }
+
+  const fetchJobAiSpend = async (jobId: string) => {
+    setJobAiSpend(null);
+    const { data, error } = await supabase
+      .from('ai_usage_logs')
+      .select('model_name, billed_cost_usd, input_tokens, output_tokens, metadata')
+      .eq('job_id', jobId);
+    if (error) {
+      console.warn('[AsyncJobQueueMonitor] job spend lookup failed:', error);
+      setJobAiSpend([]);
+      return;
+    }
+    const byModel = new Map<string, JobSpendRow>();
+    for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+      const key = String(r.model_name ?? 'unknown');
+      const row = byModel.get(key) ?? {
+        model_name: key, calls: 0, billed_usd: 0, input_tokens: 0, output_tokens: 0, failed: 0,
+      };
+      row.calls += 1;
+      row.billed_usd += Number(r.billed_cost_usd) || 0;
+      row.input_tokens += Number(r.input_tokens) || 0;
+      row.output_tokens += Number(r.output_tokens) || 0;
+      if ((r.metadata as Record<string, unknown> | null)?.success === false) row.failed += 1;
+      byModel.set(key, row);
+    }
+    setJobAiSpend([...byModel.values()].sort((a, b) => b.billed_usd - a.billed_usd));
+  };
+
   const fetchJobDetails = async (job: BackgroundJob) => {
     setPipelineValidationResult(null);
+    void fetchJobAiSpend(job.id);
     try {
       setLoadingCheckpoints(true);
 
@@ -961,21 +1003,53 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
-  const handleCancelJob = async (jobId: string) => {
-    if (!confirm('Are you sure you want to cancel this job? All partial data (chunks, embeddings, images, products, files) will be deleted. This action cannot be undone.')) {
-      return;
-    }
+  /**
+   * Cancel + purge. Two guards, because this deletes products, chunks, images and files and
+   * cannot be undone (#365 AD-10).
+   *
+   * 1. LATCH BEFORE THE PROMPT, not after. The old order was confirm → setCancellingJob, and the
+   *    button's `disabled` only reacts to that state — so a double-click opened two dialogs while
+   *    the button was still enabled, and confirming both ran the purge twice. The ref is checked
+   *    and set synchronously, so the second click returns before it can prompt; React state alone
+   *    cannot do this because the re-render has not happened yet.
+   *
+   * 2. THE STATUS TRANSITION IS THE LOCK. The update is conditioned on the job still being in a
+   *    cancellable state and returns the rows it changed. Zero rows means the job finished (or
+   *    someone else cancelled it) between the operator reading the screen and pressing the button
+   *    — and the old code would have gone on to delete a COMPLETED job's products anyway, because
+   *    it wrote `status: 'cancelled'` unconditionally and never looked at the result.
+   */
+  const [jobAiSpend, setJobAiSpend] = useState<JobSpendRow[] | null>(null);
+  const cancelInFlight = React.useRef<Set<string>>(new Set());
+  const deleteInFlight = React.useRef<Set<string>>(new Set());
 
-    setCancellingJob(jobId);
+  const handleCancelJob = async (jobId: string) => {
+    if (cancelInFlight.current.has(jobId)) return;
+    cancelInFlight.current.add(jobId);
     try {
-      // Mark as cancelled first
-      await supabase
+      if (!confirm('Are you sure you want to cancel this job? All partial data (chunks, embeddings, images, products, files) will be deleted. This action cannot be undone.')) {
+        return;
+      }
+
+      setCancellingJob(jobId);
+      // Conditional transition — this IS the lock. Only a job that is still running can be
+      // cancelled, and the row count tells us whether we won the race.
+      const CANCELLABLE = ['pending', 'processing', 'retrying', 'interrupted'];
+      const { data: claimed, error: claimError } = await supabase
         .from('background_jobs')
-        .update({
-          status: 'cancelled',
-          error: 'Job cancelled by user',
-        })
-        .eq('id', jobId);
+        .update({ status: 'cancelled', error: 'Job cancelled by user' })
+        .eq('id', jobId)
+        .in('status', CANCELLABLE)
+        .select('id, status');
+
+      if (claimError) throw claimError;
+      if (!claimed || claimed.length === 0) {
+        // Nothing was cancelled, so nothing may be deleted. Reporting success here and purging
+        // anyway is how a finished job loses its output.
+        toast.error('Job is no longer running — it finished or was already cancelled. Nothing was deleted.');
+        await fetchQueueData();
+        return;
+      }
 
       // Delete all related data using comprehensive cleanup
       const { stats } = await deleteJobWithAllData(jobId);
@@ -996,6 +1070,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       toast.error(`Failed to cancel job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setCancellingJob(null);
+      cancelInFlight.current.delete(jobId);
     }
   };
 
@@ -1159,7 +1234,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         failCount > 0 && `${failCount} failed`,
       ].filter(Boolean).join(', ');
 
-      toast.success(`Queue cleared: ${resultMessage}`);
+      // A janitor that reports success after partial failure is the documented reaper hazard:
+      // the operator reads "cleared", the rows are still there, and nothing ever revisits it.
+      // (#365 AD-29, same shape as the cron)
+      if (failCount > 0) {
+        toast.error(`Queue partially cleared: ${resultMessage}. ${failCount} job(s) could NOT be deleted — their data is still present.`);
+      } else {
+        toast.success(`Queue cleared: ${resultMessage}`);
+      }
     } catch (error) {
       console.error('Error clearing queue:', error);
       toast.error(`Failed to clear queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1175,13 +1257,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete job ${jobId}? This will delete ALL related data (products, chunks, images, etc.). This action cannot be undone.`)) {
-      return;
-    }
-
-    setDeletingJob(jobId);
+    // Latched synchronously, before the prompt — the button's `disabled` reads state that has not
+    // re-rendered yet, so without this a double-click opens two dialogs and purges twice. Same
+    // guard as handleCancelJob. (#365 AD-10)
+    if (deleteInFlight.current.has(jobId)) return;
+    deleteInFlight.current.add(jobId);
 
     try {
+      if (!confirm(`Are you sure you want to delete job ${jobId}? This will delete ALL related data (products, chunks, images, etc.). This action cannot be undone.`)) {
+        return;
+      }
+
+      setDeletingJob(jobId);
       // Use comprehensive cleanup function to delete ALL related data
       const { stats } = await deleteJobWithAllData(jobId);
 
@@ -1198,6 +1285,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setDeletingJob(null);
+      deleteInFlight.current.delete(jobId);
     }
   };
 
@@ -2786,7 +2874,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   const now = Date.now();
                   const lastHeartbeat = selectedJob.last_heartbeat ? new Date(selectedJob.last_heartbeat).getTime() : 0;
                   const heartbeatStaleMin = lastHeartbeat ? Math.floor((now - lastHeartbeat) / 60000) : 0;
-                  const processDead = lastHeartbeat > 0 && heartbeatStaleMin >= 2;
+
+                  // A stage that DECLARED itself slow is not stuck until it overruns its own
+                  // ceiling, +2 min grace. This is not a nicety — it is the exact rule
+                  // `auto-recovery-cron` applies before it restarts anything, and the two must
+                  // agree or the screen accuses a job the server is deliberately leaving alone.
+                  // Without it, every legitimate long PaddleOCR pass or SLIG fan-out renders
+                  // "process may be dead" and invites an operator to kill healthy work. (#365 AD-9)
+                  const slowOp = selectedJob.current_slow_operation as
+                    { operation?: string; started_at?: string; expected_max_seconds?: number } | null;
+                  const slowOpProtected = (() => {
+                    if (!slowOp?.started_at) return false;
+                    const ageSec = (now - new Date(slowOp.started_at).getTime()) / 1000;
+                    const capSec = (slowOp.expected_max_seconds || 300) + 120;
+                    return ageSec <= capSec;
+                  })();
+
+                  // `last_heartbeat` null means NEVER WRITTEN, which is not "fresh". The old
+                  // expression made `processDead` false in that case, so the else-branch below
+                  // rendered "Heartbeat <1m ago · alive" for a job that has never reported at all
+                  // — a green light for the absence of a signal. The server's fallback for this
+                  // case is `updated_at`, so use the same one.
+                  const neverBeat = lastHeartbeat === 0;
+                  const fallbackTs = selectedJob.updated_at ? new Date(selectedJob.updated_at).getTime() : 0;
+                  const fallbackStaleMin = fallbackTs ? Math.floor((now - fallbackTs) / 60000) : 0;
+                  const processDead = !slowOpProtected && (
+                    neverBeat ? (fallbackTs > 0 && fallbackStaleMin >= 30) : heartbeatStaleMin >= 2
+                  );
 
                   const latestStageTs = (() => {
                     const history = jobCheckpoints || [];
@@ -2818,7 +2932,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <div className="ml-auto flex items-center gap-1.5">
                         {processDead ? (
                           <Badge variant="outline" className="bg-orange-500/15 text-orange-300 border-orange-500/30 text-[10px]">
-                            Heartbeat stale {heartbeatStaleMin}m — process may be dead
+                            {neverBeat
+                              ? `No heartbeat ever · last change ${fallbackStaleMin}m ago`
+                              : `Heartbeat stale ${heartbeatStaleMin}m — process may be dead`}
+                          </Badge>
+                        ) : slowOpProtected ? (
+                          // Not "alive" — the heartbeat may well be stale. It says the SERVER is
+                          // deliberately not treating this as stuck, which is the thing an operator
+                          // about to press Cancel needs to know.
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[10px]">
+                            Long stage declared{slowOp?.operation ? ` (${slowOp.operation})` : ''} · not treated as stuck
+                          </Badge>
+                        ) : neverBeat ? (
+                          <Badge variant="outline" className="bg-muted text-muted-foreground text-[10px]">
+                            No heartbeat reported yet
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[10px]">
@@ -4228,140 +4355,97 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   <CardContent className="p-4">
                     <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">Quality</div>
                     <div className="text-2xl font-black text-foreground">
+                      {/* Was `: '94%'` — a literal, rendered as a measured quality score for every
+                          job that never produced one. A constructed value presented as a
+                          measurement is the same defect as AD-1's hard-coded green light, and on a
+                          "Quality" tile it is the number an operator would act on. (#365 AD-11) */}
                       {selectedJob?.metadata?.result?.confidence_score
                         ? `${(selectedJob.metadata.result.confidence_score * 100).toFixed(0)}%`
-                        : '94%'}
+                        : <span className="text-muted-foreground">—</span>}
                     </div>
-                    <div className="text-[9px] text-muted-foreground mt-1">Model Conf.</div>
+                    <div className="text-[9px] text-muted-foreground mt-1">
+                      {selectedJob?.metadata?.result?.confidence_score ? 'Model Conf.' : 'Not reported'}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* AI Model Cost & Usage Analytics */}
+              {/* AI Model Cost & Usage Analytics — MEASURED, never estimated. (#365 AD-11)
+
+                  What was here: a second pricing table built entirely from invented constants —
+                  "~3k tokens per product", 0.5s of GPU per image, 2s per page, SLIG at $0.45/GPU-hr,
+                  PaddleOCR at $0.80/GPU-hr — multiplied out and rendered as "Total Cost … USD".
+                  Two of its rates were also simply wrong: Claude Opus priced at $3/$15 per 1M
+                  (that is Sonar Pro's rate; Opus is $5/$25) and `text-embedding-3-small`, an
+                  OpenAI model this platform removed and does not call. CLAUDE.md's rule is that
+                  ai_model_pricing is the ONE USD source; this was a fourth one, on the screen an
+                  operator uses to judge what a job cost.
+
+                  Real spend already has a home: `ai_usage_logs`, which carries a `job_id` column.
+                  So this now reads that, and when there is nothing to read it SAYS SO instead of
+                  computing a plausible number. That matters more than it sounds — `job_id` is
+                  currently NULL on all 8,809 rows, so no job's cost is attributable at all. The
+                  estimate was hiding that; the empty state is what makes it fixable. */}
               {(() => {
+                const spend = jobAiSpend;
 
-                // Calculate costs from checkpoints and metadata
-                // Estimate costs based on usage
-                const calculateModelCosts = () => {
-                  const costs: Record<string, {
-                    model: string;
-                    generations: number;
-                    inputTokens: number;
-                    outputTokens: number;
-                    gpuSeconds: number;
-                    cost: number;
-                    description: string;
-                  }> = {};
+                if (spend === null) {
+                  return (
+                    <div className="mt-6 pt-6 border-t border-white/10">
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2">
+                        <Zap className="h-4 w-4 text-amber-500" />
+                        AI Model Cost &amp; Usage
+                      </h4>
+                      <p className="text-sm text-muted-foreground">Loading recorded spend…</p>
+                    </div>
+                  );
+                }
 
-                  const productsCreated = selectedJob?.metadata?.result?.products_discovered || productProgress.length || 0;
-                  const chunksCreated = selectedJob?.metadata?.chunks_created || 0;
-                  const imagesProcessed = selectedJob?.metadata?.images_stored || selectedJob?.metadata?.result?.images_processed || 0;
-                  const totalPages = selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || 0;
+                if (spend.length === 0) {
+                  return (
+                    <div className="mt-6 pt-6 border-t border-white/10">
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2">
+                        <Zap className="h-4 w-4 text-amber-500" />
+                        AI Model Cost &amp; Usage
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">No spend recorded against this job.</span>{' '}
+                        The pipeline does not stamp <code>ai_usage_logs.job_id</code>, so per-job cost
+                        cannot be attributed today. This panel used to fill the gap with an estimate
+                        built from invented per-page and per-token constants — that number is gone
+                        rather than replaced, because a plausible figure here is worse than none.
+                      </p>
+                    </div>
+                  );
+                }
 
-                  // Vision/Discovery runs on Claude Opus 4.8 and is captured under
-                  // the claude-opus row of `model_versions` aggregated below
-                  // by the Claude estimation block.
-
-                  // SLIG - Visual Embeddings (estimate: 0.5s per image)
-                  const clipEmbeddings = selectedJob?.metadata?.clip_embeddings || selectedJob?.metadata?.result?.clip_embeddings || imagesProcessed;
-                  if (clipEmbeddings > 0) {
-                    const gpuSeconds = clipEmbeddings * 0.5;
-                    costs['slig'] = {
-                      model: 'SLIG-768D',
-                      generations: clipEmbeddings,
-                      inputTokens: 0,
-                      outputTokens: 0,
-                      gpuSeconds,
-                      cost: (gpuSeconds / 3600) * 0.45,
-                      description: `Visual embeddings: ${clipEmbeddings} images → 768D vectors`,
-                    };
-                  }
-
-                  // PaddleOCR - Structural Pass (one call per page: layout + OCR + figure boxes; ~2s/page)
-                  if (totalPages > 0) {
-                    const gpuSeconds = totalPages * 2.0;
-                    costs['paddleocr'] = {
-                      model: 'PaddleOCR-VL',
-                      generations: totalPages,
-                      inputTokens: 0,
-                      outputTokens: 0,
-                      gpuSeconds,
-                      cost: (gpuSeconds / 3600) * 0.80,
-                      description: `Structural pass: layout + OCR + figure boxes on ${totalPages} pages`,
-                    };
-                  }
-
-                  // Claude Vision - Metadata Extraction (if used)
-                  const metadataExtracted = selectedJob?.metadata?.metadata_fields_extracted || 0;
-                  if (metadataExtracted > 0 || productsCreated > 0) {
-                    const inputTokens = productsCreated * 3000; // ~3k tokens per product
-                    const outputTokens = productsCreated * 1000; // ~1k tokens output
-                    costs['claude'] = {
-                      model: 'Claude Opus',
-                      generations: productsCreated,
-                      inputTokens,
-                      outputTokens,
-                      gpuSeconds: 0,
-                      cost: (inputTokens / 1000000) * 3.00 + (outputTokens / 1000000) * 15.00,
-                      description: `Metadata extraction: ${productsCreated} products analyzed`,
-                    };
-                  }
-
-                  // Text Embeddings (typically free or very cheap)
-                  const textEmbeddings = selectedJob?.metadata?.text_embeddings || chunksCreated;
-                  if (textEmbeddings > 0) {
-                    const inputTokens = chunksCreated * 500; // ~500 tokens per chunk
-                    costs['embeddings'] = {
-                      model: 'text-embedding-3-small',
-                      generations: textEmbeddings,
-                      inputTokens,
-                      outputTokens: 0,
-                      gpuSeconds: 0,
-                      cost: (inputTokens / 1000000) * 0.02,
-                      description: `Text embeddings: ${chunksCreated} chunks → 1024D vectors`,
-                    };
-                  }
-
-                  return costs;
-                };
-
-                const modelCosts = calculateModelCosts();
-                const totalCost = Object.values(modelCosts).reduce((sum, m) => sum + m.cost, 0);
-                const totalGpuSeconds = Object.values(modelCosts).reduce((sum, m) => sum + m.gpuSeconds, 0);
-                const totalTokens = Object.values(modelCosts).reduce((sum, m) => sum + m.inputTokens + m.outputTokens, 0);
-                const totalGenerations = Object.values(modelCosts).reduce((sum, m) => sum + m.generations, 0);
+                const totalCost = spend.reduce((sum, m) => sum + m.billed_usd, 0);
+                const totalTokens = spend.reduce((sum, m) => sum + m.input_tokens + m.output_tokens, 0);
+                const totalCalls = spend.reduce((sum, m) => sum + m.calls, 0);
 
                 return (
                   <div className="mt-6 pt-6 border-t border-white/10">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                         <Zap className="h-4 w-4 text-amber-500" />
-                        AI Model Cost & Usage Analytics
+                        AI Model Cost &amp; Usage <span className="normal-case font-normal">(recorded)</span>
                       </h4>
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30">
                           Total: ${totalCost.toFixed(4)}
                         </Badge>
                         <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/30">
-                          {formatNumber(totalGenerations)} generations
+                          {formatNumber(totalCalls)} calls
                         </Badge>
                       </div>
                     </div>
 
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                       <Card className="bg-amber-500/10 border-amber-500/20">
                         <CardContent className="p-3">
-                          <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Total Cost</div>
+                          <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Billed Cost</div>
                           <div className="text-xl font-black text-amber-300">${totalCost.toFixed(4)}</div>
-                          <div className="text-[9px] text-amber-400/70">USD estimated</div>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-purple-500/10 border-purple-500/20">
-                        <CardContent className="p-3">
-                          <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">GPU Time</div>
-                          <div className="text-xl font-black text-purple-300">{totalGpuSeconds.toFixed(1)}s</div>
-                          <div className="text-[9px] text-purple-400/70">${(totalGpuSeconds / 3600 * 0.55).toFixed(4)} @ avg rate</div>
+                          <div className="text-[9px] text-amber-400/70">USD, from ai_usage_logs</div>
                         </CardContent>
                       </Card>
                       <Card className="bg-blue-500/10 border-blue-500/20">
@@ -4373,69 +4457,35 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       </Card>
                       <Card className="bg-green-500/10 border-green-500/20">
                         <CardContent className="p-3">
-                          <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider">AI Generations</div>
-                          <div className="text-xl font-black text-green-300">{formatNumber(totalGenerations)}</div>
-                          <div className="text-[9px] text-green-400/70">total operations</div>
+                          <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Calls</div>
+                          <div className="text-xl font-black text-green-300">{formatNumber(totalCalls)}</div>
+                          <div className="text-[9px] text-green-400/70">logged operations</div>
                         </CardContent>
                       </Card>
                     </div>
 
-                    {/* Per-Model Breakdown */}
                     <div className="space-y-2">
-                      {Object.entries(modelCosts).map(([key, data]) => (
-                        <div key={key} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                      {spend.map((m) => (
+                        <div key={m.model_name} className="bg-white/5 rounded-lg p-3 border border-white/10">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
-                                key === 'slig' ? 'bg-gradient-to-br from-purple-500 to-pink-500' :
-                                key === 'paddleocr' ? 'bg-gradient-to-br from-blue-500 to-cyan-500' :
-                                key === 'claude' ? 'bg-gradient-to-br from-amber-500 to-orange-500' :
-                                'bg-gradient-to-br from-green-500 to-teal-500'
-                              }`}>
-                                {key === 'slig' ? '🖼️' : key === 'paddleocr' ? '📐' : key === 'claude' ? '🧠' : '📝'}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-sm text-foreground">{data.model}</div>
-                                <div className="text-[10px] text-muted-foreground">{data.description}</div>
+                            <div>
+                              <div className="font-semibold text-sm text-foreground">{m.model_name}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {formatNumber(m.calls)} call{m.calls === 1 ? '' : 's'}
+                                {m.input_tokens + m.output_tokens > 0
+                                  ? ` · ${((m.input_tokens + m.output_tokens) / 1000).toFixed(1)}K tokens`
+                                  : ''}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-sm text-foreground">${data.cost.toFixed(4)}</div>
-                              <div className="text-[10px] text-muted-foreground">
-                                {data.gpuSeconds > 0 ? `${data.gpuSeconds.toFixed(1)}s GPU` : `${((data.inputTokens + data.outputTokens) / 1000).toFixed(1)}K tokens`}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Detailed metrics bar */}
-                          <div className="mt-2 pt-2 border-t border-white/10 grid grid-cols-4 gap-2 text-center">
-                            <div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Generations</div>
-                              <div className="font-semibold text-xs text-foreground">{formatNumber(data.generations)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Input Tokens</div>
-                              <div className="font-semibold text-xs text-foreground">{data.inputTokens > 0 ? `${(data.inputTokens / 1000).toFixed(1)}K` : '-'}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Output Tokens</div>
-                              <div className="font-semibold text-xs text-foreground">{data.outputTokens > 0 ? `${(data.outputTokens / 1000).toFixed(1)}K` : '-'}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-muted-foreground uppercase">GPU Time</div>
-                              <div className="font-semibold text-xs text-foreground">{data.gpuSeconds > 0 ? `${data.gpuSeconds.toFixed(1)}s` : '-'}</div>
+                              <div className="font-bold text-sm text-foreground">${m.billed_usd.toFixed(4)}</div>
+                              {m.failed > 0 && (
+                                <div className="text-[10px] text-destructive">{m.failed} failed</div>
+                              )}
                             </div>
                           </div>
                         </div>
                       ))}
-                    </div>
-
-                    {/* Cost breakdown note */}
-                    <div className="mt-3 p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                      <p className="text-[10px] text-blue-400">
-                        <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: SLIG ($0.45/hr), PaddleOCR ($0.80/hr).
-                        Token costs: Claude Opus ($15/$75 per 1M), Claude Sonnet ($3/$15 per 1M), Voyage embeddings ($0.06 per 1M). Actual costs may vary.
-                      </p>
                     </div>
                   </div>
                 );

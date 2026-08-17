@@ -12,35 +12,10 @@
 import type { DbClient } from './supabase-client.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// AI Pricing Configuration (synced with ai_model_pricing DB table)
-// Canonical 3 Claude models only — legacy variants and OpenAI chat models removed.
-const AI_PRICING = {
-  // Anthropic Claude Models (per 1M tokens)
-  claude: {
-    // Corrected 2026-08-02: this said 15.00/75.00, which is 3x the real Opus rate.
-    // The same wrong number was in ai-client.ts and in the ai_model_pricing row.
-    'claude-opus-4-8':   { input:  5.00, output: 25.00 },
-    'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
-  },
-  // OpenAI Embeddings (per 1M tokens) — embeddings only, chat models removed
-  embeddings: {
-    'text-embedding-3-small': { input: 0.02, output: 0.00 },
-    'text-embedding-3-large': { input: 0.13, output: 0.00 },
-  },
-  // Voyage AI Embeddings (per 1M tokens)
-  voyage: {
-    'voyage-4': { input: 0.06, output: 0.00 },
-  },
-  // Vision Models
-  vision: {
-    'clip': { input: 0.00, output: 0.00 }, // Free (open-source)
-  },
-};
-
 // ── DB-driven token pricing overlay ───────────────────────────
-// The `ai_model_pricing` admin table is authoritative; AI_PRICING above is the
-// fallback used only when a model row is missing or the DB is unreachable. Cached
-// per-worker for 5 minutes so per-call logging stays cheap.
+// `ai_model_pricing` is the ONLY token-price source in this runtime — there is deliberately no
+// literal fallback table (#365 AD-17). Cached per-worker for 5 minutes so per-call logging stays
+// cheap; a miss resolves to null, never to a plausible number.
 export interface TokenPrice { input: number; output: number; markup: number }
 const DEFAULT_MARKUP = 1.5;
 const DB_PRICE_TTL_MS = 5 * 60 * 1000;
@@ -85,15 +60,22 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
  * (model, tokens) into USD goes through this — `AICallLogger.calculateCost` below and
  * `_logTrackedCall` in `_shared/ai-client.ts`.
  *
- * Order: `ai_model_pricing` (admin-editable, authoritative) → the `AI_PRICING` literal
- * above (fallback for an unreachable DB or a model with no row) → null.
+ * `ai_model_pricing` or NOTHING. There is no literal fallback table any more (#365 `AD-17`).
  *
- * Returns the per-row `markup` too, so callers never re-apply a global constant that
- * has drifted from the table.
+ * There used to be one, sitting directly above this function, and its own docstring warned
+ * against exactly what it was: "Do NOT add a second price table anywhere. ai-client.ts carried
+ * one for months and it silently priced Gemini 3.5 Flash at a third of the real rate and Opus at
+ * three times it." That warning was true and the table underneath it was the same hazard — it
+ * still carried Opus and Haiku rates, and `text-embedding-3-*` entries for OpenAI models this
+ * platform removed and no longer calls.
  *
- * Do NOT add a second price table anywhere. ai-client.ts carried one for months — five
- * entries, no DB lookup — and it silently priced Gemini 3.5 Flash at a third of the real
- * rate and Opus at three times it. A wrong price is a valid number, so nothing caught it.
+ * A fallback price is worse than no price for the reason a fallback embedder is worse than no
+ * vector: it is invisible when it fires. The DB being unreachable is a condition the caller must
+ * be able to see, and `null` is how it sees it. A plausible number instead means the cost is
+ * wrong and the row looks fine.
+ *
+ * Returns the per-row `markup` too, so callers never re-apply a global constant that has drifted
+ * from the table.
  */
 export async function resolveTokenPrice(
   supabase: DbClient,
@@ -105,23 +87,21 @@ export async function resolveTokenPrice(
     const dbPricing = await getDbTokenPricing(supabase);
     const exact = dbPricing[modelLower];
     if (exact) return exact;
+    // Substring fallback, in either direction — this is what lets `claude-haiku-4-5-20251001`
+    // price through the `claude-haiku-4-5` row. It resolves to a REAL row, not to a literal, so
+    // it is a lookup and not a second source. `get_ai_model_usage_coverage()` reports which models
+    // reach their price this way, because the coupling is invisible and one rename from breaking.
     for (const [key, val] of Object.entries(dbPricing)) {
       if (modelLower.includes(key) || key.includes(modelLower)) return val;
     }
-  } catch { /* fall through to the hardcoded table */ }
-
-  const groups: Array<[boolean, Record<string, { input: number; output: number }>]> = [
-    [modelLower.includes('claude'), AI_PRICING.claude],
-    [modelLower.includes('voyage'), AI_PRICING.voyage],
-    [modelLower.includes('embedding'), AI_PRICING.embeddings],
-    [modelLower.includes('clip'), AI_PRICING.vision],
-  ];
-  for (const [matches, table] of groups) {
-    if (!matches) continue;
-    const hit = Object.entries(table).find(([key]) => modelLower.includes(key.toLowerCase()))?.[1];
-    if (hit) return { ...hit, markup: DEFAULT_MARKUP };
+  } catch (e) {
+    // Deliberately not swallowed into a fallback price. An unreachable pricing table means the
+    // cost is UNKNOWN, and the caller has to be able to tell that from "this model is free".
+    console.error(`[ai-logger] pricing lookup failed for ${model}; cost is unknown, not zero:`, e);
+    return null;
   }
 
+  console.warn(`[ai-logger] no ai_model_pricing row resolves ${model} — recording it unpriced`);
   return null;
 }
 
@@ -315,13 +295,13 @@ export class AICallLogger {
     model: string,
     inputTokens: number,
     outputTokens: number,
-  ): Promise<number> {
+  ): Promise<number | null> {
     const pricing = await resolveTokenPrice(this.supabase, model);
 
-    if (!pricing) {
-      console.warn(`Unknown model pricing: ${model}`);
-      return 0;
-    }
+    // `null`, not 0. A model with no price has an UNKNOWN cost, and 0 is a claim that it was
+    // free — which is the silent-zero shape this platform keeps finding. The caller records
+    // `unbilled_reason` so the row says why the number is missing. (#365 AD-17)
+    if (!pricing) return null;
 
     return (inputTokens / 1_000_000) * pricing.input
          + (outputTokens / 1_000_000) * pricing.output;
@@ -346,8 +326,16 @@ export class AICallLogger {
     try {
       // Calculate cost if tokens provided
       let cost = data.cost;
+      let unpricedReason: string | null = null;
       if (!cost && data.input_tokens !== undefined && data.output_tokens !== undefined) {
-        cost = await this.calculateCost(data.model, data.input_tokens, data.output_tokens);
+        const computed = await this.calculateCost(data.model, data.input_tokens, data.output_tokens);
+        if (computed === null) {
+          // Leave `cost` null and SAY WHY. A 0 here is indistinguishable from a genuinely free
+          // call once it is in the table.
+          unpricedReason = `no ai_model_pricing row resolves '${data.model}'`;
+        } else {
+          cost = computed;
+        }
       }
 
       // Calculate confidence score if breakdown provided
@@ -364,7 +352,7 @@ export class AICallLogger {
         // Per-call attribution wins; the logger's default fills in for callers that set it once.
         user_id: data.user_id ?? this.attribution.userId ?? null,
         workspace_id: data.workspace_id ?? this.attribution.workspaceId ?? null,
-        unbilled_reason: data.unbilled_reason ?? null,
+        unbilled_reason: data.unbilled_reason ?? unpricedReason,
         input_tokens: data.input_tokens || null,
         output_tokens: data.output_tokens || null,
         cost: cost || null,

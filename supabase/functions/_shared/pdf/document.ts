@@ -445,14 +445,17 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
     line('Discount', `- ${formatCurrency(totals.discount_total as number, cur)}`, false, true);
     line('Net value', formatCurrency(totals.subtotal, cur));
   } else {
-    // Fall back to the older cash-discount / plain-net presentation.
-    const cashPct = totals.cash_discount_pct ?? 0;
-    const discount = round2(totals.subtotal * cashPct / 100);
+    // Plain-net presentation. This branch used to RE-DERIVE the discount here —
+    // `round2(totals.subtotal * cash_discount_pct / 100)` and then `subtotal - discount` — which
+    // is a second derivation of a money quantity in TypeScript, on a document that goes to a
+    // customer. CLAUDE.md's rule is one derivation per money quantity: SQL derives, TypeScript
+    // formats. A percentage applied here cannot see line-level rounding, per-line discounts, or
+    // anything the invoice itself did, so the PDF could print a discount the ledger disagrees
+    // with — and it would look completely plausible. (#365 AD-19)
+    //
+    // The branch above prints a discount when the DERIVED fields are present. When they are not,
+    // there is no discount to print: showing nothing is correct, showing a computed one is not.
     line('Price', formatCurrency(totals.subtotal, cur));
-    if (discount > 0) {
-      line('Discount', `- ${formatCurrency(discount, cur)}`, false, true);
-      line('Price after Discount', formatCurrency(totals.subtotal - discount, cur));
-    }
   }
   line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);
   y -= 4;

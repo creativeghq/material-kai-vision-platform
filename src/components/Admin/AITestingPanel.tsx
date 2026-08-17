@@ -61,10 +61,13 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
     return {
       success: rawResponse.success,
       data: {
+        // Was `|| 'Analysis completed'`. A response the model never produced, phrased as a
+        // successful outcome — on the panel whose entire job is to show what the model said.
+        // Empty means empty. (#365 AD-23)
         response:
           rawResponse.data.response ||
           rawResponse.data.content ||
-          'Analysis completed',
+          '',
         analysis:
           rawResponse.data.analysis || rawResponse.data.analysis_summary,
         recommendations: rawResponse.data.recommendations || [],
@@ -87,12 +90,15 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
   // Handle legacy CrewAI format
   if (rawResponse.coordinated_result) {
     return {
-      success: true,
+      // Success is what the RESPONSE said, not what the shape-match implies. Recognising a
+      // payload's shape is not evidence the call succeeded — an error body with a
+      // `coordinated_result` key was being reported as a passing test. (#365 AD-23)
+      success: rawResponse.success !== false && !rawResponse.error,
       data: {
         response:
           rawResponse.coordinated_result.content ||
           rawResponse.coordinated_result.analysis ||
-          'Analysis completed',
+          '',
         analysis: rawResponse.coordination_summary,
         recommendations: rawResponse.coordinated_result.recommendations || [],
         materials: rawResponse.coordinated_result.materials || [],
@@ -113,14 +119,16 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
   // Handle simple response format
   if (rawResponse.response || rawResponse.data?.response) {
     return {
-      success: true,
+      success: rawResponse.success !== false && !rawResponse.error,
       data: {
         response: rawResponse.response || rawResponse.data.response,
         analysis: rawResponse.analysis || rawResponse.data.analysis,
         recommendations: [],
         materials: rawResponse.materials || rawResponse.data.materials || [],
         entities: [],
-        confidence: 0.8,
+        // Was 0.8 — a fabricated confidence for a response shape that carries none. `null` is the
+        // honest value and the UI renders it as "not reported". (#365 AD-23)
+        confidence: null,
         processingTime: rawResponse.processing_time_ms || 0,
         testType: 'simple',
         model: 'unknown',
@@ -315,12 +323,12 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
           entities: (data.entities || []).map((entity: unknown) => ({
             type: (entity as any).type || 'unknown',
             text: (entity as any).text || (entity as any).value || 'unknown',
-            confidence: (entity as any).confidence || 0.8,
+            confidence: (entity as any).confidence ?? null,
           })),
           materials: (data.materials as any) || [],
           analysis_summary:
             data.response || data.analysis || 'Analysis completed successfully',
-          confidence_score: data.confidence || 0.8,
+          confidence_score: data.confidence ?? null,
         },
         processing_time_ms: data.processingTime || 0,
         success: true,
