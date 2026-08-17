@@ -26,7 +26,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { stripComments } from '../helpers/stripComments';
 
 const ROOT = join(__dirname, '..', '..');
@@ -160,6 +159,12 @@ function readdirSyncSafe(dir: string) {
  * (every `for...of`/spread discards the return value) and TERMINATES the generator, so the image
  * never reached the API and every block after it was thrown away too.
  *
+ * Measured against the pinned package on 2026-08-17:
+ *
+ *   [text, image(url), document]  ->  [text]
+ *   [text, image(base64)]         ->  [text]
+ *   [text, image_url, document]   ->  [text, image, document]
+ *
  * Consequences, none of which raised anything: agent vision never worked for anyone; attaching an
  * image and a PDF in the same turn silently lost the PDF (documents are pushed after images); and
  * the model answered from the text alone, which is why "update the date and the name" on an
@@ -167,67 +172,52 @@ function readdirSyncSafe(dir: string) {
  *
  * Upstream fixed it in 1.5.2 (`yield`). We do not depend on that: `image_url` is handled by the
  * branch above, which yields, and `_formatImage` turns a data: URL into a base64 block and an
- * http(s) URL into a url block — the same two blocks we were hand-building. Identical in both
- * versions.
+ * http(s) URL into a url block — the same two blocks we were hand-building. Identical in both.
  *
- * RUNTIME, against the pinned package. A static "does the source say image_url" check would pass
- * just as happily against a library that had changed underneath it — and the whole failure here
- * was a silent library behaviour, not a visible mistake in our source.
+ * WHY THIS IS A SOURCE CHECK AND NOT THE RUNTIME ONE IT STARTED AS
+ * ---------------------------------------------------------------
+ * The first version of this guard imported the pinned package and ran the conversion, which is
+ * strictly better evidence — and it failed the whole suite in CI, because
+ * `supabase/functions/**\/node_modules/.deno` is Deno's local cache and is gitignored. The
+ * library simply is not there on a runner. A skipIf would have "fixed" it by turning the guard
+ * into a no-op in the only environment that gates the deploy, which is the silent-zero shape
+ * this repo keeps finding.
+ *
+ * So the runtime numbers above are recorded rather than re-derived, and what CI enforces is the
+ * property that actually regresses: that we emit `image_url` and never hand-build the native
+ * block again. To re-derive them, from a machine that has run the edge functions once:
+ *
+ *   const m = await import('<repo>/supabase/functions/agent-chat/node_modules/.deno/'
+ *     + '@langchain+anthropic@1.3.10/node_modules/@langchain/anthropic/dist/utils/message_inputs.js');
+ *   m._convertMessagesToAnthropicPayload([new HumanMessage({ content: BLOCKS })]).messages[0].content
  */
-describe('multimodal blocks actually survive the LangChain conversion', () => {
-  const DENO = join(FUNCS, 'agent-chat', 'node_modules', '.deno');
-  const load = async () => {
-    const inputs: any = await import(
-      /* @vite-ignore */ pathToFileURL(join(DENO, '@langchain+anthropic@1.3.10', 'node_modules', '@langchain', 'anthropic', 'dist', 'utils', 'message_inputs.js')).href
-    );
-    const core: any = await import(
-      /* @vite-ignore */ pathToFileURL(join(DENO, '@langchain+core@1.1.15', 'node_modules', '@langchain', 'core', 'dist', 'messages', 'index.js')).href
-    );
-    return { convert: inputs._convertMessagesToAnthropicPayload, HumanMessage: core.HumanMessage };
-  };
+describe('multimodal blocks the agent sends', () => {
+  const AGENT_CHAT = join(FUNCS, 'agent-chat', 'index.ts');
 
-  const BLOCKS = [
-    { type: 'text', text: 'update the date and the name' },
-    { type: 'image_url', image_url: { url: 'https://example.com/source.png' } },
-    { type: 'document', source: { type: 'url', url: 'https://example.com/spec.pdf' } },
-  ];
-
-  it('an attached image reaches the payload as an image block', async () => {
-    const { convert, HumanMessage } = await load();
-    const out = convert([new HumanMessage({ content: BLOCKS })]).messages[0].content;
-    const kinds = out.map((b: any) => b.type);
+  it('attaches images as `image_url`, the shape LangChain actually yields', () => {
+    const src = stripComments(read(AGENT_CHAT));
     expect(
-      kinds,
-      'the image did not survive — the model would answer from the text alone and sound confused '
-      + 'about a request whose whole subject is the picture',
-    ).toContain('image');
+      /content\.push\(\{\s*type:\s*'image_url'/.test(src),
+      "the last user message must carry images as {type:'image_url', image_url:{url}}",
+    ).toBe(true);
   });
 
-  it('a document attached ALONGSIDE an image is not swallowed with it', async () => {
-    const { convert, HumanMessage } = await load();
-    const out = convert([new HumanMessage({ content: BLOCKS })]).messages[0].content;
-    // This is the part a "does the image work" check misses: the old bug terminated the
-    // generator, so the block ORDER decided what else got lost.
-    expect(out.map((b: any) => b.type)).toEqual(['text', 'image', 'document']);
+  it('never hand-builds the native image block again', () => {
+    const src = stripComments(read(AGENT_CHAT));
+    // `{type:'image', source:{...}}` is dropped whole by the pinned library, silently, along
+    // with every content block after it. It looks more "native" and more correct, which is
+    // exactly why it needs pinning down.
+    const native = src.match(/type:\s*'image'\s*,\s*source:/g) ?? [];
+    expect(
+      native.length,
+      'a native Anthropic image block is being constructed — the pinned @langchain/anthropic '
+      + 'returns instead of yielding it, so the image (and everything after it) never reaches '
+      + "the API. Use {type:'image_url', image_url:{url}}.",
+    ).toBe(0);
   });
 
-  it('the native block shape is still the trap it was — do not go back to it', async () => {
-    const { convert, HumanMessage } = await load();
-    for (const source of [
-      { type: 'url', url: 'https://example.com/source.png' },
-      { type: 'base64', media_type: 'image/png', data: 'AAAA' },
-    ]) {
-      const out = convert([new HumanMessage({ content: [
-        { type: 'text', text: 't' },
-        { type: 'image', source },
-      ] })]).messages[0].content;
-      // If this ever starts returning the image, the pinned library has been upgraded past the
-      // `return`/`yield` bug — at which point delete this case, not the two above it.
-      expect(
-        out.map((b: any) => b.type),
-        `the pinned @langchain/anthropic now passes a native ${source.type} image block through. `
-        + 'That is good news; this case has outlived its purpose and should be removed.',
-      ).toEqual(['text']);
-    }
+  it('still sends documents as document blocks — those are yielded correctly', () => {
+    const src = stripComments(read(AGENT_CHAT));
+    expect(src).toMatch(/type:\s*'document'/);
   });
 });
