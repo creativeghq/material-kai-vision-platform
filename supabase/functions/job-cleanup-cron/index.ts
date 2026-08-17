@@ -74,6 +74,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
 
     console.log('[JobCleanupCron] Starting automated job cleanup...');
 
+    // Every table's error lands here as well as in the log. The response reads this, so a run
+    // that could not clean something cannot report itself clean. (#365 AD-29)
+    const failures: string[] = [];
+
     const stats: CleanupStats = {
       backgroundJobs: 0,
       scrapingSessions: 0,
@@ -107,8 +111,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .or(`completed_at.lt.${fiveDaysAgo},failed_at.lt.${fiveDaysAgo}`)
         .limit(1000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] background_jobs error:', error);
-      else stats.backgroundJobs = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] background_jobs error:', error);
+        failures.push(`background_jobs: ${error.message}`);
+      } else stats.backgroundJobs = data?.length ?? 0;
       console.log(`[JobCleanupCron] background_jobs: ${stats.backgroundJobs} deleted`);
     }
 
@@ -125,8 +131,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('updated_at', fiveDaysAgo)
         .limit(1000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] data_import_jobs error:', error);
-      else stats.dataImportJobs = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] data_import_jobs error:', error);
+        failures.push(`data_import_jobs: ${error.message}`);
+      } else stats.dataImportJobs = data?.length ?? 0;
       console.log(`[JobCleanupCron] data_import_jobs: ${stats.dataImportJobs} deleted`);
     }
 
@@ -142,8 +150,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('created_at', thirtyDaysAgo)
         .limit(1000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] data_import_history error:', error);
-      else stats.importHistory = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] data_import_history error:', error);
+        failures.push(`data_import_history: ${error.message}`);
+      } else stats.importHistory = data?.length ?? 0;
       console.log(`[JobCleanupCron] data_import_history: ${stats.importHistory} deleted`);
     }
 
@@ -155,22 +165,52 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('updated_at', thirtyDaysAgo)
         .limit(1000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] agent_checkpoints error:', error);
-      else stats.agentCheckpoints = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] agent_checkpoints error:', error);
+        failures.push(`agent_checkpoints: ${error.message}`);
+      } else stats.agentCheckpoints = data?.length ?? 0;
       console.log(`[JobCleanupCron] agent_checkpoints: ${stats.agentCheckpoints} deleted`);
     }
 
     // ── 7. flow_run_steps (delete before parent flow_runs) ──────────────────
     {
-      // Delete steps whose parent run is completed/failed and older than 30 days
-      const { data, error } = await supabase
-        .from('flow_run_steps')
-        .delete()
+      // AGE IS NOT A REFERENCE CHECK. (#365 AD-28)
+      //
+      // The comment here has always said "steps whose parent run is completed/failed and older
+      // than 30 days" and the query did not do that — it matched on `created_at` alone, with no
+      // status filter and no look at the parent. So the steps of a run still in flight after 30
+      // days (a long scheduled flow, a retrying one, anything paused) were deleted out from
+      // under it, and `flow_runs` immediately below — which DOES filter on status — then kept the
+      // parent row pointing at steps that no longer exist.
+      //
+      // This is the janitor hazard inverted: not failing to delete, but deleting something still
+      // in use. Nothing raises either way; the flow simply loses its own history.
+      const { data: finishedRuns, error: runsErr } = await supabase
+        .from('flow_runs')
+        .select('id')
+        .in('status', ['completed', 'failed', 'cancelled'])
         .lt('created_at', thirtyDaysAgo)
-        .limit(2000)
-        .select('id');
-      if (error) console.error('[JobCleanupCron] flow_run_steps error:', error);
-      else stats.flowRunSteps = data?.length ?? 0;
+        .limit(1000);
+
+      if (runsErr) {
+        console.error('[JobCleanupCron] flow_run_steps parent lookup error:', runsErr);
+        failures.push(`flow_run_steps: parent lookup failed — ${runsErr.message}`);
+      } else if ((finishedRuns ?? []).length === 0) {
+        stats.flowRunSteps = 0;
+      } else {
+        const { data, error } = await supabase
+          .from('flow_run_steps')
+          .delete()
+          .in('flow_run_id', (finishedRuns ?? []).map((r: { id: string }) => r.id))
+          .limit(2000)
+          .select('id');
+        if (error) {
+          console.error('[JobCleanupCron] flow_run_steps error:', error);
+          failures.push(`flow_run_steps: ${error.message}`);
+        } else {
+          stats.flowRunSteps = data?.length ?? 0;
+        }
+      }
       console.log(`[JobCleanupCron] flow_run_steps: ${stats.flowRunSteps} deleted`);
     }
 
@@ -183,8 +223,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('created_at', thirtyDaysAgo)
         .limit(1000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] flow_runs error:', error);
-      else stats.flowRuns = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] flow_runs error:', error);
+        failures.push(`flow_runs: ${error.message}`);
+      } else stats.flowRuns = data?.length ?? 0;
       console.log(`[JobCleanupCron] flow_runs: ${stats.flowRuns} deleted`);
     }
 
@@ -197,8 +239,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('created_at', sevenDaysAgo)
         .limit(500)
         .select('id');
-      if (error) console.error('[JobCleanupCron] vr_worlds error:', error);
-      else stats.vrWorldsFailed = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] vr_worlds error:', error);
+        failures.push(`vr_worlds: ${error.message}`);
+      } else stats.vrWorldsFailed = data?.length ?? 0;
       console.log(`[JobCleanupCron] vr_worlds (failed): ${stats.vrWorldsFailed} deleted`);
     }
 
@@ -273,8 +317,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('created_at', thirtyDaysAgo)
         .limit(10000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] system_logs error:', error);
-      else stats.systemLogs = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] system_logs error:', error);
+        failures.push(`system_logs: ${error.message}`);
+      } else stats.systemLogs = data?.length ?? 0;
       console.log(`[JobCleanupCron] system_logs: ${stats.systemLogs} deleted`);
     }
 
@@ -288,8 +334,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('created_at', thirtyDaysAgo)
         .limit(5000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] ai_call_logs error:', error);
-      else stats.aiCallLogs = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] ai_call_logs error:', error);
+        failures.push(`ai_call_logs: ${error.message}`);
+      } else stats.aiCallLogs = data?.length ?? 0;
       console.log(`[JobCleanupCron] ai_call_logs: ${stats.aiCallLogs} deleted`);
     }
 
@@ -302,8 +350,10 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .lt('timestamp', ninetyDaysAgo)
         .limit(2000)
         .select('id');
-      if (error) console.error('[JobCleanupCron] search_query_tracking error:', error);
-      else stats.searchQueryTracking = data?.length ?? 0;
+      if (error) {
+        console.error('[JobCleanupCron] search_query_tracking error:', error);
+        failures.push(`search_query_tracking: ${error.message}`);
+      } else stats.searchQueryTracking = data?.length ?? 0;
       console.log(`[JobCleanupCron] search_query_tracking: ${stats.searchQueryTracking} deleted`);
     }
 
@@ -322,6 +372,24 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       stats.systemLogs +
       stats.aiCallLogs +
       stats.searchQueryTracking;
+
+    // A janitor that returns success after partial failure is the documented reaper shape: it
+    // exits 0, the monitoring sees a clean run, and the rows it could not delete accumulate
+    // forever with nobody told. Every per-table error above is collected rather than only
+    // console.error'd, and the RESPONSE carries them. (#365 AD-29)
+    if (failures.length > 0) {
+      console.error(`[JobCleanupCron] ⚠️ Completed with ${failures.length} failure(s):`, failures);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `Cleaned up ${stats.totalCleaned} old records, but ${failures.length} table(s) failed`,
+          failures,
+          stats,
+          timestamp: new Date().toISOString(),
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`[JobCleanupCron] ✅ Done. Total cleaned: ${stats.totalCleaned}`);
 

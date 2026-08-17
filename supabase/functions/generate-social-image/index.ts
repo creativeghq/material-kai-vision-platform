@@ -211,9 +211,11 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     image_type = 'lifestyle' as ImageType,
     model = 'auto' as ImageModel,
     aspect_ratio = '1:1' as AspectRatio,
-    workspace_id,
     post_id,
   } = body;
+  // Reassigned below when a post_id pins the workspace — the post's workspace is authoritative,
+  // so the debit and the write cannot land in different tenants. (#365 AD-30)
+  let workspace_id: string | null | undefined = body.workspace_id;
 
   // SECURITY: `workspace_id` and `post_id` arrive in the request
   // BODY and everything below runs on the service-role client. Unguarded, a user in
@@ -241,6 +243,23 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
       || !(await userCanAccessWorkspace(supabase, userId, (existingPost as { workspace_id: string }).workspace_id))) {
       return jsonResponse({ success: false, error: 'Not found' }, 404);
     }
+
+    // Both ids were checked, INDEPENDENTLY, and nothing compared them to each other. For a user
+    // who belongs to two workspaces that is a charge/write split: `workspace_id: A` routes the
+    // debit to A's pool (see the 7th argument to debitExternalServiceCredits below), while
+    // `post_id` pointing at a post in B is where the image actually lands. A pays, B receives.
+    // Both ownership checks pass, nothing raises, and the spend appears against a workspace that
+    // has nothing to show for it. (#365 AD-30, same shape as EX-1 in #364)
+    //
+    // The POST's workspace wins, because that is where the work is delivered.
+    const postWorkspace = (existingPost as { workspace_id: string }).workspace_id;
+    if (workspace_id && workspace_id !== postWorkspace) {
+      return jsonResponse({
+        success: false,
+        error: 'workspace_id does not match the post’s workspace — refusing to bill one workspace for another’s image',
+      }, 400);
+    }
+    workspace_id = postWorkspace;
   }
 
 

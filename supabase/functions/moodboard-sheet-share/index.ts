@@ -179,27 +179,64 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       view.pdf_storage_path,
     );
 
+    // ── Tenancy binding for the EMBEDDED artifacts (#365 AD-26) ──────────────────────────────
+    //
+    // The ids below come from the view row rather than the request, so a token holder cannot
+    // inject one — but nothing checked that the linked quote / VR world / room plan belongs to the
+    // same workspace as the view itself. These reads run on the SERVICE ROLE, so RLS is not
+    // standing behind them: a client_view row that ends up pointing at another tenant's quote
+    // hands that quote — with its prices — to whoever holds this token. Same shape as FE-16
+    // (#351): a token scoped to one document serving a second.
+    //
+    // Resolve the view's workspace once and require every embedded artifact to match it.
+    const { data: ownerProject } = await supabase
+      .from('projects').select('workspace_id').eq('id', view.project_id).maybeSingle();
+    const viewWorkspaceId = (ownerProject as { workspace_id: string } | null)?.workspace_id ?? null;
+
+    /** An artifact is servable only if it is in the view's workspace. Unknown → withheld. */
+    const belongsToView = (row: { workspace_id?: string | null } | null | undefined): boolean => {
+      if (!row) return false;
+      // An UNRESOLVED verdict withholds. If we could not establish the view's workspace, we
+      // cannot establish that the artifact is in it, and serving on a maybe is how this class of
+      // bug ships.
+      if (!viewWorkspaceId) return false;
+      return row.workspace_id === viewWorkspaceId;
+    };
+
     let vr_world: any = null;
     if (view.embed_vr && view.vr_world_id) {
       const { data: w } = await supabase
         .from('vr_worlds')
-        .select('id, status, splat_url_100k, splat_url_500k, splat_url_full, panorama_url, thumbnail_url')
+        .select('id, status, workspace_id, splat_url_100k, splat_url_500k, splat_url_full, panorama_url, thumbnail_url')
         .eq('id', view.vr_world_id).maybeSingle();
-      if (w && w.status === 'completed') vr_world = w;
+      if (w && w.status === 'completed' && belongsToView(w)) {
+        const { workspace_id: _ws, ...safe } = w as Record<string, unknown>;
+        vr_world = safe;
+      } else if (w && !belongsToView(w)) {
+        console.error(`[moodboard-sheet-share] vr_world ${view.vr_world_id} is not in the view's workspace — withheld`);
+      }
     }
 
     let ffe: any = null;
     if (view.embed_ffe && view.quote_id) {
       const { data: q } = await supabase
         .from('quotes')
-        .select('currency, subtotal, vat_rate, vat_amount, grand_total')
+        .select('currency, subtotal, vat_rate, vat_amount, grand_total, workspace_id')
         .eq('id', view.quote_id).maybeSingle();
-      const { data: items } = await supabase
-        .from('quote_items')
-        .select('room, name, dimensions, quantity, unit_price, line_total, custom_product_name, products(name)')
-        .eq('quote_id', view.quote_id)
-        .order('added_at', { ascending: true });
-      ffe = {
+      // A quote carries money. Serving one from another workspace is the worst version of this,
+      // so the mismatch withholds the whole FFE block rather than any part of it.
+      const quoteServable = !!q && belongsToView(q);
+      if (q && !quoteServable) {
+        console.error(`[moodboard-sheet-share] quote ${view.quote_id} is not in the view's workspace — withheld`);
+      }
+      const { data: items } = quoteServable
+        ? await supabase
+            .from('quote_items')
+            .select('room, name, dimensions, quantity, unit_price, line_total, custom_product_name, products(name)')
+            .eq('quote_id', view.quote_id)
+            .order('added_at', { ascending: true })
+        : { data: null };
+      ffe = !quoteServable ? null : {
         currency: q?.currency || 'EUR',
         subtotal: q?.subtotal != null ? Number(q.subtotal) : null,
         vat_rate: q?.vat_rate != null ? Number(q.vat_rate) : null,
@@ -226,10 +263,12 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     if (view.embed_room_plan && view.room_layout_id) {
       const { data: plan } = await supabase
         .from('room_layouts')
-        .select('id, name, room_width_m, room_depth_m, room_height_m')
+        .select('id, name, workspace_id, room_width_m, room_depth_m, room_height_m')
         .eq('id', view.room_layout_id)
         .maybeSingle();
-      if (plan) {
+      if (plan && !belongsToView(plan)) {
+        console.error(`[moodboard-sheet-share] room_layout ${view.room_layout_id} is not in the view's workspace — withheld`);
+      } else if (plan) {
         const { data: placed } = await supabase
           .from('room_layout_items_resolved')
           .select('id, product_name, x_m, y_m, rotation_deg, effective_width_m, effective_depth_m')

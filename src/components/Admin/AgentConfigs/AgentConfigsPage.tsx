@@ -198,39 +198,26 @@ export const AgentConfigsPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const usesSystemPrompt = editingPrompt.prompt_type === 'agent' || editingPrompt.prompt_type === 'tool';
-
-      // Save to history.
+      // ONE atomic RPC — the history row and the prompt update in a single transaction, admin
+      // check inside. (#365 AD-21)
       //
-      // The error MUST be destructured and thrown. supabase-js RESOLVES on an RLS denial rather
-      // than throwing, so discarding the result let a rejected write fall straight through to the
-      // "updated successfully" toast below — the enclosing try/catch cannot help, because nothing
-      // threw. That is the same defect already documented on `product_prices` in
-      // `PriceLookupDrawer`, and it is worse here: since #347 phase 3P every prompt is loaded from
-      // this table with NO code fallback, so a silently-rejected edit means the admin believes a
-      // prompt changed when the model is still being sent the old one — and the history row that
-      // would have shown the intended change is missing too.
-      const { error: histErr } = await supabase.from('prompt_history').insert({
-        prompt_id: editingPrompt.id,
-        old_prompt_text: editingPrompt.prompt_text,
-        new_prompt_text: usesSystemPrompt ? editingPrompt.prompt_text : editedText,
-        old_system_prompt: editingPrompt.system_prompt,
-        new_system_prompt: usesSystemPrompt ? editedText : editingPrompt.system_prompt,
-        old_configuration: editingPrompt.configuration,
-        new_configuration: editingPrompt.configuration,
-        change_reason: changeReason,
-        changed_by: user.id,
+      // Two things this replaced. The history insert and the prompt update were separate client
+      // calls, so a failed update could leave a history row describing a change that never
+      // happened. And the update itself DID NOT WORK for a global prompt: `prompts` UPDATE
+      // requires `is_workspace_member(workspace_id)`, global prompts live in workspace
+      // 00000000-…-0000, and nobody is a member of it — so PostgREST matched no row, answered 204,
+      // and the toast below said "updated successfully" while the model kept getting the old text.
+      // Verified live: 0 rows. Since #347 phase 3P prompts have no code fallback, so that silence
+      // lasts until somebody reads the agent's output and disbelieves it.
+      const { error: rpcErr } = await (supabase.rpc as unknown as (
+        fn: string, args: Record<string, unknown>,
+      ) => Promise<{ error: { message: string } | null }>)('update_prompt_with_history', {
+        p_prompt_id: editingPrompt.id,
+        p_new_text: editedText,
+        p_new_description: editedDescription,
+        p_change_reason: changeReason,
       });
-
-      // Update prompt
-      const updateData = usesSystemPrompt
-        ? { system_prompt: editedText, description: editedDescription }
-        : { prompt_text: editedText, description: editedDescription };
-
-      if (histErr) throw histErr;
-
-      const { error: updErr } = await supabase.from('prompts').update(updateData).eq('id', editingPrompt.id);
-      if (updErr) throw updErr;
+      if (rpcErr) throw rpcErr;
 
       toast({ title: 'Success', description: `${editingPrompt.name} updated successfully` });
       setEditingPrompt(null);
@@ -252,25 +239,35 @@ export const AgentConfigsPage: React.FC = () => {
     try {
       setDeleting(true);
 
-      if (hardDelete) {
-        // Permanently delete from database
-        const { error } = await supabase
-          .from('prompts')
-          .delete()
-          .eq('id', deletingPrompt.id);
-
-        if (error) throw error;
-        toast({ title: 'Success', description: `${deletingPrompt.name} permanently deleted` });
-      } else {
-        // Soft delete - set is_active to false
-        const { error } = await supabase
-          .from('prompts')
-          .update({ is_active: false })
-          .eq('id', deletingPrompt.id);
-
-        if (error) throw error;
-        toast({ title: 'Success', description: `${deletingPrompt.name} deactivated` });
+      // Audited + atomic, and it actually applies. `prompts` has NO DELETE policy, so the direct
+      // `.delete()` this replaced matched 0 rows, raised nothing, and reported "permanently
+      // deleted" — verified live. Deletions also wrote no history at all, so a prompt that drives
+      // agent behaviour could disappear with no record of who removed it or why. (#365 AD-21)
+      const reason = window.prompt(
+        hardDelete
+          ? 'Why is this prompt being permanently deleted? (recorded in prompt_history)'
+          : 'Why is this prompt being deactivated? (recorded in prompt_history)',
+      );
+      if (reason === null) return;              // cancelled
+      if (!reason.trim()) {
+        toast({ title: 'A reason is required', description: 'Removing a prompt is recorded, so it needs one.', variant: 'destructive' });
+        return;
       }
+
+      const { error } = await (supabase.rpc as unknown as (
+        fn: string, args: Record<string, unknown>,
+      ) => Promise<{ error: { message: string } | null }>)('delete_prompt_with_audit', {
+        p_prompt_id: deletingPrompt.id,
+        p_hard: hardDelete,
+        p_change_reason: reason,
+      });
+      if (error) throw error;
+      toast({
+        title: 'Success',
+        description: hardDelete
+          ? `${deletingPrompt.name} permanently deleted`
+          : `${deletingPrompt.name} deactivated`,
+      });
 
       setDeletingPrompt(null);
       loadPrompts();
