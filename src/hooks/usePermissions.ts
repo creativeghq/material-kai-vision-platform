@@ -60,8 +60,9 @@ export function usePermissions(): PermissionsApi {
     // isAccountant, so it keeps approval rights (server: is_workspace_finance_manager
     // already allows finance + owner/admin).
     const isAccountant = workspaceRole === 'accountant';
-    // Both sales personas get the same focused nav subset; the manager differs only in SCOPE
-    // (team-wide rows + cost/margin), which is expressed by `sales.team.view`.
+    // Both sales personas get the same focused nav subset; the manager differs only in the SCOPE
+    // of ROWS (team-wide rather than own), which is expressed by `sales.team.view`. Margin is not
+    // part of that scope — see user_can_read_quote_costs().
     const isSalesManager = persona === 'sales_manager';
     const isSalesRep = persona === 'sales' || isSalesManager;
     const isRealEstateAgent = persona === 'realestate_agent';

@@ -49,6 +49,11 @@ export type Capability =
   | 'sales.team.view'       // sales manager: the WHOLE team's quote book, not just own rows.
                             // Backed server-side by is_workspace_sales_manager(workspace_id) in
                             // consolidated_quotes_select_public — this flag only unhides the UI.
+                            // SCOPE OF ROWS, NOT OF MARGIN: the cost basis and the applied markup
+                            // are gated separately by user_can_read_quote_costs(), which answers
+                            // only for the quote's CREATOR or a workspace owner/admin. A manager
+                            // sees the team's book with the margin column blank on quotes they
+                            // did not build.
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use'             // KAI agent / chat
@@ -108,10 +113,13 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
   // user_id); customer financials are workspace-scoped reads.
   sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
-  // Sales manager: the rep surface plus `sales.team.view` — the whole team's quote book and
-  // cost/margin on it. Still NOT a workspace manager: no finance settings, pricing, network or
-  // warehouse. The team-wide read is enforced in RLS (is_workspace_sales_manager), so the extra
-  // capability only reveals UI the server would already answer.
+  // Sales manager: the rep surface plus `sales.team.view` — the whole team's quote BOOK. Not its
+  // margins: cost and markup answer only to the quote's creator or a workspace owner/admin
+  // (`user_can_read_quote_costs`), so a manager reviewing a rep's quote sees the lines and the
+  // sell price with the cost column blank. Still NOT a workspace manager: no finance settings,
+  // pricing, network or warehouse. The team-wide read is enforced in RLS
+  // (is_workspace_sales_manager), so the extra capability only reveals UI the server would
+  // already answer.
   sales_manager: ['sales.portal', 'sales.team.view', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
   // ── Functional team roles. Deliberately MINIMAL: each holds only its own module's capability
   //    plus agent.use, so a team member can never reach finance, pricing, the network or the team.

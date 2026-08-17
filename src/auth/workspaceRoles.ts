@@ -74,7 +74,7 @@ export const WORKSPACE_ROLE_META: Record<WorkspaceMemberRole, WorkspaceRoleMeta>
   sales_manager: {
     label: 'Sales Manager',
     portal: 'Sales portal (team-wide)',
-    description: 'Everything a rep can do, across the WHOLE team’s quote book, including cost and margin. Still no finance settings, pricing rules or team management.',
+    description: 'Everything a rep can do, across the WHOLE team’s quote book. Cost and margin stay with whoever built the quote (and the owner). Still no finance settings, pricing rules or team management.',
     requiresModule: 'quotes',
   },
   // HR mirrors the Sales pair: a staff tier that reads, a manager tier that runs it. Before these

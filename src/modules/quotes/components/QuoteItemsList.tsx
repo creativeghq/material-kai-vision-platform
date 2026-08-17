@@ -238,8 +238,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
     }
   };
 
-  // A sales MANAGER owns the team's numbers, so the per-rep cost blind is not theirs to wear.
-  const showMargin = can('sales.team.view') || !(isSalesRep && !salesCanSeeCost);
+  // `sales.team.view` no longer implies the margin: cost answers to the quote's CREATOR or a
+  // workspace owner/admin (`user_can_read_quote_costs`), so a manager opening a rep's quote gets
+  // an empty cost map and the block renders a dash. This flag stays as the UI's own preference
+  // for a REP viewing their own quote — the database is what decides, not this line.
+  const showMargin = !(isSalesRep && !salesCanSeeCost);
   // per-line margin (cost → price spread) is internal-only: pricing managers/admins,
   // and even then hidden from a sales rep who isn't cleared to see cost.
   const canSeeLineMargin = can('pricing.manage') && showMargin;
