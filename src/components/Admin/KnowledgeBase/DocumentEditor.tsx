@@ -498,6 +498,29 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     : 'Public — available to all agents, platform calls, and the public Knowledge Base page.'}
                 </p>
 
+                {/* THE THIRD CONDITION, which is on the CATEGORY and not on this form.
+                    `kb_docs_public_read` grants anon access only when status='published' AND
+                    visibility='public' AND the category's access_level='public'. Set the first two
+                    here and the copy above says the doc is public — while an `agent` category keeps
+                    it private, with nothing on this screen saying so. All three currently-published
+                    public docs are in `agent` categories and none of them is reachable. */}
+                {document.visibility === 'public' && (() => {
+                  const cat = categories.find((c) => c.id === document.category_id);
+                  if (!cat || cat.access_level === 'public') return null;
+                  return (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5">
+                      <p className="text-xs text-amber-600 leading-snug">
+                        <span className="font-medium">Not actually public.</span>{' '}
+                        The category <span className="font-medium">{cat.name}</span> is set to{' '}
+                        <span className="font-mono">{cat.access_level}</span>, and a document is only
+                        readable by logged-out visitors when its category is <span className="font-mono">public</span> too.
+                        Change the category, move the document, or leave it — but it will not appear
+                        on the public Knowledge Base as things stand.
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 {/* Public deep-link — surfaces the live, externally-detectable URL once
                     the doc is public + saved. The public KB page resolves ?doc=<id>
                     only for published + public rows, so we hint if it isn't published yet. */}
