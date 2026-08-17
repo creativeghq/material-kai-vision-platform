@@ -384,20 +384,44 @@ async function checkCloudflareWorkers(cfg: CloudflareConfig): Promise<Cloudflare
   const start = Date.now();
   const auth = { Authorization: `Bearer ${token}` };
   try {
-    const verify = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
-      headers: auth, signal: AbortSignal.timeout(8000),
-    });
-    const verifyJson = await verify.json().catch(() => ({})) as { success?: boolean; result?: { status?: string } };
-    if (!verify.ok || verifyJson.success !== true) {
+    // Cloudflare has TWO token families and they verify at DIFFERENT endpoints. A user-owned token
+    // verifies at /user/tokens/verify; an ACCOUNT-OWNED token (the `cfat_` prefix) is rejected
+    // there with "Invalid API Token" and must go to /accounts/{id}/tokens/verify. Checking only
+    // the user endpoint reports a perfectly good account token as REJECTED — a health check
+    // inventing an outage, which is the same class of lie as reporting a green light that measures
+    // nothing. Confirmed against a live cfat_ token: /user/... says invalid while the account
+    // endpoint says "valid and active" and the Workers list answers fine.
+    //
+    // Try the account endpoint first when we have an account id, because that is the newer shape.
+    const verifyUrls = accountId
+      ? [`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
+         'https://api.cloudflare.com/client/v4/user/tokens/verify']
+      : ['https://api.cloudflare.com/client/v4/user/tokens/verify'];
+
+    let verified = false;
+    let tokenStatus: string | undefined;
+    let lastStatus = 0;
+    for (const url of verifyUrls) {
+      const res = await fetch(url, { headers: auth, signal: AbortSignal.timeout(8000) });
+      lastStatus = res.status;
+      const json = await res.json().catch(() => ({})) as { success?: boolean; result?: { status?: string } };
+      if (res.ok && json.success === true) {
+        verified = true;
+        tokenStatus = json.result?.status;
+        break;
+      }
+    }
+
+    if (!verified) {
       return {
         status: 'unhealthy', latency_ms: Date.now() - start,
-        error: `Cloudflare API token rejected (HTTP ${verify.status})`,
+        error: `Cloudflare API token rejected by both the account and user verify endpoints (last HTTP ${lastStatus})`,
       };
     }
-    if (verifyJson.result?.status && verifyJson.result.status !== 'active') {
+    if (tokenStatus && tokenStatus !== 'active') {
       return {
         status: 'unhealthy', latency_ms: Date.now() - start,
-        error: `Cloudflare API token is ${verifyJson.result.status}`,
+        error: `Cloudflare API token is ${tokenStatus}`,
       };
     }
 
