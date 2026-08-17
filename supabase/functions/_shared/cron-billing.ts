@@ -114,3 +114,34 @@ export async function chargeCronUser(
     return { allowed: true, charged: 0 };
   }
 }
+
+/** Personal-wallet twin of `refundCronWorkspace`, for the ownerless/workspaceless charge path.
+ *  There is no `cron_refund_user` RPC — a user charge is a plain credit debit, so its refund is a
+ *  plain `refund_credits`. Best-effort: a failed refund must never break the caller. */
+export async function refundCronUser(
+  supabase: SupabaseLike,
+  userId: string,
+  cronKey: string,
+  amount: number,
+  description?: string,
+): Promise<boolean> {
+  if (!userId || !(amount > 0)) return false;
+  try {
+    const { error } = await supabase.rpc('refund_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_operation_type: `cron_${cronKey}_refund`,
+      p_description: description ?? `Refund — ${cronKey}`,
+      p_metadata: { cron_key: cronKey, refund: true },
+      p_workspace_id: null,
+    });
+    if (error) {
+      console.error(`[cron-billing] user ${cronKey}/${userId} refund failed:`, error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error(`[cron-billing] user ${cronKey}/${userId} refund threw:`, e);
+    return false;
+  }
+}

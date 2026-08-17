@@ -11,11 +11,14 @@
  *
  * Wave 1B / 2 / 3 tools will append here as they ship.
  *
- * Cost discipline:
- *   - seo_research_keyword: 0 partner credits (calls MIVAA's
- *     /opportunities-stateless which uses x-cron-secret, not user credits).
- *     Internal DataForSEO cost: ~$0.005-0.010 per call (1 SERP Advanced + up
- *     to 2 Labs calls). Logged to ai_usage_logs with module_slug='seo-tools'.
+ * Cost discipline (invariant 10, #365 `AD-13`):
+ *   - EVERY tool here reaches DataForSEO on the OPERATOR's x-cron-secret credential, so "no
+ *     partner credits" never meant "no money". All three dispatchers below now reserve the
+ *     caller's credits BEFORE the fetch and settle against the cost DataForSEO itself reports —
+ *     see `_shared/tools/dataforseo-spend-gate.ts`. A caller who cannot pay is refused with
+ *     nothing spent upstream.
+ *   - Add a new dispatcher and it must open a gate too; a raw `fetch` to the SEO gateway from
+ *     this file is ungated spend.
  *
  * Pattern: every tool emits a chunk via onChunk so the frontend can render
  * an inline card, then returns a compact JSON summary so the LLM can keep
@@ -23,6 +26,7 @@
  */
 
 import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
+import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -73,6 +77,9 @@ async function callDataForSEO(
   if (!CRON_SECRET) {
     return { ok: false, error: 'CRON_SECRET not configured' };
   }
+  // Invariant 10 — reserve the caller's credits BEFORE the operator pays DataForSEO (#365 AD-13).
+  const gate = await openSpendGate(kind, attribution?.user_id, params, attribution?.workspace_id);
+  if (!gate.ok) return { ok: false, error: gate.message };
   try {
     const resp = await fetch(
       `${MIVAA_GATEWAY_URL}/api/v1/seo-agent/dataforseo/${kind}`,
@@ -85,9 +92,18 @@ async function callDataForSEO(
     const text = await resp.text();
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    if (!resp.ok) return { ok: false, error: `${resp.status}: ${String(parsed).slice(0, 200)}` };
-    return { ok: true, data: parsed?.data };
+    if (!resp.ok) {
+      await gate.settle(0);
+      return { ok: false, error: `${resp.status}: ${String(parsed).slice(0, 200)}` };
+    }
+    const data = parsed?.data;
+    await gate.settle(data?.cost_usd);
+    // HTTP 200 is not success at DataForSEO — the verdict is in status_code (#365 AD-14).
+    const taskError = dataForSeoTaskError(data);
+    if (taskError) return { ok: false, error: taskError };
+    return { ok: true, data };
   } catch (e) {
+    await gate.settle(0);
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
   }
 }
@@ -98,6 +114,9 @@ async function callSEOAgentRoute(
   body: Record<string, any>,
 ): Promise<{ ok: boolean; data?: any; error?: string }> {
   if (!CRON_SECRET) return { ok: false, error: 'CRON_SECRET not configured' };
+  const attribution = body?.attribution as { user_id?: string; workspace_id?: string } | undefined;
+  const gate = await openSpendGate(`composite_${path}`, attribution?.user_id, body, attribution?.workspace_id);
+  if (!gate.ok) return { ok: false, error: gate.message };
   try {
     const resp = await fetch(
       `${MIVAA_GATEWAY_URL}/api/v1/seo-agent/${path}`,
@@ -110,14 +129,44 @@ async function callSEOAgentRoute(
     const text = await resp.text();
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    if (!resp.ok) return { ok: false, error: `${resp.status}: ${String(parsed).slice(0, 200)}` };
-    return { ok: true, data: parsed?.data };
+    if (!resp.ok) {
+      await gate.settle(0);
+      return { ok: false, error: `${resp.status}: ${String(parsed).slice(0, 200)}` };
+    }
+    const data = parsed?.data;
+    // Composite routes report cost per section; the call's cost is their sum.
+    await gate.settle(sumSectionCost(data));
+    const taskError = dataForSeoTaskError(data);
+    if (taskError) return { ok: false, error: taskError };
+    return { ok: true, data };
   } catch (e) {
+    await gate.settle(0);
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
   }
 }
 
-async function callOpportunitiesStateless(body: Record<string, any>): Promise<{
+/**
+ * Total upstream cost of a composite response. Returns undefined — never 0 — when no section
+ * reports one, so the gate keeps its reserve rather than settling a paid call to free.
+ */
+function sumSectionCost(data: any): number | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  if (typeof data.cost_usd === 'number') return data.cost_usd;
+  const sections = data.sections;
+  if (!sections || typeof sections !== 'object') return undefined;
+  let total = 0;
+  let seen = false;
+  for (const section of Object.values(sections as Record<string, any>)) {
+    const c = Number(section?.cost_usd);
+    if (Number.isFinite(c)) { total += c; seen = true; }
+  }
+  return seen ? total : undefined;
+}
+
+async function callOpportunitiesStateless(
+  body: Record<string, any>,
+  attribution?: { user_id?: string; workspace_id?: string | null },
+): Promise<{
   ok: boolean;
   data?: any;
   error?: string;
@@ -125,6 +174,11 @@ async function callOpportunitiesStateless(body: Record<string, any>): Promise<{
   if (!CRON_SECRET) {
     return { ok: false, error: 'CRON_SECRET not configured on edge function — cannot call /opportunities-stateless' };
   }
+  // This endpoint fans out to DataForSEO SERP + Labs on the operator's account. The header
+  // comment above used to describe it as costing "0 partner credits", which was true of the
+  // PARTNER ledger and not of the money — invariant 10 applies to the spend, not the ledger.
+  const gate = await openSpendGate('composite_opportunities', attribution?.user_id, body, attribution?.workspace_id);
+  if (!gate.ok) return { ok: false, error: gate.message };
   try {
     const resp = await fetch(
       `${MIVAA_GATEWAY_URL}/api/v1/mention-monitoring/opportunities-stateless`,
@@ -141,10 +195,13 @@ async function callOpportunitiesStateless(body: Record<string, any>): Promise<{
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
     if (!resp.ok) {
+      await gate.settle(0);
       return { ok: false, error: `backend ${resp.status}: ${String(parsed).slice(0, 200)}` };
     }
+    await gate.settle(parsed?.data?.cost_usd);
     return { ok: true, data: parsed?.data };
   } catch (e) {
+    await gate.settle(0);
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
   }
 }
@@ -251,7 +308,7 @@ export const createSEOResearchKeywordTool = (
         // table's own `is_workspace_admin(workspace_id)` policy. Sent from the session's
         // workspace, never from anything the model supplied.
         workspace_id: ctx?.workspaceId ?? undefined,
-      });
+      }, { user_id: _userId, workspace_id: ctx?.workspaceId ?? null });
 
       if (!r.ok) {
         const msg = r.error || 'opportunities-stateless call failed';

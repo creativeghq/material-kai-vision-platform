@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
+import { openSpendGate } from '../../_shared/tools/dataforseo-spend-gate.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -72,23 +73,43 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
     const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(sbAdmin, userId);
     if (entResponse) return entResponse;
 
+    // Meter BEFORE the engine runs (invariant 10, #365 `AD-13`). opportunities-stateless fans out
+    // to DataForSEO SERP + Labs on the OPERATOR's x-cron-secret credential, so entitlement alone
+    // ("this workspace bought the module") left every run of it free and unbounded. Reserve a
+    // ceiling, settle the cost MIVAA reports back.
+    const gate = await openSpendGate('composite_opportunities', userId, body.params, workspaceId);
+    if (!gate.ok) {
+      return jsonResponse({ ok: false, error: gate.message ?? 'Insufficient credits' }, 402);
+    }
+
     const start = Date.now();
     // Fire the MIVAA opportunities-stateless engine
     const url = `${PYTHON_BACKEND_URL.replace(/\/+$/, '')}/api/v1/mention-monitoring/opportunities-stateless`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-cron-secret': CRON_SECRET(),
-      },
-      body: JSON.stringify(body.params),
-    });
+    let resp: Response;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cron-secret': CRON_SECRET(),
+        },
+        body: JSON.stringify(body.params),
+      });
+    } catch (e) {
+      await gate.settle(0);
+      throw e;
+    }
     const latency_ms = Date.now() - start;
 
     let mivaaJson: any = null;
     try { mivaaJson = await resp.json(); } catch { /* ignore */ }
     const ok = resp.ok && mivaaJson?.success;
     const data = mivaaJson?.data;
+    // A failed run refunds the whole reserve; a successful one settles against the provider's
+    // own reported cost, which is also what lands in `seo_research_runs.cost_usd` below — it was
+    // hardcoded to 0, so every run reported as free regardless of what it spent.
+    const upstreamCostUsd = ok ? Number(data?.cost_usd) : 0;
+    await gate.settle(ok && Number.isFinite(upstreamCostUsd) ? upstreamCostUsd : (ok ? undefined : 0));
 
     // File the run under the workspace + connected website so it surfaces in the
     // website's SEO dashboard. website_id: explicit body.website_id → default site.
@@ -106,7 +127,7 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
         response: data || null,
         country_code: (body.params as any)?.country_codes?.[0] || null,
         language_code: (body.params as any)?.language_codes?.[0] || null,
-        cost_usd: 0,
+        cost_usd: Number.isFinite(upstreamCostUsd) ? upstreamCostUsd : null,
         latency_ms,
         success: ok,
         error_message: ok ? null : (mivaaJson?.detail || `MIVAA ${resp.status}`),

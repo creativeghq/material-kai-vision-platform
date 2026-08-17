@@ -23,6 +23,45 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 1;
 const RETRY_DELAY_MS = 2_000;
 
+/** A failure the upstream already decided; retrying it only spends money again. */
+class NonRetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonRetryableError';
+  }
+}
+
+/**
+ * DataForSEO reports failure inside a 200 response. Returns a message when the top-level or any
+ * per-task status is an error, `null` when everything succeeded.
+ * 20000 = Ok, 20100 = Task Created. 30000+ is a failure of some kind; 40000+ is a hard error.
+ */
+function taskStatusError(endpoint: string, json: unknown): string | null {
+  if (!json || typeof json !== 'object') return null;
+  const d = json as Record<string, any>;
+
+  const bad = (code: unknown): boolean => {
+    const n = Number(code);
+    return Number.isFinite(n) && n >= 30000;
+  };
+
+  if (bad(d.status_code)) {
+    return `DataForSEO ${endpoint} failed (status ${d.status_code}): ${d.status_message ?? 'no message'}`;
+  }
+  const tasks = Array.isArray(d.tasks) ? d.tasks : [];
+  for (const t of tasks) {
+    if (bad(t?.status_code)) {
+      return `DataForSEO ${endpoint} task failed (status ${t.status_code}): ${t.status_message ?? 'no message'}`;
+    }
+  }
+  // `tasks_error` is the count DataForSEO puts alongside `tasks_count`; a non-zero value with no
+  // per-task code still means part of what we paid for did not run.
+  if (Number(d.tasks_error) > 0) {
+    return `DataForSEO ${endpoint} reported ${d.tasks_error} failed task(s) of ${d.tasks_count ?? '?'}`;
+  }
+  return null;
+}
+
 export class DataForSEOClient {
   private authHeader: string;
 
@@ -525,11 +564,21 @@ export class DataForSEOClient {
           );
         }
 
-        return await response.json();
+        const json = await response.json();
+        // DataForSEO answers HTTP 200 for a FAILED task and puts the verdict in `status_code`
+        // (20000-29999 = ok). Returning the body unchecked means a paid call that produced
+        // nothing reads as a successful one and its `result` array is simply empty — a silent
+        // zero with a receipt. (#365 AD-14)
+        const statusError = taskStatusError(endpoint, json);
+        // Not retried: the upstream ANSWERED, and it answered with a rejection. Retrying a
+        // deterministic task error just pays DataForSEO twice for the same refusal.
+        if (statusError) throw new NonRetryableError(statusError);
+        return json;
       } catch (error) {
         lastError = error as Error;
         if (
           lastError.name === 'AbortError' ||
+          lastError instanceof NonRetryableError ||
           (attempt >= MAX_RETRIES)
         ) {
           break;

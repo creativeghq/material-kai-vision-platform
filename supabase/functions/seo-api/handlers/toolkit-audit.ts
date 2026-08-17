@@ -26,7 +26,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
-import { chargeCronWorkspace, chargeCronUser } from '../../_shared/cron-billing.ts';
+import { chargeCronWorkspace, chargeCronUser, refundCronWorkspace, refundCronUser } from '../../_shared/cron-billing.ts';
 import { SEO_MODULE } from './entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -136,7 +136,35 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
       if (!ent.ok) return ent.response;
     }
 
-    const result = await runAuditFor(sb, td, source);
+    // …and meter it, exactly as the cron branch does. Entitlement answers "may this workspace use
+    // the module", not "has it paid for this run": an entitled workspace could press "Audit now"
+    // in a loop and spend the operator's DataForSEO balance for free, while the identical work on
+    // the hourly tick was charged 3 credits. Same unit of work, same cron key, same price.
+    // (#365 AD-13)
+    const gate = (td as any).workspace_id
+      ? await chargeCronWorkspace(sb, (td as any).workspace_id, 'seo-toolkit-audit', {
+          description: `SEO audit: ${(td as any).domain}`,
+        })
+      : await chargeCronUser(sb, userId, 'seo-toolkit-audit', {
+          description: `SEO audit: ${(td as any).domain}`,
+        });
+    if (!gate.allowed) {
+      return jsonResponse({ ok: false, error: 'Not enough credits to run this audit.' }, 402);
+    }
+
+    let result: { audit_id: string };
+    try {
+      result = await runAuditFor(sb, td, source);
+    } catch (e) {
+      // Charged before the upstream (invariant 10), so a failed audit has to give it back or a
+      // provider outage becomes a standing charge for nothing.
+      if (gate.charged > 0) {
+        await ((td as any).workspace_id
+          ? refundCronWorkspace(sb, (td as any).workspace_id, 'seo-toolkit-audit', gate.charged, 'Audit failed')
+          : refundCronUser(sb, userId, 'seo-toolkit-audit', gate.charged, 'Audit failed'));
+      }
+      throw e;
+    }
     return jsonResponse({ ok: true, audit_id: result.audit_id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

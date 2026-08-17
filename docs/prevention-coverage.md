@@ -78,6 +78,20 @@ indistinguishable from there.
 - **Proven to fire:** 2026-08-10 — the debit was deleted from the session door and 1 of 6 assertions failed; the file was restored byte-identical.
 - **Blind spot:** source-level, so it pins the shape of the three doors it knows about. A *fourth* caller of `svc.refresh()` is only caught because the test enumerates doors by decorator — add one and you must add it to `PAID_REFRESH_DOORS`, which nothing forces.
 
+**And the same shape on the edge side, found by #365 `AD-13` (2026-08-16):** ~50 SEO agent tools
+reach DataForSEO through MIVAA on the operator's `x-cron-secret`, and **no layer debited anybody**.
+Four audits looked for the meter and each concluded it must be somewhere else — #352 `A18` at the
+tool wrappers, #361 `EG-4` in `seo-api`, the MIVAA route review, `AD-13` in the raw client. It was
+nowhere: `dataforseo` had no row in `ai_model_pricing` at all, so there was no price to charge,
+while `seo_site_crawl_start` accepted `max_pages` up to 1000. The "Audit now" button on the SEO
+dashboard was free for the same reason the hourly cron behind it was not — the cron branch charged
+`seo-toolkit-audit`, the manual branch checked entitlement and stopped there. Entitlement answers
+"may this workspace use the module", never "has it paid for this run".
+
+- **Guarded by:** [tests/unit/dataforseoSpendGate.test.ts](../tests/unit/dataforseoSpendGate.test.ts) — every dispatcher in `_shared/tools/seo-agent-tools.ts` that fetches the SEO gateway must open a spend gate BEFORE the fetch, read its answer, and settle on both the success and the failure path. It also pins the $0.001 billing unit against the `dataforseo-request` pricing row (the two are one constant expressed twice), that no ceiling is 0, and that a response reporting no cost keeps its reserve rather than settling to free.
+- **Proven to fire:** 2026-08-16 — the gate was deleted from `callDataForSEO` and 2 of 8 assertions failed; the file was restored byte-identical.
+- **Blind spot:** it enumerates dispatchers by "top-level `async function` containing `await fetch(`", so a paid call made from inside a *tool body* rather than a dispatcher is invisible to it. MIVAA is a separate repo and empty in CI, so nothing here says what `/seo-agent/*` does once the request lands.
+
 ### 3. Dead input — a control that changes nothing
 Lists and toggles that never reach the engine; a tool registered on an agent but absent from every
 toolkit cluster is stripped and unreachable.
