@@ -209,6 +209,75 @@ describe('PQ-13 / PQ-14 — a candidate list is scoped, and money input is valid
   });
 });
 
+describe('the cost basis is withheld at the COLUMN, everywhere it flows', () => {
+  // The cost basis does not stay in `quote_items`. `issue_invoice_from_quote` copies it onto
+  // `invoice_items.unit_cost_snapshot`, `materialize_upstream_orders` onto `order_items.unit_cost`,
+  // and both of those tables' SELECT policies are plain workspace membership — which the `client`
+  // role a project customer is issued satisfies. Locking one table and not the others just moves
+  // where the customer reads it from.
+  //
+  // Each of these columns is now unselectable by `authenticated` at the database, so naming one in
+  // a browser query fails the WHOLE query. That is loud, but it is loud on the USER's screen — this
+  // test is what makes it loud in CI instead.
+  const WITHHELD: Record<string, string[]> = {
+    invoice_items: ['unit_cost_snapshot', 'line_cost', 'line_margin'],
+    order_items: ['unit_cost'],
+  };
+  const FINANCE_READERS = [
+    'src/modules/finance/services/financeService.ts',
+    'src/modules/finance/services/ordersService.ts',
+    'src/modules/finance/components/InvoicePreviewModal.tsx',
+    'src/modules/finance/components/NewCreditNoteDialog.tsx',
+    'src/modules/finance/services/deliveryNotesService.ts',
+    'src/modules/finance/services/accountingExportService.ts',
+  ];
+
+  it('no browser query names a withheld line-cost column', () => {
+    const offenders: string[] = [];
+    let scanned = 0;
+    for (const rel of FINANCE_READERS) {
+      const src = read(rel);
+      for (const [table, cols] of Object.entries(WITHHELD)) {
+        const re = new RegExp(`\\.from\\(\\s*['"]${table}['"]\\s*\\)[^;]{0,600}?\\.select\\(([^;]*?)\\)`, 'g');
+        for (const m of src.matchAll(re)) {
+          scanned += 1;
+          const asked = m[1];
+          const bad = cols.filter((c) => new RegExp(`\\b${c}\\b`).test(asked));
+          // `select('*')` on either table IS the failure — it asks for the withheld ones too.
+          if (/['"]\*['"]/.test(asked)) bad.push('*');
+          if (bad.length) offenders.push(`${rel} — ${table}: ${[...new Set(bad)].join(', ')}`);
+        }
+      }
+    }
+    // An inert scan reports "clean" exactly like a clean codebase does.
+    expect(scanned, 'the scan matched no invoice_items / order_items query at all').toBeGreaterThan(3);
+    expect(
+      offenders,
+      'These ask for a column `authenticated` cannot select, so the query returns a permission '
+      + 'error rather than data. Use financeService.invoiceItemCosts() / ordersService.orderItemCosts(), '
+      + 'which gate on is_workspace_sell_side.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('both gated readers exist and treat a failure as unknown, not zero', () => {
+    const fin = read('src/modules/finance/services/financeService.ts');
+    const ord = read('src/modules/finance/services/ordersService.ts');
+    expect(fin, 'invoiceItemCosts is gone — no invoice can show margin').toContain('get_invoice_item_costs');
+    expect(ord, 'orderItemCosts is gone — no order can show cost').toContain('get_order_item_costs');
+    expect(fin.slice(fin.indexOf('async invoiceItemCosts'), fin.indexOf('async invoiceItemCosts') + 1200),
+      'financeService: a failed cost read no longer returns an empty map').toMatch(/return new Map\(\)/);
+    expect(ord.slice(ord.indexOf('async orderItemCosts'), ord.indexOf('async orderItemCosts') + 1200),
+      'ordersService: a failed cost read no longer returns an empty map').toMatch(/return new Map\(\)/);
+  });
+
+  it('the monthly P&L goes through the RPC, not the view', () => {
+    const fin = read('src/modules/finance/services/financeService.ts');
+    expect(fin, 'the browser reads vw_monthly_pnl directly again — it is no longer granted to authenticated')
+      .not.toMatch(/from\(\s*['"]vw_monthly_pnl['"]/);
+    expect(fin, 'get_monthly_pnl is gone — the finance page has no P&L').toContain('get_monthly_pnl');
+  });
+});
+
 describe('PQ-9 — internal site photos are not served by public URL', () => {
   const src = read('src/modules/projects/services/siteService.ts');
 

@@ -645,6 +645,29 @@ export interface CashFlowRow {
 // Invoices
 // =============================================================================
 
+/**
+ * Every `invoice_items` column the browser may select. `unit_cost_snapshot`, `line_cost` and
+ * `line_margin` are NOT among them — not selectable by `authenticated` at all since #358, so
+ * `select('*')` fails outright rather than over-sharing. Cost arrives via `invoiceItemCosts()`.
+ */
+const INVOICE_ITEM_SELECT = [
+  'id', 'invoice_id', 'product_id', 'source_quote_item_id', 'description', 'sku', 'unit',
+  'quantity', 'unit_price', 'discounted_price', 'line_total', 'added_at', 'vat_category',
+  'net_value', 'vat_amount', 'income_classification_type', 'income_classification_category',
+  'measurement_unit_code', 'selected_attributes', 'selected_color', 'selected_size',
+  'withheld_amount', 'withheld_category', 'fees_amount', 'fees_category', 'stamp_duty_amount',
+  'stamp_duty_category', 'other_taxes_amount', 'other_taxes_category', 'deductions_amount',
+  'line_comments', 'vat_exemption_category', 'taric_code', 'country_of_origin', 'net_mass_kg',
+  'invoice_detail_type',
+].join(', ');
+
+/** The cost half of an invoice line, as `get_invoice_item_costs` returns it. */
+export interface InvoiceLineCost {
+  unit_cost_snapshot: number | null;
+  line_cost: number | null;
+  line_margin: number | null;
+}
+
 const _financeServiceCore = {
   // -------- Invoices --------
 
@@ -842,12 +865,21 @@ const _financeServiceCore = {
       .single();
     if (invErr) throw invErr;
 
+    // Listed, not starred: `unit_cost_snapshot`, `line_cost` and `line_margin` are not selectable
+    // by the browser (#358), so `select('*')` fails outright. The cost comes back through the
+    // gated RPC below and is merged in — dropping it would make a duplicated invoice read as 100%
+    // margin, which is the failure the clone comment already warns about.
     const { data: items, error: itemsErr } = await supabase
       .from('invoice_items')
-      .select('*')
+      .select(INVOICE_ITEM_SELECT)
       .eq('invoice_id', invoiceId)
       .order('added_at', { ascending: true });
     if (itemsErr) throw itemsErr;
+    const lineCosts = await financeService.invoiceItemCosts([invoiceId]);
+    const itemsWithCost = (items ?? []).map((it: any) => ({
+      ...it,
+      unit_cost_snapshot: lineCosts.get(it.id)?.unit_cost_snapshot ?? null,
+    }));
 
     const { data: allocs } = await supabase
       .from('payment_allocations')
@@ -881,10 +913,40 @@ const _financeServiceCore = {
 
     return {
       ...(invoice as Invoice),
-      items: (items ?? []) as InvoiceItem[],
+      items: itemsWithCost as InvoiceItem[],
       payments,
       credit_notes: (creditNotes ?? []) as CreditNote[],
     };
+  },
+
+  /**
+   * Per-line COGS for a set of invoices, keyed by invoice_item id.
+   *
+   * `invoice_items.unit_cost_snapshot` — and `line_cost` / `line_margin`, both GENERATED from it —
+   * are not selectable by the browser (#358). `issue_invoice_from_quote` copies the quote line's
+   * cost snapshot onto them, so without this gate the cost that was locked out of `quote_items`
+   * reappeared on the invoice line, readable by every workspace member on every invoice.
+   *
+   * An invoice the caller is not sell-side in contributes no entries; a failed read returns an
+   * empty map. Both mean cost UNKNOWN, never zero.
+   */
+  async invoiceItemCosts(invoiceIds: string[]): Promise<Map<string, InvoiceLineCost>> {
+    const ids = [...new Set(invoiceIds.filter(Boolean))];
+    if (ids.length === 0) return new Map();
+    const { data, error } = await (supabase as any).rpc('get_invoice_item_costs', { p_invoice_ids: ids });
+    if (error) {
+      console.error('[financeService] get_invoice_item_costs failed - cost is unknown, not zero:', error);
+      return new Map();
+    }
+    const out = new Map<string, InvoiceLineCost>();
+    for (const r of (data ?? []) as Array<InvoiceLineCost & { invoice_item_id: string }>) {
+      out.set(r.invoice_item_id, {
+        unit_cost_snapshot: r.unit_cost_snapshot != null ? Number(r.unit_cost_snapshot) : null,
+        line_cost: r.line_cost != null ? Number(r.line_cost) : null,
+        line_margin: r.line_margin != null ? Number(r.line_margin) : null,
+      });
+    }
+    return out;
   },
 
   async issueInvoiceFromQuote(
@@ -2577,15 +2639,19 @@ const _financeServiceCore = {
     return (data ?? []) as FollowUpRow[];
   },
 
+  /**
+   * `vw_monthly_pnl` reads `invoice_items.line_cost` and `order_items.unit_cost`, neither of which
+   * the browser can select since #358, so the view is no longer granted to `authenticated` — it is
+   * unchanged and still served to `service_role` (finance-digest-aggregate). The RPC is the
+   * browser's path and gates on `is_workspace_sell_side`.
+   */
   async getMonthlyPnl(workspaceId: string, monthsBack = 12): Promise<PnlRow[]> {
     const cutoff = new Date();
     cutoff.setMonth(cutoff.getMonth() - monthsBack);
-    const { data, error } = await supabase
-      .from('vw_monthly_pnl')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .gte('period_month', toLocalISODate(cutoff))
-      .order('period_month', { ascending: true });
+    const { data, error } = await (supabase as any).rpc('get_monthly_pnl', {
+      p_workspace_id: workspaceId,
+      p_from: toLocalISODate(cutoff),
+    });
     if (error) throw error;
     return (data ?? []) as PnlRow[];
   },

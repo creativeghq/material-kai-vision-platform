@@ -144,6 +144,23 @@ export interface OrderItem {
   sort_order: number;
 }
 
+/**
+ * Every `order_items` column the browser may select. `unit_cost` is NOT among them — it is not
+ * selectable by `authenticated` at all since #358, and `select('*')` therefore fails outright
+ * rather than over-sharing. It arrives through `orderItemCosts()` for the sell side only.
+ *
+ * Listed rather than starred on purpose: a column added later is invisible here until someone
+ * adds it, which is the same fail-closed default the grant itself has.
+ */
+const ORDER_ITEM_SELECT = [
+  'id', 'order_id', 'workspace_id', 'product_id', 'description', 'quantity', 'unit_price',
+  'vat_category', 'vat_percent', 'vat_exemption_category', 'net_value', 'vat_amount', 'line_total',
+  'quantity_delivered', 'quantity_shipped', 'update_warehouse', 'sort_order', 'created_at',
+  'measurement_unit_code', 'supplier_company_id', 'discount_pct', 'warehouse_id', 'taric_code',
+  'country_of_origin', 'net_mass_kg', 'selected_attributes', 'selected_size', 'selected_color',
+  'price_source',
+].join(', ');
+
 export interface OrderListRow extends Order {
   party_name: string | null;
 }
@@ -696,11 +713,41 @@ export const ordersService = {
     };
   },
 
+  /**
+   * Per-line `unit_cost` for a set of orders, keyed by order_item id.
+   *
+   * `order_items.unit_cost` is not selectable by the browser (#358) — this RPC is the only path,
+   * and it gates on `is_workspace_sell_side`. An order the caller is not sell-side in contributes
+   * no entries, and a failed read returns an empty map. Both mean cost UNKNOWN, never zero.
+   */
+  async orderItemCosts(orderIds: string[]): Promise<Map<string, number>> {
+    const ids = [...new Set(orderIds.filter(Boolean))];
+    if (ids.length === 0) return new Map();
+    const { data, error } = await (supabase as any).rpc('get_order_item_costs', { p_order_ids: ids });
+    if (error) {
+      console.error('[ordersService] get_order_item_costs failed - cost is unknown, not zero:', error);
+      return new Map();
+    }
+    const out = new Map<string, number>();
+    for (const r of (data ?? []) as Array<{ order_item_id: string; unit_cost: number | null }>) {
+      if (r.unit_cost != null) out.set(r.order_item_id, Number(r.unit_cost));
+    }
+    return out;
+  },
+
   async get(id: string): Promise<{ order: Order; items: OrderItem[] }> {
     const { data: order, error } = await supabase.from('orders').select('*').eq('id', id).single();
     if (error) throw error;
-    const { data: items } = await supabase.from('order_items').select('*').eq('order_id', id).order('sort_order', { ascending: true });
-    return { order: order as Order, items: (items ?? []) as OrderItem[] };
+    const [{ data: items }, costs] = await Promise.all([
+      supabase.from('order_items').select(ORDER_ITEM_SELECT).eq('order_id', id).order('sort_order', { ascending: true }),
+      this.orderItemCosts([id]),
+    ]);
+    // A line the caller may not see the cost of comes back with `unit_cost: null` — cost unknown,
+    // which the panel renders as a dash. It is never folded to 0, which would read as free.
+    return {
+      order: order as Order,
+      items: ((items ?? []) as OrderItem[]).map((it) => ({ ...it, unit_cost: costs.get(it.id) ?? null })),
+    };
   },
 
   /**
@@ -1061,9 +1108,12 @@ export const ordersService = {
     const { data: items, error: iErr } = await supabase.from('order_items')
       // selected_* included deliberately: a reorder that drops the variant is a reorder of a
       // DIFFERENT product — same description, no size, and nothing downstream can tell.
-      .select('product_id, description, quantity, unit_price, unit_cost, measurement_unit_code, price_source, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order, selected_attributes, selected_size, selected_color')
+      .select('id, product_id, description, quantity, unit_price, measurement_unit_code, price_source, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order, selected_attributes, selected_size, selected_color')
       .eq('order_id', orderId).order('sort_order', { ascending: true });
     if (iErr) throw iErr;
+    // `unit_cost` is sell-side-only (#358); a reorder built by someone who cannot see it carries
+    // no cost rather than a zero one, and the reprice fills it in.
+    const reorderCosts = await this.orderItemCosts([orderId]);
 
     const isSales = o.order_type === 'sales';
     const companyId = (isSales ? o.customer_company_id : o.supplier_company_id) as string | null;
@@ -1072,8 +1122,9 @@ export const ordersService = {
     const changes: Array<{ description: string; was: number; now: number }> = [];
     const lines = await Promise.all(((items ?? []) as any[]).map(async (it) => {
       const wasPrice = Number(it.unit_price) || 0;
+      const wasCost = reorderCosts.get(it.id as string) ?? null;
       let price = wasPrice;
-      let cost = it.unit_cost != null ? Number(it.unit_cost) : null;
+      let cost = wasCost;
       let supplier = (it.supplier_company_id as string | null) ?? null;
       let available: number | null = null;
       // Only catalog-linked lines can be re-priced; a free-text line has no price to look up, so
@@ -1117,7 +1168,7 @@ export const ordersService = {
         // original prices" without a second round trip. This is what the old separate "Duplicate
         // order" action did, now a toggle instead of a whole parallel flow.
         original_unit_price: wasPrice,
-        original_unit_cost: it.unit_cost != null ? Number(it.unit_cost) : null,
+        original_unit_cost: wasCost,
         // The variant the original line was for. Selected above; returned here, or the prefill
         // would hand back a line stripped of the identity it was just re-priced at.
         selected_attributes: (it.selected_attributes as Record<string, string> | null) ?? null,
@@ -1780,12 +1831,15 @@ export const ordersService = {
    * `cost_net`/`has_vat` are returned for the UI breakdown. Subtract cash already paid to the
    * supplier on this order. Drives the AP view. */
   async getOrderSupplierExposure(orderId: string): Promise<Array<{ supplier_company_id: string; name: string; cost_net: number; cost: number; has_vat: boolean; paid: number; owed: number }>> {
-    const { data: items } = await supabase.from('order_items')
-      .select('supplier_company_id, quantity, unit_cost, vat_percent').eq('order_id', orderId);
+    const [{ data: items }, exposureCosts] = await Promise.all([
+      supabase.from('order_items').select('id, supplier_company_id, quantity, vat_percent').eq('order_id', orderId),
+      this.orderItemCosts([orderId]),
+    ]);
     const bySup = new Map<string, { net: number; gross: number }>();
-    for (const it of (items ?? []) as Array<{ supplier_company_id: string | null; quantity: number; unit_cost: number | null; vat_percent: number | null }>) {
-      if (!it.supplier_company_id || it.unit_cost == null) continue;
-      const net = Number(it.unit_cost) * Number(it.quantity);
+    for (const it of (items ?? []) as Array<{ id: string; supplier_company_id: string | null; quantity: number; vat_percent: number | null }>) {
+      const unitCost = exposureCosts.get(it.id) ?? null;
+      if (!it.supplier_company_id || unitCost == null) continue;
+      const net = Number(unitCost) * Number(it.quantity);
       const gross = net * (1 + (Number(it.vat_percent ?? 0) || 0) / 100);
       const cur = bySup.get(it.supplier_company_id) ?? { net: 0, gross: 0 };
       cur.net += net; cur.gross += gross;

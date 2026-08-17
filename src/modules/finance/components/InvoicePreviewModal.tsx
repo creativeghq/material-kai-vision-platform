@@ -55,7 +55,17 @@ export function InvoicePreviewModal({
         const { data: invoice, error } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
         if (error || !invoice) throw error ?? new Error('Invoice not found');
         const [{ data: items }, { data: settings }] = await Promise.all([
-          supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('added_at'),
+          // Explicit columns: the preview renders what the CUSTOMER will see, so it has no
+          // business asking for the cost snapshot — and could not get it anyway (#358).
+          supabase.from('invoice_items')
+            .select('id, invoice_id, product_id, description, sku, unit, quantity, unit_price, '
+              + 'discounted_price, line_total, net_value, vat_amount, vat_category, '
+              + 'vat_exemption_category, measurement_unit_code, income_classification_type, '
+              + 'income_classification_category, selected_attributes, selected_size, selected_color, '
+              + 'withheld_amount, withheld_category, fees_amount, fees_category, stamp_duty_amount, '
+              + 'stamp_duty_category, other_taxes_amount, other_taxes_category, deductions_amount, '
+              + 'line_comments, taric_code, country_of_origin, net_mass_kg, invoice_detail_type, added_at')
+            .eq('invoice_id', invoiceId).order('added_at'),
           supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
         ]);
 
