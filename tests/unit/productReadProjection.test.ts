@@ -65,7 +65,14 @@ describe('reads of the products table are projected', () => {
     // allowed. Without it — which is the easy mistake — the same call downloads every row.
     const offenders: string[] = [];
     for (const { rel, src } of FILES) {
-      const re = /\.from\(\s*['"]products['"]\s*\)[\s\S]{0,200}?\.select\(\s*['"]\*['"]([^)]*)\)/g;
+      // `[^;]` — not `[\s\S]` — so the gap cannot run past the end of the query it belongs to.
+      // A PostgREST chain contains no semicolon, so this costs nothing and closes a false
+      // positive that depended on LINE ENDINGS: in `PDFDocumentDetails.tsx` a correctly
+      // projected products read sits 198 characters before an unrelated `document_chunks`
+      // `.select('*')`, so the old span matched under LF and missed under CRLF. It passed on
+      // every Windows checkout and failed in CI, where it blocked the deploy from #368 onward
+      // while three commits' worth of `deploy-functions` jobs were quietly skipped.
+      const re = /\.from\(\s*['"]products['"]\s*\)[^;]{0,200}?\.select\(\s*['"]\*['"]([^)]*)\)/g;
       for (const m of src.matchAll(re)) {
         if (/head\s*:\s*true/.test(m[1])) continue;
         const line = src.slice(0, m.index).split('\n').length;
