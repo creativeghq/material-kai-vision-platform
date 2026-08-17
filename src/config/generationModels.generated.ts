@@ -433,7 +433,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
       ],
       "needs_prompt": true
     },
-    "pricing_key": null,
+    "pricing_key": "flux-depth-pro",
     "tier": "premium",
     "status": "active",
     "enabled": true,
@@ -456,7 +456,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
       ],
       "needs_prompt": false
     },
-    "pricing_key": null,
+    "pricing_key": "proplabs-virtual-staging",
     "tier": "standard",
     "status": "active",
     "enabled": true,
@@ -532,29 +532,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 220
   },
   {
-    "id": "marble-1.0-draft",
-    "display_name": "Marble 1.0 Draft",
-    "capability": "3d",
-    "sub_capability": "image-to-world",
-    "provider": "worldlabs",
-    "slug": "marble-1.0-draft",
-    "version": null,
-    "adapter": "worldlabs",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": false
-    },
-    "pricing_key": null,
-    "tier": "budget",
-    "status": "active",
-    "enabled": true,
-    "sort_order": 300
-  },
-  {
     "id": "marble-1.1",
     "display_name": "Marble 1.1",
     "capability": "3d",
@@ -571,7 +548,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
       ],
       "needs_prompt": false
     },
-    "pricing_key": null,
+    "pricing_key": "marble-1.1",
     "tier": "premium",
     "status": "active",
     "enabled": true,

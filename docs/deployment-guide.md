@@ -1256,7 +1256,6 @@ This section covers all third-party services used by the platform, their pricing
 
 | World Quality | Credits | Time |
 |--------------|---------|------|
-| `marble-1.0-draft` | 18 credits | ~30–45 seconds |
 | `marble-1.1` | 190 credits | ~5 minutes |
 
 Credits are refunded on generation failure.

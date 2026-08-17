@@ -28,20 +28,21 @@ const worldlabsApiKey = () => Deno.env.get('WORLDLABS_API_KEY') || '';
 
 const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
-// Credit costs per model (raw cost × MARKUP_MULTIPLIER × 100 credits/$)
-// WorldLabs pricing: $1 = 1,250 WL credits
-// Charge the ADVERTISED price — the agent tool (VR_CREDIT_COSTS), the "N credits used" message it
-// returns, vrWorldService, and CLAUDE.md all quote 18 for draft / 190 for 1.1. The edge was silently
-// charging 28 for draft (a ~55% overcharge vs the quoted number). Honor the quote; a real price change
-// must update every surface together, not just this constant.
+// Credit cost (raw cost x MARKUP_MULTIPLIER x 100 credits/$)
+// WorldLabs pricing: $1 = 1,250 WL credits. Marble 1.1 is 1,580 WL credits = $1.264 per world,
+// which is the figure now recorded in `ai_model_pricing` ('marble-1.1').
+//
+// `marble-1.0-draft` was RETIRED — Marble 1.1 is the only VR model. Note this makes 1.1 the
+// default, so a caller that omits `model` now pays 190 credits where it used to pay 18. That is
+// the intended consequence of having one tier, not an oversight.
 const CREDIT_COSTS: Record<string, number> = {
-  'marble-1.0-draft': 18,
   'marble-1.1': 190,
 };
 
-// Max polling duration (3 minutes for draft, 7 minutes for 1.1)
+const DEFAULT_VR_MODEL = 'marble-1.1';
+
+// Max polling duration (7 minutes for 1.1)
 const MAX_POLL_DURATION: Record<string, number> = {
-  'marble-1.0-draft': 180_000,
   'marble-1.1': 420_000,
 };
 
@@ -127,8 +128,19 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       return jsonResponse({ success: false, error: 'Missing prompt' }, 400);
     }
 
-    const model = body.model || 'marble-1.0-draft';
-    const creditCost = CREDIT_COSTS[model] || CREDIT_COSTS['marble-1.0-draft'];
+    // Reject an unknown model rather than falling back to the default's price. With
+    // marble-1.0-draft retired, a client still sending it would otherwise be charged 190
+    // credits for a model name WorldLabs will reject — debited for work that cannot happen,
+    // and told only by the upstream failure. The old `CREDIT_COSTS[model] || <default>` shape
+    // hid exactly that, because an unknown key is `undefined` and `undefined || 190` is 190.
+    const model = body.model || DEFAULT_VR_MODEL;
+    const creditCost = CREDIT_COSTS[model];
+    if (typeof creditCost !== 'number') {
+      return jsonResponse({
+        success: false,
+        error: `Unknown model '${model}'. Supported: ${Object.keys(CREDIT_COSTS).join(', ')}.`,
+      }, 400);
+    }
 
     // Check and debit credits
     const { data: debitResult, error: debitError } = await supabase.rpc('debit_credits', {
@@ -381,7 +393,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       // credits were silently kept by the platform.
       try {
         const creditCost = (typeof body !== 'undefined' && body?.model && CREDIT_COSTS[body.model])
-          || CREDIT_COSTS['marble-1.0-draft'];
+          || CREDIT_COSTS[DEFAULT_VR_MODEL];
         await supabase.rpc('refund_credits', {
           p_user_id: userId,
           p_amount: creditCost,

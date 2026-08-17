@@ -181,7 +181,7 @@ Masked inpainting — regenerate a painted zone in a room image.
 #### VR World Generation
 Generate 3D Gaussian Splat worlds from interior images via WorldLabs Marble.
 - **Function:** `generate-vr-world`
-- **Models:** `marble-1.0-draft` (18 cr, ~30–45s), `marble-1.1` (190 cr, ~5min). Legacy `0.1-mini`/`0.1-plus` deprecated.
+- **Model:** `marble-1.1` (190 cr, ~5min). The `marble-1.0-draft` tier was retired; legacy `0.1-mini`/`0.1-plus` deprecated.
 - **Output:** SPZ splat files (100k/500k/full), collider GLB, panorama, caption — stored in `vr_worlds`
 - **Documentation:** [vr-world-generation.md](../vr-world-generation.md)
 - **Access:** JWT

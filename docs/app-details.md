@@ -297,7 +297,6 @@ Any interior design image — AI-generated or user-uploaded — can be turned in
 
 | Model | Credits | Generation Time | Best For |
 |-------|---------|----------------|---------|
-| marble-1.0-draft | 18 credits | ~30–45 seconds | Quick previews, client check-ins |
 | marble-1.1 | 190 credits | ~5 minutes | High-fidelity final walkthroughs |
 
 Credits are refunded automatically on generation failure.
@@ -624,7 +623,6 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Claude Haiku (1K tokens) | ~$0.0008–0.004 | 1–5 credits | 50–80%+ |
 | GPT-4o-mini (query parsing) | ~$0.0002 | 1 credit | 50x+ |
 | Voyage AI text embedding (1K tokens) | ~$0.00006 | Bundled into search | High |
-| VR World — draft (marble-1.0-draft) | WorldLabs | 18 credits | Pass-through + platform overhead |
 | VR World — quality (marble-1.1) | WorldLabs | 190 credits | Pass-through + platform overhead |
 | Interior design (Replicate) | Replicate variable | Credits per image | Variable |
 | Gemini interior (flash) | ~$0.02 | 6 credits | 3x markup |

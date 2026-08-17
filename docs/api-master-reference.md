@@ -142,6 +142,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `asset-service-reminders-cron` | cron | Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343). |
 | `crm-api` _(GET + POST)_ | JWT / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
+| `crm-company-embedding-backfill` | secret / cron / JWT | Embed CRM companies so lookalike search has something to rank |
 | `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
 | `customer-assets-api` | JWT | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
@@ -190,12 +191,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-moodboard-sheet-pdf` | JWT | Render a moodboard presentation sheet or project client-view to PDF |
 | `moodboard-keep-active` _(GET)_ | token / public | Public one-click "keep this moodboard" target for the dormancy warning email |
 | `moodboard-sheet-share` | public | Public token resolver for shared presentation sheets and project client views |
-
-**PDF Processing**
-
-| Function | Auth | Summary |
-|---|---|---|
-| `pdf-batch-process` _(GET + POST)_ | JWT | Queue, status-check, and cancel batch PDF extraction jobs |
 
 **Data Import**
 
@@ -370,7 +365,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-interior-video-v2` | POST | JWT | Auto-routes by video type to Veo-2, Kling v3.0, Wan 2.1, Runway Gen4. Async polling. | 12–40 | [generate-interior-video-v2-api](api/generate-interior-video-v2-api.md) |
 | `generate-virtual-staging` | POST | JWT | Furnishes empty room photos (Replicate proplabs, 8 room types × 8 styles). | 20 | [generate-virtual-staging-api](api/generate-virtual-staging-api.md) |
 | `generate-region-edit` | POST | JWT | Masked inpainting with Grok Aurora. SAM 2 auto-mask + Pillow fallback. | 20 | [generate-region-edit-api](api/generate-region-edit-api.md) |
-| `generate-vr-world` | POST | JWT | WorldLabs Marble → 3D Gaussian Splat worlds (models: `marble-1.0-draft` / `marble-1.1`). Stored in `vr_worlds`. | 18 / 190 | [vr-world-generation](vr-world-generation.md) |
+| `generate-vr-world` | POST | JWT | WorldLabs Marble → 3D Gaussian Splat worlds (model: `marble-1.1`). Stored in `vr_worlds`. | 190 | [vr-world-generation](vr-world-generation.md) |
 | ~~`generate-pbr-maps`~~ | — | — | **REMOVED 2026-08-11.** Never existed as source; wrote a `pbr_maps` value 0 times. Replaced by `generate-interior-gemini` `mode: material-texture` → `product_material_maps`. | — | — |
 | `generate-quote-pdf` | POST | JWT | Branded quote PDFs with cover/backcover templates from `quote-templates` storage bucket. | — | — |
 

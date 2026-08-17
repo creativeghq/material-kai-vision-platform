@@ -72,10 +72,6 @@
       "description": "Presentation sheets + project Client View deliverables."
     },
     {
-      "name": "PDF Processing",
-      "description": "Batch PDF processing."
-    },
-    {
       "name": "Data Import",
       "description": "XML import, field templates, AI field suggestion."
     },
@@ -2045,6 +2041,95 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crm-company-embedding-backfill": {
+      "post": {
+        "tags": [
+          "CRM"
+        ],
+        "summary": "Embed CRM companies so lookalike search has something to rank",
+        "operationId": "post_crm_company_embedding_backfill",
+        "description": "Drains the derived embedding backlog for crm_companies: every row whose stored embedding_source_hash differs from the hash of crm_company_embedding_text(id) right now. Sequential, small batches, idempotent. Auth: service-role bearer (cron / internal), shared cron secret, or an admin JWT.\n\n**Response:** `{success, processed, succeeded, skipped, failed, remaining, remaining_capped}`",
+        "security": [
+          {
+            "apiKeySecret": []
+          },
+          {
+            "cronSecret": []
+          },
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "description": "Max companies to process this run (clamped to an internal MAX_LIMIT of 200)"
+                  }
                 }
               }
             }
@@ -5336,7 +5421,7 @@
         ],
         "summary": "Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble",
         "operationId": "post_generate_vr_world",
-        "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Models: marble-1.0-draft (28cr, ~3min) and marble-1.1 (190cr, ~7min). Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.\n\n**Response:** `[object Object]`",
+        "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Model: marble-1.1 (190cr, ~7min); the marble-1.0-draft tier was retired. Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.\n\n**Response:** `[object Object]`",
         "security": [
           {
             "supabaseJwt": []
@@ -7331,213 +7416,6 @@
                 "required": [
                   "kb_doc_id"
                 ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/pdf-batch-process": {
-      "post": {
-        "tags": [
-          "PDF Processing"
-        ],
-        "summary": "Queue, status-check, and cancel batch PDF extraction jobs",
-        "operationId": "post_pdf_batch_process",
-        "description": "Creates a batch job that fans out to the pdf-extract function for up to 100 documents concurrently; supports GET for status polling and DELETE for cancellation.\n\n**Routes / actions:**\n- `create (POST)` — Create a new batch job and begin async processing\n- `status (GET)` — Poll batch job status and per-document results\n- `cancel (DELETE)` — Cancel a queued or processing batch job",
-        "security": [
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "PDF Processing"
-        ],
-        "summary": "Queue, status-check, and cancel batch PDF extraction jobs",
-        "operationId": "get_pdf_batch_process",
-        "description": "Creates a batch job that fans out to the pdf-extract function for up to 100 documents concurrently; supports GET for status polling and DELETE for cancellation.\n\n**Routes / actions:**\n- `create (POST)` — Create a new batch job and begin async processing\n- `status (GET)` — Poll batch job status and per-document results\n- `cancel (DELETE)` — Cancel a queued or processing batch job",
-        "security": [
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "PDF Processing"
-        ],
-        "summary": "Queue, status-check, and cancel batch PDF extraction jobs",
-        "operationId": "delete_pdf_batch_process",
-        "description": "Creates a batch job that fans out to the pdf-extract function for up to 100 documents concurrently; supports GET for status polling and DELETE for cancellation.\n\n**Routes / actions:**\n- `create (POST)` — Create a new batch job and begin async processing\n- `status (GET)` — Poll batch job status and per-document results\n- `cancel (DELETE)` — Cancel a queued or processing batch job",
-        "security": [
-          {
-            "supabaseJwt": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
               }
             }
           }
@@ -10327,6 +10205,10 @@
                   "company_id": {
                     "type": "string",
                     "description": "crm_companies.id - if provided and authorized, caches empty-only columns onto the row"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "description": "find-competitors only: force ONE discovery provider ('apollo' | 'gemini' | 'web_search') instead of the first-wins chain"
                   }
                 },
                 "required": [

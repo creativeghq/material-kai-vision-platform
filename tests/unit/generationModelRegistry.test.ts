@@ -169,14 +169,29 @@ describe('generation model registry', () => {
     const unpriced = GENERATION_MODELS.filter((m) => m.pricing_key === null).map((m) => m.id).sort();
     expect(unpriced).toEqual(
       [
-        'flux-depth-pro',        // 20-credit copy-style/redesign path; Replicate publishes no figure
-        'marble-1.0-draft',      // WorldLabs rate not public
-        'marble-1.1',            // WorldLabs rate not public
-        'proplabs-virtual-staging',
-        // 'veo-2' priced 2026-08-17 — its ai_model_pricing row exists and is active, and the
-        // registry now points at it. This list is SHRINK-ONLY: an entry leaves when a real figure
-        // is obtained, and one may only be ADDED for a model whose rate the provider genuinely
-        // does not publish.
+        // EMPTY as of 2026-08-17 — every registered model resolves to an ai_model_pricing row.
+        //
+        // How each of the five got here, because "priced" does not mean the same thing for all
+        // of them and the difference matters when someone reads a margin report:
+        //   veo-2                    $0.35/s   — published Gemini Developer API rate.
+        //   marble-1.1               $1.264    — DERIVED, not guessed: vrWorldService.ts has
+        //                                        recorded 1,580 WL credits at $1 = 1,250 WL
+        //                                        credits since it was written.
+        //   marble-1.0-draft         retired   — the tier no longer exists; 1.1 is the only one.
+        //   proplabs-virtual-staging $0.134    — DELIBERATE PLACEHOLDER, see below.
+        //   flux-depth-pro           $0.134    — DELIBERATE PLACEHOLDER, see below.
+        //
+        // The two placeholders are set to the highest per-image cost the platform pays anywhere
+        // (gemini-3-pro-image) because neither provider publishes a figure. That is a knowing
+        // over-estimate, chosen because over-stating a cost can only make a sale look LESS
+        // profitable than it is — it can never hide a loss, which is the failure this whole
+        // family of checks exists to prevent. They are marked in the database by
+        // `last_verified_at IS NULL`; a verified row always carries a date. Do not read their
+        // margin figures as fact.
+        //
+        // This list is SHRINK-ONLY. An entry leaves when a real figure is obtained. One may be
+        // ADDED only for a model whose rate genuinely cannot be established even conservatively
+        // — and "I could not find it quickly" is not that.
       ].sort(),
     );
   });

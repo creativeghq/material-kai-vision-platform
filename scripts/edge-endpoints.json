@@ -2822,7 +2822,7 @@
     "name": "generate-vr-world",
     "tag": "AI Generation",
     "summary": "Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble",
-    "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Models: marble-1.0-draft (28cr, ~3min) and marble-1.1 (190cr, ~7min). Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.",
+    "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Model: marble-1.1 (190cr, ~7min); the marble-1.0-draft tier was retired. Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.",
     "security": [
       "supabaseJwt"
     ],
@@ -2850,10 +2850,9 @@
         "model": {
           "type": "string",
           "enum": [
-            "marble-1.0-draft",
             "marble-1.1"
           ],
-          "description": "WorldLabs model; defaults to marble-1.0-draft"
+          "description": "WorldLabs model; marble-1.1 is the only tier"
         },
         "is_pano": {
           "type": "boolean",

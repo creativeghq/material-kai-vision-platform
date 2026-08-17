@@ -652,7 +652,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'prompt', type: 'string', optional: true, description: 'Optional caption for the world (e.g. "Modern Scandinavian living room"). Auto-derived from roomType+style if omitted.' },
       { name: 'roomType', type: 'string', optional: true, description: 'Room type for caption (bedroom, living_room, kitchen, etc.)' },
       { name: 'style', type: 'string', optional: true, description: 'Design style for caption (modern, scandinavian, etc.)' },
-      { name: 'model', type: 'enum', enum: ['marble-1.0-draft', 'marble-1.1'], optional: true, description: 'Model. marble-1.0-draft (default, fast, 18cr) or marble-1.1 (slow but higher quality, 190cr). Use 1.1 only when the user explicitly asks for "high quality" or "final" VR.' },
+      { name: 'model', type: 'enum', enum: ['marble-1.1'], optional: true, description: 'Model. marble-1.1 (190cr, ~5min) is the only VR world model.' },
     ],
   },
   {

@@ -1249,7 +1249,7 @@ Invalidate recommendation cache for the current user.
   "prompt": "Modern living room with marble floors and warm lighting",
   "room_type": "living_room",
   "style": "modern",
-  "model": "marble-1.0-draft"
+  "model": "marble-1.1"
 }
 ```
 
@@ -1259,13 +1259,12 @@ Invalidate recommendation cache for the current user.
 | `prompt` | `string` | Yes | Text description of the desired world |
 | `room_type` | `string` | No | Room type hint (e.g. `"living_room"`) |
 | `style` | `string` | No | Style hint (e.g. `"modern"`) |
-| `model` | `string` | No | `"marble-1.0-draft"` (fast preview) or `"marble-1.1"` (quality) |
+| `model` | `string` | No | `"marble-1.1"` (the only VR model) |
 
 ### Credit Costs
 
 | Model | Credits | Estimated Time |
 |-------|---------|---------------|
-| `marble-1.0-draft` | 18 | ~30-45 seconds |
 | `marble-1.1` | 190 | ~5 minutes |
 
 ### Response `200`
@@ -2762,7 +2761,6 @@ The platform uses a credit system for AI operations. Credits are debited per ope
 |---------------|-----------------|
 | JARVIS agent message (Opus) | 0.5-5 credits depending on length |
 | JARVIS agent message (Haiku) | 0.1-1 credit |
-| VR World generation (marble-1.0-draft) | 18 credits |
 | VR World generation (marble-1.1) | 190 credits |
 | RAG text search | 0.5 credits |
 | RAG visual search | 1 credit |

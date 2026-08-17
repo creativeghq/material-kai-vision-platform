@@ -552,7 +552,6 @@ Complete reference of all platform features and capabilities.
 - ✅ Persists across chat sessions
 
 **Models**:
-- `marble-1.0-draft`: 18 credits, ~30-45 seconds (fast preview)
 - `marble-1.1`: 190 credits, ~5 minutes (quality)
 
 **Output Assets**:

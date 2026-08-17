@@ -2584,8 +2584,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // Values are generate_vr_world's `model` z.enum, not the invented
           // 'draft' / 'high-quality' pair they used to be — those matched no enum
           // member, so the agent had to guess the mapping on every single run.
-          { key: 'model', label: 'Quality', kind: 'select', default: 'marble-1.0-draft', options: [
-            { value: 'marble-1.0-draft', label: 'Draft — fast preview (18 credits)' },
+          { key: 'model', label: 'Quality', kind: 'select', default: 'marble-1.1', options: [
             { value: 'marble-1.1', label: 'High quality (190 credits)' },
           ] },
         ],

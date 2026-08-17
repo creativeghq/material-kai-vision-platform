@@ -248,7 +248,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Edge Function:** `generate-vr-world`
 **Frontend Component:** `WorldViewer.tsx`
 **Service:** `vrWorldService.ts`
-**External API:** WorldLabs Marble (`marble-1.0-draft` fast preview, `marble-1.1` quality)
+**External API:** WorldLabs Marble (`marble-1.1`)
 **Documentation:** [vr-world-generation.md](vr-world-generation.md)
 
 ---

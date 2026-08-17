@@ -22,7 +22,6 @@ The VR World Generation feature converts any interior design image into a fully 
 
 | Model | Credits | Generation Time | Best For |
 |-------|---------|-----------------|----------|
-| `marble-1.0-draft` | 18 credits | ~30–45 seconds | Quick previews |
 | `marble-1.1`       | 190 credits | ~5 minutes     | High-quality finals |
 
 > The legacy `marble-0.1-mini` and `marble-0.1-plus` models were deprecated by WorldLabs and are no longer accepted by the API. Pricing: $1 = 1,250 WL credits × 1.50 internal markup.
@@ -135,7 +134,7 @@ The frontend polls the `vr_worlds` table via Supabase real-time subscriptions un
 
 ## Database Schema
 
-The `vr_worlds` table stores: `id`, `workspace_id`, `message_id`, `world_id` (WorldLabs world ID), `model` (marble-1.0-draft or marble-1.1), `status` (generating / completed / failed), `splat_100k_url`, `splat_500k_url`, `splat_full_url`, `collider_glb_url`, `panorama_url`, `thumbnail_url`, `caption`, `credits_used`, `created_at`, and `updated_at`.
+The `vr_worlds` table stores: `id`, `workspace_id`, `message_id`, `world_id` (WorldLabs world ID), `model` (marble-1.1), `status` (generating / completed / failed), `splat_100k_url`, `splat_500k_url`, `splat_full_url`, `collider_glb_url`, `panorama_url`, `thumbnail_url`, `caption`, `credits_used`, `created_at`, and `updated_at`.
 
 ---
 
@@ -145,7 +144,6 @@ Credits are deducted when generation starts and **refunded automatically on fail
 
 | Model | Cost | Time |
 |-------|------|------|
-| marble-1.0-draft | 18 credits  | ~30–45s |
 | marble-1.1       | 190 credits | ~5 min  |
 
 Credit balance is tracked in the internal credit system. See [internal-pricing-credit-system.md](internal-pricing-credit-system.md) for details.

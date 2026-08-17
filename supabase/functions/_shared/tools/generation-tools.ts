@@ -945,7 +945,7 @@ export const createGenerateVRWorldTool = (
 ) => {
   // Mirror CREDIT_COSTS in generate-vr-world/index.ts
   const VR_CREDIT_COSTS: Record<string, number> = {
-    'marble-1.0-draft': 18,
+    // marble-1.0-draft retired — 1.1 is the only VR model.
     'marble-1.1': 190,
   };
 
@@ -961,8 +961,8 @@ export const createGenerateVRWorldTool = (
         }
 
         const resolvedPrompt = prompt || `Interior design: ${roomType || 'room'} in ${style || 'modern'} style`;
-        const resolvedModel = model || 'marble-1.0-draft';
-        const creditsUsed = VR_CREDIT_COSTS[resolvedModel] ?? VR_CREDIT_COSTS['marble-1.0-draft'];
+        const resolvedModel = model || 'marble-1.1';
+        const creditsUsed = VR_CREDIT_COSTS[resolvedModel] ?? VR_CREDIT_COSTS['marble-1.1'];
 
         // marble-1.1 takes ~5min — bump timeout accordingly
         const timeoutMs = resolvedModel === 'marble-1.1' ? 480_000 : 240_000;
@@ -1043,13 +1043,13 @@ export const createGenerateVRWorldTool = (
 - "make this into a VR world" / "turn this room into something I can navigate"
 
 Requires an existing room image — uses the most recent conversation image if no URL is given.
-Models: marble-1.0-draft (~30-45s, 18 credits, default for quick previews) or marble-1.1 (~5min, 190 credits, higher quality).`,
+Model: marble-1.1 (~5min, 190 credits). The faster marble-1.0-draft tier was retired.`,
       schema: z.object({
         sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated/uploaded image.'),
         prompt: z.string().optional().describe('Optional caption for the world (e.g. "Modern Scandinavian living room"). Auto-derived from roomType+style if omitted.'),
         roomType: z.string().optional().describe('Room type for caption (bedroom, living_room, kitchen, etc.)'),
         style: z.string().optional().describe('Design style for caption (modern, scandinavian, etc.)'),
-        model: z.enum(['marble-1.0-draft', 'marble-1.1']).optional().describe('Model. marble-1.0-draft (default, fast, 18cr) or marble-1.1 (slow but higher quality, 190cr). Use 1.1 only when the user explicitly asks for "high quality" or "final" VR.'),
+        model: z.enum(['marble-1.1']).optional().describe('Model. marble-1.1 (190cr, ~5min) is the only VR world model.'),
       }),
     }
   );
