@@ -42,5 +42,19 @@ describe('deploy baseline', () => {
     expect(wf).toMatch(/no deployed\/frontend marker/);
     expect(wf).toMatch(/No deployed\/functions marker/);
     expect(wf).toMatch(/frontend=true/);
+    expect(wf).toMatch(/functions=true/);
+  });
+
+  it('gates both deploy jobs on a verdict that knows about a missing marker', () => {
+    // The first version derived the function LIST from the missing marker but left the JOB GATE
+    // on the raw paths-filter answer. So on a commit touching no functions the job was skipped,
+    // the marker was never created, and the missing-marker recovery path could never run — it was
+    // unreachable precisely when it was needed. Both outputs must come from the resolved verdict.
+    expect(wf).toContain('frontend: ${{ steps.areas.outputs.frontend }}');
+    expect(wf).toContain('functions: ${{ steps.areas.outputs.functions }}');
+    expect(
+      /^\s+functions: \$\{\{ steps\.filter\.outputs\.functions \}\}/m.test(wf),
+      'the functions job gate reads paths-filter directly again — the missing-marker path becomes unreachable',
+    ).toBe(false);
   });
 });

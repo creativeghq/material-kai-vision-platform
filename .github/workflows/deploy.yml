@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.areas.outputs.frontend }}
-      functions: ${{ steps.filter.outputs.functions }}
+      functions: ${{ steps.areas.outputs.functions }}
       shared: ${{ steps.filter.outputs.shared }}
       tests: ${{ steps.filter.outputs.tests }}
       changed_functions: ${{ steps.changed-functions.outputs.list }}
@@ -133,7 +133,7 @@ jobs:
             tests:
               - 'tests/**'
 
-      - name: 🧭 Resolve the frontend verdict
+      - name: 🧭 Resolve the per-area verdicts
         id: areas
         run: |
           set -euo pipefail
@@ -146,6 +146,20 @@ jobs:
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Same for functions, and it needs saying separately because the JOB GATE reads this
+          # output while the function LIST is computed further down. Deriving the list from the
+          # missing marker but leaving the gate on the raw paths-filter answer meant the job was
+          # skipped, the marker was therefore never created, and the missing-marker path could
+          # never run — a recovery route that was unreachable exactly when it was needed. Caught
+          # on the first real run of this change, which skipped deploy-functions and left
+          # deployed/functions absent.
+          if [ -z "${{ steps.base.outputs.functions_base }}" ]; then
+            echo "⚠️  no deployed/functions marker — treating all functions as undeployed"
+            echo "functions=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "functions=${{ steps.filter.outputs.functions }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 🧮 Compute changed functions
