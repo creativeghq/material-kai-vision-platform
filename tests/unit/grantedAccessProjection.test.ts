@@ -104,6 +104,20 @@ describe('EX-4 — an email-gated viewer gets a projection, not the row', () => 
         .toContain(shown);
     }
   });
+
+  it('projects the specification tables row by row rather than passing the jsonb through', () => {
+    const fn = src.slice(src.indexOf('function projectCatalogForViewer'));
+    const projection = fn.slice(0, fn.indexOf('\n}'));
+    expect(projection, 'the public page renders spec_tables — it is no longer projected')
+      .toContain('spec_tables');
+    // The whole point of the allowlist: `spec_tables` is operator-editable jsonb, so handing
+    // the stored group object straight out re-opens EX-4 for any key a future writer adds.
+    expect(projection, 'spec_tables is passed through as stored — project title + label/value instead')
+      .not.toMatch(/spec_tables:\s*(catalog\.)?body_data/);
+    for (const field of ['label', 'value']) {
+      expect(projection, `spec rows no longer project ${field}`).toContain(field);
+    }
+  });
 });
 
 describe('EX-2 — a storage path the service role acts on is derived, not supplied', () => {
