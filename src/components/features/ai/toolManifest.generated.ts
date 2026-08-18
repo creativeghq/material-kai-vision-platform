@@ -1309,7 +1309,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'request_input',
     file: 'supabase/functions/_shared/tools/input-request-tools.ts',
     factory: 'createRequestInputTool',
-    description: 'Ask the user for specific values using an interactive form on the canvas, instead of asking in prose.',
+    description: 'THE way to ask the user anything.',
     params: [
       { name: 'title', type: 'string', optional: false, description: 'Short heading for the form, e.g. "Scope the manufacturer sweep".' },
       { name: 'prompt', type: 'string', optional: true, description: 'One sentence of context shown above the fields.' },

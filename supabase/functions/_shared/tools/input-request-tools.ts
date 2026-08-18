@@ -104,12 +104,18 @@ export const createRequestInputTool = (onChunk: ChunkSink) => {
     {
       name: 'request_input',
       description:
-        'Ask the user for specific values using an interactive form on the canvas, instead of asking '
-        + 'in prose. Use ONLY when the answer genuinely changes what you would build and you cannot '
-        + 'proceed sensibly on defaults — a parameter the tool marks optional is not a reason to ask. '
-        + 'NOT a confirmation gate: approving a spend, a send or a document stays with the confirm '
-        + 'flow. The user can always dismiss the form and tell you to decide, so never treat it as a '
-        + 'precondition. After calling it, stop and wait — do not repeat the questions in your reply.',
+        'THE way to ask the user anything. If you have decided a question is necessary, it goes '
+        + 'through this tool — a question written into your reply instead is a defect, however good '
+        + 'the question is: prose gives the user nothing to act on, cannot carry your proposed '
+        + 'defaults, and cannot be dismissed. '
+        + 'Whether to ask at all is a separate and higher bar: a parameter the tool marks optional '
+        + 'is not a reason to ask, and a broad result the user can correct beats a question. '
+        + 'Pre-fill each field\'s `default` with the value you WOULD have used, so this reads as a '
+        + 'plan to confirm rather than a form to fill in. '
+        + 'NOT a confirmation gate — approving a spend, a send or a document stays with the confirm '
+        + 'flow. The user can always dismiss it and tell you to decide, so never treat an answer as '
+        + 'a precondition. After calling it, stop: say one short line that the form is there, and '
+        + 'do not restate the questions.',
       schema: z.object({
         title: z.string().describe('Short heading for the form, e.g. "Scope the manufacturer sweep".'),
         prompt: z.string().optional().describe('One sentence of context shown above the fields.'),
