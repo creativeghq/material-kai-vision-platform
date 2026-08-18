@@ -869,3 +869,58 @@ describe('the agent can ask a structured question', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * Routing has to be VISIBLE (issue #370).
+ *
+ * JARVIS routes a turn to a specialist and the turn runs as that specialist — but every avatar in
+ * the thread rendered `currentAgent`, i.e. whatever the picker says, so Pepper's replies wore
+ * JARVIS's face. The `agent_routed` chunk only pushed a reasoning step, and reasoning is cleared
+ * between turns, so once the answer landed nothing on screen said a handoff had happened at all.
+ * The message has carried the correct agent id since the routing fix; this pins the half that
+ * reads it.
+ */
+describe('a routed turn shows which specialist answered', () => {
+  const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
+
+  it('assistant avatars resolve from the MESSAGE, not the picker', () => {
+    expect(
+      /const ma = agentForMessage\(message\);/.test(hub),
+      'the assistant avatar must resolve from message.agentId via agentForMessage — rendering ' +
+        'currentAgent puts the selected agent\'s face on a specialist\'s reply',
+    ).toBe(true);
+    expect(
+      /\{message\.role === 'assistant' && \(\s*<AgentAvatar agentId=\{currentAgent\?\.id\}/.test(hub),
+      'the message avatar is reading currentAgent again',
+    ).toBe(false);
+  });
+
+  it('the handoff is stated in words, not just a different face', () => {
+    expect(
+      /wasRoutedMessage\(message\) &&/.test(hub) && /routed by JARVIS/.test(hub),
+      'a routed message must carry a visible label naming the specialist',
+    ).toBe(true);
+  });
+
+  it('routing does NOT repoint the agent picker', () => {
+    // `selectedAgent` is what the NEXT turn is sent as. Repointing it would pin the conversation
+    // to this specialist and stop the orchestrator routing the follow-up — a design question after
+    // a sourcing question would go to Pepper. Routing is per turn, so the indicator is per turn.
+    const handler = hub.slice(hub.indexOf("chunk.type === 'agent_routed'"));
+    const body = handler.slice(0, handler.indexOf('} else if'));
+    expect(
+      /setSelectedAgent\(/.test(body),
+      'the agent_routed handler must not call setSelectedAgent — that pins the conversation to ' +
+        'the specialist and stops the orchestrator routing later turns',
+    ).toBe(false);
+    expect(/setRoutingTo\(/.test(body), 'agent_routed must set the per-turn routing indicator').toBe(true);
+  });
+
+  it('the per-turn indicator is cleared when a new turn starts', () => {
+    // Otherwise the previous turn's specialist shows while this one is still deciding.
+    expect(
+      /setIsLoading\(true\);[\s\S]{0,400}?setRoutingTo\(null\);/.test(hub),
+      'routingTo must be reset at turn start — the orchestrator routes per turn, not per conversation',
+    ).toBe(true);
+  });
+});

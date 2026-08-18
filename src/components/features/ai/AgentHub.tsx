@@ -581,6 +581,8 @@ interface Message {
    * A structured question the agent asked via `request_input` (#370, Class D). Rendered as a
    * ClarifyCard and hosted on the canvas — the agent's only previous way to ask was prose.
    */
+  /** True when JARVIS routed this turn to a specialist; drives the "· routed by JARVIS" label. */
+  routed?: boolean;
   inputRequestData?: InputRequestData;
   sheetPdfData?: {
     sheet_id: string;
@@ -842,6 +844,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'orchestrator');
+  /**
+   * The specialist JARVIS picked for the turn IN FLIGHT. Deliberately NOT `setSelectedAgent`:
+   * `selectedAgent` is what the next turn is sent as, so repointing it would pin the conversation
+   * to this specialist and stop the orchestrator routing the follow-up — a design question about
+   * a room would then go to Pepper. This is a per-turn indicator; the picker still says JARVIS.
+   */
+  const [routingTo, setRoutingTo] = useState<{ id: string; name: string } | null>(null);
   // Initialize with JARVIS (orchestrator) default model
   const [selectedModel, setSelectedModel] = useState<string>(
     AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-4-8',
@@ -2128,6 +2137,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setAttachedDocuments([]);
     setSelectedGenerationMode(null);
     setIsLoading(true);
+    // Stale routing from the PREVIOUS turn would otherwise show the wrong specialist while this
+    // one is still deciding — the orchestrator routes per turn, not per conversation.
+    setRoutingTo(null);
     setReasoningSteps([]); // Clear reasoning steps for new message
 
     try {
@@ -2345,7 +2357,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
               // Capture reasoning steps for Jarvis-style display
               if (chunk.type === 'agent_routed') {
-                // JARVIS auto-routed this turn to a specialist.
+                // JARVIS auto-routed this turn to a specialist. The reasoning step alone was not
+                // enough: reasoning is cleared between turns, so once the answer landed nothing on
+                // screen said a handoff had happened at all.
+                setRoutingTo({ id: chunk.to, name: chunk.name || chunk.to });
                 setReasoningSteps((prev) => [
                   ...prev,
                   {
@@ -3556,6 +3571,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         content: cleanedText || 'No response from agent',
         timestamp: new Date(),
         agentId: data.agentId || selectedAgent,
+        routed: data.routed ?? undefined,
         model: data.model || selectedModel,
         demoData,
         materialData,
@@ -3896,6 +3912,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // from this restore map, so they vanished on conversation reload.
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
           actionConfirmationData: msg.metadata?.actionConfirmationData as any | undefined,
+          routed: msg.metadata?.routed as boolean | undefined,
           inputRequestData: msg.metadata?.inputRequestData as InputRequestData | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
           quoteData: msg.metadata?.quoteData as any | undefined,
@@ -4089,6 +4106,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // identical. The PDF is NOT digested into the product DB.
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
+
+  /**
+   * Which agent actually produced a message.
+   *
+   * JARVIS routes a turn to a specialist and the turn runs AS that specialist, but every avatar in
+   * the thread rendered `currentAgent` — i.e. whatever is selected in the picker — so Pepper's
+   * replies wore JARVIS's face and nothing on screen ever said the handoff had happened. The
+   * message has carried the right id since the routing fix; this is the half that reads it.
+   *
+   * Note `kai` and `orchestrator` are BOTH named JARVIS, so a generalist turn resolves to JARVIS
+   * either way and correctly shows no handoff.
+   */
+  const agentForMessage = useCallback(
+    (m: Message) => AGENTS.find((a) => a.id === m.agentId) ?? currentAgent,
+    [currentAgent],
+  );
+
+  /** True when this message was answered by a specialist the orchestrator picked. */
+  const wasRoutedMessage = useCallback((m: Message) => {
+    if (m.role !== 'assistant') return false;
+    if (typeof m.routed === 'boolean') return m.routed;
+    // Older messages predate the `routed` flag: infer it from the ids.
+    const a = AGENTS.find((x) => x.id === m.agentId);
+    return !!a && a.name !== 'JARVIS' && a.id !== selectedAgent;
+  }, [selectedAgent]);
   const currentConversationTitle = conversations.find((c) => c.id === currentConversationId)?.title;
 
   // Async multi-model room-generation grid (ProgressiveImageGrid, self-polling).
@@ -5259,9 +5301,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   key={message.id}
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {message.role === 'assistant' && (
-                    <AgentAvatar agentId={currentAgent?.id} className={cn('w-8 h-8', currentAgent?.color)} />
-                  )}
+                  {message.role === 'assistant' && (() => {
+                    const ma = agentForMessage(message);
+                    return <AgentAvatar agentId={ma?.id} className={cn('w-8 h-8', ma?.color)} />;
+                  })()}
                   <div
                     className={`${message.demoData || message.materialData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-3.5 sm:p-5 ${
                       message.role === 'user'
@@ -5269,6 +5312,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         : 'msg-assistant text-white shadow-sm'
                     }`}
                   >
+                    {wasRoutedMessage(message) && (
+                      // Says the handoff happened, in words. The avatar alone is easy to miss, and
+                      // "why is this answer different" was unanswerable from the thread.
+                      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
+                        <span className="text-white/80">{agentForMessage(message)?.name}</span>
+                        <span>· routed by JARVIS</span>
+                      </div>
+                    )}
                     {message.demoData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
@@ -5846,7 +5897,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {/* Loading/Thinking Animation - Reasoning Trace Style */}
               {isLoading && (
                 <div className="flex gap-3 justify-start animate-fade-in">
-                  <AgentAvatar agentId={currentAgent?.id} className={cn('w-8 h-8 animate-pulse', currentAgent?.color)} />
+                  {(() => {
+                    const live = (routingTo && AGENTS.find((a) => a.id === routingTo.id)) || currentAgent;
+                    return <AgentAvatar agentId={live?.id} className={cn('w-8 h-8 animate-pulse', live?.color)} />;
+                  })()}
                   <div className="min-w-0 max-w-[88%] sm:max-w-[80%] rounded-2xl p-3.5 sm:p-5 bg-primary/5 border border-primary/20">
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
