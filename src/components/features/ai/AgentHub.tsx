@@ -3532,7 +3532,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           role: 'assistant',
           content: cleanedText || 'No response from agent',
           metadata: {
+            // `data.agentId` is the agent that ACTUALLY ran — the specialist when JARVIS routed.
+            // It used to arrive as `orchestrator` on every routed turn, which is why no stored
+            // message could say who answered it.
             agentId: data.agentId || selectedAgent,
+            requestedAgentId: data.requested_agent_id ?? undefined,
+            routed: data.routed ?? undefined,
             model: data.model || selectedModel,
             responseTimeMs, // Time taken to respond
             productsCount: materialData?.products?.length || 0,

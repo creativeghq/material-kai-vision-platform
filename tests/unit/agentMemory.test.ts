@@ -36,10 +36,12 @@ import { join } from 'node:path';
 import {
   AgentMemory,
   buildDistillPrompt,
+  isCapabilityClaim,
   normalizeCandidates,
   toVectorLiteral,
   type RecalledMemory,
 } from '../../supabase/functions/_shared/agent-memory.ts';
+import { turnProducedWork } from '../../supabase/functions/_shared/tool-result-shape.ts';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
@@ -299,5 +301,124 @@ describe('formatForContext', () => {
 describe('toVectorLiteral', () => {
   it('emits the pgvector text form', () => {
     expect(toVectorLiteral([0.5, -0.25, 0])).toBe('[0.5,-0.25,0]');
+  });
+});
+
+/**
+ * What counts as "the turn did work".
+ *
+ * `promote()` refuses to distil a clarifying turn — no tool ran and the reply asks a question —
+ * because that turn is the agent saying it does not yet understand the request, and the distiller
+ * cannot tell the difference. The gate is `turnDidWork`, and agent-chat computed it as
+ * `(finalResult.toolResults?.length ?? 0) > 0`: the COUNT OF CALLS.
+ *
+ * In conversation 96da9fc8 the agent ran three knowledge_base_search calls that each returned
+ * nothing plus a no-op `load_toolkit`, then replied with nothing but questions. Four tool results,
+ * so the gate said "this turn did work", stood down, and let the distiller promote the assistant's
+ * OWN invented geography as a durable fact about the user. CLAUDE.md's rule for exactly this shape
+ * is "check the world, not the exit code".
+ */
+describe('turnProducedWork — work is results, not calls', () => {
+  it('a turn of zero-result searches did no work', () => {
+    const kbMiss = JSON.stringify({ articles: [] });
+    expect(turnProducedWork([
+      { tool: 'knowledge_base_search', result: kbMiss },
+      { tool: 'knowledge_base_search', result: kbMiss },
+      { tool: 'knowledge_base_search', result: kbMiss },
+    ])).toBe(false);
+  });
+
+  it('meta tools are never evidence of work', () => {
+    expect(turnProducedWork([
+      { tool: 'load_toolkit', result: JSON.stringify({ success: true, tool_ids: ['b2b_manufacturer_search'] }) },
+    ])).toBe(false);
+    // The exact shape of the trace: three misses + a no-op toolkit load.
+    expect(turnProducedWork([
+      { tool: 'knowledge_base_search', result: JSON.stringify({ articles: [] }) },
+      { tool: 'load_toolkit', result: JSON.stringify({ success: true }) },
+      { tool: 'knowledge_base_search', result: JSON.stringify({ articles: [] }) },
+      { tool: 'knowledge_base_search', result: JSON.stringify({ articles: [] }) },
+    ])).toBe(false);
+  });
+
+  it('a tool that failed did no work', () => {
+    expect(turnProducedWork([
+      { tool: 'b2b_manufacturer_search', result: JSON.stringify({ success: false, error: 'no key' }) },
+    ])).toBe(false);
+  });
+
+  it('one real result is enough', () => {
+    expect(turnProducedWork([
+      { tool: 'knowledge_base_search', result: JSON.stringify({ articles: [] }) },
+      { tool: 'material_search', result: JSON.stringify({ products: [{ id: 'p1' }] }) },
+    ])).toBe(true);
+  });
+
+  it('an uncountable result counts as work — unknown is not empty', () => {
+    // Most successful tools return prose or a created record with no countable array. Treating
+    // those as empty would suppress memory on nearly every real turn.
+    expect(turnProducedWork([{ tool: 'create_catalog', result: JSON.stringify({ catalog_id: 'c1' }) }])).toBe(true);
+    expect(turnProducedWork([{ tool: 'analyze_inspiration_url', result: 'A warm minimal palette.' }])).toBe(true);
+  });
+
+  it('no tools at all is not work', () => {
+    expect(turnProducedWork([])).toBe(false);
+    expect(turnProducedWork(undefined)).toBe(false);
+  });
+
+  it('agent-chat gates memory promotion on it, not on the call count', () => {
+    expect(
+      /turnProducedWork\(finalResult\.toolResults\)/.test(agentChatCode),
+      'promoteTurnToMemory must be gated on turnProducedWork(...) — counting tool results is ' +
+        'what let a clarifying turn poison the memory table.',
+    ).toBe(true);
+    expect(
+      /\(finalResult\.toolResults\?\.length \?\? 0\) > 0/.test(agentChatCode),
+      'the old call-counting gate is back',
+    ).toBe(false);
+  });
+
+  it('there is ONE derivation of a tool result shape, shared with the tool-call logger', () => {
+    // The logger used to inline its own copy of the count/zero/failed extraction. Two consumers
+    // of the same question, two answers, is the shape CLAUDE.md keeps warning about.
+    expect(
+      /shapeToolResult\(/.test(agentChatCode),
+      'the tool-call logger must use shapeToolResult() rather than re-deriving result counts',
+    ).toBe(true);
+  });
+});
+
+/**
+ * Tool availability is configuration, not memory. It is derivable at any moment, it changes when
+ * the user changes a toolkit selection, and a stale copy makes the agent confidently wrong.
+ * `464a85a9` was promoted durable: "User has access to full B2B manufacturer search toolkit:
+ * b2b_manufacturer_search, company_website_scrape, …" — already false for a different selection.
+ */
+describe('isCapabilityClaim rejects memories about the assistant', () => {
+  it('rejects the promoted example verbatim', () => {
+    expect(isCapabilityClaim(
+      'User has access to full B2B manufacturer search toolkit: b2b_manufacturer_search, ' +
+      'company_website_scrape, company_enrichment, contact_discovery, email_validate, save_to_crm, ' +
+      'and catalog builder tools.',
+    )).toBe(true);
+  });
+
+  it('rejects toolkit and availability phrasing', () => {
+    expect(isCapabilityClaim('The b2b toolkit is enabled for this workspace.')).toBe(true);
+    expect(isCapabilityClaim('Generation tools are available to the user.')).toBe(true);
+  });
+
+  it('keeps real facts about the user and their business', () => {
+    expect(isCapabilityClaim('User sources porcelain tile from Marazzi and Paradyż.')).toBe(false);
+    expect(isCapabilityClaim('Prefers matte finishes and warm neutrals for hospitality projects.')).toBe(false);
+    expect(isCapabilityClaim('Their core clients are boutique hotels and BnBs in Greece.')).toBe(false);
+  });
+
+  it('the promotion loop actually applies it', () => {
+    expect(
+      /isCapabilityClaim\(c\.content\)/.test(memoryCode),
+      'the promotion loop must reject capability claims — the distiller instruction alone is not ' +
+        'an enforcement mechanism',
+    ).toBe(true);
   });
 });

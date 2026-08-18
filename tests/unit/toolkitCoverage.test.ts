@@ -718,3 +718,72 @@ describe('quick-start → chat sentence', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * The bound-toolkit hint. agent-chat injects "[CONTEXT] Toolkits already loaded for this turn:
+ * …" so the agent does not spend a tool call and a model round trip re-loading a cluster it can
+ * already call. The list was built from what the USER SELECTED, while a curated specialist binds
+ * its WHOLE kit regardless of the selection — so the hint told Pepper that `b2b` was not loaded
+ * while it was holding every tool in it. It called `load_toolkit('b2b')` (a 2ms no-op) and
+ * offered the user a "load the toolkit" next step that cost a second full turn to answer the
+ * same question again. Conversation 96da9fc8, 2026-08-18.
+ */
+describe('bound-toolkit hint', () => {
+  const src = read(AGENT_CHAT);
+
+  it('derives "already loaded" from the BOUND tools, not from the user selection', () => {
+    const loop = src.match(
+      /\/\/ Resolve toolkits → tool IDs[\s\S]*?\n {2}\}\n/,
+    );
+    expect(loop, 'toolkit resolution loop not found — this guard is reading the wrong file').toBeTruthy();
+    expect(
+      loop![0].includes('activeToolkitIds'),
+      'activeToolkitIds is being filled inside the `selectedToolkits` loop again. That is the ' +
+        'original defect: a curated specialist binds its whole kit, so the selection does not ' +
+        'describe what is bound, and the agent gets told its own tools are unavailable.',
+    ).toBe(false);
+
+    expect(
+      /const activeToolkitIds = Object\.entries\(TOOLKIT_CLUSTERS\)[\s\S]{0,600}boundToolIds/.test(src),
+      'activeToolkitIds must be derived from the bound tool set (`boundToolIds`, built from ' +
+        '`baseTools`). Without that, the hint cannot describe a curated specialist.',
+    ).toBe(true);
+  });
+
+  it('every curated specialist actually owns clusters the old rule would have hidden', () => {
+    const curated = src.match(/const CURATED_SPECIALISTS = new Set\(\[([\s\S]*?)\]\)/);
+    expect(curated, 'CURATED_SPECIALISTS not found in agent-chat').toBeTruthy();
+    const specialists = [...curated![1].matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+    expect(specialists.length, 'parsed no curated specialists — the slice is wrong').toBeGreaterThan(0);
+
+    const start = src.indexOf('const AGENT_CONFIGS');
+    const block = src.slice(start, src.indexOf('\n};', start) + 3);
+    const agentTools = new Map<string, Set<string>>();
+    for (const m of block.matchAll(/id:\s*'([a-z-]+)',[\s\S]*?tools:\s*\[([\s\S]*?)\n\s*\],/g)) {
+      const ids = new Set<string>();
+      for (const q of m[2].matchAll(/'([a-zA-Z0-9_]+)'/g)) ids.add(q[1]);
+      agentTools.set(m[1], ids);
+    }
+    expect(agentTools.size, 'parsed suspiciously few agent configs — the slice is wrong').toBeGreaterThan(3);
+
+    // A cluster is "bound" for a curated specialist when every tool in it that the agent is
+    // permitted to use is in its config — exactly when load_toolkit would add nothing.
+    const bare: string[] = [];
+    for (const slug of specialists) {
+      const owned = agentTools.get(slug);
+      expect(owned, `curated specialist "${slug}" has no AGENT_CONFIGS entry`).toBeTruthy();
+      const hidden = TOOLKITS.filter((tk) => {
+        if (tk.alwaysOn) return false; // always reported under both rules
+        const permitted = tk.tool_ids.filter((t) => owned!.has(t));
+        return permitted.length > 0 && permitted.every((t) => owned!.has(t));
+      }).map((tk) => tk.id);
+      if (hidden.length === 0) bare.push(slug);
+    }
+    expect(
+      bare,
+      'These curated specialists own no non-alwaysOn cluster, which would make the bound-toolkit ' +
+        'hint inert for them — either the kit shrank or CURATED_SPECIALISTS gained an agent that ' +
+        `is not curated: ${bare.join(', ')}`,
+    ).toEqual([]);
+  });
+});

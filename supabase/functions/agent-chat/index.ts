@@ -25,6 +25,7 @@ import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
 // loaded inside initRuntime() alongside the other lazy modules.
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
 import { runInBackground } from '../_shared/background.ts';
+import { shapeToolResult, turnProducedWork } from '../_shared/tool-result-shape.ts';
 
 // Runtime singletons — initialized once on first request
 let _initialized = false;
@@ -473,36 +474,16 @@ function createAgentGraph(
           let errorMessage: string | null = null;
 
           if (success) {
-            try {
-              const tr = (settled as any).value.toolResult;
-              const parsed = typeof tr === 'string' ? JSON.parse(tr) : tr;
-              if (parsed && typeof parsed === 'object' && parsed.success === false) {
-                success = false;
-                errorMessage = typeof parsed.error === 'string' ? parsed.error : 'tool reported success:false';
-              }
-              // Try to extract a result count from common shapes
-              if (Array.isArray(parsed?.results)) {
-                resultCount = parsed.results.length;
-              } else if (Array.isArray(parsed?.data)) {
-                resultCount = parsed.data.length;
-              } else if (Array.isArray(parsed?.products)) {
-                resultCount = parsed.products.length;
-              } else if (Array.isArray(parsed?.matches)) {
-                // price_lookup returns { matches: [...] }
-                resultCount = parsed.matches.length;
-              } else if (Array.isArray(parsed?.articles)) {
-                // knowledge_base_search returns { articles: [...] }
-                resultCount = parsed.articles.length;
-              }
-              zeroResult = resultCount === 0;
-              // Summarise but don't store full payload
-              resultSummary = {
-                result_count: resultCount,
-                has_results: resultCount !== null && resultCount > 0,
-                top_score: parsed?.results?.[0]?.score ?? null,
-                processing_time: parsed?.processing_time ?? null,
-              };
-            } catch { /* ignore parse errors */ }
+            // Shared with the memory promotion gate — see _shared/tool-result-shape.ts for why
+            // there is exactly one derivation of "did this produce anything".
+            const shape = shapeToolResult((settled as any).value.toolResult);
+            if (!shape.ok) {
+              success = false;
+              errorMessage = shape.errorMessage;
+            }
+            resultCount = shape.resultCount;
+            zeroResult = shape.zeroResult;
+            resultSummary = shape.summary; // summarised — never the full payload
           } else {
             const err = (settled as any).reason;
             errorMessage = err instanceof Error ? err.message : String(err);
@@ -1084,13 +1065,26 @@ async function executeAgent(
     modelName: string;
     turnCount: number;
   };
+  /** The agent that ACTUALLY ran this turn — the specialist, when the orchestrator routed. */
+  routedAgentId?: string;
+  /** The agent the caller asked for (`orchestrator`/`jarvis`/`auto` when routing happened). */
+  requestedAgentId?: string;
 }> {
   // Orchestrator: JARVIS routes this turn to the best specialist (or the generalist).
   // Runs before config lookup so the rest of the turn executes AS the chosen agent.
+  // Who was ASKED for, before routing rewrites `agentId`. Every downstream record (usage row,
+  // memory, final_result chunk) reports the agent that actually ran plus this, because until
+  // now they all reported `orchestrator` and nothing else did: `agent_usage_logs.agent_type`
+  // and the saved message metadata both said `orchestrator`, and only `agent_tool_call_logs`
+  // knew it was Pepper — and only because that turn happened to call a tool. A routed turn that
+  // calls none was unattributable after the fact, so every "why did the agent do that" started
+  // from a guess (conversation 96da9fc8).
+  const requestedAgentId = agentId;
   if (ORCHESTRATOR_IDS.has(agentId)) {
     const routed = await routeToSpecialist(userInput);
     if (routed && AGENT_CONFIGS[routed.slug]) {
       onChunk?.({ type: 'agent_routed', to: routed.slug, name: routed.name, timestamp: Date.now() });
+      console.log(`[agent-chat] routed ${requestedAgentId} → ${routed.slug} (${routed.name})`);
       agentId = routed.slug;
     } else if (images.length > 0 && userInput.trim().length < 20 && AGENT_CONFIGS['interior-designer']) {
       // Image-first turn with thin/empty text: the classifier only sees text, so a dropped room
@@ -1148,11 +1142,9 @@ async function executeAgent(
 
   // Resolve toolkits → tool IDs. alwaysOn clusters (core, calculators) are always included.
   const toolkitToolIds = new Set<string>();
-  const activeToolkitIds: string[] = [];
   for (const [id, def] of Object.entries(TOOLKIT_CLUSTERS)) {
     if (def.alwaysOn || (selectedToolkits || []).includes(id)) {
       for (const t of def.tool_ids) toolkitToolIds.add(t);
-      activeToolkitIds.push(id);
     }
   }
   // Always make load_toolkit available so the agent can request more clusters
@@ -1173,6 +1165,29 @@ async function executeAgent(
   // now live in the `calculators` cluster, which is alwaysOn, so the filter keeps them by
   // the same rule it keeps `core`. Same behaviour, one less special case.
   config = { ...config, tools: baseTools };
+
+  // Which clusters are ACTUALLY bound this turn.
+  //
+  // Derived from the tools that ended up in `baseTools`, NOT from `selectedToolkits`. A curated
+  // specialist binds its WHOLE kit above, so its clusters are live even though the user never
+  // selected them — and the [CONTEXT] hint below, built from the selection, told Pepper that
+  // `b2b` was not loaded while it was holding every tool in it. It believed the hint, spent a
+  // tool call and a model round trip on a no-op `load_toolkit('b2b')`, then offered the user a
+  // "load the toolkit" next step that cost a SECOND full turn (37 credits) to arrive back at the
+  // same question. Conversation 96da9fc8, 2026-08-18.
+  //
+  // A cluster counts as loaded when every tool in it that this agent is permitted to use is
+  // already bound — i.e. exactly when `load_toolkit` would add nothing. Same permitted-set the
+  // in-run loader clamps to (`agentFullToolIds` below), so the two cannot disagree.
+  // Guarded by tests/unit/toolkitCoverage.test.ts.
+  const boundToolIds = new Set(baseTools);
+  const agentPermittedToolIds = new Set<string>(AGENT_CONFIGS[agentId]?.tools || []);
+  const activeToolkitIds = Object.entries(TOOLKIT_CLUSTERS)
+    .filter(([, def]) => {
+      const permitted = def.tool_ids.filter((t) => agentPermittedToolIds.has(t));
+      return permitted.length > 0 && permitted.every((t) => boundToolIds.has(t));
+    })
+    .map(([id]) => id);
 
   // Extract previously generated image URLs from assistant messages (for edit mode).
   // Sources checked in priority order:
@@ -2413,6 +2428,8 @@ async function executeAgent(
       text: summary,
       toolResults: [{ tool: directTool.name, args: directTool.input, result: parsed ?? toolResult }],
       boundTools: describeBoundTools(tools),
+      routedAgentId: agentId,
+      requestedAgentId,
     };
   }
 
@@ -2586,6 +2603,8 @@ async function executeAgent(
       toolResults: result.toolResults.length > 0 ? result.toolResults : undefined,
       generationJob: result.generationJob,
       boundTools: describeBoundTools(tools),
+      routedAgentId: agentId,
+      requestedAgentId,
       usage: {
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -2600,6 +2619,8 @@ async function executeAgent(
     // Fallback to error response
     return {
       text: `Error during agent execution: ${graphError instanceof Error ? graphError.message : 'Unknown error'}`,
+      routedAgentId: agentId,
+      requestedAgentId,
       usage: {
         inputTokens: 0,
         outputTokens: 0,
@@ -3227,6 +3248,12 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             throw new Error('Agent execution failed to return a valid result');
           }
 
+          // The agent that ACTUALLY answered. `agentId` out here is still whatever the client
+          // sent — `orchestrator` on every routed turn — so every record keyed off it named a
+          // router rather than a responder. Everything below reports the specialist.
+          const ranAsAgentId = finalResult.routedAgentId || agentId;
+          const wasRouted = ranAsAgentId !== agentId;
+
           // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking).
           //
           // `runInBackground`, not a bare `.catch()`: this fires a real Haiku call plus an RPC
@@ -3234,10 +3261,14 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // isolate winds down. `ops.silent_zero` caught the symptom — 27 chat turns in 30 days
           // and not one promoted memory, with nothing logged either way, because the work never
           // got to fail. The payments webhook already used this pattern for the same reason.
+          // `turnProducedWork`, not "were any tools called". Three zero-result KB searches and a
+          // no-op load_toolkit are four tool results and zero work; counting them as work is what
+          // let the clarifying-turn guard stand down and a hallucinated fact reach the memory
+          // table. See _shared/tool-result-shape.ts.
           void runInBackground(
             promoteTurnToMemory(
-              userId, workspaceId, agentId, userInput, finalResult.text, conversation_id,
-              (finalResult.toolResults?.length ?? 0) > 0,
+              userId, workspaceId, ranAsAgentId, userInput, finalResult.text, conversation_id,
+              turnProducedWork(finalResult.toolResults),
             ),
             'agent-memory',
           );
@@ -3282,7 +3313,10 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             logAgentUsage(
               userId,
               workspaceId,
-              agentId,
+              // The specialist that ran, not the router that picked it. `agent_type` said
+              // `orchestrator` on every routed turn, so the table that records what an agent
+              // cost could not say which agent it was.
+              ranAsAgentId,
               finalResult.usage,
               toolsCalled,
               { conversationId: conversation_id, latencyMs: Date.now() - executeStartTime },
@@ -3291,7 +3325,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             // Log to unified ai_call_logs table (fire-and-forget)
             aiCallLogger.logAICall({
               job_id: conversation_id || undefined,
-              task: `agent_chat_${agentId}`,
+              task: `agent_chat_${ranAsAgentId}`,
               model: finalResult.usage.modelName,
               // Both were in scope the whole time and neither reached the row — `ai_call_logs`
               // has carried these columns since it was created (#365 AD-15).
@@ -3349,8 +3383,12 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           const modelUsed = finalResult.usage?.modelName || 'claude-opus-4-8';
           const finalChunk = {
             type: 'final_result',
+            // The agent that answered. The client persists this into message metadata, which
+            // used to record the router on every routed turn.
+            agentId: ranAsAgentId,
+            requested_agent_id: agentId,
+            routed: wasRouted,
             text: finalResult.text,
-            agentId,
             model: modelUsed,
             materialResults: finalResult.materialResults,
             tool_results: finalResult.toolResults,
