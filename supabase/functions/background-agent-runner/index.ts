@@ -204,10 +204,27 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     // to the agent the caller was authorized against, and `workspace_id` catches a run whose
     // agent has since moved. 404 rather than 403 on mismatch, so the response cannot be used to
     // probe which run ids exist.
+    // SYSTEM agents are the exception, and leaving them out of it broke every chat dispatch.
+    //
+    // `KAI Background Tasks` (00000000-…-0001) has `workspace_id = NULL` on purpose: it serves
+    // every tenant, and `dispatch_background_task` correctly stamps each run with the USER'S
+    // workspace so the work belongs to their tenant. Equality can therefore never hold, so this
+    // check 404'd every single chat-dispatched run — the agent told the user "I'll post results
+    // back here", `dispatch_background_task` returned success, and nothing ran. One run existed
+    // in the whole table and it died 2s after creation.
+    //
+    // Relaxing the workspace comparison for a NULL-workspace agent does not reopen the hole this
+    // check was written for. That attack is a JWT caller pairing their own agent_id with another
+    // tenant's run_id, and it is closed by the `agent_id` equality below, which still applies to
+    // everyone: a caller can only ever reach runs of the agent they named. A system agent is not
+    // reachable by a JWT caller at all — the membership check above does
+    // `.eq('workspace_id', agentConfig.workspace_id)` with NULL, which matches no row, so any
+    // non-service-role caller is already 403'd before getting here.
     const runRecord = existingRun as AgentRunRecord & { workspace_id?: string | null };
+    const agentIsSystemWide = (agentConfig.workspace_id ?? null) === null;
     if (
       runRecord.agent_id !== agent_id ||
-      (runRecord.workspace_id ?? null) !== (agentConfig.workspace_id ?? null)
+      (!agentIsSystemWide && (runRecord.workspace_id ?? null) !== (agentConfig.workspace_id ?? null))
     ) {
       console.warn(
         `[background-agent-runner] run_id ${run_id} does not belong to agent ${agent_id} ` +

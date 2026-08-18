@@ -73,7 +73,7 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
         // sees a terminal state instead of a run stuck in 'pending' forever.
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
+        const dispatch = fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
           method:  'POST',
           headers: {
             'Content-Type':  'application/json',
@@ -85,7 +85,9 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
             triggered_by: 'chat',
             input_data:   { task_prompt, context_snippet, model_override },
           }),
-        })
+        });
+
+        dispatch
           .then(async (res) => {
             if (!res.ok) {
               const errText = await res.text().catch(() => res.statusText);
@@ -112,6 +114,30 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
               .eq('id', runId);
           });
 
+
+        // Was the dispatch ACCEPTED? This tool used to return success unconditionally, because the
+        // fetch above was pure fire-and-forget. On 2026-08-18 the runner 404'd every chat dispatch
+        // (the tenancy check could not hold for a NULL-workspace system agent) — the run died 2
+        // seconds after creation, and the agent, reading `success: true`, told the user "results
+        // will land in this thread". They never could. A tool that reports success for work it
+        // never confirmed started is worse than one that fails loudly.
+        //
+        // The runner executes the task INLINE and only responds when it finishes, so we cannot
+        // simply await it — that would block the chat turn for the whole task. But a REJECTION
+        // (404/403/422) comes back in ~2s while real work takes minutes, so racing a short window
+        // separates the two: settled-and-not-ok means refused; still pending means running.
+        const verdict = await Promise.race([
+          dispatch.then((res) => (res.ok ? 'accepted' : `refused_${res.status}`)).catch(() => 'unreachable'),
+          new Promise<string>((resolve) => setTimeout(() => resolve('running'), 8000)),
+        ]);
+
+        if (verdict !== 'accepted' && verdict !== 'running') {
+          return JSON.stringify({
+            success: false,
+            run_id:  runId,
+            error:   `The background runner refused the task (${verdict}). Nothing is running. Do NOT tell the user work is in progress — say the background dispatch failed and offer to run a smaller scope inline instead.`,
+          });
+        }
 
         return JSON.stringify({
           success:    true,

@@ -463,3 +463,72 @@ describe('act-then-refine doctrine reaches every agent', () => {
     ).toBe(false);
   });
 });
+
+/**
+ * A tool must not report success for work it never confirmed started.
+ *
+ * On 2026-08-18 `dispatch_background_task` created an agent_runs row, fired the runner
+ * fire-and-forget, and returned `success: true` unconditionally. The runner 404'd — its tenancy
+ * check compared the run's workspace (the USER's) against the agent's (NULL, because the KAI
+ * system agent is deliberately workspace-less), so it could never hold for a chat dispatch. The
+ * run died 2 seconds after creation. The agent, reading `success: true`, told the user a sweep of
+ * 20+ countries was running and results would "land in this thread". Nothing was running, and it
+ * was the only chat-triggered run in the table.
+ */
+describe('background dispatch reports the truth', () => {
+  const bgTools = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/_shared/tools/background-tools.ts'), 'utf8'),
+  );
+  const runner = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/background-agent-runner/index.ts'), 'utf8'),
+  );
+
+  it('the dispatch verdict is checked before claiming success', () => {
+    expect(
+      /Promise\.race\(/.test(bgTools) && /refused_/.test(bgTools),
+      'dispatch_background_task must race the dispatch against a short window so an immediate ' +
+        'rejection is reported as failure instead of being announced as started work',
+    ).toBe(true);
+  });
+
+  it('a refused dispatch tells the agent NOT to claim work is running', () => {
+    const refusal = bgTools.slice(bgTools.indexOf('refused_'), bgTools.indexOf('refused_') + 900);
+    expect(
+      /Do NOT tell the user work is in progress/.test(refusal),
+      'the refusal payload must instruct the agent not to promise results — reading a bare ' +
+        'failure, it previously narrated a running task that did not exist',
+    ).toBe(true);
+  });
+
+  it('a system agent can run work for any workspace', () => {
+    // The tenancy check still binds run->agent for everyone (that is the actual attack: pairing
+    // your agent_id with another tenant's run_id). It just cannot demand that a workspace-LESS
+    // system agent own a workspace-scoped run, which is every chat dispatch there is.
+    expect(
+      /agentIsSystemWide/.test(runner),
+      'the runner must exempt a NULL-workspace system agent from the workspace equality check, ' +
+        'or every chat-dispatched background task 404s',
+    ).toBe(true);
+    expect(
+      /runRecord\.agent_id !== agent_id/.test(runner),
+      'the run->agent binding must still be enforced — that is the half that closes the ' +
+        'cross-tenant run_id attack',
+    ).toBe(true);
+  });
+
+  it('transient upstream failures are retried, not surfaced as an outage', () => {
+    const b2b = stripComments(
+      readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
+    );
+    expect(
+      /postAnthropicWithRetry/.test(b2b) && /529/.test(b2b),
+      '529/429/5xx are transient; without a retry one busy moment upstream reads as "the search ' +
+        'backend is down" and sends the agent looking for a background lane it does not need',
+    ).toBe(true);
+    expect(
+      /retryable/.test(b2b),
+      'an exhausted-retry failure must tell the agent it is upstream and temporary, not a ' +
+        'problem with the query or the account',
+    ).toBe(true);
+  });
+});

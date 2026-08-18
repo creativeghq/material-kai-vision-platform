@@ -141,6 +141,35 @@ export async function validateEmailWithZeroBounce(
 const SEARCH_MODEL = 'claude-opus-5';
 
 /**
+ * POST to Anthropic, retrying the TRANSIENT failures.
+ *
+ * 529 (overloaded), 429 (rate limited) and 5xx say "the upstream was busy", not "your request was
+ * wrong" — and this call had no retry at all. On 2026-08-18 two 529s seven seconds apart killed a
+ * real 30-market sweep outright; the agent read a bare failure, concluded the search backend was
+ * "temporarily down", and went looking for a background lane it did not need. One backoff would
+ * have made the whole detour unnecessary.
+ *
+ * Bounded deliberately: three attempts with 2s/6s backoff is ~8s of waiting on top of a call that
+ * already takes ~50s, which still fits the 150s edge idle timeout. Anything longer would trade one
+ * failure mode for a worse one.
+ */
+async function postAnthropicWithRetry(init: RequestInit): Promise<Response> {
+  const BACKOFF_MS = [2000, 6000];
+  let res!: Response;
+  for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
+    res = await fetch('https://api.anthropic.com/v1/messages', init);
+    if (res.ok) return res;
+    const transient = res.status === 429 || res.status === 529 || res.status >= 500;
+    if (!transient || attempt === BACKOFF_MS.length) return res;
+    // Drain the body so the connection is released before we sleep on it.
+    await res.text().catch(() => undefined);
+    console.warn(`[b2b_manufacturer_search] Anthropic ${res.status} — retrying in ${BACKOFF_MS[attempt]}ms`);
+    await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+  }
+  return res;
+}
+
+/**
  * "…also search in Polish, Romanian and Turkish" — built from the language each market row now
  * carries. Returns '' when the scope has no languages we know, so the query degrades to
  * English-only rather than instructing the model to search in nothing.
@@ -284,7 +313,7 @@ export const createB2BManufacturerSearchTool = (
         const regionLabel = region ? (termsInGroup(markets, region.toLowerCase())[0]?.group_label ?? region) : '';
         onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${regionLabel}` : ''}...`);
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await postAnthropicWithRetry({
           method: 'POST',
           headers: {
             'x-api-key': ANTHROPIC_API_KEY,
@@ -313,7 +342,21 @@ export const createB2BManufacturerSearchTool = (
           const errText = await response.text();
           console.error(`❌ Web search API error ${response.status}: ${errText}`);
           emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: `Web search failed: ${response.status}` });
-          return JSON.stringify({ success: false, error: `Web search failed: ${response.status}` });
+          // 429/529/5xx are TRANSIENT — the request was fine, the upstream was busy. Two 529s in
+          // seven seconds killed a real sweep on 2026-08-18 and sent the agent looking for a
+          // background lane it did not need. `retryable` tells the agent to try again rather than
+          // reroute; `postRequest` above already retries the transient ones itself, so reaching
+          // here means the retries were exhausted too.
+          const retryable = response.status === 429 || response.status === 529 || response.status >= 500;
+          return JSON.stringify({
+            success: false,
+            retryable,
+            error: retryable
+              ? `The web search provider is overloaded (${response.status}) and did not recover after retries. `
+                + `This is upstream and temporary — it is NOT a problem with the query, the account or the markets. `
+                + `Say so plainly and offer to retry in a minute or to run a narrower scope now.`
+              : `Web search failed: ${response.status}`,
+          });
         }
 
         const data = await response.json();
