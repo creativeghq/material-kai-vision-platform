@@ -194,6 +194,11 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
       show_client_page: isProforma,
       notes: (catalog.body_data as any)?.notes ?? null,
       sections: docSections,
+      // Technical-specification tables live alongside the sections in body_data.
+      // Coerced defensively: body_data is operator-editable jsonb, so a malformed
+      // group must drop out rather than reach the renderer as undefined text.
+      spec_tables: normalizeSpecTables(bodyMeta.spec_tables),
+      spec_title: typeof bodyMeta.spec_title === 'string' ? bodyMeta.spec_title : null,
       totals,
       closing_message: (catalog.back_cover_data as any)?.closing_message ?? null,
       // Page size + orientation follow the workspace's cover template image.
@@ -248,6 +253,27 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
     return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'PDF generation failed' }, 500);
   }
 }));
+
+/** Shape `body_data.spec_tables` into the renderer's contract, dropping anything unusable. */
+function normalizeSpecTables(raw: unknown): Array<{ title: string; rows: Array<{ label: string; value: string }> }> | null {
+  if (!Array.isArray(raw)) return null;
+  const out = raw
+    .map((t: any) => {
+      const title = typeof t?.title === 'string' ? t.title.trim() : '';
+      const rows = Array.isArray(t?.rows)
+        ? t.rows
+            .map((r: any) => ({
+              label: typeof r?.label === 'string' ? r.label.trim() : '',
+              // Numbers and booleans are legitimate values; only null/undefined drop the row.
+              value: r?.value === null || r?.value === undefined ? '' : String(r.value).trim(),
+            }))
+            .filter((r: { label: string; value: string }) => r.label !== '' && r.value !== '')
+        : [];
+      return { title: title || 'Specification', rows };
+    })
+    .filter((t) => t.rows.length > 0);
+  return out.length > 0 ? out : null;
+}
 
 function sizeColorFromSpecs(specs: Record<string, any> | null | undefined): string | null {
   if (!specs) return null;

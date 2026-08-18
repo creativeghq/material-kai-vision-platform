@@ -143,6 +143,8 @@ export interface BrandedDocItem {
   delivery_date?: string | null;
 }
 export interface BrandedDocSection { title?: string | null; intro?: string | null; items: BrandedDocItem[]; }
+/** One labelled block of key/value specification rows (e.g. "Performance"). */
+export interface BrandedSpecTable { title: string; rows: Array<{ label: string; value: string }>; }
 export interface BrandedTotals {
   subtotal: number;               // NET subtotal (after line discounts) — legacy field
   vat_rate: number;
@@ -168,6 +170,14 @@ export interface BrandedDoc {
   show_client_page?: boolean;
   notes?: string | null;
   sections: BrandedDocSection[];
+  /**
+   * Optional technical-specification tables, rendered on their own pages after the
+   * item pages. Purely additive — a document that supplies none renders exactly as
+   * before, so quotes/invoices are unaffected.
+   */
+  spec_tables?: BrandedSpecTable[] | null;
+  /** Heading for the specification pages. Defaults to "Technical specification". */
+  spec_title?: string | null;
   totals?: BrandedTotals | null;
   closing_message?: string | null;
   cover_optional?: boolean;
@@ -223,6 +233,8 @@ export async function renderBrandedDocument(doc: BrandedDoc, assets: BrandedAsse
   pageCount += doc.layout === 'grid'
     ? drawGridPages(pdfDoc, g, doc, bgImage, itemImages, font, fontBold)
     : drawListPages(pdfDoc, g, doc, bgImage, itemImages, font, fontBold);
+
+  pageCount += drawSpecPages(pdfDoc, g, doc, bgImage, font, fontBold);
 
   if (backImage) {
     const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
@@ -535,6 +547,113 @@ function drawGridPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
     if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
     drawTotals(page, g, doc.totals, g.PAGE_H - 140, font, fontBold);
   }
+  return pages;
+}
+
+// ── Specification tables ────────────────────────────────────────────────────────
+// Two newspaper-style columns of label/value rows. Values wrap, so a long feature
+// list keeps its own row height; a group that runs past the bottom continues in the
+// next column (or on the next page) under a "(cont.)" heading rather than being cut.
+function drawSpecPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: PDFImage | null, font: PDFFont, fontBold: PDFFont): number {
+  const tables = (doc.spec_tables ?? []).filter((t) => t && t.rows && t.rows.length > 0);
+  if (tables.length === 0) return 0;
+
+  const GUTTER = 30;
+  const COL_W = (g.CONTENT_W - GUTTER) / 2;
+  const LABEL_W = COL_W * 0.46;
+  const VALUE_W = COL_W - LABEL_W - 6;
+  const LINE_H = 11, ROW_PAD = 5, GROUP_GAP = 15, BOTTOM = 56;
+  const FS = 8.5;
+
+  let pages = 0;
+  let page: PDFPage = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
+  let colTop = 0, y = 0, col = 0;
+  let first = true;
+
+  const startPage = () => {
+    if (bgImage) {
+      page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+      page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_WHITE, opacity: 0.92 });
+    }
+    let hy = g.PAGE_H - g.MARGIN_TOP;
+    const heading = doc.spec_title || 'Technical specification';
+    if (first) {
+      page.drawRectangle({ x: g.MARGIN, y: hy - 4, width: 32, height: 3, color: COLOR_DARK }); hy -= 18;
+      page.drawText(heading, { x: g.MARGIN, y: hy, size: 22, font: fontBold, color: COLOR_DARK }); hy -= 24;
+      first = false;
+    } else {
+      page.drawText(`${heading} (continued)`, { x: g.MARGIN, y: hy, size: 12, font, color: COLOR_GRAY }); hy -= 18;
+    }
+    page.drawLine({ start: { x: g.MARGIN, y: hy }, end: { x: g.PAGE_W - g.MARGIN, y: hy }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
+    colTop = hy - 20;
+    y = colTop;
+    col = 0;
+  };
+
+  /** Move to the next column, or a new page when both are used up. */
+  const nextColumn = () => {
+    col++;
+    if (col > 1) { page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++; startPage(); }
+    else y = colTop;
+  };
+
+  const colX = () => g.MARGIN + col * (COL_W + GUTTER);
+
+  const drawGroupTitle = (title: string) => {
+    const x = colX();
+    page.drawText(title.toUpperCase(), { x, y, size: 8, font: fontBold, color: COLOR_DARK });
+    y -= 5;
+    page.drawLine({ start: { x, y }, end: { x: x + COL_W, y }, thickness: 0.5, color: COLOR_DARK });
+    y -= 12;
+  };
+
+  /** Height a whole group needs, so a short one is never split across a column break. */
+  const groupHeight = (t: BrandedSpecTable) => {
+    let h = 17; // heading + rule + spacing
+    for (const row of t.rows) {
+      const lines = wrapText(String(row.value ?? ''), font, FS, VALUE_W);
+      h += Math.max(LINE_H, lines.length * LINE_H) + ROW_PAD;
+    }
+    return h;
+  };
+
+  startPage();
+
+  for (const table of tables) {
+    // Keep a group whole where it can be: if it does not fit in what is left of this
+    // column but would fit in an empty one, move first. Only a group taller than a
+    // full column is allowed to split — and it continues, it never gets dropped.
+    const gh = groupHeight(table);
+    const columnCapacity = colTop - BOTTOM;
+    if (y - gh < BOTTOM && gh <= columnCapacity) nextColumn();
+    // A group needs its heading plus at least one row, else start it in the next column.
+    else if (y - (17 + LINE_H + ROW_PAD) < BOTTOM) nextColumn();
+    drawGroupTitle(table.title);
+
+    let rowIdx = 0;
+    for (const row of table.rows) {
+      const valueLines = wrapText(String(row.value ?? ''), font, FS, VALUE_W);
+      const rowH = Math.max(LINE_H, valueLines.length * LINE_H) + ROW_PAD;
+      if (y - rowH < BOTTOM) {
+        nextColumn();
+        drawGroupTitle(`${table.title} (cont.)`);
+      }
+      const x = colX();
+      if (rowIdx % 2 === 1) {
+        page.drawRectangle({ x: x - 3, y: y - rowH + LINE_H - 2, width: COL_W + 6, height: rowH, color: COLOR_ROW_ALT });
+      }
+      page.drawText(truncateText(String(row.label ?? ''), font, FS, LABEL_W), { x, y, size: FS, font, color: COLOR_GRAY });
+      let vy = y;
+      for (const line of valueLines) {
+        page.drawText(line, { x: x + LABEL_W + 6, y: vy, size: FS, font: fontBold, color: COLOR_BLACK });
+        vy -= LINE_H;
+      }
+      y -= rowH;
+      rowIdx++;
+    }
+    y -= GROUP_GAP;
+  }
+
   return pages;
 }
 

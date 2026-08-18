@@ -30,6 +30,12 @@ interface CatalogPayload {
   pdf_url: string | null;
 }
 
+/** One labelled block of key/value spec rows — the same shape the PDF renderer takes. */
+interface SpecTable {
+  title: string;
+  rows: Array<{ label: string; value: string }>;
+}
+
 interface VerifyResponse {
   granted_access: boolean;
   email?: string;
@@ -225,6 +231,47 @@ export const PublicCatalogPage: React.FC = () => {
   );
 };
 
+/**
+ * Specification tables — the same `body_data.spec_tables` the PDF renders, so the
+ * page and the download never disagree. Standard design-system table: plain <table>
+ * inside a .dashboard-card, edge-to-edge via -mx-6, overflow-x-auto (NOT hidden —
+ * <main> clips horizontally, so a wide table would silently lose columns).
+ */
+const SpecTables: React.FC<{ tables: SpecTable[] }> = ({ tables }) => (
+  <section>
+    <SectionHeading title="Technical specification" />
+    <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 'var(--grid-gap)' }}>
+      {tables.map((t) => (
+        <div key={t.title} className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-primary mb-4">{t.title}</h3>
+          <div className="overflow-x-auto -mx-6 -mb-6 mt-2">
+            <table className="w-full text-xs">
+              <tbody>
+                {t.rows.map((r, i) => (
+                  <tr key={`${r.label}-${i}`} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                    <th scope="row" className="text-left px-6 py-2.5 font-medium text-muted-foreground align-top w-2/5">
+                      {r.label}
+                    </th>
+                    <td className="px-6 py-2.5 font-medium">{r.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+);
+
+const SectionHeading: React.FC<{ title: string; intro?: string | null }> = ({ title, intro }) => (
+  <div className="mb-6">
+    <div className="h-0.5 w-8 bg-primary mb-3" />
+    <h2 className="font-display text-2xl font-semibold">{title}</h2>
+    {intro && <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{intro}</p>}
+  </div>
+);
+
 const CatalogReader: React.FC<{
   catalog: CatalogPayload;
   branding?: { logo_url: string | null; company_name: string | null; contact_line: string | null };
@@ -232,6 +279,18 @@ const CatalogReader: React.FC<{
 }> = ({ catalog, branding, onDownload }) => {
   const { showPrices } = useShowPrices();
   const sections = catalog.body_data?.sections || [];
+  const specTables: SpecTable[] = useMemo(() => {
+    const raw = (catalog.body_data as any)?.spec_tables;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((t: any) => t && typeof t.title === 'string' && Array.isArray(t.rows))
+      .map((t: any) => ({
+        title: t.title,
+        rows: t.rows.filter((r: any) => r && r.label != null && r.value != null)
+          .map((r: any) => ({ label: String(r.label), value: String(r.value) })),
+      }))
+      .filter((t: SpecTable) => t.rows.length > 0);
+  }, [catalog.body_data]);
   const dateStr = useMemo(() => {
     const raw = catalog.cover_data?.date;
     if (!raw) return null;
@@ -241,20 +300,22 @@ const CatalogReader: React.FC<{
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Identity surface — one of the few places the brand gradient is allowed. */}
       <header
-        className="text-white py-16 px-6 relative"
+        className="relative py-16 px-6 text-primary-foreground"
         style={coverImage ? {
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${coverImage})`,
+          backgroundImage: `url(${coverImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-        } : { background: '#1a1a2e' }}
+        } : { background: 'var(--brand-gradient)' }}
       >
-        <div className="container mx-auto max-w-4xl space-y-3">
+        {coverImage && <div className="absolute inset-0 bg-background/70" aria-hidden />}
+        <div className="container relative mx-auto max-w-5xl space-y-3">
           {branding?.logo_url && <img src={branding.logo_url} alt={branding.company_name || ''} className="h-10 mb-4" />}
-          <h1 className="text-3xl md:text-5xl font-semibold">{catalog.title}</h1>
+          <h1 className="font-display text-3xl md:text-5xl font-semibold">{catalog.title}</h1>
           {catalog.subtitle && <p className="text-lg opacity-90">{catalog.subtitle}</p>}
           {catalog.description && <p className="text-sm opacity-80 max-w-2xl">{catalog.description}</p>}
-          <div className="flex items-center gap-4 pt-4 text-sm opacity-80">
+          <div className="flex items-center gap-4 pt-4 text-sm opacity-90">
             {dateStr && <span>{dateStr}</span>}
             {catalog.pdf_url && (
               <Button size="sm" variant="secondary" onClick={() => onDownload(catalog.pdf_url!)}>
@@ -265,45 +326,57 @@ const CatalogReader: React.FC<{
         </div>
       </header>
 
-      <main className="container mx-auto max-w-4xl py-10 px-6 space-y-12">
+      <main className="container mx-auto max-w-5xl py-10 px-6 space-y-14">
         {sections.length === 0 ? (
           <div className="text-center text-muted-foreground py-12">This catalog has no sections yet.</div>
         ) : sections.map((section) => (
           <section key={section.id}>
-            <h2 className="text-2xl font-semibold border-l-4 border-primary pl-3 mb-2">{section.title}</h2>
-            {section.intro && <p className="text-sm text-muted-foreground mb-6 max-w-2xl">{section.intro}</p>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <SectionHeading title={section.title} intro={section.intro} />
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+              style={{ gap: 'var(--grid-gap)' }}
+            >
               {(section.materials || []).map((m: any) => (
-                <Card key={m.id} className="overflow-hidden">
-                  <div className="aspect-square bg-muted">
+                <div key={m.id} className="dashboard-card overflow-hidden transition-all duration-200">
+                  {/* object-contain, not cover: these are product shots, dimension
+                      drawings and kit layouts — cropping one to a square cuts the
+                      measurements off the drawing. */}
+                  <div className="aspect-[4/3] bg-muted rounded-lg overflow-hidden flex items-center justify-center">
                     {m.image_url ? (
-                      <img src={m.image_url} alt={m.name} className="w-full h-full object-cover" />
+                      <img src={m.image_url} alt={m.name} loading="lazy" className="w-full h-full object-contain" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">no image</div>
+                      <span className="text-xs text-muted-foreground">no image</span>
                     )}
                   </div>
-                  <CardContent className="p-3 space-y-1">
+                  <div className="pt-3 space-y-1.5">
                     <div className="font-medium text-sm">{m.name}</div>
-                    {m.description && <p className="text-xs text-muted-foreground line-clamp-2">{m.description}</p>}
+                    {m.description && <p className="text-xs text-muted-foreground">{m.description}</p>}
                     {m.specs && Object.keys(m.specs).length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {Object.entries(m.specs).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(' • ')}
-                      </p>
+                      <dl className="pt-1 space-y-0.5">
+                        {Object.entries(m.specs).map(([k, v]) => (
+                          <div key={k} className="flex justify-between gap-3 text-xs">
+                            <dt className="text-muted-foreground">{k}</dt>
+                            <dd className="font-medium text-right">{String(v)}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     )}
                     {showPrices && m.price != null && (
                       <div className="text-base font-semibold pt-1">
                         {formatPrice(m.price, m.currency)}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           </section>
         ))}
+
+        {specTables.length > 0 && <SpecTables tables={specTables} />}
       </main>
 
-      <footer className="border-t py-8 px-6 text-center text-sm text-muted-foreground space-y-1">
+      <footer className="border-t border-border py-8 px-6 text-center text-sm text-muted-foreground space-y-1">
         {catalog.back_cover_data?.closing_message && <p>{catalog.back_cover_data.closing_message}</p>}
         {(catalog.back_cover_data?.contact_line || branding?.contact_line) && (
           <p className="font-medium">{catalog.back_cover_data?.contact_line || branding?.contact_line}</p>

@@ -72,6 +72,7 @@ async function resolveOwnerBranding(supabase: any, workspaceId: string | null): 
  */
 function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | null) {
   const sections = Array.isArray(catalog.body_data?.sections) ? catalog.body_data.sections : [];
+  const specTables = Array.isArray(catalog.body_data?.spec_tables) ? catalog.body_data.spec_tables : [];
   return {
     id: catalog.id,
     slug: catalog.slug,
@@ -99,6 +100,16 @@ function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | 
           specs: m?.specs ?? {},
         })),
       })),
+      // Technical-specification tables. Same allowlist discipline as the materials
+      // above: title + label/value only, never the group object as jsonb wrote it.
+      spec_tables: specTables.map((t: any) => ({
+        title: t?.title ?? null,
+        rows: (Array.isArray(t?.rows) ? t.rows : []).map((r: any) => ({
+          label: r?.label ?? null,
+          value: r?.value ?? null,
+        })),
+      })),
+      spec_title: catalog.body_data?.spec_title ?? null,
     },
     back_cover_data: {
       closing_message: catalog.back_cover_data?.closing_message ?? null,
