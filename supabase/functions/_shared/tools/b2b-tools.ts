@@ -141,26 +141,36 @@ export async function validateEmailWithZeroBounce(
 const SEARCH_MODEL = 'claude-opus-5';
 
 /**
- * POST to Anthropic, retrying the TRANSIENT failures.
+ * POST to Anthropic, retrying the TRANSIENT failures — inside a DEADLINE.
  *
  * 529 (overloaded), 429 (rate limited) and 5xx say "the upstream was busy", not "your request was
- * wrong" — and this call had no retry at all. On 2026-08-18 two 529s seven seconds apart killed a
- * real 30-market sweep outright; the agent read a bare failure, concluded the search backend was
- * "temporarily down", and went looking for a background lane it did not need. One backoff would
- * have made the whole detour unnecessary.
+ * wrong", and this call had no retry at all: two 529s seven seconds apart killed a real sweep on
+ * 2026-08-18 and sent the agent hunting for a background lane it did not need.
  *
- * Bounded deliberately: three attempts with 2s/6s backoff is ~8s of waiting on top of a call that
- * already takes ~50s, which still fits the 150s edge idle timeout. Anything longer would trade one
- * failure mode for a worse one.
+ * But retrying blindly is worse than not retrying. The agent-chat tool runner kills a tool at 90s
+ * — tighter than the 150s edge idle timeout — and a single search already takes ~52s. Two naive
+ * retries would therefore guarantee the timeout, turning a recoverable blip into a hard failure
+ * and burning two full-price calls on the way. So each attempt is only started if there is
+ * plausibly time left for it; otherwise the last response is returned and the caller reports a
+ * retryable upstream failure, which is the honest answer.
  */
-async function postAnthropicWithRetry(init: RequestInit): Promise<Response> {
+async function postAnthropicWithRetry(init: RequestInit, budgetMs = 85_000): Promise<Response> {
   const BACKOFF_MS = [2000, 6000];
+  const startedAt = Date.now();
   let res!: Response;
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
     res = await fetch('https://api.anthropic.com/v1/messages', init);
     if (res.ok) return res;
     const transient = res.status === 429 || res.status === 529 || res.status >= 500;
     if (!transient || attempt === BACKOFF_MS.length) return res;
+    // Only retry if the backoff AND another attempt of the length we just spent could finish
+    // inside the budget. A retry that is certain to be killed helps nobody and costs full price.
+    const spent = Date.now() - startedAt;
+    const perAttempt = spent / (attempt + 1);
+    if (spent + BACKOFF_MS[attempt] + perAttempt > budgetMs) {
+      console.warn(`[b2b_manufacturer_search] Anthropic ${res.status} — no time left to retry (${spent}ms spent)`);
+      return res;
+    }
     // Drain the body so the connection is released before we sleep on it.
     await res.text().catch(() => undefined);
     console.warn(`[b2b_manufacturer_search] Anthropic ${res.status} — retrying in ${BACKOFF_MS[attempt]}ms`);
@@ -267,7 +277,7 @@ export const createB2BManufacturerSearchTool = (
   onChunk?: B2BChunkSink,
 ) => {
   return tool(
-    async ({ country, region, category, limit = 30, _workflow_run_id }) => {
+    async ({ country, region, category, limit = 8, _workflow_run_id }) => {
       const _blocked = await b2bAffordabilityGate(userId, 5, 'b2b_manufacturer_search');
       if (_blocked) return _blocked;
       const runId = _workflow_run_id || crypto.randomUUID();
@@ -490,7 +500,14 @@ export const createB2BManufacturerSearchTool = (
           'A whole market group. Ignored if `country` is provided.',
         ),
         category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
-        limit: z.number().optional().default(30).describe('Max manufacturers to find. Default: 30'),
+        // 8, not 30. MEASURED: 6 companies takes ~52s; the agent-chat tool runner kills a tool at
+        // 90s (tighter than the 150s edge idle timeout I had been sizing against), and on
+        // 2026-08-18 three real sweeps died on exactly that — `Tool 'b2b_manufacturer_search'
+        // timed out after 90s`. A default of 30 could therefore never return: the call was
+        // guaranteed to be killed before it answered, which reads to the agent as a broken tool
+        // rather than an over-large request. Ask for more than ~10 and you need the background
+        // lane, not a bigger timeout.
+        limit: z.number().optional().default(8).describe('Max manufacturers per call. Default 8; more than ~10 will exceed the 90s tool timeout — run several calls or dispatch a background task instead.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
       }),
     }

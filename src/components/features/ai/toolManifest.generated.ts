@@ -176,7 +176,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'country', type: 'string', optional: true, description: 'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.' },
       { name: 'region', type: 'string', optional: true, description: 'A whole market group. Ignored if `country` is provided.' },
       { name: 'category', type: 'string', optional: false, description: 'Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")' },
-      { name: 'limit', type: 'number', optional: true, description: 'Max manufacturers to find. Default: 30' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max manufacturers per call. Default 8; more than ~10 will exceed the 90s tool timeout — run several calls or dispatch a background task instead.' },
       { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.' },
     ],
   },
