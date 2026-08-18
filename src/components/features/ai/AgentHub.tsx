@@ -106,6 +106,7 @@ import { HeatPumpResultCard } from './HeatPumpResultCard';
 import { HeatingCostResultCard } from './HeatingCostResultCard';
 import { KitchenCostResultCard, type KitchenCostResult } from './KitchenCostResultCard';
 import { SearchSpecCard } from './SearchSpecCard';
+import { ClarifyCard, type InputRequestData } from './ClarifyCard';
 import { catalogsService } from '@/services/catalogsService';
 import { CatalogExtractionCandidatesCard, type ExtractionCandidate } from './CatalogExtractionCandidatesCard';
 import { CatalogImageCandidatesCard, type ImageCandidate } from './CatalogImageCandidatesCard';
@@ -576,6 +577,11 @@ interface Message {
     toolkitId?: string;
     status?: 'pending' | 'approved' | 'declined';
   };
+  /**
+   * A structured question the agent asked via `request_input` (#370, Class D). Rendered as a
+   * ClarifyCard and hosted on the canvas — the agent's only previous way to ask was prose.
+   */
+  inputRequestData?: InputRequestData;
   sheetPdfData?: {
     sheet_id: string;
     sheet_type: SheetType;
@@ -1024,6 +1030,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       done: '',
       toolkitId: data.toolkitId || '',
     };
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  }, []);
+
+  /**
+   * The user answered the agent's structured question. The answers go back as an ordinary user
+   * message — the agent reads "Segment: contract/hospitality" the same way it would read the user
+   * typing it, so no resume protocol is needed and a reloaded conversation still makes sense.
+   */
+  const handleClarifySubmit = useCallback((messageId: string, sentence: string, answers: Record<string, string>) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId && m.inputRequestData
+        ? { ...m, inputRequestData: { ...m.inputRequestData, status: 'answered' as const, answers } }
+        : m));
+    setInput(sentence);
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  }, []);
+
+  /**
+   * "Decide for me". Hands the turn back with explicit permission to proceed on defaults, which is
+   * what makes the card an offer rather than a gate.
+   */
+  const handleClarifyDismiss = useCallback((messageId: string, sentence: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === messageId && m.inputRequestData
+        ? { ...m, inputRequestData: { ...m.inputRequestData, status: 'dismissed' as const } }
+        : m));
+    setInput(sentence);
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
   }, []);
 
@@ -2763,6 +2796,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   service: 'AgentHub',
                   metadata: { sheet_id: chunk.sheet_id, sheet_type: chunk.sheet_type, credits_used: chunk.credits_used },
                 });
+              } else if (chunk.type === 'input_request') {
+                // The agent asked for specific values instead of writing three questions in prose.
+                // Rendered as a ClarifyCard and picked up by the canvas as a `clarify` artifact.
+                const askMsg: Message = {
+                  id: `msg-ask-${chunk.request_id || Date.now()}`,
+                  role: 'assistant',
+                  content: chunk.title || 'I need a couple of details.',
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  inputRequestData: {
+                    request_id: chunk.request_id,
+                    title: chunk.title || 'Needs your input',
+                    prompt: chunk.prompt || '',
+                    fields: Array.isArray(chunk.fields) ? chunk.fields : [],
+                    submit_label: chunk.submit_label || 'Run it',
+                    status: 'pending',
+                  },
+                };
+                setMessages(prev => [...prev, askMsg]);
+                if (currentConversationId) {
+                  void agentChatHistoryService.saveMessage({
+                    conversationId: currentConversationId,
+                    role: 'assistant',
+                    content: askMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, inputRequestData: askMsg.inputRequestData },
+                  });
+                }
               } else if (chunk.type === 'action_confirmation') {
                 // Human-in-the-loop gate: a sensitive tool previewed instead of mutating.
                 // Render an inline Approve/Decline card; Approve re-invokes the tool with confirm:true.
@@ -3835,6 +3896,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // from this restore map, so they vanished on conversation reload.
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
           actionConfirmationData: msg.metadata?.actionConfirmationData as any | undefined,
+          inputRequestData: msg.metadata?.inputRequestData as InputRequestData | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
           quoteData: msg.metadata?.quoteData as any | undefined,
           catalogData: msg.metadata?.catalogData as any | undefined,
@@ -3980,6 +4042,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.articleData) return { id: m.id, kind: 'seo', title: 'SEO article' };
     if (m.catalogExtractionData) return { id: m.id, kind: 'catalog', title: 'Catalog candidates' };
     if (m.catalogImageCandidatesData) return { id: m.id, kind: 'catalog', title: m.catalogImageCandidatesData.material_name ? `Images · ${m.catalogImageCandidatesData.material_name}` : 'Catalog images' };
+    // A pending question is an artifact. Every branch above is a FINISHED result, which is why a
+    // follow-up had nowhere to go but the chat stream (#370, Class D).
+    if (m.inputRequestData) return { id: m.id, kind: 'clarify', title: m.inputRequestData.title || 'Needs your input' };
     return null;
   }, []);
 
@@ -5290,6 +5355,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         ) : renderDataCardBody(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
+                    ) : message.inputRequestData ? (
+                      // Canvas-first, like every other artifact: when the canvas pane is up the
+                      // question lives THERE and the chat keeps a one-line chip, which is the
+                      // behaviour the user asked for — a follow-up should not be a wall of prose.
+                      canvasShown ? (
+                        <ArtifactChip
+                          kind="clarify"
+                          title={message.inputRequestData.title}
+                          active={activeCanvasId === message.id}
+                          onOpen={() => focusCanvas(message.id)}
+                        />
+                      ) : (
+                        <ClarifyCard
+                          data={message.inputRequestData}
+                          onSubmit={(sentence, answers) => handleClarifySubmit(message.id, sentence, answers)}
+                          onDismiss={(sentence) => handleClarifyDismiss(message.id, sentence)}
+                        />
+                      )
                     ) : message.actionConfirmationData ? (
                       <ActionConfirmationCard
                         title={message.actionConfirmationData.title}

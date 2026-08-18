@@ -257,7 +257,12 @@ const VocabularySelect: React.FC<{
   );
 };
 
-const FieldInput: React.FC<{
+/**
+ * Exported so the canvas clarify card (ClarifyCard) renders the SAME inputs as a quick-start form
+ * — including the vocabulary-backed market selects. A second set of renderers would drift from
+ * this one the way the country lists did.
+ */
+export const FieldInput: React.FC<{
   field: ToolkitFormField;
   value: string;
   onChange: (v: string) => void;

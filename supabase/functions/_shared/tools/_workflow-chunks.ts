@@ -74,6 +74,33 @@ export function createWorkflowEmitter(args: {
         error_message: stepArgs.error_message,
       });
     },
+    /**
+     * Pause a step and ask the user for the values it needs.
+     *
+     * AgentHub has handled `workflow_step_input_request` since it was written — it sets
+     * `awaiting_input_step_id` / `awaiting_input_schema` and renders the form from them — and
+     * NOTHING has ever emitted it. The form appeared only via the frontend-local boot path, when
+     * the picker launched a workflow and seeded the schema from the registry. So a workflow step
+     * declaring `awaits_user_input: true` (b2b-research's `search` step does) could not actually
+     * ask for anything once it was running server-side. This is the missing half.
+     *
+     * `schema` is the step's `input_schema` from workflowRegistry — the same shape the picker
+     * uses, so the two paths render identically instead of drifting.
+     */
+    inputRequest(args: {
+      step_id: string;
+      prompt?: string;
+      schema: Array<Record<string, unknown>>;
+    }) {
+      safeEmit(onChunk, {
+        type: 'workflow_step_input_request',
+        run_id,
+        definition_id,
+        step_id: args.step_id,
+        prompt: args.prompt,
+        schema: args.schema,
+      });
+    },
     finished(args: { status: 'done' | 'failed' | 'aborted'; summary?: string }) {
       safeEmit(onChunk, {
         type: 'workflow_finished',

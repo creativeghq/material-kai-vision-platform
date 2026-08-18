@@ -1,6 +1,6 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
-  "entrypoints": 172,
+  "entrypoints": 173,
   "total": 55,
   "uncheckable": {
     "agent-chat/index.ts": "type graph exceeds 12 GB even alone (@langchain/langgraph generics); no runner has the heap"
@@ -11,7 +11,6 @@
     "crm-lead-score/index.ts": 4,
     "finance-issue-invoice/index.ts": 4,
     "xml-import-orchestrator/index.ts": 4,
-    "mivaa-gateway/index.ts": 2,
     "stripe-api/handlers/checkout.ts": 3,
     "_shared/langgraph-core.ts": 2,
     "background-agent-runner/index.ts": 2,
@@ -20,6 +19,7 @@
     "generate-vr-world/index.ts": 2,
     "hr-checkin-cron/index.ts": 2,
     "messaging-api/index.ts": 2,
+    "mivaa-gateway/index.ts": 2,
     "recommendations-api/index.ts": 2,
     "stripe-api/handlers/customer-portal.ts": 2,
     "stripe-api/handlers/modules.ts": 2,

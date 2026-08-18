@@ -1128,7 +1128,11 @@ async function executeAgent(
   // bind for viewers/members even if they're in an active toolkit.
   // Toolkits + load_toolkit are the single source of truth for tool-binding.
 
-  const META_TOOLS = ['load_toolkit'];
+  // Meta-tools: available to every agent regardless of toolkit selection, and homed in no
+  // cluster. `request_input` is here rather than in a toolkit because asking the user something
+  // is not a capability you opt into — an agent that cannot reach it falls back to prose, which is
+  // the failure it exists to fix (#370, Class D).
+  const META_TOOLS = ['load_toolkit', 'request_input'];
 
   // PREVENTION (root cause of the real-estate/sourcing/trip/docs orphaning): every tool declared on
   // an agent MUST live in some cluster or be a meta-tool, otherwise the startup filter strips it for
@@ -2374,6 +2378,15 @@ async function executeAgent(
     tools.push(createLoadToolkitTool(isAdmin, onChunk, applyToolkitInRun, loadableToolkitIds));
   } catch (loadToolkitErr) {
     console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);
+  }
+
+  // Register request_input ONCE, same as load_toolkit: it is a meta-tool, so it is bound for every
+  // agent and never gated on a toolkit selection.
+  try {
+    const { createRequestInputTool } = await import('../_shared/tools/input-request-tools.ts');
+    tools.push(createRequestInputTool(onChunk));
+  } catch (requestInputErr) {
+    console.warn('⚠️ Could not register request_input tool:', requestInputErr);
   }
 
   // Startup registration — build the initially-selected toolset on the live list.

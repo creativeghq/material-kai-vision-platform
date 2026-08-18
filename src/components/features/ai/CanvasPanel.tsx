@@ -15,7 +15,7 @@ import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
   PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
-  Wand2, Calculator,
+  Wand2, Calculator, MessageSquareQuote,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +23,7 @@ export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
-  | 'demo' | 'calc';
+  | 'demo' | 'calc' | 'clarify';
 
 export interface CanvasArtifact {
   id: string;
@@ -53,6 +53,9 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   catalog: Images,
   demo: Wand2,
   calc: Calculator,
+  // A pending QUESTION is an artifact too. The canvas could only ever show finished output, so
+  // a follow-up had nowhere to live but the chat stream as prose (#370, Class D).
+  clarify: MessageSquareQuote,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -77,6 +80,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   catalog: 'Catalog',
   demo: 'Demo results',
   calc: 'Calculation',
+  clarify: 'Needs your input',
 };
 
 interface CanvasPanelProps {

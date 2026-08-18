@@ -80,7 +80,10 @@ function iconMapKeys(relPath: string): Set<string> {
 // `submit_findings` used to be listed here purely to silence the old regex's
 // phantom; the AST parser never emits it, so it is gone.
 const INTERNAL_TOOLS = new Set([
-  'load_toolkit', 'load_skill', 'check_generation_status',
+  // Meta-tools. Bound for every agent from META_TOOLS, homed in no cluster on purpose:
+  // `request_input` is how the agent asks a structured question, and an agent that has to opt
+  // into asking falls back to prose — the failure it exists to fix (#370, Class D).
+  'load_toolkit', 'load_skill', 'request_input', 'check_generation_status',
   // Ops/diagnostic tools bound only by an explicit agent config (`config.tools`),
   // never by a toolkit. Not picker material — they read raw DB/Sentry/infra state.
   'queryDatabase', 'querySentry', 'checkServerHealth',
@@ -785,5 +788,84 @@ describe('bound-toolkit hint', () => {
         'hint inert for them — either the kit shrank or CURATED_SPECIALISTS gained an agent that ' +
         `is not curated: ${bare.join(', ')}`,
     ).toEqual([]);
+  });
+});
+
+/**
+ * `request_input` — the agent's structured question channel (issue #370, Class D).
+ *
+ * The mechanism was half-built: b2b-research's `search` step declares `awaits_user_input: true`
+ * with an `input_schema`, AgentHub HANDLES `workflow_step_input_request` and RENDERS a form from
+ * it — and nothing in supabase/functions/ ever emitted it. `createWorkflowEmitter` had plan(),
+ * step() and finished() and no input request, so the form only appeared via the frontend-local
+ * boot path when the picker launched a workflow. An agent answering a free-form message had no
+ * structured channel at all, and every follow-up degraded to a wall of markdown.
+ */
+describe('the agent can ask a structured question', () => {
+  const agentChat = read(AGENT_CHAT);
+
+  it('request_input is a meta-tool, bound for every agent', () => {
+    // Not a toolkit member: asking the user something is not a capability you opt into, and an
+    // agent that cannot reach it falls back to prose — the failure it exists to fix.
+    expect(
+      /const META_TOOLS = \[[^\]]*'request_input'/.test(agentChat),
+      'request_input must be in META_TOOLS so it binds regardless of toolkit selection',
+    ).toBe(true);
+    expect(
+      /createRequestInputTool\(onChunk\)/.test(agentChat),
+      'request_input must actually be instantiated — a tool nothing constructs is unreachable',
+    ).toBe(true);
+  });
+
+  it('the workflow emitter can raise a step input request', () => {
+    const emitter = read(join(ROOT, 'supabase/functions/_shared/tools/_workflow-chunks.ts'));
+    expect(
+      /inputRequest\(/.test(emitter) && /workflow_step_input_request/.test(emitter),
+      'createWorkflowEmitter must be able to emit workflow_step_input_request — AgentHub has ' +
+        'handled and rendered that chunk since it shipped, with no emitter on the other end',
+    ).toBe(true);
+  });
+
+  it('every emitted chunk type has a frontend handler', () => {
+    const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
+    for (const chunkType of ['input_request', 'workflow_step_input_request']) {
+      expect(
+        new RegExp(`chunk\.type === '${chunkType}'`).test(hub),
+        `AgentHub must handle the '${chunkType}' chunk, or the agent asks into the void`,
+      ).toBe(true);
+    }
+  });
+
+  it('the question is dismissible — an offer, not a gate', () => {
+    const card = read(join(ROOT, 'src/components/features/ai/ClarifyCard.tsx'));
+    expect(card.includes('onDismiss'), 'ClarifyCard must offer a dismiss path').toBe(true);
+    // The dismiss control must never be disabled: a required field must not be able to trap the
+    // user in a question the agent could have answered itself. That is the whole distinction
+    // between this card and the confirmation gate.
+    const dismissBlock = card.slice(card.indexOf('Decide for me') - 600, card.indexOf('Decide for me'));
+    expect(
+      /disabled/.test(dismissBlock),
+      'the dismiss control must not be disabled by anything — it is what makes this an offer',
+    ).toBe(false);
+  });
+
+  it('the clarify card reuses the shared field renderers', () => {
+    const card = read(join(ROOT, 'src/components/features/ai/ClarifyCard.tsx'));
+    expect(
+      /import \{ FieldInput \} from '\.\/ToolkitFormModal'/.test(card),
+      'ClarifyCard must render fields with FieldInput, so a `country` field shows the real ' +
+        'sourcing-market vocabulary rather than a second list that can drift from it',
+    ).toBe(true);
+  });
+
+  it('a pending question is a canvas artifact', () => {
+    const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
+    const canvas = read(join(ROOT, 'src/components/features/ai/CanvasPanel.tsx'));
+    expect(/'clarify'/.test(canvas), 'CanvasArtifactKind must include clarify').toBe(true);
+    expect(
+      /m\.inputRequestData\) return \{ id: m\.id, kind: 'clarify'/.test(hub),
+      'getCanvasArtifact must map a pending question onto the canvas — every other branch is a ' +
+        'FINISHED result, which is why a follow-up had nowhere to go but the chat stream',
+    ).toBe(true);
   });
 });
