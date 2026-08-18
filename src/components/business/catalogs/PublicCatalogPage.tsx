@@ -391,7 +391,14 @@ const CatalogReader: React.FC<{
           <div className="flex flex-wrap items-center gap-4 pt-6 text-sm text-[hsl(var(--ink-muted))]">
             {dateStr && <span>{dateStr}</span>}
             {catalog.pdf_url && (
-              <Button size="sm" variant="secondary" onClick={() => onDownload(catalog.pdf_url!)}>
+              // Explicit ink/paper colours: the shared button variants resolve against the
+              // APP theme, and a dark-surface `secondary` on white paper is barely legible.
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-transparent border-[hsl(var(--ink))] text-[hsl(var(--ink))] hover:bg-[hsl(var(--paper-panel))] hover:text-[hsl(var(--ink))]"
+                onClick={() => onDownload(catalog.pdf_url!)}
+              >
                 <FileDown className="mr-2 h-4 w-4" /> Download PDF
               </Button>
             )}
