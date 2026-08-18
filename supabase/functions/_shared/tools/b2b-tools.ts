@@ -280,6 +280,16 @@ export const createB2BManufacturerSearchTool = (
     async ({ country, region, category, limit = 8, _workflow_run_id }) => {
       const _blocked = await b2bAffordabilityGate(userId, 5, 'b2b_manufacturer_search');
       if (_blocked) return _blocked;
+      // CLAMP, don't just document. The schema says >10 will blow the 90s tool timeout, but a
+      // description is a suggestion and the model is free to ignore it — watched live on
+      // 2026-08-18, the agent asked for limit 25 per region and every call was killed at 90s,
+      // three times in a row, having spent full price on each. A measured 6-company search takes
+      // ~52s, so anything past ~10 cannot return. Capping here converts a guaranteed timeout into
+      // a smaller result plus an explicit instruction to call again, which the agent can act on.
+      const MAX_PER_CALL = 10;
+      const requestedLimit = limit;
+      if (limit > MAX_PER_CALL) limit = MAX_PER_CALL;
+
       const runId = _workflow_run_id || crypto.randomUUID();
       const emitter = createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: runId });
       emitter.plan({ title: `${category} manufacturers`, subtitle: country || region || 'global', metadata: { country, region, category, limit } });
@@ -451,6 +461,12 @@ export const createB2BManufacturerSearchTool = (
           // paragraph explaining that nothing was found counted as a successful search.
           success: manufacturers.length > 0,
           _workflow_run_id: runId,
+          // Tell the agent it asked for more than one call can deliver, so it splits the work
+          // instead of assuming the tool under-delivered.
+          ...(requestedLimit > MAX_PER_CALL
+            ? { limit_clamped: { requested: requestedLimit, used: MAX_PER_CALL,
+                note: `Capped at ${MAX_PER_CALL} per call — more than that cannot finish inside the 90s tool timeout. Call again for another country/region, or dispatch a background task for a full multi-market sweep.` } }
+            : {}),
           // `results` is the countable array shape shapeToolResult() recognises, so a search that
           // finds nothing registers as zero-result rather than as unknown — which is what stops it
           // being mistaken for work by the memory gate (#370, Class E).
