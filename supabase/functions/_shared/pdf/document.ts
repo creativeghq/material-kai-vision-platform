@@ -489,20 +489,29 @@ function drawGridPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
   let pages = 0;
   for (const section of doc.sections) {
     const materials = section.items;
-    const chunks = Math.max(1, Math.ceil(materials.length / 4));
-    for (let chunk = 0; chunk < chunks; chunk++) {
-      const slice = materials.slice(chunk * 4, chunk * 4 + 4);
+    // Paginate by the height actually available, NOT by a fixed 4 cards per page.
+    // Page size follows the workspace's cover template, so it is not always portrait
+    // A4: on the 842x541 landscape default cover only two cards fit, and the old
+    // `slice(chunk * 4, ...)` + `break` silently dropped cards 3 and 4 of every
+    // section — no error, no warning, and page_count still reported success.
+    let idx = 0;
+    let firstPage = true;
+    do {
       const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
       if (bgImage) { page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H }); page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_WHITE, opacity: 0.92 }); }
       let y = g.PAGE_H - g.MARGIN_TOP;
-      if (chunk === 0 && section.title) {
+      if (firstPage && section.title) {
         page.drawRectangle({ x: g.MARGIN, y: y - 4, width: 32, height: 3, color: COLOR_DARK }); y -= 18;
         page.drawText(section.title, { x: g.MARGIN, y, size: 22, font: fontBold, color: COLOR_DARK }); y -= 28;
         if (section.intro) { for (const line of wrapText(section.intro, font, 11, g.CONTENT_W).slice(0, 3)) { page.drawText(line, { x: g.MARGIN, y, size: 11, font, color: COLOR_GRAY }); y -= 14; } y -= 4; }
         page.drawLine({ start: { x: g.MARGIN, y: y - 4 }, end: { x: g.PAGE_W - g.MARGIN, y: y - 4 }, thickness: 0.5, color: COLOR_LIGHT_GRAY }); y -= 18;
       } else if (section.title) { y -= 10; page.drawText(`${section.title} (continued)`, { x: g.MARGIN, y, size: 12, font, color: COLOR_GRAY }); y -= 22; }
-      for (const mat of slice) {
-        if (y - rowH < 60) break;
+      let drawn = 0;
+      while (idx < materials.length) {
+        // Always place at least one card per page — otherwise a page too short for a
+        // card would add pages forever instead of dropping content.
+        if (drawn > 0 && y - rowH < 60) break;
+        const mat = materials[idx];
         const imgX = g.MARGIN, imgY = y - imgSize;
         page.drawRectangle({ x: imgX, y: imgY, width: imgSize, height: imgSize, color: rgb(0.96, 0.96, 0.96), borderColor: COLOR_LIGHT_GRAY, borderWidth: 0.5 });
         const thumb = itemImages[mat.image_key ?? ''] ?? null;
@@ -516,8 +525,10 @@ function drawGridPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
         if (mat.unit_price != null) page.drawText(formatCurrency(mat.unit_price, doc.currency), { x: textX, y: imgY + 6, size: 14, font: fontBold, color: COLOR_DARK });
         y -= rowH;
         page.drawLine({ start: { x: g.MARGIN, y: y + 2 }, end: { x: g.PAGE_W - g.MARGIN, y: y + 2 }, thickness: 0.25, color: COLOR_LIGHT_GRAY }); y -= 8;
+        idx++; drawn++;
       }
-    }
+      firstPage = false;
+    } while (idx < materials.length);
   }
   if (doc.totals) {
     const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
