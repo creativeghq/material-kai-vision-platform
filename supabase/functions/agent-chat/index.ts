@@ -85,6 +85,7 @@ async function initRuntime() {
   getAgentTurnCost = creditMod.getAgentTurnCost;
   getToolPrompt = promptMod.getToolPrompt;
   getAgentSystemPrompt = promptMod.getAgentSystemPrompt;
+  getSharedOperatingDoctrine = promptMod.getSharedOperatingDoctrine;
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
   isAdminAccess = authMod.isAdminAccess;
@@ -583,6 +584,9 @@ function createAgentGraph(
 // getAgentSystemPrompt: Uses shared cached version from _shared/prompt-utils.ts
 // Imported as part of initRuntime() → promptMod
 let getAgentSystemPrompt: (supabase: any, agentType: string) => Promise<string>;
+
+// The act-then-refine doctrine appended to every agent prompt (#370). Also from promptMod.
+let getSharedOperatingDoctrine: (supabase: any) => Promise<string>;
 
 // Claude models — initialized in initRuntime()
 let modelHaiku: any;
@@ -1257,6 +1261,11 @@ async function executeAgent(
     console.error(`❌ Failed to load system prompt for ${agentId}:`, error);
     throw new Error(`Failed to load agent configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+
+  // Act, then refine — the same rules for every agent (#370, Class C). Appended rather than
+  // written into each agent's own prompt: 8 of 15 prompts were confirm-first and only 5 had any
+  // counterweight, so this is an ABSENCE being filled, and fifteen hand-kept copies would drift.
+  systemPrompt += `\n\n${await getSharedOperatingDoctrine(supabase)}`;
 
   // 🧠 Long-term Memory: recall the slice relevant to THIS turn (#233).
   // Ranked by cosine against the user's message, not by `created_at desc` — the old

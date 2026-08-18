@@ -422,3 +422,44 @@ describe('isCapabilityClaim rejects memories about the assistant', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * The shared operating doctrine (issue #370, Class C).
+ *
+ * Pepper asked the user to name countries — `b2b_manufacturer_search` treats country and region as
+ * optional and sweeps every defined market when both are omitted — and to define a furniture
+ * segment, when `category` is satisfied by "furniture". Then it asked the same three questions
+ * again on the next turn. Neither answer was a precondition of any tool.
+ *
+ * Measured across the 15 active agent prompts at the time: 8 carried confirm-first language and
+ * only 5 carried any "default / broad / proceed" counterweight — `product-business` and `erp`, the
+ * two most action-oriented specialists, had none. The doctrine is appended to EVERY agent prompt
+ * from ONE db row rather than pasted into fifteen, because the absence was the defect and fifteen
+ * hand-kept copies are how every other mirror in this repo drifted.
+ */
+describe('act-then-refine doctrine reaches every agent', () => {
+  it('agent-chat appends it to the system prompt', () => {
+    expect(
+      /systemPrompt \+= [^\n]*getSharedOperatingDoctrine\(supabase\)/.test(agentChatCode),
+      'every agent turn must get the shared doctrine appended — it is the counterweight to the ' +
+        'confirm-first language in the individual prompts',
+    ).toBe(true);
+  });
+
+  it('the doctrine is loaded from the database, never hardcoded', () => {
+    const promptUtils = stripComments(
+      readFileSync(join(ROOT, 'supabase/functions/_shared/prompt-utils.ts'), 'utf8'),
+    );
+    expect(
+      /from\('prompts'\)/.test(promptUtils) && /shared_operating_doctrine/.test(promptUtils),
+      'getSharedOperatingDoctrine must read the prompts table',
+    ).toBe(true);
+    // CLAUDE.md: never hardcode a prompt in a file that calls a model. A doctrine pasted into the
+    // edge function would drift from what /admin/ai-configs shows and could not be tuned without
+    // a deploy — which is the whole reason prompts live in the DB.
+    expect(
+      /Act on what you have|A clarifying question must change/.test(agentChatCode),
+      'the doctrine text is hardcoded in agent-chat — it belongs in the prompts table',
+    ).toBe(false);
+  });
+});

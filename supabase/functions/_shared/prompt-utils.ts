@@ -96,6 +96,48 @@ export async function getAgentSystemPrompt(
 }
 
 /**
+ * The shared operating doctrine appended to EVERY agent's system prompt (issue #370, Class C).
+ *
+ * WHY IT IS SHARED. Measured across the 15 active agent prompts: 8 carried confirm-first language
+ * and only 5 carried any "default / broad / proceed" counterweight — and `product-business` and
+ * `erp`, the two most action-oriented specialists, had none. So Pepper asked the user to name
+ * countries (the tool defaults to all 30) and to define a furniture segment (the schema is
+ * satisfied by "furniture"), twice, and searched nothing. Per-agent prose could not fix that: the
+ * absence was the problem, and fifteen hand-edited copies would drift the way every other
+ * hand-kept mirror in this repo has.
+ *
+ * WHY IT IS A DB ROW, not a constant here. CLAUDE.md: never hardcode a prompt in a file that calls
+ * a model. Behaviour tuning is exactly what an admin should be able to change without a deploy.
+ *
+ * Missing is NOT fatal — unlike an agent's own prompt, this one augments. A hard failure here
+ * would take the whole chat down over a tuning row, so it warns and returns ''. That is a
+ * deliberate exception to the no-fallback rule and it is safe because the empty string is not a
+ * substitute doctrine, it is the absence of one, and the warning says so.
+ */
+export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<string> {
+  const cacheKey = 'system:shared_operating_doctrine';
+  const cached = getCachedPrompt(cacheKey);
+  if (cached !== undefined && cached !== null) return cached;
+
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('system_prompt')
+    .eq('prompt_type', 'system')
+    .eq('category', 'shared_operating_doctrine')
+    .eq('is_active', true)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (error || !data?.system_prompt) {
+    console.warn('⚠️ shared_operating_doctrine prompt row missing — agents run without the act-then-refine rules', error?.message ?? '');
+    return '';
+  }
+
+  setCachedPrompt(cacheKey, data.system_prompt);
+  return data.system_prompt;
+}
+
+/**
  * Load a tool-specific prompt from the database.
  * prompt_type = 'tool', category = toolName
  *
