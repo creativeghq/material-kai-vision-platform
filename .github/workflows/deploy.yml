@@ -60,7 +60,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
+      frontend: ${{ steps.areas.outputs.frontend }}
       functions: ${{ steps.filter.outputs.functions }}
       shared: ${{ steps.filter.outputs.shared }}
       tests: ${{ steps.filter.outputs.tests }}
@@ -72,10 +72,46 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ── What is ACTUALLY live ────────────────────────────────────────────────
+      #
+      # Every diff below is taken from the last commit that REACHED PRODUCTION, not from the
+      # previous commit. Those are different things the moment a run does not finish, and the
+      # difference is silent: a superseding push cancels a deploy, the next push touches other
+      # paths, `changes` says "no frontend change" against a parent whose frontend never shipped,
+      # and CI goes green over a build that is missing work. That happened on 2026-08-17 —
+      # d02b5c79's frontend was cancelled mid-flight, 61c3b192 was test-only, and two fixes sat on
+      # main unshipped behind a green tick.
+      #
+      # The markers are moved ONLY by a successful deploy (see the `mark-deployed-*` jobs), so
+      # anything stranded by a cancellation is still in the diff on the next run and redeploys by
+      # itself. No marker (first run, or the tag was deleted) means "we cannot prove anything is
+      # live" and everything deploys — the safe direction.
+      - name: 🎯 Resolve the last-deployed markers
+        id: base
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet || true
+          for area in frontend functions; do
+            TAG="deployed/$area"
+            if SHA=$(git rev-parse -q --verify "refs/tags/$TAG^{commit}" 2>/dev/null); then
+              echo "✅ $area last deployed at $SHA"
+            else
+              SHA=""
+              echo "⚠️  no $TAG marker — treating everything as undeployed"
+            fi
+            echo "${area}_base=$SHA" >> "$GITHUB_OUTPUT"
+          done
+
       - name: 🔍 Detect changed areas
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          # Diff against what is live. paths-filter takes one base, and it is the FRONTEND marker
+          # because the frontend is what its `frontend` output gates; the function list below is
+          # computed separately against the functions marker. An empty base makes paths-filter
+          # compare against the default branch, which is why the fallback is handled explicitly in
+          # the step after this one rather than by leaving this blank.
+          base: ${{ steps.base.outputs.frontend_base }}
           filters: |
             frontend:
               - 'src/**'
@@ -97,6 +133,21 @@ jobs:
             tests:
               - 'tests/**'
 
+      - name: 🧭 Resolve the frontend verdict
+        id: areas
+        run: |
+          set -euo pipefail
+          # No marker means we cannot prove ANY frontend build is live, so everything is
+          # undeployed and everything ships. paths-filter with an empty base falls back to its own
+          # default (the push's before-SHA, or the default branch), which on a first run would
+          # answer "nothing changed" — the one answer that must never be reachable here.
+          if [ -z "${{ steps.base.outputs.frontend_base }}" ]; then
+            echo "⚠️  no deployed/frontend marker — treating the frontend as undeployed"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 🧮 Compute changed functions
         id: changed-functions
         run: |
@@ -116,14 +167,14 @@ jobs:
             FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
 
           # Case 3: normal diff-based selection.
+          # Case 3: diff against the last commit whose FUNCTIONS actually deployed.
+          elif [ -z "${{ steps.base.outputs.functions_base }}" ]; then
+            echo "ℹ️  No deployed/functions marker — deploying ALL functions"
+            FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
+
           else
-            BASE="${{ github.event.before }}"
-            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
-              # First push to branch / force-push / squash — fall back to HEAD~1.
-              BASE=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
-              echo "⚠️  github.event.before unusable; falling back to $BASE"
-            fi
-            echo "ℹ️  Diffing $BASE..${{ github.sha }}"
+            BASE="${{ steps.base.outputs.functions_base }}"
+            echo "ℹ️  Diffing $BASE..${{ github.sha }} (last DEPLOYED functions commit, not HEAD~1)"
             FUNCS=$(git diff --name-only "$BASE" "${{ github.sha }}" \
                     | grep -oP '^supabase/functions/\K[^/]+(?=/)' \
                     | grep -v '^_shared$' \
@@ -663,3 +714,44 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npm run test:integration
+
+  # ── The markers that say what is live ────────────────────────────────────────
+  #
+  # These are the OTHER half of the `changes` job's diff. Each tag moves to the commit that just
+  # finished deploying its area, and only then — a cancelled, failed or skipped deploy leaves the
+  # marker where it was, so the next run still sees that work as undeployed and ships it.
+  #
+  # Why a tag and not the last successful RUN: a run can succeed while its deploy was skipped
+  # (a test-only commit is green and deploys nothing). "The newest green run" would move the
+  # baseline past work that never shipped, which is the bug, one level up.
+  #
+  # Force-updated on purpose: the tag tracks a moving pointer, not a release.
+  mark-deployed-frontend:
+    needs: [promote]
+    if: ${{ needs.promote.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: 🏷️ Move deployed/frontend to this commit
+        run: |
+          set -euo pipefail
+          git tag -f deployed/frontend "${{ github.sha }}"
+          git push -f origin refs/tags/deployed/frontend
+          echo "deployed/frontend → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+
+  mark-deployed-functions:
+    needs: [deploy-functions]
+    if: ${{ needs.deploy-functions.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: 🏷️ Move deployed/functions to this commit
+        run: |
+          set -euo pipefail
+          git tag -f deployed/functions "${{ github.sha }}"
+          git push -f origin refs/tags/deployed/functions
+          echo "deployed/functions → ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
