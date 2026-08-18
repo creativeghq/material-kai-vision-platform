@@ -79,7 +79,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-white/8 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <MessageSquare className="h-4 w-4 text-primary" /> Requests
@@ -101,7 +101,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
             {requests.length === 0 ? 'No requests yet.' : 'Nothing open — tick "Show closed" to see the rest.'}
           </p>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-hairline">
             {visible.map((r) => {
               const expanded = openId === r.id;
               return (

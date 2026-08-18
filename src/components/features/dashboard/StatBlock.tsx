@@ -58,7 +58,7 @@ export const StatBlock: React.FC<StatBlockProps> = ({
   ];
 
   return (
-    <div className="rounded-xl border border-white/8 bg-background/40 p-3.5 flex flex-col">
+    <div className="rounded-xl border border-hairline bg-background/40 p-3.5 flex flex-col">
       <div className="flex items-center gap-2 mb-2.5">
         <span className="w-6 h-6 rounded-md bg-primary/10 grid place-items-center shrink-0">
           <Icon className="h-3.5 w-3.5 text-primary" />

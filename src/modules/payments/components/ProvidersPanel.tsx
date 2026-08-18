@@ -61,7 +61,7 @@ export const ProvidersPanel: React.FC<Props> = (_props) => {
               </Button>
             </div>
           ) : (
-            <ul className="divide-y divide-white/8">
+            <ul className="divide-y divide-hairline">
               {providers.map(p => (
                 <li key={p.slug} className="py-3 flex items-center gap-3">
                   <CreditCard className="h-4 w-4 text-primary shrink-0" />

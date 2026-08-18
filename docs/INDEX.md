@@ -323,7 +323,7 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🏗️ Architecture & Design
 
-**[design-system.md](design-system.md)** - Dark-mode theme, horizontal top nav, typography, button/tab/card/table patterns, image optimization helper. Summary + pointer to full reference at `.claude/design-system.md`.
+**[design-system.md](design-system.md)** - The full design system: tokens, surfaces, typography, primitives, the `hub/` pattern library, the three screen archetypes, and the image optimization helper. Live specimen sheet at `/design-system` in-app.
 
 **[category-field-registry.md](category-field-registry.md)** - Frontend display config for the 10 material categories (`tiles`, `wood`, `decor`, `furniture`, `general_materials`, `paint_wall_decor`, `heating`, `sanitary`, `kitchen`, `lighting`). How sections render in `ProductDetailModal`, `controlledVocab` resolution, editing rules, drift-with-Python warnings.
 

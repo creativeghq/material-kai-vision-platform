@@ -161,7 +161,7 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-white/8 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <ClipboardList className="h-4 w-4 text-primary" /> Snags
@@ -194,7 +194,7 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
             {snags.length === 0 ? 'No snags raised.' : 'Nothing matches the filter.'}
           </p>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-hairline">
             {visible.map((s) => (
               <div key={s.id} className="p-4">
                 <div className="flex items-start gap-3">
@@ -373,7 +373,7 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-white/8 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <CalendarDays className="h-4 w-4 text-primary" /> Site log
@@ -390,7 +390,7 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
         {logs.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">No site visits logged yet.</p>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-hairline">
             {logs.map((l) => (
               <div key={l.id} className="p-4">
                 <div className="flex items-start gap-3">

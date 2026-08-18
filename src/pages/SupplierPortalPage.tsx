@@ -84,7 +84,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
       ) : (
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/12 border border-primary/20 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/[0.12] border border-primary/20 flex items-center justify-center shrink-0">
               <Inbox className="h-5 w-5 text-primary" />
             </div>
             <div>

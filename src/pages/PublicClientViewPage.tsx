@@ -351,7 +351,7 @@ export default function PublicClientViewPage() {
         {view.snags && view.snags.length > 0 && (
           <section>
             <h2 className="text-lg font-semibold mb-3">Outstanding items</h2>
-            <Card className="dashboard-card divide-y divide-white/8">
+            <Card className="dashboard-card divide-y divide-hairline">
               {view.snags.map((s) => (
                 <div key={s.id} className="flex items-start gap-3 p-4">
                   <div className="min-w-0 flex-1">

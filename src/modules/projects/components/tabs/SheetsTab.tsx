@@ -211,7 +211,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
 
       {projectOwned.length > 0 && (
         <Card className="dashboard-card">
-          <div className="px-4 py-2 border-b border-white/8 flex items-center gap-2">
+          <div className="px-4 py-2 border-b border-hairline flex items-center gap-2">
             <Ruler className="h-3.5 w-3.5 text-primary" />
             <span className="text-sm font-medium">Technical plans</span>
             <span className="text-xs text-muted-foreground ml-auto">
@@ -219,7 +219,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
             </span>
           </div>
           <CardContent className="p-0">
-            <ul className="divide-y divide-white/8">
+            <ul className="divide-y divide-hairline">
               {projectOwned.map(s => <SheetRow key={s.id} s={s} />)}
             </ul>
           </CardContent>
@@ -228,7 +228,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
 
       {grouped.map(g => (
         <Card key={g.moodboard_id} className="dashboard-card">
-          <div className="px-4 py-2 border-b border-white/8 flex items-center gap-2">
+          <div className="px-4 py-2 border-b border-hairline flex items-center gap-2">
             <Palette className="h-3.5 w-3.5 text-primary" />
             <button
               type="button"
@@ -240,7 +240,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
             <span className="text-xs text-muted-foreground ml-auto">{g.sheets.length} {g.sheets.length === 1 ? 'sheet' : 'sheets'}</span>
           </div>
           <CardContent className="p-0">
-            <ul className="divide-y divide-white/8">
+            <ul className="divide-y divide-hairline">
               {g.sheets.map(s => <SheetRow key={s.id} s={s} />)}
             </ul>
           </CardContent>

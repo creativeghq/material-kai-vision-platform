@@ -112,13 +112,13 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
         return (
           <Card key={chain.rootId} className="dashboard-card">
             {hasRevisions && (
-              <div className="px-4 py-2 border-b border-white/8 flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="px-4 py-2 border-b border-hairline flex items-center gap-2 text-xs text-muted-foreground">
                 <GitBranch className="h-3.5 w-3.5" />
                 <span>Revision chain — {chain.revisions.length} versions</span>
               </div>
             )}
             <CardContent className="p-0">
-              <div className="divide-y divide-white/8">
+              <div className="divide-y divide-hairline">
                 {chain.revisions.map(q => (
                   <button
                     key={q.id}

@@ -159,7 +159,7 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
   return (
     <div className="space-y-4">
       <Card className="dashboard-card">
-        <CardHeader className="border-b border-white/8 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
+        <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
           <div>
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <GanttChartSquare className="h-4 w-4 text-primary" /> Schedule
@@ -182,8 +182,8 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
           ) : (
             <div className="flex">
               {/* Task names — fixed, so they stay readable while the timeline scrolls. */}
-              <div className="shrink-0 border-r border-white/8" style={{ width: 224 }}>
-                <div className="h-8 border-b border-white/8" />
+              <div className="shrink-0 border-r border-hairline" style={{ width: 224 }}>
+                <div className="h-8 border-b border-hairline" />
                 {tasks.map((t) => (
                   <button
                     key={t.id}
@@ -203,9 +203,9 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
               <div className="min-w-0 flex-1 overflow-x-auto" ref={timelineRef}>
                 <div className="relative" style={{ width: timelineWidth }}>
                   {/* month header */}
-                  <div className="relative h-8 border-b border-white/8">
+                  <div className="relative h-8 border-b border-hairline">
                     {monthTicks.map((m) => (
-                      <div key={m.label + m.left} className="absolute top-0 h-full border-l border-white/8 pl-1 text-[10px] leading-8 text-muted-foreground" style={{ left: m.left }}>
+                      <div key={m.label + m.left} className="absolute top-0 h-full border-l border-hairline pl-1 text-[10px] leading-8 text-muted-foreground" style={{ left: m.left }}>
                         {m.label}
                       </div>
                     ))}
@@ -436,7 +436,7 @@ const ScheduleEditDialog: React.FC<{
           <div className="space-y-1">
             <Label className="text-xs flex items-center gap-1"><Link2 className="h-3 w-3" /> Runs after</Label>
             {myDeps.length > 0 && (
-              <div className="rounded-md border border-white/10 divide-y divide-white/8 mb-2">
+              <div className="rounded-md border border-white/10 divide-y divide-hairline mb-2">
                 {myDeps.map((d) => (
                   <div key={d.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                     <span className="min-w-0 flex-1 truncate">{titleById.get(d.predecessor_id) ?? 'Unknown task'}</span>

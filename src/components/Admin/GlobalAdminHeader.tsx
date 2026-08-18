@@ -20,7 +20,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/8">
+    <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-hairline">
       <div className="flex items-center justify-between gap-4">
         {/* Left: icon + title */}
         <div className="flex items-center gap-3">

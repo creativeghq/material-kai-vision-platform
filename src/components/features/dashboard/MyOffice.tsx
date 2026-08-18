@@ -31,9 +31,9 @@ function money(n: number, currency = 'EUR'): string {
 }
 
 const TONE_STYLES: Record<InsightTone, { icon: React.ComponentType<{ className?: string }>; cls: string; chip: string }> = {
-  warning: { icon: AlertTriangle, cls: 'text-amber-400', chip: 'bg-amber-400/12' },
-  positive: { icon: TrendingUp, cls: 'text-emerald-400', chip: 'bg-emerald-400/12' },
-  tip: { icon: Lightbulb, cls: 'text-primary', chip: 'bg-primary/12' },
+  warning: { icon: AlertTriangle, cls: 'text-amber-400', chip: 'bg-amber-400/[0.12]' },
+  positive: { icon: TrendingUp, cls: 'text-emerald-400', chip: 'bg-emerald-400/[0.12]' },
+  tip: { icon: Lightbulb, cls: 'text-primary', chip: 'bg-primary/[0.12]' },
   info: { icon: Info, cls: 'text-muted-foreground', chip: 'bg-muted' },
 };
 
@@ -304,10 +304,10 @@ const MyOfficeImpl: React.FC = () => {
       <QuickAccess />
 
       {/* KAI insights */}
-      <div className="mt-1 pt-4 border-t border-white/8 flex-1 flex flex-col">
+      <div className="mt-1 pt-4 border-t border-hairline flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <span
-            className="inline-flex items-center gap-1.5 text-[11px] text-primary bg-primary/12 border border-primary/25 rounded-full px-2.5 py-1"
+            className="inline-flex items-center gap-1.5 text-[11px] text-primary bg-primary/[0.12] border border-primary/25 rounded-full px-2.5 py-1"
             style={{ fontWeight: 600 }}
           >
             <Sparkles className="h-3 w-3" /> KAI · Live insights

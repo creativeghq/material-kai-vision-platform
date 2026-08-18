@@ -37,8 +37,8 @@ export const StatCard: React.FC<StatCardProps> = ({
     <div className={cn('stat-card', className)}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm text-muted-foreground mb-2">{title}</p>
-          <p className="text-2xl font-light text-foreground">{value}</p>
+          <p className="text-xs font-semibold text-muted-foreground mb-1.5">{title}</p>
+          <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
           {change && (
             <div className="mt-2">
               <span
@@ -55,8 +55,8 @@ export const StatCard: React.FC<StatCardProps> = ({
           )}
         </div>
         {Icon && (
-          <div className={cn('p-3 rounded-lg bg-secondary/50', iconColor)}>
-            <Icon className="w-6 h-6" />
+          <div className={cn('p-2 rounded-sm bg-surface-sunken', iconColor)}>
+            <Icon className="w-4 h-4" />
           </div>
         )}
       </div>

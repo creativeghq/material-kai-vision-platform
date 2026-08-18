@@ -4,26 +4,55 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * BUTTON — rectangular, 4px radius, flat fill, no lift.
+ *
+ * The previous button was a fully-rounded pill that rose 2px and grew its
+ * shadow on hover. Two problems, in order of how much they cost:
+ *
+ *  1. A pill is the same silhouette as a status chip, a filter chip and an
+ *     active tab — all of which this platform also rendered as pills. In a
+ *     toolbar you could not tell an action from a label without reading it.
+ *     Squaring the action and squaring the tag differently is what makes a
+ *     toolbar scannable.
+ *  2. `hover:-translate-y-0.5` moves the target out from under the pointer,
+ *     and in a row of buttons it shoves the row.
+ *
+ * Hierarchy is carried by FILL, not by size: `default` (solid accent) is the
+ * one primary action on a screen; `secondary` (accent outline) is its partner;
+ * `outline` (neutral hairline) is everything else; `ghost` is icon/table-row
+ * chrome. If a screen has two solid buttons, one of them is wrong.
+ */
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm text-sm font-semibold ring-offset-background transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:opacity-90 rounded-full shadow-sm hover:shadow-md hover:-translate-y-0.5',
+        default:
+          'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80',
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full shadow-sm hover:shadow-md',
-        outline:
-          'bg-white/8 text-foreground border border-white/12 hover:bg-white/12 hover:border-white/20 rounded-full',
+          'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80',
+        // Accent outline — the canonical "second action" next to a primary.
         secondary:
-          'bg-white/6 text-foreground border border-white/10 hover:bg-white/10 rounded-full',
-        ghost: 'hover:bg-white/8 hover:text-foreground rounded-lg',
-        link: 'text-primary underline-offset-4 hover:underline',
+          'bg-transparent text-primary border border-primary hover:bg-primary/[0.08] active:bg-primary/[0.14]',
+        // Neutral outline — tertiary actions, toolbars, filter triggers.
+        outline:
+          'bg-card text-foreground border border-hairline hover:bg-surface-hover hover:border-muted-foreground/50',
+        ghost:
+          'bg-transparent text-muted-foreground hover:bg-surface-hover hover:text-foreground',
+        link: 'text-primary underline-offset-2 hover:underline p-0 h-auto',
       },
       size: {
-        default: 'h-11 px-6 py-2.5',
-        sm: 'h-9 rounded-full px-4',
-        lg: 'h-12 rounded-full px-8 text-base',
-        icon: 'h-10 w-10 rounded-full',
+        // 36px default. The old default was 44px, which is a touch target
+        // standing in for a desktop control: it set the height of every table
+        // row that carried an action and every toolbar it appeared in. 36px is
+        // dense enough for a data UI and still comfortably tappable; `sm` (32px)
+        // is for inside a table row, `lg` (40px) for a page's single hero CTA.
+        default: 'h-9 px-3.5',
+        sm: 'h-8 px-2.5 text-xs',
+        lg: 'h-10 px-5',
+        icon: 'h-9 w-9 p-0',
+        'icon-sm': 'h-8 w-8 p-0',
       },
     },
     defaultVariants: {

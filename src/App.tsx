@@ -144,6 +144,8 @@ const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
+// Live specimen sheet for the design system — see src/components/core/hub/.
+const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
 import { buildModuleRoutes } from './modules/_core';
@@ -211,6 +213,11 @@ const App = () => (
                     read is useless to the two audiences that need it (prospects and API consumers).
                     Only published rows are reachable; the RLS policy enforces that for anon too. */}
                 <Route path="/changelog" element={<PageErrorBoundary name="Changelog"><ChangelogPage /></PageErrorBoundary>} />
+                {/* Design-system specimen sheet. Deliberately outside AuthGuard: it renders no
+                    real data (every row on it is a literal in the file), and a design reference
+                    you have to hold a workspace seat to look at is the kind of reference that
+                    stops being consulted and then stops being true. */}
+                <Route path="/design-system" element={<PageErrorBoundary name="Design System"><DesignSystemPage /></PageErrorBoundary>} />
                 {/* Public legal pages — no auth required */}
                 <Route path="/privacy" element={<PageErrorBoundary name="Privacy Policy"><PrivacyPolicyPage /></PageErrorBoundary>} />
                 <Route path="/terms" element={<PageErrorBoundary name="Terms of Service"><TermsOfServicePage /></PageErrorBoundary>} />

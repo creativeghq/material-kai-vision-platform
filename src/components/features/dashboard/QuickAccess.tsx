@@ -36,7 +36,7 @@ export const QuickAccess: React.FC = () => (
           key={t.to}
           to={t.to}
           title={t.label}
-          className="group flex flex-col items-center gap-1.5 rounded-xl border border-white/8 bg-background/40 px-1 py-2.5 transition-colors hover:border-primary/40 hover:bg-background/70"
+          className="group flex flex-col items-center gap-1.5 rounded-xl border border-hairline bg-background/40 px-1 py-2.5 transition-colors hover:border-primary/40 hover:bg-background/70"
         >
           <t.icon className="h-4 w-4 text-primary shrink-0" />
           {/* 9px is small, but the tile is 1/5 of a narrow column and the icon

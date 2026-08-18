@@ -278,7 +278,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
               <Stat label="Blocked" value={taskStats.blocked} icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-300" />} />
             </div>
             {upcomingTasks.length > 0 && (
-              <div className="pt-2 border-t border-white/8">
+              <div className="pt-2 border-t border-hairline">
                 <p className="text-xs text-muted-foreground mb-2">Next due</p>
                 <ul className="space-y-1.5">
                   {upcomingTasks.map(t => {

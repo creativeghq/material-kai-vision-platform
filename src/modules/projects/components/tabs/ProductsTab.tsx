@@ -165,7 +165,7 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
           <p className="text-xs text-muted-foreground mt-1">Add one manually, or import the lines from an attached quote.</p>
         </CardContent></Card>
       ) : (
-        <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-white/8">
+        <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-hairline">
           {rows.map((r) => (
             <div key={r.id} className="p-4 flex items-center gap-3 flex-wrap">
               <div className="flex-1 min-w-[180px]">
@@ -336,7 +336,7 @@ const AddProductDialog: React.FC<{
                 </div>
                 {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
                 {results.length > 0 && (
-                  <div className="max-h-48 overflow-auto rounded-md border border-white/10 divide-y divide-white/8">
+                  <div className="max-h-48 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
                     {results.map(p => (
                       <button key={p.id} className="w-full text-left p-2 hover:bg-muted/40" onClick={() => { setPicked(p); setResults([]); setQuery(''); }}>
                         <p className="text-sm font-medium truncate">{p.name}</p>

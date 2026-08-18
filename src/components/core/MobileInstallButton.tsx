@@ -38,7 +38,7 @@ export const MobileInstallButton: React.FC<MobileInstallButtonProps> = ({ onDone
   };
 
   return (
-    <div className="mt-3 border-t border-white/8 pt-3">
+    <div className="mt-3 border-t border-hairline pt-3">
       <button
         type="button"
         onClick={handleClick}

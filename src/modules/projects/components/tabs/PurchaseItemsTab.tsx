@@ -158,7 +158,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
           <p className="text-xs text-muted-foreground mt-1">Add a door or window with its measurements — link a catalog product for a real photo, or generate one from the spec.</p>
         </CardContent></Card>
       ) : (
-        <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-white/8">
+        <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-hairline">
           {rows.map((it) => {
             const TypeIcon = TYPE_ICONS[it.item_type] || Package;
             return (
@@ -376,7 +376,7 @@ const PurchaseItemDialog: React.FC<{
             </div>
             {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
             {results.length > 0 && (
-              <div className="max-h-40 overflow-auto rounded-md border border-white/10 divide-y divide-white/8">
+              <div className="max-h-40 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
                 {results.map(p => (
                   <button key={p.id} type="button" className="w-full text-left p-2 hover:bg-muted/40" onClick={() => pickProduct(p)}>
                     <p className="text-sm font-medium truncate">{p.name}</p>

@@ -28,7 +28,7 @@ interface CommandDialogProps extends DialogProps {
 const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg">
+      <DialogContent className="overflow-hidden p-0 shadow-overlay">
         {/* Radix requires a Title (and Description) for screen-reader users; the
             command palette is visual, so render them sr-only. Fixes KAI-7V. */}
         <DialogTitle className="sr-only">Command Menu</DialogTitle>

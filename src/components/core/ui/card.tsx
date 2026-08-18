@@ -2,45 +2,67 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * PANEL — the container surface of the design system.
+ *
+ * Opaque fill, one hairline, 6px radius, no shadow at rest. The previous card
+ * was a glass panel (translucent white film + 12px backdrop blur + a floating
+ * shadow + a 2px hover lift). Three reasons that is gone:
+ *
+ *  - A translucent panel has no fixed contrast ratio. The legibility of a table
+ *    row inside it depended on whatever happened to be scrolling underneath,
+ *    so the same content was compliant in one scroll position and marginal in
+ *    another — and no static audit can catch that.
+ *  - `backdrop-filter` forces the compositor to re-sample everything behind the
+ *    element. On a dashboard with a dozen panels that is a dozen live blurs.
+ *  - The 2px hover lift meant passing the mouse across a grid rippled it.
+ *
+ * A panel is a quiet frame; the data inside it is the thing worth looking at.
+ * For a panel that IS a click target, add `panel-interactive` (or wrap it in an
+ * <a>/<button> — the CSS picks that up) to get a border+fill hover, still with
+ * no movement.
+ */
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
->(({ className, style, ...props }, ref) => (
+>(({ className, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      'gradient-border rounded-2xl transition-all duration-300',
+      'rounded-md border border-hairline bg-card text-card-foreground',
       className,
     )}
-    style={{
-      background: 'var(--glass-background)',
-      backdropFilter: 'blur(var(--glass-blur))',
-      border: '1px solid transparent',
-      ...style,
-    }}
     {...props}
   />
 ));
 Card.displayName = 'Card';
 
-// Canonical card header: a bordered header bar with tight vertical padding. Horizontal padding
-// stays px-6 so the header's left edge aligns with CardContent's p-6. Cards that want a
-// borderless header (e.g. mini KPI tiles) can override with `border-0`.
+/**
+ * Header bar of a panel: title/description on the left, actions on the right.
+ * Laid out as a row so `<CardAction>` needs no absolute positioning, and kept
+ * flex-col-friendly for the many existing call sites that pass stacked children.
+ */
 const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex flex-col space-y-1 px-6 py-4 border-b border-border/60', className)}
+    className={cn(
+      'flex flex-col gap-1 px-4 py-3 border-b border-hairline',
+      className,
+    )}
     {...props}
   />
 ));
 CardHeader.displayName = 'CardHeader';
 
-// Canonical card title: 16px. This is THE single card-header size across the platform — do not
-// pass ad-hoc text-* overrides. Page-level gradient headers (PageHeader, 24px) and the compact
-// glass analytics headers (h3 text-sm) are separate, deliberately-distinct tiers.
+/**
+ * Panel title. 14px semibold sans — deliberately NOT the display serif and
+ * deliberately not large. A page has one title (PageHeader, 20px, serif); a
+ * panel header is a label for a region, and eight serif labels down a dashboard
+ * read as eight competing page titles.
+ */
 const CardTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
@@ -48,7 +70,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-base font-semibold leading-none tracking-tight',
+      'font-sans text-sm font-semibold leading-tight tracking-tight text-foreground',
       className,
     )}
     {...props}
@@ -62,29 +84,31 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm text-muted-foreground', className)}
+    className={cn('text-xs text-muted-foreground', className)}
     {...props}
   />
 ));
 CardDescription.displayName = 'CardDescription';
 
-// Content sits below the bordered header, so it carries its own top padding (p-6, not pt-0).
-// Tables still override to p-0 for edge-to-edge rows.
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('p-6', className)} {...props} />
+  <div ref={ref} className={cn('p-4', className)} {...props} />
 ));
 CardContent.displayName = 'CardContent';
 
+/** Footer bar — sunken so it reads as chrome (pagination, totals, bulk actions). */
 const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex items-center p-6 pt-0', className)}
+    className={cn(
+      'flex items-center gap-2 px-4 py-3 border-t border-hairline',
+      className,
+    )}
     {...props}
   />
 ));

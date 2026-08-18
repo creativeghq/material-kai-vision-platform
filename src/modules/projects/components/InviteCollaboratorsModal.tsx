@@ -175,7 +175,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
                 No collaborators yet. Send an invitation above.
               </div>
             ) : (
-              <ul className="divide-y divide-white/8 rounded-lg border border-border">
+              <ul className="divide-y divide-hairline rounded-lg border border-border">
                 {collaborators.map(c => (
                   <li key={c.id} className="p-3 flex items-center gap-3">
                     <Mail className="h-4 w-4 text-muted-foreground shrink-0" />

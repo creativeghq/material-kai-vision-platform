@@ -29,10 +29,10 @@ export const DashboardCard: React.FC<DashboardCardProps> = ({
   return (
     <div className={cn('dashboard-card', !hover && 'hover:transform-none hover:shadow-card', className)}>
       {(title || subtitle || action) && (
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            {title && <h3 className="text-lg font-semibold text-foreground">{title}</h3>}
-            {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+            {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
+            {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
           </div>
           {action && <div>{action}</div>}
         </div>
