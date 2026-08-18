@@ -349,7 +349,7 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
   while (idx < rows.length || pages === 0) {
     const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
     pages++;
-    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+    drawPageBackground(page, g, bgImage);
 
     let y = g.TABLE_Y_START;
     drawTableHeader(page, g, y, cols, fontBold);
@@ -376,7 +376,7 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
       if (ffeItems.length > 0) {
         if (y < 140) {
           const ffePage = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
-          if (bgImage) ffePage.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+          drawPageBackground(ffePage, g, bgImage);
           drawFFENotes(ffePage, g, ffeItems, g.PAGE_H - 80, font, fontBold);
         } else drawFFENotes(page, g, ffeItems, y, font, fontBold);
       }
@@ -510,11 +510,10 @@ function drawGridPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
     let firstPage = true;
     do {
       const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
-      if (bgImage) { page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H }); page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_WHITE, opacity: 0.92 }); }
+      drawPageBackground(page, g, bgImage);
       let y = g.PAGE_H - g.MARGIN_TOP;
       if (firstPage && section.title) {
-        page.drawRectangle({ x: g.MARGIN, y: y - 4, width: 32, height: 3, color: COLOR_DARK }); y -= 18;
-        page.drawText(section.title, { x: g.MARGIN, y, size: 22, font: fontBold, color: COLOR_DARK }); y -= 28;
+        y = drawHeadingWithRule(page, g, section.title, y, fontBold); y -= 28;
         if (section.intro) { for (const line of wrapText(section.intro, font, 11, g.CONTENT_W).slice(0, 3)) { page.drawText(line, { x: g.MARGIN, y, size: 11, font, color: COLOR_GRAY }); y -= 14; } y -= 4; }
         page.drawLine({ start: { x: g.MARGIN, y: y - 4 }, end: { x: g.PAGE_W - g.MARGIN, y: y - 4 }, thickness: 0.5, color: COLOR_LIGHT_GRAY }); y -= 18;
       } else if (section.title) { y -= 10; page.drawText(`${section.title} (continued)`, { x: g.MARGIN, y, size: 12, font, color: COLOR_GRAY }); y -= 22; }
@@ -544,7 +543,7 @@ function drawGridPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
   }
   if (doc.totals) {
     const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++;
-    if (bgImage) page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+    drawPageBackground(page, g, bgImage);
     drawTotals(page, g, doc.totals, g.PAGE_H - 140, font, fontBold);
   }
   return pages;
@@ -571,15 +570,11 @@ function drawSpecPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
   let first = true;
 
   const startPage = () => {
-    if (bgImage) {
-      page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
-      page.drawRectangle({ x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H, color: COLOR_WHITE, opacity: 0.92 });
-    }
+    drawPageBackground(page, g, bgImage);
     let hy = g.PAGE_H - g.MARGIN_TOP;
     const heading = doc.spec_title || 'Technical specification';
     if (first) {
-      page.drawRectangle({ x: g.MARGIN, y: hy - 4, width: 32, height: 3, color: COLOR_DARK }); hy -= 18;
-      page.drawText(heading, { x: g.MARGIN, y: hy, size: 22, font: fontBold, color: COLOR_DARK }); hy -= 24;
+      hy = drawHeadingWithRule(page, g, heading, hy, fontBold); hy -= 24;
       first = false;
     } else {
       page.drawText(`${heading} (continued)`, { x: g.MARGIN, y: hy, size: 12, font, color: COLOR_GRAY }); hy -= 18;
@@ -671,6 +666,50 @@ async function embedImage(pdfDoc: PDFDocument, bytes: Uint8Array | null): Promis
 function drawRightAligned(page: PDFPage, text: string, rightX: number, y: number, size: number, font: PDFFont, color: RGB): void {
   page.drawText(text, { x: rightX - font.widthOfTextAtSize(text, size), y, size, font, color });
 }
+/**
+ * Paint the workspace's content-page artwork behind a page.
+ *
+ * NO veil. The grid and spec paths used to follow the image with a full-page white
+ * rectangle at 0.92 opacity, which washed the artwork out to almost nothing — the
+ * template a workspace had uploaded arrived on the page as a faint ghost of itself.
+ * The list path never did it, so the same document could veil one page and not the
+ * next. One helper now, so a layout cannot reintroduce it on its own.
+ *
+ * Legibility belongs to the elements that need it — table row bands, the back-cover
+ * scrim — not to a sheet thrown over the whole design.
+ */
+function drawPageBackground(page: PDFPage, g: Geom, bgImage: PDFImage | null): void {
+  if (!bgImage) return;
+  page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
+}
+
+const HEADING_SIZE = 22;
+const HEADING_RULE_W = 32;
+const HEADING_RULE_H = 3;
+/** Clearance between the accent rule and the tallest glyph below it. */
+const HEADING_RULE_GAP = 4;
+
+/**
+ * Accent rule ABOVE a section heading. `y` is the TOP of the block; returns the
+ * heading's baseline so the caller keeps its own spacing below.
+ *
+ * drawText positions the BASELINE, not the top of the text. Both call sites used to
+ * put the rule a flat 14pt above that baseline — but Open Sans caps reach ~15.8pt at
+ * 22pt, so the 3pt bar was drawn straight THROUGH the top of the first letters. It
+ * read as a strikethrough on "Monoblock Air Conditioner" and "Technical specification".
+ *
+ * Measured off the font's own ascender rather than a cap-height guess, because a Greek
+ * capital carrying a tonos climbs above cap height and would clip the rule again.
+ */
+function drawHeadingWithRule(page: PDFPage, g: Geom, title: string, y: number, fontBold: PDFFont): number {
+  const ruleY = y - HEADING_RULE_H;
+  page.drawRectangle({ x: g.MARGIN, y: ruleY, width: HEADING_RULE_W, height: HEADING_RULE_H, color: COLOR_DARK });
+  const ascent = fontBold.heightAtSize(HEADING_SIZE, { descender: false });
+  const baseline = ruleY - HEADING_RULE_GAP - ascent;
+  page.drawText(title, { x: g.MARGIN, y: baseline, size: HEADING_SIZE, font: fontBold, color: COLOR_DARK });
+  return baseline;
+}
+
 function sectionHeader(page: PDFPage, title: string, x: number, y: number, fontBold: PDFFont): number {
   page.drawText(title, { x, y, size: 10, font: fontBold, color: COLOR_DARK });
   return y - 22;

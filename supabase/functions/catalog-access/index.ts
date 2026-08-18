@@ -31,6 +31,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
+import { fetchBrandingConfig } from '../_shared/pdf/branding.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -57,6 +58,50 @@ async function resolveOwnerBranding(supabase: any, workspaceId: string | null): 
   return { logo_url, company_name: fs?.business_name ?? null, contact_line: fs?.branding_contact_line ?? null };
 }
 
+const TEMPLATE_BUCKET = 'quote-templates';
+/** quote-templates is private; re-signed on every read, never persisted (pipeline rule 7). */
+const TEMPLATE_URL_TTL = 60 * 60 * 24;
+
+export interface TemplateArt {
+  cover_image_url: string | null;
+  content_background_url: string | null;
+  back_cover_image_url: string | null;
+  /** Cover width/height, so the page hero reserves the template's own aspect. */
+  page_aspect: number | null;
+}
+
+/**
+ * The page dresses itself in the SAME template the PDF renders with — cover, inside-page
+ * background, back cover — resolved through `fetchBrandingConfig`, the one source
+ * `generate-catalog-pdf` reads. Looking the template up a second way here is exactly how
+ * the page and the download would start to disagree about what the document looks like.
+ *
+ * Decoration only: any failure returns empty rather than failing the gate.
+ */
+async function resolveTemplateArt(supabase: any, workspaceId: string | null): Promise<TemplateArt> {
+  const empty: TemplateArt = { cover_image_url: null, content_background_url: null, back_cover_image_url: null, page_aspect: null };
+  if (!workspaceId) return empty;
+  try {
+    const b = await fetchBrandingConfig(supabase, workspaceId);
+    const sign = async (path: string | null | undefined): Promise<string | null> => {
+      if (!path) return null;
+      const { data } = await supabase.storage.from(TEMPLATE_BUCKET).createSignedUrl(path, TEMPLATE_URL_TTL);
+      return data?.signedUrl ?? null;
+    };
+    const [cover, background, back] = await Promise.all([
+      sign(b.cover_image_path), sign(b.content_page_path), sign(b.backcover_image_path),
+    ]);
+    return {
+      cover_image_url: cover,
+      content_background_url: background,
+      back_cover_image_url: back,
+      page_aspect: b.cover_width && b.cover_height ? b.cover_width / b.cover_height : null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 /**
  * What an email-gated VIEWER may see of a catalog (#364 EX-4).
  *
@@ -70,17 +115,21 @@ async function resolveOwnerBranding(supabase: any, workspaceId: string | null): 
  * So this is an ALLOWLIST, keyed to what PublicCatalogPage actually renders, not a denylist of
  * the internal keys we happen to know about today.
  */
-function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | null) {
+function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | null, art: TemplateArt) {
   const sections = Array.isArray(catalog.body_data?.sections) ? catalog.body_data.sections : [];
   const specTables = Array.isArray(catalog.body_data?.spec_tables) ? catalog.body_data.spec_tables : [];
   return {
+    // The template the PDF renders with, so the page reads as the same document.
+    template: art,
     id: catalog.id,
     slug: catalog.slug,
     title: catalog.title,
     subtitle: catalog.subtitle,
     description: catalog.description,
     cover_data: {
-      cover_image_url: catalog.cover_data?.cover_image_url ?? null,
+      // The catalog's own cover wins; with none set the workspace PDF template's cover is
+      // the default, which is what the downloaded PDF opens with.
+      cover_image_url: catalog.cover_data?.cover_image_url ?? art.cover_image_url ?? null,
       date: catalog.cover_data?.date ?? null,
     },
     body_data: {
@@ -141,12 +190,15 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         .maybeSingle();
       if (!catalog) return jsonResponse({ error: 'Not found' }, 404);
 
-      const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null);
+      const [branding, art] = await Promise.all([
+        resolveOwnerBranding(supabase, catalog.workspace_id ?? null),
+        resolveTemplateArt(supabase, catalog.workspace_id ?? null),
+      ]);
 
       return jsonResponse({
         title: catalog.title,
         subtitle: catalog.subtitle,
-        cover_image_url: catalog.cover_data?.cover_image_url || null,
+        cover_image_url: catalog.cover_data?.cover_image_url || art.cover_image_url || null,
         branding: {
           logo_url: branding.logo_url,
           company_name: branding.company_name,
@@ -347,12 +399,15 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         ? (await supabase.storage.from('pdf-documents').createSignedUrl(catalogPdfPath, 604800))?.data?.signedUrl ?? catalog.pdf_url
         : catalog.pdf_url;
 
-      const branding = await resolveOwnerBranding(supabase, catalog.workspace_id ?? null);
+      const [branding, art] = await Promise.all([
+        resolveOwnerBranding(supabase, catalog.workspace_id ?? null),
+        resolveTemplateArt(supabase, catalog.workspace_id ?? null),
+      ]);
 
       return jsonResponse({
         granted_access: true,
         email: log.email,
-        catalog: projectCatalogForViewer(catalog, catalogPdfUrl),
+        catalog: projectCatalogForViewer(catalog, catalogPdfUrl, art),
         branding: {
           logo_url: branding.logo_url,
           company_name: branding.company_name,

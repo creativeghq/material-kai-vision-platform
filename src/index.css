@@ -1655,3 +1655,29 @@ html.light[data-accent='blue'] .tinted-card {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 html.light .app-grain { opacity: 0.03; }
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   Document surface — the public catalog page (/c/:slug).
+
+   That page shows the SAME document the PDF renders, so it follows the PDF
+   TEMPLATE's palette rather than the app theme: the template's inside page is
+   white paper with a black spine, and the app theme is a plum-black command
+   centre. Rendering the document on the app's surface made the link and the
+   download look like two different products.
+
+   Neutral greys + black only, mirroring the deliberately hue-free COLOR_DARK /
+   COLOR_GRAY set in supabase/functions/_shared/pdf/document.ts — so the page
+   sits on whatever artwork a workspace uploads, exactly as the PDF does.
+
+   Scoped to .document-surface; nothing else inherits it, and the app's own
+   theme tokens are untouched.
+   ────────────────────────────────────────────────────────────────────────────── */
+.document-surface {
+  --paper: 0 0% 100%;
+  --paper-panel: 0 0% 97.5%;
+  --ink: 0 0% 13%;
+  --ink-muted: 0 0% 42%;
+  --paper-rule: 0 0% 88%;
+  background-color: hsl(var(--paper));
+  color: hsl(var(--ink));
+}

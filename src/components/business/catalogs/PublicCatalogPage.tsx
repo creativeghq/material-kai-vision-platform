@@ -18,12 +18,22 @@ interface PublicMeta {
   branding: { logo_url: string | null; company_name: string | null };
 }
 
+/** The PDF template the document is dressed in — resolved server-side from the same
+ *  source generate-catalog-pdf reads, so page and download cannot drift apart. */
+interface TemplateArt {
+  cover_image_url: string | null;
+  content_background_url: string | null;
+  back_cover_image_url: string | null;
+  page_aspect: number | null;
+}
+
 interface CatalogPayload {
   id: string;
   slug: string;
   title: string;
   subtitle: string | null;
   description: string | null;
+  template?: TemplateArt | null;
   cover_data: Record<string, any>;
   body_data: { sections: Array<{ id: string; title: string; intro: string | null; materials: Array<any> }> };
   back_cover_data: Record<string, any>;
@@ -189,10 +199,11 @@ export const PublicCatalogPage: React.FC = () => {
       <div
         className="flex-1 flex items-center justify-center p-6 relative"
         style={meta.cover_image_url ? {
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url(${meta.cover_image_url})`,
+          // The gate stands on the document's own cover — same art the PDF opens with.
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${meta.cover_image_url})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-        } : { background: '#1a1a2e' }}
+        } : { background: 'var(--brand-gradient)' }}
       >
         <Card className="w-full max-w-md">
           <CardContent className="p-8 space-y-6">
@@ -237,22 +248,43 @@ export const PublicCatalogPage: React.FC = () => {
  * inside a .dashboard-card, edge-to-edge via -mx-6, overflow-x-auto (NOT hidden —
  * <main> clips horizontally, so a wide table would silently lose columns).
  */
+/**
+ * Accent rule ABOVE the heading, then the heading — the same block the PDF draws at the
+ * top of every section (see drawHeadingWithRule in _shared/pdf/document.ts).
+ */
+const SectionHeading: React.FC<{ title: string; intro?: string | null }> = ({ title, intro }) => (
+  <div className="mb-6">
+    <div className="h-[3px] w-8 bg-[hsl(var(--ink))] mb-3" />
+    <h2 className="font-display text-2xl font-semibold text-[hsl(var(--ink))]">{title}</h2>
+    {intro && <p className="text-sm text-[hsl(var(--ink-muted))] mt-2 max-w-2xl">{intro}</p>}
+  </div>
+);
+
+/**
+ * Specification tables — the same `body_data.spec_tables` the PDF renders, so the page
+ * and the download never disagree. Two columns of label/value groups, matching the PDF's
+ * specification pages.
+ */
 const SpecTables: React.FC<{ tables: SpecTable[] }> = ({ tables }) => (
   <section>
     <SectionHeading title="Technical specification" />
     <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 'var(--grid-gap)' }}>
       {tables.map((t) => (
-        <div key={t.title} className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-primary mb-4">{t.title}</h3>
-          <div className="overflow-x-auto -mx-6 -mb-6 mt-2">
+        <div key={t.title}>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--ink))] pb-1.5 border-b border-[hsl(var(--ink))]">
+            {t.title}
+          </h3>
+          {/* overflow-x-auto, NOT hidden: Layout puts overflow-x-hidden on <main>, so a
+              table wider than the viewport would be clipped with no scrollbar. */}
+          <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <tbody>
                 {t.rows.map((r, i) => (
-                  <tr key={`${r.label}-${i}`} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
-                    <th scope="row" className="text-left px-6 py-2.5 font-medium text-muted-foreground align-top w-2/5">
+                  <tr key={`${r.label}-${i}`} className={i % 2 === 1 ? 'bg-[hsl(var(--paper-panel))]' : undefined}>
+                    <th scope="row" className="text-left py-2 pr-3 font-normal text-[hsl(var(--ink-muted))] align-top w-2/5">
                       {r.label}
                     </th>
-                    <td className="px-6 py-2.5 font-medium">{r.value}</td>
+                    <td className="py-2 font-semibold text-[hsl(var(--ink))]">{r.value}</td>
                   </tr>
                 ))}
               </tbody>
@@ -264,11 +296,33 @@ const SpecTables: React.FC<{ tables: SpecTable[] }> = ({ tables }) => (
   </section>
 );
 
-const SectionHeading: React.FC<{ title: string; intro?: string | null }> = ({ title, intro }) => (
-  <div className="mb-6">
-    <div className="h-0.5 w-8 bg-primary mb-3" />
-    <h2 className="font-display text-2xl font-semibold">{title}</h2>
-    {intro && <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{intro}</p>}
+/** One catalog item, laid out as the PDF lays it out: image left, copy right, hairline below. */
+const ItemRow: React.FC<{ material: any; showPrices: boolean }> = ({ material: m, showPrices }) => (
+  <div className="flex flex-col sm:flex-row gap-5 py-6 border-b border-[hsl(var(--paper-rule))] last:border-b-0">
+    {/* object-contain, not cover: these are product shots, dimension drawings and kit
+        layouts — cropping one to a square cuts the measurements off the drawing. */}
+    <div className="shrink-0 w-full sm:w-[170px] h-[170px] bg-[hsl(var(--paper-panel))] border border-[hsl(var(--paper-rule))] rounded-md overflow-hidden flex items-center justify-center">
+      {m.image_url
+        ? <img src={m.image_url} alt={m.name} loading="lazy" className="w-full h-full object-contain" />
+        : <span className="text-xs text-[hsl(var(--ink-muted))]">no image</span>}
+    </div>
+    <div className="min-w-0 flex-1">
+      <h3 className="font-display text-lg font-semibold text-[hsl(var(--ink))]">{m.name}</h3>
+      {m.description && <p className="text-sm text-[hsl(var(--ink))] mt-1 max-w-3xl">{m.description}</p>}
+      {m.specs && Object.keys(m.specs).length > 0 && (
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
+          {Object.entries(m.specs).map(([k, v]) => (
+            <div key={k} className="text-xs">
+              <dt className="inline text-[hsl(var(--ink-muted))]">{k}: </dt>
+              <dd className="inline font-semibold text-[hsl(var(--ink))]">{String(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {showPrices && m.price != null && (
+        <div className="text-lg font-semibold text-[hsl(var(--ink))] mt-3">{formatPrice(m.price, m.currency)}</div>
+      )}
+    </div>
   </div>
 );
 
@@ -297,25 +351,44 @@ const CatalogReader: React.FC<{
     try { return formatDate(raw); } catch { return null; }
   }, [catalog.cover_data?.date]);
   const coverImage = catalog.cover_data?.cover_image_url || null;
+  const template = catalog.template ?? null;
+  const contentBg = template?.content_background_url ?? null;
+  const backCover = template?.back_cover_image_url ?? null;
+  // Reserve the template's own page proportions for the cover, so it never letterboxes.
+  const coverAspect = template?.page_aspect && template.page_aspect > 0 ? template.page_aspect : 16 / 9;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Identity surface — one of the few places the brand gradient is allowed. */}
-      <header
-        className="relative py-16 px-6 text-primary-foreground"
-        style={coverImage ? {
-          backgroundImage: `url(${coverImage})`,
+    <div className="document-surface min-h-screen">
+      {/* COVER — the template's own artwork, full bleed and nothing written over it. The
+          PDF's drawCover does exactly this: when a cover image exists it is drawn edge to
+          edge and the title lives on the first content page, not on the art. */}
+      {coverImage && (
+        <div className="w-full overflow-hidden" style={{ aspectRatio: String(coverAspect) }}>
+          <img src={coverImage} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      {/* Everything below the cover sits on the template's inside page. Fixed so the
+          spine and footer motif stay put while the content scrolls over them, which is
+          how the artwork reads on a page of any length. */}
+      <div
+        style={contentBg ? {
+          backgroundImage: `url(${contentBg})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-        } : { background: 'var(--brand-gradient)' }}
+          backgroundAttachment: 'fixed',
+          backgroundRepeat: 'no-repeat',
+        } : undefined}
       >
-        {coverImage && <div className="absolute inset-0 bg-background/70" aria-hidden />}
-        <div className="container relative mx-auto max-w-5xl space-y-3">
-          {branding?.logo_url && <img src={branding.logo_url} alt={branding.company_name || ''} className="h-10 mb-4" />}
-          <h1 className="font-display text-3xl md:text-5xl font-semibold">{catalog.title}</h1>
-          {catalog.subtitle && <p className="text-lg opacity-90">{catalog.subtitle}</p>}
-          {catalog.description && <p className="text-sm opacity-80 max-w-2xl">{catalog.description}</p>}
-          <div className="flex items-center gap-4 pt-4 text-sm opacity-90">
+        <header className="container mx-auto max-w-5xl px-6 pt-12 pb-8">
+          {!coverImage && branding?.logo_url && (
+            <img src={branding.logo_url} alt={branding.company_name || ''} className="h-10 mb-6" />
+          )}
+          <div className="h-[3px] w-8 bg-[hsl(var(--ink))] mb-4" />
+          <h1 className="font-display text-3xl md:text-5xl font-semibold text-[hsl(var(--ink))]">{catalog.title}</h1>
+          {catalog.subtitle && <p className="text-lg text-[hsl(var(--ink-muted))] mt-2">{catalog.subtitle}</p>}
+          {catalog.description && <p className="text-sm text-[hsl(var(--ink-muted))] mt-3 max-w-2xl">{catalog.description}</p>}
+          <div className="flex flex-wrap items-center gap-4 pt-6 text-sm text-[hsl(var(--ink-muted))]">
             {dateStr && <span>{dateStr}</span>}
             {catalog.pdf_url && (
               <Button size="sm" variant="secondary" onClick={() => onDownload(catalog.pdf_url!)}>
@@ -323,66 +396,58 @@ const CatalogReader: React.FC<{
               </Button>
             )}
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="container mx-auto max-w-5xl py-10 px-6 space-y-14">
-        {sections.length === 0 ? (
-          <div className="text-center text-muted-foreground py-12">This catalog has no sections yet.</div>
-        ) : sections.map((section) => (
-          <section key={section.id}>
-            <SectionHeading title={section.title} intro={section.intro} />
-            <div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-              style={{ gap: 'var(--grid-gap)' }}
-            >
-              {(section.materials || []).map((m: any) => (
-                <div key={m.id} className="dashboard-card overflow-hidden transition-all duration-200">
-                  {/* object-contain, not cover: these are product shots, dimension
-                      drawings and kit layouts — cropping one to a square cuts the
-                      measurements off the drawing. */}
-                  <div className="aspect-[4/3] bg-muted rounded-lg overflow-hidden flex items-center justify-center">
-                    {m.image_url ? (
-                      <img src={m.image_url} alt={m.name} loading="lazy" className="w-full h-full object-contain" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">no image</span>
-                    )}
-                  </div>
-                  <div className="pt-3 space-y-1.5">
-                    <div className="font-medium text-sm">{m.name}</div>
-                    {m.description && <p className="text-xs text-muted-foreground">{m.description}</p>}
-                    {m.specs && Object.keys(m.specs).length > 0 && (
-                      <dl className="pt-1 space-y-0.5">
-                        {Object.entries(m.specs).map(([k, v]) => (
-                          <div key={k} className="flex justify-between gap-3 text-xs">
-                            <dt className="text-muted-foreground">{k}</dt>
-                            <dd className="font-medium text-right">{String(v)}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    )}
-                    {showPrices && m.price != null && (
-                      <div className="text-base font-semibold pt-1">
-                        {formatPrice(m.price, m.currency)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+        <main className="container mx-auto max-w-5xl px-6 pb-16 space-y-14">
+          {sections.length === 0 ? (
+            <div className="text-center text-[hsl(var(--ink-muted))] py-12">This catalog has no sections yet.</div>
+          ) : sections.map((section) => (
+            <section key={section.id}>
+              <SectionHeading title={section.title} intro={section.intro} />
+              <div className="border-t border-[hsl(var(--paper-rule))]">
+                {(section.materials || []).map((m: any) => (
+                  <ItemRow key={m.id} material={m} showPrices={showPrices} />
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {specTables.length > 0 && <SpecTables tables={specTables} />}
+        </main>
+      </div>
+
+      {/* BACK COVER — the template's closing artwork, with the closing message over it,
+          mirroring the PDF's final page. */}
+      {backCover ? (
+        <footer>
+          <div className="relative">
+            <div className="w-full overflow-hidden" style={{ aspectRatio: String(coverAspect) }}>
+              <img src={backCover} alt="" className="w-full h-full object-cover" />
             </div>
-          </section>
-        ))}
-
-        {specTables.length > 0 && <SpecTables tables={specTables} />}
-      </main>
-
-      <footer className="border-t border-border py-8 px-6 text-center text-sm text-muted-foreground space-y-1">
-        {catalog.back_cover_data?.closing_message && <p>{catalog.back_cover_data.closing_message}</p>}
-        {(catalog.back_cover_data?.contact_line || branding?.contact_line) && (
-          <p className="font-medium">{catalog.back_cover_data?.contact_line || branding?.contact_line}</p>
-        )}
-        {branding?.company_name && <p className="text-xs">© {new Date().getFullYear()} {branding.company_name}</p>}
-      </footer>
+            {catalog.back_cover_data?.closing_message && (
+              <div className="absolute inset-0 flex items-center justify-center p-8 bg-black/30">
+                <p className="max-w-2xl text-center text-lg text-white">{catalog.back_cover_data.closing_message}</p>
+              </div>
+            )}
+          </div>
+          {/* The contact line and copyright are information, not artwork — they keep their
+              own strip so they survive whatever the workspace uploads as a back cover. */}
+          <div className="py-6 px-6 text-center text-sm text-[hsl(var(--ink-muted))] space-y-1">
+            {(catalog.back_cover_data?.contact_line || branding?.contact_line) && (
+              <p className="font-medium">{catalog.back_cover_data?.contact_line || branding?.contact_line}</p>
+            )}
+            {branding?.company_name && <p className="text-xs">© {new Date().getFullYear()} {branding.company_name}</p>}
+          </div>
+        </footer>
+      ) : (
+        <footer className="border-t border-[hsl(var(--paper-rule))] py-8 px-6 text-center text-sm text-[hsl(var(--ink-muted))] space-y-1">
+          {catalog.back_cover_data?.closing_message && <p>{catalog.back_cover_data.closing_message}</p>}
+          {(catalog.back_cover_data?.contact_line || branding?.contact_line) && (
+            <p className="font-medium">{catalog.back_cover_data?.contact_line || branding?.contact_line}</p>
+          )}
+          {branding?.company_name && <p className="text-xs">© {new Date().getFullYear()} {branding.company_name}</p>}
+        </footer>
+      )}
     </div>
   );
 };
