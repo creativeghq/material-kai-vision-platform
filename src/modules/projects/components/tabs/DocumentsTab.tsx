@@ -71,7 +71,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-white/8 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <FileStack className="h-4 w-4 text-primary" /> Drawings &amp; documents
@@ -92,7 +92,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
             No documents yet. Create one, then upload revisions against it.
           </p>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-hairline">
             {docs.map((d) => (
               <div key={d.id} className="p-4">
                 <div className="flex items-start gap-3">
@@ -116,7 +116,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                       </button>
                     )}
                     {expanded.has(d.id) && (
-                      <div className="mt-2 rounded-md border border-white/10 divide-y divide-white/8">
+                      <div className="mt-2 rounded-md border border-white/10 divide-y divide-hairline">
                         {d.revisions.filter((r) => !r.is_current).map((r) => (
                           <div key={r.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                             <span className="w-14 shrink-0 text-xs text-muted-foreground">Rev {r.rev_label}</span>

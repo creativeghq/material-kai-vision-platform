@@ -82,7 +82,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
   }> = ({ title, icon, rows, total, due, kind }) => (
     <Card className="dashboard-card">
       <CardContent className="p-0">
-        <div className="flex items-center justify-between p-4 border-b border-white/8">
+        <div className="flex items-center justify-between p-4 border-b border-hairline">
           <div className="flex items-center gap-2">
             {icon}
             <h3 className="text-sm font-medium">{title}</h3>
@@ -100,7 +100,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
         {rows.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Nothing attached yet.</div>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-hairline">
             {rows.map((r) => (
               <div key={`${r.kind}-${r.id}`} className="p-4 flex items-center gap-3">
                 <FileText className="h-4 w-4 text-primary shrink-0" />
@@ -227,7 +227,7 @@ const AttachDialog: React.FC<{
             No unattached {direction === 'receivable' ? 'invoices / receivables for this client' : 'supplier bills / payables'} found.
           </p>
         ) : (
-          <div className="max-h-72 overflow-auto rounded-md border border-white/10 divide-y divide-white/8">
+          <div className="max-h-72 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
             {candidates.map((c, i) => (
               <React.Fragment key={`${c.kind}-${c.id}`}>
                 {/* Candidates for THIS project lead; everything else in the workspace sits behind a

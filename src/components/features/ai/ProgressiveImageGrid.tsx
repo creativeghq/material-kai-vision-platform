@@ -1768,7 +1768,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       {lightboxUrl && (
         <div
           role="presentation"
-          className="fixed inset-0 z-[200] bg-black/92 flex items-center justify-center"
+          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"
           onClick={() => setLightboxUrl(null)}
         >
           <img

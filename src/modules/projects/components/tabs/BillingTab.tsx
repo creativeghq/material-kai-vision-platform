@@ -95,7 +95,7 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
       )}
 
       {invoices.length > 0 && (
-        <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-white/8">
+        <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-hairline">
           {invoices.map((inv) => (
             <button key={inv.id} onClick={() => navigate(`/finance/invoices/${inv.id}`)} className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-center gap-3">
               <FileText className="h-4 w-4 text-primary shrink-0" />

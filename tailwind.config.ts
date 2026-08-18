@@ -87,11 +87,48 @@ export default {
 					DEFAULT: 'hsl(var(--info))',
 					foreground: 'hsl(var(--info-foreground))',
 				},
+				// Surface system. `hairline` is the single rule/edge colour —
+				// header underlines, row separators, panel borders, input outlines
+				// are ALL this one value, which is most of what makes a dense
+				// interface read as tidy rather than busy.
+				hairline: 'hsl(var(--hairline))',
+				surface: {
+					hover: 'hsl(var(--surface-hover))',
+					sunken: 'hsl(var(--surface-sunken))',
+				},
 			},
+			// Product-UI corner scale. `xl`/`2xl`/`3xl` are OVERRIDDEN (Tailwind
+			// ships 12/16/24px) because they are used on hundreds of containers
+			// across the app and the old values rounded a data panel harder than
+			// an OS window. Redefining them here re-shapes every one of those call
+			// sites at once instead of editing them; the names still read as "a
+			// step rounder than the last", which is all a consumer needs.
 			borderRadius: {
-				lg: 'var(--radius)',
-				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)',
+				xs: 'var(--radius-xs)',   // 2px  — tag, checkbox
+				sm: 'var(--radius-sm)',   // 4px  — button, input, select, tag
+				DEFAULT: 'var(--radius-sm)',
+				md: 'var(--radius-md)',   // 6px  — card, panel, table container
+				lg: 'var(--radius-md)',   // 6px  — `rounded-lg` is the app's most-used
+				                          //        container radius; it maps to panel.
+				xl: 'var(--radius-lg)',   // 8px  — dialog, popover, dropdown
+				'2xl': 'var(--radius-xl)',// 10px — modal, sheet
+				'3xl': 'var(--radius-2xl)',// 12px — full-bleed hero panel
+			},
+			// Elevation is a ladder with four rungs and a hard ceiling. `xl` and
+			// `2xl` are overridden rather than left at Tailwind's defaults so that
+			// the ~12 call sites reaching for a dramatic shadow land on the same
+			// overlay value everything else floats at — the alternative is one
+			// modal in the app casting a 25px-blur shadow nothing else casts.
+			boxShadow: {
+				xs: 'var(--shadow-xs)',
+				sm: 'var(--shadow-sm)',
+				DEFAULT: 'var(--shadow)',
+				md: 'var(--shadow-md)',
+				lg: 'var(--shadow-lg)',
+				xl: 'var(--shadow-overlay)',
+				'2xl': 'var(--shadow-overlay)',
+				// Floating layers only — dropdown, popover, dialog, toast.
+				overlay: 'var(--shadow-overlay)',
 			},
 			keyframes: {
 				'accordion-down': {

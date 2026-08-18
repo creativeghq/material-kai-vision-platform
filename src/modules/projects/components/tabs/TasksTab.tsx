@@ -221,7 +221,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
       ) : (
         <Card className="dashboard-card">
           <CardContent className="p-0">
-            <ul className="divide-y divide-white/8">
+            <ul className="divide-y divide-hairline">
               {tasks.map(parent => (
                 <TaskRow
                   key={parent.id}

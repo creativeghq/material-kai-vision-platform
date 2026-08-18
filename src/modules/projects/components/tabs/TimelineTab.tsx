@@ -137,7 +137,7 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({ projectId }) => {
       ) : (
         <Card className="dashboard-card">
           <CardContent className="p-0">
-            <ul className="divide-y divide-white/8">
+            <ul className="divide-y divide-hairline">
               {visible.map(e => (
                 <li key={e.id} className="p-3 sm:p-4 flex items-start gap-3 hover:bg-muted/40 transition-colors">
                   <div className="mt-0.5 shrink-0">

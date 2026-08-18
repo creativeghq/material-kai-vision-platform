@@ -70,7 +70,7 @@ export const ProjectExpensesCard: React.FC<{
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-white/8 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <Receipt className="h-4 w-4 text-primary" /> Expenses
@@ -97,7 +97,7 @@ export const ProjectExpensesCard: React.FC<{
             Nothing booked to this project yet.
           </p>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-hairline">
             {items.map((i) => (
               <div key={i.id} className="flex items-center gap-3 p-4">
                 <div className="w-20 shrink-0 text-xs text-muted-foreground">{i.expense_date}</div>
@@ -269,7 +269,7 @@ const LinkExpenseDialog: React.FC<{
             No unassigned expenses. Imported card spend appears here once it lands.
           </p>
         ) : (
-          <div className="max-h-80 overflow-auto rounded-md border border-white/10 divide-y divide-white/8">
+          <div className="max-h-80 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
             {candidates.map((c) => (
               <div key={c.id} className="flex items-center gap-2 p-3">
                 <div className="w-20 shrink-0 text-xs text-muted-foreground">{c.expense_date}</div>

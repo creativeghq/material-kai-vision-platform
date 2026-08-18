@@ -14,10 +14,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   // under the browser toolbar with no way to scroll it into view. `100dvh`
   // tracks the visible viewport; `h-screen` stays as the fallback.
   return (
-    <div className="relative h-screen h-[100dvh] overflow-hidden flex flex-col">
-      {/* Command-center atmosphere — brand aurora + film grain behind every page. */}
-      <div className="app-aurora" aria-hidden="true" />
-      <div className="app-grain" aria-hidden="true" />
+    <div className="relative h-screen h-[100dvh] overflow-hidden flex flex-col bg-background">
+      {/* The two atmosphere layers that used to sit here (a fixed brand "aurora"
+          of radial glows plus a film-grain overlay) are gone. A data product's
+          ground has to be ONE colour: an opaque panel can only match a flat
+          canvas, and a chart, a table and a KPI all lose contrast against a
+          moving gradient. See the APP CANVAS note in index.css. */}
       {/* Skip link — the platform had none anywhere across 640 components, so a keyboard user
           tabbed the ENTIRE sidebar on every route change before reaching content. Visually
           hidden until focused, which is the point: invisible to mouse users, the first stop for

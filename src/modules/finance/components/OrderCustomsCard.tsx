@@ -216,7 +216,7 @@ export const OrderCustomsCard: React.FC<{
                     disabled={savingId === l.id}
                     onChange={(code) => void saveLine(l.id, { taricCode: code })}
                     // Borderless and unfilled: the shared trigger/input chrome is a white
-                    // overlay (`bg-white/8` + `border-white/12`) built for the dark theme, and
+                    // overlay (`bg-surface-hover` + `border-hairline`) built for the dark theme, and
                     // on the cream card it stamps a white panel over the card. The hover tint
                     // carries the affordance instead. An unrecognised code still announces
                     // itself in the trigger's own content (red text + "not in the nomenclature"),

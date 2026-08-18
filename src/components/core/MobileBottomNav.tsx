@@ -95,7 +95,7 @@ export const MobileBottomNav: React.FC = () => {
         // z-40, NOT z-50: dialogs/overlays (Radix + the agent's custom pickers)
         // all sit at z-50 and the nav is painted after <main>, so at equal z it
         // covered the bottom ~56px of every modal on mobile.
-        className="mobile-bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-sidebar/95 backdrop-blur-lg border-t border-white/8"
+        className="mobile-bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-sidebar/95 backdrop-blur-lg border-t border-hairline"
       >
         {/* Each cell keeps a full-width tap target (thumb reach) but its VISUAL
             weight is constrained to a centred pill, so a 5-across bar reads
@@ -164,7 +164,7 @@ export const MobileBottomNav: React.FC = () => {
             "Interior Design") that were being mangled in 4 columns. */}
         <SheetContent
           side="bottom"
-          className="max-h-[80vh] overflow-y-auto rounded-t-2xl bg-sidebar border-t border-white/8 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          className="max-h-[80vh] overflow-y-auto rounded-t-2xl bg-sidebar border-t border-hairline pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         >
           <SheetHeader className="text-left">
             <SheetTitle className="font-light">Menu</SheetTitle>

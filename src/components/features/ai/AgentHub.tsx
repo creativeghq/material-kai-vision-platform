@@ -5020,7 +5020,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         <button
           onClick={() => setChatCollapsed(false)}
           title="Show chat"
-          className="flex w-10 shrink-0 flex-col items-center gap-2 border-l border-white/8 bg-sidebar py-4 text-muted-foreground transition-colors hover:text-foreground"
+          className="flex w-10 shrink-0 flex-col items-center gap-2 border-l border-hairline bg-sidebar py-4 text-muted-foreground transition-colors hover:text-foreground"
         >
           <PanelRightOpen className="h-5 w-5" />
           <span className="[writing-mode:vertical-rl] text-[11px] font-medium uppercase tracking-wider">Chat</span>
@@ -5035,13 +5035,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // Right rail beside the canvas on desktop; full width on mobile (where
           // the canvas is a separate, mutually-exclusive pane).
           !chatPaneHidden && canvasShown && !isMobile
-            ? 'w-full max-w-[400px] shrink-0 border-l border-white/8'
+            ? 'w-full max-w-[400px] shrink-0 border-l border-hairline'
             : 'flex-1 min-w-0',
         )}
       >
         {/* Studio header — agent identity + conversation manager launcher */}
         <div className={cn(
-          'flex items-center px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0',
+          'flex items-center px-3 sm:px-4 py-2.5 border-b border-hairline shrink-0',
           railMode ? 'gap-1.5' : 'gap-3',
         )}>
           <AgentAvatar agentId={currentAgent?.id} className={cn('w-9 h-9 flex-shrink-0', currentAgent?.color)} />

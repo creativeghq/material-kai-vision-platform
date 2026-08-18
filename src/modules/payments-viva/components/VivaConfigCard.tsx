@@ -219,7 +219,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
             <div className="space-y-1.5">
               <Label className="text-xs">Environment</Label>
               <select
-                className="w-full h-10 rounded-lg border border-white/12 bg-white/5 px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 hover:border-white/20"
+                className="w-full h-10 rounded-lg border border-hairline bg-white/5 px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 hover:border-white/20"
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value as VivaEnvironment)}
               >

@@ -342,7 +342,7 @@ function FactoryModal({
           style={{ background: 'var(--brand-gradient)' }}
         >
           <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-surface-hover blur-3xl pointer-events-none" />
 
           {/* Top-right controls */}
           {/* `hideClose` on the DialogContent means this is the ONLY way out on

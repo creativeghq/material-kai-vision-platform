@@ -73,7 +73,7 @@ export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> 
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-white/8 px-5 py-3">
+      <CardHeader className="border-b border-hairline px-5 py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <TrendingUp className="h-4 w-4 text-primary" /> Job cost
         </CardTitle>
@@ -103,7 +103,7 @@ export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> 
         </div>
 
         {/* Cost breakdown — what makes up actual, plus the commitment still outstanding. */}
-        <div className="rounded-lg border border-white/8 divide-y divide-white/8 text-sm">
+        <div className="rounded-lg border border-hairline divide-y divide-hairline text-sm">
           <Row label="Supplier bills" value={money(pnl.supplier_cost, currency)} />
           <Row label="Labor" value={money(pnl.labor_cost, currency)}
             hint={pnl.labor.total_minutes > 0 ? `${hoursOf(pnl.labor.total_minutes)}h logged` : 'no time logged'} />
@@ -137,7 +137,7 @@ export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> 
             <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
               <Clock className="h-3 w-3" /> Labor by person
             </p>
-            <div className="rounded-lg border border-white/8 divide-y divide-white/8 text-sm">
+            <div className="rounded-lg border border-hairline divide-y divide-hairline text-sm">
               {pnl.labor.by_user.map((u) => (
                 <div key={u.user_id ?? 'unassigned'} className="flex items-center gap-3 px-4 py-2">
                   <span className="min-w-0 flex-1 truncate">

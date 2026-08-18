@@ -160,23 +160,29 @@ All colors MUST be HSL.
 
     /* ===== LAYOUT SYSTEM ===== */
     --page-max-width: 1400px;
-    --page-padding-x: var(--space-lg);     /* Left/Right: 32px */
+    --page-padding-x: var(--space-md);     /* Left/Right: 24px */
     --page-padding-y: 0;                   /* Top/Bottom: 0 (full height) */
-    --grid-gap: var(--space-md);           /* Grid gap: 24px */
-    --card-padding: var(--space-md);       /* Card padding: 24px */
-    --section-spacing: var(--space-md);    /* Section spacing: 24px (REDUCED from 48px) */
+    --grid-gap: var(--space-sm);           /* Grid gap: 16px — dense product grid */
+    --card-padding: 1.25rem;               /* Card padding: 20px */
+    --section-spacing: var(--space-sm);    /* Section spacing: 16px */
     --hero-margin-x: var(--space-lg);      /* Hero left/right: 32px */
     --hero-margin-bottom: var(--space-md); /* Hero bottom: 24px (REDUCED from 48px) */
     --hero-padding-y: var(--space-lg);     /* Hero top/bottom: 32px (REDUCED from 64px) */
     --hero-padding-x: var(--space-md);     /* Hero left/right: 24px */
 
-    /* ===== BORDER RADIUS ===== */
-    --radius-sm: 0.5rem;   /* 8px */
-    --radius-md: 0.75rem;  /* 12px */
-    --radius-lg: 1rem;     /* 16px */
-    --radius-xl: 1.5rem;   /* 24px */
-    --radius-2xl: 2rem;    /* 32px */
-    --radius-full: 9999px; /* Fully rounded */
+    /* ===== BORDER RADIUS =====
+       Crisp product-UI corners. The old scale (8→32px) rounded a data table's
+       container harder than a macOS window; at 32px a card stops reading as a
+       panel and starts reading as a bubble. Controls are 4px, panels 6px,
+       overlays 8–10px. `--radius-full` stays for avatars, dots and status
+       pips — the only things that should ever be a circle. */
+    --radius-xs: 0.125rem; /* 2px  — checkbox, tag */
+    --radius-sm: 0.25rem;  /* 4px  — button, input, select */
+    --radius-md: 0.375rem; /* 6px  — card, panel, table container */
+    --radius-lg: 0.5rem;   /* 8px  — dialog, popover, dropdown */
+    --radius-xl: 0.625rem; /* 10px — modal, large sheet */
+    --radius-2xl: 0.75rem; /* 12px — full-bleed hero panel */
+    --radius-full: 9999px; /* avatars, dots, pips ONLY */
 
     /* ===== FONT SIZES ===== */
     --text-xs: 0.75rem;    /* 12px */
@@ -263,7 +269,17 @@ All colors MUST be HSL.
     --input: 260 16% 18%;
     --ring: 335 74% 60%;  /* Focus ring — magenta accent */
 
-    --radius: 0.5rem;  /* 8px */
+    /* Row / list / card hover. Dark had no --surface-hover at all (only light
+       defined one), so every "hover tint" in the app was a hand-picked
+       white/NN. One token, both themes. */
+    --surface-hover: 264 20% 12%;
+    /* The line under a table header, between list rows, around a card. One
+       hairline value everywhere is most of what makes a dense UI read as tidy. */
+    --hairline: 260 16% 18%;
+    /* Table header strip + any "sunken" sub-surface (toolbars, filter rows). */
+    --surface-sunken: 262 22% 10%;
+
+    --radius: 0.375rem;  /* 6px — see the radius scale above */
 
     /* Sidebar/TopNav - Dark theme */
     --sidebar-background: 264 22% 7%;  /* rail — slightly lifted from bg */
@@ -291,13 +307,18 @@ All colors MUST be HSL.
     --gradient-sage: linear-gradient(180deg, rgba(198, 208, 188, 0.06) 0%, rgba(198, 208, 188, 0.01) 100%);
     --gradient-gray: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.005) 100%);
 
-    /* Shadows - Deeper for dark theme */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3);
-    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.3);
-    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.5);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    /* Shadows — a product UI separates panels with a HAIRLINE, and uses shadow
+       only for things that genuinely float (menus, dialogs, popovers). A resting
+       card casts almost nothing; that is what stops a dashboard of 12 tiles from
+       looking like 12 floating stickers. */
+    --shadow-xs: 0 1px 1px 0 rgb(0 0 0 / 0.18);
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.22);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.26);
+    --shadow-md: 0 2px 6px -1px rgb(0 0 0 / 0.32);
+    --shadow-lg: 0 8px 20px -6px rgb(0 0 0 / 0.45);
+    --shadow-card: none;
+    /* Floating layers only — dropdown, popover, dialog, toast. */
+    --shadow-overlay: 0 10px 28px -8px rgb(0 0 0 / 0.55), 0 2px 8px -2px rgb(0 0 0 / 0.4);
 
     /* Animation */
     --transition-smooth: all 0.15s ease;
@@ -352,14 +373,24 @@ All colors MUST be HSL.
     --badge-draft-text: 0 0% 60%;
     --badge-draft-border: 0 0% 25%;
 
-    /* ===== GLASSMORPHISM SYSTEM (Dark) ===== */
-    --glass-background: rgba(255, 255, 255, 0.05);
-    --glass-blur: 12px;
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    /* ===== SURFACE SYSTEM (Dark) =====
+       These four variables used to describe a GLASS panel: a translucent white
+       film over a 12px backdrop-blur. Every card, stat tile, table container and
+       modal in the platform reads them, which is why retiring glass in favour of
+       an opaque, hairlined panel is a four-line change here rather than a sweep
+       through 640 components. The names are kept for exactly that reason — the
+       consumers are unchanged, the material is not.
 
-    /* ===== REFINED SHADOWS (Dark) ===== */
-    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.4), 0 5px 20px -5px rgba(0, 0, 0, 0.3);
+       Why opaque: a translucent panel has no fixed contrast ratio. Its text
+       contrast depends on whatever scrolls underneath it, so the same table row
+       is legible over one card and marginal over another, and no audit can pin
+       it. Data surfaces are opaque. */
+    --glass-background: hsl(var(--card));
+    --glass-blur: 0px;
+    --glass-border: hsl(var(--hairline));
+    --glass-shadow: none;
+
+    --shadow-premium: var(--shadow-md);
   }
 
 .dark {
@@ -451,13 +482,14 @@ All colors MUST be HSL.
     --gradient-sage: linear-gradient(180deg, rgba(120, 140, 100, 0.07) 0%, rgba(120, 140, 100, 0.01) 100%);
     --gradient-gray: linear-gradient(180deg, rgba(0, 0, 0, 0.035) 0%, rgba(0, 0, 0, 0.006) 100%);
 
-    /* Shadows — lighter, lower alpha for light surfaces */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08);
-    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.08);
-    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.10);
-    --shadow-lg: 0 4px 12px 0 rgb(0 0 0 / 0.12);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07);
+    /* Shadows — hairline-first, same as dark. See the dark block for why. */
+    --shadow-xs: 0 1px 1px 0 rgb(31 30 22 / 0.04);
+    --shadow-sm: 0 1px 2px 0 rgb(31 30 22 / 0.06);
+    --shadow: 0 1px 3px 0 rgb(31 30 22 / 0.07);
+    --shadow-md: 0 2px 6px -1px rgb(31 30 22 / 0.09);
+    --shadow-lg: 0 8px 20px -6px rgb(31 30 22 / 0.14);
+    --shadow-card: none;
+    --shadow-overlay: 0 10px 28px -8px rgb(31 30 22 / 0.18), 0 2px 8px -2px rgb(31 30 22 / 0.10);
 
     /* Status colors — saturated foreground + pale tinted backgrounds */
     --success: 142 65% 35%;
@@ -508,16 +540,15 @@ All colors MUST be HSL.
     --badge-draft-text: 0 0% 40%;
     --badge-draft-border: 0 0% 82%;
 
-    /* ===== GLASSMORPHISM SYSTEM (Light) ===== */
-    /* Warm frosted ivory, translucent enough that the gradient canvas tints
-       through the glass panels (glass-over-gradient look). */
-    --glass-background: rgba(250, 248, 240, 0.52);
-    --glass-blur: 12px;
-    --glass-border: rgba(0, 0, 0, 0.07);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+    /* ===== SURFACE SYSTEM (Light) ===== */
+    --hairline: 46 18% 82%;
+    --surface-sunken: 44 24% 91%;
+    --glass-background: hsl(var(--card));
+    --glass-blur: 0px;
+    --glass-border: hsl(var(--hairline));
+    --glass-shadow: none;
 
-    /* ===== REFINED SHADOWS (Light) ===== */
-    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.14), 0 5px 20px -5px rgba(0, 0, 0, 0.08);
+    --shadow-premium: var(--shadow-md);
   }
 
   /* ========================================
@@ -558,6 +589,8 @@ All colors MUST be HSL.
     --border: 214 25% 88%;           /* #dbe1ea cool hairlines */
     --input: 214 25% 88%;
     --ring: 218 74% 46%;
+    --hairline: 214 25% 88%;
+    --surface-sunken: 214 32% 96%;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 215 16% 42%;
@@ -599,6 +632,9 @@ All colors MUST be HSL.
     --border: 217 25% 18%;
     --input: 217 25% 18%;
     --ring: 212 74% 54%;
+    --hairline: 217 25% 18%;
+    --surface-hover: 220 30% 13%;
+    --surface-sunken: 220 32% 11%;
 
     --sidebar-background: 220 34% 8%;
     --sidebar-foreground: 215 14% 60%;
@@ -627,43 +663,40 @@ All colors MUST be HSL.
     font-weight: var(--font-normal);
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  /* IDENTITY headings (h1/h2) keep the brand slab serif — page titles, hero
+     copy, marketing pages. UI-CHROME headings (h3–h6: card titles, section
+     labels, panel headers) are sans, because that is what an application
+     surface reads as. Mixing a serif into a dense data UI is the single
+     loudest "this is not a product UI" signal; the brand still lands on
+     every page title. Opt a chrome heading back in with `font-display`. */
+  h1, h2 {
     font-family: var(--font-display);   /* Aleo — slab-serif display face */
     font-weight: var(--font-semibold);  /* 600 → resolves to Aleo Bold (700) */
-    letter-spacing: -0.01em;
+    letter-spacing: -0.012em;
+  }
+
+  h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    font-weight: var(--font-semibold);
+    letter-spacing: -0.006em;
   }
 
   strong, b {
-    font-weight: var(--font-medium);  /* Medium weight for emphasis (500) */
+    font-weight: var(--font-semibold);
   }
 
   p, span, div {
     font-weight: var(--font-normal);  /* Regular weight for body text */
   }
 
-  /* ===== GLOBAL LIGHTER FONT WEIGHT OVERRIDES ===== */
-  /* Make all bold/semibold/medium classes lighter across the entire app */
-  /* This ensures consistency without changing every component manually */
-
-  .font-black {
-    font-weight: var(--font-light) !important;  /* 300 instead of 900 */
-  }
-
-  .font-extrabold {
-    font-weight: var(--font-light) !important;  /* 300 instead of 800 */
-  }
-
-  .font-bold {
-    font-weight: var(--font-light) !important;  /* 300 instead of 700 */
-  }
-
-  .font-semibold {
-    font-weight: var(--font-normal) !important;  /* 400 instead of 600 */
-  }
-
-  .font-medium {
-    font-weight: var(--font-normal) !important;  /* 400 instead of 500 */
-  }
+  /* NOTE — there used to be a block here that force-downgraded EVERY weight
+     utility (`.font-bold` → 300, `.font-semibold` → 400, `.font-medium` → 400,
+     with !important). It made the whole platform read as one flat, airy weight
+     with no hierarchy: a table header, a total, a KPI number and its caption
+     all rendered identically. Weight IS the hierarchy in a dense data UI —
+     labels 500, headers 600, numbers 600 — so the utilities now mean what they
+     say. Do not reintroduce a global weight override; if something is too
+     heavy, change that component's class. */
 
   /* Hide number input spinners - we use custom +/- buttons instead */
   input[type="number"]::-webkit-inner-spin-button,
@@ -838,85 +871,69 @@ All colors MUST be HSL.
     gap: var(--grid-gap);
   }
 
-  /* Dashboard Card - Dark glass effect */
+  /* ============================================================
+     PANEL — the one container surface.
+     ------------------------------------------------------------
+     Opaque fill + 1px hairline + 6px radius. No blur, no lift, no
+     inset edge-light. `.dashboard-card` keeps its name because ~400
+     call sites use it; the material underneath changed, not the API.
+
+     A panel does NOT move on hover. The old card lifted 2px and
+     lightened its whole surface, which meant: (a) every mouse
+     traverse across a dashboard rippled the layout, and (b) on a
+     card wrapping a table you got two competing highlights, the
+     panel and the row. Movement is reserved for things that are
+     themselves the click target — see `.panel-interactive`.
+     ============================================================ */
   .dashboard-card {
     position: relative;
-    background: var(--glass-background);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-radius: var(--radius-lg);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--hairline));
+    border-radius: var(--radius-md);
     padding: var(--card-padding);
-    transition: var(--transition-bounce);
-    border: 1px solid transparent;
-    /* Layered depth: resting glass shadow + a faint top edge-light for the
-       premium "elevated glass" read from the redesign. */
-    box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    transition: border-color 0.12s ease, background-color 0.12s ease;
   }
 
-  /* Gradient border ring for boxes — a masked pseudo-element draws the
-     blue→red brand gradient only in the 1px border area. Preserves
-     border-radius and never touches the card's own background, blur or
-     hover state. Add `.gradient-border` to any other box to opt it in. */
-  /* The opt-in classes PLUS any bordered, rounded *container* box that isn't
-     already covered. Scoped to block-level containers with the exact `border`
-     utility + a large rounded corner; excludes form controls (not in the
-     element list) and Tailwind-positioned floating elements (absolute/fixed/
-     sticky) so dropdowns, popovers and tooltips are untouched. */
-  .gradient-border,
-  .section-container,
-  :is(div, section, article, aside, li):where([class~="border"]):where([class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-3xl"]):not(.dashboard-card):not(.gradient-border):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"]) {
-    position: relative;
+  /* A panel that is ITSELF a link/button (a tile you click through on).
+     Border darkens, background warms a step — still no translation. */
+  .panel-interactive,
+  a > .dashboard-card,
+  button > .dashboard-card {
+    cursor: pointer;
   }
-  .dashboard-card::before,
-  .gradient-border::before,
-  .section-container::before,
-  :is(div, section, article, aside, li):where([class~="border"]):where([class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-3xl"]):not(.dashboard-card):not(.gradient-border):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"])::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: #00000014;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    pointer-events: none;
-    z-index: 1;
+  .panel-interactive:hover,
+  a:hover > .dashboard-card,
+  button:hover > .dashboard-card {
+    border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--surface-hover));
   }
 
-  .dashboard-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: var(--shadow-premium), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* Sunken sub-surface: toolbars, filter rows, table headers, footers —
+     anything that sits INSIDE a panel and should recede from it. */
+  .panel-sunken {
+    background: hsl(var(--surface-sunken));
   }
 
-  /* A card that holds a table must NOT repaint/lift its whole surface on
-     hover — only the hovered row should change colour (accessibility). The
-     table's own `tr:hover` / `hover:bg-muted/50` handles the row highlight. */
-  .dashboard-card:has(table):hover {
-    background: var(--glass-background);
-    transform: none;
-    border-color: var(--glass-border);
+  /* `.gradient-border` and the universal bordered-box ring it powered are
+     retired. That selector painted a masked pseudo-element ring onto EVERY
+     bordered, rounded div in the app — on top of the div's own real border —
+     so most containers carried two 1px edges at slightly different colours,
+     and nothing could override the outer one without knowing the rule existed.
+     One real `border` per box. The class is kept as an inert alias so the
+     ~30 call sites that opt in still resolve. */
+  .gradient-border {
+    border: 1px solid hsl(var(--hairline));
+    border-radius: var(--radius-md);
   }
 
-  /* Tabs where item-level card lift should be suppressed */
-  .tab-no-card-lift .dashboard-card:hover {
-    transform: none;
-    box-shadow: var(--glass-shadow);
-  }
-
-  /* Scope wrapper for static content (e.g. profile/detail modals) where the
-     dashboard-card panels are passive — fully neutralise the hover lift/lighten
-     so they don't react like interactive dashboard tiles. */
+  /* Legacy hover-suppression scopes. Panels no longer lift, so these are
+     no-ops kept only so their many call sites keep compiling. */
+  .tab-no-card-lift .dashboard-card:hover,
   .no-card-hover .dashboard-card:hover {
-    background: var(--glass-background);
-    transform: none;
-    border-color: var(--glass-border);
+    background: hsl(var(--card));
+    border-color: hsl(var(--hairline));
   }
 
-  /* Liquid Glass Utility */
   .glass-panel {
     @apply dashboard-card;
   }
@@ -929,16 +946,13 @@ All colors MUST be HSL.
     );
   }
 
-  /* Stat bubbles - Dark glass effect */
+  /* Stat bubbles — opaque tinted chips, same material rules as panels. */
   .stat-bubble {
-    border-radius: var(--radius);
+    border-radius: var(--radius-md);
     padding: var(--card-padding);
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    background: hsl(var(--card));
     transition: var(--transition-smooth);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid hsl(var(--hairline));
     color: hsl(var(--foreground));
     font-weight: var(--font-normal);
   }
@@ -972,12 +986,12 @@ All colors MUST be HSL.
     @apply dashboard-card;
   }
 
-  /* Section container - For grouping content (NO BORDERS) */
+  /* Section container - For grouping content */
   .section-container {
-    @apply bg-card rounded-xl space-y-4;
+    @apply bg-card space-y-4;
+    border-radius: var(--radius-md);
     padding: var(--card-padding);
-    box-shadow: var(--shadow-card);
-    border: none;
+    border: 1px solid hsl(var(--hairline));
   }
 
   /* Section spacing - Consistent vertical spacing */
@@ -985,69 +999,87 @@ All colors MUST be HSL.
     margin-bottom: var(--section-spacing);
   }
 
-  /* Sidebar item - Dark theme */
+  /* Sidebar / side-nav item — a left rail row. Active state is a tinted row
+     with an accent bar on the leading edge, not a saturated filled pill: a
+     nav list of 12 filled pills is unreadable, and the bar survives at any
+     row density. */
   .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200;
-    @apply text-sidebar-foreground hover:bg-secondary;
+    @apply relative flex items-center gap-3 px-3 py-2 transition-colors duration-100;
+    @apply text-sidebar-foreground hover:bg-[hsl(var(--surface-hover))] hover:text-foreground;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
   }
 
   .sidebar-item.active {
-    @apply bg-sidebar-accent text-sidebar-accent-foreground;
-    box-shadow: 0 0 10px hsl(var(--sidebar-accent) / 0.3);
+    background: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    font-weight: var(--font-semibold);
   }
 
-  /* Primary button - Neon yellow (Paytech style) */
+  .sidebar-item.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 15%;
+    bottom: 15%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: hsl(var(--primary));
+  }
+
+  /* Primary button */
   .btn-primary {
-    @apply bg-primary text-primary-foreground rounded-lg px-6 py-2.5;
-    @apply font-medium transition-all duration-300;
-    box-shadow: 0 0 10px hsl(var(--primary) / 0.3);
+    @apply bg-primary text-primary-foreground px-4 py-2;
+    @apply font-semibold transition-colors duration-100;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
     border: none;
   }
 
   .btn-primary:hover {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.45), 0 0 40px hsl(var(--amber) / 0.25);
-    transform: translateY(-1px);
+    background: hsl(var(--primary) / 0.88);
   }
 
-  /* Secondary button - Dark gray */
+  /* Secondary button — outlined in the accent, the standard product-UI pairing
+     for "the other action next to the primary one". */
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground rounded-lg px-6 py-2.5;
-    @apply font-medium transition-all duration-300;
-    box-shadow: var(--shadow-xs);
-    border: none;
+    @apply bg-transparent text-primary px-4 py-2;
+    @apply font-semibold transition-colors duration-100;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    border: 1px solid hsl(var(--primary));
   }
 
   .btn-secondary:hover {
-    @apply bg-muted;
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
+    background: hsl(var(--primary) / 0.08);
   }
 
-  /* Outline button - Subtle border */
+  /* Outline button — neutral hairline, for tertiary actions. */
   .btn-outline {
-    @apply bg-card text-foreground rounded-lg px-6 py-2.5;
-    @apply font-medium transition-all duration-300;
-    border: none;
-    box-shadow: var(--shadow-md);
+    @apply bg-card text-foreground px-4 py-2;
+    @apply font-semibold transition-colors duration-100;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    border: 1px solid hsl(var(--hairline));
   }
 
   .btn-outline:hover {
-    @apply bg-secondary;
-    box-shadow: var(--shadow-sm);
+    background: hsl(var(--surface-hover));
   }
 
-  /* Input field - Dark theme */
+  /* Input field */
   .input-dark {
-    @apply bg-input rounded-lg px-4 py-2.5;
+    @apply bg-card px-3 py-2;
     @apply text-foreground placeholder:text-muted-foreground;
-    @apply transition-all duration-200;
-    border: none;
-    box-shadow: var(--shadow-xs);
+    @apply transition-colors duration-100;
+    border-radius: var(--radius-sm);
+    border: 1px solid hsl(var(--hairline));
   }
 
   .input-dark:focus {
-    @apply outline-none ring-2 ring-primary;
-    border: none;
+    @apply outline-none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.16);
   }
 
   /* Search input - Like in the screenshot */
@@ -1056,10 +1088,13 @@ All colors MUST be HSL.
     background-color: hsl(var(--input));
   }
 
-  /* Badge variants - Light theme with excellent contrast */
+  /* Badge variants — squared tag, not a pill. A pill row and a button row are
+     the same silhouette; squaring the tag is what keeps "this is a value" and
+     "this is an action" visually separable in a dense table. */
   .badge {
-    @apply px-3 py-1 rounded-full text-xs border;
-    font-weight: var(--font-medium);
+    @apply px-2 py-0.5 text-xs border;
+    border-radius: var(--radius-xs);
+    font-weight: var(--font-semibold);
   }
 
   .badge-success {
@@ -1097,20 +1132,9 @@ All colors MUST be HSL.
     @apply w-2 h-2 rounded-full;
   }
 
-  .status-dot-success {
-    @apply status-dot bg-success;
-    box-shadow: 0 0 8px hsl(var(--success) / 0.5);
-  }
-
-  .status-dot-warning {
-    @apply status-dot bg-warning;
-    box-shadow: 0 0 8px hsl(var(--warning) / 0.5);
-  }
-
-  .status-dot-error {
-    @apply status-dot bg-error;
-    box-shadow: 0 0 8px hsl(var(--error) / 0.5);
-  }
+  .status-dot-success { @apply status-dot bg-success; }
+  .status-dot-warning { @apply status-dot bg-warning; }
+  .status-dot-error   { @apply status-dot bg-error; }
 
   /* Progress bar */
   .progress-bar {
@@ -1133,26 +1157,27 @@ All colors MUST be HSL.
     @apply progress-fill bg-info;
   }
 
-  /* Table styles - Dark theme */
+  /* Table styles */
   .table-dark {
     @apply w-full;
   }
 
   .table-dark thead {
-    border-bottom: none;
+    background: hsl(var(--surface-sunken));
+    border-bottom: 1px solid hsl(var(--hairline));
   }
 
   .table-dark th {
-    @apply px-4 py-3 text-left text-sm font-medium text-muted-foreground;
+    @apply px-3 py-2 text-left text-xs font-semibold text-muted-foreground;
   }
 
   .table-dark td {
-    @apply px-4 py-4 text-sm text-foreground;
-    border-bottom: none;
+    @apply px-3 py-2.5 text-sm text-foreground;
+    border-bottom: 1px solid hsl(var(--hairline));
   }
 
-  .table-dark tr:hover {
-    @apply bg-secondary/30;
+  .table-dark tbody tr:hover {
+    background: hsl(var(--surface-hover));
   }
 
   /* Chart container */
@@ -1169,21 +1194,19 @@ All colors MUST be HSL.
     background: var(--gradient-blue);
   }
 
-  /* Glow effects */
-  .glow-emerald {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-  }
-
+  /* Glow effects — retired. Neon halos are a marketing-page device; in a data
+     UI they read as an error state. Kept as no-ops for existing call sites. */
+  .glow-emerald,
   .glow-blue {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    box-shadow: none;
   }
 
   /* Divider */
   .divider {
-    @apply my-6;
+    @apply my-4;
     border-top: none;
     height: 1px;
-    background: hsl(var(--muted));
+    background: hsl(var(--hairline));
   }
 
   /* Animations */
@@ -1473,10 +1496,8 @@ html.light .badge-neutral {
   color: hsl(0 0% 40%);
   border-color: hsl(0 0% 85%);
 }
-html.light .dashboard-card:hover {
-  background: hsl(var(--surface-hover));
-  border-color: rgba(0,0,0,0.08);
-}
+/* (A panel no longer changes on hover unless it is itself the click target —
+   `.panel-interactive` handles that, from tokens, in both themes.) */
 
 /* Unified hover tint (light) — cards, table rows and list items hover to the
    previous page off-white (--surface-hover) so they read clearly against the
@@ -1491,16 +1512,11 @@ html.light .hover\:bg-muted\/80:hover,
 html.light .hover\:bg-accent:hover {
   background-color: hsl(var(--surface-hover)) !important;
 }
-/* Same row-only-hover rule for light theme: a card wrapping a table keeps its
-   resting surface on hover so only the hovered row changes colour. */
-html.light .dashboard-card:has(table):hover {
-  background: var(--glass-background);
-  border-color: var(--glass-border);
-}
+/* Panels are opaque and hairlined in both themes now, so the light theme needs
+   no card-surface patch of its own — the tokens already differ. */
 html.light .stat-bubble {
-  background: rgba(255,255,255,0.7);
-  border-color: rgba(0,0,0,0.06);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07);
+  background: hsl(var(--card));
+  border-color: hsl(var(--hairline));
 }
 html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
 html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
@@ -1554,107 +1570,105 @@ html.light .msg-assistant a { color: hsl(var(--primary)); }
    explicitly — see PageHeader.tsx. */
 
 /* ============================================================
-   APP ATMOSPHERE — command-center depth behind every page.
-   A fixed brand-aurora mesh + film grain sit over the solid body
-   ground and below all page content (main is relative z-10). The
-   aurora is driven by --primary so it adapts per theme: a magenta
-   glow on the plum-black dark ground, a soft olive glow on cream.
+   APP CANVAS — a flat, even ground.
+   ------------------------------------------------------------
+   There used to be a fixed "aurora" (three radial brand glows) plus a film
+   grain layer behind every page, and on light a warm cream→sand gradient wash
+   on <body> as well. Three things went wrong with it, and all three are fatal
+   for a data product rather than merely a taste call:
+
+     1. The ground was not one colour, so an opaque panel could never match it
+        and a translucent one changed contrast as it scrolled. Same table, two
+        different legibility results depending on scroll position.
+     2. `background-attachment: fixed` on a full-viewport gradient repaints the
+        whole canvas on every scroll frame.
+     3. Brand glow behind dense numeric content competes with the content for
+        exactly the attention the content needs.
+
+   The canvas is now flat `--background` in both themes and both accents; the
+   brand lives in the accent colour, the logo and the page-header identity —
+   places the eye visits deliberately. The `.app-aurora` / `.app-grain` classes
+   are kept as inert no-ops (Layout no longer renders them).
    ============================================================ */
-.app-aurora {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.16), transparent 60%),
-    radial-gradient(620px 460px at 4% 6%, hsl(var(--primary) / 0.09), transparent 60%),
-    radial-gradient(700px 620px at 62% 110%, hsl(var(--primary) / 0.06), transparent 60%);
-}
-html.light .app-aurora {
-  /* Calmed on light — the warm gradient canvas (on body) is the main treatment. */
-  background:
-    radial-gradient(760px 520px at 85% -8%, hsl(var(--primary) / 0.05), transparent 62%);
-}
-
-/* Light theme canvas — warm cream→sand gradient with faint olive/peach corner
-   glows, the ground the frosted (translucent) panels tint against. Dark keeps
-   the plum-black command center. background-attachment:fixed so the gradient
-   stays put while content scrolls over it (cards tint as they pass). */
-html.light body {
-  /* Airy off-white canvas with a darker WARM glow anchored at the bottom-left,
-     fading up-and-out — so the gradient reads clearly while the top/right stay
-     light. Glass panels near the bottom-left tint warmer. */
-  background:
-    radial-gradient(1200px 860px at -8% 110%, rgba(140, 128, 68, 0.34), transparent 58%),
-    radial-gradient(760px 560px at 106% 112%, rgba(208, 152, 104, 0.14), transparent 60%),
-    linear-gradient(180deg, #f8f6f0 0%, #f3efe4 58%, #ede7d7 100%);
-  background-attachment: fixed;
-}
-
-/* Blue accent (light) canvas — WHITE ground with soft blue corner glows, no warm
-   cream. Overrides the warm html.light body above (higher specificity). */
-html.light[data-accent='blue'] body {
-  background:
-    radial-gradient(1100px 820px at -6% 112%, rgba(37, 99, 235, 0.15), transparent 56%),
-    radial-gradient(820px 600px at 108% 110%, rgba(59, 130, 246, 0.10), transparent 58%),
-    radial-gradient(920px 700px at 92% -10%, rgba(37, 99, 235, 0.10), transparent 60%),
-    linear-gradient(180deg, #ffffff 0%, #f5f8fd 58%, #eaf1fb 100%);
-  background-attachment: fixed;
+.app-aurora,
+.app-grain {
+  display: none;
 }
 
 /* ============================================================
-   WARM-GLASS DESIGN HELPERS (glass-over-gradient system)
-   ------------------------------------------------------------
-   .tinted-card  — soft tinted sub-card for a contained module inside a glass
-                   panel (instead of a stark white box). Theme-aware.
-   .tabs-underline — opt-in on a TabsList: renders its triggers as underline
-                   tabs (design-system tab style A), overriding the default
-                   filled bg-primary active. Add to section-tab lists.
+   SUB-SURFACE — a contained module inside a panel.
+   `.tinted-card` keeps its name (many call sites); it is now the sunken
+   sub-surface, one step BELOW the panel it sits in rather than a tint over a
+   gradient. Nesting reads as: page → panel (card) → sub-surface (sunken).
    ============================================================ */
 .tinted-card {
-  background: hsl(var(--muted) / 0.45);
-  border: 1px solid hsl(var(--border) / 0.7);
-  border-radius: var(--radius-md);
-}
-html.light .tinted-card {
-  background: rgba(236, 228, 208, 0.5);
-  border-color: rgba(180, 165, 120, 0.28);
-}
-html.light[data-accent='blue'] .tinted-card {
-  background: rgba(226, 232, 240, 0.5);
-  border-color: rgba(148, 163, 184, 0.28);
+  background: hsl(var(--surface-sunken));
+  border: 1px solid hsl(var(--hairline));
+  border-radius: var(--radius-sm);
 }
 
+/* ============================================================
+   TABS — underline is the DEFAULT, platform-wide.
+   ------------------------------------------------------------
+   Tabs used to render their active trigger as a filled accent pill, which made
+   a tab row and a button row identical objects: the same shape, the same fill,
+   the same weight. On a page carrying both (every record page does) there was
+   no way to tell "you are here" from "press me". An underline says location; a
+   fill says action. That distinction is the single highest-leverage change in
+   this system, so it is the default rather than an opt-in — `.tabs-underline`
+   survives as an alias for the lists that already asked for it.
+
+   The rule set targets `[role="tab"]`, so it covers Radix Tabs, the Finance
+   vertical rail and any nav that reports itself as a tab.
+   ============================================================ */
+[role="tablist"]:not([data-variant="pill"]) > [role="tab"],
 .tabs-underline [role="tab"] {
+  position: relative;
   background: transparent !important;
   background-image: none !important;
   color: hsl(var(--muted-foreground));
   border-radius: 0 !important;
   box-shadow: none !important;
-  position: relative;
-}
-.tabs-underline [role="tab"]:hover { color: hsl(var(--foreground)); }
-.tabs-underline [role="tab"][data-state="active"] {
-  color: hsl(var(--foreground)) !important;
   font-weight: var(--font-medium);
+  transition: color 0.1s ease;
 }
+
+[role="tablist"]:not([data-variant="pill"]) > [role="tab"]:hover,
+.tabs-underline [role="tab"]:hover {
+  color: hsl(var(--foreground));
+}
+
+[role="tablist"]:not([data-variant="pill"]) > [role="tab"][data-state="active"],
+.tabs-underline [role="tab"][data-state="active"] {
+  color: hsl(var(--primary)) !important;
+  font-weight: var(--font-semibold);
+}
+
+/* The indicator is inset by the trigger's own horizontal padding so it tracks
+   the LABEL, not the hit area — a 2px rule running under the padding as well
+   reads as a stray divider between tabs. */
+[role="tablist"]:not([data-variant="pill"]) > [role="tab"][data-state="active"]::after,
 .tabs-underline [role="tab"][data-state="active"]::after {
   content: "";
   position: absolute;
-  left: 0.75rem; right: 0.75rem; bottom: -1px;
-  height: 2px; border-radius: 2px;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0;
+  height: 2px;
   background: hsl(var(--primary));
 }
-.app-grain {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.022;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+/* A VERTICAL tab rail (Finance's section nav) puts the indicator on the leading
+   edge instead — a horizontal rule under a stacked row is meaningless. */
+[role="tablist"][aria-orientation="vertical"] > [role="tab"][data-state="active"]::after {
+  left: 0;
+  right: auto;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  height: auto;
+  border-radius: 0 3px 3px 0;
 }
-html.light .app-grain { opacity: 0.03; }
 
 /* ──────────────────────────────────────────────────────────────────────────────
    Document surface — the public catalog page (/c/:slug).

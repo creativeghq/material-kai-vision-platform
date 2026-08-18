@@ -12,7 +12,7 @@
 - **Backend**: Python FastAPI (`mivaa-pdf-extractor/`) — **a separate git repo**, mounted as a submodule
 - **Edge Functions**: Deno/TypeScript (`supabase/functions/`)
 - **Database**: Supabase PostgreSQL 15 + pgvector 0.8.0
-- **Design System**: `.claude/design-system.md` — full reference for all UI patterns, colors, components
+- **Design System**: [docs/design-system.md](docs/design-system.md) — full reference for all UI patterns, colors, components. Live specimen: `/design-system` in-app.
 
 ## Workflow Rules
 - **SQL / migrations**: ALWAYS apply via `mcp__supabase__apply_migration` (DDL) or `mcp__supabase__execute_sql`. NEVER create a local `supabase/migrations/*.sql` file. Run `mcp__supabase__get_advisors(security)` after any DDL.
@@ -329,15 +329,27 @@ Tunable via env `SUPABASE_LOG_DENY_PREFIXES` without a deploy. **If you add a ch
 prefix — do not widen retention.**
 
 ## Design System Summary
-Full reference: `.claude/design-system.md`.
-- **Dark** = plum-black command center (`--background: 258 22% 5%`), flat **magenta** primary (`--primary: 335 74% 60%`). **Light** = warm olive/cream (`--background: 42 27% 93%`), muted **khaki-olive** primary, terracotta destructive.
-- **Headings** use **Aleo** (`font-display`); **Averta** for body/UI. Both self-hosted from `public/fonts/`.
+Full reference: [docs/design-system.md](docs/design-system.md). Live specimen: **`/design-system`** in-app.
+Guarded by [tests/unit/designSystem.test.ts](tests/unit/designSystem.test.ts).
+
+The platform runs a **product-UI** language: flat opaque surfaces, hairline separation, dense
+controls, underline tabs, one accent. It replaced a marketing language (glass panels, a brand
+aurora behind every page, pill buttons that lifted on hover) that was being applied to screens
+whose job is showing tables of money.
+
+- **Colour is unchanged**: dark/light modes × green/blue accents, owned by `ThemeContext`. Dark = plum-black + magenta; light = olive/cream (green) or slate + blue. **Every surface must work in all four** — check at `/design-system`, which has the switcher.
+- **Three surfaces, and that is the whole ladder**: `bg-background` (page, FLAT — no gradient, no aurora) → `bg-card` + `border-hairline` (panel) → `bg-surface-sunken` (toolbar / table header / footer). `--hairline` is the ONE rule colour in the app.
+- **A panel is separated by a hairline, not a shadow, and does not move on hover.** Shadow (`shadow-overlay`) is only for things that genuinely float: dropdown, popover, dialog, toast. A panel that is itself a click target gets `panel-interactive`.
+- **`.dashboard-card` / `<Card>` are the panel.** Never recreate one inline. The `--glass-*` tokens kept their names and now hold opaque values, which is why retiring glass did not need a 400-file sweep.
+- **Headings**: Aleo (`font-display`) for `h1`/`h2` — identity only. `h3`–`h6` are sans (`--font-sans`), because a serif in a dense data UI is the loudest possible "this is not a product".
 - **`--font-display` is `'Aleo', 'Averta', Georgia, ...` — do NOT drop Averta.** Aleo has ZERO Greek glyphs and only 24/128 latin-ext, so Greek party names in headings silently fell back to Georgia (absent on Linux). Font matching is per-character, so latin headings still get Aleo. Check any new display face's cmap for U+0370–U+03FF before adopting it.
-- **The brand gradient is reserved for IDENTITY surfaces** (PageHeader, logo, hero). Primary fills are flat accent — the old global "`bg-primary` → brand-gradient" rule was removed.
-- **Glass cards**: use the `.dashboard-card` class. Never recreate inline.
-- **Buttons** are pill-shaped (`rounded-full`). **NEVER add `rounded-full` to a TabsTrigger** — that is Buttons only.
-- **Tables**: `<CardContent className="p-0">`, no wrapper div, no fixed column widths. Status/type render as **plain colored words, never a Badge/pill with a colored background**.
+- **No global font-weight override.** There used to be one (`.font-bold → 300 !important` and friends); it flattened every weight utility so a table header, a total and its caption rendered identically, and it could not be worked around per component. Weight IS the hierarchy here.
+- **Buttons are rectangular** (`rounded-sm`, 4px), 36px tall, flat fill, no lift. **`rounded-full` is for avatars, dots and status pips only** — never a button, a tab or a chip. One solid button per screen; its partner is `secondary` (accent outline), everything else is `outline`/`ghost`.
+- **Tabs are UNDERLINE, platform-wide** — the treatment is in `index.css` on `[role="tab"]`, so it reaches Radix Tabs, `HubTabNav` and every hand-rolled strip. Never a filled pill: that is the exact silhouette of a primary button, so "where I am" and "what to press" become the same object.
+- **Tables**: sticky sunken header, hairline row separators, NO zebra striping, 11px semibold headers (never uppercase), right-aligned `tabular-nums` for money, an explicit empty state, `—` for an absent value. Status renders as a **tinted squared tag** (`<Badge variant="success|warning|error|info|neutral">`) — tinted, never a saturated fill, which would give every row the weight of a button.
 - **A table in a Card gets its title + subtitle + actions inside a `CardHeader`** — never a bare heading above a header-less Card.
+- **Screen archetypes live in `src/components/core/hub/`** — `HubDataTable` + `HubToolbar` (list), `HubRecordLayout` (record), `HubStatGrid` (dashboard), `HubSideNav` (settings). Build the archetype; do not re-derive it per page.
+- **Never use an off-scale opacity modifier** (`bg-white/8`, `border-white/12`). Tailwind only emits opacity variants for steps in `theme.opacity` (0,5,10,…,100); anything else compiles to NOTHING. The platform carried 74 of them, including 31 borders and 25 row dividers that had never rendered in dark mode. Use a token, or `bg-primary/[0.08]`.
 - **English is the default for all UI and documents.** Never default a language field to `'el'`.
 
 ## Where the rest lives

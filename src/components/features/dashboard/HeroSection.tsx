@@ -20,7 +20,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center rounded-2xl border border-white/8 bg-card">
+    <div className="relative overflow-hidden h-full min-h-[280px] sm:min-h-[400px] flex items-center rounded-2xl border border-hairline bg-card">
       {/* Brand glow backdrop for depth — soft radial accents, not decorative motion */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -65,7 +65,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             <button
               key={task.path}
               onClick={() => onNavigate(task.path)}
-              className="group flex items-center gap-3 rounded-xl border border-white/8 bg-background/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
+              className="group flex items-center gap-3 rounded-xl border border-hairline bg-background/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
             >
               <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <task.icon className="h-4 w-4 text-primary" />

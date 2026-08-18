@@ -33,7 +33,7 @@ const sheetVariants = cva(
   // off-screen (left/right drawers are full height; top/bottom sheets are
   // additionally capped so a tall one can't grow past the viewport and hide its
   // top edge + close button). A consumer can still override via className.
-  'fixed z-50 gap-4 overflow-y-auto bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+  'fixed z-50 gap-4 overflow-y-auto bg-background p-6 shadow-overlay transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
   {
     variants: {
       side: {

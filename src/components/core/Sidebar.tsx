@@ -32,10 +32,10 @@ const ShowPricesToggle: React.FC = () => {
       onClick={() => toggle()}
       title={showPrices ? 'Prices shown — click to hide (demo / research mode)' : 'Prices hidden — click to show'}
       aria-pressed={!showPrices}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+      className="flex items-center gap-1.5 px-2 py-1.5 rounded-sm text-xs text-muted-foreground hover:bg-surface-hover hover:text-foreground transition-colors"
     >
       {showPrices ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-      <span className="font-light hidden lg:inline">{showPrices ? 'Prices' : 'Prices hidden'}</span>
+      <span className="hidden lg:inline">{showPrices ? 'Prices' : 'Prices hidden'}</span>
     </button>
   );
 };
@@ -83,14 +83,14 @@ export const Sidebar: React.FC = () => {
           aria-label="Profile"
           // min-h-9/min-w-9 on mobile: the label is `hidden md:inline`, so this
           // was a 28x32 icon-only hit area for the primary account entry point.
-          className={`flex min-h-9 min-w-9 items-center justify-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-200 md:min-h-0 md:min-w-0 md:px-3 ${
+          className={`flex min-h-9 min-w-9 items-center justify-center gap-2 px-2 py-1.5 rounded-sm text-sm transition-colors duration-100 md:min-h-0 md:min-w-0 md:px-2.5 ${
             isActive('/profile')
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
+              ? 'bg-primary/[0.12] text-primary font-semibold'
+              : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
           }`}
         >
           {accountAvatar('h-5 w-5')}
-          <span className="font-light hidden md:inline">{profile.full_name || 'Profile'}</span>
+          <span className="hidden md:inline">{profile.full_name || 'Profile'}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 rounded-xl" align="end" forceMount>
@@ -134,14 +134,14 @@ export const Sidebar: React.FC = () => {
   ) : (
     <Link
       to="/profile"
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-sm text-sm transition-colors duration-100 ${
         isActive('/profile')
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
+          ? 'bg-primary/[0.12] text-primary font-semibold'
+          : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
       }`}
     >
       <User className="w-4 h-4" />
-      <span className="font-light">Profile</span>
+      <span>Profile</span>
     </Link>
   );
 
@@ -151,7 +151,7 @@ export const Sidebar: React.FC = () => {
     // top bar is just brand + workspace/profile controls.
     return (
       <>
-        <div className="mobile-topbar fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-2 px-3 bg-sidebar border-b border-white/8">
+        <div className="mobile-topbar fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-2 px-3 bg-sidebar border-b border-hairline">
           <Link to="/" className="flex items-center shrink-0 min-w-0" aria-label="Home">
             <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
             <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
@@ -171,11 +171,11 @@ export const Sidebar: React.FC = () => {
 
   // Desktop: horizontal top nav. Glassy so the app atmosphere reads through it.
   return (
-    <header className="sticky top-0 z-40 h-14 flex items-center px-6 bg-sidebar/70 backdrop-blur-xl border-b border-white/8">
-      <Link to="/" className="flex items-center mr-8 flex-shrink-0">
+    <header className="sticky top-0 z-40 h-12 flex items-center px-4 bg-sidebar border-b border-hairline">
+      <Link to="/" className="flex items-center mr-6 flex-shrink-0">
         {/* Logo swaps with theme: dark wordmark on light nav, white wordmark on dark nav */}
-        <img src="/mh-logo.png" alt="materialshub" className="h-8 w-auto block dark:hidden" />
-        <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-8 w-auto hidden dark:block" />
+        <img src="/mh-logo.png" alt="materialshub" className="h-7 w-auto block dark:hidden" />
+        <img src="/mh-logo-white.png" alt="" aria-hidden="true" className="h-7 w-auto hidden dark:block" />
       </Link>
 
       {/* Scrolls horizontally when there are more nav items than fit (e.g. the
@@ -186,14 +186,14 @@ export const Sidebar: React.FC = () => {
           <Link
             key={item.id}
             to={item.path}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all duration-200 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-sm whitespace-nowrap shrink-0 transition-colors duration-100 ${
               isActive(item.path)
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
+                ? 'bg-primary/[0.12] text-primary font-semibold'
+                : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
             }`}
           >
             <item.icon className="w-4 h-4 flex-shrink-0" />
-            <span className="font-light">{item.label}</span>
+            <span>{item.label}</span>
           </Link>
         ))}
         {/* App Launcher sits at the end of the nav row (after Discover), not in the

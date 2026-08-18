@@ -279,7 +279,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
             <code className="px-2 py-1 rounded bg-muted">{previewNumber}</code>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/8">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-hairline">
             <div>
               <Label className="text-xs">Default payment terms (days)</Label>
               <Input

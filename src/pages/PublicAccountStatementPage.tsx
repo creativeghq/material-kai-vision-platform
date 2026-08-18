@@ -101,7 +101,7 @@ const PublicAccountStatementPage: React.FC = () => {
             className="rounded-lg border bg-card shadow-sm overflow-hidden"
             style={data.background_url ? { backgroundImage: `url(${data.background_url})`, backgroundSize: 'cover', backgroundPosition: 'top center' } : undefined}
           >
-            <div className="bg-card/92 p-5 sm:p-8 space-y-5">
+            <div className="bg-card/90 p-5 sm:p-8 space-y-5">
               {/* Header: logo + title + period + download */}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-2">
