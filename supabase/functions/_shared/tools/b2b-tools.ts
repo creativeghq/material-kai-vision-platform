@@ -39,6 +39,7 @@ type B2BChunkSink = ((chunk: any) => void) | undefined;
 import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
+import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -124,32 +125,22 @@ export async function validateEmailWithZeroBounce(
  * Uses Claude's built-in web_search to find B2B manufacturers.
  * No extra API key required — uses ANTHROPIC_API_KEY.
  */
-const B2B_REGIONS: Record<string, { label: string; countries: string[] }> = {
-  cee: {
-    label: 'Central & Eastern Europe',
-    countries: ['Poland', 'Czech Republic', 'Slovakia', 'Hungary', 'Romania', 'Bulgaria', 'Ukraine'],
-  },
-  balkans: {
-    label: 'Balkans & Turkey',
-    countries: ['Turkey', 'Serbia', 'Croatia', 'Slovenia', 'Bosnia and Herzegovina', 'North Macedonia', 'Albania', 'Greece'],
-  },
-  baltic_nordic: {
-    label: 'Baltic & Nordic',
-    countries: ['Lithuania', 'Latvia', 'Estonia', 'Finland', 'Denmark'],
-  },
-  western_southern: {
-    label: 'Western & Southern Europe',
-    countries: ['Germany', 'Netherlands', 'France', 'Spain', 'Italy', 'Portugal', 'United Kingdom'],
-  },
-  global: {
-    label: 'Global Manufacturing Hubs',
-    countries: ['China', 'India', 'Morocco'],
-  },
-};
-
-const B2B_ALL_COUNTRIES = Object.values(B2B_REGIONS).flatMap((r) => r.countries);
-
+/**
+ * The sourcing markets are DATA — `reference_vocabularies['sourcing_markets']`, loaded by the
+ * caller and passed in (issue #370, Class A).
+ *
+ * They used to be a const right here, reachable by nothing but the scope string a few lines below.
+ * The model could not read it from the prompt, the schema (`region` was a bare `z.string()`), the
+ * description (it named the five region KEYS and never their members) or the KB. Asked to "search
+ * the countries list we have in place" the agent searched the Knowledge Base three times, found
+ * nothing, INVENTED a list, and presented it as ours — Bulgaria in the wrong region, 13 markets
+ * missing. A wrong country list is a valid country list, so nothing raised.
+ *
+ * Now one row set feeds the `region` enum, the description the model reads, and the picker form.
+ */
 export const createB2BManufacturerSearchTool = (
+  /** Active `sourcing_markets` terms, in sort order. Loaded by agent-chat's registerTools. */
+  markets: VocabularyTerm[],
   userId: string,
   /**
    * The workspace this tool is running in — for ATTRIBUTION on the usage row, not for the
@@ -175,18 +166,8 @@ export const createB2BManufacturerSearchTool = (
           return JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured.' });
         }
 
-        let scope: string;
-        if (country) {
-          scope = `in ${country}`;
-        } else if (region) {
-          const key = region.toLowerCase();
-          const regionEntry = B2B_REGIONS[key];
-          scope = regionEntry
-            ? `in the ${regionEntry.label} region (${regionEntry.countries.join(', ')})`
-            : `in the ${region} region`;
-        } else {
-          scope = `across these 30 markets: ${B2B_ALL_COUNTRIES.join(', ')}`;
-        }
+        // Shared with flow-engine — see buildMarketScope for why there is only one of these.
+        const scope = buildMarketScope(markets, { country, region });
 
         // Both this and flow-engine used to carry their own copy of this query, and the two
         // had already drifted — flow-engine's dropped "or retailers" and stopped asking for
@@ -198,7 +179,8 @@ export const createB2BManufacturerSearchTool = (
         // The system prompt has existed in the table all along with nothing reading it.
         const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
 
-        onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${B2B_REGIONS[region.toLowerCase()]?.label ?? region}` : ''}...`);
+        const regionLabel = region ? (termsInGroup(markets, region.toLowerCase())[0]?.group_label ?? region) : '';
+        onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${regionLabel}` : ''}...`);
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -307,10 +289,30 @@ export const createB2BManufacturerSearchTool = (
     },
     {
       name: 'b2b_manufacturer_search',
-      description: 'Search for B2B manufacturers using web search. Finds actual production companies with their websites, locations, and product info. Specify a country for focused results, a region (cee/balkans/baltic_nordic/western_southern/global) for regional search, or omit both for a broad global search.',
+      // The description now ENUMERATES the markets, because the model cannot read the vocabulary
+      // table and the old wording ("a region (cee/balkans/…)") named the keys without ever saying
+      // which countries were in them. That gap is the whole reason the agent invented a list when
+      // asked what countries we cover.
+      description:
+        'Search for B2B manufacturers using web search. Finds actual production companies with their '
+        + 'websites, locations and product info. '
+        + `The platform's defined sourcing markets are — ${describeGroups(markets)}. `
+        + 'Pass `country` for one market (any country is searchable, not just those listed), `region` '
+        + 'for a whole group, or OMIT BOTH to sweep every market above. Omitting both is a supported '
+        + 'default: do not ask the user which countries they want before calling this.',
       schema: z.object({
-        country: z.string().optional().describe('Specific country to search (e.g., "Poland", "Turkey"). Omit for broader search.'),
-        region: z.string().optional().describe('Region hint: "cee", "balkans", "baltic_nordic", "western_southern", "global". Ignored if country is provided.'),
+        // Deliberately NOT interpolated: `npm run tools:manifest` is a static AST projection and
+        // cannot evaluate the vocabulary, so an interpolated list lands in the manifest as a
+        // literal "…". The markets are enumerated in the tool description above, which is what
+        // the model reads; this stays static so the manifest stays truthful.
+        country: z.string().optional().describe(
+          'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.',
+        ),
+        // A real enum, built from the vocabulary. It was a bare string, so a value the tool did not
+        // recognise produced `in the <garbage> region` and searched nothing meaningful, silently.
+        region: z.enum(groupKeys(markets) as [string, ...string[]]).optional().describe(
+          'A whole market group. Ignored if `country` is provided.',
+        ),
         category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
         limit: z.number().optional().default(30).describe('Max manufacturers to find. Default: 30'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),

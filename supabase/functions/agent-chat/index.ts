@@ -26,6 +26,7 @@ import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
 import { runInBackground } from '../_shared/background.ts';
 import { shapeToolResult, turnProducedWork } from '../_shared/tool-result-shape.ts';
+import { loadVocabulary } from '../_shared/vocabularies.ts';
 
 // Runtime singletons — initialized once on first request
 let _initialized = false;
@@ -2215,7 +2216,14 @@ async function executeAgent(
     // emit workflow_plan / workflow_step_progress / workflow_finished chunks
     // for the b2b-research wizard.
     if (config.tools.includes('b2b_manufacturer_search')) {
-      tools.push(createB2BManufacturerSearchTool(userId, workspaceId ?? null, sendProgress, onChunk));
+      // The sourcing markets are DATA, and they have to be in hand BEFORE the tool is built: they
+      // become the `region` enum and the country list in the description the model reads. Loading
+      // them here rather than inside the tool body is what lets the model see them at all — the
+      // gap that had it inventing a countries list when asked what markets we cover (#370).
+      // loadVocabulary throws if the store is unreachable; let it, rather than binding a tool that
+      // silently advertises no markets.
+      const markets = await loadVocabulary(supabase, 'sourcing_markets');
+      tools.push(createB2BManufacturerSearchTool(markets, userId, workspaceId ?? null, sendProgress, onChunk));
     }
     if (config.tools.includes('company_website_scrape')) {
       tools.push(createCompanyWebsiteScrapeTool(userId, workspaceId ?? null, sendProgress));

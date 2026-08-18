@@ -173,8 +173,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createB2BManufacturerSearchTool',
     description: 'Search for B2B manufacturers using web search.',
     params: [
-      { name: 'country', type: 'string', optional: true, description: 'Specific country to search (e.g., "Poland", "Turkey"). Omit for broader search.' },
-      { name: 'region', type: 'string', optional: true, description: 'Region hint: "cee", "balkans", "baltic_nordic", "western_southern", "global". Ignored if country is provided.' },
+      { name: 'country', type: 'string', optional: true, description: 'One country to search, e.g. "Poland". Any country is searchable, not only the defined markets listed in this tool\'s description. Omit to search a whole region or every market.' },
+      { name: 'region', type: 'string', optional: true, description: 'A whole market group. Ignored if `country` is provided.' },
       { name: 'category', type: 'string', optional: false, description: 'Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")' },
       { name: 'limit', type: 'number', optional: true, description: 'Max manufacturers to find. Default: 30' },
       { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.' },

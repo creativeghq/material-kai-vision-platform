@@ -9,6 +9,7 @@
  */
 
 import { loadPrompt, renderPromptTemplate, getToolPrompt } from '../_shared/prompt-utils.ts';
+import { buildMarketScope, loadVocabulary } from '../_shared/vocabularies.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -783,11 +784,15 @@ async function executeAction(
         }
       }
 
-      const geoScope = country
-        ? `in ${country}`
-        : regionId
-        ? `in the ${regionId} region`
-        : 'across Europe and major global manufacturing hubs';
+      // Same derivation b2b-tools uses. This copy had drifted twice over: it emitted the raw
+      // region KEY (`in the cee region`, meaningless to a web search) and, with nothing set, the
+      // vague `across Europe and major global manufacturing hubs` instead of the platform's 30
+      // named markets — so an identical request answered differently depending on which caller
+      // ran it (issue #370, Class A).
+      const geoScope = buildMarketScope(
+        await loadVocabulary(supabase, 'sourcing_markets'),
+        { country, region: regionId },
+      );
 
       // Same row b2b-tools reads. This copy had drifted from it (#347 phase 3P).
       const query = renderPromptTemplate(

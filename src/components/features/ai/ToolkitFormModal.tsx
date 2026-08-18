@@ -11,6 +11,7 @@
  * single component powers every toolkit.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import { ImagePlus, X } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -78,26 +79,39 @@ interface Props {
   }) => void;
 }
 
-// Readable market name → ISO-3166 alpha-2 code for the `country_code` field
-// kind. Codes are what the SEO tools expect (z.string().length(2)).
-const COUNTRY_CODES: Array<{ code: string; label: string }> = [
-  { code: 'US', label: 'United States' }, { code: 'GB', label: 'United Kingdom' },
-  { code: 'GR', label: 'Greece' }, { code: 'DE', label: 'Germany' },
-  { code: 'FR', label: 'France' }, { code: 'IT', label: 'Italy' },
-  { code: 'ES', label: 'Spain' }, { code: 'NL', label: 'Netherlands' },
-  { code: 'CY', label: 'Cyprus' }, { code: 'PT', label: 'Portugal' },
-  { code: 'BE', label: 'Belgium' }, { code: 'AT', label: 'Austria' },
-  { code: 'CH', label: 'Switzerland' }, { code: 'IE', label: 'Ireland' },
-  { code: 'CA', label: 'Canada' }, { code: 'AU', label: 'Australia' },
-];
+/**
+ * Market lists come from `reference_vocabularies` (issue #370), not from constants here.
+ *
+ * There were two hand-written arrays at this spot and they were both wrong for at least one of
+ * their users. `COMMON_MARKETS` (the `country` kind) offered the United States, Australia and
+ * Canada and omitted Poland, Turkey, Serbia and Romania — so the B2B "Enrich a company" picker
+ * offered markets we do not source from and hid every one we do, while the b2b search tool swept
+ * a different 30. Three lists, three answers, nothing to hold them together but convention —
+ * which is exactly how the `escapeHtml` copies drifted to three different strengths.
+ *
+ *   `country`      → `sourcing_markets` — the 30 the B2B search actually sweeps
+ *   `country_code` → `seo_markets`      — ISO alpha-2, which the SEO tools require
+ *
+ * A failed fetch renders an empty, disabled select rather than a stale default list: a default
+ * that silently substitutes for the real vocabulary is the failure this whole change removes.
+ */
+function useVocabulary(key: string): { terms: VocabularyTerm[]; loading: boolean; failed: boolean } {
+  const [terms, setTerms] = useState<VocabularyTerm[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
-// Readable market names for the `country` field kind. Values are the readable
-// strings so the rendered prompt flows naturally ("...in the United Kingdom").
-const COMMON_MARKETS = [
-  'the United States', 'the United Kingdom', 'Greece', 'Germany', 'France',
-  'Italy', 'Spain', 'the Netherlands', 'Cyprus', 'Portugal', 'Belgium',
-  'Australia', 'Canada', 'globally',
-];
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setFailed(false);
+    loadVocabulary(key)
+      .then((t) => { if (alive) { setTerms(t); setLoading(false); } })
+      .catch(() => { if (alive) { setFailed(true); setLoading(false); } });
+    return () => { alive = false; };
+  }, [key]);
+
+  return { terms, loading, failed };
+}
 
 export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenerate }: Props) {
   const open = !!state;
@@ -213,6 +227,36 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenera
   );
 }
 
+/**
+ * A `<Select>` whose options ARE the vocabulary — never a copy of it. On a failed fetch it renders
+ * disabled and says so, because silently falling back to a built-in list is how the picker came to
+ * offer markets the search tool had never heard of.
+ */
+const VocabularySelect: React.FC<{
+  vocabularyKey: string;
+  field: ToolkitFormField;
+  value: string;
+  onChange: (v: string) => void;
+}> = ({ vocabularyKey, field, value, onChange }) => {
+  const { terms, loading, failed } = useVocabulary(vocabularyKey);
+  const placeholder = failed
+    ? 'Markets unavailable — try again'
+    : loading
+      ? 'Loading markets…'
+      : (field.placeholder || 'Select a market…');
+
+  return (
+    <Select value={value} onValueChange={onChange} disabled={loading || failed}>
+      <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
+      <SelectContent>
+        {terms.map((t) => (
+          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
+
 const FieldInput: React.FC<{
   field: ToolkitFormField;
   value: string;
@@ -286,28 +330,11 @@ const FieldInput: React.FC<{
         </Select>
       );
     case 'country':
-      return (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger><SelectValue placeholder={field.placeholder || 'Select a market…'} /></SelectTrigger>
-          <SelectContent>
-            {COMMON_MARKETS.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      );
+      // The 30 sourcing markets the B2B search actually sweeps.
+      return <VocabularySelect vocabularyKey="sourcing_markets" field={field} value={value} onChange={onChange} />;
     case 'country_code':
-      // Shows readable market names, emits the ISO alpha-2 code the tools want.
-      return (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger><SelectValue placeholder={field.placeholder || 'Select a market…'} /></SelectTrigger>
-          <SelectContent>
-            {COUNTRY_CODES.map((c) => (
-              <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      );
+      // Shows readable market names, emits the ISO alpha-2 code the SEO tools want.
+      return <VocabularySelect vocabularyKey="seo_markets" field={field} value={value} onChange={onChange} />;
     case 'text':
     default:
       return (
