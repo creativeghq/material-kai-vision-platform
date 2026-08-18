@@ -29,6 +29,8 @@ export interface VocabularyTerm {
   group_key: string | null;
   group_label: string | null;
   sort_order: number;
+  /** Free-form extras for the term, e.g. sourcing_markets rows carry language_code / language_name. */
+  metadata?: Record<string, unknown> | null;
 }
 
 export class VocabularyStoreUnavailable extends Error {
@@ -56,7 +58,7 @@ export async function loadVocabulary(
 
   const { data, error } = await supabase
     .from('reference_vocabularies')
-    .select('value, label, group_key, group_label, sort_order')
+    .select('value, label, group_key, group_label, sort_order, metadata')
     .eq('vocabulary_key', vocabularyKey)
     .eq('active', true)
     .order('sort_order', { ascending: true });

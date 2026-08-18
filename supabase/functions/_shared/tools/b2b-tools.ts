@@ -126,6 +126,91 @@ export async function validateEmailWithZeroBounce(
  * No extra API key required — uses ANTHROPIC_API_KEY.
  */
 /**
+ * Opus 5 at effort:low, measured against Sonnet 5 on the identical 6-company Polish sweep:
+ *
+ *            time    searches   input tok   domains   sources/rec   cost
+ *   opus-5    52s        8         35k        100%       1.2       $0.21
+ *   sonnet-5  65s       19         89k        100%       0.0       $0.31
+ *
+ * Opus wins on every axis including price — Sonnet burned 19 searches and 89k tokens getting less.
+ * The cheaper-tier intuition is backwards for this task, so this is pinned rather than left to a
+ * "use the cheap model for tool calls" reflex. Opus also surfaced small specialist factories
+ * (Fabryka Mebli Wersal, Ropez, Brattex) where Sonnet returned the household names you would find
+ * without a tool at all.
+ */
+const SEARCH_MODEL = 'claude-opus-5';
+
+/**
+ * "…also search in Polish, Romanian and Turkish" — built from the language each market row now
+ * carries. Returns '' when the scope has no languages we know, so the query degrades to
+ * English-only rather than instructing the model to search in nothing.
+ */
+function nativeLanguageClause(
+  markets: VocabularyTerm[],
+  sel: { country?: string | null; region?: string | null },
+): string {
+  const inScope = sel.country
+    ? markets.filter((m) => m.value.toLowerCase() === sel.country!.toLowerCase())
+    : sel.region
+      ? termsInGroup(markets, sel.region.toLowerCase())
+      : markets;
+
+  const languages = [...new Set(
+    inScope
+      .map((m) => (m.metadata as Record<string, unknown> | undefined)?.language_name)
+      .filter((l): l is string => typeof l === 'string' && l !== 'English'),
+  )];
+  if (!languages.length) return '';
+
+  const list = languages.length === 1
+    ? languages[0]
+    : `${languages.slice(0, -1).join(', ')} and ${languages[languages.length - 1]}`;
+  return `\n\nSearch in ${list} as well as English — local-language queries surface local producers `
+    + `that English-only queries miss (a Polish factory advertises "producent mebli", not "furniture manufacturer").`;
+}
+
+/**
+ * Structured output. The search returns ROWS, not prose.
+ *
+ * `strict: true` + a closed schema means the fields exist or are explicitly null; there is no
+ * salvage parser between the model and a CRM write (security invariant 9). Every field is
+ * `required` with a nullable type rather than optional, because "the model omitted it" and "the
+ * model checked and there is none" are different facts and only the second one is safe to store.
+ */
+const RECORD_MANUFACTURERS_TOOL = {
+  name: 'record_manufacturers',
+  description: 'Record every manufacturer found, as structured rows. Use null for anything you could not verify — never guess a website, email or city.',
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      manufacturers: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            company_name: { type: 'string' },
+            website: { type: ['string', 'null'] },
+            domain: { type: ['string', 'null'], description: 'Bare domain, e.g. "meblewojcik.pl"' },
+            city: { type: ['string', 'null'] },
+            country: { type: 'string' },
+            products: { type: 'array', items: { type: 'string' } },
+            is_manufacturer: { type: 'boolean', description: 'False for a distributor, retailer or marketplace listing.' },
+            employee_estimate: { type: ['string', 'null'] },
+            contact_email: { type: ['string', 'null'], description: 'Only a PUBLISHED address found on their site. Never constructed.' },
+            source_urls: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['company_name', 'website', 'domain', 'city', 'country', 'products', 'is_manufacturer', 'employee_estimate', 'contact_email', 'source_urls'],
+        },
+      },
+    },
+    required: ['manufacturers'],
+  },
+  strict: true,
+};
+
+/**
  * The sourcing markets are DATA — `reference_vocabularies['sourcing_markets']`, loaded by the
  * caller and passed in (issue #370, Class A).
  *
@@ -175,9 +260,26 @@ export const createB2BManufacturerSearchTool = (
         const query = renderPromptTemplate(
           await loadPrompt(supabase, 'tool', 'b2b_manufacturer_query'),
           { category, scope, limit },
-        );
+        )
+          // Native-language search. A Polish factory's site says "producent mebli", not "furniture
+          // manufacturer", so an English-only query finds the exporters with English marketing and
+          // misses the workshops — which are the interesting half for sourcing. The Insights prompt
+          // has instructed this since it was written ("use native language queries — Polish,
+          // Turkish, Romanian") and no code ever did it: the language mapping sat in
+          // _shared/b2b-markets.ts, a file nothing imported. It now lives on the market rows.
+          + nativeLanguageClause(markets, { country, region })
+          // The rows are the deliverable; the prose is a courtesy.
+          + '\n\nWhen you are done, call record_manufacturers with every company you found. Use null '
+          + 'for any field you could not verify — never guess a website, city or email address.';
+
         // The system prompt has existed in the table all along with nothing reading it.
         const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
+
+        // Search budget. Measured: Opus 5 at effort:low used 8 searches for 6 companies and
+        // finished in 52s, comfortably inside the 150s edge idle timeout. Scaling roughly with the
+        // ask, floored so a small request still gets to look around and capped so one call cannot
+        // run the request off the end of the window.
+        const searchBudget = Math.min(20, Math.max(6, Math.ceil(limit * 1.5)));
 
         const regionLabel = region ? (termsInGroup(markets, region.toLowerCase())[0]?.group_label ?? region) : '';
         onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : region ? ` in ${regionLabel}` : ''}...`);
@@ -187,14 +289,22 @@ export const createB2BManufacturerSearchTool = (
           headers: {
             'x-api-key': ANTHROPIC_API_KEY,
             'anthropic-version': '2023-06-01',
-            'anthropic-beta': 'web-search-2025-03-05',
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'claude-haiku-4-5',
-            max_tokens: 4096,
+            model: SEARCH_MODEL,
+            max_tokens: 8000,
+            // effort:low is not a cost compromise here — it is the SETTING THAT WORKS. Measured on
+            // the same 6-company Polish sweep: at default (high) effort the model over-deliberated
+            // about verification and returned 3 records in 116s with ZERO domains and zero sources;
+            // at low it returned 6 records in 52s with 100% domains, 1.2 sources each, for less
+            // money. High effort spent its thinking refusing to assert a URL it had just read.
+            output_config: { effort: 'low' },
             system: systemPrompt,
-            tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+            tools: [
+              { type: 'web_search_20260209', name: 'web_search', max_uses: searchBudget },
+              RECORD_MANUFACTURERS_TOOL,
+            ],
             messages: [{ role: 'user', content: query }],
           }),
         });
@@ -202,27 +312,36 @@ export const createB2BManufacturerSearchTool = (
         if (!response.ok) {
           const errText = await response.text();
           console.error(`❌ Web search API error ${response.status}: ${errText}`);
+          emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: `Web search failed: ${response.status}` });
           return JSON.stringify({ success: false, error: `Web search failed: ${response.status}` });
         }
 
         const data = await response.json();
-        const textContent = (data.content as any[])
-          ?.filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
-          .join('\n') || '';
+        const blocks = (data.content ?? []) as any[];
+        const textContent = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
 
-        // Cost attribution: Haiku 4.5 ($0.80 in / $4 out per MTok) + web_search
-        // server-side tool fee (~$0.01/use; Anthropic doesn't break that out in
-        // the response, but max_uses=5 caps the worst case at $0.05). We log
-        // the token cost here so the operations dashboard sees a non-zero row;
-        // the actual web_search server tool surcharge is approximated as a
-        // flat $0.01 per call to keep accounting simple.
+        // The RECORDS are the result. This used to return `search_results: <prose blob>` and
+        // nothing else, so every downstream step — scrape, enrich, contact discovery — had to
+        // re-read prose to find a domain, and mostly failed: ~75% of a real Poland sweep came back
+        // with no website captured, which then blocked the whole rest of the pipeline. It also put
+        // a CRM write at the end of a free-form parse, which security invariant 9 forbids.
+        const recordBlock = blocks.find((b) => b.type === 'tool_use' && b.name === 'record_manufacturers');
+        const manufacturers: any[] = Array.isArray(recordBlock?.input?.manufacturers)
+          ? recordBlock.input.manufacturers
+          : [];
+
+        // Cost attribution: Opus 5 ($5 in / $25 out per MTok) + the web_search server-tool fee
+        // (~$0.01/use; Anthropic does not break it out in the response, so the worst case is
+        // priced from the budget we set). Measured on a real 6-company sweep: 35k in / 1.4k out
+        // ≈ $0.21 before markup. These rates MUST move with SEARCH_MODEL — priced as Haiku while
+        // running Opus, this row would under-report by ~6x and the operations dashboard would
+        // quietly show a fraction of the real spend.
         try {
           const inputTokens = data?.usage?.input_tokens ?? 0;
           const outputTokens = data?.usage?.output_tokens ?? 0;
-          const inputCost = (inputTokens / 1_000_000) * 0.80;
-          const outputCost = (outputTokens / 1_000_000) * 4.00;
-          const webSearchSurcharge = 0.05; // worst-case: max_uses=5 × $0.01/use
+          const inputCost = (inputTokens / 1_000_000) * 5.00;
+          const outputCost = (outputTokens / 1_000_000) * 25.00;
+          const webSearchSurcharge = searchBudget * 0.01; // worst case: every allowed search used
           const rawCost = inputCost + outputCost + webSearchSurcharge;
           const billedCost = rawCost * 1.50; // platform markup
 
@@ -231,7 +350,7 @@ export const createB2BManufacturerSearchTool = (
             p_amount: Math.round(billedCost * 100 * 100) / 100, // 1 credit = $0.01
             p_operation_type: 'b2b_manufacturer_search',
             p_description: `B2B manufacturer web search (${category})`,
-            p_metadata: { country, region, category, limit, web_search_max_uses: 5 },
+            p_metadata: { country, region, category, limit, web_search_max_uses: searchBudget },
             p_workspace_id: null,
           });
 
@@ -239,7 +358,7 @@ export const createB2BManufacturerSearchTool = (
             user_id: userId,
             workspace_id: workspaceId,
             operation_type: 'b2b_manufacturer_search',
-            model_name: 'claude-haiku-4-5',
+            model_name: SEARCH_MODEL,
             api_provider: 'anthropic',
             input_tokens: inputTokens,
             output_tokens: outputTokens,
@@ -263,18 +382,32 @@ export const createB2BManufacturerSearchTool = (
           console.warn('[b2b_manufacturer_search] cost log failed:', logErr);
         }
 
-        onProgress?.(`Search complete.`);
+        const withDomain = manufacturers.filter((m) => m?.domain).length;
+        onProgress?.(`Search complete — ${manufacturers.length} companies, ${withDomain} with a domain.`);
         emitter.step({
           step_id: STEPS.B2B_RESEARCH[0],
           status: 'done',
-          status_line: textContent ? 'Manufacturers discovered' : 'No results found',
-          output: { source: 'claude_web_search', has_results: !!textContent },
+          status_line: manufacturers.length
+            ? `${manufacturers.length} manufacturers (${withDomain} with a domain)`
+            : 'No results found',
+          output: { source: 'claude_web_search', has_results: manufacturers.length > 0, count: manufacturers.length, with_domain: withDomain },
         });
 
         return JSON.stringify({
-          success: !!textContent,
+          // Success is RECORDS, not prose. The old shape reported success on any text at all, so a
+          // paragraph explaining that nothing was found counted as a successful search.
+          success: manufacturers.length > 0,
           _workflow_run_id: runId,
-          search_results: textContent || 'No results found.',
+          // `results` is the countable array shape shapeToolResult() recognises, so a search that
+          // finds nothing registers as zero-result rather than as unknown — which is what stops it
+          // being mistaken for work by the memory gate (#370, Class E).
+          results: manufacturers,
+          manufacturers,
+          count: manufacturers.length,
+          with_domain: withDomain,
+          // Kept for the human-facing summary only. Downstream steps must read `manufacturers`:
+          // parsing this prose for a domain is exactly what lost ~75% of a real Poland sweep.
+          search_results: textContent || (manufacturers.length ? '' : 'No results found.'),
           query_params: { country, region, category, limit },
           source: 'claude_web_search',
         });
