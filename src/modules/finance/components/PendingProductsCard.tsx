@@ -359,7 +359,11 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     const who = g.issuer_name || g.issuer_vat || 'this supplier';
     const wh = warehouses.find((w) => w.id === targetWarehouse);
     const ok = action === 'approve'
-      ? confirm(`Add all ${g.line_count} queued line(s) from ${who} to ${wh?.name ?? 'the default warehouse'}?\n\nThis creates or tops up ${g.line_count} product(s) and posts a stock movement for each.`)
+      ? confirm(
+          `Add all ${g.line_count} queued line(s) from ${who} to ${wh?.name ?? 'the default warehouse'}?\n\n`
+          + `This creates or tops up ${g.line_count} product(s) and posts a stock movement for each. `
+          + 'They are built from the invoice data only — the text embedding and facets are filled in by '
+          + 'the background passes, not at this moment. Use Add on a single row for a full catalog product.')
       : confirm(`Dismiss all ${g.line_count} queued line(s) from ${who}? They will not be added to stock.`);
     if (!ok) return;
 
@@ -793,11 +797,66 @@ const IntakeLineList: React.FC<{
     await onChanged();
   };
 
+  /**
+   * Add ONE line, through the real catalog pipeline.
+   *
+   * A new product is created by `createProductViaIngestCore` — the SAME MIVAA
+   * `/api/products/create-manual` core that dealer-add and ReceiveToWarehouseDialog use — so it
+   * gets `external_sku_folded` dedupe, facet canonicalization into `attributes`/`attributes_raw`,
+   * `resolve_brand_company` (without which the BRAND rung of the pricing ladder is structurally
+   * unreachable) and its Voyage `text_embedding_1024`, all before it exists. Only then does the
+   * SQL RPC run, with `matched_product_id` set, so it takes the existing-product branch and does
+   * stock, supplier attribution, pricing and the movement.
+   *
+   * That ordering is not ours — it is what ReceiveToWarehouseDialog has always done, for the
+   * reason its header gives: product creation goes through the ingest service for embeddings and
+   * cannot be folded into the SQL transaction.
+   *
+   * `embedded: false` means MIVAA was unreachable and the local fallback insert ran. Say so —
+   * a product silently created without a vector is invisible to every search that matters.
+   */
   const approveOne = async (l: IntakeLine) => {
     setBusy(l.id);
     try {
-      await warehouseService.approvePending(l.id, overrides(l.id));
-      toast({ title: 'Added to warehouse', description: edits[l.id]?.name ?? l.name });
+      const e = edits[l.id];
+      const ov = overrides(l.id);
+      let embedded = true;
+
+      if (!l.matched_product_id && e) {
+        const res = await warehouseService.createProductViaIngestCore({
+          workspaceId,
+          name: e.name || l.name,
+          sku: e.sku || null,
+          externalSku: e.supplier_product_code || e.sku || null,
+          unit: e.unit || null,
+          cost: e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, 0),
+          costCurrency: l.currency,
+          price: netSalePrice(e),
+          materialCategory: e.material_category || null,
+          dimensions: {
+            width_mm: e.width_mm === '' ? null : parseDecimalOr(e.width_mm, NaN),
+            length_mm: e.length_mm === '' ? null : parseDecimalOr(e.length_mm, NaN),
+            thickness_mm: e.thickness_mm === '' ? null : parseDecimalOr(e.thickness_mm, NaN),
+          },
+          manufacturer: e.manufacturer || null,
+          grade: e.grade || null,
+          color: e.color || null,
+          finish: e.finish || null,
+          series: e.series || null,
+          itemType: 'good',
+        });
+        ov.matched_product_id = res.productId;
+        embedded = res.embedded;
+      }
+
+      await warehouseService.approvePending(l.id, ov);
+      toast({
+        title: 'Added to warehouse',
+        description: embedded
+          ? (e?.name ?? l.name)
+          : `${e?.name ?? l.name} — created WITHOUT an embedding (the ingest service was unreachable). It will be picked up by the backfill agent.`,
+        variant: embedded ? undefined : 'destructive',
+      });
       await afterMutation(1);
     } catch (err) {
       toast({ title: 'Could not add', description: (err as Error)?.message, variant: 'destructive' });
@@ -814,7 +873,14 @@ const IntakeLineList: React.FC<{
   const runBulkSelected = async (action: 'approve' | 'dismiss') => {
     const ids = [...selected];
     if (ids.length === 0) return;
-    if (action === 'approve' && !confirm(`Add ${ids.length} selected line(s) to the warehouse?`)) return;
+    // Bulk deliberately does NOT run the ingest core: that is one MIVAA call per line, each
+    // debiting credits, and a thousand of them is not a thing to put behind one button. The
+    // products are real and the background passes do finish them — but say so, don't assume it.
+    if (action === 'approve' && !confirm(
+      `Add ${ids.length} selected line(s) to the warehouse?\n\n`
+      + 'They are created from the invoice data only. The text embedding and facets are filled in '
+      + 'by the background passes (embeddings within ~15 min, facets overnight). '
+      + 'Use Add on a single row to build a full catalog product immediately.')) return;
     setBulkBusy(true);
     try {
       if (action === 'approve') {
