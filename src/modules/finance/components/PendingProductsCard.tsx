@@ -59,12 +59,13 @@ import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   Loader2, Check, X, PackagePlus, ChevronRight, ChevronDown, Search, Ban, Undo2, Building2,
-  SlidersHorizontal, UserPlus, AlertTriangle, FileText,
+  SlidersHorizontal, UserPlus, AlertTriangle, FileText, Link2, PackageSearch,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   warehouseService, INTAKE_LINE_PAGE_SIZE,
   type IntakeSupplierGroup, type IntakeLine, type IntakeLineDetails, type IntakeIgnoredIssuer,
+  type IntakeCandidate,
   type PriceRung, type Warehouse,
 } from '@/services/warehouseService';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
@@ -363,7 +364,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
           `Add all ${g.line_count} queued line(s) from ${who} to ${wh?.name ?? 'the default warehouse'}?\n\n`
           + `This creates or tops up ${g.line_count} product(s) and posts a stock movement for each. `
           + 'They are built from the invoice data only — the text embedding and facets are filled in by '
-          + 'the background passes, not at this moment. Use Add on a single row for a full catalog product.')
+          + 'the background passes, not at this moment.')
       : confirm(`Dismiss all ${g.line_count} queued line(s) from ${who}? They will not be added to stock.`);
     if (!ok) return;
 
@@ -687,6 +688,13 @@ const IntakeLineList: React.FC<{
   /** What the deterministic parser read out of each line's text, kept so the row can show its
    *  evidence. A silently applied guess is the thing this screen must never do again. */
   const [parsed, setParsed] = useState<Record<string, ParsedSupplierLine>>({});
+  /** Existing products this line might BE, per row, loaded on demand. Never on page load: 25
+   *  lookups per page is the N+1 this screen was rebuilt to remove. */
+  const [candidates, setCandidates] = useState<Record<string, IntakeCandidate[]>>({});
+  const [candBusy, setCandBusy] = useState<string | null>(null);
+  /** The operator's answer to "is this an existing product?" — a product id, or '' for "no,
+   *  create a new one". Overrides whatever the queue-time matcher decided. */
+  const [chosen, setChosen] = useState<Record<string, string>>({});
 
   const reqSeq = useRef(0);
 
@@ -708,6 +716,8 @@ const IntakeLineList: React.FC<{
       }
       setParsed(pp);
       setEdits(e);
+      setCandidates({});
+      setChosen({});
       setRepriced({});
       setSelected(new Set());
       setOpenDetails(new Set());
@@ -746,6 +756,17 @@ const IntakeLineList: React.FC<{
       markup_pct: cost != null && Number.isFinite(cost) && cost > 0 && Number.isFinite(price)
         ? String(round2(((price - cost) / cost) * 100)) : e.markup_pct,
     });
+  };
+
+  const findSimilar = async (l: IntakeLine) => {
+    setCandBusy(l.id);
+    try {
+      const rows = await warehouseService.intakeMatchCandidates(workspaceId, l.id, 5);
+      setCandidates((m) => ({ ...m, [l.id]: rows }));
+      if (rows.length === 0) toast({ title: 'Nothing similar in the catalog', description: 'Approving will create a new product.' });
+    } catch (err) {
+      toast({ title: 'Could not check the catalog', description: (err as Error)?.message, variant: 'destructive' });
+    } finally { setCandBusy(null); }
   };
 
   const toggleDetails = (id: string) => setOpenDetails((s) => {
@@ -787,6 +808,9 @@ const IntakeLineList: React.FC<{
       target_warehouse_id: targetWarehouseId || null,
       add_to_catalog: addToCatalog,
       ...detailOverrides(e),
+      // '' is a real answer — "no, create a new product" — and must beat the stored match, so
+      // this is only spread when the operator actually chose.
+      ...(chosen[id] !== undefined ? { matched_product_id: chosen[id] || null } : {}),
     };
   };
 
@@ -798,65 +822,23 @@ const IntakeLineList: React.FC<{
   };
 
   /**
-   * Add ONE line, through the real catalog pipeline.
+   * Add ONE line.
    *
-   * A new product is created by `createProductViaIngestCore` — the SAME MIVAA
-   * `/api/products/create-manual` core that dealer-add and ReceiveToWarehouseDialog use — so it
-   * gets `external_sku_folded` dedupe, facet canonicalization into `attributes`/`attributes_raw`,
-   * `resolve_brand_company` (without which the BRAND rung of the pricing ladder is structurally
-   * unreachable) and its Voyage `text_embedding_1024`, all before it exists. Only then does the
-   * SQL RPC run, with `matched_product_id` set, so it takes the existing-product branch and does
-   * stock, supplier attribution, pricing and the movement.
+   * This path deliberately does NOT run the MIVAA ingest core. Warehouse intake records what a
+   * supplier delivered and what it cost — it is a stock and cost event, not a catalogue
+   * authoring tool. A Greek invoice line is not the raw material for an embedded, faceted
+   * catalogue entry, and making every approval mint one would spend a credit per line to
+   * manufacture products nobody asked for.
    *
-   * That ordering is not ours — it is what ReceiveToWarehouseDialog has always done, for the
-   * reason its header gives: product creation goes through the ingest service for embeddings and
-   * cannot be folded into the SQL transaction.
-   *
-   * `embedded: false` means MIVAA was unreachable and the local fallback insert ran. Say so —
-   * a product silently created without a vector is invisible to every search that matters.
+   * So: reuse the matched product when there is one, otherwise the SQL RPC creates a plain row
+   * carrying everything the invoice knows. Turning an intake product into a full catalogue entry
+   * is a separate, deliberate action — not a side effect of receiving stock.
    */
   const approveOne = async (l: IntakeLine) => {
     setBusy(l.id);
     try {
-      const e = edits[l.id];
-      const ov = overrides(l.id);
-      let embedded = true;
-
-      if (!l.matched_product_id && e) {
-        const res = await warehouseService.createProductViaIngestCore({
-          workspaceId,
-          name: e.name || l.name,
-          sku: e.sku || null,
-          externalSku: e.supplier_product_code || e.sku || null,
-          unit: e.unit || null,
-          cost: e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, 0),
-          costCurrency: l.currency,
-          price: netSalePrice(e),
-          materialCategory: e.material_category || null,
-          dimensions: {
-            width_mm: e.width_mm === '' ? null : parseDecimalOr(e.width_mm, NaN),
-            length_mm: e.length_mm === '' ? null : parseDecimalOr(e.length_mm, NaN),
-            thickness_mm: e.thickness_mm === '' ? null : parseDecimalOr(e.thickness_mm, NaN),
-          },
-          manufacturer: e.manufacturer || null,
-          grade: e.grade || null,
-          color: e.color || null,
-          finish: e.finish || null,
-          series: e.series || null,
-          itemType: 'good',
-        });
-        ov.matched_product_id = res.productId;
-        embedded = res.embedded;
-      }
-
-      await warehouseService.approvePending(l.id, ov);
-      toast({
-        title: 'Added to warehouse',
-        description: embedded
-          ? (e?.name ?? l.name)
-          : `${e?.name ?? l.name} — created WITHOUT an embedding (the ingest service was unreachable). It will be picked up by the backfill agent.`,
-        variant: embedded ? undefined : 'destructive',
-      });
+      await warehouseService.approvePending(l.id, overrides(l.id));
+      toast({ title: 'Added to warehouse', description: edits[l.id]?.name ?? l.name });
       await afterMutation(1);
     } catch (err) {
       toast({ title: 'Could not add', description: (err as Error)?.message, variant: 'destructive' });
@@ -879,8 +861,7 @@ const IntakeLineList: React.FC<{
     if (action === 'approve' && !confirm(
       `Add ${ids.length} selected line(s) to the warehouse?\n\n`
       + 'They are created from the invoice data only. The text embedding and facets are filled in '
-      + 'by the background passes (embeddings within ~15 min, facets overnight). '
-      + 'Use Add on a single row to build a full catalog product immediately.')) return;
+      + 'by the background passes (embeddings within ~15 min, facets overnight).')) return;
     setBulkBusy(true);
     try {
       if (action === 'approve') {
@@ -1007,7 +988,14 @@ const IntakeLineList: React.FC<{
               const autoPrice = e.sales_price === '' ? ladder : null;
               const pinned = e.sales_price !== '';
               const why = explainRung(rung, markup, supplierName ?? l.inbound_document?.issuer_name ?? null);
-              const matched = l.match_score != null && Number(l.match_score) >= 0.5;
+              const cands = candidates[l.id];
+              const pick = chosen[l.id];
+              // What approving will actually do, after the operator's override.
+              const willUpdateId = pick !== undefined ? (pick || null) : l.matched_product_id;
+              const willUpdateName = willUpdateId
+                ? (cands?.find((c) => c.product_id === willUpdateId)?.name ?? null)
+                : null;
+              const matched = willUpdateId != null;
               const vatPct = VAT_PCT_BY_CATEGORY[Number(e.sale_vat_category)] ?? null;
               const netPrice = netSalePrice(e);
               const costNum = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
@@ -1051,8 +1039,9 @@ const IntakeLineList: React.FC<{
                       )}
                     </div>
                     {/* What approving will actually DO. */}
-                    <Badge variant={matched ? 'info' : 'neutral'} className="shrink-0 text-[10px]" title={l.match_reason ?? undefined}>
-                      {matched ? 'Tops up existing' : 'New product'}
+                    <Badge variant={matched ? 'info' : 'neutral'} className="shrink-0 text-[10px]"
+                      title={willUpdateName ?? l.match_reason ?? undefined}>
+                      {matched ? (willUpdateName ? `Updates ${willUpdateName}` : 'Updates existing') : 'New product'}
                     </Badge>
                   </div>
 
@@ -1164,6 +1153,63 @@ const IntakeLineList: React.FC<{
                         )}
                         {' '}· pins the list price, so the pricing rules stop applying to this product.
                       </div>
+                    </div>
+                  )}
+
+                  {/* "Do we already carry this?" — asked per row, on demand. The queue-time
+                      matcher stores one best guess; two plausible candidates, or one at 0.48 a
+                      human would recognise instantly, are exactly the cases it cannot show. */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                      disabled={candBusy === l.id} onClick={() => findSimilar(l)}>
+                      {candBusy === l.id
+                        ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        : <PackageSearch className="h-3.5 w-3.5 mr-1" />}
+                      {cands ? `Similar products (${cands.length})` : 'Check for an existing product'}
+                    </Button>
+                    {pick !== undefined && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {pick ? 'will update the product below' : 'will create a new product'}
+                        {' · '}
+                        <button type="button" className="underline underline-offset-2"
+                          onClick={() => setChosen((m) => { const n = { ...m }; delete n[l.id]; return n; })}>
+                          undo
+                        </button>
+                      </span>
+                    )}
+                  </div>
+
+                  {cands && cands.length > 0 && (
+                    <div className="divide-y divide-hairline rounded-sm border border-hairline bg-surface-sunken">
+                      {cands.map((c) => {
+                        const active = pick === c.product_id
+                          || (pick === undefined && l.matched_product_id === c.product_id);
+                        return (
+                          <button key={c.product_id} type="button"
+                            onClick={() => setChosen((m) => ({ ...m, [l.id]: c.product_id }))}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left ${active ? 'bg-primary/[0.06]' : 'hover:bg-muted/40'}`}>
+                            <Link2 className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-xs font-medium">{c.name}</div>
+                              <div className="truncate text-[10px] text-muted-foreground">
+                                {c.reason}
+                                {c.sku && <> · <span className="font-mono">{c.sku}</span></>}
+                                {c.qty_on_hand > 0 && <> · {c.qty_on_hand} on hand</>}
+                                {c.cost != null && <> · cost {formatMoney(c.cost, c.cost_currency ?? l.currency)}</>}
+                              </div>
+                            </div>
+                            {c.same_supplier && <Badge variant="success" className="shrink-0 text-[10px]">same supplier</Badge>}
+                            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                              {Math.round(Number(c.score) * 100)}%
+                            </span>
+                          </button>
+                        );
+                      })}
+                      <button type="button" onClick={() => setChosen((m) => ({ ...m, [l.id]: '' }))}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${pick === '' ? 'bg-primary/[0.06]' : 'hover:bg-muted/40'}`}>
+                        <PackagePlus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        None of these — create a new product
+                      </button>
                     </div>
                   )}
 

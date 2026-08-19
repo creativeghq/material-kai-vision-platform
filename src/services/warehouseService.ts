@@ -588,6 +588,22 @@ export const warehouseService = {
     return { total: Number(r.total ?? 0), lines: r.lines ?? [] };
   },
 
+  /**
+   * "Is this already something we carry?" — ranked candidates for ONE queued line.
+   *
+   * Asked on demand, per row, because it is a per-row question and 1,000 of them on page load
+   * would be the N+1 this whole screen was rebuilt to remove. Ranked in SQL over four signals:
+   * this supplier already selling us the product under the same code, a normalised product-code
+   * match, trigram name similarity, and the platform's token scorer.
+   */
+  async intakeMatchCandidates(workspaceId: string, pendingId: string, limit = 5): Promise<IntakeCandidate[]> {
+    const { data, error } = await supabase.rpc('warehouse_intake_match_candidates', {
+      p_workspace_id: workspaceId, p_pending_id: pendingId, p_limit: limit,
+    });
+    if (error) throw error;
+    return (data ?? []) as IntakeCandidate[];
+  },
+
   /** Every queued line id for one issuer (or one search) — what "Add all" / "Dismiss all" act on. */
   async intakeLineIds(workspaceId: string, opts: { issuerKey?: string | null; search?: string | null } = {}): Promise<string[]> {
     const { data, error } = await supabase.rpc('warehouse_intake_line_ids', {
@@ -799,6 +815,24 @@ export interface IntakeLineDetails {
   location?: string | null;
   reorder_point?: number | null;
   serial_number?: string | null;
+}
+
+/** An existing product this queued line might BE, rather than something new. */
+export interface IntakeCandidate {
+  product_id: string;
+  name: string;
+  sku: string | null;
+  external_sku: string | null;
+  /** The code this supplier uses for it, when we already buy it from them. */
+  supplier_sku: string | null;
+  /** True when the invoice's issuer already supplies this product — the strongest signal there is. */
+  same_supplier: boolean;
+  /** 0–1. ≥ 0.95 is a code identity; below that it is a resemblance a human should confirm. */
+  score: number;
+  reason: string;
+  cost: number | null;
+  cost_currency: string | null;
+  qty_on_hand: number;
 }
 
 export interface IntakeIgnoredIssuer {
