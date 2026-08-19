@@ -8,6 +8,16 @@ import { supabase } from '@/integrations/supabase/client';
 export type CrmActivityTargetKind = 'contact' | 'company' | 'user' | 'deal';
 export interface CrmActivityTarget { kind: CrmActivityTargetKind; id: string }
 
+/** A note written from a deal. It still belongs to the contact/company it targets. */
+export interface CrmDealNote {
+  id: string;
+  body: string;
+  created_at: string;
+  created_by: string | null;
+  target_kind: 'contact' | 'company';
+  target_id: string;
+}
+
 export interface CrmActivity {
   id: string;
   target_kind: CrmActivityTargetKind;
@@ -99,14 +109,44 @@ class CrmActivitiesService {
     }));
   }
 
-  /** Add an internal note (also surfaces in the merged timeline). */
-  async addNote(target: CrmActivityTarget, body: string): Promise<void> {
+  /**
+   * Add an internal note (also surfaces in the merged timeline).
+   *
+   * `dealId` links the note to the deal it was written from WITHOUT changing who it is about.
+   * That distinction is the whole design: a note typed into a deal is still a note about the
+   * contact or the company, so it targets them and appears on their record page with no extra
+   * plumbing — `crm_record_timeline` already reads `crm_notes`. The deal only needs to be able to
+   * show the subset written against it, which is what the column is for.
+   *
+   * The alternative — a separate deal-notes table, copied onto the party — gives you two rows
+   * saying the same thing that disagree the moment one is edited.
+   */
+  async addNote(target: CrmActivityTarget, body: string, dealId?: string | null): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
     const { error } = await supabase.from('crm_notes').insert({
       target_kind: target.kind, target_id: target.id, body, created_by: user.id,
-    });
+      ...(dealId ? { deal_id: dealId } : {}),
+    } as never);
     if (error) throw error;
+  }
+
+  /**
+   * Notes written from one deal, newest first.
+   *
+   * Reads the same rows the party's timeline reads — filtered, not duplicated. `target_kind` /
+   * `target_id` come back so the drawer can say which party the note landed on, which is the
+   * thing a user needs to trust that "this also went to the CRM record" actually happened.
+   */
+  async listDealNotes(dealId: string, limit = 100): Promise<CrmDealNote[]> {
+    const { data, error } = await supabase
+      .from('crm_notes')
+      .select('id, body, created_at, created_by, target_kind, target_id')
+      .eq('deal_id' as never, dealId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as unknown as CrmDealNote[];
   }
 
   /**

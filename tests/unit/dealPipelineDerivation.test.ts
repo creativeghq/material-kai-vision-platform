@@ -299,4 +299,83 @@ describe('the deal pipeline has one object and data-driven stages', () => {
       expect(timeline, `${t} has no icon in CrmActivityTimeline ICONS`).toContain(`${t}:`);
     }
   });
+  it('the deal dialog asks for TYPE before it asks what the deal is about', () => {
+    // The reported bug: "New deal" opened straight onto a Property picker. The type was inherited
+    // silently from whichever board tab was selected, so the first question asked about a deal was
+    // which listing it concerned — for a deal whose KIND nobody had been asked about, and which
+    // could not be changed from inside the dialog.
+    //
+    // Two things have to stay true, and neither is visible to a typecheck:
+    const board = SOURCES.get(BOARD)!;
+    const dialog = board.slice(board.indexOf('const DealDialog'));
+
+    //   1. The type field is rendered ABOVE the subject picker. Order is the whole fix: the
+    //      subject list is meaningless until the type that decides it has been chosen.
+    const typeFieldAt = dialog.indexOf('htmlFor="deal-type"');
+    // The RENDERED picker, not the earlier `subjectKind` checks in save()/the load effect —
+    // matching those would compare against the wrong position and pass on a broken order.
+    const subjectFieldAt = dialog.indexOf('Select a listing');
+    expect(typeFieldAt, 'the deal dialog no longer renders a type field').toBeGreaterThan(-1);
+    expect(
+      typeFieldAt < subjectFieldAt,
+      'The subject picker (Property/Project) is rendered before the deal type. Type decides which ' +
+      'subject list is even correct, so it has to be asked first.',
+    ).toBe(true);
+
+    //   2. Changing the type CLEARS the subject. Carrying a property_id across to a construction
+    //      type would attach a listing to a deal that has no listing — a valid uuid in a column
+    //      that should be null, which nothing downstream would flag.
+    expect(
+      /changeType[\s\S]{0,240}property_id: ''[\s\S]{0,80}project_id: ''/.test(dialog),
+      'Switching deal type no longer clears property_id/project_id, so the old subject rides ' +
+      'along into a type that cannot have it.',
+    ).toBe(true);
+
+    //   3. Stages are reloaded for the selected type and the stage is reset when the new type has
+    //      no such key. `crm_deals` has a composite FK on (deal_type_id, stage) — keeping the old
+    //      stage makes the insert fail at the database, which is at least loud, but the user sees
+    //      a stage list belonging to a different type until they submit.
+    expect(
+      dialog.includes('dealsService.listStages(typeId)'),
+      'The dialog no longer loads stages for the SELECTED type, so it offers the stages of ' +
+      'whichever type the BOARD is showing.',
+    ).toBe(true);
+  });
+
+  it('a deal can be moved without a mouse', () => {
+    // Drag-and-drop is not an accessible control: it is unreachable by keyboard and by screen
+    // reader, and on a touch device a horizontally scrolling board that also drags horizontally
+    // fights the user's own scroll. The per-card <Select> is the equivalent path, not a leftover
+    // from before the drag existed — deleting it as redundant removes the only way some people
+    // have to move a deal at all.
+    const board = SOURCES.get(BOARD)!;
+    expect(board).toContain('useDraggable');
+    expect(
+      /aria-label="Move to stage"/.test(board),
+      'The keyboard/touch path for moving a deal (the per-card stage <Select>) is gone, leaving ' +
+      'drag-and-drop as the only way to move one.',
+    ).toBe(true);
+  });
+
+  it('a note written on a deal is a note on the PARTY, stored once', () => {
+    // The requirement is that a note added from the deal drawer also appears on the contact's or
+    // company's CRM page. The wrong way to do that is a deal-notes table plus a copy onto the
+    // party: two rows saying the same thing, which disagree the moment one is edited, and then a
+    // permanent question about which is true.
+    //
+    // So there is ONE row, targeted at the contact/company — which is what crm_record_timeline
+    // already reads, so the CRM page needed no change — with `deal_id` recording where it was
+    // typed so the deal can show its own subset.
+    const drawer = SOURCES.get('src/components/business/crm/DealDrawer.tsx');
+    expect(drawer, 'the deal drawer is gone').toBeTruthy();
+    expect(
+      /addNote\(\{ kind: noteTarget\.kind, id: noteTarget\.id \}, body, deal\.id\)/.test(drawer!),
+      'The drawer no longer writes its note against the contact/company on the deal. A note ' +
+      'stored only against the deal never reaches the CRM record, which is the point of it.',
+    ).toBe(true);
+    expect(
+      /crm_deal_notes|deal_notes/.test(drawer!),
+      'A separate deal-notes store has appeared. One note row, targeted at the party.',
+    ).toBe(false);
+  });
 });

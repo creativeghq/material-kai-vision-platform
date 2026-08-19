@@ -111,7 +111,7 @@ export default function RealEstatePage() {
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
           {/* The board is a CRM object; Real Estate is one consumer of it, pinned to its own deal type. */}
-          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} lockedTypeKey="real_estate" /></TabsContent>
+          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} lockedTypeKey="real_estate" analyticsHref="/crm/pipeline/analytics" /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>

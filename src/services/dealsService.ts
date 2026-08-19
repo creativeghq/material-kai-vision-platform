@@ -667,3 +667,141 @@ export const stageEmail = {
     if (error) throw error;
   },
 };
+
+// ── Pipeline analytics ────────────────────────────────────────────────────────────────────────
+// Every figure below is DERIVED in SQL and only formatted here. Two implementations of
+// "conversion rate" is how a dashboard ends up disagreeing with itself, and a funnel recomputed
+// in the browser also has to re-derive which stage is further along — which the database already
+// knows from `crm_deal_stages.sort`.
+//
+// Money always arrives grouped BY CURRENCY. A pipeline total is the easiest place in the app to
+// add EUR to GBP by accident and produce a number that is true of nothing.
+
+/** One row per stage, in board order. `conversion_pct` is null on the last stage. */
+export interface DealFunnelRow {
+  stage_key: string;
+  label: string;
+  sort: number;
+  is_won: boolean;
+  is_lost: boolean;
+  /** Deals known to have reached this stage — derived from stage ORDER, so it works on day one. */
+  reached: number;
+  current_open: number;
+  lost_here: number;
+  /** Share of `reached` that went on to the next stage. Null at the end of the funnel. */
+  conversion_pct: number | null;
+}
+
+export async function getDealStageFunnel(workspaceId: string, dealTypeId?: string | null): Promise<DealFunnelRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_deal_stage_funnel', {
+    p_workspace_id: workspaceId,
+    p_deal_type_id: dealTypeId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DealFunnelRow[];
+}
+
+/**
+ * Average time a deal spends in each stage.
+ *
+ * `sample_size` is part of the contract, not a debug field: an average over three deals is not a
+ * trend, and a dashboard that shows "14.2 days" without saying it is three deals invites a
+ * decision the data cannot support. Deals that existed before stage history was recorded are
+ * excluded outright — the time they spent in earlier stages is not knowable, and filling it in
+ * would put a confident wrong number on the page.
+ */
+export interface DealVelocityRow {
+  stage_key: string;
+  label: string;
+  sort: number;
+  avg_days: number | null;
+  median_days: number | null;
+  sample_size: number;
+}
+
+export async function getDealVelocity(workspaceId: string, dealTypeId?: string | null): Promise<DealVelocityRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_deal_velocity', {
+    p_workspace_id: workspaceId,
+    p_deal_type_id: dealTypeId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DealVelocityRow[];
+}
+
+/** Created / won / lost per month, per currency. */
+export interface DealOutcomeRow {
+  month: string;
+  currency: string;
+  created_count: number;
+  won_count: number;
+  won_value: number;
+  lost_count: number;
+  lost_value: number;
+}
+
+export async function getDealOutcomesByMonth(
+  workspaceId: string,
+  dealTypeId?: string | null,
+  months = 12,
+): Promise<DealOutcomeRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_deal_outcomes_by_month', {
+    p_workspace_id: workspaceId,
+    p_deal_type_id: dealTypeId ?? null,
+    p_months: months,
+  });
+  if (error) throw error;
+  return (data ?? []) as DealOutcomeRow[];
+}
+
+/** Per-owner totals. `win_rate_pct` is won / CLOSED — never won / total. */
+export interface DealOwnerStatRow {
+  owner_user_id: string | null;
+  owner_name: string;
+  currency: string;
+  open_count: number;
+  open_value: number;
+  won_count: number;
+  won_value: number;
+  lost_count: number;
+  win_rate_pct: number | null;
+}
+
+export async function getDealOwnerStats(workspaceId: string, dealTypeId?: string | null): Promise<DealOwnerStatRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_deal_owner_stats', {
+    p_workspace_id: workspaceId,
+    p_deal_type_id: dealTypeId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DealOwnerStatRow[];
+}
+
+// ── Stage history ─────────────────────────────────────────────────────────────────────────────
+/**
+ * The recorded moves on one deal, oldest first.
+ *
+ * Written by a database trigger (`trg_crm_deal_stage_event`), never by this client. A history the
+ * client writes is a two-call pattern that loses the event when the tab closes between the calls,
+ * and records whatever the client claimed rather than what the table actually did.
+ */
+export interface DealStageEvent {
+  id: string;
+  deal_id: string;
+  from_stage: string | null;
+  to_stage: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  /** 'backfill' rows were reconstructed when history was introduced — not observed moves. */
+  source: 'trigger' | 'backfill';
+  occurred_at: string;
+}
+
+export async function listDealStageEvents(dealId: string): Promise<DealStageEvent[]> {
+  const { data, error } = await supabase
+    .from('crm_deal_stage_events' as never)
+    .select('id, deal_id, from_stage, to_stage, from_status, to_status, changed_by, source, occurred_at')
+    .eq('deal_id', dealId)
+    .order('occurred_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as DealStageEvent[];
+}

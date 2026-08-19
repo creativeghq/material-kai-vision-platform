@@ -48,6 +48,7 @@ const MarketplaceNetworkPage = lazy(() => import('./pages/MarketplaceNetworkPage
 const FinancePage = lazy(() => import('./pages/Admin/FinancePage'));
 const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
 const CrmContactDetailPage = lazy(() => import('./modules/crm/pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
+const PipelineAnalyticsPage = lazy(() => import('./modules/crm/pages/PipelineAnalyticsPage'));
 const DealDetailPage = lazy(() => import('./modules/crm/pages/DealDetailPage').then(m => ({ default: m.DealDetailPage })));
 const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
@@ -329,6 +330,23 @@ const App = () => (
                         <EntitlementGuard moduleSlug="crm" moduleName="CRM">
                           <Layout>
                             <CRMPage />
+                          </Layout>
+                        </EntitlementGuard>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Pipeline analytics. Same three gates as the board it analyses — a report over
+                    deals is exactly as sensitive as the deals, and gating it more loosely is how a
+                    read-only surface becomes the way around a capability check. */}
+                <Route
+                  path="/crm/pipeline/analytics"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="crm.view">
+                        <EntitlementGuard moduleSlug="crm" moduleName="CRM">
+                          <Layout>
+                            <PipelineAnalyticsPage />
                           </Layout>
                         </EntitlementGuard>
                       </CapabilityGuard>

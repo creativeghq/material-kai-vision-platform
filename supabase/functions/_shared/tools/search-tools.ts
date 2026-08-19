@@ -26,6 +26,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { rerankResults, type RerankCandidate } from '../rerank.ts';
+import { resolveTokenPrice } from '../ai-logger.ts';
 
 /**
  * Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place.
@@ -837,7 +838,9 @@ ${scrapeResult.markdown.substring(0, 8000)}
               .map((b: any) => b.text)
               .join('\n');
 
-        // Cost log for Haiku ($0.80 in / $4 out / MTok) — the firecrawl scrape is debited
+        // Cost log for the Haiku pass. The rate comes from ai_model_pricing, not from here:
+        // this block said 0.80/4.00 while claude-haiku-4-5 is 1.00/5.00, so it under-reported
+        // by a fifth. The firecrawl scrape is debited
         // 1 credit, but the Haiku call costs ~$0.005-0.015 on top and must not be absorbed
         // silently.
         try {
@@ -847,10 +850,12 @@ ${scrapeResult.markdown.substring(0, 8000)}
           const inputTokens = usage.input_tokens ?? usage.inputTokens ?? 0;
           const outputTokens = usage.output_tokens ?? usage.outputTokens ?? 0;
           if (inputTokens > 0 || outputTokens > 0) {
-            const inputCost = (inputTokens / 1_000_000) * 0.80;
-            const outputCost = (outputTokens / 1_000_000) * 4.00;
+            const price = await resolveTokenPrice(supabase, 'claude-haiku-4-5');
+            if (!price) throw new Error('no ai_model_pricing row for claude-haiku-4-5');
+            const inputCost = (inputTokens / 1_000_000) * price.input;
+            const outputCost = (outputTokens / 1_000_000) * price.output;
             const rawCost = inputCost + outputCost;
-            const billedCost = rawCost * 1.50;
+            const billedCost = rawCost * price.markup;
             const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
             await supabase.rpc('debit_credits', {

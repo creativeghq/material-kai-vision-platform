@@ -38,6 +38,7 @@ type B2BChunkSink = ((chunk: any) => void) | undefined;
 
 import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
+import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
 import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
 
@@ -139,6 +140,9 @@ export async function validateEmailWithZeroBounce(
  * without a tool at all.
  */
 const SEARCH_MODEL = 'claude-opus-5';
+/** The model the website-analysis pass runs on. Named so the price lookup and the usage row
+ *  cannot name two different models, which is exactly what they did. */
+const ANALYSIS_MODEL = 'claude-opus-4-8';
 
 /**
  * Apollo circuit breaker.
@@ -427,11 +431,16 @@ export const createB2BManufacturerSearchTool = (
         try {
           const inputTokens = data?.usage?.input_tokens ?? 0;
           const outputTokens = data?.usage?.output_tokens ?? 0;
-          const inputCost = (inputTokens / 1_000_000) * 5.00;
-          const outputCost = (outputTokens / 1_000_000) * 25.00;
+          const searchPrice = await resolveTokenPrice(supabase, SEARCH_MODEL);
+          if (!searchPrice) {
+            console.warn(`[b2b] no ai_model_pricing row for ${SEARCH_MODEL} — not charging for an unpriced call`);
+            return;
+          }
+          const inputCost = (inputTokens / 1_000_000) * searchPrice.input;
+          const outputCost = (outputTokens / 1_000_000) * searchPrice.output;
           const webSearchSurcharge = searchBudget * 0.01; // worst case: every allowed search used
           const rawCost = inputCost + outputCost + webSearchSurcharge;
-          const billedCost = rawCost * 1.50; // platform markup
+          const billedCost = rawCost * searchPrice.markup;
 
           await supabase.rpc('debit_credits', {
             p_user_id: userId,
@@ -687,7 +696,10 @@ ${markdown.substring(0, 15000)}`;
                 .map((b: any) => b.text)
                 .join('\n');
 
-          // Cost log for Opus 4.7 ($15 in / $75 out per MTok). The agent tool
+          // Cost log for the website-analysis pass. The rate is NOT written here: this block
+          // charged 15.00/75.00 while the row it writes says claude-opus-4-8, whose real rate is
+          // 5.00/25.00 — a 3x overcharge on every scrape, from a literal whose own comment named
+          // yet a third model (Opus 4.7). One derivation, from ai_model_pricing. The agent tool
           // currently only debits the firecrawl scrape (~$0.001) but the Opus
           // pass on a 15K-char page costs orders of magnitude more — without
           // this log + debit, every scrape silently absorbs $0.05-0.15 of
@@ -699,10 +711,15 @@ ${markdown.substring(0, 15000)}`;
             const inputTokens = usage.input_tokens ?? usage.inputTokens ?? 0;
             const outputTokens = usage.output_tokens ?? usage.outputTokens ?? 0;
             if (inputTokens > 0 || outputTokens > 0) {
-              const inputCost = (inputTokens / 1_000_000) * 15.00;
-              const outputCost = (outputTokens / 1_000_000) * 75.00;
+              const price = await resolveTokenPrice(supabase, ANALYSIS_MODEL);
+              if (!price) {
+                console.warn(`[b2b] no ai_model_pricing row for ${ANALYSIS_MODEL} — not charging for an unpriced call`);
+                return;
+              }
+              const inputCost = (inputTokens / 1_000_000) * price.input;
+              const outputCost = (outputTokens / 1_000_000) * price.output;
               const rawCost = inputCost + outputCost;
-              const billedCost = rawCost * 1.50;
+              const billedCost = rawCost * price.markup;
               const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
               await supabase.rpc('debit_credits', {
@@ -717,7 +734,7 @@ ${markdown.substring(0, 15000)}`;
                 user_id: userId,
                 workspace_id: workspaceId,
                 operation_type: 'company_website_scrape_analysis',
-                model_name: 'claude-opus-4-8',
+                model_name: ANALYSIS_MODEL,
                 api_provider: 'anthropic',
                 input_tokens: inputTokens,
                 output_tokens: outputTokens,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, User, Check } from 'lucide-react';
+import { Search, User, Check, Plus } from 'lucide-react';
 import { contactsAPI } from '@/services/crm.service';
 import { Button } from '@/components/core/ui/button';
 import {
@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/core/ui/popover';
+import { QuickCreatePartyDialog } from '@/components/business/crm/QuickCreatePartyDialog';
 
 /** Rows offered in the dropdown. The server pages, so this is a display cap, not a search cap. */
 const PAGE_SIZE = 50;
@@ -24,6 +25,16 @@ interface ContactSearchDropdownProps {
   excludeContactIds?: string[];
   placeholder?: string;
   selectedContactId?: string | null;
+  /**
+   * Offer "create it" when the search finds nothing.
+   *
+   * Deliberately opt-in and deliberately only reachable from a search that came back
+   * empty: this platform's rule is that a CRM party is searched for before it is created,
+   * because the same customer entered twice (once in Greek script, once in Latin) is the
+   * failure a CRM never recovers from. Reaching create THROUGH the search means the
+   * duplicate check has already run and the user has already seen the misses.
+   */
+  allowCreate?: boolean;
 }
 
 interface Contact {
@@ -40,12 +51,14 @@ export function ContactSearchDropdown({
   excludeContactIds = [],
   placeholder = 'Search contacts by name...',
   selectedContactId,
+  allowCreate = false,
 }: ContactSearchDropdownProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [creating, setCreating] = useState(false);
 
   // Fetch contacts when search changes
   useEffect(() => {
@@ -144,7 +157,17 @@ export function ContactSearchDropdown({
               <CommandEmpty>Type at least 2 characters to search</CommandEmpty>
             )}
             {!loading && search.length >= 2 && contacts.length === 0 && (
-              <CommandEmpty>No contacts found</CommandEmpty>
+              /* The miss IS the duplicate check. By the time this renders the user has
+                 searched the folded name index and seen nothing, which is exactly the
+                 precondition for creating a party rather than duplicating one. */
+              <div className="px-3 py-6 text-center">
+                <p className="text-sm text-muted-foreground">No contacts match &ldquo;{search}&rdquo;</p>
+                {allowCreate && (
+                  <Button size="sm" className="mt-2.5" onClick={() => setCreating(true)}>
+                    <Plus /> Create &ldquo;{search.trim()}&rdquo;
+                  </Button>
+                )}
+              </div>
             )}
             {!loading && contacts.length > 0 && (
               <CommandGroup>
@@ -179,9 +202,35 @@ export function ContactSearchDropdown({
                 ))}
               </CommandGroup>
             )}
+            {allowCreate && !loading && search.trim().length >= 2 && contacts.length > 0 && (
+              /* Present even when there ARE matches: "Aegean" can return three rows and
+                 none of them be the one on the phone. Without this the user's only way
+                 out is to abandon the deal and go to the CRM. */
+              <CommandGroup>
+                <CommandItem value="__create__" onSelect={() => setCreating(true)} className="cursor-pointer text-primary">
+                  <Plus className="mr-2 h-4 w-4" />
+                  <span className="font-semibold">Create &ldquo;{search.trim()}&rdquo; as a new contact</span>
+                </CommandItem>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
+
+      {creating && (
+        <QuickCreatePartyDialog
+          kind="contact"
+          initialName={search.trim()}
+          onClose={() => setCreating(false)}
+          onCreated={(id, name) => {
+            setCreating(false);
+            setSelectedContact({ id, name } as Contact);
+            onSelect(id);
+            setOpen(false);
+            setSearch('');
+          }}
+        />
+      )}
     </Popover>
   );
 }

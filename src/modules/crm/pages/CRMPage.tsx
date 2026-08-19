@@ -617,7 +617,7 @@ export const CRMManagement: React.FC = () => {
                   <CardDescription>Deals in flight, by stage. Stages follow each deal type.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <PipelineBoard ws={activeWorkspaceId} canManage={canManageDeals} canManageTypes={isWsAdmin} />
+                  <PipelineBoard ws={activeWorkspaceId} canManage={canManageDeals} canManageTypes={isWsAdmin} analyticsHref="/crm/pipeline/analytics" />
                 </CardContent>
               </Card>
             </ModuleTabGate>

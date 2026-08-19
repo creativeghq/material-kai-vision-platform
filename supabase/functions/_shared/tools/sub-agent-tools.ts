@@ -28,6 +28,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // Import createSearchTool from search-tools (needed by research/business/product sub-agents)
 import { createSearchTool } from './search-tools.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
+import { resolveTokenPrice } from '../ai-logger.ts';
+
+/** The model these sub-agents run on. Named once so the price lookup and the usage row
+ *  cannot drift apart — they were two literals before, and one of them was wrong. */
+const SUB_AGENT_MODEL = 'claude-opus-4-8';
 
 // Reserve ceiling for one Opus 4.8 sub-agent pass (~$0.40; credits = billed_usd * 100).
 // The exact usage is settled back after the call.
@@ -51,10 +56,24 @@ async function logSubAgentUsage(opName: string, response: any, userId: string | 
       return;
     }
 
-    const inputCost = (inputTokens / 1_000_000) * 15.00; // Opus 4.8 input
-    const outputCost = (outputTokens / 1_000_000) * 75.00; // Opus 4.8 output
+    // 15.00/75.00 was the rate this file charged, labelled "Opus 4.8". The real Opus 4.8 rate is
+    // 5.00/25.00 and `ai_model_pricing` has said so all along — so every sub-agent call settled
+    // the user's reservation against THREE TIMES its cost. `ai-client.ts` carried the identical
+    // pair and its removal comment names them as the bug ("Opus at 15.00/75.00, real rate
+    // 5.00/25.00"); the literal simply survived over here, where nothing was looking.
+    //
+    // A missing row means the cost is UNKNOWN, so the reservation is released rather than settled
+    // against a guess: the only thing worse than not charging is charging a number nobody derived.
+    const price = await resolveTokenPrice(supabase, SUB_AGENT_MODEL);
+    if (!price) {
+      console.warn(`[sub-agent] no ai_model_pricing row for ${SUB_AGENT_MODEL} — releasing the reservation unsettled`);
+      await refundCredits(supabase, userId, workspaceId, reservedCredits, opName, { reason: 'unpriced_model' });
+      return;
+    }
+    const inputCost = (inputTokens / 1_000_000) * price.input;
+    const outputCost = (outputTokens / 1_000_000) * price.output;
     const rawCost = inputCost + outputCost;
-    const billedCost = rawCost * 1.50;
+    const billedCost = rawCost * price.markup;
     const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
 
     // Settle the reservation against the real cost (refund surplus, or debit overage).
@@ -62,14 +81,14 @@ async function logSubAgentUsage(opName: string, response: any, userId: string | 
     await supabase.from('ai_usage_logs').insert({
       user_id: userId ?? null,
       operation_type: opName,
-      model_name: 'claude-opus-4-8',
+      model_name: SUB_AGENT_MODEL,
       api_provider: 'anthropic',
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       input_cost_usd: inputCost,
       output_cost_usd: outputCost,
       raw_cost_usd: rawCost,
-      markup_multiplier: 1.5,
+      markup_multiplier: price.markup,
       billed_cost_usd: billedCost,
       credits_debited: userId ? creditsToDebit : 0,
       metadata: { feature: 'sub_agent', sub_feature: opName, workspace_id: workspaceId, ...extra },
@@ -132,7 +151,7 @@ export const createResearchAnalysisTool = (workspaceId: string, userId?: string)
 
         // Create a mini-agent execution with research context
         const researchModel = new ChatAnthropic({
-          model: 'claude-opus-4-8',
+          model: SUB_AGENT_MODEL,
           temperature: 0.7,
           maxTokens: 2048,
         });
@@ -209,7 +228,7 @@ export const createAnalyticsAnalysisTool = (userId?: string, workspaceId?: strin
         const systemPrompt = await getAgentSystemPrompt('analytics');
 
         const analyticsModel = new ChatAnthropic({
-          model: 'claude-opus-4-8',
+          model: SUB_AGENT_MODEL,
           temperature: 0.5,
           maxTokens: 2048,
         });
@@ -283,7 +302,7 @@ export const createBusinessAnalysisTool = (workspaceId: string, userId?: string)
         const systemPrompt = await getAgentSystemPrompt('business');
 
         const businessModel = new ChatAnthropic({
-          model: 'claude-opus-4-8',
+          model: SUB_AGENT_MODEL,
           temperature: 0.7,
           maxTokens: 2048,
         });
@@ -359,7 +378,7 @@ export const createProductAnalysisTool = (workspaceId: string, userId?: string) 
         const systemPrompt = await getAgentSystemPrompt('product');
 
         const productModel = new ChatAnthropic({
-          model: 'claude-opus-4-8',
+          model: SUB_AGENT_MODEL,
           temperature: 0.7,
           maxTokens: 2048,
         });

@@ -12,6 +12,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
+import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 
 // Per-request extraction ceilings (#363 `EE-17`). One Sonnet vision pass per PDF is the cost
 // lever, but memory is the hard limit: each PDF is fully buffered AND base64-encoded before it
@@ -436,10 +437,15 @@ async function logCost(supabase: any, userId: string | undefined, workspaceId: s
   if (!userId || !usage) return;
   const inputTokens = usage.input_tokens ?? 0;
   const outputTokens = usage.output_tokens ?? 0;
-  // Sonnet 4.6 pricing: $3/MTok input, $15/MTok output (matches anthropic public pricing — keep aligned with ai_model_pricing).
-  const inputCost = (inputTokens / 1_000_000) * 3;
-  const outputCost = (outputTokens / 1_000_000) * 15;
-  const rawCost = inputCost + outputCost;
+  // The rate is NOT a literal here. The comment this replaces said "keep aligned with
+  // ai_model_pricing", which is the instruction to maintain two copies of one number — and the
+  // model it named has no row in that table at all, so it was aligned with nothing.
+  const price = await resolveTokenPrice(supabase, MODEL);
+  const inputCost = price ? (inputTokens / 1_000_000) * price.input : null;
+  const outputCost = price ? (outputTokens / 1_000_000) * price.output : null;
+  // null, never 0 — an unpriced model is a gap in ai_model_pricing, not a free call, and
+  // `ops.silent_zero` can only see the difference if we keep it.
+  const rawCost = price ? inputCost! + outputCost! : null;
   try {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
@@ -452,8 +458,8 @@ async function logCost(supabase: any, userId: string | undefined, workspaceId: s
       input_cost_usd: inputCost,
       output_cost_usd: outputCost,
       raw_cost_usd: rawCost,
-      markup_multiplier: 1,
-      billed_cost_usd: rawCost,
+      markup_multiplier: price?.markup ?? null,
+      billed_cost_usd: rawCost === null ? null : rawCost * price!.markup,
       credits_debited: 0,
       metadata: {
         feature: 'presentation_catalogs',
