@@ -160,7 +160,7 @@ The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool sch
 - Segmentation
 - Stage 4 product validation / enrichment
 - Product discovery (Stage 0, alternative to GPT-5)
-- JARVIS agent (Mastra)
+- JARVIS agent (LangChain + LangGraph in `agent-chat` — Mastra was replaced)
 
 **Cost**: $5.00 per 1M input tokens, $25.00 per 1M output tokens
 **Speed**: 3-8 seconds per image

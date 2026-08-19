@@ -195,7 +195,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    ↓
 3. Frontend calls agent-chat Edge Function
    ↓
-4. Mastra Agent processes request:
+4. LangGraph agent (`agent-chat`) processes request:
    - Loads agent-specific prompt from database
    - Analyzes user input
    - Executes tools (search, PDF processing, etc.)

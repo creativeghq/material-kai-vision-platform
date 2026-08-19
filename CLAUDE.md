@@ -292,6 +292,23 @@ SPACE, so a substituted vector is stored, indexed and ranked without anything
 raising. `None` means NO VECTOR — never a vector from somewhere else. Guarded by
 [tests/unit/test_no_fallback_embedder.py](mivaa-pdf-extractor/tests/unit/test_no_fallback_embedder.py).
 
+## Which client makes the model call — three runtimes, three answers
+There is no single AI client and no plan for one. Picking the wrong one is **silent**: the call
+succeeds, it just skips whatever the right one gives you for free.
+
+| You are writing | Use | Entry point |
+|---|---|---|
+| MIVAA / Python | **httpx, never a provider SDK** | `tracked_claude_call_async` (auto-logs) |
+| An edge function needing ONE model turn (text / image / video) | **Vercel AI SDK, only through the shared client** | `generateWithClaude` / `generateWithGemini` / … from `_shared/ai-client.ts` |
+| An agent loop — tools, state, streaming | **LangChain + LangGraph, and it already exists** | `agent-chat`; register the tool, never build a second loop |
+
+- **Python has no SDK because of a pin trap** — the `anthropic` package broke the `tools` kwarg on upgrade and was removed 2026-05-23 (pipeline convention 10).
+- **Edge does not import a provider SDK because `ai-client.ts` is the chokepoint.** It constructs the providers **lazily**, so `platform_secrets` bootstrapped into env *at handler entry* is actually seen — a module-load capture reads `undefined` — and it is where token cost reaches `ai_usage_logs` against `ai_model_pricing`. Never `fetch()` a provider URL and never import `@anthropic-ai/sdk` into an edge function. `generate-social-content` is the one file still on `@anthropic-ai/sdk@0.39.0`; it re-implements the cost log by hand via `AICallLogger` and should move.
+- **`agent-chat` is not on the AI SDK because it is not a one-shot.** LangGraph owns checkpointing, the tool loop, RBAC and SSE streaming; it replaced Mastra, which is why a doc naming Mastra is out of date. A second agent runtime would need its own copy of all four.
+- `@anthropic-ai/sdk` in root `package.json` is imported by nothing in `src/` — dead weight, not a signal that the frontend calls models. It does not.
+
+**Not yet enforced.** The `fetch()`-a-provider and import-a-provider-SDK halves are semgrep-shaped and should become rules; until then this section is the whole guard.
+
 ## Storage — routing rule
 6 buckets; routing is path-based and feature identity lives in the **top-level folder**, not the bucket name.
 `pdf-documents` and `quote-templates` are private (signed URLs, re-signed on every read); `pdf-tiles`,
