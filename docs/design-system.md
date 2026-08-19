@@ -45,6 +45,7 @@ as the new thing, or as an inert no-op. Nothing needs a find-and-replace to keep
 4. [Spacing, radius, density](#4-spacing-radius-density)
 5. [Primitives](#5-primitives)
 6. [Patterns (the `hub/` library)](#6-patterns-the-hub-library)
+6b. [Empty states](#6b-empty-states)
 7. [The three screen archetypes](#7-the-three-screen-archetypes)
 8. [Navigation](#8-navigation)
 9. [Do / Don't](#9-do--dont)
@@ -264,7 +265,58 @@ that a record page has three columns with three different jobs. Those rules live
 | `HubStatTile` / `HubStatGrid` | KPI tile with a meaning-coloured delta; auto-fitting grid (no orphan tile on the last row). |
 | `HubSideNav` | The settings / section rail. Active row = tint + leading accent bar. |
 | `HubTabNav` | Underline tabs for routes and saved views. Route tabs are real `<a>`s — middle-click and ⌘-click are how people use a tab strip. |
-| `HubEmptyState` | Two variants, because "you have none" and "your filters excluded all 4,000" need opposite offers. |
+| `HubEmptyState` | Two variants, because "you have none" and "your filters excluded all 4,000" need opposite offers. **Always pass `action`** — see §6b. |
+
+---
+
+## 6b. Empty states
+
+**An empty surface must offer the way out of being empty.** This is the most common defect in the
+platform's UI, and the most invisible one: the text is correct, the component renders, the types
+are fine, and the screen only looks wrong to somebody who has no data — which is never the person
+writing the code and rarely the person reviewing it.
+
+`ContractsSection` rendered a bare `No contracts yet.` eight lines below its own `canCreate` and
+`openCreate`. The button the user needed was in scope the whole time, unused. That shape repeated
+**116 times across 74 files**.
+
+There are three kinds of empty, and they need three different offers:
+
+| Kind | Reads as | Offer |
+|---|---|---|
+| **Nothing yet** | "You have no contracts" | The create action. |
+| **Filtered out** | "No contacts match these filters" | *Clear filters*. **Never** the create action — offering "New contact" to somebody with 4,000 contacts and a stage filter set is how duplicates get made. |
+| **Not enabled** | "Finance is a paid module" | Enable / buy / ask the owner. Already handled at route level by `EntitlementGuard` — do not hand-roll it. |
+
+```tsx
+{rows.length === 0 ? (
+  activeFilters > 0 ? (
+    <HubEmptyState
+      variant="filtered"
+      icon={FileSignature}
+      title="No contracts match your filters"
+      description="Widen the search or clear a filter to see the rest."
+      action={<Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>}
+    />
+  ) : (
+    <HubEmptyState
+      icon={FileSignature}
+      title="No contracts yet"
+      description="One sentence on what a contract is FOR — not what the button does."
+      action={canCreate ? <Button size="sm" onClick={openCreate}><Plus /> New contract</Button> : undefined}
+    />
+  )
+) : ( … )}
+```
+
+Write the `description` as *what the thing is for*, not *how to make one*. "Contracts are signable
+agreements — draft one, send a signing link, and the signed PDF is stored against the record" tells
+a new user why they would want one; "Click New contract to add a contract" tells them nothing they
+could not read off the button.
+
+Ratcheted by [tests/unit/emptyStates.test.ts](../tests/unit/emptyStates.test.ts) against
+`.github/empty-state-baseline.json`. A new actionless empty state fails the build; the recorded
+count may only go down.
 
 ---
 
@@ -345,6 +397,10 @@ Side rails (`HubSideNav`, `.sidebar-item`) mark the active row with a 3px leadin
 - ✅ weight for hierarchy; serif for h1/h2 only
 - ❌ a global weight override; `text-*` overrides on `CardTitle`; uppercase table headers
 
+**Empty states**
+- ✅ `<HubEmptyState>` with an `action`; `variant="filtered"` when filters are what emptied it
+- ❌ a bare `<p>No X yet.</p>`; the create button on a filtered-empty list
+
 **Money & dates** — orthogonal to design but caught by CI on every page:
 `formatMoney` from `@/utils/decimal`, `todayLocalISO()` from `@/utils/datetime`. Never a local
 re-implementation of either, not even in a demo page.
@@ -357,7 +413,7 @@ re-implementation of either, not even in a demo page.
 2. Pick an archetype from §7 and use its `hub/` components.
 3. Every colour from a token. No `text-white`, no `bg-gray-*`, no hex.
 4. Controls at `h-9`; one solid button.
-5. Tables: sortable headers, an empty state, right-aligned numbers.
+5. Tables: sortable headers, right-aligned numbers, and an empty state that OFFERS something (§6b).
 6. Check it in **all four** theme combinations at `/design-system`.
 7. Check it at 375px wide — wide tables scroll, they do not clip.
 8. `npm run lint && npm run typecheck && npm test`.
