@@ -1346,13 +1346,43 @@ export const createEmailValidateTool = (userId: string, onProgress?: (status: st
  */
 export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
   return tool(
-    async ({ company, contacts, _workflow_run_id }) => {
+    async ({ company, contacts, confirm, _workflow_run_id }) => {
       const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: _workflow_run_id }) : null;
       emitter?.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'running', status_line: `Saving ${company?.name || 'company'} to CRM…` });
       try {
         const startTime = Date.now();
 
         // Send progress update
+        // HUMAN-IN-THE-LOOP GATE (invariant #9). Writing a party into the CRM is a durable,
+        // outward-facing change to the customer's own records, and the agent reaches this tool off
+        // its OWN research — the companies and the contact names come from a web search it just
+        // ran, not from anything the user typed. On 2026-08-19 a single sentence produced two
+        // companies and three named people in the live CRM with no approval step anywhere.
+        //
+        // `confirm` is on NEVER_ASK in the quick-start catalog, so a form can never pre-answer it
+        // on the user's behalf — the approval has to come from the card.
+        if (confirm !== true) {
+          const contactLine = contacts?.length
+            ? ` and ${contacts.length} contact${contacts.length === 1 ? '' : 's'} (${contacts.map((c: any) => c.name).filter(Boolean).slice(0, 3).join(', ')})`
+            : '';
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'save_to_crm',
+            input: { company, contacts, confirm: true },
+            title: `Save ${company.name} to your CRM?`,
+            summary: `Adds ${company.name}${company.website ? ` (${company.website})` : ''}${contactLine} to your CRM. `
+              + `These came from web research, so check the details are right — contact names and emails in particular.`,
+            toolkit_id: 'crm',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({
+            success: true,
+            awaiting_confirmation: true,
+            message: 'Waiting for the user to approve saving this company. Do not retry and do not '
+              + 'save anything else — they will approve or decline on the card.',
+          });
+        }
+
         onProgress?.(`Saving ${company.name} to CRM...`);
 
         // Dedupe on the SAME folded key crm-api uses (#366 BU-3), because this is a second
@@ -1565,6 +1595,7 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
           notes: z.string().optional().describe('Notes about the contact'),
           is_primary: z.boolean().optional().describe('Is this the primary contact'),
         })).optional().describe('Contacts to save and link to the company'),
+        confirm: z.boolean().optional().describe('Leave unset. The tool previews and asks the user to approve; the Approve button re-invokes it with confirm:true.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/save:<run_id>]` prefix.'),
       }),
     }

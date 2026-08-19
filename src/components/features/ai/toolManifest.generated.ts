@@ -1350,6 +1350,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'company', type: 'object', optional: false, description: 'Company information to save' },
       { name: 'contacts', type: 'array', optional: true, description: 'Contacts to save and link to the company' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Leave unset. The tool previews and asks the user to approve; the Approve button re-invokes it with confirm:true.' },
       { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from `[workflow:b2b-research/save:<run_id>]` prefix.' },
     ],
   },

@@ -687,3 +687,47 @@ describe('the agent cannot create a duplicate CRM company', () => {
       'the agent must be told the company already exists so it offers to open or update it').toBe(true);
   });
 });
+
+/**
+ * Writing a party into the CRM is a durable change to the customer's own records, and the agent
+ * reaches save_to_crm off its OWN research — the company and the contact names come from a web
+ * search it just ran, not from anything the user typed.
+ *
+ * On 2026-08-19 one sentence produced two companies and three named people in the live CRM with
+ * no approval step anywhere. The names were real people. That is invariant 9's case exactly:
+ * a state-mutating tool triggered off tool-result content requires explicit confirmation.
+ */
+describe('saving to the CRM is confirmed, not assumed', () => {
+  const b2b = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
+  );
+  const save = b2b.slice(b2b.indexOf('createSaveToCRMTool'));
+
+  it('previews instead of writing until confirmed', () => {
+    expect(/confirm !== true/.test(save), 'save_to_crm must gate on confirm').toBe(true);
+    expect(/type: 'action_confirmation'/.test(save), 'it must emit the approval card').toBe(true);
+    expect(/awaiting_confirmation: true/.test(save), 'and tell the agent to stop and wait').toBe(true);
+  });
+
+  it('the gate precedes every write', () => {
+    const gate = save.indexOf('confirm !== true');
+    const firstInsert = save.search(/\.insert\(/);
+    expect(gate).toBeGreaterThan(-1);
+    expect(firstInsert).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(firstInsert);
+  });
+
+  it('names what is being written, including the people', () => {
+    // "Save 2 records?" is not informed consent. Contact names come from web research and are the
+    // most likely thing to be wrong, so the card says them.
+    const window = save.slice(save.indexOf("type: 'action_confirmation'"), save.indexOf("type: 'action_confirmation'") + 900);
+    expect(/contacts\?\.length/.test(window) || /contactLine/.test(window),
+      'the summary must name the contacts being created, not just count them').toBe(true);
+  });
+
+  it('a quick-start cannot pre-approve it', () => {
+    const auto = readFileSync(join(ROOT, 'src/components/features/ai/toolAutoFields.ts'), 'utf8');
+    expect(/NEVER_ASK[\s\S]{0,600}'confirm'/.test(auto),
+      '`confirm` must stay on NEVER_ASK or a form could answer the approval on the user\'s behalf').toBe(true);
+  });
+});
