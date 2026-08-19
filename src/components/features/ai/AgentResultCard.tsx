@@ -3,6 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
 import { Badge } from '@/components/core/ui/badge';
 import { formatDate } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 
 /**
  * Generic structured renderer for agent result chunks that were
@@ -284,10 +285,44 @@ export const AgentResultCard: React.FC<{ title: string; data: Record<string, any
       */}
       {(() => {
         const entries = Object.entries(data ?? {}).filter(([k, v]) => !isPlumbing(k, v));
-        if (entries.length === 1) {
-          const [, only] = entries[0];
-          const cols = Array.isArray(only) ? tabularColumns(only) : null;
-          if (cols) return <RecordTable rows={only as any[]} columns={cols} />;
+        // The LIST this result is about — the one array among the fields. `{days: 7,
+        // appointments: []}` is a list result with a scalar hint attached, not two peers.
+        const listEntry = entries.find(([, v]) => Array.isArray(v)) as [string, any[]] | undefined;
+
+        if (listEntry) {
+          const [key, rows] = listEntry;
+          // The commonest real payload on this platform is an EMPTY list — measured across saved
+          // result messages, `{contracts: []}`, `{appointments: []}`, `{threads: []}`,
+          // `{channels: []}`. It used to render as the card title, then the same word again as a
+          // field label, then "None": three sayings of nothing and no way forward. CLAUDE.md's
+          // rule is that an empty surface must offer the way out of being empty, and the card
+          // already HAS the way out — the "Open in {Hub}" handoff below.
+          if (rows.length === 0) {
+            return (
+              <HubEmptyState
+                title={`No ${labelize(key).toLowerCase()} yet`}
+                description={hubLabel
+                  ? `Nothing to show right now. ${hubLabel} is where these get created.`
+                  : 'The search ran fine — there is simply nothing here yet.'}
+              />
+            );
+          }
+          const cols = tabularColumns(rows);
+          if (cols) {
+            const rest = entries.filter(([k]) => k !== key);
+            return (
+              <>
+                <RecordTable rows={rows} columns={cols} />
+                {/* A scalar sitting beside the list is context for it (`days: 7` = the window
+                    searched), so it reads under the table rather than above it. */}
+                {rest.length > 0 && (
+                  <div className="mt-2 border-t border-hairline pt-2">
+                    <KeyValues obj={Object.fromEntries(rest)} />
+                  </div>
+                )}
+              </>
+            );
+          }
         }
         return <KeyValues obj={data} />;
       })()}

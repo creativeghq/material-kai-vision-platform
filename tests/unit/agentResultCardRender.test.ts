@@ -91,3 +91,46 @@ describe('AgentResultCard leaves non-tabular payloads alone', () => {
     expect(html).toContain('—');
   });
 });
+
+/**
+ * The commonest real payload on this platform is an EMPTY list.
+ *
+ * Measured across saved agent result messages: `{contracts: []}`, `{appointments: [], days: 7}`,
+ * `{threads: []}`, `{channels: []}`. It rendered as the card title, then the same word again as a
+ * field label, then "None" — three sayings of nothing, and no way forward. CLAUDE.md's rule is
+ * that an empty surface must offer the way out of being empty, and this card already has one: the
+ * "Open in {Hub}" handoff.
+ */
+describe('AgentResultCard handles the empty result properly', () => {
+  it('an empty list is an empty STATE, not the word None', () => {
+    const html = render({ contracts: [], workspace_id: 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e' }, 'contracts_list', 'Contracts');
+    expect(html).not.toContain('>None<');
+    expect(html).toContain('No contracts yet');
+    // The way out survives — that is what makes it an empty state rather than a dead end.
+    expect(html).toContain('Open in');
+  });
+
+  it('says the run was clean, so an empty card does not read as a failure', () => {
+    const html = render({ threads: [] }, 'inbox_threads_list', 'Inbox');
+    expect(html).toMatch(/nothing to show|nothing here yet/i);
+  });
+
+  it('does not repeat the list name as a field label above nothing', () => {
+    const html = render({ contracts: [] }, 'contracts_list', 'Contracts');
+    // The defect is the KEY/VALUE ROW — the card title says "Contracts", and the old render put a
+    // field label "Contracts" directly under it with "None" beside it. Counting the word is the
+    // wrong instrument: it also appears legitimately in the hub button and the description.
+    expect(html).not.toContain('grid grid-cols-[140px_1fr]');
+  });
+
+  it('a scalar beside the list is context, and reads under the table', () => {
+    const html = render(
+      { days: 7, appointments: [{ id: 'a1b2c3d4-1111-2222-3333-444455556666', title: 'Site visit', status: 'confirmed', starts_at: '2026-08-20T09:00:00+00:00' },
+                                { id: 'a1b2c3d4-1111-2222-3333-444455556667', title: 'Handover', status: 'pending', starts_at: '2026-08-21T14:00:00+00:00' }] },
+      'appointments_list', 'Appointments',
+    );
+    expect(html).toContain('<table');
+    // `days: 7` is the window searched — context for the table, so it must come after it.
+    expect(html.indexOf('</table>')).toBeLessThan(html.indexOf('Days'));
+  });
+});
