@@ -35,6 +35,10 @@ interface Props {
   workspaceId: string;
   /** Seeds the name field — e.g. whatever the operator had typed into the payee search. */
   initialName?: string;
+  /** Seeds the VAT field. Pass it whenever the caller already HAS the number — a myDATA issuer,
+   *  a scanned invoice — because VAT is the authoritative dedupe key and the registry lookup
+   *  runs off it. Seeding the name alone makes the operator retype the one thing we knew. */
+  initialVat?: string;
   /** What this business is to us. Both flags are ALWAYS sent: the crm-api POST treats a request
    *  that names neither as "it's a customer", so a supplier would silently become one too. */
   role?: 'supplier' | 'customer' | 'both';
@@ -48,6 +52,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   onOpenChange,
   workspaceId,
   initialName,
+  initialVat,
   role = 'supplier',
   onCreated,
   title = 'New business',
@@ -75,13 +80,16 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   const wasOpen = useRef(false);
   useEffect(() => {
     if (open && !wasOpen.current) {
-      setDraft(emptyCompanyIdentity({ name: initialName?.trim() ?? '' }));
+      setDraft(emptyCompanyIdentity({
+        name: initialName?.trim() ?? '',
+        vatNumber: initialVat?.trim() ?? '',
+      }));
       setEmail('');
       setDuplicate(null);
       setSaving(false);
     }
     wasOpen.current = open;
-  }, [open, initialName]);
+  }, [open, initialName, initialVat]);
 
   // Dedupe probe. VAT first (authoritative, and matched across every spelling a row might be
   // stored under), name second. Debounced because it runs as you type.
@@ -193,7 +201,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
           onBusyChange={setLookupBusy}
           onSubmit={() => { if (!duplicate) void handleCreate(); }}
           disabled={saving}
-          autoFocusName={!initialName}
+          autoFocusName={!initialName && !initialVat}
           namePlaceholder="e.g. Acme Tiles S.A."
         >
           {duplicate && (

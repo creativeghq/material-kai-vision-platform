@@ -598,12 +598,18 @@ export const warehouseService = {
   },
 
   /** The ladder's answer for ONE line at an edited cost — used while the operator types. */
-  async previewIntakeSellPrice(id: string, cost: number | null): Promise<{ sell: number | null; attributed: boolean }> {
+  async previewIntakeSellPrice(
+    id: string, cost: number | null,
+  ): Promise<{ sell: number | null; rung: PriceRung; markupPct: number | null; attributed: boolean }> {
     const { data, error } = await supabase.rpc('preview_pending_item_sell_price', { p_id: id, p_cost: cost });
     if (error) throw error;
-    const r = (data ?? {}) as { suggested_sell?: number | null; supplier_attributed?: boolean };
+    const r = (data ?? {}) as {
+      suggested_sell?: number | null; rung?: PriceRung; markup_pct?: number | null; supplier_attributed?: boolean;
+    };
     return {
       sell: r.suggested_sell != null ? Number(r.suggested_sell) : null,
+      rung: r.rung ?? 'no_cost',
+      markupPct: r.markup_pct != null ? Number(r.markup_pct) : null,
       attributed: r.supplier_attributed === true,
     };
   },
@@ -618,11 +624,23 @@ export const warehouseService = {
     if (error) throw error;
   },
 
-  /** Approve many at once. `overrides` applies to every id; each line keeps its own name, SKU,
-   *  quantity and cost. A line that fails is reported, not rolled back over the ones that worked. */
-  async bulkApprovePending(ids: string[], overrides: Record<string, unknown> = {}): Promise<BulkApproveResult> {
+  /**
+   * Approve many at once.
+   *
+   * `overrides` applies to every id (which warehouse, is it sellable). `perItem` carries what the
+   * operator actually typed into individual rows and WINS over the shared object — without it,
+   * selecting three rows you had just corrected and pressing "Add" discarded all three edits and
+   * reported success.
+   *
+   * A line that fails is reported, not rolled back over the ones that worked.
+   */
+  async bulkApprovePending(
+    ids: string[],
+    overrides: Record<string, unknown> = {},
+    perItem: Record<string, Record<string, unknown>> = {},
+  ): Promise<BulkApproveResult> {
     const { data, error } = await supabase.rpc('bulk_approve_pending_warehouse_items', {
-      p_ids: ids, p_overrides: overrides,
+      p_ids: ids, p_overrides: overrides, p_per_item: perItem,
     });
     if (error) throw error;
     const r = (data ?? {}) as Partial<BulkApproveResult>;
@@ -700,6 +718,18 @@ export interface IntakeSupplierGroup {
   supplier_attributed: boolean;
 }
 
+/**
+ * Which rung of `_pricing_markup_ladder` produced a suggested price.
+ *
+ * `unpriced` is the one that matters: it means NO rule matched at any rung and the workspace
+ * default markup is 0%, so the "suggested" price is the cost and the product would be sold at
+ * what it was bought for. That is indistinguishable from a deliberate 0% supplier rule by the
+ * number alone, which is why the rung is carried separately.
+ */
+export type PriceRung =
+  | 'list_price' | 'product' | 'brand' | 'supplier' | 'category'
+  | 'workspace_default' | 'unpriced' | 'no_cost';
+
 /** One queued supplier line, with its document and the ladder's price already derived. */
 export interface IntakeLine {
   id: string;
@@ -707,14 +737,20 @@ export interface IntakeLine {
   sku: string | null;
   unit: string | null;
   size: string | null;
+  attributes: string | null;
   quantity: number;
   unit_cost: number | null;
   currency: string;
   sales_price: number | null;
   category_id: string | null;
   raw_description: string | null;
-  /** Set server-side by `match_pending_items_for_document`. ≥ 0.5 tops up existing stock;
-   *  below that, approving creates a new product. */
+  manufacturer: string | null;
+  supplier_product_code: string | null;
+  width_mm: number | null;
+  length_mm: number | null;
+  thickness_mm: number | null;
+  /** Set server-side by `match_pending_items_for_document`. ≥ 0.5 tops up existing stock or
+   *  reuses a catalog product; below that, approving creates a new product. */
   match_score: number | null;
   match_reason: string | null;
   matched_product_id: string | null;
@@ -727,7 +763,32 @@ export interface IntakeLine {
   } | null;
   /** The pricing ladder's answer at the stored cost. Null = no cost, so no price to suggest. */
   suggested_sell: number | null;
+  price_rung: PriceRung;
+  price_basis: 'markup' | 'fixed_price' | null;
+  markup_pct: number | null;
+  supplier_company_id: string | null;
   supplier_attributed: boolean;
+}
+
+/** The catalog-depth fields the intake approval can write, beyond the four on the row. */
+export interface IntakeLineDetails {
+  description?: string | null;
+  manufacturer?: string | null;
+  supplier_product_code?: string | null;
+  material_category?: string | null;
+  barcode?: string | null;
+  taric_code?: string | null;
+  cpv_code?: string | null;
+  mydata_vat_category?: number | null;
+  mydata_income_classification_type?: string | null;
+  mydata_income_classification_category?: string | null;
+  width_mm?: number | null;
+  length_mm?: number | null;
+  thickness_mm?: number | null;
+  weight_kg?: number | null;
+  location?: string | null;
+  reorder_point?: number | null;
+  serial_number?: string | null;
 }
 
 export interface IntakeIgnoredIssuer {

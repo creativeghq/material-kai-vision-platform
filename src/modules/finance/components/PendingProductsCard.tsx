@@ -23,6 +23,24 @@
  * issuer's documents never reach the AI extractor: the rule saves the credit, it does not
  * merely hide what the credit bought.
  *
+ * ── What "Add" actually does ──────────────────────────────────────────────────────────────
+ * `_approve_pending_item_core` (SQL, one transaction per line): reuse the matched product or
+ * CREATE one — name, supplier SKU as `external_sku`, the supplier's own wording as
+ * `description`, cost + `cost_source='supplier_invoice'`, and the details panel's fields — then
+ * attach the supplier (`supplier_products`, `products.supplier_company_id`), derive the sale
+ * price through the ladder, and post an `in` stock movement into the chosen warehouse.
+ *
+ * It is NOT the MIVAA ingest core that `ReceiveToWarehouseDialog` and dealer-add use. A Greek
+ * invoice line is not enough to build a catalogue entry from, and 900 ingest calls is not a
+ * thing to do behind a bulk button. What it does instead is write everything the line knows and
+ * flag the row (`metadata.facet_canonicalization`) so the nightly facet sweep and the
+ * 15-minute embedding-backfill agent can finish the job. Before that flag those products were
+ * invisible to the only pass that would ever give them facets — empty forever, nothing complaining.
+ *
+ * "Sellable" does NOT decide whether a product is created. It decides whether a `product_prices`
+ * row exists, i.e. whether the thing can be quoted. The product is created either way, because
+ * stock has to point at one.
+ *
  * The suggested price is never computed here. It used to be — `cost * (1 + margin_pct/100)` in
  * the browser, a second answer to "what margin applies" that disagreed with the `pricing_rules`
  * ladder every other pricing path uses, so the number the operator approved could differ from
@@ -41,12 +59,16 @@ import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   Loader2, Check, X, PackagePlus, ChevronRight, ChevronDown, Search, Ban, Undo2, Building2,
+  SlidersHorizontal, UserPlus, AlertTriangle, FileText,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   warehouseService, INTAKE_LINE_PAGE_SIZE,
-  type IntakeSupplierGroup, type IntakeLine, type IntakeIgnoredIssuer, type Warehouse,
+  type IntakeSupplierGroup, type IntakeLine, type IntakeLineDetails, type IntakeIgnoredIssuer,
+  type PriceRung, type Warehouse,
 } from '@/services/warehouseService';
+import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
+import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { supabase } from '@/integrations/supabase/client';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { formatMoney } from '@/modules/finance/services/financeService';
@@ -60,17 +82,100 @@ const GROUP_PAGE_SIZE = 15;
 type IntakeMode = 'off' | 'suggest' | 'auto';
 
 /** Per-line operator edits, held only while a group is expanded. */
-interface LineEdit { name: string; sku: string; unit: string; quantity: string; unit_cost: string; sales_price: string; category_id: string; }
+interface LineEdit {
+  name: string; sku: string; unit: string; quantity: string;
+  unit_cost: string; sales_price: string; category_id: string;
+  // Catalog depth. Empty means "not supplied" and is never written over what the line already
+  // carries — `_approve_pending_item_core` coalesces each of these onto the pending row.
+  manufacturer: string; supplier_product_code: string; material_category: string;
+  width_mm: string; length_mm: string; thickness_mm: string; weight_kg: string;
+  location: string; reorder_point: string;
+  barcode: string; taric_code: string; cpv_code: string;
+  mydata_vat_category: string;
+}
+
+const numStr = (n: number | null | undefined) => (n != null ? String(n) : '');
 
 const editFrom = (l: IntakeLine): LineEdit => ({
   name: l.name,
   sku: l.sku ?? '',
   unit: l.unit ?? '',
   quantity: String(l.quantity ?? 1),
-  unit_cost: l.unit_cost != null ? String(l.unit_cost) : '',
-  sales_price: l.sales_price != null ? String(l.sales_price) : '',
+  unit_cost: numStr(l.unit_cost),
+  sales_price: numStr(l.sales_price),
   category_id: l.category_id ?? '',
+  manufacturer: l.manufacturer ?? '',
+  supplier_product_code: l.supplier_product_code ?? '',
+  material_category: '',
+  width_mm: numStr(l.width_mm),
+  length_mm: numStr(l.length_mm),
+  thickness_mm: numStr(l.thickness_mm),
+  weight_kg: '',
+  location: '',
+  reorder_point: '',
+  barcode: '',
+  taric_code: '',
+  cpv_code: '',
+  mydata_vat_category: '',
 });
+
+/** Only the keys the operator actually filled in. Blank must not overwrite a real value. */
+const detailOverrides = (e: LineEdit): IntakeLineDetails => {
+  const out: IntakeLineDetails = {};
+  const txt = (k: keyof IntakeLineDetails, v: string) => { if (v.trim()) (out as Record<string, unknown>)[k] = v.trim(); };
+  const num = (k: keyof IntakeLineDetails, v: string) => {
+    const n = v.trim() === '' ? null : parseDecimalOr(v, NaN);
+    if (n != null && Number.isFinite(n)) (out as Record<string, unknown>)[k] = n;
+  };
+  txt('manufacturer', e.manufacturer);
+  txt('supplier_product_code', e.supplier_product_code);
+  txt('material_category', e.material_category);
+  txt('location', e.location);
+  txt('barcode', e.barcode);
+  txt('taric_code', e.taric_code);
+  txt('cpv_code', e.cpv_code);
+  num('width_mm', e.width_mm);
+  num('length_mm', e.length_mm);
+  num('thickness_mm', e.thickness_mm);
+  num('weight_kg', e.weight_kg);
+  num('reorder_point', e.reorder_point);
+  num('mydata_vat_category', e.mydata_vat_category);
+  return out;
+};
+
+/**
+ * Say WHICH pricing rule produced the suggestion.
+ *
+ * A €7.00 cost suggesting €7.00 is either "the supplier rule says 0%" or "nothing matched and
+ * the workspace default is 0%". Same number, opposite meanings — the second one is an UNPRICED
+ * product about to be sold at what it cost. `tone: 'warn'` is the second one.
+ */
+const explainRung = (rung: PriceRung, markupPct: number | null, supplier: string | null):
+  { text: string; tone: 'warn' | 'muted' } => {
+  const pct = markupPct != null ? `+${markupPct}%` : '';
+  switch (rung) {
+    case 'no_cost':
+      return { text: 'The invoice line carries no cost, so no price can be derived.', tone: 'warn' };
+    case 'unpriced':
+      return {
+        text: 'No pricing rule matches and the workspace default markup is 0% — this would be sold at cost. Set a markup in Finance → Pricing, or type a price.',
+        tone: 'warn',
+      };
+    case 'list_price':
+      return { text: 'This product already has a pinned list price; the ladder is not consulted.', tone: 'muted' };
+    case 'product':
+      return { text: `From this product’s own pricing rule ${pct}.`.trim(), tone: 'muted' };
+    case 'brand':
+      return { text: `From the brand pricing rule ${pct}.`.trim(), tone: 'muted' };
+    case 'supplier':
+      return { text: `From the pricing rule for ${supplier ?? 'this supplier'} ${pct}.`.trim(), tone: 'muted' };
+    case 'category':
+      return { text: `From the category pricing rule ${pct}.`.trim(), tone: 'muted' };
+    case 'workspace_default':
+    default:
+      return { text: `Workspace default markup ${pct}.`.trim(), tone: 'muted' };
+  }
+};
 
 export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Warehouse[]; onChanged?: () => void }> =
 ({ workspaceId, warehouses, onChanged }) => {
@@ -78,6 +183,10 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   const [groups, setGroups] = useState<IntakeSupplierGroup[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [ignored, setIgnored] = useState<IntakeIgnoredIssuer[]>([]);
+  /** `material_categories` for the details panel. Fetched once, shared by every expanded row. */
+  const [materialCategories, setMaterialCategories] = useState<{ id: string; name: string }[]>([]);
+  /** The issuer the operator is putting into the CRM, if any. */
+  const [crmFor, setCrmFor] = useState<IntakeSupplierGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -111,17 +220,20 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [gs, cats, fin, ign] = await Promise.all([
+      const [gs, cats, fin, ign, mats] = await Promise.all([
         warehouseService.intakeSupplierGroups(workspaceId),
         financeCategoriesService.list(workspaceId)
           .then((c) => c.filter((x) => x.kind === 'income' || x.kind === 'both')).catch(() => []),
         supabase.from('finance_settings').select('warehouse_autosync_mode').eq('workspace_id', workspaceId).maybeSingle()
           .then((r) => r.data, () => null),
         warehouseService.intakeIgnoredIssuers(workspaceId).catch(() => [] as IntakeIgnoredIssuer[]),
+        supabase.from('material_categories').select('id, name').order('name').limit(300)
+          .then((r) => (r.data ?? []) as { id: string; name: string }[], () => []),
       ]);
       setGroups(gs);
       setCategories(cats);
       setIgnored(ign);
+      setMaterialCategories(mats);
       setMode((((fin as { warehouse_autosync_mode?: IntakeMode } | null)?.warehouse_autosync_mode) ?? 'suggest'));
       setPage((p) => clampPage(p, gs.length, GROUP_PAGE_SIZE));
     } catch (err) {
@@ -312,7 +424,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
           <IntakeLineList
             key={`search:${search}`}
             workspaceId={workspaceId} issuerKey={null} search={search}
-            categories={categories} warehouses={warehouses}
+            categories={categories} materialCategories={materialCategories} warehouses={warehouses}
             targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog}
             onChanged={async () => { await load(); onChanged?.(); }}
           />
@@ -353,6 +465,17 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
+                        {/* A supplier the CRM does not know books cost with no counterparty, so
+                            spend-per-supplier and the supplier pricing rung both stay dark. The
+                            VAT is right there on the invoice — offer the fix where the problem
+                            is reported, not as a trip to another module. */}
+                        {!g.supplier_attributed && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs text-[hsl(var(--warning))]" disabled={busy}
+                            title="Add this issuer to the CRM so cost, pricing rules and supplier comparison attach to it"
+                            onClick={() => setCrmFor(g)}>
+                            <UserPlus className="h-3.5 w-3.5 mr-1" /> Add to CRM
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy}
                           onClick={() => runBulk(g, 'approve')}>
                           {busy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
@@ -373,7 +496,8 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                     {open && (
                       <IntakeLineList
                         workspaceId={workspaceId} issuerKey={g.issuer_key} search={null}
-                        categories={categories} warehouses={warehouses}
+                        categories={categories} materialCategories={materialCategories} warehouses={warehouses}
+                        supplierName={g.issuer_name}
                         targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog}
                         onChanged={async () => { await load(); onChanged?.(); }}
                       />
@@ -399,6 +523,26 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
       )}
 
       {ignoredDialog}
+
+      {/* VAT is the authoritative identity and myDATA already gave it to us — seed it, so the
+          registry lookup and the duplicate probe both run off the real key rather than a name
+          the operator would otherwise retype. */}
+      <QuickAddCompanyDialog
+        open={!!crmFor}
+        onOpenChange={(v) => { if (!v) setCrmFor(null); }}
+        workspaceId={workspaceId}
+        initialName={crmFor?.issuer_name ?? ''}
+        initialVat={crmFor?.issuer_vat ?? ''}
+        role="supplier"
+        title="Add supplier to CRM"
+        description="This issuer invoices you but is not a CRM company, so their cost is recorded with no counterparty. Look up the ΑΦΜ to pull the official name, address and registry details."
+        onCreated={async () => {
+          setCrmFor(null);
+          // Re-read: attribution flips, and the supplier rung of the pricing ladder becomes
+          // reachable, so every suggested price in this group may change.
+          await load();
+        }}
+      />
     </Card>
   );
 };
@@ -408,17 +552,26 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
  *
  * Everything here is lazy: the lines exist only while their group is expanded, and the page is
  * `INTAKE_LINE_PAGE_SIZE` rows, so the DOM holds tens of editors rather than hundreds.
+ *
+ * Lines are grouped by the INVOICE they arrived on and each one is its own bordered card with a
+ * number and a bold title. The flat `divide-y` list this replaced put six unlabelled inputs
+ * between one product and the next, so there was no visual answer to "where does this item end".
  */
 const IntakeLineList: React.FC<{
   workspaceId: string;
   issuerKey: string | null;
   search: string | null;
   categories: FinanceCategory[];
+  materialCategories: { id: string; name: string }[];
   warehouses: Warehouse[];
   targetWarehouseId: string;
   addToCatalog: boolean;
+  supplierName?: string | null;
   onChanged: () => void | Promise<void>;
-}> = ({ workspaceId, issuerKey, search, categories, warehouses, targetWarehouseId, addToCatalog, onChanged }) => {
+}> = ({
+  workspaceId, issuerKey, search, categories, materialCategories, warehouses,
+  targetWarehouseId, addToCatalog, supplierName, onChanged,
+}) => {
   const { toast } = useToast();
   const [lines, setLines] = useState<IntakeLine[]>([]);
   const [total, setTotal] = useState(0);
@@ -426,11 +579,12 @@ const IntakeLineList: React.FC<{
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState<Record<string, LineEdit>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   /** The ladder's answer at an operator-typed cost, keyed by line id. Only the row being edited
    *  is re-asked; the rest keep the value `warehouse_intake_lines` already derived for them. */
-  const [repriced, setRepriced] = useState<Record<string, number | null>>({});
+  const [repriced, setRepriced] = useState<Record<string, { sell: number | null; rung: PriceRung; markupPct: number | null }>>({});
 
   const reqSeq = useRef(0);
 
@@ -449,6 +603,7 @@ const IntakeLineList: React.FC<{
       setEdits(e);
       setRepriced({});
       setSelected(new Set());
+      setOpenDetails(new Set());
     } catch (err) {
       if (seq === reqSeq.current) {
         toast({ title: 'Failed to load lines', description: (err as Error)?.message, variant: 'destructive' });
@@ -461,6 +616,10 @@ const IntakeLineList: React.FC<{
 
   const setEdit = (id: string, patch: Partial<LineEdit>) =>
     setEdits((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
+
+  const toggleDetails = (id: string) => setOpenDetails((s) => {
+    const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  });
 
   /**
    * Re-ask the ladder for ONE line, because the operator changed its cost.
@@ -475,7 +634,7 @@ const IntakeLineList: React.FC<{
       const cost = typed === '' ? null : parseDecimalOr(typed, 0);
       try {
         const r = await warehouseService.previewIntakeSellPrice(id, cost);
-        setRepriced((m) => ({ ...m, [id]: r.sell }));
+        setRepriced((m) => ({ ...m, [id]: { sell: r.sell, rung: r.rung, markupPct: r.markupPct } }));
       } catch { /* no suggestion is better than a wrong one */ }
     }, 400);
   };
@@ -496,7 +655,15 @@ const IntakeLineList: React.FC<{
       category_id: e.category_id || null,
       target_warehouse_id: targetWarehouseId || null,
       add_to_catalog: addToCatalog,
+      ...detailOverrides(e),
     };
+  };
+
+  /** A page that lost rows must not strand the operator on an empty page. */
+  const afterMutation = async (removed: number) => {
+    const nextPage = clampPage(page, Math.max(total - removed, 0), INTAKE_LINE_PAGE_SIZE);
+    if (nextPage !== page) setPage(nextPage); else await load(page);
+    await onChanged();
   };
 
   const approveOne = async (l: IntakeLine) => {
@@ -504,7 +671,7 @@ const IntakeLineList: React.FC<{
     try {
       await warehouseService.approvePending(l.id, overrides(l.id));
       toast({ title: 'Added to warehouse', description: edits[l.id]?.name ?? l.name });
-      await afterMutation();
+      await afterMutation(1);
     } catch (err) {
       toast({ title: 'Could not add', description: (err as Error)?.message, variant: 'destructive' });
     } finally { setBusy(null); }
@@ -512,17 +679,9 @@ const IntakeLineList: React.FC<{
 
   const dismissOne = async (l: IntakeLine) => {
     setBusy(l.id);
-    try { await warehouseService.dismissPending(l.id); await afterMutation(); }
+    try { await warehouseService.dismissPending(l.id); await afterMutation(1); }
     catch (err) { toast({ title: 'Failed', description: (err as Error)?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
-  };
-
-  /** A page that lost rows must not strand the operator on an empty page. */
-  const afterMutation = async () => {
-    const remaining = total - 1;
-    const nextPage = clampPage(page, Math.max(remaining, 0), INTAKE_LINE_PAGE_SIZE);
-    if (nextPage !== page) setPage(nextPage); else await load(page);
-    await onChanged();
   };
 
   const runBulkSelected = async (action: 'approve' | 'dismiss') => {
@@ -532,9 +691,14 @@ const IntakeLineList: React.FC<{
     setBulkBusy(true);
     try {
       if (action === 'approve') {
+        // Carry each selected row's edits. Without this the shared-override call re-reads the
+        // stored row, so a corrected name or a typed cost is discarded and the toast still says
+        // it worked.
+        const perItem: Record<string, Record<string, unknown>> = {};
+        for (const id of ids) perItem[id] = overrides(id);
         const res = await warehouseService.bulkApprovePending(ids, {
           target_warehouse_id: targetWarehouseId || null, add_to_catalog: addToCatalog,
-        });
+        }, perItem);
         toast({
           title: `${res.approved} added to warehouse`,
           description: res.failed > 0 ? `${res.failed} failed: ${res.errors[0]?.error ?? ''}` : undefined,
@@ -544,12 +708,11 @@ const IntakeLineList: React.FC<{
         const n = await warehouseService.bulkDismissPending(ids);
         toast({ title: `${n} line(s) dismissed` });
       }
-      const nextPage = clampPage(page, Math.max(total - ids.length, 0), INTAKE_LINE_PAGE_SIZE);
-      if (nextPage !== page) setPage(nextPage); else await load(page);
-      await onChanged();
+      setSelected(new Set());
+      await afterMutation(ids.length);
     } catch (err) {
       toast({ title: 'Bulk action failed', description: (err as Error)?.message, variant: 'destructive' });
-    } finally { setBulkBusy(false); setSelected(new Set()); }
+    } finally { setBulkBusy(false); }
   };
 
   const allOnPageSelected = lines.length > 0 && lines.every((l) => selected.has(l.id));
@@ -557,6 +720,19 @@ const IntakeLineList: React.FC<{
   const toggleOne = (id: string) => setSelected((s) => {
     const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n;
   });
+
+  /** Consecutive lines from the same invoice, in the order SQL returned them. */
+  const docGroups = useMemo(() => {
+    const out: { key: string; doc: IntakeLine['inbound_document']; items: { line: IntakeLine; n: number }[] }[] = [];
+    lines.forEach((line, i) => {
+      const key = line.inbound_document?.id ?? 'no-document';
+      const last = out[out.length - 1];
+      const entry = { line, n: (page - 1) * INTAKE_LINE_PAGE_SIZE + i + 1 };
+      if (last && last.key === key) last.items.push(entry);
+      else out.push({ key, doc: line.inbound_document, items: [entry] });
+    });
+    return out;
+  }, [lines, page]);
 
   if (loading) {
     return (
@@ -577,8 +753,8 @@ const IntakeLineList: React.FC<{
   const warehouseName = warehouses.find((w) => w.id === targetWarehouseId)?.name;
 
   return (
-    <div className="border-t border-hairline bg-surface-sunken/50">
-      {/* Selection bar — doubles as the page's column legend. */}
+    <div className="border-t border-hairline bg-surface-sunken">
+      {/* Selection bar */}
       <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-1.5">
         <label className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground">
           <Checkbox className="h-3.5 w-3.5" checked={allOnPageSelected} onCheckedChange={toggleAll} />
@@ -604,85 +780,188 @@ const IntakeLineList: React.FC<{
         )}
       </div>
 
-      <div className="divide-y divide-hairline">
-        {lines.map((l) => {
-          const e = edits[l.id]; if (!e) return null;
-          // The ladder's number, shown only while the operator has not typed their own.
-          const ladder = l.id in repriced ? repriced[l.id] : l.suggested_sell;
-          const autoPrice = e.sales_price === '' ? ladder : null;
-          const doc = l.inbound_document;
-          const rowBusy = busy === l.id;
-          return (
-            <div key={l.id} className="space-y-1.5 px-4 py-2.5">
-              {/* WHO invoiced this and under which document — the queue is "what my partners
-                  sent me", so a bare description string isn't enough to act on. */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-                <Checkbox className="h-3.5 w-3.5" checked={selected.has(l.id)} onCheckedChange={() => toggleOne(l.id)} />
-                {search && doc?.issuer_name && <span className="font-medium text-foreground/80">{doc.issuer_name}</span>}
-                {(doc?.series || doc?.aa) && (
-                  <span className="text-muted-foreground">{[doc.series, doc.aa].filter(Boolean).join(' ')}</span>
-                )}
-                {doc?.issue_date && <span className="text-muted-foreground">{formatDate(doc.issue_date)}</span>}
-                {/* What approving will actually DO — top up existing stock, or create a product. */}
-                {l.match_score != null && (
-                  <span className={Number(l.match_score) >= 0.5
-                    ? 'text-[hsl(var(--info))]' : 'text-muted-foreground'}>
-                    {Number(l.match_score) >= 0.5 ? 'Tops up existing stock' : 'Creates a new product'}
-                    {l.match_reason ? ` · ${l.match_reason}` : ''}
-                  </span>
-                )}
-                {!l.supplier_attributed && (
-                  <span className="text-[hsl(var(--warning))]">Supplier not in CRM — cost saved without it</span>
-                )}
-              </div>
-              {l.raw_description && (
-                <div className="truncate text-[11px] text-muted-foreground">Invoice line: {l.raw_description}</div>
-              )}
+      {/* The two money fields are not two views of the same number, and the difference decides
+          whether this product is priced by your rules or by a figure typed here once. */}
+      <p className="border-b border-hairline px-4 py-2 text-[11px] leading-relaxed text-muted-foreground">
+        <strong className="text-foreground">Unit cost</strong> is what the supplier charged — it writes the product’s
+        cost and this supplier’s price list, and it is what every margin is measured against.{' '}
+        <strong className="text-foreground">Sale price</strong> is what you charge. Leave it blank and every quote and
+        order re-derives it from your pricing rules; type a number and it is pinned as the product’s list price and the
+        rules stop applying to it.
+      </p>
 
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_70px_80px]">
-                <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(l.id, { name: ev.target.value })} placeholder="Product name" />
-                <Input className="h-8 text-sm" value={e.sku} onChange={(ev) => setEdit(l.id, { sku: ev.target.value })} placeholder="SKU" />
-                <Input className="h-8 text-sm" value={e.unit} onChange={(ev) => setEdit(l.id, { unit: ev.target.value })} placeholder="unit" />
-                <Input className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal" value={e.quantity}
-                  onChange={(ev) => setEdit(l.id, { quantity: ev.target.value })} placeholder="qty" />
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-[120px_140px_1fr_auto]">
-                <div className="space-y-0.5">
-                  <label htmlFor={`intake-cost-${l.id}`} className="text-[10px] text-muted-foreground">Unit cost</label>
-                  <Input id={`intake-cost-${l.id}`} className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal"
-                    value={e.unit_cost}
-                    onChange={(ev) => { setEdit(l.id, { unit_cost: ev.target.value }); repriceOne(l.id, ev.target.value); }}
-                    placeholder="0.00" />
-                </div>
-                <div className="space-y-0.5">
-                  <label htmlFor={`intake-price-${l.id}`} className="text-[10px] text-muted-foreground">Sale price</label>
-                  <Input id={`intake-price-${l.id}`} className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal"
-                    value={e.sales_price} onChange={(ev) => setEdit(l.id, { sales_price: ev.target.value })}
-                    placeholder={autoPrice != null ? `auto ${formatMoney(autoPrice, l.currency)}` : 'set price'} />
-                </div>
-                <div className="space-y-0.5">
-                  <label htmlFor={`intake-cat-${l.id}`} className="text-[10px] text-muted-foreground">Category</label>
-                  <Select value={e.category_id || '__none'} onValueChange={(v) => setEdit(l.id, { category_id: v === '__none' ? '' : v })}>
-                    <SelectTrigger id={`intake-cat-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none">— None —</SelectItem>
-                      {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end gap-1">
-                  <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive" disabled={rowBusy} onClick={() => dismissOne(l)}>
-                    <X className="h-4 w-4 mr-1" /> Dismiss
-                  </Button>
-                  <Button size="sm" className="h-8 text-xs" disabled={rowBusy} onClick={() => approveOne(l)}>
-                    {rowBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />} Add
-                  </Button>
-                </div>
-              </div>
+      <div className="space-y-3 px-3 py-3">
+        {docGroups.map((g) => (
+          <div key={g.key} className="space-y-2">
+            {/* Which invoice these arrived on. In search mode the issuer matters too, because
+                consecutive results can come from different suppliers. */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-[11px] text-muted-foreground">
+              <FileText className="h-3.5 w-3.5" />
+              {search && g.doc?.issuer_name && <span className="font-medium text-foreground/80">{g.doc.issuer_name}</span>}
+              <span className="font-mono">{[g.doc?.series, g.doc?.aa].filter(Boolean).join(' ') || 'No document'}</span>
+              {g.doc?.issue_date && <span>{formatDate(g.doc.issue_date)}</span>}
+              <span>· {g.items.length} line{g.items.length === 1 ? '' : 's'} on this invoice</span>
             </div>
-          );
-        })}
+
+            {g.items.map(({ line: l, n }) => {
+              const e = edits[l.id]; if (!e) return null;
+              const rep = repriced[l.id];
+              const ladder = rep ? rep.sell : l.suggested_sell;
+              const rung = rep ? rep.rung : l.price_rung;
+              const markup = rep ? rep.markupPct : l.markup_pct;
+              // The ladder's number, shown only while the operator has not typed their own.
+              const autoPrice = e.sales_price === '' ? ladder : null;
+              const pinned = e.sales_price !== '';
+              const why = explainRung(rung, markup, supplierName ?? l.inbound_document?.issuer_name ?? null);
+              const matched = l.match_score != null && Number(l.match_score) >= 0.5;
+              const rowBusy = busy === l.id;
+              const detailsOpen = openDetails.has(l.id);
+              const detailCount = Object.keys(detailOverrides(e)).length;
+
+              return (
+                <div key={l.id} className="space-y-2 rounded-sm border border-hairline bg-card px-3 py-2.5">
+                  {/* Title block — the anchor that says "this is one product". */}
+                  <div className="flex items-start gap-2">
+                    <Checkbox className="mt-1 h-3.5 w-3.5 shrink-0" checked={selected.has(l.id)} onCheckedChange={() => toggleOne(l.id)} />
+                    <span className="mt-0.5 inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-sm bg-surface-sunken px-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                      {n}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{e.name || l.name}</div>
+                      {l.raw_description && (
+                        <div className="truncate font-mono text-[10px] text-muted-foreground" title={l.raw_description}>
+                          {l.raw_description}
+                        </div>
+                      )}
+                    </div>
+                    {/* What approving will actually DO. */}
+                    <Badge variant={matched ? 'info' : 'neutral'} className="shrink-0 text-[10px]" title={l.match_reason ?? undefined}>
+                      {matched ? 'Tops up existing' : 'New product'}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_70px_80px]">
+                    <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(l.id, { name: ev.target.value })} placeholder="Product name" />
+                    <Input className="h-8 text-sm" value={e.sku} onChange={(ev) => setEdit(l.id, { sku: ev.target.value })} placeholder="SKU" />
+                    <Input className="h-8 text-sm" value={e.unit} onChange={(ev) => setEdit(l.id, { unit: ev.target.value })} placeholder="unit" />
+                    <Input className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal" value={e.quantity}
+                      onChange={(ev) => setEdit(l.id, { quantity: ev.target.value })} placeholder="qty" />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[120px_150px_1fr_auto]">
+                    <div className="space-y-0.5">
+                      <label htmlFor={`intake-cost-${l.id}`} className="text-[10px] text-muted-foreground">Unit cost (paid)</label>
+                      <Input id={`intake-cost-${l.id}`} className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal"
+                        value={e.unit_cost}
+                        onChange={(ev) => { setEdit(l.id, { unit_cost: ev.target.value }); repriceOne(l.id, ev.target.value); }}
+                        placeholder="0.00" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <label htmlFor={`intake-price-${l.id}`} className="text-[10px] text-muted-foreground">
+                        Sale price {pinned ? <span className="text-[hsl(var(--warning))]">· pinned</span> : '· auto'}
+                      </label>
+                      <Input id={`intake-price-${l.id}`} className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal"
+                        value={e.sales_price} onChange={(ev) => setEdit(l.id, { sales_price: ev.target.value })}
+                        placeholder={autoPrice != null ? `auto ${formatMoney(autoPrice, l.currency)}` : 'set price'} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <label htmlFor={`intake-cat-${l.id}`} className="text-[10px] text-muted-foreground">Finance category</label>
+                      <Select value={e.category_id || '__none'} onValueChange={(v) => setEdit(l.id, { category_id: v === '__none' ? '' : v })}>
+                        <SelectTrigger id={`intake-cat-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">— None —</SelectItem>
+                          {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end gap-1">
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => toggleDetails(l.id)}
+                        title="Manufacturer, dimensions, codes and myDATA classification">
+                        <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
+                        Details{detailCount > 0 ? ` (${detailCount})` : ''}
+                        {detailsOpen ? <ChevronDown className="h-3.5 w-3.5 ml-1" /> : <ChevronRight className="h-3.5 w-3.5 ml-1" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive" disabled={rowBusy} onClick={() => dismissOne(l)}>
+                        <X className="h-4 w-4 mr-1" /> Dismiss
+                      </Button>
+                      <Button size="sm" className="h-8 text-xs" disabled={rowBusy} onClick={() => approveOne(l)}>
+                        {rowBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />} Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* WHICH rule produced the suggestion. Without this a cost-equals-price row is
+                      indistinguishable from a deliberate 0% margin. */}
+                  {!pinned && (
+                    <div className={`flex items-start gap-1.5 text-[11px] ${why.tone === 'warn' ? 'text-[hsl(var(--warning))]' : 'text-muted-foreground'}`}>
+                      {why.tone === 'warn' && <AlertTriangle className="mt-px h-3 w-3 shrink-0" />}
+                      <span>{why.text}</span>
+                    </div>
+                  )}
+                  {!l.supplier_attributed && (
+                    <div className="text-[11px] text-[hsl(var(--warning))]">
+                      Supplier is not a CRM company — cost is recorded without a counterparty, and no supplier pricing rule can apply.
+                    </div>
+                  )}
+
+                  {detailsOpen && (
+                    <div className="space-y-2 rounded-sm border border-hairline bg-surface-sunken px-3 py-2.5">
+                      <p className="text-[11px] text-muted-foreground">
+                        Everything here is written onto the product when you add it. Blank means “leave whatever is
+                        already there” — nothing below overwrites an existing product’s values.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        <DetailField label="Manufacturer" id={`mfr-${l.id}`} value={e.manufacturer}
+                          onChange={(v) => setEdit(l.id, { manufacturer: v })} placeholder="e.g. Jowat" />
+                        <DetailField label="Supplier item code" id={`sup-${l.id}`} value={e.supplier_product_code}
+                          onChange={(v) => setEdit(l.id, { supplier_product_code: v })} placeholder="their code" />
+                        <div className="space-y-0.5">
+                          <label htmlFor={`mat-${l.id}`} className="text-[10px] text-muted-foreground">Material category</label>
+                          <Select value={e.material_category || '__none'}
+                            onValueChange={(v) => setEdit(l.id, { material_category: v === '__none' ? '' : v })}>
+                            <SelectTrigger id={`mat-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">— None —</SelectItem>
+                              {materialCategories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <DetailField label="Shelf / location" id={`loc-${l.id}`} value={e.location}
+                          onChange={(v) => setEdit(l.id, { location: v })} placeholder="Aisle 3 / Shelf B" />
+
+                        <DetailField label="Width (mm)" id={`w-${l.id}`} value={e.width_mm} numeric
+                          onChange={(v) => setEdit(l.id, { width_mm: v })} />
+                        <DetailField label="Length (mm)" id={`l-${l.id}`} value={e.length_mm} numeric
+                          onChange={(v) => setEdit(l.id, { length_mm: v })} />
+                        <DetailField label="Thickness (mm)" id={`t-${l.id}`} value={e.thickness_mm} numeric
+                          onChange={(v) => setEdit(l.id, { thickness_mm: v })} />
+                        <DetailField label="Weight (kg)" id={`kg-${l.id}`} value={e.weight_kg} numeric
+                          onChange={(v) => setEdit(l.id, { weight_kg: v })} />
+
+                        <DetailField label="Reorder point" id={`rp-${l.id}`} value={e.reorder_point} numeric
+                          onChange={(v) => setEdit(l.id, { reorder_point: v })} />
+                        <DetailField label="Barcode" id={`bc-${l.id}`} value={e.barcode}
+                          onChange={(v) => setEdit(l.id, { barcode: v })} placeholder="EAN / UPC" />
+                        <div className="space-y-0.5">
+                          {/* TaricCombobox puts `id` on its trigger button, so this really is an
+                              associated label even though the control is a combobox, not an input. */}
+                          <label htmlFor={`taric-${l.id}`} className="text-[10px] text-muted-foreground">TARIC code</label>
+                          <TaricCombobox id={`taric-${l.id}`} value={e.taric_code} onChange={(v) => setEdit(l.id, { taric_code: v })}
+                            triggerClassName="w-full h-8 text-xs" />
+                        </div>
+                        <DetailField label="CPV code" id={`cpv-${l.id}`} value={e.cpv_code}
+                          onChange={(v) => setEdit(l.id, { cpv_code: v })} placeholder="procurement" />
+
+                        <DetailField label="myDATA VAT category" id={`vc-${l.id}`} value={e.mydata_vat_category} numeric
+                          onChange={(v) => setEdit(l.id, { mydata_vat_category: v })} placeholder="1 = 24%" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <TablePagination
@@ -692,6 +971,21 @@ const IntakeLineList: React.FC<{
     </div>
   );
 };
+
+/** A labelled input in the details grid. Exists so the grid reads as data, not as markup. */
+const DetailField: React.FC<{
+  label: string; id: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; numeric?: boolean;
+}> = ({ label, id, value, onChange, placeholder, numeric }) => (
+  <div className="space-y-0.5">
+    <label htmlFor={id} className="text-[10px] text-muted-foreground">{label}</label>
+    <Input
+      id={id} className={`h-8 text-xs${numeric ? ' text-right tabular-nums' : ''}`}
+      type="text" inputMode={numeric ? 'decimal' : undefined}
+      value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+    />
+  </div>
+);
 
 /** Suppliers whose invoice lines never reach the extractor — and the way back. */
 const IgnoredIssuersDialog: React.FC<{
