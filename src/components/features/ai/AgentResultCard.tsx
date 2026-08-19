@@ -2,6 +2,7 @@ import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
 import { Badge } from '@/components/core/ui/badge';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Generic structured renderer for agent result chunks that were
@@ -49,10 +50,26 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const isPlumbing = (k: string, v: unknown) =>
   HIDDEN_KEYS.has(k) || ((k === 'id' || k.endsWith('_id')) && typeof v === 'string' && UUID_RE.test(v));
 
+// An ISO timestamp is not a thing to show a person. Rendering the payload verbatim printed
+// `2026-08-18T20:02:46.275904+00:00` in a table cell — the single most "this is a debug view"
+// detail in the whole card. `formatDate` is the canonical formatter with a PINNED locale (eleven
+// hand-written copies preceded it, three of which let the browser decide), so this is the twelfth
+// call site rather than the twelfth implementation.
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+// A stored enum reads as `quote_approved`. It is a value, not prose, and the reader should see
+// "Quote approved" — the same labelize the column headers already get.
+const ENUM_VALUE_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+
 function Scalar({ v }: { v: any }) {
   if (v == null || v === '') return <span className="text-muted-foreground">—</span>;
   if (typeof v === 'boolean') return <span>{v ? 'Yes' : 'No'}</span>;
   if (typeof v === 'string') {
+    if (ISO_DATE_RE.test(v)) {
+      // Time only when the value carries one — a date-only field gains nothing from "12:00 AM".
+      return <span>{formatDate(v, { withTime: /[T ]\d{2}:\d{2}/.test(v) })}</span>;
+    }
+    if (ENUM_VALUE_RE.test(v)) return <span>{labelize(v)}</span>;
     if (IMG_URL_RE.test(v)) {
       return (
         <a href={v} target="_blank" rel="noopener noreferrer" className="inline-block" aria-label="Open image in a new tab">
@@ -172,12 +189,22 @@ function tabularColumns(rows: any[]): string[] | null {
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
   }
-  // Keys present on most rows, in first-seen order, capped so a wide payload stays readable.
+  // "Share a shape" means a real INTERSECTION, not just overlapping key counts. Requiring only
+  // "present on half the rows" let `[{a:1},{totally:'different'}]` through as a two-column table
+  // where each row filled one column and left the other an em dash — a table that is worse than
+  // the chips it replaced. Two keys every row actually has is the honest bar.
+  const common = Object.keys(rows[0] ?? {}).filter(
+    (k) => (counts.get(k) ?? 0) === rows.length,
+  );
+  if (common.length < 2) return null;
+
+  // Columns are the common keys plus anything else most rows carry, in first-seen order, capped
+  // so a wide payload stays readable.
   const ordered: string[] = [];
   for (const r of rows) for (const k of Object.keys(r)) {
     if (!ordered.includes(k) && (counts.get(k) ?? 0) >= Math.ceil(rows.length / 2)) ordered.push(k);
   }
-  return ordered.length >= 2 ? ordered.slice(0, 7) : null;
+  return ordered.slice(0, 7);
 }
 
 function RecordTable({ rows, columns }: { rows: any[]; columns: string[] }) {
