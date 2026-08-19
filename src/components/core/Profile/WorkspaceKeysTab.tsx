@@ -17,7 +17,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  CreditCard, Share2, MessageCircle, ArrowRight,
+  Share2, MessageCircle, ArrowRight,
   FileImage, Landmark, Mail, Users, Truck, Code2,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -30,16 +30,15 @@ import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEm
 import { VivaConfigCard } from '@/modules/payments-viva/components/VivaConfigCard';
 import { RevolutConfigCard } from '@/modules/banking-revolut/components/RevolutConfigCard';
 import { RevolutMerchantSettingsPanel } from '@/modules/payments-revolut/components/RevolutMerchantSettingsPanel';
+import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { WorkspacePdfTemplateCard } from '@/components/core/Profile/WorkspacePdfTemplateCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
 import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCredentialsCard';
 import { EmbedKeysCard } from '@/components/core/Profile/EmbedKeysCard';
 import { useModule } from '@/modules/_core';
-import { paymentRoutingService } from '@/services/paymentRoutingService';
 
 interface ConnState {
-  stripe: 'connected' | 'onboarding' | 'none';
   social: number;
 }
 
@@ -82,7 +81,7 @@ export const WorkspaceKeysTab: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
   const stockModule = useModule('stock');
   const hrModule = useModule('hr');
-  const [conn, setConn] = useState<ConnState>({ stripe: 'none', social: 0 });
+  const [conn, setConn] = useState<ConnState>({ social: 0 });
   const [searchParams, setSearchParams] = useSearchParams();
   // Deep-linkable: `/profile?tab=keys&section=email` lands on the right card (cross-module
   // "configure your key here" links target it). Falls back to finance.
@@ -104,16 +103,10 @@ export const WorkspaceKeysTab: React.FC = () => {
     if (!activeWorkspaceId) return;
     let cancelled = false;
     (async () => {
-      const [cfg, socialRes] = await Promise.all([
-        paymentRoutingService.getConfig(activeWorkspaceId).catch(() => null),
-        supabase.from('social_accounts').select('id', { count: 'exact', head: true })
-          .eq('workspace_id', activeWorkspaceId).eq('is_active', true),
-      ]);
+      const socialRes = await supabase.from('social_accounts').select('id', { count: 'exact', head: true })
+        .eq('workspace_id', activeWorkspaceId).eq('is_active', true);
       if (cancelled) return;
-      const stripe: ConnState['stripe'] = cfg?.charges_enabled
-        ? 'connected'
-        : cfg?.stripe_connect_account_id ? 'onboarding' : 'none';
-      setConn({ stripe, social: socialRes.count ?? 0 });
+      setConn({ social: socialRes.count ?? 0 });
     })();
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
@@ -158,23 +151,14 @@ export const WorkspaceKeysTab: React.FC = () => {
             <p className="pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Checkout Providers — how buyers pay you</p>
             <VivaConfigCard workspaceId={activeWorkspaceId} />
             <RevolutMerchantSettingsPanel />
-            <Card>
-              <CardContent className="p-5">
-                <ConnectionRow
-                  icon={CreditCard}
-                  title="Stripe payouts"
-                  description="Receive store payments into your own Stripe account."
-                  to="/finance"
-                  status={
-                    conn.stripe === 'connected'
-                      ? <span className="text-xs text-success">Connected</span>
-                      : conn.stripe === 'onboarding'
-                        ? <span className="text-xs text-warning">Onboarding</span>
-                        : <span className="text-xs text-muted-foreground">Not connected</span>
-                  }
-                />
-              </CardContent>
-            </Card>
+            {/* The real Stripe Connect control, not a link to it. This row used to be a status
+                chip + a "Manage" button pointing at `/finance`, which is the Finance DASHBOARD:
+                it says nothing about Stripe and has no onboarding affordance, so the button read
+                as doing nothing. The onboarding surface it meant to reach is Finance → Settings →
+                Payments, and that sub-section is not URL-addressable, so no link could have got
+                there either. Mounting the card here matches Viva and Revolut above — every
+                checkout provider is configured in place. */}
+            <PaymentRoutingCard workspaceId={activeWorkspaceId} />
             <p className="pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Banking — your own account, feed & payouts</p>
             <RevolutConfigCard workspaceId={activeWorkspaceId} />
           </>

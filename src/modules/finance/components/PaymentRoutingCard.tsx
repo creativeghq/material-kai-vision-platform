@@ -1,7 +1,12 @@
 /**
  * per-workspace payout routing. When a workspace connects its own Stripe
  * account (Express, via Connect), invoice payments are routed there as destination
- * charges; otherwise the platform collects. Mounted in Finance → Settings.
+ * charges; otherwise the platform collects.
+ *
+ * Mounted in Finance → Settings → Payments AND in Profile → Keys → Finance & Tax, because
+ * "connect our Stripe account" is asked from both places. Both mounts are the same component
+ * on purpose — the Keys entry used to be a status chip linking to `/finance`, which lands on
+ * the Finance dashboard and offers nothing to click.
  */
 import React, { useEffect, useState } from 'react';
 import { Loader2, CreditCard, ExternalLink, CheckCircle2, RefreshCw } from 'lucide-react';
@@ -19,14 +24,29 @@ export const PaymentRoutingCard: React.FC<{ workspaceId: string }> = ({ workspac
 
   useEffect(() => {
     let cancelled = false;
-    paymentRoutingService.getConfig(workspaceId).then((c) => { if (!cancelled) { setConfig(c); setLoading(false); } }).catch(() => setLoading(false));
+    paymentRoutingService.getConfig(workspaceId).then(async (c) => {
+      if (cancelled) return;
+      setConfig(c);
+      setLoading(false);
+      // Landing back here straight from Stripe's hosted onboarding, the stored flags are still
+      // the pre-onboarding ones until `account.updated` arrives. Ask Stripe once so a finished
+      // onboarding doesn't sit reading "not connected" waiting on a webhook.
+      if (c?.stripe_connect_account_id && !c.charges_enabled) {
+        const s = await paymentRoutingService.refreshStatus(workspaceId).catch(() => null);
+        if (!cancelled && s) {
+          setConfig((prev) => prev && ({ ...prev, charges_enabled: s.charges_enabled, details_submitted: !!s.details_submitted }));
+        }
+      }
+    }).catch(() => setLoading(false));
     return () => { cancelled = true; };
   }, [workspaceId]);
 
   const onboard = async () => {
     try {
       setBusy(true);
-      const { url } = await paymentRoutingService.onboard(workspaceId, `${window.location.origin}/finance`);
+      // Come back to the page onboarding was STARTED from — this card has two mount points,
+      // and a hardcoded /finance dropped anyone who started in Profile → Keys somewhere else.
+      const { url } = await paymentRoutingService.onboard(workspaceId, window.location.href);
       window.location.href = url; // Stripe-hosted onboarding
     } catch (err: any) {
       toast({ title: 'Could not start onboarding', description: err?.message, variant: 'destructive' });
