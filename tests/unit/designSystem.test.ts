@@ -230,3 +230,48 @@ describe('design system — the app canvas stays flat', () => {
     ).toBe(false);
   });
 });
+
+/**
+ * The generic agent result card is the ONLY renderer for all 127 result types in
+ * AGENT_RESULT_TITLES — contracts, appointments, CRM deals, campaigns, stock, flows, assets. So
+ * its shape handling is not a detail, it IS the Agent Hub's presentation layer.
+ *
+ * A list payload (`{ flows: [...] }`, `{ deals: [...] }`) used to render as one grey chip per row
+ * with `Name: x  Status: y` runs inside it — readable at one row, a wall at twenty, and impossible
+ * to scan down a column. "List my flows" then added a SECOND message, "Done! I've pulled up the
+ * automations…", restating what the card had shown. Right data, wrong shape, said twice.
+ */
+describe('agent result card follows the table language', () => {
+  const card = readFileSync(join(process.cwd(), 'src/components/features/ai/AgentResultCard.tsx'), 'utf8');
+
+  it('renders a list of records as a table, not a stack of chips', () => {
+    expect(/function RecordTable/.test(card), 'a tabular array needs a table renderer').toBe(true);
+    expect(/tabularColumns\(/.test(card), 'columns must be derived from the rows').toBe(true);
+  });
+
+  it('uses the platform table treatment, not a bare <table>', () => {
+    const t = card.slice(card.indexOf('function RecordTable'));
+    // docs/design-system.md: sunken header, hairline separators, NO zebra, 11px semibold headers
+    // that are not uppercase, right-aligned tabular-nums for numbers.
+    expect(/bg-surface-sunken/.test(t), 'header row must sit on the sunken surface').toBe(true);
+    expect(/border-hairline/.test(t), 'rows are separated by a hairline').toBe(true);
+    expect(/text-\[11px\] font-semibold/.test(t), 'headers are 11px semibold').toBe(true);
+    expect(/uppercase/.test(t), 'headers are never uppercase').toBe(false);
+    expect(/odd:|even:|zebra/.test(t), 'no zebra striping').toBe(false);
+    expect(/tabular-nums/.test(t), 'numeric columns use tabular-nums').toBe(true);
+    expect(/overflow-x-auto/.test(t), 'a wide table scrolls in its own container').toBe(true);
+  });
+
+  it('renders status as a tinted Badge rather than raw text', () => {
+    expect(/STATUS_VARIANT/.test(card) && /<Badge variant=/.test(card),
+      'status/stage/severity render as a squared tinted tag, per the table spec').toBe(true);
+  });
+
+  it('does not repeat the card in prose', () => {
+    const hub = readFileSync(join(process.cwd(), 'src/components/features/ai/AgentHub.tsx'), 'utf8');
+    expect(/renderedResultCardRef/.test(hub),
+      'when a card answered, the quick-start placeholder copy must not arrive as a second message').toBe(true);
+    expect(/renderedResultCardRef\.current = false/.test(hub),
+      'the flag is per TURN — a card last turn must not silence this turn').toBe(true);
+  });
+});

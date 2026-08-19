@@ -865,6 +865,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * a room would then go to Pepper. This is a per-turn indicator; the picker still says JARVIS.
    */
   const [routingTo, setRoutingTo] = useState<{ id: string; name: string } | null>(null);
+  /**
+   * Did a result CARD already render this turn?
+   *
+   * "List my flows" produced TWO assistant messages: the card ("Workspace flows", with the rows),
+   * then two seconds later "Done! I've pulled up the automations this workspace has built." — the
+   * quick-start's `done` copy, as its own bubble, restating what the card had already shown. One
+   * action should leave one answer.
+   */
+  const renderedResultCardRef = useRef(false);
   // Initialize with JARVIS (orchestrator) default model
   const [selectedModel, setSelectedModel] = useState<string>(
     AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-4-8',
@@ -2154,6 +2163,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // Stale routing from the PREVIOUS turn would otherwise show the wrong specialist while this
     // one is still deciding — the orchestrator routes per turn, not per conversation.
     setRoutingTo(null);
+    // Per TURN, not per conversation: a card rendered last turn must not silence this turn's reply.
+    renderedResultCardRef.current = false;
     setReasoningSteps([]); // Clear reasoning steps for new message
 
     try {
@@ -3075,6 +3086,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentResultData: { title, data: payload, resultType: chunk.type },
                 };
                 setMessages(prev => [...prev, m]);
+                // A card carried the answer this turn — see renderedResultCardRef.
+                renderedResultCardRef.current = true;
                 if (conversationId) {
                   await agentChatHistoryService.saveMessage({
                     conversationId, role: 'assistant', content: m.content,
@@ -3559,8 +3572,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // `count: 0` is the shared convention for "ran clean, found nothing" —
           // worth saying out loud, or the card below reads as a failure.
           const emptyResult = toolResult && typeof toolResult.count === 'number' && toolResult.count === 0;
-          cleanedText = `Done${firstName ? `, ${firstName}` : ''}! ${body}`
-            + (emptyResult && isPlaceholder ? ' Nothing came back — it\'s empty right now.' : '');
+          // A card already answered and the copy is the quick-start's stock line: say nothing
+          // rather than restate the card in prose. An "empty" result still speaks up — a card
+          // showing no rows reads as a failure unless something says it ran clean.
+          cleanedText = (isPlaceholder && renderedResultCardRef.current && !emptyResult)
+            ? ''
+            : `Done${firstName ? `, ${firstName}` : ''}! ${body}`
+              + (emptyResult && isPlaceholder ? ' Nothing came back — it\'s empty right now.' : '');
         }
       }
 

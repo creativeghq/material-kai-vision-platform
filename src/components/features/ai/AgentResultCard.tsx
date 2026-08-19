@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
+import { Badge } from '@/components/core/ui/badge';
 
 /**
  * Generic structured renderer for agent result chunks that were
@@ -90,6 +91,8 @@ function Value({ v, depth = 0 }: { v: any; depth?: number }) {
   if (isScalar(v)) return <Scalar v={v} />;
   if (Array.isArray(v)) {
     if (v.length === 0) return <span className="text-muted-foreground">None</span>;
+    const cols = tabularColumns(v);
+    if (cols) return <RecordTable rows={v} columns={cols} />;
     const shown = v.slice(0, ARRAY_INLINE_CAP);
     const rest = v.slice(ARRAY_INLINE_CAP);
     return (
@@ -128,6 +131,98 @@ function Value({ v, depth = 0 }: { v: any; depth?: number }) {
   return <KeyValues obj={v} depth={depth + 1} />;
 }
 
+
+// ── A list of records is a TABLE, not a stack of chips ──────────────────────
+//
+// Every one of the 127 result types in AGENT_RESULT_TITLES renders through this card, and a list
+// payload — `{ flows: [...] }`, `{ manufacturers: [...] }`, `{ deals: [...] }` — used to come out
+// as one grey chip per row with `Name: x  Status: y` runs inside it. Readable for a single row,
+// a wall at twenty, and impossible to scan down a column. That is most of why the Hub reads as a
+// debug view rather than a product: the data was right and the shape was wrong.
+//
+// Design system (docs/design-system.md): sunken sticky header, hairline row separators, NO zebra,
+// 11px semibold headers that are not uppercase, right-aligned tabular-nums for numbers, `—` for an
+// absent value, status as a tinted squared Badge, and the whole thing in its own overflow-x
+// container so a wide table scrolls instead of pushing the page sideways.
+
+/** Status-ish values map onto the semantic badge tints; anything unknown stays neutral. */
+const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
+  active: 'success', live: 'success', published: 'success', completed: 'success', done: 'success',
+  paid: 'success', approved: 'success', sent: 'success', verified: 'success', enabled: 'success',
+  pending: 'warning', draft: 'warning', processing: 'warning', queued: 'warning', partial: 'warning',
+  failed: 'error', error: 'error', cancelled: 'error', canceled: 'error', overdue: 'error', rejected: 'error',
+  paused: 'neutral', archived: 'neutral', inactive: 'neutral', disabled: 'neutral',
+};
+const STATUS_KEYS = new Set(['status', 'state', 'stage', 'tier', 'severity', 'ring', 'payment_status']);
+
+const isNumericCol = (rows: any[], k: string) =>
+  rows.some((r) => typeof r?.[k] === 'number') &&
+  rows.every((r) => r?.[k] == null || typeof r?.[k] === 'number');
+
+/** An array worth tabulating: 2+ objects that actually share a shape. */
+function tabularColumns(rows: any[]): string[] | null {
+  if (!Array.isArray(rows) || rows.length < 2) return null;
+  if (!rows.every((r) => r && typeof r === 'object' && !Array.isArray(r))) return null;
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    for (const [k, v] of Object.entries(r)) {
+      if (isPlumbing(k, v)) continue;
+      // A column of nested objects/arrays does not belong in a table — those rows fall back.
+      if (!isScalar(v)) continue;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+  }
+  // Keys present on most rows, in first-seen order, capped so a wide payload stays readable.
+  const ordered: string[] = [];
+  for (const r of rows) for (const k of Object.keys(r)) {
+    if (!ordered.includes(k) && (counts.get(k) ?? 0) >= Math.ceil(rows.length / 2)) ordered.push(k);
+  }
+  return ordered.length >= 2 ? ordered.slice(0, 7) : null;
+}
+
+function RecordTable({ rows, columns }: { rows: any[]; columns: string[] }) {
+  return (
+    <div className="-mx-1 overflow-x-auto custom-scrollbar">
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr className="bg-surface-sunken">
+            {columns.map((c) => (
+              <th
+                key={c}
+                className={`whitespace-nowrap px-2 py-1.5 text-[11px] font-semibold text-muted-foreground ${
+                  isNumericCol(rows, c) ? 'text-right' : 'text-left'
+                }`}
+              >
+                {labelize(c)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-t border-hairline align-top">
+              {columns.map((c) => {
+                const v = r?.[c];
+                const numeric = isNumericCol(rows, c);
+                return (
+                  <td
+                    key={c}
+                    className={`px-2 py-1.5 ${numeric ? 'text-right tabular-nums' : 'text-left'}`}
+                  >
+                    {STATUS_KEYS.has(c) && typeof v === 'string' && v
+                      ? <Badge variant={STATUS_VARIANT[v.toLowerCase()] ?? 'neutral'}>{v}</Badge>
+                      : <Scalar v={v} />}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: number; inline?: boolean }) {
   if (obj == null || typeof obj !== 'object') return <Scalar v={obj} />;
   const entries = Object.entries(obj).filter(([k, v]) => !isPlumbing(k, v));
@@ -154,13 +249,27 @@ export const AgentResultCard: React.FC<{ title: string; data: Record<string, any
   return (
     <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
       <div className="text-xs text-muted-foreground mb-2">{title}</div>
-      <KeyValues obj={data} />
+      {/*
+        A payload that is just a wrapper around one list — `{ flows: [...] }`, `{ deals: [...] }` —
+        renders the table directly. Otherwise the card reads "Workspace flows" and then, one line
+        below, a field label "Flows" above the same rows: the shape of the JSON leaking through as
+        a heading nobody needs.
+      */}
+      {(() => {
+        const entries = Object.entries(data ?? {}).filter(([k, v]) => !isPlumbing(k, v));
+        if (entries.length === 1) {
+          const [, only] = entries[0];
+          const cols = Array.isArray(only) ? tabularColumns(only) : null;
+          if (cols) return <RecordTable rows={only as any[]} columns={cols} />;
+        }
+        return <KeyValues obj={data} />;
+      })()}
       {pageUrl && (
         <div className="mt-3 flex justify-end">
           <button
             type="button"
             onClick={() => window.open(pageUrl, '_blank')}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Open in {hubLabel || 'page'}
