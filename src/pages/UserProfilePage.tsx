@@ -3,7 +3,6 @@ import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
 import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
@@ -160,8 +159,7 @@ export const UserProfilePage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          <SectionHeader icon={Star} title="Reviews from Clients" subtitle="Reviews left by people who have worked with you. You can reply to each one." />
-          {user && (<ReviewsSection profileUserId={user.id} currentUserId={user.id} />)}
+          {user && (<ReviewsSection profileUserId={user.id} currentUserId={user.id} hideHeader />)}
         </TabsContent>
 
         <TabsContent value="subscription" className="space-y-6">
@@ -198,11 +196,6 @@ export const UserProfilePage: React.FC = () => {
 
         {showTeam && activeWorkspaceId && (
           <TabsContent value="team" className="space-y-6">
-            <SectionHeader
-              icon={Users}
-              title="Team & Portals"
-              subtitle="Invite colleagues and decide which portal each of them lands on."
-            />
             <TeamPanel workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} />
           </TabsContent>
         )}

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Share2, Plus, Trash2, Loader2, RefreshCw, Users } from 'lucide-react';
+import { Plus, Trash2, Loader2, RefreshCw, Users } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
 
@@ -225,7 +224,6 @@ export const SocialAccountsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Share2} title="Social Accounts" subtitle="Connect the accounts you publish to." />
 
       {/* Connected accounts */}
       {accounts.length > 0 && (

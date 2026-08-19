@@ -9,7 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supplierClaimsService, type SupplierInboundOrder } from '@/services/supplierClaimsService';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
 
 /**
@@ -78,9 +77,10 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
 
   const body = (
     <div className="space-y-4">
-      {/* Standalone gets its own page hero; embedded (Profile / Finance tab) uses the shared SectionHeader. */}
+      {/* Standalone gets its own page hero; embedded (Profile / Finance tab) sits under the tab that
+          already names it, so it keeps only the toolbar. */}
       {embedded ? (
-        <SectionHeader icon={Inbox} title="Incoming Orders" subtitle="Purchase orders sent to you across every buyer." actions={headerActions} />
+        <div className="flex justify-end">{headerActions}</div>
       ) : (
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

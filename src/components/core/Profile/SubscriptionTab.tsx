@@ -13,7 +13,6 @@ import { StripeService } from '@/services/stripe.service';
 import { apiGatewayService, type ApiKey } from '@/services/apiGateway/apiGatewayService';
 import { ChangelogList } from './ChangelogList';
 import { ApplyForRoleCard } from './ApplyForRoleCard';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 
@@ -207,7 +206,6 @@ export const SubscriptionTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Crown} title="Subscription" subtitle="Your plan, developer API keys and change log." />
 
       {/* Current Subscription */}
       {currentTier !== 'free' && (

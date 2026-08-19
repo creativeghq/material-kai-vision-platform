@@ -52,7 +52,9 @@ export const ReviewsSection: React.FC<{
   profileUserId: string;
   currentUserId?: string;
   services?: { id: string; name: string }[];
-}> = ({ profileUserId, currentUserId, services = [] }) => {
+  /** Mounted under a tab that already says "Reviews" — drop the duplicate lead-in. */
+  hideHeader?: boolean;
+}> = ({ profileUserId, currentUserId, services = [], hideHeader = false }) => {
   const [reviews, setReviews] = useState<ProfileReview[]>([]);
   const [summary, setSummary] = useState<string | null>(null);
   const [stats, setStats] = useState<AggregateStats | null>(null);
@@ -122,15 +124,17 @@ export const ReviewsSection: React.FC<{
 
   return (
     <section>
-      <SectionHeader
-        icon={Star}
-        title="Reviews"
-        actions={stats && (
-          <Badge variant="secondary" className="text-xs font-normal">
-            {stats.count} review{stats.count !== 1 ? 's' : ''}
-          </Badge>
-        )}
-      />
+      {!hideHeader && (
+        <SectionHeader
+          icon={Star}
+          title="Reviews"
+          actions={stats && (
+            <Badge variant="secondary" className="text-xs font-normal">
+              {stats.count} review{stats.count !== 1 ? 's' : ''}
+            </Badge>
+          )}
+        />
+      )}
 
       {/* Aggregate row */}
       {stats && (

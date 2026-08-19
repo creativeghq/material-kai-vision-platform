@@ -21,7 +21,6 @@ import {
   type PreviewResult,
 } from '@/services/userWebsitesService';
 import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatNumber } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
 
@@ -206,7 +205,6 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Globe} title="Connected Websites" subtitle="Connect your website's sitemap to enable site-aware inter-linking suggestions when generating SEO articles." />
 
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">

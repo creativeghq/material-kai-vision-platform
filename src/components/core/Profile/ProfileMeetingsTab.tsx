@@ -13,7 +13,6 @@ import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { crmMeetingsService, type CrmMeeting } from '@/services/crmMeetingsService';
 import { getErrorMessage } from '@/core/errors/utils';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
 
@@ -99,7 +98,9 @@ export const ProfileMeetingsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={CalendarDays} title="Meetings & Calendar" subtitle="Meetings you've logged on CRM contacts & companies. Log a meeting from a contact's Activity tab." />
+      <p className="max-w-2xl text-xs text-muted-foreground">
+        {"Meetings you've logged on CRM contacts & companies. Log a meeting from a contact's Activity tab."}
+      </p>
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

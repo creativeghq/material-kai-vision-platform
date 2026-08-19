@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';
-import { Receipt, ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { directionTone } from '@/utils/statusTone';
 import {
   Table,
@@ -67,7 +66,6 @@ export const BillingHistoryTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Receipt} title="Billing History" subtitle="All your credit transactions and purchases." />
       <Card className="rounded-2xl">
         <CardContent className="p-0">
         {loading ? (

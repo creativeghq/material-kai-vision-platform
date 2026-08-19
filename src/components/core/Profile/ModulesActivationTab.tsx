@@ -19,7 +19,6 @@ import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { buildModuleFilters, type ModuleFilterRow } from './moduleFilters';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -477,22 +476,16 @@ export const ModulesActivationTab: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
-        icon={Sparkles}
-        title="Modules"
-        subtitle={
-          <>
-            {isOwner ? (
-              <>Everything you can run in this workspace, grouped the same way as your Hubs.
-              You're on <span className="font-medium text-foreground">{planName}</span> — modules it
-              covers switch on for free, the rest are monthly add-ons you can cancel any time.</>
-            ) : (
-              <>Everything this workspace can run. You can request a module — the workspace owner is
-              notified and decides.</>
-            )}
-          </>
-        }
-      />
+      <p className="max-w-2xl text-xs text-muted-foreground">
+        {isOwner ? (
+          <>Everything you can run in this workspace, grouped the same way as your Hubs.
+          You're on <span className="font-medium text-foreground">{planName}</span> — modules it
+          covers switch on for free, the rest are monthly add-ons you can cancel any time.</>
+        ) : (
+          <>Everything this workspace can run. You can request a module — the workspace owner is
+          notified and decides.</>
+        )}
+      </p>
 
       {(loading || entLoading) ? (
         <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">

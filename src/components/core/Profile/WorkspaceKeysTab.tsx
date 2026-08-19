@@ -17,7 +17,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  KeyRound, CreditCard, Share2, MessageCircle, ArrowRight,
+  CreditCard, Share2, MessageCircle, ArrowRight,
   FileImage, Landmark, Mail, Users, Truck, Code2,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -25,7 +25,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { VivaConfigCard } from '@/modules/payments-viva/components/VivaConfigCard';
@@ -270,7 +269,6 @@ export const WorkspaceKeysTab: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <SectionHeader icon={KeyRound} title="Keys & Connections" subtitle="API keys, integrations and per-workspace credentials." />
 
       <div className="flex flex-col gap-6 md:flex-row">
         {/* Sidebar — horizontal scroll on mobile, left column on desktop */}

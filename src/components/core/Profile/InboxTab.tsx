@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Inbox, Trash2, Loader2, Briefcase } from 'lucide-react';
+import { Mail, Trash2, Loader2, Briefcase } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 
 import { onEnterOrSpace } from '@/utils/a11y';
 
@@ -81,12 +80,6 @@ export const InboxTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <SectionHeader
-        icon={Inbox}
-        title="Inbox"
-        subtitle="Messages people sent you from your public profile."
-        actions={messages.length > 0 ? <Badge variant="secondary">{messages.length}</Badge> : undefined}
-      />
       <Card className="rounded-2xl">
         <CardContent>
           {messages.length === 0 ? (

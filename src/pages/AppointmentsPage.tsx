@@ -12,7 +12,6 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/core/ui/sheet';
 import { FilterBar, useFilters } from '@/components/core/filters';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { buildAppointmentFilters } from './appointmentFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -280,9 +279,7 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
 
   return (
     <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 max-w-4xl mx-auto space-y-6'}>
-      {embedded ? (
-        <SectionHeader icon={Calendar} title="Appointments" subtitle="Manage booking requests from clients on your public profile." />
-      ) : (
+      {embedded ? null : (
         <div>
           <h1 className="text-2xl font-light tracking-tight">Appointments</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage booking requests from clients on your public profile.</p>
