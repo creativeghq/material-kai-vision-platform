@@ -637,3 +637,53 @@ describe('enrichment is best-effort, never a gate', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * The agent's CRM save is a SECOND create path, and it was skipping the first one's guarantee.
+ *
+ * crm-api refuses a create whose folded name already exists in the workspace and hands back the
+ * row it found (#366 BU-3) — the QuickAddCompanyDialog probe is only a courtesy on top of that
+ * guarantee. `save_to_crm` wrote straight to `crm_companies` with the service-role client, so
+ * none of it applied: asking twice produced the company twice. Verified live on 2026-08-19 —
+ * "save Nowy Styl to my CRM" inserted with no lookup of any kind.
+ *
+ * CLAUDE.md says a CRM party must go through the duplicate search first and is never created
+ * silently; that is why `crm_company` sits in the entity_templates CHECK deliberately unbuilt.
+ */
+describe('the agent cannot create a duplicate CRM company', () => {
+  const b2b = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
+  );
+  const save = b2b.slice(b2b.indexOf('createSaveToCRMTool'));
+
+  it('checks the folded name before inserting', () => {
+    expect(/name_fold/.test(save) && /foldForSearch\(/.test(save),
+      'the lookup must use `name_fold` / foldForSearch — the same folded key crm-api uses, so a ' +
+      'Greek name matches regardless of case and accents').toBe(true);
+    // The check has to come BEFORE the write, or it is a report rather than a guard.
+    // Located by pattern rather than an exact literal, so reformatting cannot silently turn this
+    // assertion into `indexOf(...) === -1` and pass for the wrong reason.
+    const firstInsert = save.search(/\.insert\(/);
+    expect(firstInsert, 'no insert found in save_to_crm — this guard is reading the wrong block').toBeGreaterThan(-1);
+    expect(save.indexOf('name_fold')).toBeLessThan(firstInsert);
+  });
+
+  it('reuses the shared fold helper rather than re-implementing it', () => {
+    expect(/from '\.\.\/searchFold\.ts'/.test(b2b),
+      'foldForSearch is shared with crm-api — a second folding implementation would drift and the ' +
+      'two paths would disagree about what counts as the same company').toBe(true);
+  });
+
+  it('a failed lookup does not fall through to the insert', () => {
+    // Same reasoning as crm-api: a duplicate is cheap to detect and expensive to unpick, so an
+    // unreadable CRM means "save nothing", never "save anyway".
+    const window = save.slice(save.indexOf('dupError'), save.indexOf('dupError') + 700);
+    expect(/success: false/.test(window),
+      'a lookup error must abort the save, not proceed to insert').toBe(true);
+  });
+
+  it('an existing company is reported, not silently re-saved', () => {
+    expect(/already_existed/.test(save) && /do NOT save it again/.test(save),
+      'the agent must be told the company already exists so it offers to open or update it').toBe(true);
+  });
+});

@@ -41,6 +41,7 @@ import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
 import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
+import { foldForSearch } from '../searchFold.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -1353,6 +1354,47 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
 
         // Send progress update
         onProgress?.(`Saving ${company.name} to CRM...`);
+
+        // Dedupe on the SAME folded key crm-api uses (#366 BU-3), because this is a second
+        // create path and it was skipping the first one's guarantee.
+        //
+        // crm-api refuses a create whose `name_fold` already exists and hands back the row it
+        // found; the QuickAddCompanyDialog probe is only a courtesy on top of that. This tool
+        // wrote straight to `crm_companies` with the service-role client, so none of it applied:
+        // "save Nowy Styl to my CRM" twice produced Nowy Styl twice. `name_fold` is a generated
+        // column over `crm_fold(name)`, so the match survives Greek case and accents — "Καρέλης
+        // ΑΕ" finds the stored "ΚΑΡΕΛΗΣ ΑΕ", which a plain ilike on the raw column never did.
+        // Duplicates are not cosmetic: they are what makes spend-per-supplier and AP aging wrong.
+        //
+        // A failed LOOKUP does not fall through to the insert, for the same reason it does not in
+        // crm-api: a duplicate is cheap to detect and expensive to unpick.
+        {
+          const { data: existing, error: dupError } = await supabase
+            .from('crm_companies')
+            .select('id, name')
+            .eq('workspace_id', workspaceId)
+            .eq('name_fold', foldForSearch(company.name))
+            .limit(1)
+            .maybeSingle();
+          if (dupError) {
+            return JSON.stringify({
+              success: false,
+              error: `Could not check whether "${company.name}" is already in the CRM (${dupError.message}). `
+                + `Nothing was saved — say so rather than retrying, since a duplicate is expensive to unpick.`,
+            });
+          }
+          if (existing) {
+            emitter.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'done', status_line: `${existing.name} is already in the CRM` });
+            return JSON.stringify({
+              success: true,
+              already_existed: true,
+              company_id: existing.id,
+              company_name: existing.name,
+              message: `"${existing.name}" is already in this workspace's CRM — nothing was created. `
+                + `Tell the user it already exists and offer to open or update it; do NOT save it again.`,
+            });
+          }
+        }
 
         // First, create or update the company. workspace_id is stamped server-side
         // from the authenticated context (CLAUDE.md invariant 1 — never body-supplied;
