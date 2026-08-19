@@ -79,7 +79,7 @@ export default function EmployeeSelfServicePage() {
   return (
     <div className="min-h-screen">
       <PageHeader icon={UserCircle} title="My HR" subtitle={activeWorkspace?.name ? `Your record at ${activeWorkspace.name}` : 'Your employee self-service'} />
-      <div className="p-3 sm:p-6 max-w-4xl">
+      <div className="p-3 sm:p-6">
         <Tabs defaultValue="clock">
           <TabsList className="mb-4">
             <TabsTrigger value="clock"><Clock className="h-4 w-4 mr-2" />Clock</TabsTrigger>

@@ -8,7 +8,7 @@
  * wildcard is spelled out as a warning rather than offered as a checkbox with a neutral label.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Code2, Copy, Loader2, Plus, Trash2, Globe, AlertTriangle, Sparkles } from 'lucide-react';
+import { Code2, Copy, Loader2, Plus, Trash2, Globe, AlertTriangle, Sparkles, KeyRound } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
@@ -51,6 +51,7 @@ const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_add_to_cart', 'Add to cart'],
 ];
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
+import { HubEmptyState } from '@/components/core/hub';
 
 const DEFAULT_RATE = 60;
 
@@ -304,8 +305,8 @@ export const EmbedKeysCard: React.FC = () => {
               are ever served.
             </CardDescription>
           </div>
-          <Button size="sm" className="rounded-full shrink-0" onClick={() => setCreating(true)}>
-            <Plus className="h-4 w-4 mr-1" />New key
+          <Button size="sm" className="shrink-0" onClick={() => setCreating(true)}>
+            <Plus />New key
           </Button>
         </CardHeader>
 
@@ -367,9 +368,12 @@ export const EmbedKeysCard: React.FC = () => {
               <Loader2 className="h-4 w-4 animate-spin" />Loading keys…
             </div>
           ) : keys.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">
-              No embed keys yet. Create one to start showing products on your site.
-            </p>
+            <HubEmptyState
+              icon={KeyRound}
+              title="No embed keys yet"
+              description="An embed key lets your own website show this catalog — the planner, the product grid, the lead form — scoped to exactly the origins you allow."
+              action={<Button size="sm" onClick={() => setCreating(true)}><Plus /> New key</Button>}
+            />
           ) : (
             keys.map((key) => {
               const wildcard = isWildcardOriginList(key.allowed_origins);

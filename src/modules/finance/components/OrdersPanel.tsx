@@ -70,6 +70,7 @@ import {
   type ThreeWayMatch, type ThreeWayMatchStatus, type OrderLinkTarget, type OrderBalance,
 } from '@/modules/finance/services/ordersService';
 import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
+import { HubEmptyState } from '@/components/core/hub';
 
 /**
  * Orders filter every dimension in SQL (`search_orders` RPC), so NO field carries an accessor —
@@ -377,11 +378,27 @@ export const OrdersPanel: React.FC<{
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : rows.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              {searchQ
-                ? `No orders match “${searchQ}”.`
-                : 'No orders yet. An accepted quote creates one automatically, or add one above.'}
-            </div>
+            searchQ ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={ShoppingCart}
+                title={`No orders match “${searchQ}”`}
+                description="Clear the search to see every order on this workspace."
+                action={<Button size="sm" variant="outline" onClick={() => { setFilterValues((v) => ({ ...v, q: '' })); setSearchQ(''); }}>Clear search</Button>}
+              />
+            ) : (
+              <HubEmptyState
+                icon={ShoppingCart}
+                title="No orders yet"
+                description="An accepted quote turns into an order automatically. You can also raise one directly — a sales order for what a customer owes you, a purchase order for what you owe a supplier."
+                action={
+                  <>
+                    <Button size="sm" onClick={() => openCreate('sales', false)}><Plus /> New sales order</Button>
+                    <Button size="sm" variant="outline" onClick={() => openCreate('purchase', false)}><Plus /> New purchase order</Button>
+                  </>
+                }
+              />
+            )
           ) : (
             <>
             <table className="w-full text-sm">

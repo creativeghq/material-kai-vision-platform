@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, Save, ListOrdered } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';
@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, TimelineStep } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface TimelineStepsManagementProps {
   embedded?: boolean;
@@ -365,9 +366,14 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
             </TableHeader>
             <TableBody>
               {timelineSteps.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                    No timeline steps yet
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={3} className="p-0">
+                    <HubEmptyState
+                      icon={ListOrdered}
+                      title="No timeline steps yet"
+                      description="Timeline steps are what the customer sees as their job progresses — survey booked, materials ordered, fitting scheduled. Define them once and every quote uses them."
+                      action={<Button size="sm" onClick={handleOpenCreate}><Plus /> Add step</Button>}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

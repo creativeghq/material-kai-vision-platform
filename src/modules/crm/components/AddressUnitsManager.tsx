@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   addressUnitsAPI, formatAddressLine, type AddressUnit, type AddressUnitInput,
 } from '@/services/crm.service';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface Props {
   /** Exactly one of companyId / contactId identifies the parent party. */
@@ -128,7 +129,12 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
           <p className="text-sm text-muted-foreground">Save this record first to add addresses.</p>
         )}
         {hasParent && !loading && units.length === 0 && (
-          <p className="text-sm text-muted-foreground">No additional addresses yet.</p>
+          <HubEmptyState
+            icon={MapPin}
+            title="No additional addresses yet"
+            description="Beyond the main address — a warehouse, a branch, a site office. A quote, invoice, project or delivery note can then be addressed to any of them."
+            action={!readOnly ? <Button size="sm" onClick={openCreate}><Plus /> Add address</Button> : undefined}
+          />
         )}
         {units.map((u) => (
           <div key={u.id} className="flex items-start justify-between gap-3 rounded-md border p-3">

@@ -33,6 +33,7 @@ import {
   type ProjectPurchaseItem,
   type ProjectRoom,
 } from '../../services/projectsService';
+import { HubEmptyState } from '@/components/core/hub';
 
 const TYPE_LABELS: Record<string, string> = { door: 'Door', window: 'Window', other: 'Other' };
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -141,22 +142,25 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
               <SelectItem value="per_item">Spec sheets only</SelectItem>
             </SelectContent>
           </Select>
-          <Button size="sm" variant="outline" className="rounded-full" onClick={generateSheet} disabled={generatingSheet || rows.length === 0}>
+          <Button size="sm" variant="outline" onClick={generateSheet} disabled={generatingSheet || rows.length === 0}>
             {generatingSheet ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FileDown className="h-3.5 w-3.5 mr-1" />}
             Generate sheet
           </Button>
-          <Button size="sm" className="rounded-full" onClick={() => setDialogItem('new')}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add item
+          <Button size="sm" onClick={() => setDialogItem('new')}>
+            <Plus /> Add item
           </Button>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <Card className="dashboard-card"><CardContent className="py-12 text-center">
-          <Hammer className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No purchase items yet.</p>
-          <p className="text-xs text-muted-foreground mt-1">Add a door or window with its measurements — link a catalog product for a real photo, or generate one from the spec.</p>
-        </CardContent></Card>
+        <Card>
+          <HubEmptyState
+            icon={Hammer}
+            title="No purchase items yet"
+            description="Add a door or window with its measurements — link a catalog product for a real photo, or generate one from the spec."
+            action={<Button size="sm" onClick={() => setDialogItem('new')}><Plus /> Add item</Button>}
+          />
+        </Card>
       ) : (
         <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-hairline">
           {rows.map((it) => {

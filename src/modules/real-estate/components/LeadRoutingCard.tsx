@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type LeadRoutingRule } from '../services/realEstateService';
+import { HubEmptyState } from '@/components/core/hub';
 
 /**
  * Lead routing rules. Inbound leads used to sit on the listing until somebody noticed; response time
@@ -73,15 +74,27 @@ export const LeadRoutingCard: React.FC<{ ws: string | null; canManage: boolean }
           </p>
         </div>
         {canManage && !draft && (
-          <Button size="sm" variant="outline" className="rounded-full"
+          <Button size="sm" variant="outline"
             onClick={() => setDraft({ name: '', towns: '', regions: '', postcodes: '', agents: '', priority: '100' })}>
-            <Plus className="mr-1 h-4 w-4" /> New rule
+            <Plus /> New rule
           </Button>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
         {rules.length === 0 && !draft && (
-          <p className="py-2 text-sm text-muted-foreground">No rules yet — leads stay unassigned until someone picks them up.</p>
+          <HubEmptyState
+            icon={Route}
+            title="No routing rules yet"
+            description="Without a rule, an incoming lead sits unassigned until somebody notices it. A rule sends leads for a town, region or postcode straight to the right agent."
+            action={
+              <Button
+                size="sm"
+                onClick={() => setDraft({ name: '', towns: '', regions: '', postcodes: '', agents: '', priority: '100' })}
+              >
+                <Plus /> New rule
+              </Button>
+            }
+          />
         )}
 
         {rules.map((r) => (

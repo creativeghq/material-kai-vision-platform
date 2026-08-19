@@ -551,17 +551,63 @@ export const warehouseService = {
     if (error) throw error;
   },
 
-  // ── Pending products (AI-extracted from inbound expenses → ✓ add / ✗ dismiss) ──
-  /** Queued supplier lines awaiting ✓/✗. Carries WHERE each line came from (issuer + document)
-   *  so the queue reads as "what my partners invoiced me", not a list of anonymous strings. */
-  async listPending(workspaceId: string): Promise<PendingProduct[]> {
-    const { data, error } = await supabase.from('warehouse_pending_items')
-      .select('*, inbound_document:inbound_documents(issuer_name, issuer_vat, series, aa, issue_date, total_gross, currency)')
-      .eq('workspace_id', workspaceId).eq('status', 'pending')
-      .order('created_at', { ascending: false });
+  // ── Supplier-invoice intake queue (AI-extracted from inbound expenses → ✓ add / ✗ dismiss) ──
+  //
+  // The unit of work is the ISSUER, not the line. A myDATA feed carries every supplier invoice a
+  // workspace receives, so a week's backlog here was 929 lines from 94 issuers — and 10 issuers
+  // accounted for half of them. Deciding once per supplier clears the queue; deciding once per
+  // line never finishes. The old flat read (every pending row, plus one price-preview round trip
+  // PER ROW) is what made the tab take a minute to become usable.
+
+  /** Who is waiting, and how much of the queue each one is. One call, no lines. */
+  async intakeSupplierGroups(workspaceId: string): Promise<IntakeSupplierGroup[]> {
+    const { data, error } = await supabase.rpc('warehouse_intake_supplier_groups', { p_workspace_id: workspaceId });
     if (error) throw error;
-    return (data ?? []) as PendingProduct[];
+    return (data ?? []) as IntakeSupplierGroup[];
   },
+
+  /**
+   * One page of queued lines — for a single issuer, or (issuerKey omitted) searched across the
+   * whole queue. `suggested_sell` arrives already derived by the SAME pricing ladder that
+   * `_approve_pending_item_core` will run on approval, so the page costs one round trip rather
+   * than one per row.
+   */
+  async intakeLines(
+    workspaceId: string,
+    opts: { issuerKey?: string | null; search?: string | null; limit?: number; offset?: number } = {},
+  ): Promise<{ total: number; lines: IntakeLine[] }> {
+    const { data, error } = await supabase.rpc('warehouse_intake_lines', {
+      p_workspace_id: workspaceId,
+      p_issuer_key: opts.issuerKey ?? null,
+      p_search: opts.search ?? null,
+      p_limit: opts.limit ?? INTAKE_LINE_PAGE_SIZE,
+      p_offset: opts.offset ?? 0,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as { total?: number; lines?: IntakeLine[] };
+    return { total: Number(r.total ?? 0), lines: r.lines ?? [] };
+  },
+
+  /** Every queued line id for one issuer (or one search) — what "Add all" / "Dismiss all" act on. */
+  async intakeLineIds(workspaceId: string, opts: { issuerKey?: string | null; search?: string | null } = {}): Promise<string[]> {
+    const { data, error } = await supabase.rpc('warehouse_intake_line_ids', {
+      p_workspace_id: workspaceId, p_issuer_key: opts.issuerKey ?? null, p_search: opts.search ?? null,
+    });
+    if (error) throw error;
+    return (data ?? []) as string[];
+  },
+
+  /** The ladder's answer for ONE line at an edited cost — used while the operator types. */
+  async previewIntakeSellPrice(id: string, cost: number | null): Promise<{ sell: number | null; attributed: boolean }> {
+    const { data, error } = await supabase.rpc('preview_pending_item_sell_price', { p_id: id, p_cost: cost });
+    if (error) throw error;
+    const r = (data ?? {}) as { suggested_sell?: number | null; supplier_attributed?: boolean };
+    return {
+      sell: r.suggested_sell != null ? Number(r.suggested_sell) : null,
+      attributed: r.supplier_attributed === true,
+    };
+  },
+
   async approvePending(id: string, overrides: Record<string, unknown>): Promise<string> {
     const { data, error } = await supabase.rpc('approve_pending_warehouse_item', { p_id: id, p_overrides: overrides });
     if (error) throw error;
@@ -571,24 +617,127 @@ export const warehouseService = {
     const { error } = await supabase.rpc('dismiss_pending_warehouse_item', { p_id: id });
     if (error) throw error;
   },
+
+  /** Approve many at once. `overrides` applies to every id; each line keeps its own name, SKU,
+   *  quantity and cost. A line that fails is reported, not rolled back over the ones that worked. */
+  async bulkApprovePending(ids: string[], overrides: Record<string, unknown> = {}): Promise<BulkApproveResult> {
+    const { data, error } = await supabase.rpc('bulk_approve_pending_warehouse_items', {
+      p_ids: ids, p_overrides: overrides,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Partial<BulkApproveResult>;
+    return { approved: Number(r.approved ?? 0), failed: Number(r.failed ?? 0), errors: r.errors ?? [] };
+  },
+
+  async bulkDismissPending(ids: string[]): Promise<number> {
+    const { data, error } = await supabase.rpc('bulk_dismiss_pending_warehouse_items', { p_ids: ids });
+    if (error) throw error;
+    return Number(data ?? 0);
+  },
+
+  /** Issuers whose invoice lines are never queued. Read-only list for the settings dialog. */
+  async intakeIgnoredIssuers(workspaceId: string): Promise<IntakeIgnoredIssuer[]> {
+    const { data, error } = await supabase.rpc('warehouse_intake_ignored_list', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as IntakeIgnoredIssuer[];
+  },
+
+  /** Ignoring also dismisses what that issuer already has queued — a rule that leaves the
+   *  existing backlog behind still leaves the operator to clear it by hand. */
+  async setIntakeIssuerIgnored(
+    workspaceId: string, issuerKey: string, issuerName: string | null, ignored: boolean,
+  ): Promise<number> {
+    const { data, error } = await supabase.rpc('set_warehouse_intake_issuer_ignored', {
+      p_workspace_id: workspaceId, p_issuer_key: issuerKey, p_issuer_name: issuerName, p_ignored: ignored,
+    });
+    if (error) throw error;
+    return Number((data as { dismissed?: number } | null)?.dismissed ?? 0);
+  },
 };
 
+/** Lines fetched per page inside an expanded supplier group. */
+export const INTAKE_LINE_PAGE_SIZE = 25;
+
+/**
+ * A raw `warehouse_pending_items` row.
+ *
+ * Read directly (not through this service) by ReceiveToWarehouseDialog, which reuses the
+ * nightly sync's Haiku extraction for the document it is receiving rather than running a
+ * second, dumber pass over the same text. The intake QUEUE reads `IntakeLine` instead —
+ * grouped, paged and priced by SQL.
+ */
 export interface PendingProduct {
   id: string; workspace_id: string; inbound_document_id: string | null; raw_description: string | null;
   name: string; sku: string | null; unit: string | null; size: string | null; attributes: string | null;
   quantity: number; unit_cost: number | null; currency: string;
   suggested_sales_price: number | null; sales_price: number | null; category_id: string | null;
   matched_product_id: string | null; add_to_catalog: boolean; target_warehouse_id: string | null;
-  /** Set server-side by `match_pending_items_for_document`. 1.0 = the supplier's own item code
-   *  identifies stock we already carry, so approving TOPS UP that item instead of creating a
-   *  second product. Below 0.5 nothing matched and approving creates a new product. */
   matched_warehouse_item_id?: string | null;
   match_score?: number | null;
   match_reason?: string | null;
-  /** The myDATA document this line came from — who invoiced it and under which number. */
-  inbound_document?: {
-    issuer_name: string | null; issuer_vat: string | null;
-    series: string | null; aa: string | null;
-    issue_date: string | null; total_gross: number | null; currency: string | null;
+}
+
+/** One issuer's share of the intake queue. */
+export interface IntakeSupplierGroup {
+  /** Normalized VAT (`public._vat_key`), or 'unknown'. The grouping key everywhere. */
+  issuer_key: string;
+  issuer_name: string | null;
+  issuer_vat: string | null;
+  currency: string;
+  line_count: number;
+  doc_count: number;
+  /** Σ quantity × unit_cost across the group's queued lines. */
+  total_cost: number;
+  /** Lines invoiced at 0 — usually a promo/bundle line, and a product with no cost prices at nothing. */
+  zero_cost_count: number;
+  /** Lines that will TOP UP existing stock rather than create a product. */
+  matched_count: number;
+  first_seen: string | null;
+  last_seen: string | null;
+  /** Null = this issuer is not a CRM party, so approving records cost with no record of who
+   *  charged it. A CRM company is never created silently, so this is a warning, not a fixup. */
+  supplier_company_id: string | null;
+  supplier_attributed: boolean;
+}
+
+/** One queued supplier line, with its document and the ladder's price already derived. */
+export interface IntakeLine {
+  id: string;
+  name: string;
+  sku: string | null;
+  unit: string | null;
+  size: string | null;
+  quantity: number;
+  unit_cost: number | null;
+  currency: string;
+  sales_price: number | null;
+  category_id: string | null;
+  raw_description: string | null;
+  /** Set server-side by `match_pending_items_for_document`. ≥ 0.5 tops up existing stock;
+   *  below that, approving creates a new product. */
+  match_score: number | null;
+  match_reason: string | null;
+  matched_product_id: string | null;
+  add_to_catalog: boolean;
+  target_warehouse_id: string | null;
+  issuer_key: string;
+  inbound_document: {
+    id: string; issuer_name: string | null; issuer_vat: string | null;
+    series: string | null; aa: string | null; issue_date: string | null;
   } | null;
+  /** The pricing ladder's answer at the stored cost. Null = no cost, so no price to suggest. */
+  suggested_sell: number | null;
+  supplier_attributed: boolean;
+}
+
+export interface IntakeIgnoredIssuer {
+  issuer_key: string;
+  issuer_name: string | null;
+  created_at: string;
+}
+
+export interface BulkApproveResult {
+  approved: number;
+  failed: number;
+  errors: Array<{ id: string; error: string }>;
 }

@@ -26,6 +26,7 @@ import { financeService, formatMoney, type BankAccountBalance, type BankAccountK
 import { parseDecimalOr } from '@/utils/decimal';
 import { normalizeIban } from '@/utils/iban';
 import { statusTone } from '@/utils/statusTone';
+import { HubEmptyState } from '@/components/core/hub';
 
 const KIND_META: Record<BankAccountKind, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
   bank: { label: 'Bank', icon: Landmark },
@@ -164,7 +165,12 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         {loading ? (
           <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No accounts yet. Add your first bank or cash account.</p>
+          <HubEmptyState
+            icon={Landmark}
+            title="No accounts yet"
+            description="An account is where money sits. Add one and every payment you record can say which account it landed in — or came out of."
+            action={<Button size="sm" onClick={openAdd}><Plus /> Add account</Button>}
+          />
         ) : (
           <div className="space-y-1">
             {rows.map((r) => {

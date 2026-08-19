@@ -399,6 +399,20 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   job_search_updated: 'Job search updated',
   job_searches_list: 'Job searches',
   job_digest_preview: 'Job digest preview',
+  // The three READ chunks below are each reachable from a `run:` quick-start ("My flows",
+  // "Which job boards?", "Browse the radar"). A direct run has NO model turn, so the
+  // "the agent's prose summarizes it" assumption these used to rely on is false: they were
+  // logged to console.debug and the user got a bare "Done!" with the data thrown away.
+  // Their MUTATION siblings (flow_created/updated/removed, job_sites_updated) are deliberately
+  // NOT here — every quick-start that could reach those pins `action:'list'`, so they only ever
+  // run through the agent, which does narrate them; a card beside that prose would be noise.
+  job_sites_list: 'Job boards searched',
+  flows_list: 'Workspace flows',
+  tech_radar_list: 'Tech radar',
+  // Also a `run:` ("Track an entry" pins action:'create'), so also unnarrated. Its `done` copy
+  // at least says an entry was added — but the title, cadence and derived schedule it came back
+  // with were going to console.debug, so the user could not see WHAT was tracked.
+  tech_radar_monitor: 'Tech radar entry tracked',
   // Stock management
   stock_overview: 'Stock overview',
   stock_items: 'Stock items',
@@ -3123,12 +3137,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   default_site_type: chunk.default_site_type || 'perplexity_domain',
                   prefill: chunk.prefill || undefined,
                 });
-              } else if (chunk.type === 'job_sites_updated' || chunk.type === 'job_sites_list') {
-                // Surface as a tool-progress log entry — the agent's text reply summarizes the change.
-                // (No rich card needed; a list of domains is concise enough as prose.)
+              } else if (chunk.type === 'job_sites_updated') {
+                // A mutation, and only ever reachable through the agent — its text reply
+                // summarizes the change. (`job_sites_list` is registered above instead: it
+                // IS reachable from a `run:` quick-start, where no prose is ever written.)
                 console.debug('[agent-hub] job_sites chunk', chunk);
-              } else if (chunk.type === 'flow_created' || chunk.type === 'flow_updated' || chunk.type === 'flows_list' || chunk.type === 'flow_removed') {
-                // The agent's text reply summarizes the change; no rich card needed.
+              } else if (chunk.type === 'flow_created' || chunk.type === 'flow_updated' || chunk.type === 'flow_removed') {
+                // Mutations, agent-only (create/pause are deliberately not `run:` quick-starts,
+                // per agentToolsCatalog) — the agent's text reply summarizes the change.
                 console.debug('[agent-hub] flows chunk', chunk);
               } else if (chunk.type === 'tech_radar_findings') {
                 // Pepper's Tech Radar review → render a ring-grouped findings card.
@@ -3158,9 +3174,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // Vague request → mount the setup modal. No thread message; on submit
                 // the modal posts a structured follow-up that re-invokes the radar tools.
                 setTechRadarFormState({ prefill: chunk.prefill || undefined });
-              } else if (chunk.type === 'tech_radar_monitor' || chunk.type === 'tech_radar_list') {
-                // Concise enough as the agent's prose reply — just log.
-                console.debug('[agent-hub] tech_radar chunk', chunk);
               } else if (chunk.type === 'mention_tracking_started') {
                 const m: Message = {
                   id: `msg-mention-track-${Date.now()}`,

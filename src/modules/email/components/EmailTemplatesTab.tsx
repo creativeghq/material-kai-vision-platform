@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit, Eye, Trash2 } from 'lucide-react';
+import { Plus, Edit, Eye, Trash2, Mail } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import CreateTemplateModal from './CreateTemplateModal';
 import { buildEmailTemplateFilters } from './emailFilters';
+import { HubEmptyState } from '@/components/core/hub';
 
 /**
  * Topic groups — derived from the template's slug prefix. Lets admins filter
@@ -227,12 +228,23 @@ export const EmailTemplatesTab: React.FC = () => {
             </div>
           </div>
         ) : filteredTemplates.length === 0 ? (
-          <div className="dashboard-card">
-            <div className="py-8 text-center text-muted-foreground">
-              {templates.length === 0
-                ? 'No templates found. Create your first template to get started.'
-                : 'No templates match the current filters.'}
-            </div>
+          <div className="dashboard-card p-0">
+            {templates.length === 0 ? (
+              <HubEmptyState
+                icon={Mail}
+                title="No templates yet"
+                description="A template is a reusable email — a quote follow-up, an order confirmation, a review request — with the record's own values merged in when it sends."
+                action={<Button size="sm" onClick={() => setShowCreateModal(true)}><Plus /> Create template</Button>}
+              />
+            ) : (
+              <HubEmptyState
+                variant="filtered"
+                icon={Mail}
+                title="No templates match the current filters"
+                description="Widen the filter to see the rest of your templates."
+                action={<Button size="sm" variant="outline" onClick={() => setFilterValues({})}>Clear filters</Button>}
+              />
+            )}
           </div>
         ) : (
           groupedTemplates.flatMap((group) => [

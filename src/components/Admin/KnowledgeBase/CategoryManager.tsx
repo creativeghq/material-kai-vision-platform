@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, ExternalLink, Lock, ListFilter } from 'lucide-react';
+import { Plus, Edit, Trash2, ExternalLink, Lock, ListFilter, FolderTree } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -31,6 +31,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { KBCategory } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+import { HubEmptyState } from '@/components/core/hub';
 
 const ACCESS_LEVEL_CONFIG = {
   admin: { label: 'Admin Only', emoji: '🔒', className: 'bg-red-100 text-red-800 border-red-200' },
@@ -241,9 +242,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocument
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Categories</CardTitle>
-            <Button onClick={handleCreate} className="rounded-full">
-              <Plus className="h-4 w-4 mr-2" />
-              New category
+            <Button onClick={handleCreate} size="sm">
+              <Plus /> New category
             </Button>
           </div>
         </CardHeader>
@@ -251,9 +251,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocument
           {isLoading ? (
             <div className="text-center py-8">Loading categories...</div>
           ) : categories.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No categories found. Create your first category to organize documents.
-            </div>
+            <HubEmptyState
+              icon={FolderTree}
+              title="No categories yet"
+              description="A category is how a reader finds a document without already knowing its title. Create the first one and documents can be filed into it."
+              action={<Button size="sm" onClick={handleCreate}><Plus /> New category</Button>}
+            />
           ) : (
             <Table>
               <TableHeader>

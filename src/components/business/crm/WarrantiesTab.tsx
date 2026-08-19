@@ -29,6 +29,7 @@ import {
   type ServiceHistoryRow, type WarrantyKind,
 } from '@/services/customerAssetsService';
 import { todayLocalISO } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface WarrantiesTabProps {
   /** Exactly one of these identifies whose units these are. */
@@ -245,9 +246,12 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
               <Loader2 className="h-5 w-5 animate-spin mr-2" />Loading…
             </div>
           ) : assets.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              No units registered yet.
-            </div>
+            <HubEmptyState
+              icon={ShieldCheck}
+              title="No units registered yet"
+              description="A unit is a specific thing this customer owns — with its serial, its warranty and its service history. Anything sold on a delivered order registers itself once the product is marked serviceable."
+              action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus /> Add unit</Button>}
+            />
           ) : (
             <Table>
               <TableHeader>

@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, StatusTag } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub';
 
 export const StatusTagsManagement: React.FC = () => {
   const { toast } = useToast();
@@ -138,12 +139,8 @@ export const StatusTagsManagement: React.FC = () => {
           title="Status Tags"
           subtitle="Create and manage custom status tags for organizing quotes"
           actions={
-            <Button
-              onClick={handleOpenCreate}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create status tag
+            <Button onClick={handleOpenCreate} size="sm">
+              <Plus /> Create status tag
             </Button>
           }
         />
@@ -161,9 +158,14 @@ export const StatusTagsManagement: React.FC = () => {
             </TableHeader>
             <TableBody>
               {statusTags.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-600">
-                    No status tags found. Create your first tag to get started.
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="p-0">
+                    <HubEmptyState
+                      icon={Tag}
+                      title="No status tags yet"
+                      description="A status tag is your own label on a quote request — “waiting on survey”, “priced”, “chasing”. They are how a busy pipeline stays sortable."
+                      action={<Button size="sm" onClick={handleOpenCreate}><Plus /> Create status tag</Button>}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

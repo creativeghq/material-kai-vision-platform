@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   supplierPricingService, type SupplierProductRow, type SupplierProductInput,
 } from '@/services/supplierPricingService';
+import { HubEmptyState } from '@/components/core/hub';
 
 /**
  * "Suppliers & pricing" for one product (#324 phase 5).
@@ -122,11 +123,11 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="rounded-full h-8" onClick={load} disabled={loading}>
+          <Button size="sm" variant="outline" className="h-8" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button size="sm" className="rounded-full h-8" onClick={() => setEditing('new')}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add supplier
+          <Button size="sm" className="h-8" onClick={() => setEditing('new')}>
+            <Plus /> Add supplier
           </Button>
         </div>
       </CardHeader>
@@ -136,9 +137,12 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-10 text-center">
-            No suppliers yet. Add one to enable multi-supplier sourcing for this product.
-          </p>
+          <HubEmptyState
+            icon={Truck}
+            title="No suppliers yet"
+            description="Record who you buy this product from and what they charge. With more than one, the cheapest available source is the one that prices a quote."
+            action={<Button size="sm" onClick={() => setEditing('new')}><Plus /> Add supplier</Button>}
+          />
         ) : (
           <table className="w-full text-sm">
             <thead>

@@ -43,6 +43,7 @@ import {
   PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
 } from '../crmConstants';
+import { HubEmptyState } from '@/components/core/hub';
 
 // Pipeline renders FIRST, but 'users' stays the landing tab: bare `/crm` is the main nav
 // target, and defaulting to a module-gated tab would show an upsell as the front door of a
@@ -673,7 +674,19 @@ export const CRMManagement: React.FC = () => {
                       {loadingUsers ? (
                         <TableRow><TableCell colSpan={8} className="text-center py-4">Loading...</TableCell></TableRow>
                       ) : filteredUsers.length === 0 ? (
-                        <TableRow><TableCell colSpan={8} className="text-center py-4">No users found</TableCell></TableRow>
+                        <TableRow className="hover:bg-transparent"><TableCell colSpan={8} className="p-0">
+                          <HubEmptyState
+                            variant={Object.keys(userValues).length ? 'filtered' : 'empty'}
+                            icon={Users}
+                            title={Object.keys(userValues).length ? 'No users match your filters' : 'No users yet'}
+                            description={Object.keys(userValues).length
+                              ? 'Widen the filter to see the rest of the account list.'
+                              : 'Platform accounts appear here once somebody signs up or is invited.'}
+                            action={Object.keys(userValues).length
+                              ? <Button size="sm" variant="outline" onClick={() => setUserValues({})}>Clear filters</Button>
+                              : undefined}
+                          />
+                        </TableCell></TableRow>
                       ) : pagedUsers.map((user) => (
                         <TableRow key={user.id} data-state={selUsers.has(user.user_id) ? 'selected' : undefined}>
                           <TableCell>
@@ -761,7 +774,19 @@ export const CRMManagement: React.FC = () => {
                       {loadingContacts ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Loading...</TableCell></TableRow>
                       ) : contacts.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center py-4">No contacts found</TableCell></TableRow>
+                        <TableRow className="hover:bg-transparent"><TableCell colSpan={7} className="p-0">
+                          <HubEmptyState
+                            variant={Object.keys(contactValues).length ? 'filtered' : 'empty'}
+                            icon={Users}
+                            title={Object.keys(contactValues).length ? 'No contacts match your filters' : 'No contacts yet'}
+                            description={Object.keys(contactValues).length
+                              ? 'Contacts are filtered on the server, so this is the whole matching set — widen the filter to see more.'
+                              : 'A contact is a person you deal with. Add one directly, or let an inbound lead, quote request or imported list create them for you.'}
+                            action={Object.keys(contactValues).length
+                              ? <Button size="sm" variant="outline" onClick={() => onContactFilters({})}>Clear filters</Button>
+                              : <Button size="sm" onClick={() => navigate('/crm/contacts/new')}><Plus /> Add contact</Button>}
+                          />
+                        </TableCell></TableRow>
                       ) : contacts.map((contact) => (
                         <TableRow key={contact.id} data-state={selContacts.has(contact.id) ? 'selected' : undefined}>
                           <TableCell>
@@ -843,7 +868,19 @@ export const CRMManagement: React.FC = () => {
                       {loadingCompanies ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Loading...</TableCell></TableRow>
                       ) : companies.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center py-4">No companies found</TableCell></TableRow>
+                        <TableRow className="hover:bg-transparent"><TableCell colSpan={7} className="p-0">
+                          <HubEmptyState
+                            variant={Object.keys(companyValues).length ? 'filtered' : 'empty'}
+                            icon={Building2}
+                            title={Object.keys(companyValues).length ? 'No companies match your filters' : 'No companies yet'}
+                            description={Object.keys(companyValues).length
+                              ? 'Companies are filtered on the server, so this is the whole matching set — widen the filter to see more.'
+                              : 'A company is the business behind your contacts — the party a quote, an order or an invoice is actually addressed to.'}
+                            action={Object.keys(companyValues).length
+                              ? <Button size="sm" variant="outline" onClick={() => onCompanyFilters({})}>Clear filters</Button>
+                              : <Button size="sm" onClick={() => setShowAddCompany(true)}><Plus /> Add company</Button>}
+                          />
+                        </TableCell></TableRow>
                       ) : companies.map((company) => (
                         <TableRow key={company.id} data-state={selCompanies.has(company.id) ? 'selected' : undefined}>
                           <TableCell>

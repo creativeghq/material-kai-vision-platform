@@ -19,6 +19,7 @@ import {
 import { projectsService } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface SheetsTabProps {
   projectId: string;
@@ -187,16 +188,13 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
   if (sheets.length === 0) {
     return (
       <>
-        <Card className="dashboard-card">
-          <CardContent className="py-12 text-center">
-            <FileImage className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground mb-3">No sheets yet.</p>
-            <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
-              Technical plans — electrical, plumbing, lighting — belong to the project and can be
-              created here. Presentation sheets are made inside a moodboard and roll up automatically.
-            </p>
-            <NewPlanButton />
-          </CardContent>
+        <Card>
+          <HubEmptyState
+            icon={FileImage}
+            title="No sheets yet"
+            description="Technical plans — electrical, plumbing, lighting — belong to the project and are created here. Presentation sheets are made inside a moodboard and roll up automatically."
+            action={<NewPlanButton />}
+          />
         </Card>
         {wizard}
       </>

@@ -924,3 +924,113 @@ describe('a routed turn shows which specialist answered', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * A `run:` quick-start renders what its tool emits.
+ *
+ * A quick-start with `run:` is a DETERMINISTIC direct tool call: agent-chat performs no model
+ * turn, so nothing ever writes prose about the result. The frontend substitutes the
+ * quick-start's own `done` copy and the tool's data arrives separately, as an onChunk chunk.
+ * If AgentHub does not RENDER that chunk, the user gets a confident "Done! <done copy>" with
+ * the payload thrown away — the tool ran, the data came back, and the screen stays empty.
+ *
+ * This shipped three times over: "My flows" (`flows_list`), "Which job boards?"
+ * (`job_sites_list`) and "Browse the radar" (`tech_radar_list`) each emitted their list into a
+ * `console.debug` branch commented "the agent's text reply summarizes the change" — true when
+ * a model is in the loop, and false for every one of these, because `run:` means there is no
+ * model in the loop. CLAUDE.md carries the same warning for the `my_hr_*` chunks; a comment is
+ * not an enforcement mechanism, so here is the check.
+ *
+ * Note what does NOT satisfy this test: a `chunk.type === 'x'` branch that only logs. That is
+ * the defect itself, so "a handler exists" is the wrong question — "something reaches the
+ * screen" is the right one.
+ */
+describe('a direct-run quick-start renders its tool output', () => {
+  const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
+
+  // Keys of AGENT_RESULT_TITLES — the generic AgentResultCard route.
+  const titlesBody = hub.slice(
+    hub.indexOf('const AGENT_RESULT_TITLES'),
+    hub.indexOf('\n};', hub.indexOf('const AGENT_RESULT_TITLES')),
+  );
+  const registered = new Set(
+    [...titlesBody.matchAll(/^\s*([a-z0-9_]+):\s*'/gm)].map((m) => m[1]),
+  );
+
+  // Prefix dispatches: one handler covering a whole family of chunk types.
+  const prefixHandled = (t: string) =>
+    (t.startsWith('seo_') && t.endsWith('_card')) || t.startsWith('catalog_');
+
+  /**
+   * A dedicated branch counts only if it puts something on SCREEN, not just in the console.
+   * Three shapes qualify: posting a message, driving state (a modal is a render), and
+   * buffering into a `pendingX` local that is later attached to the assistant message —
+   * which is how `search_spec` reaches SearchSpecCard.
+   */
+  const rendersInABranch = (t: string) => {
+    const at = hub.indexOf(`chunk.type === '${t}'`);
+    if (at === -1) return false;
+    const nextBranch = hub.indexOf('} else if', at + 1);
+    const body = hub.slice(at, nextBranch === -1 ? at + 1200 : nextBranch);
+    return /setMessages\(/.test(body) || /\bset[A-Z]\w*\(/.test(body) || /\bpending[A-Z]\w*\s*=/.test(body);
+  };
+
+  const runStarts = TOOLKITS.flatMap((tk) =>
+    (tk.quick_starts ?? [])
+      .filter((qs) => (qs as any).run)
+      .map((qs) => ({
+        toolkit: tk.id,
+        label: qs.label,
+        tool: (qs as any).run.tool as string,
+        // A router tool emits a different chunk per `action`, and a quick-start PINS the action
+        // it calls. Without this, the guard demands a card for `flow_created` on the strength of
+        // a quick-start that can only ever call `action:'list'` — a failure the reader cannot act
+        // on, which is how a guard earns its way onto an ignore list.
+        action: (qs as any).run.fixedArgs?.action as string | undefined,
+      })),
+  );
+
+  it('there are direct-run quick-starts to check', () => {
+    expect(runStarts.length).toBeGreaterThan(40);
+  });
+
+  it.each(runStarts)('$toolkit → "$label" renders every chunk $tool emits', ({ tool, label, action }) => {
+    const entry = byName.get(tool);
+    if (!entry) return; // manifest freshness is guarded separately
+
+    const src = read(join(ROOT, entry.file));
+    const start = src.indexOf(`export const ${entry.factory}`);
+    if (start === -1) return; // factory shape guarded separately
+    const after = src.indexOf('\nexport const create', start + 1);
+    let factoryBody = src.slice(start, after === -1 ? src.length : after);
+
+    // Narrow to the pinned action's branch when there is one, so the chunks attributed to this
+    // quick-start are the ones it can actually cause.
+    if (action) {
+      const branchAt = factoryBody.indexOf(`action === '${action}'`);
+      if (branchAt !== -1) {
+        const nextAction = factoryBody.indexOf("action === '", branchAt + 20);
+        factoryBody = factoryBody.slice(branchAt, nextAction === -1 ? factoryBody.length : nextAction);
+      }
+    }
+
+    const emitted = new Set<string>();
+    for (const m of factoryBody.matchAll(/onChunk[^\n]{0,40}\(\s*\{/g)) {
+      // Scan forward from the emit for this object literal's `type:`.
+      const t = /\btype:\s*'([a-z0-9_]+)'/.exec(factoryBody.slice(m.index!, m.index! + 600));
+      if (t) emitted.add(t[1]);
+    }
+
+    for (const t of emitted) {
+      // A form/modal-opening chunk is a control signal, not a result to render.
+      if (t.endsWith('_form_open') || t === 'tool_progress') continue;
+      expect(
+        registered.has(t) || prefixHandled(t) || rendersInABranch(t),
+        `"${label}" runs ${tool} deterministically (no model turn, so nothing narrates it), and ` +
+          `it emits '${t}' — which AgentHub renders nowhere. Add '${t}' to AGENT_RESULT_TITLES, ` +
+          `or give it a branch that actually puts it on screen. A console.debug is how the user ` +
+          `ends up staring at "Done!" with no data.`,
+      ).toBe(true);
+    }
+  });
+});

@@ -56,7 +56,7 @@ export default function ContractsPage() {
   return (
     <div className="min-h-screen">
       <PageHeader icon={FileSignature} title="Contracts" subtitle="Signable agreements across HR, Finance, Projects and Real estate" />
-      <div className="p-3 sm:p-6 max-w-4xl">
+      <div className="p-3 sm:p-6">
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
           <TabsList className="mb-4 gap-1.5">
             {TABS.map((t) => <TabsTrigger key={t.value} value={t.value} className="px-3">{t.label}</TabsTrigger>)}
