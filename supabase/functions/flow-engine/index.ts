@@ -9,6 +9,7 @@
  */
 
 import { loadPrompt, renderPromptTemplate, getToolPrompt } from '../_shared/prompt-utils.ts';
+import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { buildMarketScope, loadVocabulary } from '../_shared/vocabularies.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
@@ -754,9 +755,6 @@ async function executeAction(
 
     case 'web_search':
     case 'perplexity_search': {
-      const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
-      if (!ANTHROPIC_API_KEY()) throw new Error('ANTHROPIC_API_KEY not configured');
-
       const country = String(resolved.country || '');
       const regionId = String(resolved.region || '');
       const category = String(resolved.category || '');
@@ -804,27 +802,22 @@ async function executeAction(
       let textContent = '';
       try {
         const searchRes = await withRetry(async () => {
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'x-api-key': ANTHROPIC_API_KEY(),
-              'anthropic-version': '2023-06-01',
-              'anthropic-beta': 'web-search-2025-03-05',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5',
-              max_tokens: 4096,
-              system: systemPrompt,
-              tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
-              messages: [{ role: 'user', content: query }],
-            }),
+          // Through the shared client — this was the highest-volume of the calls that reached
+          // no cost ledger at all, and it runs inside automations nobody is watching live. The
+          // key also came off Deno.env, which the platform_secrets bootstrap cannot populate on
+          // edge, so a DB-only key failed every flow that used this action.
+          const data = await callClaudeMessages({
+            model: 'claude-haiku-4-5',
+            max_tokens: 4096,
+            system: systemPrompt,
+            tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+            messages: [{ role: 'user', content: query }],
+          }, {
+            task: 'flow_web_search',
+            userId: webSearchDebit?.userId,
+            workspaceId: webSearchDebit?.workspaceId ?? null,
+            headers: { 'anthropic-beta': 'web-search-2025-03-05' },
           });
-          if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Web search failed: ${response.status} - ${errText}`);
-          }
-          const data = await response.json();
           const text = (data.content as any[])
             ?.filter((b: any) => b.type === 'text')
             .map((b: any) => b.text)

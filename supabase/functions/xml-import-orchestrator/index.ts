@@ -1,4 +1,5 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { captureException } from '../_shared/sentry.ts';
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
@@ -400,7 +401,6 @@ const FIELD_MAPPING_TOOL = {
 
 async function suggestFieldMappings(
   fieldSamples: Map<string, FieldDetection>,
-  anthropicApiKey: string,
   supabase: DbClient,
   userId: string | null,
   workspaceId: string | null,
@@ -435,12 +435,6 @@ async function suggestFieldMappings(
       suggestions.set(field, { mapping: 'metadata', confidence: 0.5 });
     }
   };
-
-  if (!anthropicApiKey) {
-    console.log('⚠️ No Anthropic API key, using dictionary-only fallback for residual');
-    applyDefaults();
-    return suggestions;
-  }
 
   // Build AI prompt — only send the residual, not all fields. This is the
   // cost lever: stable feeds with all-standard tag names skip the AI call
@@ -490,40 +484,27 @@ async function suggestFieldMappings(
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        // Haiku is enough — categorization-with-context is well within its
-        // capability and ~20× cheaper than Opus per call.
-        model: 'claude-haiku-4-5',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-        // Real tool_use with a FORCED tool_choice (#363 `EE-16`, invariant 9). This
-        // classifier's verdict decides which product column every unrecognised supplier tag
-        // writes into, so it drives a DB write and may not be parsed out of prose. What this
-        // replaces was free-form text plus `content.match(/\{[\s\S]*\}/)` — a salvage regex
-        // that takes the first `{` to the last `}` and hopes. That greedy span happily
-        // swallows a preamble's example JSON, and any shape that parses is accepted: a
-        // confidence of "high", a mapping of `null`, an object where a number belongs. Same
-        // defect class as document_classifier.py and consensus_validator.py in mivaa#12.
-        tools: [FIELD_MAPPING_TOOL],
-        tool_choice: { type: 'tool', name: FIELD_MAPPING_TOOL.name },
-      }),
-    });
+    // Through the shared client: this call's tokens reached no ledger before, while the user
+    // was debited for it 40 lines up. An unresolved key now arrives as a throw and lands in the
+    // same dictionary-only fallback the explicit key check used to provide.
+    const data = await callClaudeMessages({
+      // Haiku is enough — categorization-with-context is well within its
+      // capability and ~20× cheaper than Opus per call.
+      model: 'claude-haiku-4-5',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }],
+      // Real tool_use with a FORCED tool_choice (#363 `EE-16`, invariant 9). This
+      // classifier's verdict decides which product column every unrecognised supplier tag
+      // writes into, so it drives a DB write and may not be parsed out of prose. What this
+      // replaces was free-form text plus `content.match(/\{[\s\S]*\}/)` — a salvage regex
+      // that takes the first `{` to the last `}` and hopes. That greedy span happily
+      // swallows a preamble's example JSON, and any shape that parses is accepted: a
+      // confidence of "high", a mapping of `null`, an object where a number belongs. Same
+      // defect class as document_classifier.py and consensus_validator.py in mivaa#12.
+      tools: [FIELD_MAPPING_TOOL],
+      tool_choice: { type: 'tool', name: FIELD_MAPPING_TOOL.name },
+    }, { task: 'xml_field_mapper', userId: userId ?? undefined, workspaceId });
 
-    if (!response.ok) {
-      console.error('Claude API error:', await response.text());
-      await refundMapping();
-      applyDefaults();
-      return suggestions;
-    }
-
-    const data = await response.json();
     const toolUse = (data.content || []).find(
       (b: any) => b?.type === 'tool_use' && b?.name === FIELD_MAPPING_TOOL.name,
     );
@@ -644,7 +625,6 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const anthropicApiKey = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase credentials not configured');
@@ -735,7 +715,6 @@ Deno.serve(withApiLogging('xml-import-orchestrator', async (req) => {
       // the function docstring for the rationale.
       const aiSuggestions = await suggestFieldMappings(
         fieldDetections,
-        anthropicApiKey(),
         supabase,
         userId,
         workspace_id,

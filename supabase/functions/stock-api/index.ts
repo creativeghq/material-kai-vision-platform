@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
+import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { trackShipment, refreshShipment, type TrackInput } from '../_shared/shipping/shipsgo.ts';
@@ -112,21 +113,31 @@ const QUOTE_MODES = ['fcl', 'lcl', 'air'];
 
 const FORECAST_MODEL = () => Deno.env.get('STOCK_FORECAST_MODEL') || 'claude-sonnet-4-6';
 
-/** Force a tool call and return its structured input (mirrors hr-api/ai-meter callClaudeTool). */
-async function callClaudeTool(prompt: string, tool: any, maxTokens = 1600): Promise<any> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!key) throw new HttpError(400, 'AI is not configured (ANTHROPIC_API_KEY missing)');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
+/**
+ * Force a tool call and return its structured input.
+ *
+ * Goes through `callClaudeMessages` rather than its own fetch, which is what gets this forecast's
+ * token spend into ai_usage_logs — it was landing in no ledger at all, while the USER was being
+ * charged for it two lines up by debitStockOp. It also stops reading ANTHROPIC_API_KEY off
+ * Deno.env: the platform_secrets bootstrap cannot write env on Supabase edge, so a DB-only key
+ * was invisible here and the endpoint just 400'd.
+ */
+async function callClaudeTool(
+  prompt: string,
+  tool: any,
+  attribution: { userId?: string; workspaceId?: string | null },
+  maxTokens = 1600,
+): Promise<any> {
+  let data;
+  try {
+    data = await callClaudeMessages({
       model: FORECAST_MODEL(), max_tokens: maxTokens,
       tools: [tool], tool_choice: { type: 'tool', name: tool.name },
       messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
-  const data = await res.json();
+    }, { task: 'stock_reorder_prioritise', ...attribution });
+  } catch (e) {
+    throw new HttpError(502, `AI request failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const block = (data.content || []).find((b: any) => b.type === 'tool_use');
   if (!block?.input) throw new HttpError(502, 'AI returned no structured result');
   return block.input;
@@ -362,7 +373,7 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
           // invariant-9 data delimiter, not tunable copy.
           const planner = await loadPrompt(svc, 'tool', 'stock_reorder_prioritise');
           const prompt = `${planner}\n\n<items>\n${JSON.stringify(top)}\n</items>`;
-          const out = await callClaudeTool(prompt, PRIORITIZE_TOOL);
+          const out = await callClaudeTool(prompt, PRIORITIZE_TOOL, { userId, workspaceId });
           const recs: any[] = Array.isArray(out?.recommendations) ? out.recommendations : [];
           // Merge AI reasoning back onto the candidates for a single ranked list.
           const byId = new Map(candidates.map((c) => [c.warehouse_item_id, c]));

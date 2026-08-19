@@ -542,6 +542,8 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       body.reference_image_url,
       body.edit_instruction ?? body.prompt ?? '',
       isOurs,
+      resolvedUserId,
+      body.workspace_id ?? null,
     );
     if (!gate.allowed) {
       console.warn(`[generate-interior-gemini] edit refused (${gate.documentKind ?? 'unknown'}) user=${resolvedUserId} mode=${mode}`);

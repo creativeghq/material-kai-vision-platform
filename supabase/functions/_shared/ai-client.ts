@@ -53,6 +53,7 @@ import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 import { resolveTokenPrice, resolveUnitPrice } from './ai-logger.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
+import { resolveSecret } from './secrets.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
 // Every call through generateWithGemini / generateWithClaude is automatically
@@ -639,6 +640,126 @@ export async function generateStructuredWithClaude<T>(
     });
     throw err;
   }
+}
+
+// ── Claude: the raw Messages API, through the chokepoint ─────────────────────
+/**
+ * The Messages API verbatim, with the two things a hand-rolled `fetch` keeps forgetting.
+ *
+ * The AI SDK wrappers above cover a one-shot text or structured turn. They do NOT cover forced
+ * `tool_use` against a hand-written tool schema, or an image block in the user turn — and those
+ * are not exotic here: invariant 9 REQUIRES forced tool_use for any classifier whose verdict
+ * drives a spend or a write, and `image-edit-gate` classifies an actual image. So fifteen call
+ * sites reached past this file to `fetch('https://api.anthropic.com/v1/messages')`, which is not
+ * fifteen people ignoring a rule — it is a rule with a hole in it.
+ *
+ * What they lost by going around:
+ *   1. Cost. Ten re-implemented logging by hand; five (flow-engine, stock-api,
+ *      xml-import-orchestrator, image-edit-gate, next-steps) logged NOTHING, so that Anthropic
+ *      spend reached no cost view at all. A plausible zero that nothing raises.
+ *   2. The key. Three read `Deno.env.get('ANTHROPIC_API_KEY')` directly. `Deno.env.set` throws on
+ *      Supabase edge, so the platform_secrets bootstrap is a no-op — a key an admin set in the DB
+ *      and never in env is invisible to those three, and the call just fails.
+ *
+ * Both come free here. `body` is passed to Anthropic unchanged, so a migrating call site keeps
+ * its own tools, tool_choice, system blocks and image content exactly as they were.
+ *
+ * THROWS on a missing key, a non-2xx, or a network failure — always after logging the attempt.
+ * Every site this replaced already had a try/catch around its fetch and a separate `!res.ok`
+ * branch that did the same thing as the catch, so a throw preserves their behaviour.
+ */
+export interface ClaudeMessagesResponse {
+  id?: string;
+  stop_reason?: string;
+  // `input` is the provider's tool_use payload — shape is the caller's own tool schema, so
+  // it is keyed-unknown rather than `unknown` (which blocks every property read) or `any`
+  // (which would silently accept a typo at every call site).
+  content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+export async function callClaudeMessages(
+  body: Record<string, unknown> & { model?: string; max_tokens: number },
+  config: {
+    task: string;
+    userId?: string;
+    workspaceId?: string | null;
+    /** Default 60s. The old sites ranged 20–120s; pass the one that site used. */
+    timeoutMs?: number;
+    /**
+     * Set ONLY when this call's tokens are already booked in another ledger, and name it in a
+     * comment at the call site. `agent-chat` books its turns — including the next-steps garnish —
+     * into `agent_usage_logs` via `log_agent_usage`, which ALSO debits credits. AIPerformanceTab
+     * reads both tables, so a second row here would count the same tokens twice, which is the
+     * two-derivations-of-one-money-quantity shape in a new costume.
+     */
+    costLoggedByCaller?: boolean;
+    /**
+     * Extra request headers, for the beta opt-ins the Messages API gates behind one —
+     * `{'anthropic-beta': 'web-search-2025-03-05'}` for the server-side web_search tool, which is
+     * why flow-engine had its own fetch. Never put the API key here; it is resolved above.
+     */
+    headers?: Record<string, string>;
+  },
+): Promise<ClaudeMessagesResponse> {
+  const modelId = String(body.model || DEFAULT_CLAUDE_MODEL);
+  const _start = Date.now();
+  const fail = (message: string): never => {
+    if (config.costLoggedByCaller) throw new Error(message);
+    void _logTrackedCall({
+      task: config.task,
+      userId: config.userId,
+      workspaceId: config.workspaceId ?? undefined,
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: message,
+    });
+    throw new Error(message);
+  };
+
+  // env first, platform_secrets second — the shared resolver, never a bare Deno.env.get.
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'ANTHROPIC_API_KEY')).value
+    : Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) fail('ANTHROPIC_API_KEY unresolved (env and platform_secrets)');
+
+  let res: Response;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(config.headers ?? {}),
+        // After the spread, so a caller cannot accidentally override either.
+        'x-api-key': apiKey!,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ ...body, model: modelId }),
+      signal: AbortSignal.timeout(config.timeoutMs ?? 60_000),
+    });
+  } catch (e) {
+    return fail(`anthropic request failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    return fail(`anthropic ${res.status}: ${detail.slice(0, 300)}`);
+  }
+
+  const response = await res.json() as ClaudeMessagesResponse;
+  if (config.costLoggedByCaller) return response;
+  void _logTrackedCall({
+    task: config.task,
+    userId: config.userId,
+    workspaceId: config.workspaceId ?? undefined,
+    model: modelId,
+    inputTokens: Number(response.usage?.input_tokens ?? 0),
+    outputTokens: Number(response.usage?.output_tokens ?? 0),
+    latencyMs: Date.now() - _start,
+  });
+  return response;
 }
 
 // ── Gemini: Image generation + editing ──

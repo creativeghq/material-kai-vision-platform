@@ -28,7 +28,7 @@
  *    stopped appearing.
  */
 import { loadPrompt } from './prompt-utils.ts';
-import { resolveSecret } from './secrets.ts';
+import { callClaudeMessages, type ClaudeMessagesResponse } from './ai-client.ts';
 import { captureException } from './sentry.ts';
 
 /** One offered next step: a button caption + the message clicking it sends. */
@@ -116,6 +116,10 @@ export async function proposeNextSteps(
      * platform cannot do, while still letting it write a step in its own words.
      */
     capabilities?: string[];
+    /** Attribution for the ai_usage_logs row. NULL here means the spend belongs to nobody,
+     *  which is the gap that broke every per-tenant cost view once already. */
+    userId?: string;
+    workspaceId?: string | null;
   },
 ): Promise<{ steps: NextStep[]; usage: NextStepsUsage | null }> {
   const none = { steps: [] as NextStep[], usage: null };
@@ -130,12 +134,6 @@ export async function proposeNextSteps(
     void captureException(e instanceof Error ? e : new Error(String(e)), {
       tags: { area: 'next-steps', reason: 'prompt_unavailable' },
     });
-    return none;
-  }
-
-  const apiKey = (await resolveSecret(supabase, 'ANTHROPIC_API_KEY')).value;
-  if (!apiKey) {
-    console.error('[next-steps] ANTHROPIC_API_KEY unresolved — no suggestions this turn');
     return none;
   }
 
@@ -168,31 +166,26 @@ export async function proposeNextSteps(
     `${parts.join('\n\n')}\n\n` +
     'Call propose_next_steps with what this user would most plausibly want next.';
 
-  let response: AnthropicResponse;
+  let response: ClaudeMessagesResponse;
   let usage: NextStepsUsage | null = null;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system,
-        tools: [PROPOSE_TOOL],
-        tool_choice: { type: 'tool', name: PROPOSE_TOOL.name },
-        messages: [{ role: 'user', content: userContent }],
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+    response = await callClaudeMessages({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system,
+      tools: [PROPOSE_TOOL],
+      tool_choice: { type: 'tool', name: PROPOSE_TOOL.name },
+      messages: [{ role: 'user', content: userContent }],
+    }, {
+      task: 'agent_next_steps',
+      userId: args.userId,
+      workspaceId: args.workspaceId,
+      timeoutMs: TIMEOUT_MS,
+      // These tokens are returned to agent-chat, which books them into `agent_usage_logs` via
+      // log_agent_usage — that RPC also DEBITS the user. AIPerformanceTab reads both ledgers, so
+      // letting the shared client write an ai_usage_logs row too would count this turn twice.
+      costLoggedByCaller: true,
     });
-    if (!res.ok) {
-      console.error(`[next-steps] call failed: ${res.status} ${await res.text().catch(() => '')}`);
-      return none;
-    }
-    response = await res.json();
     usage = {
       inputTokens: Number(response.usage?.input_tokens ?? 0),
       outputTokens: Number(response.usage?.output_tokens ?? 0),
@@ -200,7 +193,9 @@ export async function proposeNextSteps(
       modelName: MODEL,
     };
   } catch (e) {
-    console.error('[next-steps] call threw:', e);
+    // Covers the unresolved key, a non-2xx and a network failure alike — all three used to be
+    // separate branches here and all three returned `none`.
+    console.error('[next-steps] call failed:', e);
     return none;
   }
 
