@@ -29,6 +29,7 @@ import {
   type WorkspaceWebhook,
   type WebhookDelivery,
 } from '@/services/workspaceWebhooksService';
+import { HubEmptyState } from '@/components/core/hub';
 
 const relative = (iso: string | null) => (iso ? formatDate(iso, { withTime: true }) : '—');
 
@@ -162,8 +163,8 @@ export const WebhooksTab: React.FC = () => {
                 verify it really came from us.
               </p>
             </div>
-            <Button size="sm" className="rounded-full shrink-0" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add endpoint
+            <Button size="sm" className="shrink-0" onClick={() => setAddOpen(true)}>
+              <Plus /> Add endpoint
             </Button>
           </div>
         </CardHeader>
@@ -171,9 +172,12 @@ export const WebhooksTab: React.FC = () => {
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : hooks.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              No endpoints yet. Add one to start receiving events.
-            </p>
+            <HubEmptyState
+              icon={Webhook}
+              title="No endpoints yet"
+              description="A webhook endpoint receives a signed POST whenever something happens in this workspace — an order is placed, a quote is signed, a lead arrives."
+              action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus /> Add endpoint</Button>}
+            />
           ) : (
             <table className="w-full text-sm">
               <thead>

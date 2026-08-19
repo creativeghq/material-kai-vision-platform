@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2,
-  Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag,
-  ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink,
-  ChevronLeft, ChevronRight, CalendarDays, BarChart2, Users, Calendar, Grid3x3,
-  Mail, MessageCircle, FileText, Sparkles, Layers,
-} from 'lucide-react';
+import { User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2, Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, CalendarDays, BarChart2, Users, Calendar, Grid3x3, Mail, MessageCircle, FileText, Sparkles, Layers, Wrench } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -30,6 +24,7 @@ import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatNumber } from '@/utils/decimal';
+import { HubEmptyState } from '@/components/core/hub';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -1088,7 +1083,16 @@ export const ProfileTab: React.FC = () => {
             />
           )}
           {services.length === 0 && !addingService && (
-            <p className="text-sm text-muted-foreground">No services added yet.</p>
+            <HubEmptyState
+              icon={Wrench}
+              title="No services added yet"
+              description="What you offer, in your own words — this is what shows on your public profile and in the marketplace."
+              action={
+                <Button size="sm" onClick={() => { setAddingService(true); setEditingServiceId(null); }}>
+                  <Plus /> Add a service
+                </Button>
+              }
+            />
           )}
         </CardContent>
       </Card>

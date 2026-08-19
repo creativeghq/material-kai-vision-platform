@@ -9,6 +9,7 @@ import { Loader2, Plus, Trash2, Tags, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { humanizeLabel } from '@/utils/humanize';
+import { HubEmptyState } from '@/components/core/hub';
 
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -52,7 +53,7 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4" /> Finance Categories</CardTitle>
-        <Button size="sm" variant="outline" className="rounded-full" onClick={importDefaults} disabled={importing}>
+        <Button size="sm" variant="outline" onClick={importDefaults} disabled={importing}>
           {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} Import default categories
         </Button>
       </CardHeader>
@@ -69,7 +70,16 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
         {loading ? (
           <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No categories yet.</p>
+          <HubEmptyState
+            icon={Tags}
+            title="No categories yet"
+            description="Categories classify invoices, receipts, expenses and payments. Import the standard set to start — you can rename and add to it after."
+            action={
+              <Button size="sm" onClick={importDefaults} disabled={importing}>
+                {importing ? <Loader2 className="animate-spin" /> : <Download />} Import default categories
+              </Button>
+            }
+          />
         ) : (
           <div className="space-y-1">
             {rows.map((c) => (

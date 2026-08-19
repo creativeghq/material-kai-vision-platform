@@ -5,7 +5,7 @@
  * only the current revision of `client_visible` documents — enforced by RLS, not by this UI.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History } from 'lucide-react';
+import { Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -18,6 +18,7 @@ import {
   projectDocumentsService,
   type ProjectDocumentWithRevisions, type ProjectDocumentRevision,
 } from '../../services/projectDocumentsService';
+import { HubEmptyState } from '@/components/core/hub';
 
 export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
   const { toast } = useToast();
@@ -81,16 +82,19 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
           </p>
         </div>
         {isOwner && (
-          <Button size="sm" className="rounded-full" onClick={() => setCreating(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> New document
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus /> New document
           </Button>
         )}
       </CardHeader>
       <CardContent className="p-0">
         {docs.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            No documents yet. Create one, then upload revisions against it.
-          </p>
+          <HubEmptyState
+            icon={FileText}
+            title="No documents yet"
+            description="Create the document first, then upload revisions against it. Clients always see the current revision, never an older one."
+            action={isOwner ? <Button size="sm" onClick={() => setCreating(true)}><Plus /> New document</Button> : undefined}
+          />
         ) : (
           <div className="divide-y divide-hairline">
             {docs.map((d) => (

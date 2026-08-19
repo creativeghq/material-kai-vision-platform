@@ -168,7 +168,13 @@ Clusters are declared **once**, in the client `TOOLKITS` catalog (`agentToolsCat
 map is a generated projection of it (`_shared/toolkitClusters.generated.ts`). **Never hand-write a
 `SERVER_TOOLKITS` map** — that hand-kept mirror is what this replaced, and a second copy is a red build. Every
 new tool's `onChunk` type MUST be registered in `AGENT_RESULT_TITLES` in `AgentHub.tsx`, or the output is
-silently dropped.
+silently dropped. **This bites hardest on a `run:` quick-start**, which calls the tool deterministically with no
+model turn — so there is no prose to fall back on, and the user gets the quick-start's cheerful `done` copy over
+an empty screen. "My flows", "Which job boards?", "Browse the radar" and "Track an entry" all shipped that way,
+each logging its result to `console.debug` under a comment saying the agent's reply would summarize it. Note a
+handler is NOT enough: a branch that only logs is the bug. Now guarded — for every `run:` quick-start, against
+the chunks its tool actually emits for the action it pins — by the "direct-run quick-start renders its tool
+output" case in [tests/unit/toolkitCoverage.test.ts](tests/unit/toolkitCoverage.test.ts).
 
 **Run `npm run tools:manifest` after touching any `tool(fn, {...})` definition or the `TOOLKITS` catalog.** It
 emits two committed files: `src/components/features/ai/toolManifest.generated.ts` (an AST projection of every

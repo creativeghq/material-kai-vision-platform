@@ -16,6 +16,7 @@ import { servicesService, type ServiceItem, type ServiceInput } from '@/modules/
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { parseDecimal, formatMoney } from '@/utils/decimal';
+import { HubEmptyState } from '@/components/core/hub';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
 
@@ -146,7 +147,12 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
         {loading ? (
           <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
         ) : items.length === 0 && editing === null ? (
-          <p className="text-xs text-muted-foreground">No services yet. Click <strong>New service</strong> to add one.</p>
+          <HubEmptyState
+            icon={Wrench}
+            title="No services yet"
+            description="Services are what you sell that carries no stock — installation, consulting, delivery. They appear on quotes and invoices and transmit to myDATA with their own classification."
+            action={<Button size="sm" onClick={startNew}><Plus /> New service</Button>}
+          />
         ) : (
           <div className="space-y-1">
             {items.map((s) => (

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { HubEmptyState } from '@/components/core/hub';
 import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
@@ -114,7 +115,7 @@ export const ContractsSection: React.FC<{
   useEffect(() => { void load(); }, [load]);
 
   const groups = useMemo(() => (buildGroups ? buildGroups(rows) : []), [buildGroups, rows]);
-  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+  const { values: filterValues, setValues: setFilterValues, reset: resetFilters, filtered, previewCount, activeCount } =
     useFilters<Contract>(rows, groups);
 
   const resetForm = () => {
@@ -234,7 +235,7 @@ export const ContractsSection: React.FC<{
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><FileSignature className="h-4 w-4" /> {heading}</h3>
         {canCreate && (
-          <Button size="sm" variant="outline" className="rounded-full" onClick={openCreate}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
+          <Button size="sm" variant="outline" onClick={openCreate}><Plus /> New contract</Button>
         )}
       </div>
 
@@ -252,9 +253,30 @@ export const ContractsSection: React.FC<{
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm py-6"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">
-          {activeCount > 0 ? 'No contracts match your filters.' : 'No contracts yet.'}
-        </p>
+        /* Two different kinds of nothing, and they need opposite offers. With filters on, the
+           workspace probably has plenty of contracts and the fix is to widen the filter —
+           showing "New contract" there invites the user to create a duplicate of something they
+           already have. With no filters, the create action is the whole point of the screen. */
+        activeCount > 0 ? (
+          <HubEmptyState
+            variant="filtered"
+            icon={FileSignature}
+            title="No contracts match your filters"
+            description="Widen the search or clear a filter to see the rest."
+            action={
+              <Button size="sm" variant="outline" onClick={resetFilters}>
+                Clear filters
+              </Button>
+            }
+          />
+        ) : (
+          <HubEmptyState
+            icon={FileSignature}
+            title="No contracts yet"
+            description="Contracts are signable agreements — draft one, send a signing link, and the signed PDF is stored against the record."
+            action={canCreate ? <Button size="sm" onClick={openCreate}><Plus /> New contract</Button> : undefined}
+          />
+        )
       ) : (
         <div className="space-y-2">
           {filtered.map((c) => (

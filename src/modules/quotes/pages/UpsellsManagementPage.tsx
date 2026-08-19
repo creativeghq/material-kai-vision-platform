@@ -42,6 +42,7 @@ import { parseDecimal, formatMoney } from '@/utils/decimal';
 import { quotesService, Upsell } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface UpsellsManagementProps {
   embedded?: boolean;
@@ -296,9 +297,14 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
             </TableHeader>
             <TableBody>
               {upsells.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    No upsells yet
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={4} className="p-0">
+                    <HubEmptyState
+                      icon={Plus}
+                      title="No upsells yet"
+                      description="An upsell is an optional extra offered alongside a quote — an extended warranty, a fitting service, a care kit. Define one and it can be attached to any quote."
+                      action={<Button size="sm" onClick={handleOpenCreate}><Plus /> Add upsell</Button>}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

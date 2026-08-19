@@ -30,6 +30,7 @@ import {
   type ProjectProductWithDisplay,
 } from '../../services/projectsService';
 import { statusTone } from '@/utils/statusTone';
+import { HubEmptyState } from '@/components/core/hub';
 
 const STATUS_LABELS: Record<ProjectProductStatus, string> = {
   selection: 'Selection',
@@ -148,22 +149,32 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-medium flex items-center gap-2"><Package className="h-4 w-4" /> Products</h3>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="rounded-full" onClick={importFromQuotes} disabled={importing}>
+          <Button size="sm" variant="outline" onClick={importFromQuotes} disabled={importing}>
             {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <DownloadCloud className="h-3.5 w-3.5 mr-1" />}
             Import from quotes
           </Button>
-          <Button size="sm" className="rounded-full" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add product
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus /> Add product
           </Button>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <Card className="dashboard-card"><CardContent className="py-12 text-center">
-          <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No products tracked on this project yet.</p>
-          <p className="text-xs text-muted-foreground mt-1">Add one manually, or import the lines from an attached quote.</p>
-        </CardContent></Card>
+        <Card className="dashboard-card p-0">
+          <HubEmptyState
+            icon={Package}
+            title="No products tracked on this project yet"
+            description="Tracking a product here is what lets the project say what was specified, what is ordered and what has arrived."
+            action={
+              <>
+                <Button size="sm" onClick={() => setAddOpen(true)}><Plus /> Add product</Button>
+                <Button size="sm" variant="outline" onClick={importFromQuotes} disabled={importing}>
+                  {importing ? <Loader2 className="animate-spin" /> : <DownloadCloud />} Import from quotes
+                </Button>
+              </>
+            }
+          />
+        </Card>
       ) : (
         <Card className="dashboard-card"><CardContent className="p-0"><div className="divide-y divide-hairline">
           {rows.map((r) => (

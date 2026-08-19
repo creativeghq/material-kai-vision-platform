@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Clock, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { emailService, EmailDomain } from '../services/emailService';
 import { useToast } from '@/hooks/use-toast';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface EmailDomainsTabProps {
   onDomainVerified?: () => void;
@@ -185,10 +186,13 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
             <div className="py-8 text-center text-muted-foreground">Loading domains...</div>
           </div>
         ) : domains.length === 0 ? (
-          <div className="dashboard-card">
-            <div className="py-8 text-center text-muted-foreground">
-              No domains configured. Add your first domain to start sending emails.
-            </div>
+          <div className="dashboard-card p-0">
+            <HubEmptyState
+              icon={Globe}
+              title="No domains configured"
+              description="Email sent from a domain you have verified lands in the inbox; email sent from an unverified one lands in spam. Add yours and follow the DNS records shown."
+              action={<Button size="sm" onClick={() => setShowAddDialog(true)}><Plus /> Add domain</Button>}
+            />
           </div>
         ) : (
           domains.map((domain) => (

@@ -444,3 +444,140 @@ function extractOrderCodePascal(rawBody: string): string | null {
   const m = rawBody.match(/"OrderCode"\s*:\s*"?(\d+)"?/);
   return m ? m[1] : null;
 }
+
+/**
+ * Non-destructive end-to-end check of a tenant's stored Viva credentials.
+ *
+ * WHY THIS EXISTS: every field on the setup card is silently wrong until a real customer
+ * pays. A mistyped `source_code` (Viva issues a 4-DIGIT code per payment source; the old
+ * card copy suggested the literal string "Default") authenticates fine, stores fine, and
+ * only fails at `POST /checkout/v2/orders` — i.e. at the first sale. So we do that POST
+ * here, deliberately, on demand.
+ *
+ * It creates a real €0.30 order and reads it back. No money moves: nobody is sent to the
+ * checkout page, and `paymentTimeout` expires it in five minutes. The read-back is the
+ * part that actually proves the source code, since Viva echoes `SourceCode` back and a
+ * wrong-but-existing code would otherwise pass silently.
+ *
+ * The webhook leg is NOT testable from here — Viva provides no way to trigger a delivery —
+ * which is exactly why `webhook_event_types` records what really arrives instead.
+ */
+export interface VivaCheck {
+  key: 'oauth' | 'merchant' | 'order' | 'source_code';
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+/** Short enough that a stray test order is gone before anyone could find it. */
+const TEST_ORDER_TIMEOUT_SECONDS = 300;
+
+export async function runVivaConnectionTest(
+  ctx: PaymentProviderContext,
+  opts: { currency?: string } = {},
+): Promise<{ ok: boolean; checks: VivaCheck[]; orderCode: string | null }> {
+  const checks: VivaCheck[] = [];
+  const currency = (opts.currency ?? 'EUR').toUpperCase();
+  const hosts = vivaHosts(ctx.isSandbox);
+  const envLabel = ctx.isSandbox ? 'demo' : 'production';
+
+  // 1 — Smart Checkout OAuth pair.
+  try {
+    await getVivaAccessToken(ctx);
+    checks.push({
+      key: 'oauth',
+      label: 'Smart Checkout credentials',
+      ok: true,
+      detail: `Token issued by ${envLabel} accounts host.`,
+    });
+  } catch (err) {
+    checks.push({
+      key: 'oauth',
+      label: 'Smart Checkout credentials',
+      ok: false,
+      // The overwhelmingly common cause is a demo/production mismatch: the two are
+      // separate accounts whose credentials are NOT interchangeable.
+      detail: `${err instanceof Error ? err.message : String(err)} — check the Client ID / Secret, and that they belong to your ${envLabel} account.`,
+    });
+    return { ok: false, checks, orderCode: null };
+  }
+
+  // 2 — Merchant pair. Same call the webhook verification handshake makes, so a failure
+  //     here predicts a failed "Verify" in the Viva dashboard.
+  try {
+    const res = await fetch(`${hosts.www}/api/messages/config/token`, {
+      headers: { Authorization: `Basic ${btoa(`${ctx.credentials.merchant_id}:${ctx.credentials.api_key}`)}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    checks.push({
+      key: 'merchant',
+      label: 'Merchant ID / API key',
+      ok: true,
+      detail: 'Verification key retrieved — the webhook Verify step will succeed.',
+    });
+  } catch (err) {
+    checks.push({
+      key: 'merchant',
+      label: 'Merchant ID / API key',
+      ok: false,
+      detail: `${err instanceof Error ? err.message : String(err)} — webhook verification will fail until this pair is right.`,
+    });
+  }
+
+  // 3 — The real proof: create an order on the configured source.
+  let orderCode: string | null = null;
+  try {
+    const created = await createVivaOrder(
+      {
+        invoiceId: 'connection-test',
+        invoiceNumber: 'connection-test',
+        amount: 0.3,
+        currency,
+        description: 'Connection test — do not pay',
+        method: 'card',
+      },
+      ctx,
+      { paymentTimeout: TEST_ORDER_TIMEOUT_SECONDS },
+    );
+    orderCode = created.orderCode;
+    checks.push({
+      key: 'order',
+      label: 'Create a payment order',
+      ok: true,
+      detail: `Order ${created.orderCode} created for 0.30 ${currency}. It expires in 5 minutes and nobody was charged.`,
+    });
+  } catch (err) {
+    checks.push({
+      key: 'order',
+      label: 'Create a payment order',
+      ok: false,
+      detail: `${err instanceof Error ? err.message : String(err)} — most often a wrong payment source code (Viva's is a 4-digit number, e.g. 2241).`,
+    });
+    return { ok: false, checks, orderCode: null };
+  }
+
+  // 4 — Read it back and confirm Viva used the source we asked for. Viva accepts an
+  //     unknown source code by falling back, so only the echo proves it.
+  try {
+    const order = await retrieveVivaOrder(orderCode, ctx);
+    const echoed = String((order.raw as Record<string, unknown>).SourceCode ?? '');
+    const expected = ctx.credentials.source_code || 'Default';
+    checks.push({
+      key: 'source_code',
+      label: 'Payment source',
+      ok: echoed === expected,
+      detail: echoed === expected
+        ? `Viva echoed source ${echoed} — matches your configuration.`
+        : `Viva used source "${echoed}" but this workspace is configured for "${expected}". Fix the source code, or payments land on the wrong source.`,
+    });
+  } catch (err) {
+    checks.push({
+      key: 'source_code',
+      label: 'Payment source',
+      ok: false,
+      detail: `Order read-back failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+
+  return { ok: checks.every((c) => c.ok), checks, orderCode };
+}

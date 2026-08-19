@@ -12,6 +12,7 @@ import { PropertyFormDialog, type PropertyFormValues } from './PropertyFormDialo
 import { scoreLead } from '@/modules/crm/services/leadScoring';
 import { statusTone } from '@/utils/statusTone';
 import { formatMoney, formatNumber } from '@/utils/decimal';
+import { HubEmptyState } from '@/components/core/hub';
 
 // real-estate panel on the CRM contact page: the person's PROPERTIES (own as many as they
 // like — each a real listing record), their buyer profile (budget / pre-approval) and saved
@@ -81,16 +82,18 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
             <CardTitle className="flex items-center gap-2"><Home className="h-4 w-4" /> Properties</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">Every property this person owns or is selling. Add as many as they have.</p>
           </div>
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => openNew()} disabled={!ws}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add property
+          <Button size="sm" variant="outline" onClick={() => openNew()} disabled={!ws}>
+            <Plus /> Add property
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           {owned.length === 0 && interested.length === 0 && !valuationLead ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No properties on this record yet. Use “Add property” to create one — it becomes a full listing
-              you can price, photograph, publish and take offers on.
-            </div>
+            <HubEmptyState
+              icon={Home}
+              title="No properties on this record yet"
+              description="Add one and it becomes a full listing — priced, photographed, publishable, and able to take offers."
+              action={<Button size="sm" onClick={() => openNew()} disabled={!ws}><Plus /> Add property</Button>}
+            />
           ) : (
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">

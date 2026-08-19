@@ -16,6 +16,7 @@ import { stockService, type StockCount, type StockCountLine } from '../services/
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildStockCountFilters } from './stockCountFilters';
 import { formatDate } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 const STATUS_META: Record<string, { cls: string; label: string }> = {
   draft: { cls: 'text-amber-600 dark:text-amber-400', label: 'Draft' },
@@ -52,7 +53,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId]);
 
   const filterGroups = useMemo(() => buildStockCountFilters(counts), [counts]);
-  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+  const { values: filterValues, setValues: setFilterValues, reset: resetFilters, filtered, previewCount, activeCount } =
     useFilters<StockCount>(counts, filterGroups);
   // A narrowed list is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterValues]);
@@ -72,18 +73,29 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
               searchPlaceholder="Search counts…"
             />
           )}
-          <Button size="sm" className="rounded-full" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New count</Button>
+          <Button size="sm" onClick={() => setNewOpen(true)}><Plus /> New count</Button>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            {activeCount > 0
-              ? 'No stock counts match your filters.'
-              : 'No stock counts yet. Start one to reconcile physical stock against the system.'}
-          </div>
+          activeCount > 0 ? (
+            <HubEmptyState
+              variant="filtered"
+              icon={ClipboardList}
+              title="No stock counts match your filters"
+              description="Widen the filter to see the counts you have already run."
+              action={<Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>}
+            />
+          ) : (
+            <HubEmptyState
+              icon={ClipboardList}
+              title="No stock counts yet"
+              description="A stock count reconciles what is physically on the shelf against what the system thinks is there, and posts the difference as an adjustment."
+              action={<Button size="sm" onClick={() => setNewOpen(true)}><Plus /> Start a count</Button>}
+            />
+          )
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">

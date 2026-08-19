@@ -24,13 +24,17 @@
 
 /* ===== Aleo — headings / display serif (self-hosted, LATIN ONLY) =====
    No Greek, and only a partial latin-ext. --font-display falls through to Averta
-   for anything Aleo cannot draw; see the note on --font-display above. */
+   for anything Aleo cannot draw; see the note on --font-display above.
+
+   UPRIGHT ONLY. Aleo is reachable from exactly two places — `h1`/`h2` and the
+   `font-display` utility — and nothing in the app renders either in italic, so
+   the three italic faces were 60KB of files no browser could ever request.
+   Weight 300 stays: three pages set `font-light` on an h1/h2. If a display
+   heading ever does need italic, the browser synthesises an oblique from the
+   upright face; add the real face back only if that is visibly wrong. */
 @font-face { font-family: 'Aleo'; font-style: normal;  font-weight: 300; font-display: swap; src: url('/fonts/Aleo-Light.woff2') format('woff2'); }
-@font-face { font-family: 'Aleo'; font-style: italic;  font-weight: 300; font-display: swap; src: url('/fonts/Aleo-LightItalic.woff2') format('woff2'); }
 @font-face { font-family: 'Aleo'; font-style: normal;  font-weight: 400; font-display: swap; src: url('/fonts/Aleo-Regular.woff2') format('woff2'); }
-@font-face { font-family: 'Aleo'; font-style: italic;  font-weight: 400; font-display: swap; src: url('/fonts/Aleo-Italic.woff2') format('woff2'); }
 @font-face { font-family: 'Aleo'; font-style: normal;  font-weight: 700; font-display: swap; src: url('/fonts/Aleo-Bold.woff2') format('woff2'); }
-@font-face { font-family: 'Aleo'; font-style: italic;  font-weight: 700; font-display: swap; src: url('/fonts/Aleo-BoldItalic.woff2') format('woff2'); }
 
 @tailwind base;
 @tailwind components;

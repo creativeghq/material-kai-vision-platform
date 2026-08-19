@@ -24,6 +24,7 @@ import {
   siteService, SNAG_STATUSES, SNAG_SEVERITIES, SNAG_CLOSED_STATUSES,
   type ProjectSnag, type ProjectSiteLog, type SnagStatus, type SnagSeverity,
 } from '../../services/siteService';
+import { HubEmptyState } from '@/components/core/hub';
 
 type View = 'snags' | 'log';
 
@@ -381,14 +382,19 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
           <p className="text-xs text-muted-foreground">Dated visit notes. Internal — never shown to the client.</p>
         </div>
         {isOwner && (
-          <Button size="sm" className="rounded-full" onClick={() => setAdding(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add entry
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus /> Add entry
           </Button>
         )}
       </CardHeader>
       <CardContent className="p-0">
         {logs.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">No site visits logged yet.</p>
+          <HubEmptyState
+            icon={CalendarDays}
+            title="No site visits logged yet"
+            description="A dated note per visit — what you found, what you agreed, what is blocking. Internal only; the client never sees this."
+            action={isOwner ? <Button size="sm" onClick={() => setAdding(true)}><Plus /> Add entry</Button> : undefined}
+          />
         ) : (
           <div className="divide-y divide-hairline">
             {logs.map((l) => (

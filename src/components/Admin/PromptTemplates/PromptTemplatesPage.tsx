@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Plus,
-  Edit,
-  RefreshCw,
-} from 'lucide-react';
+import { Plus, Edit, RefreshCw, FileText } from 'lucide-react';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -33,6 +29,7 @@ import {
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { PromptTemplateEditorModal, type EditableTemplate } from './PromptTemplateEditorModal';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface PromptTemplate {
   id: string;
@@ -216,9 +213,12 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">Loading templates...</div>
             ) : templates.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No templates found. Create your first template to get started.
-              </div>
+              <HubEmptyState
+                icon={FileText}
+                title="No prompt templates yet"
+                description="A prompt template is a saved starting point for a generation — the industry, the stage and the wording, ready to reuse instead of retyped."
+                action={<Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true); }}><Plus /> New template</Button>}
+              />
             ) : (
               <Table>
                 <TableHeader>

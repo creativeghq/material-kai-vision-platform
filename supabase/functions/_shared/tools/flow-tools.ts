@@ -99,15 +99,37 @@ export const createManageFlowsTool = (
       const ws = workspaceId!;
 
       if (action === 'list') {
-        const { data, error } = await db
+        // The seeded `system-default` flows — the 100+ locked, global, ALREADY-ACTIVE rows that
+        // actually deliver this platform's notifications — are `is_global = true` with a NULL
+        // workspace_id. Filtering them out client-side meant "list my flows" answered with only
+        // the handful a tenant had hand-built (usually none), while /admin → Flows listed every
+        // one, because flowService.listFlows applies no is_global filter at all. Same table,
+        // same user, two different answers, and the quick-start's `done` copy claims to have
+        // pulled up "the automations running in this workspace".
+        //
+        // So drop the redundant filter and let RLS be the single arbiter, exactly as the admin
+        // page does: `flows_tenant_select` already restricts a member to
+        // `is_global = false AND is_workspace_member(workspace_id)`, and only the platform-admin
+        // policy widens that to the global rows. A tenant's result is therefore unchanged; an
+        // admin now gets the same list here as on the page.
+        //
+        // ONLY when a JWT scoped the client, though. callerClient() falls back to the SERVICE
+        // ROLE for the partner `kai_` key and admin-secret paths, and service role bypasses RLS
+        // — so the same query on those paths would hand a partner key every platform flow.
+        let q = db
           .from('flows')
-          .select('id, name, trigger_type, status, created_at')
-          .eq('workspace_id', ws)
-          .eq('is_global', false)
-          .order('created_at', { ascending: false });
+          .select('id, name, trigger_type, status, created_at, is_global, is_locked');
+        q = jwt
+          ? q.or(`workspace_id.eq.${ws},is_global.is.true`)
+          : q.eq('workspace_id', ws).eq('is_global', false);
+        const { data, error } = await q
+          .order('is_global', { ascending: true })
+          .order('created_at', { ascending: false })
+          .limit(200);
         if (error) return JSON.stringify({ success: false, error: error.message });
-        onChunk?.({ type: 'flows_list', flows: data ?? [], timestamp: Date.now() });
-        return JSON.stringify({ success: true, flows: data ?? [] });
+        const flows = data ?? [];
+        onChunk?.({ type: 'flows_list', flows, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: flows.length, flows });
       }
 
       if (action === 'create') {

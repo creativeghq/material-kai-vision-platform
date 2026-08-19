@@ -2,7 +2,7 @@
 // and the HR module (who-holds-what angle). One data model, one component; the `context` prop only
 // shifts the emphasis (subtitle + default column focus). No dedicated /assets page by design.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2, Pencil, UserCheck, Undo2, Car, Smartphone, Laptop, CreditCard, Wrench, Box } from 'lucide-react';
+import { Loader2, Plus, Trash2, Pencil, UserCheck, Undo2, Car, Smartphone, Laptop, CreditCard, Wrench, Box, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -18,6 +18,7 @@ import {
   type CompanyAsset, type AssetCategory, type AssetStatus, type AcquisitionType, type DepreciationMethod,
   type AssetInput, type EmployeeOption, type ContactOption, type RecurringExpenseOption, type CompanyOption,
 } from '@/services/assetsService';
+import { HubEmptyState } from '@/components/core/hub';
 
 const CATEGORY_ICON: Record<AssetCategory, React.ComponentType<{ className?: string }>> = {
   vehicle: Car, phone: Smartphone, laptop: Laptop, payment_card: CreditCard, equipment: Wrench, other: Box,
@@ -218,9 +219,12 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
         {loading ? (
           <div className="p-8 flex items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No assets yet. {canManage && 'Add a vehicle, phone, card or piece of equipment to start tracking who holds it and what it costs.'}
-          </div>
+          <HubEmptyState
+            icon={Package}
+            title="No assets yet"
+            description="A vehicle, a phone, a card, a piece of equipment — track who is holding it, what it cost and what it still costs to run."
+            action={canManage ? <Button size="sm" onClick={openAdd}><Plus /> Add asset</Button> : undefined}
+          />
         ) : (
           <>
             <table className="w-full text-sm">

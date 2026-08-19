@@ -9,6 +9,7 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type PresentationCatalog, type CatalogSourcePdf } from '@/services/catalogsService';
 import { getErrorMessage } from '@/core/errors/utils';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface Props {
   catalog: PresentationCatalog;
@@ -217,7 +218,11 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
         </CardHeader>
         <CardContent className="space-y-2">
           {attached.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-2">No PDFs attached yet. Upload or attach one above.</div>
+            <HubEmptyState
+              icon={FileText}
+              title="No PDFs attached yet"
+              description="Attach a supplier catalogue and its pages become source material for this catalog. Upload a new one, or pick one already in your library, using the controls above."
+            />
           ) : attached.map((s) => (
             <div key={s.id} className="border rounded p-3 space-y-2">
               <div className="flex items-center gap-2">

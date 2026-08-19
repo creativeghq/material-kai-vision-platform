@@ -25,6 +25,7 @@ import { SheetWizardModal, type SheetWizardResult } from '@/components/features/
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface MoodboardSheetsTabProps {
   moodboardId: string;
@@ -323,12 +324,12 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </Card>
       ) : sheets.length === 0 ? (
-        <Card className="dashboard-card p-12 text-center space-y-3">
-          <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-          <p className="text-sm text-muted-foreground">Nothing here yet.</p>
-          <p className="text-xs text-muted-foreground">
-            Pick a <span className="text-foreground">New Tool</span> above to produce your first deliverable.
-          </p>
+        <Card className="dashboard-card p-0">
+          <HubEmptyState
+            icon={FileText}
+            title="No sheets yet"
+            description="A sheet is the deliverable this moodboard turns into — a presentation board, a spec sheet, a client view. Pick a tool above to make the first one."
+          />
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

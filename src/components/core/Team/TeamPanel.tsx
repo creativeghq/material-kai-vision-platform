@@ -33,6 +33,7 @@ import {
   WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, workspaceRoleLabel,
   type WorkspaceInviteRole, type WorkspaceMemberRole, type RoleModuleSlug,
 } from '@/auth/workspaceRoles';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface MemberRow {
   user_id: string;
@@ -232,11 +233,11 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" className="rounded-full" onClick={sendEmailInvite} disabled={!!busy || !email.trim()}>
+            <Button size="sm" onClick={sendEmailInvite} disabled={!!busy || !email.trim()}>
               {busy === 'invite-email' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
               Send invitation
             </Button>
-            <Button size="sm" variant="outline" className="rounded-full" onClick={generateLink} disabled={!!busy}>
+            <Button size="sm" variant="outline" onClick={generateLink} disabled={!!busy}>
               {busy === 'invite-link' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Link2 className="h-4 w-4 mr-2" />}
               Generate link instead
             </Button>
@@ -318,7 +319,12 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : members.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">No members yet.</div>
+            <HubEmptyState
+              icon={Users}
+              title="No members yet"
+              description="A member is someone with a seat in this workspace. Invite them by email, or hand out a one-time link — their role decides which portal they land on."
+              action={<Button size="sm" onClick={generateLink} disabled={!!busy}><Link2 /> Generate an invite link</Button>}
+            />
           ) : (
             <div className="divide-y divide-border/40">
               {members.map((m) => {

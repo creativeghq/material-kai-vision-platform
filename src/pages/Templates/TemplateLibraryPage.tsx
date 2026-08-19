@@ -26,6 +26,7 @@ import {
   EXTERNAL_TEMPLATE_SOURCES, LIVE_TEMPLATE_TYPES, TEMPLATE_ADAPTERS, getAdapter,
   type LiveTemplateEntityType,
 } from '@/services/templates/registry';
+import { HubEmptyState } from '@/components/core/hub';
 
 /**
  * Rail values that are not an entity type.
@@ -332,9 +333,18 @@ export const TemplateLibraryPage: React.FC = () => {
           {/* No inner "Starter examples" heading: the panel IS the starters now, and the
               SectionHeader above already says so. */}
           {activeTab !== MINE_TAB && (starters.length === 0 ? (
-            <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
-              No starter templates for this type yet.
-            </CardContent></Card>
+            <Card className="dashboard-card p-0">
+              <HubEmptyState
+                icon={Layers}
+                title="No starter templates for this type yet"
+                description="Starters are the ready-made examples we ship. You can still build your own — save any existing record as a template and it appears under My templates."
+                action={
+                  <Button size="sm" variant="outline" onClick={() => setTab(MINE_TAB)}>
+                    See my templates
+                  </Button>
+                }
+              />
+            </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {starters.map((t) => <Tile key={t.id} tpl={t} />)}

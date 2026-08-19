@@ -23,6 +23,7 @@ import {
 import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatNumber } from '@/utils/decimal';
+import { HubEmptyState } from '@/components/core/hub';
 
 
 function statusOf(w: UserWebsite): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode } {
@@ -218,7 +219,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
               The crawler reads your sitemap, fetches each page, and builds a semantic index. We never publish or modify anything on your site.
             </CardDescription>
           </div>
-          <Button onClick={openAdd} className="rounded-full" size="sm">
+          <Button onClick={openAdd} size="sm">
             <Plus className="w-4 h-4 mr-1" />
             Add website
           </Button>
@@ -229,9 +230,12 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : sites.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              No websites connected yet. Add one to enable inter-linking suggestions.
-            </div>
+            <HubEmptyState
+              icon={Globe}
+              title="No websites connected yet"
+              description="Connect a site's sitemap and generated SEO articles can link to pages you already have, instead of inventing URLs."
+              action={<Button size="sm" onClick={openAdd}><Plus /> Add website</Button>}
+            />
           ) : (
             <div className="space-y-2">
               {sites.map((w) => {

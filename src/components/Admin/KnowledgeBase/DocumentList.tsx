@@ -1,21 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  CheckCircle,
-  XCircle,
-  Clock,
-  RefreshCw,
-  ExternalLink,
-  Globe,
-  Lock,
-  Unlock,
-  Database,
-} from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, RefreshCw, ExternalLink, Globe, Lock, Unlock, Database, FileText } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -50,6 +36,7 @@ import { FilterBar, applyFiltersToQuery, countActive, type FilterValues } from '
 import { statusTone } from '@/utils/statusTone';
 import { buildKbDocFilters, type KbFilterCategory } from './kbDocFilters';
 import { formatDate } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface DocumentListProps {
   onEdit: (docId: string) => void;
@@ -649,9 +636,12 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         {isLoading ? (
           <div className="text-center py-8">Loading documents...</div>
         ) : filteredDocuments.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No documents found. Create your first document to get started.
-          </div>
+          <HubEmptyState
+            icon={FileText}
+            title="No documents yet"
+            description="Knowledge-base documents are what the assistant reads before it answers, and what a customer sees on the public help pages."
+            action={<Button size="sm" onClick={onCreate}><Plus /> New document</Button>}
+          />
         ) : (
           <Table>
             <TableHeader>

@@ -33,6 +33,7 @@ import { TOOLKITS, ALWAYS_ON_TOOLKIT_IDS } from './agentToolsCatalog';
 
 import { onEnterOrSpace } from '@/utils/a11y';
 import { formatDate } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface ConversationManagerModalProps {
   open: boolean;
@@ -181,12 +182,21 @@ export const ConversationManagerModal: React.FC<ConversationManagerModalProps> =
 
         <div className="max-h-[60vh] min-h-[240px] overflow-y-auto p-2 custom-scrollbar">
           {groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/60" />
-              <p className="text-sm text-muted-foreground">
-                {query ? 'No conversations match your search.' : 'No conversations yet.'}
-              </p>
-            </div>
+            query ? (
+              <HubEmptyState
+                variant="filtered"
+                icon={MessageSquare}
+                title="No conversations match your search"
+                description="Try a shorter phrase, or clear the search to see everything."
+                action={<Button size="sm" variant="outline" onClick={() => setQuery('')}>Clear search</Button>}
+              />
+            ) : (
+              <HubEmptyState
+                icon={MessageSquare}
+                title="No conversations yet"
+                description="Every chat you have with the assistant is saved here, so you can come back to one and pick up where it left off."
+              />
+            )
           ) : (
             groups.map((group) => (
               <div key={group.key} className="mb-1">

@@ -8765,6 +8765,28 @@
     "response": "{ ok } (always 200 to Viva once accepted; processing errors are logged, not surfaced)"
   },
   {
+    "name": "viva-config-test",
+    "tag": "Payments",
+    "summary": "Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone",
+    "description": "Runs a workspace's saved Viva credentials against Viva for real and returns a per-step verdict: the Smart Checkout OAuth pair, the Merchant pair (the same call the webhook verification handshake makes), creating a payment order on the configured source, and reading that order back.\n\nWHY IT EXISTS: every field on the Viva setup card is silently wrong until a customer pays. A mistyped payment source code — Viva issues a 4-DIGIT code per source — authenticates, saves, and is accepted by every layer right up until the first real sale. The order read-back is the only check that proves it, because Viva echoes SourceCode back.\n\nNo money moves: the test order is 0.30, nobody is redirected to checkout, and paymentTimeout expires it in five minutes. The webhook leg is NOT testable here (Viva offers no way to trigger a delivery) — `workspace_viva_config.webhook_event_types` records what actually arrives instead.\n\nTENANCY: caller must be a finance manager of the target workspace, checked under their own RLS via supabaseAsUser; mismatch returns 404, not 403.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Workspace whose stored Viva credentials to test. Gated on is_workspace_finance_manager — a mismatch 404s."
+      }
+    ],
+    "response": "{ ok, incomplete, checks: [{ key, label, ok, detail }], orderCode }"
+  },
+  {
     "name": "real-estate-api",
     "tag": "Real Estate",
     "summary": "Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals",
