@@ -156,20 +156,14 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
   const data = event?.EventData ?? {};
   const messageId = String(event?.MessageId ?? '');
 
-  // Only act on the events that move money. Everything else is acknowledged so Viva
-  // stops retrying (24 attempts, hourly, until a 2xx).
-  const actionable = [
-    EVENT_PAYMENT_CREATED,
-    EVENT_REVERSAL_CREATED,
-    EVENT_PAYMENT_FAILED,
-    EVENT_ACCOUNT_TRANSACTION,
-  ].includes(eventTypeId);
-  if (!actionable) {
-    return json({ ok: true, ignored: true, event_type_id: eventTypeId });
-  }
-
   // Resolve the TENANT from the merchant id. Unknown merchant → drop (and say so
   // blandly): this endpoint must not become a probe for which workspaces exist.
+  //
+  // ORDER MATTERS: this runs BEFORE the actionable filter, so that a delivery we ignore
+  // is still RECORDED. The whole diagnostic value is seeing that 4865 (Order Updated —
+  // a cancellation notice) arrives while 1796 never does, which is the shape of a tenant
+  // who picked the wrong event type in Viva's dropdown. Filter first and the one symptom
+  // of that mistake is thrown away unseen.
   const merchantId = String(data?.MerchantId ?? '');
   if (!merchantId) {
     console.warn('[viva-webhooks] delivery without MerchantId', messageId);
@@ -187,6 +181,17 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     return json({ ok: true, ignored: true });
   }
 
+  // Delivery health, for the setup card. Diagnostic ONLY — nothing about settlement reads
+  // it, so a forged POST buys an attacker a wrong number on a panel and nothing else.
+  // Atomic in SQL: Viva retries hourly x24, so concurrent deliveries are routine and a
+  // read-modify-write here would drop counts.
+  await db.rpc('record_viva_webhook_delivery', {
+    p_workspace_id: cfg.workspace_id,
+    p_event_type_id: eventTypeId,
+  }).then(({ error }: { error: unknown }) => {
+    if (error) console.warn('[viva-webhooks] delivery record failed', error);
+  });
+
   // Proof the tenant completed the manual dashboard registration — this is the only
   // signal we get, since Viva has no API to register merchant webhooks.
   await db
@@ -194,6 +199,18 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     .update({ webhook_verified_at: new Date().toISOString() })
     .eq('workspace_id', cfg.workspace_id)
     .is('webhook_verified_at', null);
+
+  // Only act on the events that move money. Everything else is acknowledged so Viva
+  // stops retrying (24 attempts, hourly, until a 2xx).
+  const actionable = [
+    EVENT_PAYMENT_CREATED,
+    EVENT_REVERSAL_CREATED,
+    EVENT_PAYMENT_FAILED,
+    EVENT_ACCOUNT_TRANSACTION,
+  ].includes(eventTypeId);
+  if (!actionable) {
+    return json({ ok: true, ignored: true, event_type_id: eventTypeId });
+  }
 
   const ctx = ctxFromConfig(cfg);
 

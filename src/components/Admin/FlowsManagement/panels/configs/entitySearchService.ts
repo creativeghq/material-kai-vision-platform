@@ -152,6 +152,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'trigger-factory-enrichment', label: 'trigger-factory-enrichment', sublabel: 'Propagate factory fields within a scope and queue a factory-enrichment agent if needed' },
   { id: 'trip-expense-ops', label: 'trip-expense-ops', sublabel: 'Sales trip-expense receipts: upload, sign, and render the expense PDF' },
   { id: 'vies-validate', label: 'vies-validate', sublabel: 'Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write.' },
+  { id: 'viva-config-test', label: 'viva-config-test', sublabel: 'Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone' },
   { id: 'viva-webhooks', label: 'viva-webhooks', sublabel: 'Viva.com payment webhook receiver + verification-key handshake (multi-tenant BYOK)' },
   { id: 'workspace-webhook-dispatcher', label: 'workspace-webhook-dispatcher', sublabel: 'Deliver queued outbound webhook events to tenant endpoints' },
   { id: 'workspace-webhooks-api', label: 'workspace-webhooks-api', sublabel: 'Manage a workspace\'s outbound webhook endpoints' },

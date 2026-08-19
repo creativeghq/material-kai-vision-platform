@@ -16702,6 +16702,92 @@
         }
       }
     },
+    "/viva-config-test": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone",
+        "operationId": "post_viva_config_test",
+        "description": "Runs a workspace's saved Viva credentials against Viva for real and returns a per-step verdict: the Smart Checkout OAuth pair, the Merchant pair (the same call the webhook verification handshake makes), creating a payment order on the configured source, and reading that order back.\n\nWHY IT EXISTS: every field on the Viva setup card is silently wrong until a customer pays. A mistyped payment source code — Viva issues a 4-DIGIT code per source — authenticates, saves, and is accepted by every layer right up until the first real sale. The order read-back is the only check that proves it, because Viva echoes SourceCode back.\n\nNo money moves: the test order is 0.30, nobody is redirected to checkout, and paymentTimeout expires it in five minutes. The webhook leg is NOT testable here (Viva offers no way to trigger a delivery) — `workspace_viva_config.webhook_event_types` records what actually arrives instead.\n\nTENANCY: caller must be a finance manager of the target workspace, checked under their own RLS via supabaseAsUser; mismatch returns 404, not 403.\n\n**Response:** `{ ok, incomplete, checks: [{ key, label, ok, detail }], orderCode }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Workspace whose stored Viva credentials to test. Gated on is_workspace_finance_manager — a mismatch 404s. (string (uuid))"
+                  }
+                },
+                "required": [
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/real-estate-api": {
       "post": {
         "tags": [
