@@ -31,7 +31,6 @@
     "blueprint:mirror": "node scripts/gen-blueprint-mirror.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.67.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@hookform/resolvers": "^5.2.1",

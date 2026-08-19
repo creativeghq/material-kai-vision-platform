@@ -315,11 +315,11 @@ succeeds, it just skips whatever the right one gives you for free.
 | An agent loop — tools, state, streaming | **LangChain + LangGraph, and it already exists** | `agent-chat`; register the tool, never build a second loop |
 
 - **Python has no SDK because of a pin trap** — the `anthropic` package broke the `tools` kwarg on upgrade and was removed 2026-05-23 (pipeline convention 10).
-- **Edge does not import a provider SDK because `ai-client.ts` is the chokepoint.** It constructs the providers **lazily**, so `platform_secrets` bootstrapped into env *at handler entry* is actually seen — a module-load capture reads `undefined` — and it is where token cost reaches `ai_usage_logs` against `ai_model_pricing`. Never `fetch()` a provider URL and never import `@anthropic-ai/sdk` into an edge function. `generate-social-content` is the one file still on `@anthropic-ai/sdk@0.39.0`; it re-implements the cost log by hand via `AICallLogger` and should move.
+- **Edge does not import a provider SDK because `ai-client.ts` is the chokepoint.** It constructs the providers **lazily**, so `platform_secrets` bootstrapped into env *at handler entry* is actually seen — a module-load capture reads `undefined` — and it is where token cost reaches `ai_usage_logs` against `ai_model_pricing`. Never `fetch()` a provider URL and never import a provider SDK into an edge function.
 - **`agent-chat` is not on the AI SDK because it is not a one-shot.** LangGraph owns checkpointing, the tool loop, RBAC and SSE streaming; it replaced Mastra, which is why a doc naming Mastra is out of date. A second agent runtime would need its own copy of all four.
-- `@anthropic-ai/sdk` in root `package.json` is imported by nothing in `src/` — dead weight, not a signal that the frontend calls models. It does not.
+- **The frontend does not call models at all** — zero `ai` / `@ai-sdk` / provider imports in `src/`. `@anthropic-ai/sdk` sat in `package.json` unused and was removed; do not re-add it to reach a model from a component.
 
-**Not yet enforced.** The `fetch()`-a-provider and import-a-provider-SDK halves are semgrep-shaped and should become rules; until then this section is the whole guard.
+**Enforced** for the import half by semgrep `no-provider-sdk-outside-ai-client` (`_shared/ai-client.ts` and `agent-chat/**` excluded, with the reason on each). The `fetch()`-a-provider half is not yet a rule.
 
 ## Storage — routing rule
 6 buckets; routing is path-based and feature identity lives in the **top-level folder**, not the bucket name.

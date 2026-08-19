@@ -58,6 +58,41 @@ rules:
       - pattern: const escapeHtml = (...) => { ... }
       - pattern: const escapeHtml = function (...) { ... }
 
+  # ── H · Which client makes the model call ──────────────────────────────────
+  # `_shared/ai-client.ts` is the ONE place an edge function reaches a model provider, because
+  # it is where two things happen that a direct SDK import silently skips: the providers are
+  # constructed LAZILY (so `platform_secrets` bootstrapped into env at handler entry is actually
+  # seen — a module-load capture reads `undefined`), and token cost reaches `ai_usage_logs`
+  # priced against `ai_model_pricing`. `generate-social-content` was the last file on a raw
+  # `@anthropic-ai/sdk` import; it kept its own AICallLogger call by hand, which is exactly the
+  # duplicate that drifts. Nothing failed while it was there — that is why this is a rule.
+  - id: no-provider-sdk-outside-ai-client
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      An edge function must not import an AI provider SDK. Call the shared client
+      (`_shared/ai-client.ts`: generateWithClaude / generateStructuredWithClaude /
+      generateWithGemini / generateImageWithGemini / ...) — it constructs providers lazily so
+      bootstrapped platform_secrets are seen, and it logs token cost to ai_usage_logs. A direct
+      import skips both and nothing raises.
+    paths:
+      include:
+        - "supabase/functions/**"
+      exclude:
+        # The one legitimate importer — this IS the shared client.
+        - "supabase/functions/_shared/ai-client.ts"
+        # agent-chat is the agent RUNTIME, not a one-shot: LangGraph owns the tool loop,
+        # checkpointing, RBAC and SSE streaming. It binds its model through @langchain/anthropic
+        # by design, and a second agent runtime on the AI SDK would need its own copy of all four.
+        - "supabase/functions/agent-chat/**"
+    # Provider packages only. `npm:ai@6` itself is NOT matched — inbox-api imports `tool` from
+    # it to DEFINE a tool schema, which reaches no provider and constructs no client.
+    # Nested under `pattern-either` rather than sitting at the top level: semgrep accepts both,
+    # but semgrepRuleset.test.ts asserts every non-taint rule carries one of
+    # pattern/pattern-either/patterns, and a rule the guard cannot see is a rule nobody reviews.
+    pattern-either:
+      - pattern-regex: ^\s*import\s[^;]*['"](?:https://esm\.sh/)?(?:npm:)?(?:@anthropic-ai/|@google/generative-ai|@ai-sdk/(?:anthropic|google|klingai|openai|xai)|openai[@/'"])[^'"]*['"]
+
   # ── A · Auth (invariant 1/5) ────────────────────────────────────────────────
   - id: no-jwt-verification-disabled
     languages: [python]
