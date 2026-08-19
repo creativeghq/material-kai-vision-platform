@@ -30,12 +30,27 @@
  * attach the supplier (`supplier_products`, `products.supplier_company_id`), derive the sale
  * price through the ladder, and post an `in` stock movement into the chosen warehouse.
  *
- * It is NOT the MIVAA ingest core that `ReceiveToWarehouseDialog` and dealer-add use. A Greek
- * invoice line is not enough to build a catalogue entry from, and 900 ingest calls is not a
- * thing to do behind a bulk button. What it does instead is write everything the line knows and
- * flag the row (`metadata.facet_canonicalization`) so the nightly facet sweep and the
- * 15-minute embedding-backfill agent can finish the job. Before that flag those products were
- * invisible to the only pass that would ever give them facets — empty forever, nothing complaining.
+ * It is NOT the MIVAA ingest core that `ReceiveToWarehouseDialog` and dealer-add use, on any
+ * path, single or bulk. Intake records what a supplier delivered and what it cost — a stock and
+ * cost event, not catalogue authoring. A Greek invoice line is not the raw material for an
+ * embedded, faceted catalogue entry, and minting one per approval would spend a credit a line to
+ * manufacture products nobody asked for. Promoting an intake product to a full catalogue entry
+ * is a separate, deliberate action on a product that already exists.
+ *
+ * What approval does instead is write everything the line knows and flag the row
+ * (`metadata.facet_canonicalization`, in the catalog's own facet vocabulary) so the nightly facet
+ * sweep and the 15-minute embedding-backfill agent can finish the job. Before that flag those
+ * products were invisible to the only pass that would ever give them facets.
+ *
+ * ── Recognising what we already carry ─────────────────────────────────────────────────────
+ * The queue-time matcher stores ONE best guess per line, which hides the interesting cases: two
+ * plausible candidates, or one just under the floor that a human would recognise instantly.
+ * Approving then silently forks the catalogue. So each row can ask
+ * `warehouse_intake_match_candidates` for ranked alternatives — this supplier already selling us
+ * the product under the same code, a normalised code match, trigram name similarity, the token
+ * scorer — and the operator picks one (or "create a new product"), which sets
+ * `matched_product_id` and turns the approval into an UPDATE. On demand, per row: 25 lookups a
+ * page is the N+1 this screen exists to have removed.
  *
  * "Sellable" does NOT decide whether a product is created. It decides whether a `product_prices`
  * row exists, i.e. whether the thing can be quoted. The product is created either way, because
