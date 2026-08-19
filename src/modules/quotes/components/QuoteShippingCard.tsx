@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { stockService, type FreightQuote, type FreightOffer } from '@/modules/stock/services/stockService';
 import { quotesService } from '../services/QuotesService';
+import { HubEmptyState } from '@/components/core/hub';
 
 const CONTAINERS = [
   { value: '20st', label: "20' Standard" }, { value: '40st', label: "40' Standard" },
@@ -68,14 +69,19 @@ export const QuoteShippingCard: React.FC<{ quoteId: string; editable: boolean; o
           <p className="text-xs text-muted-foreground mt-0.5">Get a freight cost (compares 100+ forwarders) and add it to the quote.</p>
         </div>
         {editable && (
-          <Button size="sm" className="rounded-full" onClick={() => setModalOpen(true)}><Calculator className="h-4 w-4 mr-1" /> Get shipping quote</Button>
+          <Button size="sm" onClick={() => setModalOpen(true)}><Calculator /> Get shipping quote</Button>
         )}
       </div>
 
       {loading ? (
         <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
       ) : rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No shipping quotes yet.</p>
+        <HubEmptyState
+          icon={Ship}
+          title="No shipping quotes yet"
+          description="Ask for a freight price on this quote and it lands here for the operator to confirm, so the shipping line on the customer's quote is a real number."
+          action={editable ? <Button size="sm" onClick={() => setModalOpen(true)}><Calculator /> Get shipping quote</Button> : undefined}
+        />
       ) : (
         <div className="space-y-3">
           {rows.map((q) => (

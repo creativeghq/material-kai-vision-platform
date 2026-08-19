@@ -143,3 +143,85 @@ describe('flow event contract', () => {
     expect(union.size).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The tenant flow vocabulary is TWO copies, and only one of them enforces.
+ *
+ * `TENANT_TRIGGERS` / `TENANT_ACTIONS` in flow-tools.ts become the zod enum handed to the LLM —
+ * what a user is OFFERED. `create_simple_flow`'s `v_allowed_triggers` / `v_allowed_actions` are
+ * what is ALLOWED. The tool's own comment says they "MUST stay in sync"; nothing checked, and
+ * they drifted: the enum carried `payment_sent`, the RPC did not, so every "notify me when a
+ * payment goes out" flow passed zod, reached the RPC and raised
+ * `42501 trigger_type "payment_sent" is not allowed for tenant flows`. Offered, accepted,
+ * impossible — and the only way to find out was to click it.
+ *
+ * The RPC lives in the database, so no unit test can read it. What this CAN do is refuse to let
+ * the TypeScript half change quietly: the pin below fails the build on any edit, and the message
+ * says to apply the matching migration in the same change. A silent drift becomes a deliberate
+ * one, which is the whole difference.
+ */
+describe('tenant flow vocabulary', () => {
+  const TOOL_FILE = 'supabase/functions/_shared/tools/flow-tools.ts';
+
+  const readConst = (name: string): string[] => {
+    const src = stripComments(readFileSync(TOOL_FILE, 'utf8'));
+    const start = src.indexOf(`const ${name} = [`);
+    expect(start, `could not find ${name} in ${TOOL_FILE}`).toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf(']', start));
+    return [...body.matchAll(/'([a-zA-Z0-9_.]+)'/g)].map((m) => m[1]);
+  };
+
+  // Must equal create_simple_flow's v_allowed_triggers / v_allowed_actions, verbatim.
+  const RPC_TRIGGERS = [
+    'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
+    'inbox.message_received',
+  ];
+  const RPC_ACTIONS = [
+    'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
+  ];
+
+  const SYNC_HINT =
+    'Changing the tenant vocabulary means changing BOTH halves in the same change: this constant ' +
+    '(what the LLM is offered) and create_simple_flow (what the RPC allows), applied via ' +
+    'mcp__supabase__apply_migration. Update the pinned list here once the migration is applied.';
+
+  it('the offered triggers are exactly the ones create_simple_flow allows', () => {
+    expect([...readConst('TENANT_TRIGGERS')].sort(), SYNC_HINT).toEqual([...RPC_TRIGGERS].sort());
+  });
+
+  it('the offered actions are exactly the ones create_simple_flow allows', () => {
+    expect([...readConst('TENANT_ACTIONS')].sort(), SYNC_HINT).toEqual([...RPC_ACTIONS].sort());
+  });
+
+  it('every tenant trigger is a real member of the TriggerType union', () => {
+    const union = readTriggerUnion();
+    for (const t of readConst('TENANT_TRIGGERS')) {
+      expect(union.has(t), `'${t}' is offered to tenants but is not in the TriggerType union`).toBe(true);
+    }
+  });
+
+  /**
+   * The tool's admission rule, enforced: "Add a trigger only once a trusted server-side emitter
+   * stamps workspace_id." A tenant flow bound to an event nothing emits is the silent-zero shape
+   * — it saves, it activates, it shows up in the list, and it never once fires.
+   */
+  it('every tenant trigger has an emitter (or is an entry point)', () => {
+    // 'scheduled' is cron-driven — flow-engine wakes it, no emit call exists or should.
+    const ENTRY_POINTS = new Set(['scheduled']);
+    // collectEmits() only sees STRING-LITERAL event names, by deliberate design (see its comment).
+    // 'quote_approved' is emitted through a ternary — `const eventName = accepted ? 'quote_approved'
+    // : 'quote_rejected'; flowEventService.emit(eventName, { …, workspace_id })` in
+    // src/modules/quotes/services/QuotesService.ts:572 — so it is real, workspace-stamped, and
+    // invisible here. Exempted with its site named, not by loosening the scan into guesswork.
+    const EMITTED_VIA_VARIABLE = new Set(['quote_approved']);
+    const emitted = new Set(collectEmits().map((e) => e.event));
+    for (const t of readConst('TENANT_TRIGGERS')) {
+      if (ENTRY_POINTS.has(t) || EMITTED_VIA_VARIABLE.has(t)) continue;
+      expect(
+        emitted.has(t),
+        `'${t}' is offered to tenants but nothing in the repo emits it — a flow bound to it can ` +
+          `never fire, and nothing would ever report that.`,
+      ).toBe(true);
+    }
+  });
+});

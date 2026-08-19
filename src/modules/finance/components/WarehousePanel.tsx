@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag, Boxes, Upload } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag, Boxes, Upload, Warehouse as WarehouseIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -23,6 +23,7 @@ import { TaricCombobox } from '@/components/core/TaricCombobox';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
 import { localISODateOffset } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -190,7 +191,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
         <div className="flex items-center gap-2 shrink-0">
           <Button size="sm" variant="outline" onClick={() => setAddWhOpen(true)} className="rounded-full"><Plus className="h-4 w-4 mr-1" /> Warehouse</Button>
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="rounded-full" disabled={!selectedWh}><Upload className="h-4 w-4 mr-1" /> Import</Button>
-          <Button size="sm" onClick={() => setAddOpen(true)} className="rounded-full" disabled={!selectedWh}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
+          <Button size="sm" onClick={() => setAddOpen(true)} disabled={!selectedWh}><Plus /> Add item</Button>
         </div>
       </CardHeader>
       {/* Stock filters */}
@@ -227,10 +228,24 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             </thead>
             <tbody>
               {items.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No stock items yet.</td></tr>
+                <tr className="hover:bg-transparent"><td colSpan={7} className="p-0">
+                  <HubEmptyState
+                    icon={WarehouseIcon}
+                    title="No stock items yet"
+                    description="A stock item is a product this warehouse physically holds, with a quantity on hand and a reorder point that warns you before you run out."
+                    action={<Button size="sm" onClick={() => setAddOpen(true)} disabled={!selectedWh}><Plus /> Add item</Button>}
+                  />
+                </td></tr>
               )}
               {items.length > 0 && visibleItems.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No items match the filters.</td></tr>
+                <tr className="hover:bg-transparent"><td colSpan={7} className="p-0">
+                  <HubEmptyState
+                    variant="filtered"
+                    icon={WarehouseIcon}
+                    title="No items match the filters"
+                    description={`This warehouse holds ${items.length} item${items.length === 1 ? '' : 's'} — widen the filter to see them.`}
+                  />
+                </td></tr>
               )}
               {paginate(visibleItems, page).map((it) => {
                 const low = it.qty_on_hand <= it.reorder_point && it.reorder_point > 0;

@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { projectsService } from '../../services/projectsService';
 import { formatDate } from '@/utils/datetime';
+import { HubEmptyState } from '@/components/core/hub';
 
 const money = (n: number | null, c: string | null) => formatMoney(n, c ?? 'EUR');
 
@@ -81,17 +82,24 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium flex items-center gap-2"><Receipt className="h-4 w-4" /> Invoices</h3>
-        <Button size="sm" className="rounded-full" onClick={() => { setOpen(true); setQuoteId(acceptedQuotes[0]?.id ?? ''); setMode('full'); setPercent('50'); }} disabled={acceptedQuotes.length === 0}>
+        <Button size="sm" onClick={() => { setOpen(true); setQuoteId(acceptedQuotes[0]?.id ?? ''); setMode('full'); setPercent('50'); }} disabled={acceptedQuotes.length === 0}>
           <Plus className="h-3.5 w-3.5 mr-1" /> New invoice
         </Button>
       </div>
 
       {acceptedQuotes.length === 0 && invoices.length === 0 && (
-        <Card className="dashboard-card"><CardContent className="py-12 text-center">
-          <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No accepted quotes to invoice yet.</p>
-          <p className="text-xs text-muted-foreground mt-1">Accept a project quote, then bill it here — in full or by progress %.</p>
-        </CardContent></Card>
+        <Card className="dashboard-card p-0">
+          <HubEmptyState
+            icon={FileText}
+            title="No accepted quotes to invoice yet"
+            description="Billing starts from an accepted quote — once one is accepted you can invoice it in full, or by progress percentage as the job runs."
+            action={
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${projectId}?tab=quotes`)}>
+                Go to quotes
+              </Button>
+            }
+          />
+        </Card>
       )}
 
       {invoices.length > 0 && (
