@@ -48,9 +48,33 @@ on:
         default: false
         type: boolean
 
-concurrency:
-  group: deploy-frontend-prod
-  cancel-in-progress: false
+# ────────────────────────────────────────────────────────────────────────────────────────
+# Concurrency is per-JOB, not per-workflow, and that distinction is the whole point.
+#
+# It used to be one workflow-level `deploy-frontend-prod` group with `cancel-in-progress:
+# false`, which serialized ENTIRE RUNS — including the hermetic gates, which contend for
+# nothing. Measured 2026-08-19: five pushes between 07:37 and 08:17 took 38 minutes end to
+# end, ~13 of it pure waiting, and the push at 07:58 sat 9m09s before a single job started.
+# A lint error in that commit was therefore 11 minutes away instead of 2.
+#
+# So: the gates (changes, typecheck, unit-tests, lint) carry NO group and start immediately
+# on every push — every commit still gets its own verdict. Only the jobs that touch a shared
+# external resource are grouped, each in its OWN group (a shared group would make
+# deploy-frontend and deploy-functions cancel each other WITHIN one run, since they run
+# concurrently).
+#
+# Those groups cancel in progress, which is safe here BY DESIGN rather than by luck: the
+# `deployed/frontend` / `deployed/functions` markers are moved only by a successful deploy,
+# so a superseded run's work stays in the next run's diff and redeploys by itself (see the
+# marker comment in `changes`). A burst of five pushes now collapses into one deploy that
+# ships all five.
+#
+# The honest cost, stated because it is real: cancelling deploy-functions mid-sweep leaves
+# prod running old code for the functions it had not reached yet, until the superseding run
+# finishes. That is an EXTENSION of an existing window, not a new failure mode — the sweep is
+# sequential by necessity (see the comment on it), so prod is mixed-version for ~5 minutes on
+# every normal functions deploy already. What the markers guarantee is that it converges.
+# ────────────────────────────────────────────────────────────────────────────────────────
 
 jobs:
   # ────────────────────────────────────────────────────────────────────
@@ -273,6 +297,12 @@ jobs:
   # ────────────────────────────────────────────────────────────────────
   regenerate:
     runs-on: ubuntu-latest
+    # This job PUSHES to the branch, so it is the one gate that must not run concurrently with
+    # itself: two runs regenerating and pushing at once race on the same ref. Only the newest
+    # tree is worth regenerating, so cancel rather than queue.
+    concurrency:
+      group: regenerate-generated-artifacts-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: write
     steps:
@@ -352,6 +382,29 @@ jobs:
       # declares — describes a real design error no generator can fix, and those still gate.
       - run: npm run gen:all
       - run: npm test
+
+  # ────────────────────────────────────────────────────────────────────
+  # lint: the eslint + a11y ratchets. Split out of `unit-tests` on 2026-08-19 purely for
+  # wall-clock — the three checks ran serially there (test 28s + lint 30s + a11y 31s) on the
+  # critical path in front of every deploy, and they are independent.
+  #
+  # It gates the deploy exactly as it did inside unit-tests: both deploy jobs list it in
+  # `needs`, so a red lint still ships nothing. That wiring is the part to keep — the reason
+  # lint matters here is that the Deploy workflow is the ONLY thing running it, so a lint-only
+  # failure passes typecheck and tests and would otherwise block the deploy silently.
+  # ────────────────────────────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      # Lint the tree as CI BUILDS it, not as it was pushed — a generator output with a lint
+      # error must fail here rather than at the next person's `npm run lint`.
+      - run: npm run gen:all
       # Lint is a gate as of 2026-07-16 (it never was, so 3468 errors accumulated
       # unnoticed — including 9 real react-hooks/rules-of-hooks violations).
       # `npm run lint` tolerates ZERO errors; the remaining WARNINGS are ratcheted
@@ -371,10 +424,17 @@ jobs:
   deploy-frontend:
     # `unit-tests` was an orphan: it ran `npm test`, `npm run lint` and `lint:a11y`
     # and NOTHING depended on it, so a red suite still shipped to production and the
-    # failure was a report rather than a gate. It gates now.
-    needs: [changes, typecheck, unit-tests]
+    # failure was a report rather than a gate. It gates now — and `lint`, which was split
+    # out of it, must stay listed here for the same reason.
+    needs: [changes, typecheck, unit-tests, lint]
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # One build+upload against the Vercel project at a time; newest push wins. A cancelled
+    # upload never gets aliased (--skip-domain), so there is nothing to unwind, and the
+    # `deployed/frontend` marker stays put so the next run rebuilds it.
+    concurrency:
+      group: deploy-frontend-vercel
+      cancel-in-progress: true
     environment: production
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -441,6 +501,13 @@ jobs:
     needs: [deploy-frontend, fe-smoke]
     if: ${{ needs.deploy-frontend.result == 'success' && needs.fe-smoke.result == 'success' }}
     runs-on: ubuntu-latest
+    # Its own group, separate from deploy-frontend's — sharing one would have the two cancel
+    # each other. cancel-in-progress here is what keeps the alias monotonic: if a newer
+    # candidate is ready to promote, aliasing the older one first and the newer one second is
+    # merely wasteful, but the reverse order would leave the OLD build live behind a green tick.
+    concurrency:
+      group: promote-vercel-alias
+      cancel-in-progress: true
     environment: production
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -498,7 +565,7 @@ jobs:
   # Runs in parallel with the frontend job. Skipped if no functions changed.
   # ────────────────────────────────────────────────────────────────────
   deploy-functions:
-    needs: [changes, unit-tests]
+    needs: [changes, unit-tests, lint]
     # Run when the diff touched functions, OR on a manual/forced dispatch (the changes job fills
     # changed_functions with ALL functions in that case — gating on the paths-filter `functions`
     # output alone made the force_full_functions_deploy toggle inert on a frontend-only HEAD).
@@ -508,6 +575,14 @@ jobs:
        || github.event.inputs.force_full_functions_deploy == 'true')
       && needs.changes.outputs.changed_functions_count != '0'
     runs-on: ubuntu-latest
+    # One sweep against the Supabase project at a time — the CLI is not safe to run
+    # concurrently against one project even from separate runners (see the deploy step's
+    # comment: contention makes some functions silently get a stale upload while exiting 0).
+    # Cancelling a half-finished sweep is the accepted cost of collapsing bursts: the marker
+    # is not moved, so the superseding run redeploys everything this one did not reach.
+    concurrency:
+      group: deploy-functions-supabase
+      cancel-in-progress: true
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -670,7 +745,36 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+
+      # `--with-deps` was removed 2026-08-19 and it was the single slowest thing in the
+      # pipeline. It ran `apt-get update` + install on every run, and the log says what for:
+      #
+      #     0 upgraded, 9 newly installed
+      #     Fetched 21.1 MB in 3min 16s (107 kB/s)
+      #
+      # Nine FONT packages — CJK, Thai, Cyrillic, unifont — crawling out of
+      # azure.archive.ubuntu.com. Every library Chromium actually links reported "already the
+      # newest": the runner image ships them. Measured range 24s–251s across recent runs, all
+      # of the variance being that mirror's throughput. The 294 MB of browser binaries from
+      # cdn.playwright.dev took ELEVEN SECONDS, and the suite itself takes 20.
+      #
+      # This job sits in front of `promote`, so that apt call was up to 4 minutes of
+      # time-to-live spent on glyph sets no route in this app renders (Latin and Greek are
+      # covered by the runner's DejaVu).
+      #
+      # If a future runner image ever drops a Chromium dependency, this fails loudly at browser
+      # launch — restore it by adding a `npx playwright install-deps chromium` step, NOT by
+      # putting `--with-deps` back and paying the font download again.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
       - name: 🖥️ Front-end route-load smoke
         env:
           # The unaliased production candidate, NOT the live domain — this has to fail before

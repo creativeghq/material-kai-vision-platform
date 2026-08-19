@@ -58,3 +58,75 @@ describe('deploy baseline', () => {
     ).toBe(false);
   });
 });
+
+/**
+ * Guard: the two properties that used to be free and are now load-bearing wiring.
+ *
+ * On 2026-08-19 this workflow was restructured for wall-clock — the lint checks moved out of
+ * `unit-tests` into their own job, and the single workflow-level concurrency group (which
+ * serialized entire runs, costing ~13 minutes of pure queueing across five pushes) was replaced
+ * by per-job groups on only the jobs that touch a shared external resource.
+ *
+ * Both changes are safe, and both replaced a structural guarantee with a wiring decision that
+ * fails SILENTLY if it is undone. Hence these.
+ */
+// LF-normalized. A Windows checkout has CRLF, so an LF-anchored multiline regex matches
+// nothing and every assertion below would pass vacuously — the same shape that had to be
+// fixed in another guard this week.
+const wfLF = wf.split('\r\n').join('\n');
+
+function jobBlock(name: string): string {
+  // From `^  <name>:` to the next top-level job key. Comments between jobs belong to the block
+  // that follows them, which does not matter for anything asserted here.
+  const m = new RegExp(`^  ${name}:$([\\s\\S]*?)(?=^  [a-z][a-z0-9-]*:$|$(?![\\s\\S]))`, 'm').exec(wfLF);
+  if (!m) throw new Error(`job "${name}" not found in deploy.yml — it was renamed or removed`);
+  return m[1];
+}
+
+describe('deploy wiring', () => {
+  it('keeps lint gating BOTH deploys, wherever the lint steps live', () => {
+    // `npm run lint` is the check people skip: it is the one gate the Deploy workflow alone
+    // runs, so a lint-only failure passes typecheck and tests and blocks the deploy silently.
+    // While it lived inside `unit-tests` it was gated for free. Now it is a `needs:` entry —
+    // one word, deletable, and nothing goes red if it goes missing.
+    const owner = ['unit-tests', 'lint'].find((j) => {
+      const b = jobBlock(j);
+      return b.includes('npm run lint') && b.includes('npm run lint:a11y');
+    });
+    expect(owner, 'no job runs both `npm run lint` and `npm run lint:a11y`').toBeDefined();
+
+    for (const deployer of ['deploy-frontend', 'deploy-functions']) {
+      const needs = /needs:\s*\[([^\]]*)\]/.exec(jobBlock(deployer))?.[1] ?? '';
+      expect(
+        needs.split(',').map((s) => s.trim()),
+        `${deployer} no longer needs "${owner}" — a red lint would ship to production`,
+      ).toContain(owner);
+    }
+  });
+
+  it('serializes every job that touches a shared external resource', () => {
+    // There is no workflow-level group any more, so this is the ONLY thing stopping two runs
+    // building against the same Vercel project, aliasing out of order, or running two
+    // `supabase functions deploy` sweeps at once — the last of which reports ✅ while silently
+    // uploading stale code (2026-06-01).
+    expect(
+      /^concurrency:/m.test(wfLF),
+      'a workflow-level concurrency group is back — it serializes the hermetic gates too, ' +
+        'which is what cost 9 minutes of queueing per push',
+    ).toBe(false);
+
+    const groups = new Map<string, string>();
+    for (const job of ['deploy-frontend', 'promote', 'deploy-functions']) {
+      const group = /concurrency:\s*\n\s*group:\s*(\S+)/.exec(jobBlock(job))?.[1];
+      expect(group, `${job} has no concurrency group — two runs can now race on it`).toBeDefined();
+      // Distinct groups, and this is not tidiness: deploy-frontend and deploy-functions run
+      // CONCURRENTLY inside one run, so a shared group makes them cancel each other and the
+      // run half-deploys itself.
+      expect(
+        groups.get(group!),
+        `${job} shares its concurrency group with ${groups.get(group!)}`,
+      ).toBeUndefined();
+      groups.set(group!, job);
+    }
+  });
+});
