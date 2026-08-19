@@ -42,7 +42,12 @@ _syncEnvIntoPolyfill();
 import { generateText, generateImage, experimental_generateVideo as generateVideo, Output, stepCountIs } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
-import { createKlingAI } from 'npm:@ai-sdk/klingai';
+// Pinned to a MAJOR, like the two providers above. The bare `npm:@ai-sdk/klingai` this
+// replaced was a wildcard: `supabase/functions/deno.lock` is NOT tracked, so nothing held
+// the resolved 4.0.17 and every deploy took whatever npm called latest that morning. That
+// is the exact shape that got the Python `anthropic` SDK removed (a pin trap broke the
+// `tools` kwarg) and that produced `fix(ai-client): AI SDK v4 API against a v6 pin`.
+import { createKlingAI } from 'npm:@ai-sdk/klingai@4';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
