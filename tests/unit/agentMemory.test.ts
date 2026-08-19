@@ -532,3 +532,60 @@ describe('background dispatch reports the truth', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * A question in prose is converted into a form — mechanically (#370, Class D).
+ *
+ * Three prompt rules ("if you ask, ask on the canvas", "a menu is a question", "never open with
+ * I'd be happy to help") took this from 0% to ~55% and then stopped. Measured over the 2026-08-19
+ * suite: quote, SEO, pricing, b2b, moodboard and mentions asked through `request_input`; catalog
+ * (4/4 attempts), hiring and stock still wrote numbered questions into the reply. A fourth
+ * paragraph was not going to close a plateau three could not — instruction is a suggestion,
+ * enforcement is a mechanism. This pins the mechanism.
+ */
+describe('prose questions are converted to a canvas form', () => {
+  it('a turn that asks without working triggers one corrective pass', () => {
+    expect(
+      /askedInProse[\s\S]{0,300}?calledRequestInput[\s\S]{0,300}?didWork/.test(agentChatCode),
+      'the corrective pass must gate on all three: the reply asked, request_input was NOT already ' +
+        'used, and the turn produced no work. Missing any one of them either misses the failing ' +
+        'case or fires on a turn that was fine.',
+    ).toBe(true);
+  });
+
+  it('it re-asks through the tool rather than rewriting the prose', () => {
+    const block = agentChatCode.slice(agentChatCode.indexOf('askedInProse'));
+    expect(
+      /bindTools\(\[requestInputTool\]\)/.test(block) && /requestInputTool\.invoke\(/.test(block),
+      'the corrective pass must force request_input and actually invoke it — otherwise the card ' +
+        'never reaches the canvas and only the wording changed',
+    ).toBe(true);
+  });
+
+  it('the reply is replaced so the questions are not shown twice', () => {
+    const block = agentChatCode.slice(agentChatCode.indexOf('askedInProse'));
+    expect(
+      /finalText = /.test(block),
+      'once the card is on screen the prose reply must be replaced, or the user reads the same ' +
+        'questions underneath a form that already asks them',
+    ).toBe(true);
+  });
+
+  it('it never fails the turn', () => {
+    const block = agentChatCode.slice(agentChatCode.indexOf('askedInProse'));
+    expect(
+      /catch \(correctiveErr\)/.test(block),
+      'a prose answer is worse than a form, not broken — the corrective pass must not be able to ' +
+        'take the turn down with it',
+    ).toBe(true);
+  });
+
+  it('it only fires when a real question was asked, not on any turn', () => {
+    // Gating on `didWork` is what keeps it off the successful path: a turn that searched and
+    // answered "…want me to narrow it?" has done its job and must not be re-prompted.
+    expect(
+      /turnProducedWork\(/.test(agentChatCode.slice(agentChatCode.indexOf('askedInProse'))),
+      'the corrective pass must reuse turnProducedWork rather than re-deriving "did anything happen"',
+    ).toBe(true);
+  });
+});

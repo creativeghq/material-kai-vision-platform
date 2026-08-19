@@ -2624,8 +2624,61 @@ async function executeAgent(
     // Log final usage stats
 
     // Return results
-    const finalText = result.finalResponse ||
+    let finalText = result.finalResponse ||
       (result.iteration >= 10 ? 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.' : '');
+
+    // ── A question in prose is converted into a form. Mechanically. ───────────
+    //
+    // Three separate prompt rules — "if you ask, ask on the canvas", "a menu is a question",
+    // "never open with I'd be happy to help" — moved this from 0% to about 55% and then stopped.
+    // Measured over the 2026-08-19 suite: quote, SEO, pricing, b2b, moodboard and mentions asked
+    // through `request_input`; catalog (4/4), hiring and stock still wrote numbered questions into
+    // the reply. A fourth paragraph of instruction was not going to close a plateau that three
+    // could not, which is the same lesson as every other fix in #370: instruction is a suggestion,
+    // enforcement is a mechanism.
+    //
+    // So when a turn ENDS by asking in prose and did no work, it gets exactly one corrective pass
+    // telling it to re-ask through the tool. It fires only on the path that is already failing —
+    // a turn that acted, or that already used `request_input`, never reaches here — so the cost is
+    // one extra call on the turns that would otherwise have produced an unusable wall of text.
+    try {
+      const askedInProse = /\?/.test(finalText);
+      const calledRequestInput = result.toolResults?.some((tr: any) => tr?.tool === 'request_input');
+      const didWork = turnProducedWork(
+        (result.toolResults ?? []).map((tr: any) => ({ tool: tr?.tool, result: tr?.result })),
+      );
+      const requestInputTool = tools.find((t: any) => t?.name === 'request_input');
+
+      if (askedInProse && !calledRequestInput && !didWork && requestInputTool && modelOpus) {
+        console.log('[agent-chat] prose question detected with no work — running the request_input corrective pass');
+        const corrective = await modelOpus.bindTools([requestInputTool]).invoke([
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userInput },
+          { role: 'assistant', content: finalText },
+          {
+            role: 'user',
+            content:
+              'STOP. That reply asked me questions in prose, which gives me nothing to act on. '
+              + 'Call `request_input` now with exactly those questions as fields — turn any list of '
+              + 'options into a `select` with its options, and set `default` on every field to the '
+              + 'value you would have used if I had not been here. Do not write the questions again.',
+          },
+        ]);
+
+        const call = (corrective?.tool_calls ?? []).find((c: any) => c?.name === 'request_input');
+        if (call) {
+          await requestInputTool.invoke(call.args);
+          // The card is now on screen, so the reply must not repeat its contents. One line.
+          finalText = 'I need a couple of details — the form is on screen.';
+          result.toolResults = [...(result.toolResults ?? []), { tool: 'request_input', args: call.args, result: '{"success":true}' }];
+        } else {
+          console.warn('[agent-chat] corrective pass did not produce a request_input call — leaving the prose reply');
+        }
+      }
+    } catch (correctiveErr) {
+      // Never fail a turn over this: the prose answer is worse, not broken.
+      console.warn('[agent-chat] request_input corrective pass failed:', correctiveErr);
+    }
 
     return {
       text: finalText,
