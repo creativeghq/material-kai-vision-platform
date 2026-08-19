@@ -10,7 +10,7 @@
 import { getGenerationPrompt, loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
-import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.39.0';
+import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -18,15 +18,13 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
-// Pre-flight estimate ONLY — shown before the call, never persisted. The real charge is
-// derived inside debitExternalServiceCredits from ai_model_pricing and comes back as
-// debitResult.credits_debited. Reporting this constant instead was a second derivation of a
-// money quantity (anti-regression rule #1): a caption is actually billed 0.3 and was reported
-// as 2 — a 6.7x overstatement that could never reconcile against credit_transactions or
-// ai_usage_logs, and that any future "what did this post cost" rollup would inherit.
-const CREDIT_COST = 2;
+// The real charge is derived inside debitExternalServiceCredits from ai_model_pricing and
+// comes back as debitResult.credits_debited — that is the ONLY number this function may report
+// (anti-regression rule #1). The previous fix moved the three DB writes onto credits_debited
+// and left the RESPONSE on a hardcoded 2, so the row said 0.3 and the screen said 2: the same
+// 6.7x overstatement, now disagreeing with the row written by the same request. There is no
+// constant here any more, because the estimate had no reader — nothing shows it before the call.
 
 const PLATFORM_SPECS: Record<string, { max_chars: number; hashtag_style: string; tone_notes: string }> = {
   instagram:  { max_chars: 2200, hashtag_style: 'mix of popular and niche', tone_notes: 'visual, aspirational, story-driven' },
@@ -39,6 +37,16 @@ const PLATFORM_SPECS: Record<string, { max_chars: number; hashtag_style: string;
   threads:    { max_chars: 500, hashtag_style: 'minimal hashtags', tone_notes: 'conversational, authentic' },
 };
 
+
+const CAPTION_RESULT = z.object({
+  captions: z.array(z.object({
+    variant: z.number(),
+    caption: z.string(),
+    char_count: z.number(),
+  })).min(1),
+  hashtags: z.array(z.string()),
+  best_time_hint: z.string(),
+});
 
 Deno.serve(withApiLogging('generate-social-content', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -110,69 +118,30 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY() });
-
     const systemPrompt = renderPromptTemplate(await loadPrompt(supabase, 'tool', 'social_content_system'), { tone: tone, platform: platform, max_chars: spec.max_chars, tone_notes: spec.tone_notes, hashtag_instruction: include_hashtags ? `Include ${hashtag_count} hashtags — style: ${spec.hashtag_style}.` : 'Do not include hashtags.' });
 
     const userPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'social_caption_variants'), { platform: platform, topic: topic, product_info: product_info ? `Product/material details: ${product_info}` : '' });
 
-    const claudeStart = Date.now();
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: userPrompt }],
-      system: systemPrompt,
-    });
-    const claudeLatencyMs = Date.now() - claudeStart;
+    // Schema-locked, so there is no fenced-JSON strip, no JSON.parse, and no "did it come back
+    // with a captions array" guard — the three things that used to turn a paid call into a
+    // refund. A shape violation throws and the outer catch refunds, same as any other failure.
+    // Cost logging comes with the shared client; the hand-rolled AICallLogger block this
+    // replaced was the only reason the raw SDK path stayed honest.
+    const { output: parsed } = await generateStructuredWithClaude(
+      userPrompt,
+      CAPTION_RESULT,
+      {
+        model: 'claude-haiku-4-5',
+        systemPrompt,
+        maxTokens: 1500,
+        task: 'social_content_generation',
+        userId,
+        workspaceId: workspace_id ?? undefined,
+      },
+    );
 
-    // Track Claude usage in ai_call_logs (cost + tokens) — credits already
-    // debited upfront via debitExternalServiceCredits, so this is observability only.
-    try {
-      const { AICallLogger } = await import('../_shared/ai-logger.ts');
-      const aiLogger = new AICallLogger(supabaseUrl, supabaseServiceKey);
-      await aiLogger.logClaudeCall(
-        'social_content_generation',
-        'claude-haiku-4-5',
-        message,
-        claudeLatencyMs,
-        0.9,
-        { model_confidence: 0.9, completeness: 0.9, consistency: 0.9, validation: 0.9 },
-        'use_ai_result',
-        undefined,
-        undefined,
-        // Name the tenant the spend belongs to (#365 AD-15).
-        { userId, workspaceId: workspace_id ?? null },
-      );
-    } catch (logErr) {
-      console.warn('[generate-social-content] Logger failed:', logErr);
-    }
-
-    const firstBlock = Array.isArray(message.content) ? message.content[0] : undefined;
-    const rawText = firstBlock && firstBlock.type === 'text' ? firstBlock.text : '';
-    let parsed: { captions: Array<{ variant: number; caption: string; char_count: number }>; hashtags: string[]; best_time_hint: string };
-
-    try {
-      const cleaned = rawText.replace(/^```json\s*/m, '').replace(/```\s*$/m, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      console.error('[generate-social-content] Failed to parse Claude response:', rawText);
-      await refundCredits(supabase, userId, debitResult.credits_debited, workspace_id);
-      return jsonResponse({ success: false, error: 'Failed to parse AI response' }, 500);
-    }
-
-    // The AI may return a malformed shape — guard before mapping so we don't 500
-    // after the credit was already debited.
-    if (!parsed || !Array.isArray(parsed.captions)) {
-      console.error('[generate-social-content] AI response missing captions array:', rawText);
-      await refundCredits(supabase, userId, debitResult.credits_debited, workspace_id);
-      return jsonResponse({ success: false, error: 'AI response missing captions' }, 500);
-    }
-
-    // Fill in char_counts
-    parsed.captions = parsed.captions.map(c => ({
-      ...c,
-      char_count: (c?.caption || '').length,
-    }));
+    // char_count is ours to compute, not the model's to claim.
+    parsed.captions = parsed.captions.map((c) => ({ ...c, char_count: (c?.caption || '').length }));
 
     // Save draft post if no post_id provided
     let savedPostId = post_id;
@@ -223,7 +192,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
       hashtags: parsed.hashtags,
       best_time_hint: parsed.best_time_hint,
       platform,
-      credits_used: CREDIT_COST,
+      credits_used: debitResult.credits_debited,
       credits_remaining: debitResult.new_balance,
     });
 
