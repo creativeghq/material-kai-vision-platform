@@ -64,7 +64,10 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // ── Marketing ──
   { id: 'social-post', label: 'Social Post', hub: 'marketing', agentId: 'social-media', agentTool: 'manage_social', toolkitId: 'social', recordTable: 'social_posts', moduleSlug: 'social-media' },
   { id: 'email-campaign', label: 'Email Campaign', hub: 'marketing', pageRoute: '/marketing/email', agentId: 'kai', agentTool: 'manage_email_campaign', toolkitId: 'email-marketing', recordTable: 'campaigns', moduleSlug: 'email-marketing' },
-  { id: 'flow', label: 'Automations', hub: 'marketing', pageRoute: '/automations', agentId: 'kai', agentTool: 'manage_flows', toolkitId: 'flows-toolkit', recordTable: 'flows', moduleSlug: 'flows-toolkit' },
+  // openInLabel, like contract/warehouse: /automations is its own page, not the Marketing Hub
+  // landing, so the hub-label fallback would put "Open in Marketing Hub" on a button that lands
+  // on a screen titled Automations.
+  { id: 'flow', label: 'Automations', hub: 'marketing', openInLabel: 'Automations', pageRoute: '/automations', agentId: 'kai', agentTool: 'manage_flows', toolkitId: 'flows-toolkit', recordTable: 'flows', moduleSlug: 'flows-toolkit' },
   { id: 'seo-article', label: 'SEO Article', hub: 'marketing', agentId: 'marketing', agentTool: 'create_seo_article', toolkitId: 'seo-article', canvasKind: 'seo' },
   { id: 'seo-research', label: 'SEO Research', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_research_keyword', toolkitId: 'seo-research', canvasKind: 'seo' },
   { id: 'mention-monitoring', label: 'Mention Monitoring', hub: 'marketing', pageRoute: '/mention-monitoring', agentId: 'kai', agentTool: 'track_product_mentions', toolkitId: 'mentions', recordTable: 'tracked_mentions', canvasKind: 'mentions', moduleSlug: 'mention-monitoring' },
@@ -121,6 +124,10 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   finance_invoices_list: 'invoice', finance_orders_list: 'invoice', finance_payments_list: 'invoice',
   customer_balance_result: 'invoice', finance_invoice_issued: 'invoice',
   inbox_threads_list: 'inbox', inbox_reply_sent: 'inbox',
+  // Without this the flows card was a dead end: it listed the workspace's automations and offered
+  // no way to reach one — no open, no edit, not even a link to the page they live on. The handoff
+  // machinery was already built; `flows_list` simply was not registered to use it.
+  flows_list: 'flow',
 };
 
 /** Per-result-type payload key that holds the record id to deep-link (when the page has a detail route). */
