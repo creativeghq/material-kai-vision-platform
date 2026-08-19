@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Plus } from 'lucide-react';
 import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
 import { Badge } from '@/components/core/ui/badge';
 import { formatDate } from '@/utils/datetime';
@@ -208,6 +208,19 @@ function tabularColumns(rows: any[]): string[] | null {
   return ordered.slice(0, 7);
 }
 
+
+/**
+ * "contacts" → "contact". Enough English to name a create action; nothing more is needed, because
+ * the string only ever comes from a payload key we already chose to show as a column heading.
+ */
+function singularize(word: string): string {
+  const w = word.toLowerCase();
+  if (/ies$/.test(w)) return w.replace(/ies$/, 'y');
+  if (/(s|x|z|ch|sh)es$/.test(w)) return w.replace(/es$/, '');
+  if (/ss$/.test(w)) return w;
+  return w.replace(/s$/, '');
+}
+
 function RecordTable({ rows, columns }: { rows: any[]; columns: string[] }) {
   return (
     <div className="-mx-1 overflow-x-auto custom-scrollbar">
@@ -267,12 +280,34 @@ function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: numbe
   );
 }
 
-export const AgentResultCard: React.FC<{ title: string; data: Record<string, any>; resultType?: string }> = ({ title, data, resultType }) => {
+export const AgentResultCard: React.FC<{
+  title: string;
+  data: Record<string, any>;
+  resultType?: string;
+  /**
+   * Ask the agent something on the user's behalf. This is how a result card offers the next
+   * action — "Add contact" — WITHOUT becoming a second create path.
+   *
+   * Deliberately not a deep link to a `/crm/contacts/new` route: a CRM party must go through the
+   * duplicate search before it exists (CLAUDE.md — `crm_company` is deliberately unbuilt as a
+   * template type for exactly this reason), and a button that jumps past that is how duplicates
+   * get made. Handing the intent back to the agent runs the real flow, and since `request_input`
+   * exists the agent answers with a form on the canvas rather than an interrogation.
+   */
+  onAsk?: (prompt: string) => void;
+}> = ({ title, data, resultType, onAsk }) => {
   // Rail-3 reverse handoff: resolve the owning capability's page + Hub label.
   const capId = resultType ? RESULT_TYPE_CAPABILITY[resultType] : undefined;
   const recordId = capId && resultType ? (data?.[RESULT_RECORD_KEY[resultType]] as string | undefined) : undefined;
   const pageUrl = capId ? buildPageUrl(capId, recordId) : null;
   const hubLabel = capId ? capabilityHubLabel(capId) : undefined;
+
+  // What this result is a LIST of, singular — "contacts" → "contact". Only list-shaped results
+  // get a create action: "add another" makes sense under a list of contacts and makes none under
+  // a single enrichment record or a calculation.
+  const listKey = Object.entries(data ?? {})
+    .find(([k, v]) => Array.isArray(v) && !isPlumbing(k, v))?.[0];
+  const addLabel = listKey ? singularize(labelize(listKey)) : undefined;
 
   return (
     <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
@@ -326,16 +361,30 @@ export const AgentResultCard: React.FC<{ title: string; data: Record<string, any
         }
         return <KeyValues obj={data} />;
       })()}
-      {pageUrl && (
-        <div className="mt-3 flex justify-end">
-          <button
-            type="button"
-            onClick={() => window.open(pageUrl, '_blank')}
-            className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Open in {hubLabel || 'page'}
-          </button>
+      {(pageUrl || addLabel) && (
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          {/* A list you cannot act on is a report, not a product surface. The create action sits
+              beside the handoff so "show me my contacts" is one click from "add another". */}
+          {addLabel && onAsk && (
+            <button
+              type="button"
+              onClick={() => onAsk(`Add a new ${addLabel}.`)}
+              className="inline-flex items-center gap-1.5 rounded-sm border border-primary/40 px-3 py-1 text-xs text-foreground transition-colors hover:bg-primary/10"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add {addLabel}
+            </button>
+          )}
+          {pageUrl && (
+            <button
+              type="button"
+              onClick={() => window.open(pageUrl, '_blank')}
+              className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open in {hubLabel || 'page'}
+            </button>
+          )}
         </div>
       )}
     </div>

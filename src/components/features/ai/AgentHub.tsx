@@ -1092,6 +1092,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
   }, []);
 
+  /**
+   * A result card asking the agent for the next step — "Add contact" under a contacts list.
+   *
+   * Goes back through the AGENT rather than to a create page, so the flow that owns the rules
+   * runs: CRM parties get their duplicate search, and the agent replies with a request_input
+   * form on the canvas instead of an empty page.
+   */
+  const handleCardAsk = useCallback((prompt: string) => {
+    setInput(prompt);
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  }, []);
+
   const handleActionDecline = useCallback((messageId: string) => {
     setMessages(prev => prev.map(m =>
       m.id === messageId && m.actionConfirmationData
@@ -4843,7 +4855,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.techRadarData) return <TechRadarFindingsCard data={message.techRadarData} />;
-    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} />;
+    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} />;
     return renderDataCardBody(message);
   };
 
@@ -5474,7 +5486,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             onOpen={() => focusCanvas(message.id)}
                           />
                         ) : (
-                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} />
+                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} />
                         )}
                       </div>
                     ) : message.sourcingOptionsData ? (

@@ -28,7 +28,7 @@ const FLOWS = {
 };
 
 const render = (data: Record<string, unknown>, resultType = 'flows_list', title = 'Workspace flows') =>
-  renderToStaticMarkup(React.createElement(AgentResultCard, { title, data, resultType }));
+  renderToStaticMarkup(React.createElement(AgentResultCard, { title, data, resultType, onAsk: () => {} }));
 
 describe('AgentResultCard renders a record list as a table', () => {
   const html = render(FLOWS);
@@ -132,5 +132,41 @@ describe('AgentResultCard handles the empty result properly', () => {
     expect(html).toContain('<table');
     // `days: 7` is the window searched — context for the table, so it must come after it.
     expect(html.indexOf('</table>')).toBeLessThan(html.indexOf('Days'));
+  });
+});
+
+/**
+ * A list you cannot act on is a report, not a product surface. "Show me my contacts" should be one
+ * click from "add another" — but NOT by deep-linking a create page: a CRM party has to go through
+ * the duplicate search before it exists, which is why `crm_company` is deliberately unbuilt as a
+ * template type. The action hands the intent back to the agent, which runs the real flow.
+ */
+describe('AgentResultCard offers the next action', () => {
+  it('offers a create action under a list, named from the list itself', () => {
+    const html = render(FLOWS);
+    expect(html).toContain('Add flow');
+  });
+
+  it('offers it on an empty list too — that is where it matters most', () => {
+    const html = render({ contacts: [] }, 'crm_contact_created', 'Contacts');
+    expect(html).toContain('No contacts yet');
+    expect(html).toContain('Add contact');
+  });
+
+  it('singularises properly rather than hacking off an s', () => {
+    expect(render({ companies: [] }, 'x', 'Companies')).toContain('Add company');
+    expect(render({ addresses: [] }, 'x', 'Addresses')).toContain('Add address');
+  });
+
+  it('does NOT offer create under a single record — "add another" means nothing there', () => {
+    const html = render({ name: 'Fabryka Mebli Wersal', city: 'Poznań' }, 'company_enrichment', 'Company');
+    expect(html).not.toContain('Add ');
+  });
+
+  it('renders nothing clickable when the host gives it no way to ask', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(AgentResultCard, { title: 'Contacts', data: { contacts: [] }, resultType: 'x' }),
+    );
+    expect(html).not.toContain('Add contact');
   });
 });
