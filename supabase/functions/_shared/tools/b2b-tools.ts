@@ -141,6 +141,31 @@ export async function validateEmailWithZeroBounce(
 const SEARCH_MODEL = 'claude-opus-5';
 
 /**
+ * Apollo circuit breaker.
+ *
+ * Telling the agent "do not retry" is a request; this is the mechanism. On 2026-08-19 a single
+ * "save these two companies to my CRM" spent 190 seconds calling company_enrichment into a 403
+ * over and over and never reached the save. Once Apollo has answered 401/402/403 the account is
+ * unusable and every further call in the next few minutes will fail identically — at ~1s of
+ * latency each, plus the model round trip to decide to try again.
+ *
+ * Short TTL on purpose: this is about not hammering a dead provider inside one conversation, not
+ * about caching an outage. Funding the account should take effect within a minute, not a deploy.
+ */
+let apolloUnavailableUntil = 0;
+const APOLLO_BREAKER_MS = 120_000;
+const apolloIsKnownDown = () => Date.now() < apolloUnavailableUntil;
+const APOLLO_DOWN_PAYLOAD = JSON.stringify({
+  success: false,
+  enrichment_unavailable: true,
+  retryable: false,
+  error: 'Apollo enrichment is unavailable (checked moments ago in this conversation). Do NOT call '
+    + 'it again this turn. Enrichment is optional — continue with the search and website-scrape data '
+    + 'you already have, save to CRM if that is what was asked (save_to_crm needs only a company '
+    + 'name), and note in one line that enrichment was skipped.',
+});
+
+/**
  * POST to Anthropic, retrying the TRANSIENT failures — inside a DEADLINE.
  *
  * 529 (overloaded), 429 (rate limited) and 5xx say "the upstream was busy", not "your request was
@@ -770,11 +795,19 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
         // Send progress update
         onProgress?.(`Enriching company data for ${company_name}...`);
 
+        // Breaker: Apollo already told us it is unusable, moments ago. Do not spend another
+        // round trip finding that out again.
+        if (apolloIsKnownDown()) return APOLLO_DOWN_PAYLOAD;
+
         const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY');
         if (!APOLLO_API_KEY) {
           return JSON.stringify({
             success: false,
-            error: 'APOLLO_API_KEY not configured. Please add it to Supabase secrets.',
+            enrichment_unavailable: true,
+            retryable: false,
+            error: 'Apollo enrichment is not configured (APOLLO_API_KEY is unset), and it is read from '
+              + 'the environment so it cannot be added without a redeploy. Do NOT retry. Enrichment is '
+              + 'optional — continue with the data you have and save to CRM if that is what was asked.',
           });
         }
 
@@ -824,9 +857,25 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`❌ Apollo API error: ${response.status} - ${errorText}`);
+          // 401/402/403 mean the Apollo account itself is unusable — wrong key, no plan, no
+          // credit. Retrying cannot fix that, and a bare "Apollo API error: 403" reads to the
+          // agent as a transient blip: on 2026-08-19 it retried enrichment for 190 seconds and
+          // never reached the CRM save the user had actually asked for. Enrichment is a NICE-TO-
+          // HAVE — save_to_crm needs a company name and nothing else — so the failure says so.
+          const unavailable = response.status === 401 || response.status === 402 || response.status === 403;
+          if (unavailable) apolloUnavailableUntil = Date.now() + APOLLO_BREAKER_MS;
           return JSON.stringify({
             success: false,
-            error: `Apollo API error: ${response.status}`,
+            enrichment_unavailable: unavailable,
+            retryable: !unavailable,
+            error: unavailable
+              ? `Apollo enrichment is unavailable (${response.status}: key missing, unfunded or forbidden). `
+                + `Do NOT retry it and do NOT call it for other companies this turn — it will fail the same way. `
+                + `Enrichment is optional: continue with what you already have from the search and the website `
+                + `scrape, save to CRM if that is what was asked (save_to_crm needs only a company name), and `
+                + `mention in one line that employee-count/revenue enrichment was skipped because the provider `
+                + `is unavailable.`
+              : `Apollo API error: ${response.status}`,
           });
         }
 
@@ -959,7 +1008,8 @@ export const createContactDiscoveryTool = (userId: string, onProgress?: (status:
           // Step 2: Fallback to Apollo.io People Match if Hunter failed or low confidence
           if (!foundEmail || confidence < 50) {
             const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY');
-            if (APOLLO_API_KEY) {
+            // Same breaker: Hunter having missed is no reason to walk into a known-dead fallback.
+            if (APOLLO_API_KEY && !apolloIsKnownDown()) {
               onProgress?.(`Trying Apollo.io for ${personLabel}...`);
               fallbackUsed = true;
 
@@ -1425,7 +1475,11 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
     },
     {
       name: 'save_to_crm',
-      description: 'Save a researched company and its contacts to the CRM database. Use this after the user confirms they want to save a manufacturer.',
+      description: 'Save a researched company and its contacts to the CRM database. Use this after the user '
+        + 'confirms they want to save a manufacturer. ONLY `company.name` is required — every other field is '
+        + 'optional. Enrichment and contact discovery are enhancements, NOT prerequisites: if either is '
+        + 'unavailable or returns nothing, save what you have and say which fields are missing. Never abandon '
+        + 'a save the user asked for because an enrichment provider is down.',
       schema: z.object({
         company: z.object({
           name: z.string().describe('Company name'),

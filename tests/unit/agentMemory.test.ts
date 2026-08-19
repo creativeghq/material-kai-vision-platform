@@ -589,3 +589,51 @@ describe('prose questions are converted to a canvas form', () => {
     ).toBe(true);
   });
 });
+
+/**
+ * A dead enrichment provider must not cost the user the save they asked for (#370).
+ *
+ * "save Nowy Styl and Black Red White to my CRM" spent 190 seconds calling company_enrichment
+ * into an Apollo 403, over and over, and never reached save_to_crm. Three things were wrong: the
+ * failure read as transient ("Apollo API error: 403" and nothing else), the agent's own playbook
+ * presented search→scrape→enrich→contacts→save as a sequential gate, and nothing stopped it
+ * retrying a provider that had already said the account was unusable.
+ *
+ * save_to_crm only ever required `company.name`. Enrichment was never a prerequisite — the agent
+ * merely believed it was.
+ */
+describe('enrichment is best-effort, never a gate', () => {
+  const b2b = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
+  );
+
+  it('an unusable Apollo account is reported as terminal, not retryable', () => {
+    expect(
+      /enrichment_unavailable/.test(b2b) && /retryable/.test(b2b),
+      'a 401/402/403 from Apollo means the account cannot be used — the result must say so ' +
+        'explicitly instead of returning a bare status the agent reads as a transient blip',
+    ).toBe(true);
+  });
+
+  it('a circuit breaker stops the retry loop mechanically', () => {
+    // The instruction not to retry is a request; this is the mechanism. 190s of 1s-apart 403s
+    // plus a model round trip each time is what it cost without one.
+    expect(
+      /apolloIsKnownDown\(\)/.test(b2b) && /apolloUnavailableUntil/.test(b2b),
+      'once Apollo answers 401/402/403 further calls in the same window must short-circuit',
+    ).toBe(true);
+    const sites = (b2b.match(/apolloIsKnownDown\(\)/g) || []).length;
+    expect(sites, 'the breaker must guard BOTH Apollo call sites — enrichment and the ' +
+      'contact-discovery fallback, which otherwise walks straight into the same dead provider',
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('save_to_crm advertises that only a name is required', () => {
+    const desc = b2b.slice(b2b.indexOf("name: 'save_to_crm'"), b2b.indexOf("name: 'save_to_crm'") + 900);
+    expect(
+      /ONLY `company\.name` is required/.test(desc) && /NOT prerequisites/.test(desc),
+      'the description must state that enrichment and contact discovery are enhancements, or the ' +
+        'agent keeps treating the research chain as a gate on the save',
+    ).toBe(true);
+  });
+});

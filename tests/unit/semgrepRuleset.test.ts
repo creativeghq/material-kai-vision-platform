@@ -195,7 +195,12 @@ describe('semgrep security ruleset', () => {
       expect(
         isTaint
           ? 'pattern-sources' in rule && 'pattern-sinks' in rule
-          : 'pattern' in rule || 'pattern-either' in rule || 'patterns' in rule,
+          // `pattern-regex` is as valid a matcher as the others and was missing from this list,
+          // so the guard called a working rule unmatchable — the exact false positive it exists to
+          // prevent, pointed the wrong way. Semgrep also accepts `pattern-regex` at top level for
+          // rules that match raw text rather than an AST shape, which is what an import-line rule
+          // wants.
+          : 'pattern' in rule || 'pattern-either' in rule || 'patterns' in rule || 'pattern-regex' in rule,
         isTaint
           ? `taint rule ${rule.id} needs both pattern-sources and pattern-sinks`
           : `rule ${rule.id} has no pattern — it can never match`,
