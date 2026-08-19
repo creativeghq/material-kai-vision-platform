@@ -1384,7 +1384,7 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             });
           }
           if (existing) {
-            emitter.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'done', status_line: `${existing.name} is already in the CRM` });
+            emitter?.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'done', status_line: `${existing.name} is already in the CRM` });
             return JSON.stringify({
               success: true,
               already_existed: true,

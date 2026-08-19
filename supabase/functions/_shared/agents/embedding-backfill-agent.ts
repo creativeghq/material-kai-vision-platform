@@ -87,6 +87,18 @@ export class EmbeddingBackfillAgent implements AgentRunner {
 
     await log('info', `Embedding backfill starting (scope=${scope})`, { scope, sinceIso, maxProducts, maxChunks, maxImages });
 
+    /**
+     * `mivaaGatewayUrl` is the BARE base — every other caller adds its own `/api` prefix
+     * (`kai-task-agent` fetches `${mivaaGatewayUrl}/api/rag/search`). These five calls did not,
+     * and every admin backfill route lives on `APIRouter(prefix="/api")`, so all five 404'd.
+     *
+     * It never showed. When a family has nothing to scan the code returns `{scanned: 0,
+     * status: 'ok'}` WITHOUT calling MIVAA, so the 404 is only reachable on a run that has real
+     * work — and `products` was empty platform-wide. 691 consecutive runs reported `completed`
+     * with `scanned: 0`, and the first run that finally had one product to embed returned
+     * `HTTP 404: {"detail":"Not Found"}`. The safety net for every un-embedded product on the
+     * platform had never once run.
+     */
     const callMivaa = async (path: string, body: Record<string, unknown>): Promise<any> => {
       const res = await fetch(`${mivaaGatewayUrl}${path}`, {
         method: 'POST',
@@ -115,7 +127,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
         families.push({ family: 'product_text', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
         await supabase.rpc('record_embedding_backfill_attempts', { p_entity_type: 'product', p_deficiency: 'product_text', p_ids: ids });
-        await callMivaa('/admin/text-embeddings/backfill', {
+        await callMivaa('/api/admin/text-embeddings/backfill', {
           product_ids: ids, include_products: true, include_chunks: false, max_products: ids.length, batch_size: batchSize,
         });
         await heartbeat();
@@ -142,7 +154,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       if (!count) {
         families.push({ family: 'chunk_text', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
-        const summary = await callMivaa('/admin/text-embeddings/backfill', {
+        const summary = await callMivaa('/api/admin/text-embeddings/backfill', {
           include_products: false, include_chunks: true, max_chunks: maxChunks, batch_size: batchSize,
         });
         const c = summary?.chunks ?? summary ?? {};
@@ -166,7 +178,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       if (!count) {
         families.push({ family: 'understanding', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
-        const summary = await callMivaa('/admin/understanding-embeddings/backfill', { max_images: maxImages, batch_size: 25 });
+        const summary = await callMivaa('/api/admin/understanding-embeddings/backfill', { max_images: maxImages, batch_size: 25 });
         families.push({ family: 'understanding', scanned: Number(summary?.scanned ?? 0), fixed: Number(summary?.reembedded ?? 0), failed: Number(summary?.failed ?? 0), status: 'ok' });
         await log('info', 'understanding backfill', { summary });
       }
@@ -193,7 +205,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
         families.push({ family: 'aspects', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
         await supabase.rpc('record_embedding_backfill_attempts', { p_entity_type: 'image', p_deficiency: 'aspects', p_ids: ids });
-        await callMivaa('/admin/aspect-embeddings/backfill', { image_ids: ids, batch_size: 25, max_images: ids.length });
+        await callMivaa('/api/admin/aspect-embeddings/backfill', { image_ids: ids, batch_size: 25, max_images: ids.length });
         await heartbeat();
         const { data: still } = await supabase.from('document_images').select('id').in('id', ids).or(ASPECT_DEFICIENT_OR);
         const failedIds = (still ?? []).map((r: any) => r.id as string);
@@ -218,7 +230,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       if (!count) {
         families.push({ family: 'classification', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
-        const summary = await callMivaa('/admin/images/classification-backfill', { max_images: maxImages, batch_size: 10 });
+        const summary = await callMivaa('/api/admin/images/classification-backfill', { max_images: maxImages, batch_size: 10 });
         families.push({ family: 'classification', scanned: Number(summary?.scanned ?? 0), fixed: Number(summary?.embedded ?? 0), failed: Number(summary?.failed ?? 0), status: 'ok' });
         await log('info', 'classification backfill', { summary });
       }
