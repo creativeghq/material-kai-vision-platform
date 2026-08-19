@@ -162,6 +162,18 @@ deploy. Adding a trigger: follow §8 of [docs/flows-notification-system.md](docs
 `TriggerType` union + config interface + the exhaustive icon/label maps + a `paletteItems.ts` entry + a seeded
 locked default flow + a `flow_area_registry` row. Typecheck before done.
 
+**`is_global` flows are the OPERATOR's, and no tenant surface may ever show one.** The seeded
+`system-default` set (114 rows, `workspace_id IS NULL`) is edited in ONE place — /admin → Flows, by a platform
+admin — and applies everywhere: flow-engine matches `is_global.eq.true` for *every* workspace, so those flows
+genuinely execute inside tenant workspaces while remaining invisible to them. That combination is what makes
+the boundary easy to breach by accident. A tenant-facing read of `flows` therefore carries an **explicit**
+`.eq('is_global', false)` even where RLS says the same thing — `manage_flows` can run under the service role
+(partner `kai_` keys, admin-secret paths), and there RLS does not apply at all, so the filter *is* the
+boundary rather than a duplicate of one. Deleting it as redundant discloses the whole operator automation set.
+Tenant vocabulary is likewise two copies — `TENANT_TRIGGERS`/`TENANT_ACTIONS` (offered) vs
+`create_simple_flow`'s `v_allowed_*` (enforced); change both in one go. Guarded by
+[tests/unit/flowEventContract.test.ts](tests/unit/flowEventContract.test.ts).
+
 ## Agent tools — the tool file is the source, everything else is derived or guarded
 A tool registered on an agent but absent from every toolkit cluster is silently stripped and unreachable.
 Clusters are declared **once**, in the client `TOOLKITS` catalog (`agentToolsCatalog.ts`); agent-chat's binder
