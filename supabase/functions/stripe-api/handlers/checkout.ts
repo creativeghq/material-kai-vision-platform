@@ -24,10 +24,10 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
     }
 
     // Platform revenue (credits/subscriptions) is collected on the dedicated billing
-    // account when configured (falls back to the default key otherwise). Resolve AFTER auth →
-    // bootstrap has run. If Stripe still isn't configured, the canonical 503 routes the admin
-    // to the right settings page.
-    const stripe = getPlatformBillingStripe();
+    // account when configured (falls back to the default key otherwise). The getter resolves
+    // env-first / platform_secrets-second by itself. If Stripe still isn't configured, the
+    // canonical 503 routes the admin to the right settings page.
+    const stripe = await getPlatformBillingStripe();
     const supabase = getSupabase();
     if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
 
@@ -65,7 +65,7 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
     // The customer must live on the SAME account we charge. When a distinct billing account is
     // configured, use a separate customer id (stripe_billing_customer_id) — a customer created
     // on the default account doesn't exist on the billing account.
-    const distinct = hasDistinctBillingAccount();
+    const distinct = await hasDistinctBillingAccount();
     const customerCol = distinct ? 'stripe_billing_customer_id' : 'stripe_customer_id';
     let customerId: string;
 

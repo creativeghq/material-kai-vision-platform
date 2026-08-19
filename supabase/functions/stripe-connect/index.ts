@@ -23,7 +23,7 @@ Deno.serve(withApiLogging('stripe-connect', async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   await bootstrapForFunction();
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
   const auth = await authenticate(req, { requireUser: true });

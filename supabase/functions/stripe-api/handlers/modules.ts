@@ -156,7 +156,7 @@ async function activateModule(req: Request, auth: AuthResult, body: Record<strin
     );
   }
 
-  const stripe = getPlatformBillingStripe();
+  const stripe = await getPlatformBillingStripe();
   const supabase = getSupabase();
   if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
 
@@ -172,7 +172,7 @@ async function activateModule(req: Request, auth: AuthResult, body: Record<strin
   }
 
   // Resolve/create the Stripe customer on the platform-billing account (mirrors checkout.ts).
-  const distinct = hasDistinctBillingAccount();
+  const distinct = await hasDistinctBillingAccount();
   const customerCol = distinct ? 'stripe_billing_customer_id' : 'stripe_customer_id';
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -229,7 +229,7 @@ async function deactivateModule(auth: AuthResult, body: Record<string, unknown>)
     .maybeSingle();
 
   if (sub?.stripe_subscription_id) {
-    const stripe = getPlatformBillingStripe();
+    const stripe = await getPlatformBillingStripe();
     if (!stripe) return noPaymentProviderResponse(corsHeaders);
     await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: true });
     await service
@@ -355,7 +355,7 @@ async function createAddonProduct(auth: AuthResult, body: Record<string, unknown
     .maybeSingle();
   if (!mod) return json({ error: 'Module not found' }, 404);
 
-  const stripe = getPlatformBillingStripe();
+  const stripe = await getPlatformBillingStripe();
   if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
   // Create product → recurring price → set as default. Product carries module metadata so it's
@@ -405,7 +405,7 @@ async function listStripeProducts(auth: AuthResult): Promise<Response> {
   if (!isAdminAccess(auth) && !(await isOperator(auth.supabase, auth.userId))) {
     return json({ error: 'Operator access required', code: 'not_operator' }, 403);
   }
-  const stripe = getPlatformBillingStripe();
+  const stripe = await getPlatformBillingStripe();
   if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
   const products = await stripe.products.list({ active: true, limit: 100, expand: ['data.default_price'] });

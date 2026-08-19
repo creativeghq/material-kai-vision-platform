@@ -16,7 +16,7 @@
 import { getStripe } from '../stripe-clients.ts';
 
 export async function syncStripeFeed(service: any, workspaceId: string): Promise<number> {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) return 0;
 
   const { data: pc } = await service

@@ -30,9 +30,10 @@ export const stripeProvider: PaymentProvider = {
   currencies: null,
 
   async resolveContext(supabase: any, workspaceId: string): Promise<PaymentProviderContext | null> {
-    // The platform key must exist at all (env-first, platform_secrets second — the caller
-    // has already run bootstrapForFunction()).
-    if (!getStripe()) return null;
+    // The platform key must exist at all. getStripe() resolves it env-first, platform_secrets
+    // second, on its own — it does NOT depend on the caller having run bootstrapForFunction(),
+    // which cannot populate env on the Supabase edge runtime.
+    if (!(await getStripe())) return null;
 
     // `get_workspace_payout_account` returns the connected account id only when the
     // workspace's Connect onboarding is complete (charges_enabled).
@@ -57,7 +58,7 @@ export const stripeProvider: PaymentProvider = {
   },
 
   async createCharge(input: CreateChargeInput, ctx: PaymentProviderContext): Promise<ChargeResult> {
-    const stripe = getStripe();
+    const stripe = await getStripe();
     if (!stripe) throw new Error('Stripe is not configured');
 
     const session = await stripe.checkout.sessions.create({

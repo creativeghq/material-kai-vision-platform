@@ -673,7 +673,7 @@ async function ensureBalancePaymentLink(
   outstanding: number, currency: string, share: any | null, redirectUrl: string,
 ): Promise<string | null> {
   if (!(outstanding > 0)) return null;
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) return null;
 
   const amountCents = Math.round(outstanding * 100);

@@ -37,6 +37,11 @@ const SECRET_KEYS = [
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
+    // `deno check` vendors an npm cache into supabase/functions/<fn>/node_modules (gitignored).
+    // Recursing in scans tens of thousands of dependency files — including other packages' own
+    // *.test.ts fixtures — and readFileSync races the cache, so the walk ENOENTs on a file that
+    // existed a moment earlier. Nothing under here is ours.
+    if (entry === 'node_modules' || entry === '.deno') continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...walk(full));
     else if (entry.endsWith('.ts')) out.push(full);

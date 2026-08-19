@@ -1,18 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
-import Stripe from 'https://esm.sh/stripe@14.10.0';
-
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { getStripe, getSupabase, noPaymentProviderResponse } from '../../_shared/stripe-clients.ts';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const stripeSecretKey = () => Deno.env.get('STRIPE_SECRET_KEY') || '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const stripe = new Stripe(stripeSecretKey(), {
-  apiVersion: '2023-10-16',
-  httpClient: Stripe.createFetchHttpClient(),
-});
+// This file used to keep its own `const stripeSecretKey = () => Deno.env.get(...)` and build the
+// client AT MODULE LOAD. Two bugs in one line: a module-load env read can't see anything the
+// handler resolves later, and a private copy of the factory meant this handler never picked up
+// the platform_secrets fallback the shared one now provides. Both clients are the same account
+// (STRIPE_SECRET_KEY) — deliberately unchanged here, since moving platform revenue to the
+// billing account would also have to move which customer-id column is read.
 
 /**
  * CRM Stripe API
@@ -29,6 +24,10 @@ export async function handleCrmStripe(req: Request): Promise<Response> {
   }
 
   try {
+    const stripe = await getStripe();
+    const supabase = getSupabase();
+    if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
+
     const url = new URL(req.url);
     const method = req.method;
     const path = url.pathname.replace(/^(\/functions\/v1)?(\/crm-api)?\/stripe/, '').split('/').filter(Boolean);

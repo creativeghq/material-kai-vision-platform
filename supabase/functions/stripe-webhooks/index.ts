@@ -37,13 +37,14 @@ function profileByCustomer(customerId: string, columns: string) {
 Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
   await bootstrapForFunction();
 
-  // Verify configuration AFTER bootstrap. Both secrets MUST be set; rejecting
-  // webhooks when unsigned is critical (otherwise anyone could forge payment
-  // events). 503 rather than throwing keeps the function alive and recovers
-  // automatically when an admin pastes the secrets into the DB.
-  const _stripe = getStripe();
+  // Both secrets MUST be set; rejecting webhooks when unsigned is critical (otherwise
+  // anyone could forge payment events). 503 rather than throwing keeps the function alive
+  // and recovers automatically when an admin pastes the secrets into the DB — which now
+  // genuinely works, because these resolve through platform_secrets rather than waiting on
+  // a bootstrap into env that the edge runtime refuses to perform.
+  const _stripe = await getStripe();
   const _supabase = getSupabase();
-  const webhookSecret = stripeWebhookSecret();
+  const webhookSecret = await stripeWebhookSecret();
   if (!_stripe || !_supabase || !webhookSecret) {
     return new Response(
       JSON.stringify({
@@ -87,8 +88,8 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
     // before it ever checks the signature, so every delivery 400s regardless of secret.
     event = await _stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
   } catch (primaryErr) {
-    const billingSecret = platformBillingWebhookSecret();
-    const billingStripe = getPlatformBillingStripe();
+    const billingSecret = await platformBillingWebhookSecret();
+    const billingStripe = await getPlatformBillingStripe();
     if (billingSecret && billingSecret !== webhookSecret && billingStripe) {
       try {
         event = await billingStripe.webhooks.constructEventAsync(body, signature, billingSecret);
@@ -324,7 +325,7 @@ async function reconcileModuleAddonsForOwner(userId: string, planTier: string) {
   // Module add-on subscriptions are created on the platform-BILLING account (getPlatformBillingStripe
   // in modules.ts). A plan-tier event arrives on the DEFAULT account, so cancelling through the
   // event's `stripe` client would hit "No such subscription" and silently leave the add-on billing.
-  const billingStripe = getPlatformBillingStripe() ?? stripe;
+  const billingStripe = (await getPlatformBillingStripe()) ?? stripe;
 
   for (const s of (subs || []) as Array<{ workspace_id: string; module_slug: string; stripe_subscription_id: string | null; modules?: { price_tier?: string | null } }>) {
     if (!s.stripe_subscription_id) continue;

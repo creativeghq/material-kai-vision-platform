@@ -77,7 +77,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
   // any more. A workspace may collect via Viva (BYOK) with no platform
   // Stripe key at all, so "no Stripe" is only fatal on the Stripe path itself —
   // checked at the point of use below.
-  const stripe = getStripe();
+  const stripe = await getStripe();
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

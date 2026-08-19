@@ -23,7 +23,7 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
     }
 
     // Subscriptions/credits live on the platform-billing account; manage them there.
-    const stripe = getPlatformBillingStripe();
+    const stripe = await getPlatformBillingStripe();
     const supabase = getSupabase();
     if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);
 
@@ -32,7 +32,7 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
     const { returnUrl } = body;
 
     // Use the customer id for the account we're opening the portal on.
-    const customerCol = hasDistinctBillingAccount() ? 'stripe_billing_customer_id' : 'stripe_customer_id';
+    const customerCol = (await hasDistinctBillingAccount()) ? 'stripe_billing_customer_id' : 'stripe_customer_id';
     const { data: profile } = await supabase
       .from('user_profiles')
       .select(customerCol)
