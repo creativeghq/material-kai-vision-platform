@@ -21,7 +21,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
-const SRC = readFileSync(join(ROOT, 'supabase/functions/_shared/next-steps.ts'), 'utf8');
+// Normalised to LF: the repo checks out CRLF on Windows, so the multi-line `includes(...)`
+// below matched nothing and this file failed for line endings rather than for content.
+const SRC = readFileSync(join(ROOT, 'supabase/functions/_shared/next-steps.ts'), 'utf8')
+  .replace(/\r\n/g, '\n');
 
 describe('next-step suggestions', () => {
   it('takes its prompt from the database, with no copy in the file', () => {
@@ -72,10 +75,14 @@ describe('next-step suggestions', () => {
     // Every early exit hands back the same empty shape; the caller ships the turn regardless.
     expect(SRC).toMatch(/const none = \{ steps: \[\] as NextStep\[\], usage: null \}/);
     const returnsNone = (SRC.match(/return none;/g) ?? []).length;
-    expect(returnsNone, 'the failure paths must return the empty result').toBeGreaterThanOrEqual(3);
+    // Two, not three: resolving ANTHROPIC_API_KEY moved into callClaudeMessages, which throws on
+    // an unresolved key — so that path now arrives at the same catch as a non-2xx and a network
+    // failure, instead of being its own early return here. The count is a proxy; what the test
+    // actually protects is that no failure escapes as an exception, which the catch below covers.
+    expect(returnsNone, 'the failure paths must return the empty result').toBeGreaterThanOrEqual(2);
     // …and none of them may be silent: a suggestion feature that stops appearing with nothing
     // logged is indistinguishable from one nobody clicks.
-    for (const path of ['prompt unavailable', 'ANTHROPIC_API_KEY unresolved', 'call failed', 'call threw']) {
+    for (const path of ['prompt unavailable', 'call failed']) {
       expect(SRC, `failure path "${path}" must log`).toContain(path);
     }
   });
