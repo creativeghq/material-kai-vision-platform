@@ -225,3 +225,58 @@ describe('tenant flow vocabulary', () => {
     }
   });
 });
+
+/**
+ * Global (operator) flows are visible to the OPERATOR ONLY — never to a tenant, anywhere.
+ *
+ * `is_global = true` rows are the platform's own automations. A platform admin edits them in one
+ * place (/admin → Flows) and they apply to every workspace at once: flow-engine matches
+ * `is_global.eq.true` for EVERY workspace, so all 100+ of them genuinely execute inside tenant
+ * workspaces. That is what makes this boundary easy to breach by accident — the rows are live in
+ * a tenant's world, they are just not the tenant's to see.
+ *
+ * The database enforces it (`flows_tenant_select` requires `is_global = false`; `flow_runs`
+ * likewise; create/toggle/delete_simple_flow all guard it; flow-engine's on-demand run demands a
+ * platform admin for a global flow). This guards the layer RLS cannot: a tenant-facing query that
+ * runs under the SERVICE ROLE, where RLS does not apply at all. `manage_flows` is exactly that —
+ * callerClient() falls back to service role for partner `kai_` keys and admin-secret paths — so
+ * its filter is the only thing standing there, and a "redundant, RLS has it" cleanup would be a
+ * silent full disclosure of the operator's automation set.
+ */
+describe('operator flows never reach a tenant surface', () => {
+  // Surfaces a non-operator can reach. Engine internals (flow-engine, flow-scheduler-cron,
+  // flow-webhook, _shared/flow-events.ts) are deliberately absent: matching global flows is their
+  // job. The admin console is absent for the same reason — it is the operator's own screen.
+  const TENANT_SURFACES = [
+    'supabase/functions/_shared/tools/flow-tools.ts',
+    ...walk('src/modules/flows-toolkit'),
+  ];
+
+  it.each(TENANT_SURFACES)('%s filters is_global on every flows read', (file) => {
+    const src = stripComments(readFileSync(file, 'utf8'));
+    let from = src.indexOf(".from('flows')");
+    while (from !== -1) {
+      // The query chain up to its terminator — enough to hold the filters that belong to it.
+      const chain = src.slice(from, from + 700);
+      expect(
+        /\.eq\(\s*'is_global'\s*,\s*false\s*\)/.test(chain),
+        `${file} reads the flows table without an explicit .eq('is_global', false). This is a ` +
+          `tenant surface, and it may run under the service role where RLS does not apply — so ` +
+          `that filter is the disclosure boundary, not a duplicate of one. Operator flows are ` +
+          `read and edited in /admin only.`,
+      ).toBe(true);
+      from = src.indexOf(".from('flows')", from + 1);
+    }
+  });
+
+  it('the tenant flows page and the chat tool agree on the scope', () => {
+    // Two independent tenant surfaces answering "what are my automations". If they ever disagree,
+    // one of them is showing a set the other calls private.
+    for (const f of ['src/modules/flows-toolkit/pages/FlowsPage.tsx',
+                     'supabase/functions/_shared/tools/flow-tools.ts']) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      expect(/\.eq\(\s*'is_global'\s*,\s*false\s*\)/.test(src), `${f} must scope to non-global flows`).toBe(true);
+      expect(/\.eq\(\s*'workspace_id'/.test(src), `${f} must scope to one workspace`).toBe(true);
+    }
+  });
+});

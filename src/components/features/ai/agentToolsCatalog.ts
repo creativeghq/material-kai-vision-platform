@@ -2202,9 +2202,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_flows'],
     quick_starts: [
       {
-        label: 'My flows', description: 'List automations in this workspace', icon: 'ListChecks',
+        // "the automations running in this workspace" was a promise this tool cannot keep. It
+        // lists the workspace's OWN flows; the platform's built-in automations are the operator's
+        // global set, which is invisible here by design. Most workspaces have built none, so the
+        // old copy announced success over an empty list and read as a bug.
+        label: 'My flows', description: 'Automations this workspace has built', icon: 'ListChecks',
         prompt: 'List my flows.',
-        done: 'I\'ve pulled up the automations running in this workspace.',
+        done: 'I\'ve pulled up the automations this workspace has built.',
         run: { tool: 'manage_flows', fixedArgs: { action: 'list' } },
       },
       {

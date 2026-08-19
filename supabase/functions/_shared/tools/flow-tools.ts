@@ -99,35 +99,31 @@ export const createManageFlowsTool = (
       const ws = workspaceId!;
 
       if (action === 'list') {
-        // The seeded `system-default` flows — the 100+ locked, global, ALREADY-ACTIVE rows that
-        // actually deliver this platform's notifications — are `is_global = true` with a NULL
-        // workspace_id. Filtering them out client-side meant "list my flows" answered with only
-        // the handful a tenant had hand-built (usually none), while /admin → Flows listed every
-        // one, because flowService.listFlows applies no is_global filter at all. Same table,
-        // same user, two different answers, and the quick-start's `done` copy claims to have
-        // pulled up "the automations running in this workspace".
+        // TENANT SURFACE — workspace flows ONLY, never the global/operator set.
         //
-        // So drop the redundant filter and let RLS be the single arbiter, exactly as the admin
-        // page does: `flows_tenant_select` already restricts a member to
-        // `is_global = false AND is_workspace_member(workspace_id)`, and only the platform-admin
-        // policy widens that to the global rows. A tenant's result is therefore unchanged; an
-        // admin now gets the same list here as on the page.
+        // The `is_global = true` rows (the seeded `system-default` automations) are the
+        // OPERATOR's: only a platform admin may see or edit them, and they are edited in one
+        // place — /admin → Flows — from where they apply to every workspace at once. They are
+        // deliberately not "my flows" for anybody here, the operator included, because this tool
+        // is the tenant-module surface and mixing the two makes the same question return a
+        // different kind of answer depending on who asks.
         //
-        // ONLY when a JWT scoped the client, though. callerClient() falls back to the SERVICE
-        // ROLE for the partner `kai_` key and admin-secret paths, and service role bypasses RLS
-        // — so the same query on those paths would hand a partner key every platform flow.
-        let q = db
+        // The `is_global = false` filter is therefore load-bearing and stays EXPLICIT even though
+        // `flows_tenant_select` enforces the same thing: a disclosure boundary this categorical
+        // should not rest on one RLS policy continuing to be written correctly. (It also must not
+        // rest on RLS at all here — callerClient() falls back to the SERVICE ROLE for the partner
+        // `kai_` key and admin-secret paths, and service role bypasses RLS outright.)
+        const { data, error } = await db
           .from('flows')
-          .select('id, name, trigger_type, status, created_at, is_global, is_locked');
-        q = jwt
-          ? q.or(`workspace_id.eq.${ws},is_global.is.true`)
-          : q.eq('workspace_id', ws).eq('is_global', false);
-        const { data, error } = await q
-          .order('is_global', { ascending: true })
+          .select('id, name, trigger_type, status, created_at')
+          .eq('workspace_id', ws)
+          .eq('is_global', false)
           .order('created_at', { ascending: false })
           .limit(200);
         if (error) return JSON.stringify({ success: false, error: error.message });
         const flows = data ?? [];
+        // `count: 0` is the shared "ran clean, found nothing" convention the AgentHub direct-run
+        // path reads to say so out loud, instead of rendering an empty card as if it were data.
         onChunk?.({ type: 'flows_list', flows, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: flows.length, flows });
       }
