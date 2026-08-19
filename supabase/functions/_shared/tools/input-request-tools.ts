@@ -131,7 +131,35 @@ export const createRequestInputTool = (onChunk: ChunkSink) => {
           default: z.string().optional().describe('Pre-filled value. Use the default you WOULD have proceeded with.'),
           options: z.array(z.object({ value: z.string(), label: z.string() })).optional()
             .describe('Required when kind is "select".'),
-        })).describe('The values to collect. Keep it to the few that actually change the work.'),
+        })).describe('The values to collect. Keep it to the few that actually change the work.')
+          // ENFORCED, not requested. "Pre-fill the defaults" was in the doctrine and in this
+          // description, and the model complied about half the time — R3 pre-filled all four
+          // fields, T2/V2/W2 sent every field null. A form of empty boxes is an interrogation with
+          // extra steps, which is the thing this tool exists to avoid.
+          //
+          // Only `select` is required to carry a default, deliberately. A select always HAS a
+          // most-likely option, so omitting it is laziness. A free-text field often has no
+          // honest guess — forcing one there would make the model invent a website or a client
+          // name and pre-fill it, which is worse than an empty box.
+          .superRefine((fields, ctx) => {
+            for (const [i, f] of fields.entries()) {
+              if (f.kind === 'select' && !f.default) {
+                ctx.addIssue({
+                  code: 'custom',
+                  path: [i, 'default'],
+                  message: `Field "${f.key}" is a select and must set \`default\` to the option you would have chosen. `
+                    + `The user is confirming your plan, not filling in a blank form.`,
+                });
+              }
+              if (f.kind === 'select' && (f.options ?? []).length < 2) {
+                ctx.addIssue({
+                  code: 'custom',
+                  path: [i, 'options'],
+                  message: `Field "${f.key}" is a select and needs at least 2 options.`,
+                });
+              }
+            }
+          }),
         submit_label: z.string().optional().describe('Button text, e.g. "Run the sweep". Defaults to "Run it".'),
       }),
     },
