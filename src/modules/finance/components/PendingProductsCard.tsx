@@ -68,13 +68,17 @@ import {
   type PriceRung, type Warehouse,
 } from '@/services/warehouseService';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
+import { parseSupplierLine, type ParsedSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { supabase } from '@/integrations/supabase/client';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { formatMoney } from '@/modules/finance/services/financeService';
-import { parseDecimalOr } from '@/utils/decimal';
+import { parseDecimalOr, round2 } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 import { TablePagination, clampPage } from '@/components/core/ui/table-pagination';
+
+/** A CRM row read only for the names `parseSupplierLine` can recognise in a description. */
+interface MakerRow { name: string; factory_names: string[] | null }
 
 /** Issuers per page in the collapsed list. */
 const GROUP_PAGE_SIZE = 15;
@@ -92,24 +96,61 @@ interface LineEdit {
   location: string; reorder_point: string;
   barcode: string; taric_code: string; cpv_code: string;
   mydata_vat_category: string;
+  // Read out of the invoice text by `parseSupplierLine`. They land in products.metadata, the
+  // same place createProductViaIngestCore puts them.
+  grade: string; color: string; finish: string; series: string;
+  // Pricing, matching ReceiveToWarehouseDialog's "Pricing" section. `markup_pct` and
+  // `sales_price` are two views of ONE number; either edits the other.
+  markup_pct: string; sale_vat_category: string; discount_percent: string; prices_include_vat: boolean;
 }
+
+/** AADE sale-VAT categories. Same table ReceiveToWarehouseDialog uses. */
+const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
 
 const numStr = (n: number | null | undefined) => (n != null ? String(n) : '');
 
-const editFrom = (l: IntakeLine): LineEdit => ({
+/**
+ * Read what the invoice text actually says.
+ *
+ * `parseSupplierLine` pulls dimensions, grade, the supplier's article code, the maker, colour,
+ * finish and the range out of a line like "AMALFI GRIS 80X80 A' -3 -1", and infers the unit from
+ * the shape of the quantity (a 2-D size billed at a fractional quantity is m², not pieces). Its
+ * own header says it "is the thing that fills the intake form's fields" — and it only ever ran
+ * inside ReceiveToWarehouseDialog. Measured on this queue: 1,079 lines, ZERO with a manufacturer,
+ * a supplier code or a dimension. The AI extraction had been doing the whole job alone.
+ *
+ * It runs here, on read, rather than at queue time in the edge function: it is deterministic and
+ * free, so there is nothing to persist and nothing to backfill — every row already queued gets
+ * the benefit the moment it is looked at. Everything it returns is a SUGGESTION shown in an
+ * editable field with its evidence on screen, which is the contract the parser documents.
+ */
+const parseLine = (l: IntakeLine, knownManufacturers: string[]): ParsedSupplierLine =>
+  parseSupplierLine({
+    description: l.raw_description || l.name,
+    quantity: l.quantity,
+    netValue: l.unit_cost != null ? Number(l.unit_cost) * Number(l.quantity ?? 1) : null,
+    knownManufacturers,
+    // Deliberately NOT the issuer. ReceiveToWarehouseDialog defaults to "whoever sent the
+    // document", which is right when you are receiving a delivery from the maker; here the
+    // issuer is already recorded as the SUPPLIER, and a distributor is not the manufacturer.
+    defaultManufacturer: null,
+  });
+
+const editFrom = (l: IntakeLine, parsed?: ParsedSupplierLine): LineEdit => ({
   name: l.name,
   sku: l.sku ?? '',
-  unit: l.unit ?? '',
+  // The stored unit wins — Haiku saw the whole line. The parser only answers when nobody did.
+  unit: l.unit ?? parsed?.unit ?? '',
   quantity: String(l.quantity ?? 1),
   unit_cost: numStr(l.unit_cost),
   sales_price: numStr(l.sales_price),
   category_id: l.category_id ?? '',
-  manufacturer: l.manufacturer ?? '',
-  supplier_product_code: l.supplier_product_code ?? '',
+  manufacturer: l.manufacturer ?? parsed?.manufacturer ?? '',
+  supplier_product_code: l.supplier_product_code ?? parsed?.supplier_product_code ?? '',
   material_category: '',
-  width_mm: numStr(l.width_mm),
-  length_mm: numStr(l.length_mm),
-  thickness_mm: numStr(l.thickness_mm),
+  width_mm: numStr(l.width_mm ?? parsed?.dimensions.width_mm ?? null),
+  length_mm: numStr(l.length_mm ?? parsed?.dimensions.length_mm ?? null),
+  thickness_mm: numStr(l.thickness_mm ?? parsed?.dimensions.thickness_mm ?? null),
   weight_kg: '',
   location: '',
   reorder_point: '',
@@ -117,6 +158,17 @@ const editFrom = (l: IntakeLine): LineEdit => ({
   taric_code: '',
   cpv_code: '',
   mydata_vat_category: '',
+  grade: parsed?.grade ?? '',
+  color: parsed?.color ?? '',
+  finish: parsed?.finish ?? '',
+  series: parsed?.series ?? '',
+  // Markup and sale price start BLANK on purpose. Seeding the markup would compute a sale price,
+  // and a sale price PINS list_price — taking the product off the ladder for good. The ladder's
+  // own answer is shown as the placeholder instead, so it stays a suggestion until someone types.
+  markup_pct: '',
+  sale_vat_category: '',
+  discount_percent: '',
+  prices_include_vat: false,
 });
 
 /** Only the keys the operator actually filled in. Blank must not overwrite a real value. */
@@ -140,7 +192,30 @@ const detailOverrides = (e: LineEdit): IntakeLineDetails => {
   num('weight_kg', e.weight_kg);
   num('reorder_point', e.reorder_point);
   num('mydata_vat_category', e.mydata_vat_category);
+  txt('grade', e.grade);
+  txt('color', e.color);
+  txt('finish', e.finish);
+  txt('series', e.series);
+  num('discount_percent', e.discount_percent);
+  num('markup_percent', e.markup_pct);
+  num('mydata_vat_category', e.sale_vat_category);
+  if (e.prices_include_vat) (out as Record<string, unknown>).prices_include_vat = true;
   return out;
+};
+
+/**
+ * The ex-VAT figure to store as `list_price`.
+ *
+ * A Greek operator reads a GROSS price off an invoice. Netting on WRITE rather than on read is
+ * what keeps `list_price` meaning exactly one thing everywhere — the same rule (and the same
+ * arithmetic) as ReceiveToWarehouseDialog. Without this the queue stored whatever was typed, so
+ * a gross figure landed 24% high and every quote built on it was wrong.
+ */
+const netSalePrice = (e: LineEdit): number | null => {
+  const typed = e.sales_price === '' ? null : parseDecimalOr(e.sales_price, NaN);
+  if (typed == null || !Number.isFinite(typed)) return null;
+  const vatPct = VAT_PCT_BY_CATEGORY[Number(e.sale_vat_category)] ?? null;
+  return e.prices_include_vat && vatPct != null ? round2(typed / (1 + vatPct / 100)) : typed;
 };
 
 /**
@@ -187,6 +262,9 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   const [materialCategories, setMaterialCategories] = useState<{ id: string; name: string }[]>([]);
   /** The issuer the operator is putting into the CRM, if any. */
   const [crmFor, setCrmFor] = useState<IntakeSupplierGroup | null>(null);
+  /** Maker names `parseSupplierLine` can recognise inside a description. A maker is only ever
+   *  matched against a name we already know — the parser never invents one from a stray word. */
+  const [knownManufacturers, setKnownManufacturers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -220,7 +298,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [gs, cats, fin, ign, mats] = await Promise.all([
+      const [gs, cats, fin, ign, mats, companies] = await Promise.all([
         warehouseService.intakeSupplierGroups(workspaceId),
         financeCategoriesService.list(workspaceId)
           .then((c) => c.filter((x) => x.kind === 'income' || x.kind === 'both')).catch(() => []),
@@ -229,11 +307,25 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
         warehouseService.intakeIgnoredIssuers(workspaceId).catch(() => [] as IntakeIgnoredIssuer[]),
         supabase.from('material_categories').select('id, name').order('name').limit(300)
           .then((r) => (r.data ?? []) as { id: string; name: string }[], () => []),
+        // Brands and manufacturers the workspace already knows, plus the factory names they
+        // trade under — `factory_names` is where "Blum" lives when the CRM row is the distributor.
+        supabase.from('crm_companies').select('name, factory_names')
+          .eq('workspace_id', workspaceId).limit(1000)
+          .then(
+            (r) => (r.data ?? []) as MakerRow[],
+            () => [] as MakerRow[],
+          ),
       ]);
       setGroups(gs);
       setCategories(cats);
       setIgnored(ign);
       setMaterialCategories(mats);
+      // Annotated rather than inferred: the Supabase client is untyped, so `companies` widens to
+      // `any` and `new Set(any)` would infer Set<unknown>.
+      const makerNames: string[] = (companies as MakerRow[])
+        .flatMap((c) => [c.name, ...(c.factory_names ?? [])])
+        .filter((n) => typeof n === 'string' && n.trim().length > 0);
+      setKnownManufacturers([...new Set(makerNames)]);
       setMode((((fin as { warehouse_autosync_mode?: IntakeMode } | null)?.warehouse_autosync_mode) ?? 'suggest'));
       setPage((p) => clampPage(p, gs.length, GROUP_PAGE_SIZE));
     } catch (err) {
@@ -425,6 +517,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
             key={`search:${search}`}
             workspaceId={workspaceId} issuerKey={null} search={search}
             categories={categories} materialCategories={materialCategories} warehouses={warehouses}
+            knownManufacturers={knownManufacturers}
             targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog}
             onChanged={async () => { await load(); onChanged?.(); }}
           />
@@ -497,6 +590,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                       <IntakeLineList
                         workspaceId={workspaceId} issuerKey={g.issuer_key} search={null}
                         categories={categories} materialCategories={materialCategories} warehouses={warehouses}
+                        knownManufacturers={knownManufacturers}
                         supplierName={g.issuer_name}
                         targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog}
                         onChanged={async () => { await load(); onChanged?.(); }}
@@ -564,13 +658,14 @@ const IntakeLineList: React.FC<{
   categories: FinanceCategory[];
   materialCategories: { id: string; name: string }[];
   warehouses: Warehouse[];
+  knownManufacturers: string[];
   targetWarehouseId: string;
   addToCatalog: boolean;
   supplierName?: string | null;
   onChanged: () => void | Promise<void>;
 }> = ({
   workspaceId, issuerKey, search, categories, materialCategories, warehouses,
-  targetWarehouseId, addToCatalog, supplierName, onChanged,
+  knownManufacturers, targetWarehouseId, addToCatalog, supplierName, onChanged,
 }) => {
   const { toast } = useToast();
   const [lines, setLines] = useState<IntakeLine[]>([]);
@@ -585,6 +680,9 @@ const IntakeLineList: React.FC<{
   /** The ladder's answer at an operator-typed cost, keyed by line id. Only the row being edited
    *  is re-asked; the rest keep the value `warehouse_intake_lines` already derived for them. */
   const [repriced, setRepriced] = useState<Record<string, { sell: number | null; rung: PriceRung; markupPct: number | null }>>({});
+  /** What the deterministic parser read out of each line's text, kept so the row can show its
+   *  evidence. A silently applied guess is the thing this screen must never do again. */
+  const [parsed, setParsed] = useState<Record<string, ParsedSupplierLine>>({});
 
   const reqSeq = useRef(0);
 
@@ -599,7 +697,12 @@ const IntakeLineList: React.FC<{
       setLines(res.lines);
       setTotal(res.total);
       const e: Record<string, LineEdit> = {};
-      for (const l of res.lines) e[l.id] = editFrom(l);
+      const pp: Record<string, ParsedSupplierLine> = {};
+      for (const l of res.lines) {
+        pp[l.id] = parseLine(l, knownManufacturers);
+        e[l.id] = editFrom(l, pp[l.id]);
+      }
+      setParsed(pp);
       setEdits(e);
       setRepriced({});
       setSelected(new Set());
@@ -609,13 +712,37 @@ const IntakeLineList: React.FC<{
         toast({ title: 'Failed to load lines', description: (err as Error)?.message, variant: 'destructive' });
       }
     } finally { if (seq === reqSeq.current) setLoading(false); }
-  }, [workspaceId, issuerKey, search, toast]);
+  }, [workspaceId, issuerKey, search, knownManufacturers, toast]);
 
   useEffect(() => { setPage(1); }, [issuerKey, search]);
   useEffect(() => { void load(page); }, [load, page]);
 
   const setEdit = (id: string, patch: Partial<LineEdit>) =>
     setEdits((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
+
+  /** Markup and sale price are two views of one number — editing either updates the other.
+   *  Arithmetic on a markup the OPERATOR TYPED, never on a policy fetched from the DB
+   *  (pricingChain.test.ts fails the build on the latter, and rightly). */
+  const applyMarkup = (id: string, markup: string) => {
+    const e = edits[id]; if (!e) return;
+    const cost = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
+    const pct = Number(markup);
+    setEdit(id, {
+      markup_pct: markup,
+      sales_price: cost != null && Number.isFinite(cost) && markup !== '' && Number.isFinite(pct)
+        ? String(round2(cost * (1 + pct / 100))) : e.sales_price,
+    });
+  };
+  const applySalePrice = (id: string, salePrice: string) => {
+    const e = edits[id]; if (!e) return;
+    const cost = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
+    const price = parseDecimalOr(salePrice, NaN);
+    setEdit(id, {
+      sales_price: salePrice,
+      markup_pct: cost != null && Number.isFinite(cost) && cost > 0 && Number.isFinite(price)
+        ? String(round2(((price - cost) / cost) * 100)) : e.markup_pct,
+    });
+  };
 
   const toggleDetails = (id: string) => setOpenDetails((s) => {
     const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n;
@@ -651,7 +778,7 @@ const IntakeLineList: React.FC<{
       name: e.name, sku: e.sku || null, unit: e.unit || null,
       quantity: parseDecimalOr(e.quantity, 0) || l.quantity,
       unit_cost: e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, 0),
-      sales_price: e.sales_price === '' ? null : parseDecimalOr(e.sales_price, 0),
+      sales_price: netSalePrice(e),
       category_id: e.category_id || null,
       target_warehouse_id: targetWarehouseId || null,
       add_to_catalog: addToCatalog,
@@ -805,6 +932,7 @@ const IntakeLineList: React.FC<{
 
             {g.items.map(({ line: l, n }) => {
               const e = edits[l.id]; if (!e) return null;
+              const pl = parsed[l.id];
               const rep = repriced[l.id];
               const ladder = rep ? rep.sell : l.suggested_sell;
               const rung = rep ? rep.rung : l.price_rung;
@@ -814,6 +942,13 @@ const IntakeLineList: React.FC<{
               const pinned = e.sales_price !== '';
               const why = explainRung(rung, markup, supplierName ?? l.inbound_document?.issuer_name ?? null);
               const matched = l.match_score != null && Number(l.match_score) >= 0.5;
+              const vatPct = VAT_PCT_BY_CATEGORY[Number(e.sale_vat_category)] ?? null;
+              const netPrice = netSalePrice(e);
+              const costNum = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
+              const margin = netPrice != null && costNum != null && Number.isFinite(costNum)
+                ? round2(netPrice - costNum) : null;
+              const marginPct = margin != null && costNum != null && costNum > 0
+                ? round2((margin / costNum) * 100) : null;
               const rowBusy = busy === l.id;
               const detailsOpen = openDetails.has(l.id);
               const detailCount = Object.keys(detailOverrides(e)).length;
@@ -831,6 +966,21 @@ const IntakeLineList: React.FC<{
                       {l.raw_description && (
                         <div className="truncate font-mono text-[10px] text-muted-foreground" title={l.raw_description}>
                           {l.raw_description}
+                        </div>
+                      )}
+                      {/* What was READ out of that text, and therefore already filled in below.
+                          Shown rather than applied silently — a guess the operator cannot see is
+                          a guess they cannot correct. */}
+                      {pl && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          {pl.dimensions.label && <Detected label={pl.dimensions.label} title={`Read from "${pl.dimensions.matched}"`} />}
+                          {pl.manufacturer && <Detected label={pl.manufacturer} title="Maker recognised from a name your CRM already knows" />}
+                          {pl.supplier_product_code && <Detected label={`code ${pl.supplier_product_code}`} title="The supplier's own article code" />}
+                          {pl.series && <Detected label={pl.series} title="Range / collection" />}
+                          {pl.color && <Detected label={pl.color} title="Colour" />}
+                          {pl.finish && <Detected label={pl.finish} title="Surface finish" />}
+                          {pl.grade && <Detected label={`grade ${pl.grade}`} title="Quality grade" />}
+                          {!l.unit && pl.unit && <Detected label={pl.unit} title={pl.unit_reason} />}
                         </div>
                       )}
                     </div>
@@ -861,7 +1011,7 @@ const IntakeLineList: React.FC<{
                         Sale price {pinned ? <span className="text-[hsl(var(--warning))]">· pinned</span> : '· auto'}
                       </label>
                       <Input id={`intake-price-${l.id}`} className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal"
-                        value={e.sales_price} onChange={(ev) => setEdit(l.id, { sales_price: ev.target.value })}
+                        value={e.sales_price} onChange={(ev) => applySalePrice(l.id, ev.target.value)}
                         placeholder={autoPrice != null ? `auto ${formatMoney(autoPrice, l.currency)}` : 'set price'} />
                     </div>
                     <div className="space-y-0.5">
@@ -898,6 +1048,59 @@ const IntakeLineList: React.FC<{
                       <span>{why.text}</span>
                     </div>
                   )}
+                  {/* The rest of the pricing decision — the same four controls the receive
+                      modal has always had. Only meaningful once a price is being set by hand,
+                      so it appears with one. */}
+                  {pinned && (
+                    <div className="space-y-1.5 rounded-sm border border-hairline bg-surface-sunken px-3 py-2">
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        <div className="space-y-0.5">
+                          <label htmlFor={`mk-${l.id}`} className="text-[10px] text-muted-foreground">Markup %</label>
+                          <Input id={`mk-${l.id}`} className="h-8 text-right text-xs tabular-nums" type="text" inputMode="decimal"
+                            value={e.markup_pct} onChange={(ev) => applyMarkup(l.id, ev.target.value)}
+                            placeholder={markup != null ? `auto ${markup}%` : '0'} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label htmlFor={`vat-${l.id}`} className="text-[10px] text-muted-foreground">Sale VAT</label>
+                          <Select value={e.sale_vat_category || '__none'}
+                            onValueChange={(vv) => setEdit(l.id, { sale_vat_category: vv === '__none' ? '' : vv })}>
+                            <SelectTrigger id={`vat-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">— not set —</SelectItem>
+                              {Object.entries(VAT_PCT_BY_CATEGORY).map(([cat, pct]) => (
+                                <SelectItem key={cat} value={cat}>{pct}% (cat {cat})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label htmlFor={`disc-${l.id}`} className="text-[10px] text-muted-foreground">Catalog discount %</label>
+                          <Input id={`disc-${l.id}`} className="h-8 text-right text-xs tabular-nums" type="text" inputMode="decimal"
+                            value={e.discount_percent} onChange={(ev) => setEdit(l.id, { discount_percent: ev.target.value })}
+                            placeholder="0" />
+                        </div>
+                        <label className="flex cursor-pointer items-end gap-1.5 pb-1.5 text-[11px] text-muted-foreground">
+                          <Checkbox className="h-3.5 w-3.5" checked={e.prices_include_vat}
+                            onCheckedChange={(vv) => setEdit(l.id, { prices_include_vat: vv === true })} />
+                          Price I typed includes VAT
+                        </label>
+                      </div>
+                      {/* What will actually be stored, and what it earns. list_price is ex-VAT
+                          everywhere in the platform, so a gross figure has to be netted BEFORE
+                          it is written or every quote built on it is 24% wrong. */}
+                      <div className="text-[11px] text-muted-foreground">
+                        Stored as <span className="font-medium text-foreground tabular-nums">{formatMoney(netPrice, l.currency)}</span> ex-VAT
+                        {e.prices_include_vat && vatPct != null && <> (netted from the {vatPct}% gross you typed)</>}
+                        {margin != null && (
+                          <> · margin <span className={`font-medium tabular-nums ${margin < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                            {formatMoney(margin, l.currency)}{marginPct != null ? ` (${marginPct}%)` : ''}
+                          </span></>
+                        )}
+                        {' '}· pins the list price, so the pricing rules stop applying to this product.
+                      </div>
+                    </div>
+                  )}
+
                   {!l.supplier_attributed && (
                     <div className="text-[11px] text-[hsl(var(--warning))]">
                       Supplier is not a CRM company — cost is recorded without a counterparty, and no supplier pricing rule can apply.
@@ -954,6 +1157,15 @@ const IntakeLineList: React.FC<{
 
                         <DetailField label="myDATA VAT category" id={`vc-${l.id}`} value={e.mydata_vat_category} numeric
                           onChange={(v) => setEdit(l.id, { mydata_vat_category: v })} placeholder="1 = 24%" />
+
+                        <DetailField label="Range / collection" id={`ser-${l.id}`} value={e.series}
+                          onChange={(v) => setEdit(l.id, { series: v })} placeholder="e.g. AMALFI" />
+                        <DetailField label="Colour" id={`col-${l.id}`} value={e.color}
+                          onChange={(v) => setEdit(l.id, { color: v })} placeholder="e.g. grey" />
+                        <DetailField label="Finish" id={`fin-${l.id}`} value={e.finish}
+                          onChange={(v) => setEdit(l.id, { finish: v })} placeholder="e.g. lappato" />
+                        <DetailField label="Grade" id={`grd-${l.id}`} value={e.grade}
+                          onChange={(v) => setEdit(l.id, { grade: v })} placeholder="e.g. A" />
                       </div>
                     </div>
                   )}
@@ -971,6 +1183,14 @@ const IntakeLineList: React.FC<{
     </div>
   );
 };
+
+/** One thing the parser read out of the invoice text, with its evidence in the tooltip. */
+const Detected: React.FC<{ label: string; title: string }> = ({ label, title }) => (
+  <span title={title}
+    className="inline-flex items-center rounded-sm border border-hairline bg-surface-sunken px-1.5 py-px text-[10px] text-muted-foreground">
+    {label}
+  </span>
+);
 
 /** A labelled input in the details grid. Exists so the grid reads as data, not as markup. */
 const DetailField: React.FC<{

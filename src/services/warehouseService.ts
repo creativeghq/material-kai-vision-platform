@@ -782,6 +782,16 @@ export interface IntakeLineDetails {
   mydata_vat_category?: number | null;
   mydata_income_classification_type?: string | null;
   mydata_income_classification_category?: string | null;
+  /** Catalog price policy. `discount_percent` lands on `product_prices`; the other two on
+   *  `products`, where the markup ladder and the invoice builder read them. */
+  discount_percent?: number | null;
+  markup_percent?: number | null;
+  prices_include_vat?: boolean;
+  /** Read out of the invoice text by `parseSupplierLine`; stored in `products.metadata`. */
+  grade?: string | null;
+  color?: string | null;
+  finish?: string | null;
+  series?: string | null;
   width_mm?: number | null;
   length_mm?: number | null;
   thickness_mm?: number | null;
