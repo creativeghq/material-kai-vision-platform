@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
-import { FINANCE_BASE } from '@/modules/finance/routes';
+import { FINANCE_BASE, ORDERS_FILTER_KEY } from '@/modules/finance/routes';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
@@ -59,7 +59,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { TablePagination, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
-import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/core/filters';
+import { FilterBar, useFilterValues, type FilterGroupDef, type FilterValues } from '@/components/core/filters';
 import { UNITS } from '@/lib/units';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
@@ -164,7 +164,15 @@ export const OrdersPanel: React.FC<{
   // Total MATCHING rows as counted by the server — the list itself only ever holds one page.
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
+  const embedded = !!(companyId || contactId);
+  // Filters live in the URL on the standalone Finance list, so a filtered view is shareable AND
+  // so another surface can link straight into one. The dashboard's Orders block addresses
+  // `Confirmed` / `Draft` this way; without the URL half it would open the tab showing everything
+  // and look exactly like it had worked. Never mirrored when embedded in a party/project tab —
+  // the filter cluster is hidden there, so a param nothing can clear would be a trap.
+  const { values: filterValues, setValues: setFilterValues } =
+    useFilterValues({ urlKey: embedded ? undefined : ORDERS_FILTER_KEY });
   // `filterValues.q` is what the user is typing; `searchQ` is the debounced value the query
   // actually runs on, so a fast typist doesn't fire a round trip per keystroke.
   const search = (filterValues.q as string | undefined) ?? '';
@@ -177,8 +185,6 @@ export const OrdersPanel: React.FC<{
   // Finance categories — for classifying an order (income for sales, expense for purchase). Loaded
   // once here and passed to the create + detail dialogs so an order carries a category like invoices do.
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
-  const embedded = !!(companyId || contactId);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const financeBase = FINANCE_BASE;

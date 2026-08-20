@@ -16,9 +16,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { StatBlock } from './StatBlock';
 import { QuickAccess } from './QuickAccess';
 import { usePipelineCounts, useCrmCounts } from './useDashboardBlocks';
+import {
+  ordersLink, quotesLink, receivablesLink, payablesLink, companiesLink,
+  CRM_KIND, PROJECTS_LINK,
+} from './officeLinks';
+import { loadAgingLedger, summarizeAging, type AgingSummary } from '@/modules/finance/services/agingLedger';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { inboxApi } from '@/services/inboxApi';
 import {
   getDashboardInsights,
   type DashboardInsights,
@@ -38,18 +42,25 @@ const TONE_STYLES: Record<InsightTone, { icon: React.ComponentType<{ className?:
 };
 
 // ── stat tile ─────────────────────────────────────────────────────────────────
+const EMPTY_SUMMARY: AgingSummary = {
+  outstanding: 0, creditHeld: 0, overdueTotal: 0, overdueCount: 0, openCount: 0,
+  currency: 'EUR', mixed: false,
+};
+
 interface StatState {
-  finance: { total: number; count: number; overdue: number; currency: string };
+  /** Receivables / payables, summarized from the SAME ledger the Finance page reads. */
+  ar: AgingSummary;
+  ap: AgingSummary;
+  /** The uninvoiced-orders overlay failed → both figures UNDER-report. Never shown as settled. */
+  overlayFailed: boolean;
   projects: number;
-  tasks: number;
-  inbox: number;
 }
 
 const EMPTY_STATS: StatState = {
-  finance: { total: 0, count: 0, overdue: 0, currency: 'EUR' },
+  ar: EMPTY_SUMMARY,
+  ap: EMPTY_SUMMARY,
+  overlayFailed: false,
   projects: 0,
-  tasks: 0,
-  inbox: 0,
 };
 
 // ── main panel ──────────────────────────────────────────────────────────────
@@ -130,6 +141,14 @@ const MyOfficeImpl: React.FC = () => {
   }, [user, activeWorkspaceId, workspaceLoading]);
 
   // ── stats ──
+  //
+  // Receivables and payables come from `loadAgingLedger` — the SAME assembly the Finance page
+  // reads, so the figure on this tile and the tab it links to cannot disagree. This used to sum
+  // `invoices.amount_due` for three statuses with `.limit(1000)`, which was wrong three ways at
+  // once: a silent cap past 1,000 open invoices, a total summed across currencies and then
+  // labelled with whichever one the last row carried, and — the reason it was noticed — no
+  // knowledge of confirmed-but-uninvoiced orders. In this workspace that is every receivable
+  // there is, so the tile said "All Settled" and the Receivables tab it opened listed the money.
   useEffect(() => {
     if (!activeWorkspaceId) {
       // Only leave the loading state once we KNOW there is no workspace. While the
@@ -141,49 +160,22 @@ const MyOfficeImpl: React.FC = () => {
     let alive = true;
     setStatsLoading(true);
     (async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id ?? null;
-
-      const [invRes, projRes, taskRes, threadsRes] = await Promise.all([
-        supabase
-          .from('invoices')
-          .select('amount_due, due_at, status, currency')
-          .eq('workspace_id', activeWorkspaceId)
-          .in('status', ['issued', 'partially_paid', 'overdue'])
-          .limit(1000),
+      const [ledger, projRes] = await Promise.all([
+        loadAgingLedger(activeWorkspaceId),
         supabase
           .from('projects')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', activeWorkspaceId)
           .in('status', ['planning', 'in_progress', 'on_hold']),
-        userId
-          ? supabase
-              .from('project_tasks')
-              .select('id', { count: 'exact', head: true })
-              .eq('assignee_id', userId)
-              .in('status', ['todo', 'in_progress', 'blocked'])
-          : Promise.resolve({ count: 0 } as { count: number | null }),
-        inboxApi.listThreads({ status: 'open' }).catch(() => ({ threads: [] as unknown[] })),
       ]);
 
       if (!alive) return;
 
-      const invRows = (invRes.data ?? []) as Array<{ amount_due: number | null; due_at: string | null; status: string; currency: string }>;
-      const now = Date.now();
-      let total = 0;
-      let overdue = 0;
-      let currency = 'EUR';
-      for (const r of invRows) {
-        total += Number(r.amount_due ?? 0);
-        if (r.status === 'overdue' || (r.due_at && new Date(r.due_at).getTime() < now)) overdue++;
-        if (r.currency) currency = r.currency;
-      }
-
       setStats({
-        finance: { total: Math.round(total), count: invRows.length, overdue, currency },
+        ar: summarizeAging(ledger.ar),
+        ap: summarizeAging(ledger.ap),
+        overlayFailed: ledger.overlayFailed,
         projects: projRes.count ?? 0,
-        tasks: (taskRes as { count: number | null }).count ?? 0,
-        inbox: ((threadsRes as { threads?: unknown[] })?.threads ?? []).length,
       });
       setStatsLoading(false);
     })().catch(() => alive && setStatsLoading(false));
@@ -218,6 +210,31 @@ const MyOfficeImpl: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorkspaceId, workspaceLoading]);
 
+  // The Finance headline, and the one thing it must never say by accident.
+  //
+  // `overlayFailed` means the uninvoiced-orders half of the ledger did not load, so `outstanding`
+  // is an UNDER-report — and an under-report of money owed reads as good news. "All Settled" is
+  // therefore only ever shown when we actually know the ledger is complete AND empty; a failed
+  // load says so instead. `mixed` gets the same treatment: a sum across currencies is not a
+  // number a symbol can fix, so the caption says the total cannot be taken at face value rather
+  // than quietly stamping it with the largest bucket's currency.
+  const financeIncomplete = stats.overlayFailed;
+  const financeHeadline = financeIncomplete
+    ? '—'
+    : stats.ar.openCount === 0
+      ? '—'
+      : money(stats.ar.outstanding, stats.ar.currency);
+  const financeCaption = financeIncomplete
+    ? 'Could Not Load'
+    : stats.ar.openCount === 0
+      // Nothing owed to us is not the same as nothing to know about. Customer money sitting on
+      // account is money we HOLD, and the Finance page says so right next to this figure — a bare
+      // "All Settled" here would be the only surface that omits it.
+      ? (stats.ar.creditHeld > 0 ? `Settled · ${money(stats.ar.creditHeld, stats.ar.currency)} Held` : 'All Settled')
+      : stats.ar.mixed
+        ? `Outstanding · ${stats.ar.currency} + Other`
+        : 'Outstanding';
+
   // A user with genuinely no workspace has no office to show — but `activeWorkspaceId`
   // is ALSO null for the first beat of every load, while the workspace resolves.
   // Returning null there rendered the dashboard's top row hero-only and then grew it
@@ -242,10 +259,17 @@ const MyOfficeImpl: React.FC = () => {
         </h2>
       </div>
 
-      {/* Operational blocks — every panel carries a figure, what it is made of,
-          and a way into the detail. Replaces four bare counters, three of which
-          read zero because `projects`, `project_tasks` and `invoices` are empty
-          in this workspace while `orders`, `quotes` and `crm_companies` are not. */}
+      {/* Operational blocks — every panel carries a figure, what it is made of, and a way into
+          the detail. Two rules hold here and nothing else checks them:
+
+          1. Every bucket counted in the headline is VISIBLE in the breakdown. Orders showed
+             Draft / Confirmed / Fulfilled under a headline of confirmed + partially_fulfilled, so
+             no combination of the rows on screen added up to the number above them — and the one
+             bucket that did (`partially_fulfilled`) was the only one not shown. Same for quotes:
+             `quoted` was counted and hidden while `accepted` was shown and not counted.
+          2. Every figure LINKS to the records it counted — the block to the list, each row to its
+             slice. Not to the module's front door: `/finance` opens the Dashboard pane and `/crm`
+             opens Users, which is not the CRM at all. */}
       <div className="grid grid-cols-2 gap-2.5">
         <StatBlock
           icon={ShoppingCart}
@@ -254,11 +278,12 @@ const MyOfficeImpl: React.FC = () => {
           value={pipeline.ordersOpen}
           caption={pipeline.ordersOpen === 1 ? 'Open Order' : 'Open Orders'}
           rows={[
-            { label: 'Draft', value: pipeline.orders.draft ?? 0 },
-            { label: 'Confirmed', value: pipeline.orders.confirmed ?? 0 },
-            { label: 'Fulfilled', value: pipeline.orders.fulfilled ?? 0 },
+            { label: 'Confirmed', value: pipeline.orders.confirmed ?? 0, to: ordersLink('confirmed') },
+            { label: 'Partly fulfilled', value: pipeline.orders.partially_fulfilled ?? 0, to: ordersLink('partially_fulfilled') },
+            { label: 'Draft', value: pipeline.orders.draft ?? 0, to: ordersLink('draft') },
           ]}
-          linkTo="/finance"
+          linkTo={ordersLink()}
+          linkLabel="All orders"
         />
         <StatBlock
           icon={FileText}
@@ -267,24 +292,31 @@ const MyOfficeImpl: React.FC = () => {
           value={pipeline.quotesActive}
           caption="In Play"
           rows={[
-            { label: 'Draft', value: pipeline.quotes.draft ?? 0 },
-            { label: 'Submitted', value: pipeline.quotes.submitted ?? 0 },
-            { label: 'Accepted', value: pipeline.quotes.accepted ?? 0 },
+            { label: 'Draft', value: pipeline.quotes.draft ?? 0, to: quotesLink('draft') },
+            { label: 'Submitted', value: pipeline.quotes.submitted ?? 0, to: quotesLink('submitted') },
+            { label: 'Quoted', value: pipeline.quotes.quoted ?? 0, to: quotesLink('quoted') },
           ]}
-          linkTo="/quotes"
+          linkTo={quotesLink()}
+          linkLabel="All quotes"
         />
         <StatBlock
           icon={Wallet}
           title="Finance"
           loading={statsLoading}
-          value={stats.finance.count === 0 ? '—' : money(stats.finance.total, stats.finance.currency)}
-          caption={stats.finance.count === 0 ? 'All Settled' : 'Outstanding'}
+          value={financeHeadline}
+          caption={financeCaption}
           rows={[
-            { label: 'Open invoices', value: stats.finance.count },
-            { label: 'Overdue', value: stats.finance.overdue, alert: stats.finance.overdue > 0 },
-            { label: 'Conversations', value: stats.inbox },
+            { label: 'Open receivables', value: stats.ar.openCount, to: receivablesLink() },
+            {
+              label: 'Overdue',
+              value: stats.ar.overdueCount,
+              alert: stats.ar.overdueCount > 0,
+              to: receivablesLink({ pastDue: true }),
+            },
+            { label: 'Payables', value: money(stats.ap.outstanding, stats.ap.currency), to: payablesLink() },
           ]}
-          linkTo="/finance"
+          linkTo={receivablesLink()}
+          linkLabel="Receivables"
         />
         <StatBlock
           icon={Building2}
@@ -293,11 +325,12 @@ const MyOfficeImpl: React.FC = () => {
           value={crm.total}
           caption={crm.total === 1 ? 'Company' : 'Companies'}
           rows={[
-            { label: 'Customers', value: crm.customers },
-            { label: 'Suppliers', value: crm.suppliers },
-            { label: 'Active projects', value: stats.projects },
+            { label: 'Customers', value: crm.customers, to: companiesLink(CRM_KIND.customer) },
+            { label: 'Suppliers', value: crm.suppliers, to: companiesLink(CRM_KIND.supplier) },
+            { label: 'Active projects', value: stats.projects, to: PROJECTS_LINK },
           ]}
-          linkTo="/crm"
+          linkTo={companiesLink()}
+          linkLabel="All companies"
         />
       </div>
 

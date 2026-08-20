@@ -20,6 +20,7 @@ import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildQuoteFilters } from '../components/quoteFilters';
+import { QUOTES_TAB, QUOTES_FILTER_KEY, quoteUrl } from '../routes';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -30,7 +31,7 @@ import { formatDate } from '@/utils/datetime';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
 import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
 
-type QuotesTab = 'quotes' | 'requests' | 'settings';
+type QuotesTab = typeof QUOTES_TAB[keyof typeof QUOTES_TAB];
 
 /**
  * Main Quotes Page - Customer facing
@@ -45,12 +46,12 @@ export const QuotesPage: React.FC = () => {
   // Tab state (?tab=requests deep-links the procurement inbox, merged here from /requests).
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
-  const activeTab: QuotesTab = canManageNetwork && (requestedTab === 'requests' || requestedTab === 'settings')
+  const activeTab: QuotesTab = canManageNetwork && (requestedTab === QUOTES_TAB.requests || requestedTab === QUOTES_TAB.settings)
     ? (requestedTab as QuotesTab)
-    : 'quotes';
+    : QUOTES_TAB.quotes;
   const handleTabChange = (val: string) => {
     const params = new URLSearchParams(searchParams);
-    if (val === 'requests' || val === 'settings') params.set('tab', val);
+    if (val === QUOTES_TAB.requests || val === QUOTES_TAB.settings) params.set('tab', val);
     else params.delete('tab');
     setSearchParams(params, { replace: true });
   };
@@ -94,8 +95,10 @@ export const QuotesPage: React.FC = () => {
   }, [loadQuotes]);
 
   const filterGroups = useMemo(() => buildQuoteFilters(quotes), [quotes]);
+  // Mirrored into `?qf=` so a filtered list is shareable and, more to the point, addressable:
+  // the dashboard's Quotes block links straight to the submitted / accepted slice.
   const { values: filterValues, setValues: setFilterValues, filtered: filteredQuotes, previewCount } =
-    useFilters<QuoteWithItems>(quotes, filterGroups);
+    useFilters<QuoteWithItems>(quotes, filterGroups, { urlKey: QUOTES_FILTER_KEY });
 
   // Narrowing the filter or deleting a quote can shrink the list under the current page.
   useEffect(() => { setPage(1); }, [filterValues]);
@@ -118,7 +121,7 @@ export const QuotesPage: React.FC = () => {
 
   // Handle quote click - navigate to detail page
   const handleViewQuote = (quoteId: string) => {
-    navigate(`/quotes/${quoteId}`);
+    navigate(quoteUrl(quoteId));
   };
 
   // Handle delete quote
@@ -146,7 +149,7 @@ export const QuotesPage: React.FC = () => {
   // Handle quote created - navigate to detail page
   const handleQuoteCreated = (quoteId: string) => {
     loadQuotes();
-    navigate(`/quotes/${quoteId}`);
+    navigate(quoteUrl(quoteId));
   };
 
   return (

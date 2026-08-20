@@ -1,6 +1,12 @@
 export { FilterBar, type FilterBarProps } from './FilterBar';
 export { FilterModal, type FilterModalProps } from './FilterModal';
-export { useFilters, type UseFiltersOptions } from './useFilters';
+export {
+  useFilters,
+  useFilterValues,
+  type UseFiltersOptions,
+  type FilterValuesUpdater,
+} from './useFilters';
+export { filterUrl, cleanFilterValues, readFilterParam } from './filterUrl';
 export { applyFiltersToQuery, sanitizeIlikeTerm } from './serverFilters';
 export {
   NONE_VALUE,

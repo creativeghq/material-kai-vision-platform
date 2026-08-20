@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { quoteUrl } from '@/modules/quotes/routes';
 
 /* ────────────────────────────────────────────────────────────────────────────
    Data for the dashboard's operational blocks.
@@ -210,7 +211,11 @@ export function useRecentActivity() {
           title: q.quote_number ? `Quote ${q.quote_number}` : (q.name || 'Quote'),
           detail: String(q.status ?? '').replace(/_/g, ' '),
           at: q.updated_at ?? q.created_at,
-          to: '/quotes',
+          // THE quote, not the list. Every other kind in this feed opens the record it names
+          // (`/finance/orders/:id`, `/crm/companies/:id`); a quote row dropped the reader on the
+          // full list to find it again — and `quoteUrl` is the address QuotesPage itself
+          // navigates to on a row click, so there is one answer to "where does a quote live".
+          to: quoteUrl(q.id),
         });
       }
       for (const c of (companiesRes.data ?? []) as any[]) {

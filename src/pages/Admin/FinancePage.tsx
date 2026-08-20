@@ -28,7 +28,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { BankFeedTab } from '@/modules/finance/tabs/BankFeedTab';
-import { FINANCE_BASE } from '@/modules/finance/routes';
+import { FINANCE_BASE, FINANCE_TAB, AR_FILTER_KEY, AP_FILTER_KEY } from '@/modules/finance/routes';
+import { loadAgingLedger, summarizeAging, aggregateCurrency } from '@/modules/finance/services/agingLedger';
 import { PayViaRevolutDialog } from '@/modules/banking-revolut/components/PayViaRevolutDialog';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { CardsExpensesCard } from '@/modules/banking-revolut/components/CardsExpensesCard';
@@ -96,16 +97,16 @@ import { TemplatePickerDialog } from '@/components/features/templates/TemplatePi
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
-  { value: 'doc_invoices', type: 'invoices', label: 'Invoices', icon: FileText },
-  { value: 'doc_receipts', type: 'receipts', label: 'Receipts', icon: Receipt },
-  { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit Notes', icon: FileMinus },
-  { value: 'doc_payments', type: 'payments', label: 'Payments', icon: Banknote },
-  { value: 'doc_expenses', type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
+  { value: FINANCE_TAB.orders, type: 'orders', label: 'Orders', icon: ShoppingCart },
+  { value: FINANCE_TAB.invoices, type: 'invoices', label: 'Invoices', icon: FileText },
+  { value: FINANCE_TAB.receipts, type: 'receipts', label: 'Receipts', icon: Receipt },
+  { value: FINANCE_TAB.creditNotes, type: 'credit_notes', label: 'Credit Notes', icon: FileMinus },
+  { value: FINANCE_TAB.payments, type: 'payments', label: 'Payments', icon: Banknote },
+  { value: FINANCE_TAB.expenses, type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
   // Dispatch board lives in the Warehouse module (it's a loading/fulfilment surface, not a
   // finance document). Reachable from the WH shortcut at the top of this sidebar.
-  { value: 'doc_delivery', type: 'delivery_notes', label: 'Delivery Notes', icon: Truck },
-  { value: 'doc_cheques', type: 'cheques', label: 'Cheques', icon: FileSignature },
+  { value: FINANCE_TAB.deliveryNotes, type: 'delivery_notes', label: 'Delivery Notes', icon: Truck },
+  { value: FINANCE_TAB.cheques, type: 'cheques', label: 'Cheques', icon: FileSignature },
 ];
 
 // Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
@@ -154,7 +155,7 @@ const FinancePage: React.FC = () => {
   // Tab is URL-driven so other surfaces (e.g. the CRM Account tab) can deep-link
   // straight to a view — /finance?tab=parties&party=company:<id>.
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'dashboard';
+  const activeTab = searchParams.get('tab') || FINANCE_TAB.dashboard;
   const autoOpenParty = searchParams.get('party');
   const onTabChange = (v: string) => {
     const p = new URLSearchParams(searchParams);
@@ -308,115 +309,24 @@ const FinancePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [arRows, apRows, queue, pnlRows, cashRows, invoices, cats] = await Promise.all([
-        financeService.getArAging(wsId),
-        financeService.getApAging(wsId),
+      // Receivables and payables come out of `loadAgingLedger` — the ONE assembly of
+      // "what is still owed": the aging views, plus confirmed-but-uninvoiced orders, plus the
+      // customer credit we hold. The dashboard's Finance block reads the same function, which is
+      // what stops the tile and this tab reporting different money.
+      const [ledger, queue, pnlRows, cashRows, invoices, cats] = await Promise.all([
+        loadAgingLedger(wsId),
         financeService.getFollowUpQueue(wsId),
         financeService.getMonthlyPnl(wsId, 12),
         financeService.getCashFlowForecast(wsId, 90),
         financeService.listInvoices({ workspaceId: wsId, limit: 25 }),
         financeCategoriesService.list(wsId).catch(() => [] as FinanceCategory[]),
       ]);
-      // Cash + documents only: receivables/payables are issued invoices / supplier bills, plus
-      // confirmed-but-not-yet-invoiced orders (real order-derived money). Manual "virtual" AR/AP
-      // entries are intentionally excluded everywhere now.
-      let arWithOrders = arRows.filter((r) => r.entry_kind !== 'manual');
-      let apWithOrders = apRows.filter((r) => r.entry_kind !== 'manual');
-      setOverlayFailed(false);
-      try {
-        const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: wsId });
-        // An un-invoiced order has no invoice due date, so it ages against `due_date` — the
-        // operator's expected payment date when set, else order date + the workspace's default
-        // payment terms (see ordersService.listUninvoicedOutstanding). Only an order whose date
-        // can't be derived at all stays 'no_due_date'. Buckets mirror vw_ar_aging exactly.
-        // The invoice aging view computes `CURRENT_DATE - due_at` in the DB session timezone
-        // (UTC on Supabase). We MUST match that reference or an order and an invoice with the same
-        // date can disagree by a day near midnight — so both "today" and the due date are compared
-        // as UTC calendar days (date-only), not local time.
-        const nowUtc = new Date();
-        const todayUtcMs = Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate());
-        const agingFromExpected = (expected: string | null): { age_bucket: AgeBucket; days_overdue: number } => {
-          if (!expected) return { age_bucket: 'no_due_date', days_overdue: 0 };
-          const [y, m, d] = expected.split('-').map(Number);
-          if (!y || !m || !d) return { age_bucket: 'no_due_date', days_overdue: 0 };
-          const days = Math.floor((todayUtcMs - Date.UTC(y, m - 1, d)) / 86_400_000);
-          const bucket: AgeBucket = days <= 0 ? 'current' : days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+';
-          return { age_bucket: bucket, days_overdue: Math.max(days, 0) };
-        };
-        const toAgingRow = (o: typeof uninvoiced[number]): AgingRow => ({
-          id: o.id,
-          workspace_id: wsId,
-          total: o.total,
-          amount_paid: o.settled,
-          amount_due: o.outstanding,
-          // The ORDER's currency, not the workspace base. A synthesised row that guesses EUR is
-          // exactly how a USD order's outstanding got summed into the euro bucket totals.
-          currency: o.currency,
-          // `due_at` stays the operator-set date (often null) so the inline editor below opens
-          // empty and never persists a date nobody typed; the derived one drives aging + display.
-          due_at: o.expected_payment_date,
-          effective_due_at: o.due_date,
-          due_from_terms: o.due_from_terms,
-          issued_at: o.created_at,
-          status: o.status,
-          ...agingFromExpected(o.due_date),
-          entry_kind: 'order',
-          // Bare number only — the row already says "Order, not invoiced" next to it, so the
-          // word "Order" in front of the number just read as "Order ORD-2026-0001".
-          description: o.order_number ?? o.id.slice(0, 8),
-          party_name: o.party_name,
-          category_id: o.category_id,
-          category_name: o.category_name,
-        });
-        arWithOrders = [...arWithOrders, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
-        apWithOrders = [...apWithOrders, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
-      } catch (overlayErr) {
-        // Best-effort, but NOT invisible. When this fails, confirmed-but-uninvoiced orders vanish
-        // from BOTH the AR and AP lists and every total above them quietly reports a smaller
-        // number — an under-report that looks exactly like "there is less outstanding", which is
-        // the one reading an operator must never be handed by accident.
-        setOverlayFailed(true);
-        console.error('[FinancePage] uninvoiced-orders overlay failed — AR/AP under-report:', overlayErr);
-      }
-      // Customer money held on account (unallocated inbound payments) lives in the receivables
-      // list so the operator sees it next to what that customer owes — but it carries POSITIVE
-      // amounts and is aggregated separately (creditHeld), never summed into "owed" totals as a
-      // negative row. Per operator (2026-08-04): negative numbers on this page are banned; a
-      // credit is presented as "money we hold for the customer", and the netting happens in
-      // labelled aggregate lines, not in row signs.
-      const depositsData = await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', totals: [], rows: [] }));
-      setDeposits(depositsData);
-      const creditRows: AgingRow[] = depositsData.rows.map((d) => ({
-        id: d.payment_id,
-        workspace_id: wsId,
-        total: d.unallocated,
-        amount_paid: 0,
-        amount_due: d.unallocated, // positive — aggregates key off entry_kind, not the sign
-        // The DEPOSIT's currency. A credit may only net against same-currency receivables —
-        // netting a USD deposit against a EUR invoice is not a discount, it is a wrong number.
-        currency: d.currency,
-        due_at: null,
-        issued_at: d.paid_at,
-        status: 'credit',
-        age_bucket: 'no_due_date' as AgeBucket,
-        days_overdue: 0,
-        entry_kind: 'credit' as const,
-        description: d.credit_number ? `Credit ${d.credit_number}` : 'Credit on account',
-        party_name: d.party_name,
-        category_id: null,
-        category_name: null,
-        order_id: d.order_id,
-        order_number: d.order_number,
-        credit_number: d.credit_number,
-      }));
-      arWithOrders = [...arWithOrders, ...creditRows];
-      // Sort each side by how overdue it is (most overdue first) so aging orders interleave with
-      // invoices instead of always sitting below them. 'no_due_date' (unaged) sinks to the bottom.
-      const byOverdue = (a: AgingRow, b: AgingRow) => (b.days_overdue || 0) - (a.days_overdue || 0);
-      arWithOrders.sort(byOverdue);
-      apWithOrders.sort(byOverdue);
-      setAr(arWithOrders);
-      setAp(apWithOrders);
+      // NOT swallowed: when the uninvoiced-orders overlay fails, every AR/AP figure on this page
+      // is an UNDER-report rather than a smaller true number.
+      setOverlayFailed(ledger.overlayFailed);
+      setDeposits(ledger.deposits);
+      setAr(ledger.ar);
+      setAp(ledger.ap);
       // First finance use with no categories → seed the standard set (idempotent, once per ws).
       let categoryList = cats;
       if (categoryList.length === 0 && !isAccountant && !seededWorkspaces.current.has(wsId)) {
@@ -451,12 +361,12 @@ const FinancePage: React.FC = () => {
   // ---- Derived metrics
   const kpis = useMemo(() => {
     // Owed and held are reported as two separate POSITIVE numbers, never netted into one figure
-    // that can go negative on screen. Credit rows are excluded from every "owed" sum.
-    const arOutstanding = ar.reduce((acc, r) => acc + (r.entry_kind === 'credit' ? 0 : (r.amount_due || 0)), 0);
-    const creditHeld = ar.reduce((acc, r) => acc + (r.entry_kind === 'credit' ? (r.amount_due || 0) : 0), 0);
-    const apOutstanding = ap.reduce((acc, r) => acc + (r.amount_due || 0), 0);
-    const overdue = ar.filter((r) => r.age_bucket !== 'current' && r.age_bucket !== 'paid' && r.age_bucket !== 'no_due_date');
-    const overdueTotal = overdue.reduce((acc, r) => acc + (r.amount_due || 0), 0);
+    // that can go negative on screen. `summarizeAging` is shared with the dashboard's Finance
+    // block, so the tile and this page cannot report different money for the same rows.
+    const arSummary = summarizeAging(ar);
+    const apSummary = summarizeAging(ap);
+    const { outstanding: arOutstanding, creditHeld, overdueTotal } = arSummary;
+    const apOutstanding = apSummary.outstanding;
     const lastMonth = pnl.length > 0 ? pnl[pnl.length - 1] : null;
     const monthRevenue = Number(lastMonth?.revenue_net ?? 0);
     const monthMargin = Number(lastMonth?.gross_margin ?? 0);
@@ -504,10 +414,10 @@ const FinancePage: React.FC = () => {
   const apGroups = useMemo(() => buildAgingFilters('ap', { rows: ap, categories: expenseCats }), [ap, expenseCats]);
   const {
     values: arValues, setValues: setArValues, filtered: arFiltered, previewCount: arPreview,
-  } = useFilters<AgingRow>(ar, arGroups);
+  } = useFilters<AgingRow>(ar, arGroups, { urlKey: AR_FILTER_KEY });
   const {
     values: apValues, setValues: setApValues, filtered: apFiltered, previewCount: apPreview,
-  } = useFilters<AgingRow>(ap, apGroups);
+  } = useFilters<AgingRow>(ap, apGroups, { urlKey: AP_FILTER_KEY });
 
   // Follow-ups (quotes needing a nudge) — unbounded list, so give it search / status / value / idle.
   const followUpGroups = useMemo<FilterGroupDef[]>(() => {
@@ -1499,29 +1409,6 @@ const KpiCard: React.FC<{
     </CardContent>
   </Card>
 );
-
-/**
- * Which currency an aggregate over these rows is actually denominated in.
- *
- * Bucket totals, the DSO base and the AR/AP KPI cards all sum `amount_due` across every row, so
- * they are only meaningful when the rows share a currency. Fall back to formatMoney's EUR
- * default and a USD invoice's 1,000 is added to the euro total and shown with a euro symbol.
- *
- * Summing genuinely mixed rows is not something a symbol can fix, so this reports the dominant
- * currency AND whether the set is mixed; the callers label the total honestly and warn when it
- * cannot be trusted. Converting to a base currency needs stored FX rates per document, which is
- * a larger change.
- */
-function aggregateCurrency(rows: AgingRow[]): { currency: string; mixed: boolean } {
-  const totals = new Map<string, number>();
-  for (const r of rows) {
-    const c = r.currency || 'EUR';
-    totals.set(c, (totals.get(c) ?? 0) + Math.abs(r.amount_due || 0));
-  }
-  if (totals.size === 0) return { currency: 'EUR', mixed: false };
-  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
-  return { currency: sorted[0][0], mixed: totals.size > 1 };
-}
 
 function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: number }> {
   const out = {

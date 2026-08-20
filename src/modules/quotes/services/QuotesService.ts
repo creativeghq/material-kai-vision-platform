@@ -366,14 +366,27 @@ export class QuotesService {
   }
 
   /**
-   * Get all quotes for the current user with their items (for customer-facing quotes page)
+   * Quotes for the ACTIVE WORKSPACE, with their items (the /quotes list and the sales portal).
+   *
+   * The workspace filter is explicit and it is not a duplicate of RLS. The read policy on
+   * `quotes` is `user_id = auth.uid() OR is_workspace_admin(ws) OR is_workspace_sales_manager(ws)`
+   * — a user-and-role rule, not a workspace one — so an unfiltered select returns every quote the
+   * caller owns ANYWHERE plus every quote of every workspace they administer, all merged into one
+   * list. Every count next to it (the dashboard's Quotes block, this page's own stat cards) is
+   * scoped to one workspace, so the tile and the list it links to disagreed by exactly the quotes
+   * belonging to the other workspaces.
    */
   async getUserQuotes(): Promise<QuoteWithItems[]> {
-    // Get all quotes for the current user
-    const { data: quotes, error: quotesError } = await supabase
+    const { data: userData } = await supabase.auth.getUser();
+    const workspaceId = getActiveWorkspaceId(userData.user?.id);
+    let q = supabase
       .from('quotes')
       .select('*')
       .order('created_at', { ascending: false });
+    // No active workspace resolved (first load, storage blocked) → fall back to RLS alone rather
+    // than showing an empty list, which would read as "you have no quotes".
+    if (workspaceId) q = q.eq('workspace_id', workspaceId);
+    const { data: quotes, error: quotesError } = await q;
 
     if (quotesError) throw quotesError;
     if (!quotes || quotes.length === 0) return [];

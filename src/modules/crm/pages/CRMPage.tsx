@@ -34,7 +34,8 @@ import { CategoriesPanel } from './CategoriesPage';
 import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
-import { FilterBar, optionsFromRows, useFilters, type FilterOption, type FilterValues } from '@/components/core/filters';
+import { FilterBar, optionsFromRows, useFilters, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
+import { CRM_TAB, CRM_COMPANY_FILTER_KEY, CRM_CONTACT_FILTER_KEY, CRM_USER_FILTER_KEY } from '@/modules/crm/routes';
 import { buildCompanyFilters, buildContactFilters, buildUserFilters, categoryFacetOptions } from './crmFilters';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
@@ -48,7 +49,9 @@ import { HubEmptyState } from '@/components/core/hub';
 // Pipeline renders FIRST, but 'users' stays the landing tab: bare `/crm` is the main nav
 // target, and defaulting to a module-gated tab would show an upsell as the front door of a
 // free module. Deep link with ?tab=pipeline.
-const TAB_VALUES = ['pipeline', 'users', 'contacts', 'companies', 'categories'] as const;
+const TAB_VALUES = [
+  CRM_TAB.pipeline, CRM_TAB.users, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
+] as const;
 type TabValue = typeof TAB_VALUES[number];
 
 interface UserWithAuth {
@@ -130,17 +133,20 @@ export const CRMManagement: React.FC = () => {
   // the RLS on crm_deal_types.
   const isWsAdmin = workspaceRole === 'owner' || workspaceRole === 'admin';
 
-  const initialTab: TabValue = (() => {
+  // The URL IS the tab — not a seed for it. Held in `useState` this read the param once, at
+  // mount, so a `?tab=companies` link followed from a page that already had CRM mounted (the
+  // dashboard's Customers block, a notification, the app launcher) changed the address bar and
+  // left the operator staring at whichever tab was already open. Nothing failed; the link just
+  // did nothing. Same reason FinancePage drives its tab off `?tab=` directly.
+  const activeTab: TabValue = (() => {
     const t = searchParams.get('tab');
-    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'users';
+    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : CRM_TAB.users;
   })();
-  const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
   const handleTabChange = (val: string) => {
-    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'users';
-    setActiveTab(next);
+    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : CRM_TAB.users;
     setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
-    if (next === 'users') params.delete('tab'); else params.set('tab', next);
+    if (next === CRM_TAB.users) params.delete('tab'); else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
 
@@ -169,9 +175,14 @@ export const CRMManagement: React.FC = () => {
   const [companiesPage, setCompaniesPage] = useState(1);
 
   // Per-tab filter values. Each tab owns its own bag, so a term typed for contacts no
-  // longer leaks into the users list.
-  const [contactValues, setContactValues] = useState<FilterValues>({});
-  const [companyValues, setCompanyValues] = useState<FilterValues>({});
+  // longer leaks into the users list — and each bag is mirrored into its own URL param, so a
+  // filtered list is shareable AND addressable. The dashboard's Customers block links straight
+  // to `?tab=companies` filtered to clients; without the URL half that link would open the
+  // companies tab showing all 44 and look exactly like it had worked.
+  const { values: contactValues, setValues: setContactValues } =
+    useFilterValues({ urlKey: CRM_CONTACT_FILTER_KEY });
+  const { values: companyValues, setValues: setCompanyValues } =
+    useFilterValues({ urlKey: CRM_COMPANY_FILTER_KEY });
   // Contacts/companies search hits the server, so the raw box is debounced before it
   // reaches the request — otherwise it is one fetch per keystroke.
   const contactSearch = useDebouncedText(contactValues.q);
@@ -422,7 +433,7 @@ export const CRMManagement: React.FC = () => {
   const {
     values: userValues, setValues: setUserValues,
     filtered: filteredUsers, previewCount: userPreviewCount,
-  } = useFilters(users, userGroups);
+  } = useFilters(users, userGroups, { urlKey: CRM_USER_FILTER_KEY });
 
   // The attached business: prefer the primary junction company, then any junction
   // company, falling back to the legacy free-text `company` field.

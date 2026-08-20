@@ -39,6 +39,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
+import {
+  ordersLink, quotesLink, receivablesLink, payablesLink, companiesLink,
+  receivablesBucketLink, CRM_KIND, PROJECTS_LINK, INBOX_LINK,
+} from '../../src/components/features/dashboard/officeLinks';
+import { readFilterParam } from '../../src/components/core/filters/filterUrl';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
@@ -172,15 +177,56 @@ function routeExists(urlPath: string): boolean {
 
 const tabCache = new Map<string, Set<string>>();
 
-function tabKeys(file: string, depth = 0, seen = new Set<string>()): Set<string> {
+/**
+ * `export const NAME = { key: 'literal', … } as const` — the members of every such object in a
+ * file, so a tab key written as `FINANCE_TAB.orders` can be resolved back to `doc_orders`.
+ *
+ * Without this the scan only sees string literals, and moving a page's tab vocabulary into a
+ * shared constant — which is the fix for links and panes drifting apart — would make the guard
+ * report "renders no tabs at all" for the very page it was written about.
+ */
+const constCache = new Map<string, Map<string, Map<string, string>>>();
+function constMembers(file: string): Map<string, Map<string, string>> {
+  if (constCache.has(file)) return constCache.get(file)!;
+  const out = new Map<string, Map<string, string>>();
+  const src = blankComments(read(file));
+  for (const m of src.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*\{([\s\S]*?)\}\s*as\s+const/g)) {
+    const members = new Map<string, string>();
+    for (const f of m[2].matchAll(/([A-Za-z0-9_]+)\s*:\s*'([^']*)'/g)) members.set(f[1], f[2]);
+    out.set(m[1], members);
+  }
+  constCache.set(file, out);
+  return out;
+}
+
+/** Resolve `NAME.member` as referenced from `file`, following the import to its declaration. */
+function resolveConstRef(file: string, name: string, member: string): string | undefined {
+  const own = constMembers(file).get(name)?.get(member);
+  if (own !== undefined) return own;
+  const spec = importMap(file).get(name);
+  const target = spec && resolveSpec(spec, file, name);
+  return target ? constMembers(target).get(name)?.get(member) : undefined;
+}
+
+function tabKeys(file: string, depth = 0, seen = new Set<string>(), followDelegation = true): Set<string> {
   if (seen.has(file) || depth > 2) return new Set();
   seen.add(file);
   const src = read(file);
   const keys = new Set<string>();
   for (const m of src.matchAll(/<TabsContent\s+[^>]*value="([^"]+)"/g)) keys.add(m[1]);
+  // A pane whose key comes from a shared constant: <TabsContent value={FINANCE_TAB.orders}>.
+  for (const m of src.matchAll(/<TabsContent\s+[^>]*value=\{([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)\}/g)) {
+    const v = resolveConstRef(file, m[1], m[2]);
+    if (v) keys.add(v);
+  }
   // Catalog-driven panes: <TabsContent value={d.value}> fed by an array of { value: '…' }.
   if (/<TabsContent\s+[^>]*value=\{/.test(src)) {
     for (const m of src.matchAll(/value:\s*'([A-Za-z0-9_-]+)'/g)) keys.add(m[1]);
+    // …and the same catalog written against a shared constant: { value: FINANCE_TAB.orders, … }.
+    for (const m of src.matchAll(/value:\s*([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)/g)) {
+      const v = resolveConstRef(file, m[1], m[2]);
+      if (v) keys.add(v);
+    }
     for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
       const r = resolveSpec(m[1], file);
       if (r) for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
@@ -192,13 +238,28 @@ function tabKeys(file: string, depth = 0, seen = new Set<string>()): Set<string>
   // which reads as a broken link when the truth is that the check could not see the tabs. Follow
   // local imports when THIS file declares no panes of its own; the "no tabs at all" verdict then
   // still fires, but only once the children have been looked at too.
-  if (keys.size === 0) {
+  if (keys.size === 0 && followDelegation) {
     for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
       const r = resolveSpec(m[1], file);
       if (r) for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
     }
   }
   return keys;
+}
+
+/**
+ * The tabs a page renders ITSELF — no delegation fallback.
+ *
+ * `tabsFor` follows a thin shell down to the component that holds its panes, which is right when
+ * you are checking that a `?tab=` key names a real pane. It is wrong for the opposite question —
+ * "does this page show a tab strip at all?" — because a plain list page that merely imports a
+ * tabbed dialog comes back looking tabbed. `/projects` reported `company, contact` that way, off
+ * a child component, and would have demanded a `?tab=` on a page that has none.
+ */
+const ownTabCache = new Map<string, Set<string>>();
+function ownTabsFor(file: string): Set<string> {
+  if (!ownTabCache.has(file)) ownTabCache.set(file, tabKeys(file, 0, new Set(), false));
+  return ownTabCache.get(file)!;
 }
 
 function tabsFor(file: string): Set<string> {
@@ -400,5 +461,167 @@ describe('?tab= deep links', () => {
     const offenders = [...scan(/(\/(?:admin\/)?finance)\?tab=[A-Za-z0-9_]+&(order)=/g).entries()]
       .map(([, sites]) => show(sites));
     expect(offenders, `orders-list links carrying an id:\n${offenders.join('\n')}`).toEqual([]);
+  });
+});
+
+/**
+ * The dashboard's My Office blocks — the other half of the same defect, and the half a
+ * `?tab=` scan cannot see.
+ *
+ * All four blocks linked to a page with no `?tab=` at all, so every one of them passed the scan
+ * above by having nothing to check. Two of them then landed somewhere that does not contain the
+ * records the tile counted: `/finance` opens the Dashboard pane rather than the Orders list, and
+ * `/crm` opens **Users** — the platform accounts list — while the block counted `crm_companies`.
+ * The route resolved, the page rendered, the operator was simply somewhere else.
+ *
+ * So the rule is stated positively and checked here: a dashboard figure addresses the records it
+ * counted. If the page it lands on has tabs, the link names one; if it narrows to a slice, the
+ * filter is spelled the way that list reads it back.
+ */
+describe('My Office block destinations', () => {
+  const DESTINATIONS: Array<{ what: string; url: string }> = [
+    { what: 'Orders block', url: ordersLink() },
+    { what: 'Orders → Confirmed', url: ordersLink('confirmed') },
+    { what: 'Orders → Partly fulfilled', url: ordersLink('partially_fulfilled') },
+    { what: 'Orders → Draft', url: ordersLink('draft') },
+    { what: 'Quotes block', url: quotesLink() },
+    { what: 'Quotes → Draft', url: quotesLink('draft') },
+    { what: 'Quotes → Submitted', url: quotesLink('submitted') },
+    { what: 'Quotes → Quoted', url: quotesLink('quoted') },
+    { what: 'Finance block', url: receivablesLink() },
+    { what: 'Finance → Overdue', url: receivablesLink({ pastDue: true }) },
+    { what: 'Finance → Payables', url: payablesLink() },
+    { what: 'Finance → an age bucket', url: receivablesBucketLink('90+') },
+    { what: 'Customers block', url: companiesLink() },
+    { what: 'Customers → Customers', url: companiesLink(CRM_KIND.customer) },
+    { what: 'Customers → Suppliers', url: companiesLink(CRM_KIND.supplier) },
+    { what: 'Customers → Active projects', url: PROJECTS_LINK },
+    { what: 'Quick access → Inbox', url: INBOX_LINK },
+  ];
+
+  const parse = (url: string) => {
+    const [path, qs = ''] = url.split('?');
+    return { path, params: new URLSearchParams(qs) };
+  };
+
+  /** `const NAME = 'literal'` as declared in `file`, or in the module `file` imports it from. */
+  function constLiteral(file: string, name: string): string | undefined {
+    const re = new RegExp(`const\\s+${name}\\s*=\\s*'([^']+)'`);
+    const own = blankComments(read(file)).match(re);
+    if (own) return own[1];
+    const spec = importMap(file).get(name);
+    const target = spec && resolveSpec(spec, file, name);
+    const decl = target && blankComments(read(target)).match(re);
+    return decl ? decl[1] : undefined;
+  }
+
+  it('every destination resolves to a declared route', () => {
+    const offenders = DESTINATIONS
+      .filter((d) => !routeExists(parse(d.url).path))
+      .map((d) => `${d.what} → ${d.url}`);
+    expect(offenders, `dashboard links that land on no route:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  it('every destination resolves to a page this guard can actually inspect', () => {
+    // A path we cannot resolve is NOT a pass — it is a hole in the check, and it must be visible.
+    const unresolved = [...new Set(DESTINATIONS.map((d) => parse(d.url).path))]
+      .filter((p) => !PAGE_FOR.has(p));
+    expect(unresolved, `dashboard paths with no resolvable page component:\n${unresolved.join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * THE regression. A tabbed page opened without a tab shows its default pane, which is not the
+   * list the figure was counted from — and nothing anywhere reports it.
+   */
+  it('names a tab whenever the page it opens has tabs', () => {
+    const offenders: string[] = [];
+    for (const d of DESTINATIONS) {
+      const { path, params } = parse(d.url);
+      const page = PAGE_FOR.get(path);
+      if (!page) continue; // reported by the test above
+      const keys = ownTabsFor(page);
+      if (keys.size === 0) continue; // genuinely tab-less: the bare path IS the whole address
+      const tab = params.get('tab');
+      if (!tab) {
+        // QuotesPage is the one page whose DEFAULT pane is the list a block counts, and its own
+        // tab handler DELETES `?tab=` when that pane is selected — naming it here would write a
+        // param the page immediately strips. Every other page must say where it is going.
+        if (path === '/quotes') continue;
+        offenders.push(`${d.what} → ${d.url} opens ${rel(page)} with no ?tab=; it renders: ${[...keys].sort().join(', ')}`);
+      } else if (!keys.has(tab)) {
+        offenders.push(`${d.what} → ${d.url} names ?tab=${tab}; ${rel(page)} renders: ${[...keys].sort().join(', ')}`);
+      }
+    }
+    expect(offenders, `dashboard links that open the wrong pane:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * The filter half. `filterUrl` writes a JSON bag under a per-surface key; `useFilters` /
+   * `useFilterValues` read it back. A key nothing reads produces a URL that every route resolves
+   * and every list ignores — the tab is right and the list shows everything, which is exactly as
+   * silent as the wrong tab was.
+   */
+  it('every filter param it writes is read back by a list surface', () => {
+    const declared = new Set<string>();
+    for (const file of sourceFiles) {
+      // The whole expression after `urlKey:`, not just a bare token — OrdersPanel writes
+      // `urlKey: embedded ? undefined : ORDERS_FILTER_KEY`, and a scan that only accepted a
+      // literal would report that key as read by nobody and blame the link for it.
+      for (const m of blankComments(read(file)).matchAll(/urlKey:\s*([^,}\n]+)/g)) {
+        const expr = m[1];
+        for (const lit of expr.matchAll(/'([^']+)'/g)) declared.add(lit[1]);
+        for (const ref of expr.matchAll(/\b([A-Z][A-Z0-9_]{2,})\b/g)) {
+          const lit = constLiteral(file, ref[1]);
+          if (lit) declared.add(lit);
+        }
+      }
+    }
+    expect(declared.size, 'no urlKey call sites found — the scan is broken, not the links').toBeGreaterThan(3);
+
+    const offenders: string[] = [];
+    for (const d of DESTINATIONS) {
+      for (const [key, raw] of parse(d.url).params) {
+        if (key === 'tab') continue;
+        if (!declared.has(key)) {
+          offenders.push(`${d.what} writes ?${key}= and no surface reads it (read back: ${[...declared].sort().join(', ')})`);
+          continue;
+        }
+        // …and the bag has to survive the round trip the list will put it through.
+        const back = readFilterParam(raw, { __unparsed: true } as never) as Record<string, unknown>;
+        if (back.__unparsed) offenders.push(`${d.what} writes ?${key}=${raw}, which does not parse back into a filter bag`);
+      }
+    }
+    expect(offenders, `dashboard filters nothing reads:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * And the field names inside the bag. `{ status: 'confirmed' }` only narrows the orders list if
+   * that list declares a field keyed `status`; a typo matches no field, `applyFilters` passes it
+   * through untouched, and the list shows everything.
+   */
+  it('every field it filters on is declared by some filter-group definition', () => {
+    const fieldKeys = new Set<string>();
+    for (const file of sourceFiles) {
+      const src = blankComments(read(file));
+      if (!src.includes('FilterGroupDef')) continue;
+      for (const m of src.matchAll(/key:\s*'([A-Za-z0-9_]+)'/g)) fieldKeys.add(m[1]);
+      // A field keyed by a shared constant: `key: OVERDUE_KEY`.
+      for (const m of src.matchAll(/key:\s*([A-Z][A-Z0-9_]*)\s*,/g)) {
+        const lit = constLiteral(file, m[1]);
+        if (lit) fieldKeys.add(lit);
+      }
+    }
+    expect(fieldKeys.size, 'no filter fields found — the scan is broken, not the links').toBeGreaterThan(20);
+
+    const offenders: string[] = [];
+    for (const d of DESTINATIONS) {
+      for (const [key, raw] of parse(d.url).params) {
+        if (key === 'tab') continue;
+        for (const field of Object.keys(readFilterParam(raw))) {
+          if (!fieldKeys.has(field)) offenders.push(`${d.what} filters on '${field}', which no filter definition declares`);
+        }
+      }
+    }
+    expect(offenders, `dashboard filters on fields that do not exist:\n${offenders.join('\n')}`).toEqual([]);
   });
 });

@@ -7,6 +7,13 @@ export interface StatBreakdownRow {
   value: number | string;
   /** Draw attention to a row that needs action (overdue, rejected…). */
   alert?: boolean;
+  /**
+   * Where this row's records live. A breakdown row is a claim about a specific slice ("3
+   * confirmed orders"), so it opens THAT slice — the block's own link only reaches the whole
+   * list. Build it with the helpers in `officeLinks.ts`; a hand-written query string is a URL
+   * every route resolves and no list reads.
+   */
+  to?: string;
 }
 
 interface StatBlockProps {
@@ -83,23 +90,35 @@ export const StatBlock: React.FC<StatBlockProps> = ({
       </p>
 
       <div className="mt-2.5 space-y-1">
-        {slots.map((row, i) => (
-          <div key={i} className="flex items-center justify-between gap-2 h-[1.05rem]">
-            {row && !loading ? (
-              <>
-                <span className="text-[11px] text-muted-foreground truncate">{row.label}</span>
-                <span
-                  className={`text-[11px] tabular-nums shrink-0 ${row.alert ? 'text-amber' : 'text-foreground/80'}`}
-                >
-                  {row.value}
-                </span>
-              </>
-            ) : (
-              /* Empty slot — holds the row's height and nothing else. */
-              <span aria-hidden="true" className="block w-full" />
-            )}
-          </div>
-        ))}
+        {slots.map((row, i) => {
+          if (!row || loading) {
+            /* Empty slot — holds the row's height and nothing else. Hidden from assistive tech;
+               there is nothing to announce. */
+            return <div key={i} className="h-[1.05rem]" aria-hidden="true" />;
+          }
+          const body = (
+            <>
+              <span className="text-[11px] text-muted-foreground truncate transition-colors group-hover/row:text-foreground">
+                {row.label}
+              </span>
+              <span
+                className={`text-[11px] tabular-nums shrink-0 ${row.alert ? 'text-amber' : 'text-foreground/80'}`}
+              >
+                {row.value}
+              </span>
+            </>
+          );
+          const cls = 'flex items-center justify-between gap-2 h-[1.05rem]';
+          /* A row with a destination is a link; one without stays inert text. Same box either
+             way — the hover affordance must not change the block's height. */
+          return row.to ? (
+            <Link key={i} to={row.to} className={`${cls} group/row -mx-1 px-1 rounded transition-colors hover:bg-primary/[0.08]`}>
+              {body}
+            </Link>
+          ) : (
+            <div key={i} className={cls}>{body}</div>
+          );
+        })}
       </div>
 
       <Link

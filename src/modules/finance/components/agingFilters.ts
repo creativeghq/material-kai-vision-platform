@@ -9,11 +9,16 @@
 import { CalendarDays, Coins, FileText, Tags, Users } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { ageBucketLabel, type AgeBucket, type AgingRow } from '@/modules/finance/services/financeService';
+import { isAgingRowOverdue } from '@/modules/finance/services/agingLedger';
+import { AGE_BUCKET_KEY, OVERDUE_KEY } from '@/modules/finance/routes';
 import { humanizeLabel } from '@/utils/humanize';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
-/** Key of the age-bucket field — shared by BucketCards and the modal. */
-export const AGE_BUCKET_KEY = 'age_bucket';
+/** Key of the age-bucket field (shared by BucketCards and the modal) and of the past-due flag —
+ *  both declared in `@/modules/finance/routes` (which has no runtime dependencies, so a surface
+ *  that only wants to BUILD a link need not import the filter defs) and re-exported here for the
+ *  call sites that already import from this module. */
+export { AGE_BUCKET_KEY, OVERDUE_KEY };
 
 /** Every bucket a row can carry, not just the five with KPI cards. */
 const ALL_AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+', 'no_due_date', 'paid'];
@@ -65,6 +70,18 @@ export function buildAgingFilters(
           key: 'status', type: 'multi', label: 'Status',
           options: optionsFromRows(rows, (r) => r.status, humanizeLabel),
           accessor: (r: AgingRow) => r.status,
+        },
+        {
+          // "Past due" spans four buckets (0-30 / 31-60 / 61-90 / 90+), so the single-select
+          // bucket field above cannot express it and neither can a due-date range: an
+          // un-invoiced order ages against `effective_due_at` (order date + payment terms) while
+          // `due_at` stays null, so a date filter would silently drop exactly the rows the
+          // buckets DO age. `isAgingRowOverdue` is the one definition, shared with the summary
+          // the dashboard's Overdue figure comes from — so the number and the list it links to
+          // are the same set of rows.
+          key: OVERDUE_KEY, type: 'bool', label: 'Past due',
+          trueLabel: 'Past due only', falseLabel: 'Not yet due',
+          accessor: (r: AgingRow) => isAgingRowOverdue(r),
         },
       ],
     },

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Database, BookOpen, FileText, Palette, Sparkles } from 'lucide-react';
+import { Database, BookOpen, Inbox, Palette, Sparkles } from 'lucide-react';
+
+import { INBOX_LINK } from './officeLinks';
 
 interface QuickTile {
   icon: React.ComponentType<{ className?: string }>;
@@ -13,7 +15,11 @@ interface QuickTile {
  *  of these can be a dead route. */
 const TILES: QuickTile[] = [
   { icon: Database, label: 'Catalog', to: '/discover' },
-  { icon: FileText, label: 'Quotes', to: '/quotes' },
+  // Inbox, not Quotes: the Quotes block directly above this row already links to the list, and
+  // this row is the only remaining way into the conversation threads — the open-thread count
+  // used to sit as the third row of the FINANCE block, where it was neither finance nor linked
+  // to anything.
+  { icon: Inbox, label: 'Inbox', to: INBOX_LINK },
   { icon: BookOpen, label: 'Knowledge', to: '/knowledge-base' },
   { icon: Palette, label: 'MoodBoards', to: '/moodboard' },
   { icon: Sparkles, label: 'Ask KAI', to: '/agent-hub' },

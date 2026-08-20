@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, FileText, Building2, ArrowRight } from 'lucide-react';
+import { ShoppingCart, FileText, Building2 } from 'lucide-react';
 
 import { useRecentActivity, type ActivityKind } from './useDashboardBlocks';
 
@@ -35,14 +35,12 @@ export const RecentActivity: React.FC = () => {
 
   return (
     <div className="dashboard-card p-5">
-      <div className="flex items-center justify-between mb-4">
+      {/* No "View all". This feed merges THREE sources (orders, quotes, CRM companies) and there
+          is no page that shows all three, so the link that used to sit here pointed at `/crm` —
+          which opens the Users tab, containing none of the records above it. Each row already
+          opens the record it names; that is the honest way out of this card. */}
+      <div className="mb-4">
         <h3 className="font-medium text-sm">Recent Activity</h3>
-        <Link
-          to="/crm"
-          className="flex items-center gap-1 text-xs text-primary hover:underline transition-colors"
-        >
-          View all <ArrowRight className="h-3 w-3" />
-        </Link>
       </div>
 
       {/* `relative` so the empty state can sit centred OVER the reserved slots
