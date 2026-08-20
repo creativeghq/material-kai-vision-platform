@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, FileText, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Loader2, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
@@ -26,6 +26,17 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const [description, setDescription] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copySlug = async (slug: string) => {
+    try {
+      await navigator.clipboard.writeText(slug);
+      setCopied(slug);
+      setTimeout(() => setCopied((c) => (c === slug ? null : c)), 1500);
+    } catch {
+      toast({ title: 'Copy failed', description: slug, variant: 'destructive' });
+    }
+  };
 
   // App Launcher deep-link: /marketing/email?tab=templates&new=template opens the create modal.
   useEffect(() => {
@@ -106,6 +117,11 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
               <tr>
                 <th className="text-left py-3 px-4 font-medium">Template</th>
                 <th className="text-left py-3 px-4 font-medium">Subject</th>
+                {/* The slug is how a FLOW addresses this template (send_email → Template).
+                    It was selected by the service and rendered nowhere, and it carries a random
+                    suffix (mkt-<name>-<8 hex>) precisely so it cannot be guessed — so a template
+                    built here was unreachable from automation without reading the database. */}
+                <th className="text-left py-3 px-4 font-medium">Slug</th>
                 <th className="text-left py-3 px-4 font-medium">Status</th>
                 <th className="text-right py-3 px-4 font-medium">Actions</th>
               </tr>
@@ -118,6 +134,17 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
                     {t.description && <div className="text-xs text-muted-foreground">{t.description}</div>}
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground">{t.subject_template || '—'}</td>
+                  <td className="py-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => copySlug(t.slug)}
+                      title="Copy slug — paste it into a flow's Send email action"
+                      className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {t.slug}
+                      {copied === t.slug ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    </button>
+                  </td>
                   <td className="py-3 px-4">
                     <span className={`text-sm capitalize ${statusTone(t.is_active ? 'active' : 'draft')}`}>{t.is_active ? 'Ready' : 'Draft'}</span>
                   </td>

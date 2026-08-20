@@ -40,6 +40,7 @@ import type {
   ZeroBounceValidateConfig,
 } from '@/services/flows/types';
 import { EntityPicker } from './EntityPicker';
+import { EmailTemplateSelect } from './EmailTemplateSelect';
 
 /** JSON editor for a `Record<string,string>` fields map. Keeps a free-text draft so typing invalid
  *  intermediate JSON doesn't reset the cursor; commits to onChange only when the draft parses to an
@@ -194,16 +195,14 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Template slug (optional)</Label>
-            <Input
+            <Label className="text-xs">Template (optional)</Label>
+            <EmailTemplateSelect
               value={cfg.template_id || ''}
-              onChange={(e) => onChange({ ...cfg, template_id: e.target.value })}
-              placeholder="welcome-email"
-              className="h-8 text-sm"
+              onChange={(slug) => onChange({ ...cfg, template_id: slug })}
             />
             <p className="text-[10px] text-muted-foreground">
-              An <code>email_templates</code> slug. When set, the template's {'{{tag}}'} placeholders
-              are filled from the variables below (Subject/Body above are ignored).
+              Pick a template you designed in Email Marketing, or a platform one. Its {'{{tag}}'}
+              placeholders are filled from the variables below, and Subject/Body above are ignored.
             </p>
           </div>
           <div className="space-y-1.5">

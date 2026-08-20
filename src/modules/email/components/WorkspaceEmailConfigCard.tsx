@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { emailService, isSenderNotConfigured } from '@/modules/email/services/emailService';
 
-export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?: () => void; requireOwnSender?: boolean }> = ({ workspaceId, onSaved, requireOwnSender = false }) => {
+export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?: () => void }> = ({ workspaceId, onSaved }) => {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [fromEmail, setFromEmail] = useState('');
@@ -107,11 +107,12 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
         <CardTitle className="flex items-center gap-2"><Mail className="h-4 w-4" /> Email Sender (Bring Your Own Resend)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
-        {/* The platform default sender only applies to TRANSACTIONAL email (invoices/statements/
-            quotes/catalog). In a BYOK-required context (Email Marketing #255 — bulk campaigns send
-            ONLY from the workspace's own verified Resend), suppress the "nothing to set up" box so
-            it doesn't contradict the "add your own Resend to activate" prompt. */}
-        {!requireOwnSender && platformSender && (platformSender.email || platformSender.name) && (
+        {/* ALWAYS shown when a send currently resolves to the platform sender. This used to be
+            suppressed in the BYOK-required context (Email Marketing), which removed the only
+            statement on the page of which address mail actually goes out from — leaving an empty
+            form under a "configured" banner. Whether your own Resend is REQUIRED is a separate
+            question from what is in effect today, and the second one always deserves an answer. */}
+        {platformSender && (platformSender.email || platformSender.name) && (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 space-y-1">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-500" />
@@ -125,22 +126,16 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
             </p>
           </div>
         )}
+        {/* One description, because this card has one job. It used to carry a second, conditional
+            copy block reading "This is required to unlock Templates and Campaigns" — an ACTIVATION
+            prompt that Email Marketing showed permanently, including on the settings tab you reach
+            after everything is already unlocked. Activation copy belongs at the activation step. */}
         <p className="text-xs text-muted-foreground">
-          {requireOwnSender ? (
-            <>
-              Bulk campaigns send only from <strong>your own</strong>{' '}
-              <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">
-                Resend account <ExternalLink className="h-3 w-3" />
-              </a>{' '}— paste a Resend API key and a sender address on a domain you've verified in Resend. This is required to unlock Templates and Campaigns.
-            </>
-          ) : (
-            <>
-              Optionally send your invoices, statements, quotes and catalog emails from <strong>your own</strong>{' '}
-              <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">
-                Resend account <ExternalLink className="h-3 w-3" />
-              </a>{' '}— paste a Resend API key and a sender address on a domain you've verified in Resend. Leave blank to use the platform default sender.
-            </>
-          )}
+          Send your invoices, statements, quotes, catalog emails and bulk campaigns from <strong>your own</strong>{' '}
+          <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">
+            Resend account <ExternalLink className="h-3 w-3" />
+          </a>{' '}— paste a Resend API key and a sender address on a domain you've verified in Resend.
+          Tenant marketing campaigns require this; transactional mail falls back to the platform sender without it.
         </p>
         <div className="space-y-1">
           <Label className="text-xs">Resend API Key</Label>

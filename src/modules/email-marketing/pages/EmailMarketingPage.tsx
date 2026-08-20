@@ -22,6 +22,10 @@ export default function EmailMarketingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'campaigns';
   const [byokReady, setByokReady] = useState(false);
+  // Separate from byokReady on purpose: "campaigns can send" and "the workspace brought its own
+  // Resend" are different facts, and reporting the second when only the first is true is what put
+  // a green "your Resend sender is configured" banner over an empty form on the root workspace.
+  const [platformExempt, setPlatformExempt] = useState(false);
   const [checking, setChecking] = useState(true);
 
   const setTab = (v: string) => {
@@ -35,11 +39,19 @@ export default function EmailMarketingPage() {
   // sender counts as ready there (BYOK-only is a TENANT rule, not an operator one).
   const senderReady = (cfg: Awaited<ReturnType<typeof emailService.getWorkspaceConfig>>) =>
     cfg?.source === 'workspace' || (isRootWorkspace && !!cfg?.platform_from_email);
+  /** Ready, but on the platform's sender rather than the workspace's own Resend. */
+  const onPlatformSender = (cfg: Awaited<ReturnType<typeof emailService.getWorkspaceConfig>>) =>
+    cfg?.source !== 'workspace' && isRootWorkspace && !!cfg?.platform_from_email;
+
+  const applyCfg = (cfg: Awaited<ReturnType<typeof emailService.getWorkspaceConfig>>) => {
+    setByokReady(senderReady(cfg));
+    setPlatformExempt(onPlatformSender(cfg));
+  };
 
   const recheckByok = useCallback(async () => {
     if (!activeWorkspaceId) return;
     const cfg = await emailService.getWorkspaceConfig(activeWorkspaceId).catch(() => null);
-    setByokReady(senderReady(cfg));
+    applyCfg(cfg);
   }, [activeWorkspaceId, isRootWorkspace]);
 
   useEffect(() => {
@@ -49,12 +61,22 @@ export default function EmailMarketingPage() {
       setChecking(true);
       const cfg = await emailService.getWorkspaceConfig(activeWorkspaceId).catch(() => null);
       if (cancelled) return;
-      setByokReady(senderReady(cfg));
+      applyCfg(cfg);
       setChecking(false);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorkspaceId, isRootWorkspace]);
+
+  // The sender is configured ELSEWHERE now (Profile → Keys → Email), so this page has to notice
+  // when it changes. Re-check on focus: the owner sets the key in another tab, comes back, and the
+  // gate opens — without that, the copy above ("come back here and this page will pick it up")
+  // would be a promise only a manual reload keeps.
+  useEffect(() => {
+    const onFocus = () => { void recheckByok(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [recheckByok]);
 
   if (wsLoading || checking) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
 
@@ -73,10 +95,11 @@ export default function EmailMarketingPage() {
             <h3 className="text-lg font-semibold mb-1">One step to activate</h3>
             <p className="text-sm text-muted-foreground">
               Email Marketing sends from <strong>your own</strong> verified Resend domain — there's no shared platform
-              sender. Add your Resend API key and a verified sender below, then your Templates and Campaigns unlock.
+              sender. Add your Resend API key and a verified sender in Profile → Keys → Email, then your Templates and
+              Campaigns unlock. Come back here and this page will pick it up.
             </p>
           </div>
-          <MarketingSetupCard workspaceId={ws} byokReady={false} onConfigured={async () => { await recheckByok(); setTab('campaigns'); }} />
+          <MarketingSetupCard workspaceId={ws} byokReady={false} platformExempt={false} />
         </div>
       </div>
     );
@@ -98,7 +121,7 @@ export default function EmailMarketingPage() {
           <TabsContent value="campaigns" className="mt-0"><MarketingCampaignsTab workspaceId={ws} byokReady={byokReady} /></TabsContent>
           <TabsContent value="templates" className="mt-0"><MarketingTemplatesTab workspaceId={ws} /></TabsContent>
           <TabsContent value="contacts" className="mt-0"><MarketingContactsTab workspaceId={ws} /></TabsContent>
-          <TabsContent value="setup" className="mt-0"><MarketingSetupCard workspaceId={ws} byokReady={byokReady} /></TabsContent>
+          <TabsContent value="setup" className="mt-0"><MarketingSetupCard workspaceId={ws} byokReady={byokReady} platformExempt={platformExempt} /></TabsContent>
         </Tabs>
       </div>
     </div>
