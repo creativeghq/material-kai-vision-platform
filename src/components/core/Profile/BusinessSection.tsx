@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, User as UserIcon, Pencil, Save, X, Loader2, ShieldCheck, ShieldAlert, ShieldQuestion, CornerDownLeft } from 'lucide-react';
+import { Building2, User as UserIcon, Pencil, Save, X, Loader2, ShieldCheck, ShieldAlert, ShieldQuestion, CornerDownLeft, CornerUpLeft, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
+import { isAdmin } from '@/auth/roles';
+import {
+  EMPTY_BUSINESS, FIELD_LABELS, MY_BUSINESS_IDENTITY_RPC, SOLO_IDENTITY, parseBusinessIdentity, toBusinessForm,
+  type BusinessForm, type BusinessIdentity,
+} from './businessIdentity';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -17,38 +22,6 @@ import { SupplierIdentityClaimCard } from './SupplierIdentityClaimCard';
 import { formatDate } from '@/utils/datetime';
 
 export type EntityType = 'solo' | 'business';
-
-interface BusinessForm {
-  name: string;
-  vat_number: string;
-  tax_office: string;
-  profession: string;
-  phone: string;
-  email: string;
-  website: string;
-  country: string;
-  country_code: string;
-  city: string;
-  postal_code: string;
-  street: string;
-  street_number: string;
-}
-
-const EMPTY_BUSINESS: BusinessForm = {
-  name: '',
-  vat_number: '',
-  tax_office: '',
-  profession: '',
-  phone: '',
-  email: '',
-  website: '',
-  country: '',
-  country_code: '',
-  city: '',
-  postal_code: '',
-  street: '',
-  street_number: '',
-};
 
 interface BusinessSectionProps {
   /** Notifies parent when entity_type / business_id flip so the parent can refresh anything that depends on it. */
@@ -71,7 +44,7 @@ interface ViesCacheSnapshot {
 
 export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChanged }) => {
   const { user } = useAuth();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -92,26 +65,44 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   const [aadeChecking, setAadeChecking] = useState(false);
   const [aadeLastResult, setAadeLastResult] = useState<AadeLookupResult | null>(null);
 
+  /**
+   * Who this user is as a business, DERIVED in SQL. Never assembled here: `entity_type` on its own
+   * says "solo" for every operator who declared their company in Finance instead of in Profile,
+   * which is every operator who ever issued an invoice.
+   */
+  const [identity, setIdentity] = useState<BusinessIdentity>(SOLO_IDENTITY);
+  const [adopting, setAdopting] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, activeWorkspaceId]);
 
   const load = async () => {
     if (!user) return;
     setLoading(true);
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('entity_type, business_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Cast: `types.ts` is generated from the remote schema and this project cannot regenerate it
+    // locally, so a new RPC is unknown to the client types until someone with a token refreshes them.
+    const { data: rpcData, error: rpcError } = await (supabase as unknown as {
+      rpc: (fn: string) => Promise<{ data: unknown; error: unknown }>;
+    }).rpc(MY_BUSINESS_IDENTITY_RPC);
+    const derived = rpcError ? SOLO_IDENTITY : parseBusinessIdentity(rpcData);
+    setIdentity(derived);
 
-    const et = (profile?.entity_type as EntityType) ?? 'solo';
-    const bid = profile?.business_id ?? null;
+    const et: EntityType = derived.entityType;
+    const bid = derived.companyId;
     setEntityType(et);
     setPendingEntityType(et);
     setBusinessId(bid);
+
+    // A workspace-derived identity has no crm_companies row to read, so the display and the edit
+    // form start from what the invoicing profile says.
+    if (!bid && derived.identity) {
+      const next = toBusinessForm(derived.identity);
+      setBusiness(next);
+      setBusinessForm(next);
+    }
 
     if (bid) {
       const { data: company } = await supabase
@@ -148,6 +139,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     } else {
       setViesCache(null);
     }
+
     setLoading(false);
   };
 
@@ -271,6 +263,69 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     } finally { setSyncingInvoicing(false); }
   };
 
+  const invoicing = identity.invoicing;
+  /**
+   * Overwriting the profile copy from the invoicing one is a decision, not a default: both are real
+   * records with real consumers, so the drift banner offers it and nothing performs it silently.
+   * Finance *visibility* is not enough — an accountant can read the identity and must not be able
+   * to restate the company on somebody's personal profile. Workspace admin/owner only.
+   */
+  const canTakeInvoicing = !!invoicing && isAdmin(workspaceRole) && !!activeWorkspaceId;
+
+  /** Fills the open edit form from the invoicing identity — unsaved, for review. */
+  const fillFromInvoicing = () => {
+    if (!invoicing) return;
+    setBusinessForm(toBusinessForm(invoicing));
+    setPendingEntityType('business');
+    toast({ title: 'Filled from your invoicing profile', description: 'Review it, then Save.' });
+  };
+
+  /** Resolves drift the other way: the profile copy takes what the invoicing profile says. */
+  const takeInvoicingValues = async () => {
+    if (!user || !invoicing || !activeWorkspaceId || !businessId) return;
+    if (!isAdmin(workspaceRole)) {
+      toast({ title: 'Only a workspace admin can change the linked company', variant: 'destructive' });
+      return;
+    }
+    setAdopting(true);
+    try {
+      // A cached VIES verdict is a verdict about ONE number. Carrying it over onto a different VAT
+      // number would leave a "VIES verified" badge vouching for a number nobody checked — and the
+      // badge is what an admin reviewing a role application looks at.
+      const vatChanged = business.vat_number.replace(/\s+/g, '').toUpperCase() !== invoicing.vat_number;
+      // Blank → NULL, matching what save() writes. An empty string is a value: it reads back as
+      // "filled in, with nothing", which is not what an unfilled invoicing field means.
+      const fields = Object.fromEntries(
+        Object.entries(toBusinessForm(invoicing)).map(([k, v]) => [k, v.trim() || null]),
+      );
+      const { error } = await supabase.from('crm_companies').update({
+        ...fields,
+        gemi_number: invoicing.gemi_number || null,
+        updated_at: new Date().toISOString(),
+        ...(vatChanged
+          ? {
+              vat_validated: null,
+              vat_validated_at: null,
+              vat_validated_name: null,
+              vat_validated_address: null,
+              vat_validated_name_latin: null,
+              vat_validated_address_latin: null,
+              vat_validation_source: null,
+            }
+          : {}),
+      }).eq('id', businessId);
+      if (error) throw error;
+
+      toast({ title: 'Business profile updated', description: 'It now matches what your invoices say.' });
+      await load();
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'Unknown error';
+      toast({ title: 'Could not update the business', description: detail, variant: 'destructive' });
+    } finally {
+      setAdopting(false);
+    }
+  };
+
   const startEdit = () => {
     setBusinessForm({ ...business });
     setPendingEntityType(entityType);
@@ -344,7 +399,9 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
         } else {
           const { data: inserted, error } = await supabase
             .from('crm_companies')
-            .insert({ ...payload, created_by: user.id, is_customer: false, is_supplier: false })
+            // workspace_id explicitly: the BEFORE-INSERT trigger stamps the user's DEFAULT
+            // workspace, which is not necessarily the one they are looking at.
+            .insert({ ...payload, ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {}), created_by: user.id, is_customer: false, is_supplier: false })
             .select('id')
             .single();
           if (error) throw error;
@@ -381,6 +438,9 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       setSaving(false);
     }
   };
+
+  /** Fields the two copies disagree on — compared in SQL, shown here, never silently reconciled. */
+  const drift = identity.drift;
 
   const fullAddress = [
     [business.street, business.street_number].filter(Boolean).join(' '),
@@ -466,6 +526,18 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                 </div>
               </button>
             </div>
+
+            {pendingEntityType === 'business' && invoicing && (
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-hairline bg-surface-sunken px-3 py-2">
+                <p className="text-xs text-muted-foreground flex-1 min-w-[16rem]">
+                  You already invoice as <strong>{invoicing.name || 'a registered company'}</strong> — start from those
+                  details instead of retyping them.
+                </p>
+                <Button type="button" size="sm" variant="outline" onClick={fillFromInvoicing}>
+                  <CornerUpLeft className="h-3.5 w-3.5 mr-1.5" />Fill from invoicing
+                </Button>
+              </div>
+            )}
 
             {pendingEntityType === 'business' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -606,20 +678,68 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
             </div>
 
             {entityType === 'business' ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-8">
-                <FieldDisplay label="Company name" value={business.name} />
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">VAT number</p>
-                  <p className="text-sm">{business.vat_number || <span className="text-muted-foreground italic">Not set</span>}</p>
-                  <ViesStatusBadge cache={viesCache} />
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-8">
+                  <FieldDisplay label="Company name" value={business.name} />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">VAT number</p>
+                    <p className="text-sm">{business.vat_number || <span className="text-muted-foreground italic">Not set</span>}</p>
+                    <ViesStatusBadge cache={viesCache} />
+                  </div>
+                  <FieldDisplay label="Tax office" value={business.tax_office} />
+                  <FieldDisplay label="Profession" value={business.profession} />
+                  <FieldDisplay label="Phone" value={business.phone} />
+                  <FieldDisplay label="Business email" value={business.email} />
+                  <FieldDisplay label="Website" value={business.website} className="md:col-span-3" />
+                  <FieldDisplay label="Address" value={fullAddress} className="md:col-span-3" />
                 </div>
-                <FieldDisplay label="Tax office" value={business.tax_office} />
-                <FieldDisplay label="Profession" value={business.profession} />
-                <FieldDisplay label="Phone" value={business.phone} />
-                <FieldDisplay label="Business email" value={business.email} />
-                <FieldDisplay label="Website" value={business.website} className="md:col-span-3" />
-                <FieldDisplay label="Address" value={fullAddress} className="md:col-span-3" />
-              </div>
+                {identity.source === 'workspace' && (
+                  <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                    <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      Taken from the invoicing profile this workspace issues under
+                      (Finance → Business Identity). Edit here to keep a separate version on your profile.
+                    </span>
+                  </p>
+                )}
+                {drift.length > 0 && invoicing && (
+                  <div className="rounded-md border border-hairline bg-surface-sunken p-4 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
+                      <div className="space-y-1.5">
+                        <p className="text-sm">
+                          This differs from what your invoices say on{' '}
+                          <strong>{drift.map((k) => FIELD_LABELS[k]).join(', ')}</strong>.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Finance → Business Identity is the copy printed on invoices and sent to myDATA; this one is
+                          what CRM and role applications read. Pick which is right.
+                        </p>
+                        <ul className="text-xs text-muted-foreground space-y-0.5 pt-0.5">
+                          {drift.map((k) => (
+                            <li key={k}>
+                              <span className="text-muted-foreground/70">{FIELD_LABELS[k]}: </span>
+                              here <strong>{business[k]}</strong> · invoices <strong>{invoicing[k]}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={copyToInvoicing} disabled={syncingInvoicing}>
+                        {syncingInvoicing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CornerDownLeft className="h-3.5 w-3.5 mr-1.5" />}
+                        Push this to invoicing
+                      </Button>
+                      {canTakeInvoicing && (
+                        <Button size="sm" variant="outline" onClick={takeInvoicingValues} disabled={adopting}>
+                          {adopting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CornerUpLeft className="h-3.5 w-3.5 mr-1.5" />}
+                          Take the invoicing values
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">
                 You're registered as a solo entity. Switch to <strong>Business</strong> if you operate as a registered company, and you'll be able to apply for Dealer or Brand roles.

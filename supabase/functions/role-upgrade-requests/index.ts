@@ -5,7 +5,9 @@
  *
  *   POST /submit   (any authed user)
  *     body: { requested_role: 'supplier' | 'architect', justification?: string }
- *     - Validates the caller is a Business entity (entity_type='business' + business_id set).
+ *     - Validates the caller is a Business entity via `user_business_identity()` — the explicit
+ *       profile link if there is one, ELSE a workspace they own or administer that already invoices
+ *       as a company. Materialises the CRM company row here when only the latter exists.
  *     - Resolves requested_role → role_id.
  *     - Inserts a role_upgrade_requests row (partial unique index prevents duplicates).
  *     - Fans out: bell notification + email (template role_upgrade_request.submitted) to every admin.
@@ -204,18 +206,70 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
         return jsonResponse({ error: 'requested_role must be "supplier" or "architect"' }, 400);
       }
 
-      // Business-entity gate
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('entity_type, business_id, full_name, email')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!profile || profile.entity_type !== 'business' || !profile.business_id) {
+      // Business-entity gate — DERIVED, never restated. `user_business_identity` answers from the
+      // explicit profile link if there is one, otherwise from a workspace this user owns or
+      // administers that already invoices as a company. Reading `entity_type` directly is what
+      // turned a real ΕΕ with a VAT number, a ΓΕΜΗ number and live myDATA invoicing into a "solo
+      // entity" that could not apply: the fact was on record, just not on THIS record.
+      const { data: derived } = await supabase.rpc('user_business_identity', { p_user_id: user.id });
+      const identity = derived as {
+        entity_type?: string;
+        company_id?: string | null;
+        workspace_id?: string | null;
+        identity?: Record<string, string | null> | null;
+      } | null;
+
+      if (!identity || identity.entity_type !== 'business') {
         return jsonResponse(
-          { error: 'business_required', message: 'Complete your Business profile before applying for a Dealer or Factory role.' },
+          { error: 'business_required', message: 'Set up your business details — in Profile → Business, or in Finance → Business Identity — before applying for a Dealer or Factory role.' },
           400,
         );
+      }
+
+      // The identity may be derived from the workspace and never materialised as a CRM company.
+      // Applying for a role IS the deliberate claim, so this is where the row gets created and
+      // linked — not on a button somewhere the applicant had to find first.
+      let businessId = identity.company_id ?? null;
+      if (!businessId) {
+        const src = identity.identity ?? {};
+        const { data: created, error: createErr } = await supabase
+          .from('crm_companies')
+          .insert({
+            workspace_id: identity.workspace_id,
+            created_by: user.id,
+            is_customer: false,
+            is_supplier: false,
+            name: src.name,
+            vat_number: src.vat_number,
+            tax_office: src.tax_office,
+            profession: src.profession,
+            phone: src.phone,
+            email: src.email,
+            website: src.website,
+            country: src.country,
+            country_code: src.country_code,
+            city: src.city,
+            postal_code: src.postal_code,
+            street: src.street,
+            street_number: src.street_number,
+            gemi_number: src.gemi_number,
+          })
+          .select('id')
+          .single();
+        if (createErr || !created) {
+          return jsonResponse({ error: 'business_link_failed', message: createErr?.message ?? 'Could not record your business.' }, 500);
+        }
+        businessId = created.id;
+        await supabase
+          .from('user_profiles')
+          .update({ entity_type: 'business', business_id: businessId, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
       }
 
       // Resolve role
@@ -230,7 +284,7 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
       const { data: business } = await supabase
         .from('crm_companies')
         .select('name, vat_number, country, country_code, vat_validated, vat_validated_at, vat_validated_name')
-        .eq('id', profile.business_id)
+        .eq('id', businessId)
         .maybeSingle();
 
       // Re-validate VAT via VIES at submission time (snapshot baked into the request row).
@@ -262,7 +316,7 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
             vat_validated_name: viesSnapshot.vat_validated_name,
             vat_validation_source: 'vies',
             updated_at: new Date().toISOString(),
-          }).eq('id', profile.business_id);
+          }).eq('id', businessId);
         }
       }
 
@@ -315,15 +369,15 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
           user_id: a.user_id,
           type: 'role_upgrade_request',
           title: `New ${requestedRoleLabel} application`,
-          body: `${profile.full_name || profile.email || 'A user'} applied to become a ${requestedRoleLabel}. VAT: ${viesSnapshot.status_text}.`,
+          body: `${profile?.full_name || profile?.email || 'A user'} applied to become a ${requestedRoleLabel}. VAT: ${viesSnapshot.status_text}.`,
           action_url: actionUrl,
         }).catch(() => {});
 
         if (a.email) {
-          await sendEmail(supabase, a.email, `New ${requestedRoleLabel} application from ${profile.full_name || profile.email || 'a user'}`, 'role_upgrade_request.submitted', {
+          await sendEmail(supabase, a.email, `New ${requestedRoleLabel} application from ${profile?.full_name || profile?.email || 'a user'}`, 'role_upgrade_request.submitted', {
             admin_name: a.full_name || 'Admin',
-            user_name: profile.full_name || profile.email || 'User',
-            user_email: profile.email || '',
+            user_name: profile?.full_name || profile?.email || 'User',
+            user_email: profile?.email || '',
             requested_role: requestedRoleLabel,
             business_name: business?.name || '',
             business_vat: business?.vat_number || '',

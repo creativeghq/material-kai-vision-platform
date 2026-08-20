@@ -69,6 +69,9 @@ export const VAT_COUNTRY_OPTIONS: VatCountryOption[] = [
  * which is the whole point, because `finance_settings.business_country_code`
  * stores the ISO code while `crm_companies.country_code` stores the prefix,
  * and a `GR` fed to VIES validates nothing and reports no error either.
+ *
+ * SQL keeps its own twin, `public._vat_prefix(text)`, because the invoicing-identity
+ * projection runs there and cannot call this. One rule, two runtimes — change both.
  */
 export const toVatPrefix = (code: string | null | undefined): string => {
   const u = (code ?? '').trim().toUpperCase();

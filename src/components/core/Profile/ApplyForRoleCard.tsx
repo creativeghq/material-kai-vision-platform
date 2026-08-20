@@ -17,6 +17,7 @@ import {
   type RoleUpgradeRequest,
   type RoleUpgradeRequestedRole,
 } from '@/services/roleUpgradeRequestService';
+import { MY_BUSINESS_IDENTITY_RPC, parseBusinessIdentity } from './businessIdentity';
 
 type EntityType = 'solo' | 'business';
 
@@ -45,12 +46,20 @@ export const ApplyForRoleCard: React.FC = () => {
     try {
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('entity_type, roles!user_profiles_role_id_fkey(name)')
+        .select('roles!user_profiles_role_id_fkey(name)')
         .eq('user_id', user.id)
         .maybeSingle();
       const roleName = (profile as { roles?: { name?: string } | null } | null)?.roles?.name;
-      setEntityType((profile?.entity_type as EntityType) ?? 'solo');
       setCurrentRoleName(roleName ?? 'user');
+
+      // Whether you count as a business is DERIVED, and this card must ask the same question the
+      // submit gate asks. Reading `user_profiles.entity_type` here is what told an operator whose
+      // workspace invoices as a real ΕΕ to "switch your account to a Business entity" first.
+      // Cast: this project cannot regenerate `types.ts` locally, so a new RPC is unknown to it.
+      const { data: derived } = await (supabase as unknown as {
+        rpc: (fn: string) => Promise<{ data: unknown; error: unknown }>;
+      }).rpc(MY_BUSINESS_IDENTITY_RPC);
+      setEntityType(parseBusinessIdentity(derived).entityType);
 
       const myRequests = await listMyRoleUpgradeRequests(user.id);
       setRequests(myRequests);
@@ -127,7 +136,7 @@ export const ApplyForRoleCard: React.FC = () => {
             <div className="text-sm">
               <p className="font-medium">Business profile required</p>
               <p className="text-xs text-muted-foreground">
-                Switch your account to a <strong>Business entity</strong> and fill in your VAT, company name and address in the Profile tab before applying.
+                Add your company's VAT number, name and address — in <strong>Profile → Business</strong>, or in <strong>Finance → Business Identity</strong> if you already invoice under it. Either one counts.
               </p>
             </div>
           </div>
