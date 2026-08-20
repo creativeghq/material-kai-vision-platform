@@ -86,20 +86,28 @@ export async function fetchQuoteData(
     quote.customer_contact_id ?? null,
   );
 
-  // Resolve a primary image per catalog product (same source as QuotesService.getQuote).
+  // #374 Phase 8 — the image for each LINE, from the one derivation the quote screen also uses.
+  //
+  // This previously read the associations directly with NO `order by overall_score`, while
+  // QuotesService.getQuote ordered by it — so the PDF and the screen could disagree about which
+  // photo represents a product. Now both ask `get_product_variant_images`, which prefers the
+  // chosen variant's own photo and never returns another variant's.
   const productImageMap: Record<string, string> = {};
   const productIds = items.map((i: any) => i.products?.id).filter(Boolean);
   if (productIds.length > 0) {
     try {
-      const { data: rels } = await supabase
-        .from('image_product_associations')
-        .select('product_id, image:document_images(image_url)')
-        .in('product_id', productIds);
-      for (const rel of rels || []) {
-        const img = (rel as any).image;
-        if (img?.image_url && !productImageMap[(rel as any).product_id]) {
-          productImageMap[(rel as any).product_id] = img.image_url;
-        }
+      const { data: imageRows } = await supabase.rpc('get_product_variant_images', {
+        p_pairs: items
+          .filter((it: any) => it.products?.id)
+          .map((it: any) => ({
+            product_id: it.products.id,
+            // The raw map, canonicalised by SQL `_variant_key`. Deno has no copy of the
+            // TypeScript twin and must not grow one — that is how five registries happened.
+            attributes: it.selected_attributes ?? {},
+          })),
+      });
+      for (const r of (imageRows ?? []) as Array<{ product_id: string; image_url: string | null }>) {
+        if (r.image_url && !productImageMap[r.product_id]) productImageMap[r.product_id] = r.image_url;
       }
     } catch { /* images are optional — a missing thumbnail just renders blank */ }
   }

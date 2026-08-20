@@ -457,23 +457,26 @@ export class QuotesService {
       .filter(item => item.product?.id)
       .map(item => item.product!.id);
 
+    // #374 Phase 8 — THE image for this line: the chosen variant's own photo, else a general
+    // product photo, never another variant's. Derived by `get_product_variant_images` because
+    // this was resolved independently here and in generate-quote-pdf (which did not even order by
+    // score), so the quote on screen and the quote PDF could show different photos for one
+    // product — the five-money-derivations shape, in pixels.
     const productImageMap: Record<string, string> = {};
-
     if (productIds.length > 0) {
-      const { data: imageRelations } = await supabase
-        .from('image_product_associations')
-        .select('product_id, image:document_images(image_url)')
-        .in('product_id', productIds)
-        .order('overall_score', { ascending: false });
-
-      if (imageRelations) {
-        for (const rel of imageRelations) {
-          const imgData = rel.image as any;
-          if (!productImageMap[rel.product_id] && imgData?.image_url) {
-            productImageMap[rel.product_id] = imgData.image_url;
-          }
+      try {
+        const { data: imageRows } = await (supabase as any).rpc('get_product_variant_images', {
+          p_pairs: (items || [])
+            .filter((it) => it.product?.id)
+            .map((it) => ({
+              product_id: it.product!.id,
+              variant_key: variantKey(it.selected_attributes as Record<string, string> | null),
+            })),
+        });
+        for (const r of (imageRows ?? []) as Array<{ product_id: string; image_url: string | null }>) {
+          if (r.image_url && !productImageMap[r.product_id]) productImageMap[r.product_id] = r.image_url;
         }
-      }
+      } catch { /* a thumbnail is an aid; the quote still opens without it */ }
     }
 
     // Attach images to products

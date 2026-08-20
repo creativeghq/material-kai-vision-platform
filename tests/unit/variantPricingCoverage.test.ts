@@ -348,3 +348,44 @@ describe('#374 Phase 7 — no first-of-list variant guess', () => {
     expect(text).toContain('soleVariant');
   });
 });
+
+/**
+ * Phase 8 — one derivation of "the image for this line".
+ *
+ * `image_product_associations` linked an image to a PRODUCT and nothing finer, so a tile stocked
+ * in Bianco and Nero had one pool of photos and a customer buying Nero was looking at Bianco.
+ *
+ * Worse, the two readers disagreed with each other before any of this: QuotesService ordered by
+ * `overall_score desc` and generate-quote-pdf did not order at all, so the quote on screen and the
+ * quote PDF could already pick different photos for one product. Same shape as the five money
+ * derivations, in pixels — which is why both now ask `get_product_variant_images`.
+ */
+describe('#374 Phase 8 — the image for a line is derived once', () => {
+  const READERS = [
+    'src/modules/quotes/services/QuotesService.ts',
+    'supabase/functions/generate-quote-pdf/data-fetcher.ts',
+  ];
+
+  it('both readers ask the shared resolver for a line thumbnail', () => {
+    const missing = READERS.filter((rel) => {
+      try {
+        return !blankComments(readFileSync(join(ROOT, rel), 'utf8')).includes('get_product_variant_images');
+      } catch {
+        return true;
+      }
+    });
+    expect(
+      missing,
+      'Re-derives "the product image" instead of using the one resolver: ' + missing.join(', '),
+    ).toEqual([]);
+  });
+
+  it('the edge reader passes the RAW attribute map, never a hand-rolled key', () => {
+    // Deno has no copy of `variantKey()`, and adding a third twin of the canonicalisation is the
+    // drift variantKeyParity.test.ts exists to prevent. SQL canonicalises for that runtime.
+    const text = blankComments(
+      readFileSync(join(ROOT, 'supabase/functions/generate-quote-pdf/data-fetcher.ts'), 'utf8'),
+    );
+    expect(text).toContain('attributes: it.selected_attributes');
+  });
+});

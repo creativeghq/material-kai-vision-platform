@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { variantKey, formatVariantKey } from '@/services/lineIdentityRules';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
@@ -122,6 +124,13 @@ interface ProductImageRelationship {
   id: string;
   product_id: string;
   image_id: string;
+  /**
+   * #374 Phase 8 — which variant this image DEPICTS. null is a general image of the product
+   * (a box shot, a drawing, a room scene), which is the right default and true of every row
+   * that predates the column. Never inferred: showing a customer the wrong colourway is worse
+   * than showing them a generic photo.
+   */
+  variant_key: string | null;
   product_name: string;
   image_url: string;
   overall_score: number;
@@ -251,6 +260,32 @@ export const RelevancyManagement: React.FC = () => {
     setStats(prev => ({ ...prev, chunkProduct: { total: formatted.length, avgScore } }));
   };
 
+  /**
+   * Tag an image with the variant it depicts (#374 Phase 8).
+   *
+   * `get_product_variant_images` then prefers this photo for a line that chose that variant, and
+   * — the part that matters — never returns it for a line that chose a DIFFERENT one. Untagged
+   * images stay general and remain the fallback for everybody.
+   *
+   * The picker is write-only on purpose: the stored value is a canonical key, and
+   * `formatVariantKey` is explicitly display-only ("never parse this back"). Reversing a key into
+   * attributes to re-populate the control would be a second, lossy derivation of the identity the
+   * key already is. So the current tag renders as text and the picker sets a new one.
+   */
+  const setImageVariant = async (relId: string, attrs: Record<string, string>) => {
+    const vkey = variantKey(attrs);
+    const { error } = await supabase
+      .from('image_product_associations')
+      .update({ variant_key: vkey })
+      .eq('id', relId);
+    if (error) {
+      toast({ title: 'Could not tag image', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setProductImageRels((prev) => prev.map((r) => (r.id === relId ? { ...r, variant_key: vkey } : r)));
+    toast({ title: vkey ? 'Image tagged to this variant' : 'Image is now a general product image' });
+  };
+
   const loadProductImageRelationships = async (values: FilterValues, defs: FilterGroupDef[]) => {
     // image_product_associations columns: overall_score, spatial_score, caption_score,
     // clip_score, confidence, reasoning — there is NO relevance_score or relationship_type
@@ -266,6 +301,7 @@ export const RelevancyManagement: React.FC = () => {
         caption_score,
         clip_score,
         reasoning,
+        variant_key,
         created_at,
         products!inner(name),
         document_images!inner(image_url)
@@ -290,6 +326,7 @@ export const RelevancyManagement: React.FC = () => {
       caption_score: item.caption_score ?? 0,
       clip_score: item.clip_score ?? 0,
       reasoning: item.reasoning || '',
+      variant_key: item.variant_key ?? null,
       created_at: item.created_at,
     }));
 
@@ -541,6 +578,7 @@ export const RelevancyManagement: React.FC = () => {
                       <TableRow>
                         <TableHead>Product</TableHead>
                         <TableHead>Image</TableHead>
+                        <TableHead>Variant</TableHead>
                         <TableHead>Confidence</TableHead>
                         <TableHead>Overall Score</TableHead>
                         <TableHead>Actions</TableHead>
@@ -556,6 +594,19 @@ export const RelevancyManagement: React.FC = () => {
                               alt="Product"
                               className="h-12 w-12 object-cover rounded"
                             />
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                {formatVariantKey(rel.variant_key)
+                                  ?? <span title="A general image of the product — shown for any variant">General</span>}
+                              </div>
+                              <LineIdentityPicker
+                                productId={rel.product_id}
+                                value={{}}
+                                onChange={(next) => void setImageVariant(rel.id, next.selected_attributes)}
+                              />
+                            </div>
                           </TableCell>
                           <TableCell>
                             <span className="text-sm font-medium">
