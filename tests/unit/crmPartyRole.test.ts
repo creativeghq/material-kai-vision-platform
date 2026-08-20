@@ -96,6 +96,45 @@ describe('CRM party role is stated, never defaulted', () => {
   });
 
   /**
+   * The B2B discovery save is the other half of the same bug, arrived at from the opposite
+   * direction (#334 defect 1). It did not OMIT the role — it PINNED it, `is_customer: true`,
+   * under a comment reasoning that B2B research prospects a party we want to sell to. The
+   * toolkit's only discovery tool is `b2b_manufacturer_search`, which finds factories, so every
+   * porcelain tile plant the agent saved was filed as a customer with no way to say otherwise.
+   *
+   * A pinned literal is invisible to the guard above, which only constrains inserts that claim
+   * `is_supplier` — so it gets its own case. The role must be a tool PARAMETER (the operator sees
+   * it on the confirmation card and can change it), and it must default to supplier.
+   */
+  it('lets the B2B discovery save choose the party role instead of pinning it', () => {
+    const src = stripComments(
+      readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
+    );
+
+    expect(
+      src,
+      '`save_to_crm` must expose the party role as a parameter — the agent knows whether it just '
+      + 'searched for factories or for buyers, and the operator can correct it on the confirm card.',
+    ).toMatch(/role:\s*z\.enum\(\[\s*'supplier',\s*'customer',\s*'both'\s*\]\)/);
+
+    expect(
+      src,
+      'The default must be supplier: the only discovery tool in this toolkit finds manufacturers, '
+      + 'and a party we intend to SELL to has to be named as one.',
+    ).toMatch(/company\.role\s*\?\?\s*'supplier'/);
+
+    const insert = src.match(/from\(\s*'crm_companies'\s*\)[\s\S]{0,200}?\.insert\(\{([\s\S]{0,900}?)\}\s*\)/);
+    expect(insert, '`save_to_crm` no longer inserts into crm_companies — re-point this guard.').toBeTruthy();
+    for (const flag of ['is_customer', 'is_supplier']) {
+      expect(
+        insert![1],
+        `${flag} is pinned to a literal again. Both flags come from the role parameter; pinning one `
+        + `is how every discovered factory ended up in the customer lists.`,
+      ).not.toMatch(new RegExp(`\\b${flag}\\s*:\\s*(?:true|false)\\b`));
+    }
+  });
+
+  /**
    * The convention has to live SOMEWHERE, and the API handler is the one layer that can tell
    * "this caller wants the default" from "this caller is creating a supplier". If this guard
    * goes, a partner-key caller that posts a bare company silently stops being a customer.

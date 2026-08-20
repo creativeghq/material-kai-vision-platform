@@ -41,7 +41,8 @@ import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
 import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
-import { foldForSearch } from '../searchFold.ts';
+import { escapeLike, foldForSearch } from '../searchFold.ts';
+import { domainFromUrl } from '../seo-website.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -1352,6 +1353,18 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
       try {
         const startTime = Date.now();
 
+        // WHICH SIDE OF THE TRADE (#334 defect 1). This used to be `is_customer: true`, hardcoded,
+        // with a comment asserting that B2B research prospects a party we want to SELL to. It does
+        // not: `b2b_manufacturer_search` looks for FACTORIES, so every porcelain tile plant the
+        // agent found was filed as a customer. That is not cosmetic — a company with `is_supplier`
+        // false has its Products tab and factory link suppressed, and it turns up in customer lists
+        // and A/R views it has no business being in.
+        //
+        // Defaulting to supplier rather than customer because this toolkit's only discovery tool
+        // finds manufacturers; a party we intend to sell to has to be named as one.
+        const partyRole: 'supplier' | 'customer' | 'both' = company.role ?? 'supplier';
+        const roleLabel = partyRole === 'both' ? 'supplier and customer' : partyRole;
+
         // Send progress update
         // HUMAN-IN-THE-LOOP GATE (invariant #9). Writing a party into the CRM is a durable,
         // outward-facing change to the customer's own records, and the agent reaches this tool off
@@ -1370,7 +1383,10 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             tool: 'save_to_crm',
             input: { company, contacts, confirm: true },
             title: `Save ${company.name} to your CRM?`,
-            summary: `Adds ${company.name}${company.website ? ` (${company.website})` : ''}${contactLine} to your CRM. `
+            // The ROLE is on the card because it is the half the operator is most likely to want
+            // changed, and it is the half that decides which lists the row shows up in.
+            summary: `Adds ${company.name}${company.website ? ` (${company.website})` : ''} as a **${roleLabel}**`
+              + `${company.is_manufacturer ? ' (manufacturer)' : ''}${contactLine} to your CRM. `
               + `These came from web research, so check the details are right — contact names and emails in particular.`,
             toolkit_id: 'crm',
             timestamp: Date.now(),
@@ -1399,6 +1415,47 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         // A failed LOOKUP does not fall through to the insert, for the same reason it does not in
         // crm-api: a duplicate is cheap to detect and expensive to unpick.
         {
+          const probeFailed = (why: string) => JSON.stringify({
+            success: false,
+            error: `Could not check whether "${company.name}" is already in the CRM (${why}). `
+              + `Nothing was saved — say so rather than retrying, since a duplicate is expensive to unpick.`,
+          });
+          const alreadyExists = (row: { id: string; name: string }, matchedOn: 'domain' | 'name') => {
+            emitter?.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'done', status_line: `${row.name} is already in the CRM` });
+            return JSON.stringify({
+              success: true,
+              already_existed: true,
+              matched_on: matchedOn,
+              company_id: row.id,
+              company_name: row.name,
+              message: `"${row.name}" is already in this workspace's CRM (matched on ${matchedOn}) — nothing was `
+                + `created. Tell the user it already exists and offer to open or update it; do NOT save it again.`,
+            });
+          };
+
+          // DOMAIN FIRST (#334 defect 2). `name_fold` alone misses the duplicate that matters most
+          // in a discovery sweep: one factory spelled two ways — "Ceramika Paradyż", "Paradyz
+          // S.A.", "PARADYŻ Sp. z o.o." — is one company with one website, and the next sweep will
+          // spell it the other way. The fold survives case and accents; it does not survive a legal
+          // suffix appearing or a transliteration changing.
+          //
+          // There is no domain COLUMN to match on — `website` is free text ("https://www.x.com/en",
+          // "x.com/", "X.COM") — so this is a narrowing ilike followed by an exact compare of the
+          // normalised host. The ilike alone is not the test: "%paradyz.com%" also matches
+          // "notparadyz.com", which is a different company.
+          const wantDomain = domainFromUrl(company.website);
+          if (wantDomain) {
+            const { data: candidates, error: domainError } = await supabase
+              .from('crm_companies')
+              .select('id, name, website')
+              .eq('workspace_id', workspaceId)
+              .ilike('website', `%${escapeLike(wantDomain)}%`)
+              .limit(50);
+            if (domainError) return probeFailed(domainError.message);
+            const hit = (candidates ?? []).find((c: any) => domainFromUrl(c.website) === wantDomain);
+            if (hit) return alreadyExists(hit, 'domain');
+          }
+
           const { data: existing, error: dupError } = await supabase
             .from('crm_companies')
             .select('id, name')
@@ -1406,24 +1463,8 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             .eq('name_fold', foldForSearch(company.name))
             .limit(1)
             .maybeSingle();
-          if (dupError) {
-            return JSON.stringify({
-              success: false,
-              error: `Could not check whether "${company.name}" is already in the CRM (${dupError.message}). `
-                + `Nothing was saved — say so rather than retrying, since a duplicate is expensive to unpick.`,
-            });
-          }
-          if (existing) {
-            emitter?.step({ step_id: STEPS.B2B_RESEARCH[5], status: 'done', status_line: `${existing.name} is already in the CRM` });
-            return JSON.stringify({
-              success: true,
-              already_existed: true,
-              company_id: existing.id,
-              company_name: existing.name,
-              message: `"${existing.name}" is already in this workspace's CRM — nothing was created. `
-                + `Tell the user it already exists and offer to open or update it; do NOT save it again.`,
-            });
-          }
+          if (dupError) return probeFailed(dupError.message);
+          if (existing) return alreadyExists(existing, 'name');
         }
 
         // First, create or update the company. workspace_id is stamped server-side
@@ -1444,10 +1485,12 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             country: company.country,
             linkedin: company.linkedin,
             description: company.description,
-            // Explicit: is_customer no longer defaults to true at the column (that default
-            // filed every supplier as a customer too). B2B research prospects a party we want
-            // to SELL to, so the customer role is the intended one here.
-            is_customer: true,
+            // Explicit, and derived from `partyRole` rather than pinned — see the note above the
+            // declaration. All three flags are written on every insert so the row never inherits a
+            // column default nobody chose.
+            is_supplier: partyRole === 'supplier' || partyRole === 'both',
+            is_customer: partyRole === 'customer' || partyRole === 'both',
+            is_manufacturer: company.is_manufacturer === true,
             created_by: userId,
           })
           .select('id')
@@ -1480,6 +1523,48 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         // Create contacts and link them to the company
         if (contacts && contacts.length > 0) {
           for (const contact of contacts) {
+            // The contact half of the duplicate guard (#334 defect 2). The company probe above
+            // returns early on a hit, so a fresh company cannot collect a duplicate link — but the
+            // same PERSON legitimately reaches this tool twice: once from a supplier sweep, once
+            // from a customer one, and the second pass would mint a second `crm_contacts` row for
+            // an address we already hold.
+            //
+            // EMAIL is the only key used. Name is deliberately not: two people genuinely called
+            // "Μαρία Παπαδοπούλου" at two factories are two people, and collapsing them loses one.
+            // An email address is one inbox belonging to one person.
+            let existingContactId: string | null = null;
+            if (contact.email) {
+              const { data: priorContact, error: contactDupError } = await supabase
+                .from('crm_contacts')
+                .select('id')
+                .eq('workspace_id', workspaceId)
+                .ilike('email', escapeLike(String(contact.email).trim()))
+                .limit(1)
+                .maybeSingle();
+              // A failed probe SKIPS the contact rather than falling through to the insert — same
+              // reason the company probe does not fall through. One missing contact is recoverable;
+              // a duplicated person with half the history on each row is not.
+              if (contactDupError) {
+                console.warn(`Contact duplicate probe failed for ${contact.email}: ${contactDupError.message}`);
+                continue;
+              }
+              existingContactId = priorContact?.id ?? null;
+            }
+
+            if (existingContactId) {
+              contactIds.push(existingContactId);
+              await supabase
+                .from('crm_company_contacts')
+                .upsert({
+                  company_id: companyId,
+                  contact_id: existingContactId,
+                  role: contact.position,
+                  is_primary: contact.is_primary || false,
+                  notes: `Linked via B2B Research Agent`,
+                }, { onConflict: 'company_id,contact_id', ignoreDuplicates: true });
+              continue;
+            }
+
             // Create the contact
             const { data: contactData, error: contactError } = await supabase
               .from('crm_contacts')
@@ -1568,7 +1653,8 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         + 'confirms they want to save a manufacturer. ONLY `company.name` is required — every other field is '
         + 'optional. Enrichment and contact discovery are enhancements, NOT prerequisites: if either is '
         + 'unavailable or returns nothing, save what you have and say which fields are missing. Never abandon '
-        + 'a save the user asked for because an enrichment provider is down.',
+        + 'a save the user asked for because an enrichment provider is down. '
+        + 'Pass `company.role` — a manufacturer you might buy from is a "supplier" (the default), not a customer.',
       schema: z.object({
         company: z.object({
           name: z.string().describe('Company name'),
@@ -1583,6 +1669,17 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
           linkedin: z.string().optional().describe('LinkedIn URL'),
           description: z.string().optional().describe('Company description'),
           notes: z.string().optional().describe('Additional notes'),
+          role: z.enum(['supplier', 'customer', 'both']).optional().describe(
+            'Which side of the trade this party is on. A factory, producer, mill or brand you might BUY from '
+            + 'is "supplier" — that is the default and it is what `b2b_manufacturer_search` returns. Only pass '
+            + '"customer" for a party you intend to SELL to, and "both" when they are genuinely each. This '
+            + 'decides which lists the company appears in and whether its Products tab is shown, so do not '
+            + 'guess: if the user asked to find suppliers, it is a supplier.',
+          ),
+          is_manufacturer: z.boolean().optional().describe(
+            'True when this party actually produces goods, as opposed to distributing or retailing them. '
+            + '`b2b_manufacturer_search` returns this per row — pass it straight through rather than re-deciding it.',
+          ),
         }).describe('Company information to save'),
         contacts: z.array(z.object({
           name: z.string().describe('Contact full name'),

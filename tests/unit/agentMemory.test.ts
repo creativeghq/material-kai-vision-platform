@@ -674,12 +674,44 @@ describe('the agent cannot create a duplicate CRM company', () => {
       'two paths would disagree about what counts as the same company').toBe(true);
   });
 
+  /**
+   * The folded name is not the whole guard (#334 defect 2). One factory spelled two ways —
+   * "Ceramika Paradyż", "Paradyz S.A." — folds to two different keys and inserts twice, and a
+   * discovery sweep re-run next month is exactly the thing that spells it the other way. The
+   * website is the stable identity, so it is probed first.
+   */
+  it('checks the domain too, not just the folded name', () => {
+    expect(/domainFromUrl\(/.test(save),
+      'the domain probe must normalise both sides through the shared `domainFromUrl` — the stored ' +
+      '`website` is free text ("https://www.x.com/en", "x.com"), so comparing it raw finds nothing').toBe(true);
+    const firstInsert = save.search(/\.insert\(/);
+    expect(save.indexOf('domainFromUrl('),
+      'the domain check has to come BEFORE the write, or it is a report rather than a guard').toBeLessThan(firstInsert);
+  });
+
   it('a failed lookup does not fall through to the insert', () => {
     // Same reasoning as crm-api: a duplicate is cheap to detect and expensive to unpick, so an
     // unreadable CRM means "save nothing", never "save anyway".
-    const window = save.slice(save.indexOf('dupError'), save.indexOf('dupError') + 700);
-    expect(/success: false/.test(window),
-      'a lookup error must abort the save, not proceed to insert').toBe(true);
+    //
+    // Checked per PROBE rather than once. The company is now looked up twice — by domain and by
+    // folded name — and an error on either has to abort; asserting on `dupError` alone stopped
+    // covering the guard the moment a second probe appeared beside it.
+    // Everything before the insert STATEMENT — cut at the `const {` that binds its result, not at
+    // `.insert(` itself, or the insert's own error binding reads as a probe that never aborts.
+    const insertAt = save.search(/\.insert\(/);
+    const beforeWrite = save.slice(0, save.lastIndexOf('const {', insertAt));
+    const probes = [...new Set([...beforeWrite.matchAll(/error:\s*(\w+)\s*\}\s*=/g)].map((m) => m[1]))];
+    expect(probes.length,
+      'fewer than two duplicate probes before the insert — either a probe was deleted or this ' +
+      'guard is reading the wrong block').toBeGreaterThanOrEqual(2);
+    for (const v of probes) {
+      const at = beforeWrite.indexOf(`if (${v})`);
+      expect(at, `probe error \`${v}\` is bound but never tested`).toBeGreaterThan(-1);
+      expect(/^if \(\w+\)\s*\{?\s*return\b/.test(beforeWrite.slice(at, at + 80)),
+        `a \`${v}\` failure must return, not fall through to the insert`).toBe(true);
+    }
+    expect(/success: false/.test(beforeWrite),
+      'and the abort must report failure rather than a silent no-op').toBe(true);
   });
 
   it('an existing company is reported, not silently re-saved', () => {
