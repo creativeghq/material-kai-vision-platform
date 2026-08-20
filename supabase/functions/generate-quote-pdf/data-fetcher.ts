@@ -32,6 +32,7 @@ export async function fetchQuoteData(
       notes,
       selected_size,
       selected_color,
+      selected_attributes,
       unit_price,
       discounted_price,
       line_total,
@@ -103,6 +104,24 @@ export async function fetchQuoteData(
     } catch { /* images are optional — a missing thumbnail just renders blank */ }
   }
 
+  // #374 Phase 6 — one round trip for every line's variant label. Derived in SQL because the
+  // rule needs the field registry (which keys are identity axes, which are internal and must
+  // never reach a customer's PDF) and re-implementing that here would be a second copy of it.
+  // Best-effort: a quote must still render when the registry is unreachable.
+  const variantLabels: Record<string, string> = {};
+  try {
+    const { data: labels } = await supabase.rpc('get_variant_labels', {
+      p_rows: items.map((it: any) => ({
+        key: it.id,
+        product_id: it.product_id ?? null,
+        attributes: it.selected_attributes ?? {},
+      })),
+    });
+    for (const r of (labels ?? []) as Array<{ row_key: string; label: string | null }>) {
+      if (r.label) variantLabels[r.row_key] = r.label;
+    }
+  } catch { /* labels are an aid; the line still prints without them */ }
+
   // Map items (supports both catalog products and custom items)
   const mappedItems: QuoteItemData[] = items.map((item: any) => {
     const product = item.products;
@@ -125,6 +144,7 @@ export async function fetchQuoteData(
         : (product?.sku || metadata?.sku || null),
       selected_size: item.selected_size || null,
       selected_color: item.selected_color || null,
+      variant_label: variantLabels[item.id] ?? null,
       quantity: item.quantity,
       unit: isCustom ? (item.custom_unit || 'pcs') : (metadata?.unit || 'pcs'),
       unit_price: parseFloat(item.unit_price) || 0,

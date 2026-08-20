@@ -176,13 +176,20 @@ const emptyLine = (g?: Partial<LineItem>): LineItem => ({
 });
 
 // Best-effort extraction of color/size/unit from heterogeneous product metadata.
+//
+// #374 Phase 7 — a SINGULAR value only. `meta.variants[0]` and `dimensions[0]` were "the first of
+// several", which is a guess wearing the costume of a fact: it pre-answered which colour the
+// customer is being invoiced for, and an invoice is a fiscal record. Where the product genuinely
+// offers a choice the operator now makes it in the variant picker, which ranks stocked values
+// first; where it offers one value, that value is a fact and still flows through.
 function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string } {
   if (!meta || typeof meta !== 'object') return {};
   const app = meta.appearance ?? {};
   const dims = Array.isArray(meta.dimensions) ? meta.dimensions : [];
-  const firstVariant = Array.isArray(meta.variants) && meta.variants[0] ? meta.variants[0] : {};
-  const color = app.color ?? app.colour ?? meta.color ?? firstVariant.color ?? '';
-  const size = app.size ?? meta.size ?? firstVariant.format ?? firstVariant.size ?? (dims[0]?.label ?? dims[0]?.value ?? '');
+  const soleVariant = Array.isArray(meta.variants) && meta.variants.length === 1 ? meta.variants[0] : {};
+  const soleDim = dims.length === 1 ? dims[0] : null;
+  const color = app.color ?? app.colour ?? meta.color ?? soleVariant.color ?? '';
+  const size = app.size ?? meta.size ?? soleVariant.format ?? soleVariant.size ?? (soleDim?.label ?? soleDim?.value ?? '');
   return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
 }
 

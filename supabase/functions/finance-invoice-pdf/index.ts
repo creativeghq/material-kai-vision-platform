@@ -27,6 +27,44 @@ import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type Invoice
 // Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
 // Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
 // the document "bold" (the app's heaviest loaded weight).
+/**
+ * #374 Phase 6 — attach each line's full chosen variant, derived by SQL `variant_label`.
+ *
+ * The two renderers below printed `selected_color` / `selected_size` only, so a finish, a wood
+ * species or an IP rating was chosen, priced and stored and then never appeared on the invoice.
+ * Derived in SQL rather than assembled here because the rule needs the field registry — which
+ * keys are identity axes at all, and which are internal and must never reach a customer document.
+ *
+ * Mutates in place onto `_variant_label`; best-effort, because an invoice must still render when
+ * the registry is unreachable, and then the projected columns carry it exactly as before.
+ *
+ * `credit_note_items` carries no `selected_attributes` column, so those rows simply get no label
+ * and fall back — the same output they produce today.
+ */
+async function attachVariantLabels(supabase: any, items: any[]): Promise<void> {
+  if (!items?.length) return;
+  try {
+    const { data } = await supabase.rpc('get_variant_labels', {
+      p_rows: items.map((it) => ({
+        key: String(it.id),
+        product_id: it.product_id ?? null,
+        attributes: it.selected_attributes ?? {},
+      })),
+    });
+    const byId: Record<string, string> = {};
+    for (const r of (data ?? []) as Array<{ row_key: string; label: string | null }>) {
+      if (r.label) byId[r.row_key] = r.label;
+    }
+    for (const it of items) it._variant_label = byId[String(it.id)] ?? null;
+  } catch { /* the line still prints; it just says less */ }
+}
+
+/** The variant detail for a line: the full label when we have it, else the legacy two columns. */
+function variantOf(it: any): string {
+  return it?._variant_label
+    || [it?.selected_color, it?.selected_size].filter(Boolean).join(' / ');
+}
+
 const FONT_URLS = {
   regular: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-Regular.ttf',
   bold: 'https://cdn.jsdelivr.net/gh/googlefonts/opensans@main/fonts/ttf/OpenSans-SemiBold.ttf',
@@ -347,6 +385,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     if (kind === 'invoice') {
       const { data } = await supabase.from('invoice_items').select('*').eq('invoice_id', docId).order('added_at');
       items = data ?? [];
+      await attachVariantLabels(supabase, items);
     } else if (kind === 'credit_note') {
       const [{ data: cnItems }, { data: srcInv }] = await Promise.all([
         supabase.from('credit_note_items').select('*').eq('credit_note_id', docId).order('created_at'),
@@ -776,7 +815,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     vatByRate[key].net += net; vatByRate[key].vat += vat;
 
     if (isCommercial) {
-      const detailC = [[it.selected_color, it.selected_size].filter(Boolean).join(' / '), it.line_comments].filter(Boolean).join(' — ');
+      const detailC = [variantOf(it), it.line_comments].filter(Boolean).join(' — ');
       const unitLabelC = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL[Number(it.measurement_unit_code)] : '') ?? '';
       const codeLines = wrap(String(it.sku ?? '—'), font, 8, 64);
       const dLinesC = wrap(it.description ?? 'Item', font, 8, 118);
@@ -796,7 +835,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     }
 
     const dLines = wrap(it.description ?? 'Item', font, 8.5, cols.qty - cols.descr - 10);
-    const detail = [[it.selected_color, it.selected_size].filter(Boolean).join(' / '), it.line_comments].filter(Boolean).join(' — ');
+    const detail = [variantOf(it), it.line_comments].filter(Boolean).join(' — ');
     const rowH = Math.max(13, dLines.length * 10 + (detail ? 10 : 0) + 3);
     if (y - rowH < M + 150) { newPage(); drawHead(); }
     let ly = y;

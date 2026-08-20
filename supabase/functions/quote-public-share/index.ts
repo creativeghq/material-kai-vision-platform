@@ -55,7 +55,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // Fetch items (catalog + custom).
   const { data: rawItems } = await supabase
     .from('quote_items')
-    .select('id, product_id, quantity, selected_size, selected_color, unit_price, discounted_price, line_total, custom_product_name, custom_unit, room, dimensions, products ( name, sku )')
+    .select('id, product_id, quantity, selected_size, selected_color, selected_attributes, unit_price, discounted_price, line_total, custom_product_name, custom_unit, room, dimensions, products ( name, sku )')
     .eq('quote_id', quote.id)
     .order('added_at', { ascending: true });
 
@@ -67,6 +67,24 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     vat_rate?: number; vat_amount?: number; grand_total?: number;
   } | null;
 
+  // #374 Phase 6 — the whole chosen variant, derived in SQL so the per-key internal gate runs.
+  // This page is reachable by an anonymous visitor, so that gate is the thing that keeps a
+  // stray cost or supplier key out of a public document. Best-effort: the quote still renders.
+  //
+  // NB the acceptance hash below covers [id, line_total] and the totals, NOT the variant, so
+  // adding this changes nothing a previously-signed quote is verified against.
+  const variantLabels: Record<string, string> = {};
+  try {
+    const { data: labels } = await supabase.rpc('get_variant_labels', {
+      p_rows: (rawItems ?? []).map((it: any) => ({
+        key: it.id, product_id: it.product_id ?? null, attributes: it.selected_attributes ?? {},
+      })),
+    });
+    for (const r of (labels ?? []) as Array<{ row_key: string; label: string | null }>) {
+      if (r.label) variantLabels[r.row_key] = r.label;
+    }
+  } catch { /* a missing label must never stop a customer opening their quote */ }
+
   const items = (rawItems ?? []).map((it: any) => {
     const product = it.products;
     const isCustom = !product;
@@ -77,6 +95,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       quantity: it.quantity,
       selected_size: it.selected_size ?? null,
       selected_color: it.selected_color ?? null,
+      variant_label: variantLabels[it.id] ?? null,
       room: it.room ?? null,
       dimensions: it.dimensions ?? null,
       unit_price: it.unit_price != null ? Number(it.unit_price) : null,

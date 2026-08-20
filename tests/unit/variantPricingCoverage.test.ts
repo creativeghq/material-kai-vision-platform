@@ -264,3 +264,87 @@ describe('availabilityKey — one key per (product, variant) and no collisions',
     expect(availabilityKey('p1', undefined)).toBe(availabilityKey('p1', null));
   });
 });
+
+/**
+ * Phase 6 — the customer's copy shows what they chose.
+ *
+ * Every document renderer built its line detail from `selected_color` + `selected_size`, the two
+ * projected columns, so forty-eight other identity axes were chosen, priced, stored and never
+ * printed. The fiscal path meanwhile folded the whole attribute map into the name it transmits,
+ * so AADE received a more specific description than the customer's own page.
+ *
+ * These live in `supabase/functions/`, which `npm run typecheck` does not cover (tsconfig excludes
+ * it) — so a regression here is invisible to the main typecheck and only `typecheck:edge` or this
+ * would see it.
+ */
+describe('#374 Phase 6 — document renderers print the whole variant', () => {
+  const RENDERERS = [
+    'supabase/functions/generate-quote-pdf/index.ts',
+    'supabase/functions/generate-quote-pdf/data-fetcher.ts',
+    'supabase/functions/finance-invoice-pdf/index.ts',
+    'supabase/functions/quote-public-share/index.ts',
+  ];
+
+  it('each renderer derives the variant rather than re-joining two columns', () => {
+    const missing = RENDERERS.filter((rel) => {
+      let text: string;
+      try {
+        text = blankComments(readFileSync(join(ROOT, rel), 'utf8'));
+      } catch {
+        return true; // a renderer that moved must fail loudly, not silently pass
+      }
+      return !text.includes('variant_label');
+    });
+    expect(
+      missing,
+      'Prints only selected_color/selected_size, so a finish or wood species never reaches the '
+        + 'page: ' + missing.join(', '),
+    ).toEqual([]);
+  });
+
+  it('the two projected columns survive as a FALLBACK, not as the source', () => {
+    // A legacy line with no attribute map must still print what it always did. The point is that
+    // the pair is now the fallback branch, never the only branch.
+    const text = blankComments(
+      readFileSync(join(ROOT, 'supabase/functions/finance-invoice-pdf/index.ts'), 'utf8'),
+    );
+    expect(text).toContain('_variant_label');
+    expect(text).toContain('selected_color');
+  });
+});
+
+/**
+ * Phase 7 — a variant is chosen, not guessed.
+ *
+ * `AddProductsSheet` seeded `sizes[0]` / `colors[0]` on add: the first entry of a list, so a tile
+ * that comes in four colours had one picked on the operator's behalf. It then read as a decision —
+ * the line printed that colour, priced that variant and reserved its stock.
+ *
+ * Exactly ONE candidate is a different case: that is a fact about the product, not a choice, which
+ * is why `get_line_identity_options` withholds single-option fields from the picker entirely. So
+ * the rule is `=== 1`, and `> 0` is the bug.
+ */
+describe('#374 Phase 7 — no first-of-list variant guess', () => {
+  it('AddProductsSheet seeds an axis only when the product offers exactly one value', () => {
+    const text = blankComments(
+      readFileSync(join(ROOT, 'src/modules/quotes/components/AddProductsSheet.tsx'), 'utf8'),
+    );
+    expect(text).toContain('sizes.length === 1');
+    expect(text).toContain('colors.length === 1');
+    expect(
+      /(sizes|colors)\.length > 0/.test(text),
+      'A `.length > 0` seed is the first-of-list guess this phase removed.',
+    ).toBe(false);
+  });
+
+  it('NewInvoiceDialog never seeds from the first of several variants', () => {
+    const text = blankComments(
+      readFileSync(join(ROOT, 'src/modules/finance/components/NewInvoiceDialog.tsx'), 'utf8'),
+    );
+    expect(
+      text.includes('firstVariant'),
+      'An invoice is a fiscal record; pre-answering which colour it bills for is not a default.',
+    ).toBe(false);
+    expect(text).toContain('soleVariant');
+  });
+});

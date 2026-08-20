@@ -43,6 +43,13 @@ export interface QuoteItemData {
   sku: string | null;
   selected_size: string | null;
   selected_color: string | null;
+  /**
+   * #374 Phase 6 — the WHOLE chosen variant, derived by SQL `variant_label`. The two columns
+   * above are a projection of two of its axes and are kept only for templates that still read
+   * them; a tile's finish or a parquet's wood species reaches the page through this and
+   * nothing else. null when the line chose nothing.
+   */
+  variant_label: string | null;
   quantity: number;
   unit: string;
   unit_price: number;

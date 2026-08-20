@@ -232,9 +232,20 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     // the drift projectIdentity exists to prevent: the line printed 600x600 while its attributes
     // said nothing, so anything reading the map (pricing's variant key, warehouse matching) saw an
     // unvarianted line.
+    //
+    // #374 Phase 7 — seed only when the product offers exactly ONE value for an axis.
+    //
+    // `sizes[0]` / `colors[0]` picked the first entry of a list, so adding a tile that comes in
+    // four colours silently chose one on the operator's behalf and it read as a decision: the
+    // line printed a colour nobody selected, priced that variant, and reserved its stock.
+    //
+    // One value is a different thing entirely — it is a FACT about the product, not a choice
+    // between alternatives, which is exactly why `get_line_identity_options` withholds a
+    // single-option field from the picker. Dropping those too would mean the one colour the
+    // product has could never reach the document at all.
     const attrs: Record<string, string> = {};
-    if (sizes.length > 0) attrs[SIZE_KEYS[0]] = sizes[0];
-    if (colors.length > 0) attrs[COLOR_KEYS[0]] = colors[0];
+    if (sizes.length === 1) attrs[SIZE_KEYS[0]] = sizes[0];
+    if (colors.length === 1) attrs[COLOR_KEYS[0]] = colors[0];
     const projected = projectIdentity(attrs);
 
     setSelectedProducts(prev => [...prev, {

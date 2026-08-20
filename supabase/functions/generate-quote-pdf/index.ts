@@ -19,7 +19,10 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
     description: it.description,
     sku: it.sku,
     room: it.room,
-    size_color: [it.selected_size, it.selected_color].filter(Boolean).join(' · ') || null,
+    // #374 Phase 6 — the full variant when we have it, falling back to the two projected
+    // columns so a legacy line with no attribute map still prints what it always did.
+    size_color: it.variant_label
+      || ([it.selected_size, it.selected_color].filter(Boolean).join(' · ') || null),
     quantity: it.quantity,
     unit: it.unit,
     unit_price: it.unit_price,
@@ -353,9 +356,12 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
 // admin sees a faithful render of the template without a real quote.
 function buildSampleQuote(workspaceId: string | null, vatRate: number): QuoteData {
   const items = [
-    { name: 'Porcelain Tile — Carrara', sku: 'TIL-CAR-60', size: '60×60 cm', color: 'White', qty: 40, unit: 'm²', price: 28.5, room: 'Bathroom' },
-    { name: 'Oak Engineered Flooring', sku: 'FLR-OAK-14', size: '1900×190 mm', color: 'Natural', qty: 55, unit: 'm²', price: 42.0, room: 'Living room' },
-    { name: 'Matt Black Mixer Tap', sku: 'TAP-BLK-01', size: null, color: 'Matt black', qty: 3, unit: 'pcs', price: 89.0, room: 'Kitchen' },
+    // #374 — the samples carry a third axis so the admin previewing a template sees what a real
+    // variant line looks like. Before Phase 6 a document could only ever show size and colour,
+    // so a preview built from those two flattered every template.
+    { name: 'Porcelain Tile — Carrara', sku: 'TIL-CAR-60', size: '60×60 cm', color: 'White', extra: 'Matt', qty: 40, unit: 'm²', price: 28.5, room: 'Bathroom' },
+    { name: 'Oak Engineered Flooring', sku: 'FLR-OAK-14', size: '1900×190 mm', color: 'Natural', extra: 'Brushed & oiled', qty: 55, unit: 'm²', price: 42.0, room: 'Living room' },
+    { name: 'Matt Black Mixer Tap', sku: 'TAP-BLK-01', size: null, color: 'Matt black', extra: null, qty: 3, unit: 'pcs', price: 89.0, room: 'Kitchen' },
   ];
   let subtotal = 0;
   const itemData = items.map((it, i) => {
@@ -364,6 +370,7 @@ function buildSampleQuote(workspaceId: string | null, vatRate: number): QuoteDat
     return {
       id: `sample-${i}`, product_name: it.name, description: 'Sample line item for template preview.',
       sku: it.sku, selected_size: it.size, selected_color: it.color, quantity: it.qty, unit: it.unit,
+      variant_label: [it.size, it.color, it.extra].filter(Boolean).join(' · ') || null,
       unit_price: it.price, discounted_price: null, line_total: lineTotal, notes: null, pricing_status: 'priced',
       image_url: null, room: it.room, dimensions: it.size, installation_requirements: null, delivery_date: null,
     };
