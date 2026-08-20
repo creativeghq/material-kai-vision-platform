@@ -37,6 +37,8 @@ import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { projectIdentity, variantKey, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -57,6 +59,13 @@ interface LineItem {
   discount: string;                // line-level discount amount (currency)
   unit: string;                    // free-text unit label (e.g. "pcs", "m²")
   measurement_unit_code: string;   // myDATA measurement unit code
+  /**
+   * #374 Phase 5 — the whole variant, in the registry's vocabulary. `color` and `size` below
+   * are PROJECTED from this via projectIdentity, never written independently: writing the two
+   * columns directly and leaving the map empty is how a line printed 60x60 while its attributes
+   * said nothing, so pricing and the warehouse both saw an unvarianted line.
+   */
+  selected_attributes: Record<string, string>;
   color: string;
   size: string;
   vat_category: string;            // myDATA VAT category code
@@ -154,7 +163,7 @@ const taxOptionLabel = (r: TaxRef): string => `${r.description}${r.rate_kind ===
 
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
-  measurement_unit_code: '', color: '', size: '',
+  measurement_unit_code: '', selected_attributes: {}, color: '', size: '',
   vat_category: '', vat_exemption: '',
   income_classification_type: '',
   income_classification_category: '',
@@ -510,6 +519,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   const pickProduct = async (idx: number, p: any) => {
     const meta = pickFromMeta(p.metadata);
+    // #374 — seed the registry-keyed map, then PROJECT color/size out of it, the same contract
+    // AddProductsSheet and LineIdentityPicker follow.
+    const attrs: Record<string, string> = {};
+    if (meta.color) attrs[COLOR_KEYS[0]] = meta.color;
+    if (meta.size) attrs[SIZE_KEYS[0]] = meta.size;
+    const projected = projectIdentity(attrs);
     let price = '';
     try {
       // This call used to pass workspace + product ONLY, so an invoice line was priced at bare
@@ -526,6 +541,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         p_company_id: customer?.type === 'company' ? customer.id : null,
         p_contact_id: customer?.type === 'contact' ? customer.id : null,
         p_audience: 'seller',
+        // #374 Phase 4 — an invoice line priced product-wide while the quote for the same
+        // buyer priced the variant is the same product costing different money on two documents.
+        p_variant_key: variantKey(attrs) ?? null,
         ...breakArgs,
       });
       const row = Array.isArray(data) ? data[0] : data;
@@ -536,8 +554,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       description: p.name ?? '',
       sku: p.sku ?? '',
       unit: meta.unit ?? '',
-      color: meta.color ?? '',
-      size: meta.size ?? '',
+      selected_attributes: attrs,
+      color: projected.selected_color ?? '',
+      size: projected.selected_size ?? '',
       ...(price ? { unit_price: price } : {}),
       expanded: true,
     });
@@ -818,7 +837,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
           discounted_price: disc || null, net_value: Number(net.toFixed(2)), line_total: Number(net.toFixed(2)),
           unit_cost_snapshot: l.unit_cost.trim() ? parseDecimalOr(l.unit_cost, 0) : null,
-          selected_color: l.color || null, selected_size: l.size || null,
+          selected_attributes: l.selected_attributes ?? {}, selected_color: l.color || null, selected_size: l.size || null,
           vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
           // 0%-VAT lines fall back to the customer's default myDATA exemption
           // category (crm party.vat_exemption_reason) when the line leaves it blank.
@@ -935,7 +954,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         unit: l.unit || null, measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
         unit_price: parseDecimalOr(l.unit_price, 0), net_value: net, line_total: net,
         vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null, vat_percent: pct,
-        selected_color: l.color || null, selected_size: l.size || null, line_comments: l.line_comments || null,
+        selected_attributes: l.selected_attributes ?? {}, selected_color: l.color || null, selected_size: l.size || null, line_comments: l.line_comments || null,
       };
     }),
     settings: issuer,
@@ -1304,8 +1323,30 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       {l.expanded && (
                         <div className="grid grid-cols-2 gap-2 border-t border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
                           <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">SKU</Label><Input className="h-7 text-xs" value={l.sku} onChange={(e) => update(idx, { sku: e.target.value })} /></div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
+                          {l.product_id ? (
+                            /* #374 Phase 5 — a catalog line picks its variant from the field
+                               registry, exactly like the quote and order lines do, so an invoice
+                               can finally record a finish or a wood species instead of only the
+                               two axes these free-text boxes allowed. A line with NO catalog
+                               product has no registry to consult and keeps the text inputs. */
+                            <div className="space-y-1 sm:col-span-2">
+                              <Label className="text-[10px] text-muted-foreground">Variant</Label>
+                              <LineIdentityPicker
+                                productId={l.product_id}
+                                value={l.selected_attributes ?? {}}
+                                onChange={(next) => update(idx, {
+                                  selected_attributes: next.selected_attributes,
+                                  color: next.selected_color ?? '',
+                                  size: next.selected_size ?? '',
+                                })}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
+                              <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
+                            </>
+                          )}
                           <div className="space-y-1">
                             <Label className="text-[10px] text-muted-foreground">Measurement unit</Label>
                             <Select value={l.measurement_unit_code || 'none'} onValueChange={(v) => update(idx, { measurement_unit_code: v === 'none' ? '' : v })}>

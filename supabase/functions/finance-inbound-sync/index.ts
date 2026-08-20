@@ -21,6 +21,7 @@ import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { extractProductsFromLines } from '../_shared/finance/extract-products.ts';
 import { resolveInboundIssuerNames } from '../_shared/finance/resolve-issuer-names.ts';
+import { unitFromMydataCode } from '../_shared/fiscal/types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -410,13 +411,34 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           const pendingRows = usable.map((l: any, i: number) => {
             const s = byIdx.get(i);
             const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
-            const unitCost = l.net_value != null ? r2(Number(l.net_value) / qty) : null;
-            const name = s ? [s.name, s.size, s.attributes].filter((x) => x && String(x).trim()).join(' ').trim() : String(l.item_description);
+            const netValue = l.net_value != null ? Number(l.net_value) : null;
+            const unitCost = netValue != null ? r2(netValue / qty) : null;
+            // A myDATA line is not just a description. It states the unit, the supplier's own
+            // article code and the VAT category, and those are FACTS about the document — read
+            // them rather than asking a model to re-derive them from prose that may not say.
+            // `src/lib/units.ts` puts it plainly: "wherever a code is present it is the
+            // authority — never infer the unit from a product description instead." Inferring
+            // it is exactly what this did, for every line it ever queued: 4.1 metres of worktop
+            // (measurement_unit 4) was filed as 4.1 pieces, which is not a thing.
+            const unitCode = l.measurement_unit != null ? Number(l.measurement_unit) : null;
+            const itemCode = String(l.item_code ?? '').trim();
+            // The product name ALONE. `size` and `attributes` are kept in their own columns and
+            // shown as evidence; gluing all three into one string produced names like "AMALFI
+            // GRIS 80x80 grey finish" and "Magnetic Ceiling Rail 48VDC 3 black matte finish",
+            // which is the AI's structured answer flattened back into the prose it came from.
+            const name = String(s?.name ?? '').trim() || String(l.item_description);
             return {
               workspace_id: workspaceId, inbound_document_id: d.id, line_index: i,
               raw_description: String(l.item_description), name: name || 'Item',
-              sku: s?.sku ?? null, unit: s?.unit ?? null, size: s?.size ?? null, attributes: s?.attributes ?? null,
-              quantity: qty, unit_cost: unitCost, currency: d.currency ?? 'EUR',
+              sku: s?.sku ?? null, size: s?.size ?? null, attributes: s?.attributes ?? null,
+              // The stated unit wins; the model's reading is the fallback for a line that omits
+              // the code (1,621 of 3,643 lines here do).
+              unit: unitFromMydataCode(unitCode) ?? s?.unit ?? null,
+              measurement_unit_code: unitCode,
+              supplier_product_code: itemCode || null,
+              mydata_vat_category: l.vat_category != null ? Number(l.vat_category) : null,
+              quantity: qty, unit_cost: unitCost, net_value: netValue,
+              currency: d.currency ?? 'EUR',
             };
           });
           const { error: upErr } = await supabase.from('warehouse_pending_items')

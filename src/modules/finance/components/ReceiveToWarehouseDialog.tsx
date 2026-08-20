@@ -35,7 +35,11 @@ import {
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 import type { ManualImageRef } from '@/services/dealerProductsService';
 import { parseSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
-import { UNITS, unitSuffix, normalizeUnit, unitFromMydataCode, unitDef } from '@/lib/units';
+import {
+  resolveIntakeUnit, resolveSupplierCode, unitCostFromNet,
+  priceFromMarkup, markupFromPrice, netListPrice,
+} from '@/modules/finance/utils/intakeLine';
+import { UNITS, unitSuffix, normalizeUnit, unitDef } from '@/lib/units';
 import { invoicingSetupService, type RefRow, type DocTypeSetting } from '@/services/invoicingSetupService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
@@ -100,7 +104,6 @@ interface LineRow {
   serialNumber: string;
 }
 
-import { round2 as r2 } from '@/utils/decimal';
 
 /**
  * How well an existing stock item matches a supplier line, 0..1.
@@ -128,9 +131,6 @@ function matchScore(item: WarehouseItem, description: string, supplierCode: stri
   const hits = itemTokens.filter((t) => lineTokens.has(t)).length;
   return hits / itemTokens.length;
 }
-
-/** AADE VAT-category code → percent. Mirrors the table in `_shared/fiscal/invoice-builder.ts`. */
-const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
 
 /** Read a File as raw base64 (no data-URL prefix) — what MIVAA's image search expects. */
 const fileToBase64 = (file: File): Promise<string> =>
@@ -284,9 +284,14 @@ export const ReceiveToWarehouseDialog: React.FC<{
           const existing = scored[0]?.it;
           // AADE states the unit on the line (`measurementUnit`). When it does, that IS the
           // unit — the description heuristic is only a fallback for lines that omit it.
-          const aadeUnit = unitFromMydataCode(ln.measurement_unit);
-          const unit = aadeUnit ?? normalizeUnit(ai?.unit ?? parsed.unit);
-          const cost = parsed.unit_cost;
+          const resolvedUnit = resolveIntakeUnit({
+            code: ln.measurement_unit,
+            modelUnit: ai?.unit,
+            parsedUnit: parsed.unit,
+            parsedReason: parsed.unit_reason,
+          });
+          const unit = resolvedUnit.unit;
+          const cost = unitCostFromNet(ln.net_value, ln.quantity);
           const markupPct = markup && Number(markup) > 0 ? markup : '';
           init[i] = {
             // Every describable line is included by default — the operator unticks the ones
@@ -304,7 +309,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
             weight: '',
             manufacturer: parsed.manufacturer ?? '',
             // Same rule: the supplier's own `itemCode` beats anything scraped out of the text.
-            supplierCode: ln.item_code ?? parsed.supplier_product_code ?? '',
+            supplierCode: resolveSupplierCode(ln.item_code, parsed.supplier_product_code),
             grade: parsed.grade,
             // Dictionary hit from the name first; the nightly Haiku pass's free-text
             // `attributes` is the fallback for wording the dictionary doesn't know.
@@ -312,14 +317,15 @@ export const ReceiveToWarehouseDialog: React.FC<{
             finish: parsed.finish ?? '',
             series: parsed.series ?? '',
             markup: markupPct,
-            salePrice: cost != null && markupPct ? String(r2(cost * (1 + Number(markupPct) / 100))) : '',
+            salePrice: (() => {
+              const p = markupPct ? priceFromMarkup(cost, Number(markupPct)) : null;
+              return p != null ? String(p) : '';
+            })(),
             match: null,
             images: [],
             visualMatches: [],
             matching: false,
-            unitReason: aadeUnit
-              ? 'Unit stated by AADE on this line (myDATA measurementUnit).'
-              : parsed.unit_reason,
+            unitReason: resolvedUnit.reason,
             uploading: false,
             itemType: 'good',
             categoryId: '',
@@ -387,29 +393,17 @@ export const ReceiveToWarehouseDialog: React.FC<{
     });
 
   /** Cost per unit is always net ÷ quantity — the document's own arithmetic, ex-VAT. */
-  const unitCostOf = (i: number): number | null => {
-    const ln = lines[i];
-    const qty = parseDecimalOr(rows[i]?.qty ?? '', 0);
-    if (!qty || ln?.net_value == null) return null;
-    return r2(Number(ln.net_value) / qty);
-  };
+  const unitCostOf = (i: number): number | null =>
+    unitCostFromNet(lines[i]?.net_value, parseDecimalOr(rows[i]?.qty ?? '', 0));
 
   /** Markup and sale price are two views of one number — editing either updates the other. */
   const applyMarkup = (i: number, markup: string) => {
-    const cost = unitCostOf(i);
-    const pct = Number(markup);
-    setRow(i, {
-      markup,
-      salePrice: cost != null && markup !== '' && Number.isFinite(pct) ? String(r2(cost * (1 + pct / 100))) : rows[i]?.salePrice ?? '',
-    });
+    const next = markup === '' ? null : priceFromMarkup(unitCostOf(i), Number(markup));
+    setRow(i, { markup, salePrice: next != null ? String(next) : rows[i]?.salePrice ?? '' });
   };
   const applySalePrice = (i: number, salePrice: string) => {
-    const cost = unitCostOf(i);
-    const price = parseDecimalOr(salePrice, NaN);
-    setRow(i, {
-      salePrice,
-      markup: cost != null && cost > 0 && Number.isFinite(price) ? String(r2(((price - cost) / cost) * 100)) : rows[i]?.markup ?? '',
-    });
+    const next = markupFromPrice(unitCostOf(i), parseDecimalOr(salePrice, NaN));
+    setRow(i, { salePrice, markup: next != null ? String(next) : rows[i]?.markup ?? '' });
   };
 
   /**
@@ -572,11 +566,24 @@ export const ReceiveToWarehouseDialog: React.FC<{
         // "The sale price I typed includes VAT": store the NET list price, because that is
         // what every downstream reader (quote/order lines, invoice-builder, marketplace)
         // assumes. Netting here rather than at read time keeps one meaning for list_price.
-        const typed = parseDecimalOr(r.salePrice, NaN);
-        const saleVatPct = VAT_PCT_BY_CATEGORY[Number(r.vatCategory)] ?? null;
-        const price = r.pricesIncludeVat && Number.isFinite(typed) && saleVatPct != null
-          ? r2(typed / (1 + saleVatPct / 100))
-          : typed;
+        const typedPrice = parseDecimalOr(r.salePrice, NaN);
+        const netted = netListPrice({
+          typed: Number.isFinite(typedPrice) ? typedPrice : null,
+          vatCategory: r.vatCategory,
+          pricesIncludeVat: r.pricesIncludeVat,
+        });
+        if (!netted.ok) {
+          // Storing the gross figure unchanged is the one answer that is definitely wrong, and
+          // it is what both copies of this arithmetic used to do when the category was blank.
+          toast({
+            title: `Cannot price "${r.name || 'this line'}"`,
+            description: 'The typed price is marked as VAT-inclusive but no sale VAT category is set, so there is no rate to net it by. Set the VAT category on the line, or untick "includes VAT".',
+            variant: 'destructive',
+          });
+          setBusy(false);
+          return;
+        }
+        const price = netted.net ?? NaN;
         const discount = num(r.defaultDiscount);
         if (productId && (Number.isFinite(price) && price > 0 || discount != null)) {
           await marketplacePricingService.setListPrice(

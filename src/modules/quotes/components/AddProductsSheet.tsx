@@ -216,7 +216,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   useEffect(() => {
     if (!activeWorkspaceId || searchResults.length === 0) { setAvailStock(new Map()); return; }
     let cancelled = false;
-    void ordersService.getAvailableStock(searchResults.map((p) => p.id), activeWorkspaceId)
+    void ordersService.getAvailableStock(searchResults.map((p) => p.id))
       .then((m) => { if (!cancelled) setAvailStock(m); })
       .catch(() => { /* best-effort */ });
     return () => { cancelled = true; };

@@ -21,8 +21,11 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { UNITS } from '@/lib/units';
-import { UNCODED_MYDATA_UNITS, isUncodedMydataUnit } from '../../supabase/functions/_shared/fiscal/types';
+import { UNITS, unitFromMydataCode as clientUnitFromMydataCode } from '@/lib/units';
+import {
+  UNCODED_MYDATA_UNITS, isUncodedMydataUnit,
+  MYDATA_UNIT_BY_CODE, unitFromMydataCode as edgeUnitFromMydataCode,
+} from '../../supabase/functions/_shared/fiscal/types';
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus';
 
 /** Minimal input — the guard runs before anything else reads issuer/counterpart/summary. */
@@ -78,6 +81,39 @@ describe('fiscal measurement units — edge twin matches src/lib/units.ts', () =
 
   it('buildNovusPayload lets a coded unit through', () => {
     expect(payloadWithUnit('m2')).not.toThrow();
+  });
+
+  /**
+   * The other direction of the same twin. `UNCODED_MYDATA_UNITS` stops an uncoded unit going OUT
+   * to AADE; this map is what lets the intake queue writer honour a coded unit coming IN, which
+   * it could not do before because an edge function cannot import `src/lib/units.ts`.
+   *
+   * Watched failing: drop the `4: 'm'` entry and the first case here goes red. Before this
+   * existed, the same absence produced a worktop billed in metres being filed as 4.1 pieces —
+   * a valid number that nothing downstream could question.
+   */
+  it('the edge code→unit map is the inverse of the mydataCode field', () => {
+    const fromUnits = Object.fromEntries(
+      UNITS.filter((u) => u.mydataCode != null).map((u) => [u.mydataCode!, u.key]),
+    );
+    expect(MYDATA_UNIT_BY_CODE).toEqual(fromUnits);
+  });
+
+  it('both runtimes resolve every code — and every non-code — identically', () => {
+    for (const code of [1, 2, 3, 4, 5, 6, 7, 0, -1, 99]) {
+      expect(edgeUnitFromMydataCode(code), `code ${code}`).toBe(clientUnitFromMydataCode(code));
+    }
+    for (const absent of [null, undefined]) {
+      expect(edgeUnitFromMydataCode(absent)).toBe(clientUnitFromMydataCode(absent));
+    }
+  });
+
+  it('a stated code always resolves to a unit AADE will accept back', () => {
+    // Round trip: anything the map produces must be transmittable, or intake would create stock
+    // in a unit its own invoices cannot carry.
+    for (const key of Object.values(MYDATA_UNIT_BY_CODE)) {
+      expect(isUncodedMydataUnit(key), `${key} came from an AADE code and must transmit`).toBe(false);
+    }
   });
 
   it('does not refuse unknown or alias units', () => {

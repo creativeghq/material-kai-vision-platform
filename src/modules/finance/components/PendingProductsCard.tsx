@@ -1,8 +1,24 @@
 /**
- * Supplier-invoice intake queue. When a myDATA expense is pulled, the inbound sync runs the
- * cheapest AI model over each line, turns it into a clean product and queues it here. The
- * operator reviews and ✓ adds it to the warehouse (matched to existing stock or created new,
- * with cost from the invoice and the sale price DERIVED BY THE PRICING LADDER) or ✗ dismisses it.
+ * Supplier-invoice intake queue. When a myDATA expense is pulled, the inbound sync reads each
+ * line and queues it here. The operator reviews and ✓ adds it to the warehouse (matched to
+ * existing stock or created new, with cost from the invoice and the sale price DERIVED BY THE
+ * PRICING LADDER) or ✗ dismisses it.
+ *
+ * ── What is a FACT and what is a reading ──────────────────────────────────────────────────
+ * A myDATA line is not just a description. It states the unit (`measurementUnit`), the
+ * supplier's own article code (`itemCode`), the VAT category and the exact net value, and those
+ * are facts about the document — they are read straight through, shown as filled chips, and
+ * never re-derived. Only the product NAME needs a model, because that genuinely is prose.
+ *
+ * This distinction is the whole screen. Before it, the writer read three of those six fields
+ * and asked Haiku to infer the rest from the description: 4.1 metres of worktop (measurement
+ * unit 4) was filed as 4.1 PIECES, article code 11-3331-60-1 was stored as "H3331" because a
+ * regex found something code-shaped in the text, and the VAT category the invoice stated was
+ * left blank for the operator to retype. `src/lib/units.ts` had said not to do this in as many
+ * words — "wherever a code is present it is the authority — never infer the unit from a product
+ * description instead" — and `ReceiveToWarehouseDialog`, the OTHER screen that receives a
+ * supplier line, had always got it right. The reading is now one shared module
+ * (`utils/intakeLine.ts`) that both call, so the two cannot drift apart again.
  *
  * ── Why this is grouped by SUPPLIER ───────────────────────────────────────────────────────
  * The myDATA feed carries EVERY invoice a workspace receives, so the queue is not a short list
@@ -25,7 +41,14 @@
  *
  * ── What "Add" actually does ──────────────────────────────────────────────────────────────
  * `_approve_pending_item_core` (SQL, one transaction per line): reuse the matched product or
- * CREATE one — name, supplier SKU as `external_sku`, the supplier's own wording as
+ * CREATE one — and "None of these — create a new product" is now an ANSWER it honours. It used
+ * to `coalesce` an explicit null back onto the queue-time guess, which cannot tell "the operator
+ * said create a new one" apart from "the caller said nothing", so approval updated the very
+ * product the screen said it would not touch. It also refuses to add stock in a unit the target
+ * bin does not count in: 4.1 metres added to a counter holding pieces is a valid number that
+ * means neither, and nothing downstream could ever notice.
+ *
+ * The full write: name, the supplier's own article code as `external_sku`, their wording as
  * `description`, cost + `cost_source='supplier_invoice'`, and the details panel's fields — then
  * attach the supplier (`supplier_products`, `products.supplier_company_id`), derive the sale
  * price through the ladder, and post an `in` stock movement into the chosen warehouse.
@@ -85,6 +108,11 @@ import {
 } from '@/services/warehouseService';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { parseSupplierLine, type ParsedSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
+import {
+  VAT_PCT_BY_CATEGORY, vatPctForCategory, resolveIntakeUnit, netValueDrift,
+  priceFromMarkup, markupFromPrice, netListPrice, unitQuantityIssue,
+} from '@/modules/finance/utils/intakeLine';
+import { UNITS, unitSuffix } from '@/lib/units';
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { supabase } from '@/integrations/supabase/client';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -111,29 +139,36 @@ interface LineEdit {
   width_mm: string; length_mm: string; thickness_mm: string; weight_kg: string;
   location: string; reorder_point: string;
   barcode: string; taric_code: string; cpv_code: string;
+  /** ONE VAT category per line, seeded from the document.
+   *
+   *  There used to be two — this one in the details panel and a `sale_vat_category` in the
+   *  pricing panel — and `detailOverrides` wrote BOTH into the single `mydata_vat_category`
+   *  key, so whichever the operator touched last silently overwrote the other. They were never
+   *  two facts: `ReceiveToWarehouseDialog` has always carried one, on the reasoning that we
+   *  bought the thing at that rate and absent other information we resell it at the same rate. */
   mydata_vat_category: string;
   // Read out of the invoice text by `parseSupplierLine`. They land in products.metadata, the
   // same place createProductViaIngestCore puts them.
   grade: string; color: string; finish: string; series: string;
   // Pricing, matching ReceiveToWarehouseDialog's "Pricing" section. `markup_pct` and
   // `sales_price` are two views of ONE number; either edits the other.
-  markup_pct: string; sale_vat_category: string; discount_percent: string; prices_include_vat: boolean;
+  markup_pct: string; discount_percent: string; prices_include_vat: boolean;
 }
-
-/** AADE sale-VAT categories. Same table ReceiveToWarehouseDialog uses. */
-const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
 
 const numStr = (n: number | null | undefined) => (n != null ? String(n) : '');
 
 /**
  * Read what the invoice text actually says.
  *
- * `parseSupplierLine` pulls dimensions, grade, the supplier's article code, the maker, colour,
- * finish and the range out of a line like "AMALFI GRIS 80X80 A' -3 -1", and infers the unit from
- * the shape of the quantity (a 2-D size billed at a fractional quantity is m², not pieces). Its
- * own header says it "is the thing that fills the intake form's fields" — and it only ever ran
- * inside ReceiveToWarehouseDialog. Measured on this queue: 1,079 lines, ZERO with a manufacturer,
- * a supplier code or a dimension. The AI extraction had been doing the whole job alone.
+ * `parseSupplierLine` pulls dimensions, grade, the maker, colour, finish and the range out of a
+ * line like "AMALFI GRIS 80X80 A' -3 -1". Its own header says it "is the thing that fills the
+ * intake form's fields" — and it only ever ran inside ReceiveToWarehouseDialog. Measured on this
+ * queue before it ran here: 1,079 lines, ZERO with a manufacturer or a dimension.
+ *
+ * It is the FALLBACK, never the authority. Where the document states something — the unit, the
+ * article code — that is used instead and this is not consulted; the parser's unit inference in
+ * particular is a heuristic over the shape of the quantity, which is a reasonable guess for a
+ * line that omits the code and simply wrong for one that carries it.
  *
  * It runs here, on read, rather than at queue time in the edge function: it is deterministic and
  * free, so there is nothing to persist and nothing to backfill — every row already queued gets
@@ -155,8 +190,14 @@ const parseLine = (l: IntakeLine, knownManufacturers: string[]): ParsedSupplierL
 const editFrom = (l: IntakeLine, parsed?: ParsedSupplierLine): LineEdit => ({
   name: l.name,
   sku: l.sku ?? '',
-  // The stored unit wins — Haiku saw the whole line. The parser only answers when nobody did.
-  unit: l.unit ?? parsed?.unit ?? '',
+  // Resolved at queue time from the AADE code when the document stated one; this re-resolves so
+  // a row queued before that read (or a document that omitted the code) still gets an answer.
+  unit: resolveIntakeUnit({
+    code: l.measurement_unit_code,
+    modelUnit: l.unit,
+    parsedUnit: parsed?.unit,
+    parsedReason: parsed?.unit_reason,
+  }).unit,
   quantity: String(l.quantity ?? 1),
   unit_cost: numStr(l.unit_cost),
   sales_price: numStr(l.sales_price),
@@ -173,7 +214,10 @@ const editFrom = (l: IntakeLine, parsed?: ParsedSupplierLine): LineEdit => ({
   barcode: '',
   taric_code: '',
   cpv_code: '',
-  mydata_vat_category: '',
+  // The document said which VAT rate this was bought at. Leaving the field blank asked the
+  // operator to retype a fact that arrived with the invoice — and blank is also what made
+  // "the price I typed includes VAT" silently store the gross figure.
+  mydata_vat_category: numStr(l.mydata_vat_category),
   grade: parsed?.grade ?? '',
   color: parsed?.color ?? '',
   finish: parsed?.finish ?? '',
@@ -182,7 +226,6 @@ const editFrom = (l: IntakeLine, parsed?: ParsedSupplierLine): LineEdit => ({
   // and a sale price PINS list_price — taking the product off the ladder for good. The ladder's
   // own answer is shown as the placeholder instead, so it stays a suggestion until someone types.
   markup_pct: '',
-  sale_vat_category: '',
   discount_percent: '',
   prices_include_vat: false,
 });
@@ -214,24 +257,8 @@ const detailOverrides = (e: LineEdit): IntakeLineDetails => {
   txt('series', e.series);
   num('discount_percent', e.discount_percent);
   num('markup_percent', e.markup_pct);
-  num('mydata_vat_category', e.sale_vat_category);
   if (e.prices_include_vat) (out as Record<string, unknown>).prices_include_vat = true;
   return out;
-};
-
-/**
- * The ex-VAT figure to store as `list_price`.
- *
- * A Greek operator reads a GROSS price off an invoice. Netting on WRITE rather than on read is
- * what keeps `list_price` meaning exactly one thing everywhere — the same rule (and the same
- * arithmetic) as ReceiveToWarehouseDialog. Without this the queue stored whatever was typed, so
- * a gross figure landed 24% high and every quote built on it was wrong.
- */
-const netSalePrice = (e: LineEdit): number | null => {
-  const typed = e.sales_price === '' ? null : parseDecimalOr(e.sales_price, NaN);
-  if (typed == null || !Number.isFinite(typed)) return null;
-  const vatPct = VAT_PCT_BY_CATEGORY[Number(e.sale_vat_category)] ?? null;
-  return e.prices_include_vat && vatPct != null ? round2(typed / (1 + vatPct / 100)) : typed;
 };
 
 /**
@@ -751,27 +778,30 @@ const IntakeLineList: React.FC<{
 
   /** Markup and sale price are two views of one number — editing either updates the other.
    *  Arithmetic on a markup the OPERATOR TYPED, never on a policy fetched from the DB
-   *  (pricingChain.test.ts fails the build on the latter, and rightly). */
+   *  (pricingChain.test.ts fails the build on the latter, and rightly). Shared with
+   *  ReceiveToWarehouseDialog, which had its own copy of exactly this pair. */
+  const costOf = (e: LineEdit): number | null => {
+    if (e.unit_cost === '') return null;
+    const n = parseDecimalOr(e.unit_cost, NaN);
+    return Number.isFinite(n) ? n : null;
+  };
   const applyMarkup = (id: string, markup: string) => {
     const e = edits[id]; if (!e) return;
-    const cost = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
-    const pct = Number(markup);
-    setEdit(id, {
-      markup_pct: markup,
-      sales_price: cost != null && Number.isFinite(cost) && markup !== '' && Number.isFinite(pct)
-        ? String(round2(cost * (1 + pct / 100))) : e.sales_price,
-    });
+    const next = markup === '' ? null : priceFromMarkup(costOf(e), Number(markup));
+    setEdit(id, { markup_pct: markup, sales_price: next != null ? String(next) : e.sales_price });
   };
   const applySalePrice = (id: string, salePrice: string) => {
     const e = edits[id]; if (!e) return;
-    const cost = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
-    const price = parseDecimalOr(salePrice, NaN);
-    setEdit(id, {
-      sales_price: salePrice,
-      markup_pct: cost != null && Number.isFinite(cost) && cost > 0 && Number.isFinite(price)
-        ? String(round2(((price - cost) / cost) * 100)) : e.markup_pct,
-    });
+    const next = markupFromPrice(costOf(e), parseDecimalOr(salePrice, NaN));
+    setEdit(id, { sales_price: salePrice, markup_pct: next != null ? String(next) : e.markup_pct });
   };
+
+  /** The ex-VAT figure this row would store, or a refusal. */
+  const pricedOf = (e: LineEdit) => netListPrice({
+    typed: e.sales_price === '' ? null : parseDecimalOr(e.sales_price, NaN),
+    vatCategory: e.mydata_vat_category,
+    pricesIncludeVat: e.prices_include_vat,
+  });
 
   const findSimilar = async (l: IntakeLine) => {
     setCandBusy(l.id);
@@ -818,7 +848,7 @@ const IntakeLineList: React.FC<{
       name: e.name, sku: e.sku || null, unit: e.unit || null,
       quantity: parseDecimalOr(e.quantity, 0) || l.quantity,
       unit_cost: e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, 0),
-      sales_price: netSalePrice(e),
+      sales_price: (() => { const p = pricedOf(e); return p.ok ? p.net : null; })(),
       category_id: e.category_id || null,
       target_warehouse_id: targetWarehouseId || null,
       add_to_catalog: addToCatalog,
@@ -870,6 +900,20 @@ const IntakeLineList: React.FC<{
   const runBulkSelected = async (action: 'approve' | 'dismiss') => {
     const ids = [...selected];
     if (ids.length === 0) return;
+    // Same refusal as the per-row Add: a VAT-inclusive price with no rate to net it by would be
+    // stored gross. Named rather than silently skipped — dropping rows out of a bulk the
+    // operator asked for is how you get a "12 added" toast for 15 selected lines.
+    if (action === 'approve') {
+      const blocked = ids.filter((id) => edits[id] && !pricedOf(edits[id]).ok);
+      if (blocked.length > 0) {
+        toast({
+          title: `${blocked.length} selected line(s) cannot be priced`,
+          description: 'They are marked as VAT-inclusive with no VAT category set. Set it, or untick “includes VAT”, then add them.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
     // Bulk deliberately does NOT run the ingest core: that is one MIVAA call per line, each
     // debiting credits, and a thousand of them is not a thing to put behind one button. The
     // products are real and the background passes do finish them — but say so, don't assume it.
@@ -1011,8 +1055,9 @@ const IntakeLineList: React.FC<{
                 ? (cands?.find((c) => c.product_id === willUpdateId)?.name ?? null)
                 : null;
               const matched = willUpdateId != null;
-              const vatPct = VAT_PCT_BY_CATEGORY[Number(e.sale_vat_category)] ?? null;
-              const netPrice = netSalePrice(e);
+              const priced = pricedOf(e);
+              const vatPct = vatPctForCategory(e.mydata_vat_category);
+              const netPrice = priced.ok ? priced.net : null;
               const costNum = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, NaN);
               const margin = netPrice != null && costNum != null && Number.isFinite(costNum)
                 ? round2(netPrice - costNum) : null;
@@ -1021,6 +1066,17 @@ const IntakeLineList: React.FC<{
               const rowBusy = busy === l.id;
               const detailsOpen = openDetails.has(l.id);
               const detailCount = Object.keys(detailOverrides(e)).length;
+              const qtyNum = parseDecimalOr(e.quantity, NaN);
+              const costShown = costNum != null && Number.isFinite(costNum) ? costNum : null;
+              // What the DOCUMENT says this line came to, against what the fields on screen
+              // multiply out to. The stated net is the authority; a difference means somebody
+              // edited the cost or the quantity, which is allowed but must not be invisible.
+              const stated = l.net_value;
+              const lineTotal = costNum != null && Number.isFinite(costNum) && Number.isFinite(qtyNum)
+                ? round2(costNum * qtyNum) : null;
+              const drift = netValueDrift(stated, Number.isFinite(qtyNum) ? qtyNum : null, costNum);
+              const unitIssue = unitQuantityIssue(e.unit, Number.isFinite(qtyNum) ? qtyNum : null);
+              const unitStated = l.measurement_unit_code != null;
 
               return (
                 <div key={l.id} className="space-y-2 rounded-sm border border-hairline bg-card px-3 py-2.5">
@@ -1040,18 +1096,37 @@ const IntakeLineList: React.FC<{
                       {/* What was READ out of that text, and therefore already filled in below.
                           Shown rather than applied silently — a guess the operator cannot see is
                           a guess they cannot correct. */}
-                      {pl && (
-                        <div className="mt-1 flex flex-wrap items-center gap-1">
-                          {pl.dimensions.label && <Detected label={pl.dimensions.label} title={`Read from "${pl.dimensions.matched}"`} />}
-                          {pl.manufacturer && <Detected label={pl.manufacturer} title="Maker recognised from a name your CRM already knows" />}
-                          {pl.supplier_product_code && <Detected label={`code ${pl.supplier_product_code}`} title="The supplier's own article code" />}
-                          {pl.series && <Detected label={pl.series} title="Range / collection" />}
-                          {pl.color && <Detected label={pl.color} title="Colour" />}
-                          {pl.finish && <Detected label={pl.finish} title="Surface finish" />}
-                          {pl.grade && <Detected label={`grade ${pl.grade}`} title="Quality grade" />}
-                          {!l.unit && pl.unit && <Detected label={pl.unit} title={pl.unit_reason} />}
-                        </div>
-                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {/* Stated by the document — facts, not readings. They come first because
+                            the difference is the whole point: everything after this is a guess
+                            about what the supplier's prose meant. */}
+                        {l.supplier_product_code && (
+                          <Detected label={`code ${l.supplier_product_code}`} stated title="The supplier's own article code, as printed on their document" />
+                        )}
+                        {unitStated && (
+                          <Detected label={`billed in ${unitSuffix(e.unit) || e.unit}`} stated
+                            title={`Unit stated by AADE on this line (myDATA measurementUnit ${l.measurement_unit_code}).`} />
+                        )}
+                        {l.mydata_vat_category != null && (
+                          <Detected label={`VAT ${vatPctForCategory(l.mydata_vat_category) ?? '?'}%`} stated
+                            title={`AADE VAT category ${l.mydata_vat_category} on this line`} />
+                        )}
+                        {/* What the AI extraction split out, kept as its own facts rather than
+                            glued onto the end of the product name. */}
+                        {l.size && <Detected label={l.size} title="Size, as the extraction read it" />}
+                        {l.attributes && <Detected label={l.attributes} title="Attributes, as the extraction read them" />}
+                        {pl && (
+                          <>
+                            {pl.dimensions.label && <Detected label={pl.dimensions.label} title={`Read from "${pl.dimensions.matched}"`} />}
+                            {pl.manufacturer && <Detected label={pl.manufacturer} title="Maker recognised from a name your CRM already knows" />}
+                            {pl.series && <Detected label={pl.series} title="Range / collection" />}
+                            {pl.color && <Detected label={pl.color} title="Colour" />}
+                            {pl.finish && <Detected label={pl.finish} title="Surface finish" />}
+                            {pl.grade && <Detected label={`grade ${pl.grade}`} title="Quality grade" />}
+                            {!unitStated && pl.unit && <Detected label={pl.unit} title={pl.unit_reason} />}
+                          </>
+                        )}
+                      </div>
                     </div>
                     {/* What approving will actually DO. */}
                     <Badge variant={matched ? 'info' : 'neutral'} className="shrink-0 text-[10px]"
@@ -1063,7 +1138,16 @@ const IntakeLineList: React.FC<{
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_70px_80px]">
                     <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(l.id, { name: ev.target.value })} placeholder="Product name" />
                     <Input className="h-8 text-sm" value={e.sku} onChange={(ev) => setEdit(l.id, { sku: ev.target.value })} placeholder="SKU" />
-                    <Input className="h-8 text-sm" value={e.unit} onChange={(ev) => setEdit(l.id, { unit: ev.target.value })} placeholder="unit" />
+                    {/* A Select, not a text box. Free text is how the queue came to hold 'ml',
+                        'gr', 'ltr', 'BIG BAG' and 'σάκι' — none of which any reader normalises
+                        and none of which has an AADE code, so a line priced in one cannot be
+                        transmitted on an invoice. */}
+                    <Select value={e.unit || 'pcs'} onValueChange={(v) => setEdit(l.id, { unit: v })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {UNITS.map((u) => <SelectItem key={u.key} value={u.key}>{u.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <Input className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal" value={e.quantity}
                       onChange={(ev) => setEdit(l.id, { quantity: ev.target.value })} placeholder="qty" />
                   </div>
@@ -1104,11 +1188,57 @@ const IntakeLineList: React.FC<{
                       <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive" disabled={rowBusy} onClick={() => dismissOne(l)}>
                         <X className="h-4 w-4 mr-1" /> Dismiss
                       </Button>
-                      <Button size="sm" className="h-8 text-xs" disabled={rowBusy} onClick={() => approveOne(l)}>
+                      <Button size="sm" className="h-8 text-xs" disabled={rowBusy || !priced.ok}
+                        title={priced.ok ? undefined : 'Set the VAT category, or untick “includes VAT”'}
+                        onClick={() => approveOne(l)}>
                         {rowBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />} Add
                       </Button>
                     </div>
                   </div>
+
+                  {/* What this line comes to, against what the invoice says it came to.
+                      `unit_cost` is stored rounded to the cent, so it cannot reproduce the
+                      stated net exactly (100.48 over 4.1 is 24.5073…, and 24.51 × 4.1 is
+                      100.491) — and neither number was on screen, so an edited cost or quantity
+                      silently moved what the warehouse recorded away from what was paid. */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                    <span className="tabular-nums">
+                      {e.quantity || '—'} {unitSuffix(e.unit) || e.unit} × {formatMoney(costShown, l.currency)}
+                      {' = '}
+                      <span className="font-medium text-foreground">{formatMoney(lineTotal, l.currency)}</span>
+                    </span>
+                    {stated != null && (
+                      <span className="tabular-nums">
+                        invoice says <span className="font-medium text-foreground">{formatMoney(stated, l.currency)}</span> net
+                      </span>
+                    )}
+                    {drift != null && (
+                      <span className="tabular-nums text-[hsl(var(--warning))]">
+                        off by {formatMoney(drift, l.currency)}
+                      </span>
+                    )}
+                  </div>
+
+                  {unitIssue && (
+                    <div className="flex items-start gap-1.5 text-[11px] text-[hsl(var(--warning))]">
+                      <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+                      <span>
+                        {unitIssue}
+                        {unitStated && ' The document itself states pieces, so the supplier’s own line disagrees with itself.'}
+                      </span>
+                    </div>
+                  )}
+
+                  {!priced.ok && (
+                    <div className="flex items-start gap-1.5 text-[11px] text-destructive">
+                      <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+                      <span>
+                        The price is marked as VAT-inclusive but no VAT category is set, so there is no rate to
+                        net it by. Set the VAT category, or untick “includes VAT” — storing the gross figure as
+                        the list price would make every quote built on it {vatPct ?? 24}% high.
+                      </span>
+                    </div>
+                  )}
 
                   {/* WHICH rule produced the suggestion. Without this a cost-equals-price row is
                       indistinguishable from a deliberate 0% margin. */}
@@ -1132,8 +1262,8 @@ const IntakeLineList: React.FC<{
                         </div>
                         <div className="space-y-0.5">
                           <label htmlFor={`vat-${l.id}`} className="text-[10px] text-muted-foreground">Sale VAT</label>
-                          <Select value={e.sale_vat_category || '__none'}
-                            onValueChange={(vv) => setEdit(l.id, { sale_vat_category: vv === '__none' ? '' : vv })}>
+                          <Select value={e.mydata_vat_category || '__none'}
+                            onValueChange={(vv) => setEdit(l.id, { mydata_vat_category: vv === '__none' ? '' : vv })}>
                             <SelectTrigger id={`vat-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__none">— not set —</SelectItem>
@@ -1282,8 +1412,21 @@ const IntakeLineList: React.FC<{
                         <DetailField label="CPV code" id={`cpv-${l.id}`} value={e.cpv_code}
                           onChange={(v) => setEdit(l.id, { cpv_code: v })} placeholder="procurement" />
 
-                        <DetailField label="myDATA VAT category" id={`vc-${l.id}`} value={e.mydata_vat_category} numeric
-                          onChange={(v) => setEdit(l.id, { mydata_vat_category: v })} placeholder="1 = 24%" />
+                        <div className="space-y-0.5">
+                          <label htmlFor={`vc-${l.id}`} className="text-[10px] text-muted-foreground">
+                            VAT category{l.mydata_vat_category != null ? ' · from the invoice' : ''}
+                          </label>
+                          <Select value={e.mydata_vat_category || '__none'}
+                            onValueChange={(v) => setEdit(l.id, { mydata_vat_category: v === '__none' ? '' : v })}>
+                            <SelectTrigger id={`vc-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">— not set —</SelectItem>
+                              {Object.entries(VAT_PCT_BY_CATEGORY).map(([cat, pct]) => (
+                                <SelectItem key={cat} value={cat}>{pct}% (cat {cat})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
                         <DetailField label="Range / collection" id={`ser-${l.id}`} value={e.series}
                           onChange={(v) => setEdit(l.id, { series: v })} placeholder="e.g. AMALFI" />
@@ -1312,9 +1455,20 @@ const IntakeLineList: React.FC<{
 };
 
 /** One thing the parser read out of the invoice text, with its evidence in the tooltip. */
-const Detected: React.FC<{ label: string; title: string }> = ({ label, title }) => (
+/**
+ * One thing we know about this line.
+ *
+ * `stated` distinguishes a FACT the document carries (the unit AADE coded, the supplier's own
+ * article code, the VAT category) from a READING of its description. They look different because
+ * they are different: a reading is what the operator is here to check, a fact is not.
+ */
+const Detected: React.FC<{ label: string; title: string; stated?: boolean }> = ({ label, title, stated }) => (
   <span title={title}
-    className="inline-flex items-center rounded-sm border border-hairline bg-surface-sunken px-1.5 py-px text-[10px] text-muted-foreground">
+    className={`inline-flex items-center rounded-sm border px-1.5 py-px text-[10px] ${
+      stated
+        ? 'border-primary/30 bg-primary/[0.06] text-foreground'
+        : 'border-hairline bg-surface-sunken text-muted-foreground'
+    }`}>
     {label}
   </span>
 );

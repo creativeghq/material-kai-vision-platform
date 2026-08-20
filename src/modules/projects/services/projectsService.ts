@@ -1151,7 +1151,17 @@ class ProjectsService {
      * `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity with a missing or
      * unconvertible unit is read as already being in base units and matches the wrong threshold.
      */
-    opts?: { quantity?: number | null; unit?: string | null },
+    opts?: {
+      quantity?: number | null;
+      unit?: string | null;
+      /**
+       * #374 Phase 4 — which variant to price. `project_products` does not capture a variant
+       * yet, so today's callers pass nothing and get the product-wide row exactly as before;
+       * the parameter exists so a project line that gains one is priced like a quote line
+       * rather than silently falling back to base.
+       */
+      variantKey?: string | null;
+    },
   ): Promise<ResolvedPrice> {
     const qty = opts?.quantity == null ? null : Number(opts.quantity);
     const hasQty = qty != null && Number.isFinite(qty) && qty > 0;
@@ -1159,6 +1169,7 @@ class ProjectsService {
     const { data, error } = await (supabase as any).rpc('get_product_price_for_workspace', {
       p_workspace_id: workspaceId,
       p_product_id: productId,
+      p_variant_key: opts?.variantKey ?? null,
       ...breakArgs,
     });
     if (error) throw error;

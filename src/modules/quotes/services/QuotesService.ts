@@ -3,6 +3,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { productDetailService } from '@/services/productDetailService';
+import { variantKey } from '@/services/lineIdentityRules';
 
 // =====================================================
 // INTERFACES
@@ -681,6 +682,11 @@ export class QuotesService {
           p_company_id: quote.customer_company_id ?? null,
           p_contact_id: quote.customer_contact_id ?? null,
           p_audience: 'seller',
+          // #374 Phase 4 — price THIS variant. The resolver prefers a row keyed to it and
+          // falls back to the product-wide row, so a line that has chosen nothing prices
+          // exactly as before. `variantKey` is the twin of SQL `_variant_key`, held equal by
+          // tests/unit/variantKeyParity.test.ts.
+          p_variant_key: variantKey(data.selected_attributes as Record<string, string> | undefined) ?? null,
           ...breakArgs,
         });
         const p: any = priced;
@@ -843,7 +849,7 @@ export class QuotesService {
     if (data.unit_price !== undefined || data.discounted_price !== undefined || data.quantity !== undefined) {
       const { data: current } = await supabase
         .from('quote_items')
-        .select('unit_price, discounted_price, quantity, quote_id, product_id, custom_unit')
+        .select('unit_price, discounted_price, quantity, quote_id, product_id, custom_unit, selected_attributes')
         .eq('id', itemId)
         .single();
       if (current) {
@@ -872,6 +878,11 @@ export class QuotesService {
                 p_workspace_id: q.workspace_id, p_product_id: current.product_id,
                 p_company_id: q.customer_company_id ?? null, p_contact_id: q.customer_contact_id ?? null,
                 p_audience: 'seller',
+                // #374 Phase 4 — a quantity change must reprice the SAME variant, not the
+                // product-wide row. Without this the line silently jumped to the base price.
+                p_variant_key: variantKey(
+                  (current as { selected_attributes?: Record<string, string> | null }).selected_attributes,
+                ) ?? null,
                 ...breakArgs,
               });
               const p: any = priced;

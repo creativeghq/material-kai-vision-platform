@@ -110,11 +110,17 @@ export const catalogGrantsService = {
     workspaceId: string,
     productId: string,
     listPrice: number | null,
-    opts: { currency?: string; unit?: string | null } = {},
+    opts: {
+      currency?: string;
+      unit?: string | null;
+      /** #374 — price a single variant into the catalog; null is the product-wide row. */
+      variantKey?: string | null;
+    } = {},
   ): Promise<void> {
     const { error } = await supabase.from('product_prices').upsert({
       workspace_id: workspaceId,
       product_id: productId,
+      variant_key: opts.variantKey ?? null,
       list_price: listPrice,
       currency: opts.currency ?? 'EUR',
       unit: opts.unit ?? null,

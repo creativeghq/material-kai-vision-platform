@@ -765,6 +765,14 @@ export interface IntakeLine {
   width_mm: number | null;
   length_mm: number | null;
   thickness_mm: number | null;
+  /** The line total ex-VAT exactly as the document states it. `quantity * unit_cost` only
+   *  approximates it, because unit_cost is stored rounded to the cent. */
+  net_value: number | null;
+  /** AADE VAT category off the supplier line — present on every line myDATA delivers. */
+  mydata_vat_category: number | null;
+  /** AADE `measurementUnit` code. When set, `unit` was resolved FROM it and is a fact rather
+   *  than a reading of the description. */
+  measurement_unit_code: number | null;
   /** Set server-side by `match_pending_items_for_document`. ≥ 0.5 tops up existing stock or
    *  reuses a catalog product; below that, approving creates a new product. */
   match_score: number | null;

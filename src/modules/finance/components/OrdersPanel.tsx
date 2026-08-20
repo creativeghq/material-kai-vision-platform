@@ -2305,7 +2305,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     // Pull on-hand for catalog lines so the edit grid can warn on over-stock (sales).
     const pids = items.map((it) => it.product_id).filter(Boolean) as string[];
     if (pids.length && order) {
-      void ordersService.getAvailableStock(pids, order.workspace_id).then((stock) => {
+      void ordersService.getAvailableStock(pids).then((stock) => {
         setEditItems((ls) => ls.map((l) => (l.product_id ? { ...l, available: stock.get(l.product_id) ?? null } : l)));
       }).catch(() => { /* best-effort */ });
     }

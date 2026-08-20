@@ -31,13 +31,19 @@ export const marketplacePricingService = {
   async getProductPrice(
     workspaceId: string,
     productId: string,
-    opts: { companyId?: string | null; contactId?: string | null } = {},
+    opts: {
+      companyId?: string | null;
+      contactId?: string | null;
+      /** #374 Phase 4 — which variant to price. Omit for the product-wide row. */
+      variantKey?: string | null;
+    } = {},
   ): Promise<WorkspacePrice | null> {
     const { data, error } = await supabase.rpc('get_product_price_for_workspace', {
       p_workspace_id: workspaceId,
       p_product_id: productId,
       p_company_id: opts.companyId ?? undefined,
       p_contact_id: opts.contactId ?? undefined,
+      p_variant_key: opts.variantKey ?? null,
     });
     if (error) throw error;
     return (data as unknown as WorkspacePrice) ?? null;
@@ -49,11 +55,23 @@ export const marketplacePricingService = {
     workspaceId: string,
     productId: string,
     listPrice: number | null,
-    opts: { currency?: string; unit?: string | null; discountPercent?: number | null } = {},
+    opts: {
+      currency?: string;
+      unit?: string | null;
+      discountPercent?: number | null;
+      /**
+       * #374 Phase 4 — WHICH variant this price is for. null (the default) is the
+       * "applies to any variant" row, which is what every caller wrote before this existed;
+       * the unique index is (workspace_id, product_id, variant_key) NULLS NOT DISTINCT
+       * precisely because those are different prices rather than duplicates.
+       */
+      variantKey?: string | null;
+    } = {},
   ): Promise<void> {
     const { error } = await supabase.from('product_prices').upsert({
       workspace_id: workspaceId,
       product_id: productId,
+      variant_key: opts.variantKey ?? null,
       list_price: listPrice,
       currency: opts.currency ?? 'EUR',
       unit: opts.unit ?? null,

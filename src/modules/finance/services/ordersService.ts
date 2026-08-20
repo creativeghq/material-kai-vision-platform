@@ -235,6 +235,24 @@ export interface NewOrderItem {
 }
 
 /** Customer-aware pricing for an order line (from the pricing resolver / catalog cost). */
+/** Free stock for one (product, variant), as `get_variant_availability` derives it (#374). */
+export interface VariantAvailability {
+  /** Rows keyed to this exact variant. */
+  exact: number;
+  /** Rows with NO variant — shippable for any line, so deliberately NOT folded into `exact`. */
+  unassigned: number;
+  /** The whole product, every variant. Only meaningful when nothing has been chosen. */
+  productTotal: number;
+}
+
+/**
+ * Map key for an availability lookup. JSON-encoded rather than string-joined: a variant key
+ * is operator-authored text, so any plain separator is a value it could itself contain, and
+ * two different pairs would then collide on one key.
+ */
+export const availabilityKey = (productId: string, vk: string | null | undefined): string =>
+  JSON.stringify([productId, vk ?? null]);
+
 export interface LinePricing {
   unit_price: number | null;
   unit_cost: number | null;
@@ -1605,7 +1623,15 @@ export const ordersService = {
     const [{ data: prod }, costs, available] = await Promise.all([
       supabase.from('products').select('supplier_company_id').eq('id', opts.productId).maybeSingle(),
       productDetailService.costs([opts.productId]),
-      this.getAvailableStock([opts.productId], opts.workspaceId).then((m) => m.get(opts.productId) ?? null),
+      // #374 Phase 3 — what can actually ship THIS line: rows keyed to its variant, plus
+      // unvarianted rows (which the warehouse resolver will also accept for it). Summing those
+      // two is only wrong when adding up across variants, which this single-line lookup is not.
+      this.availabilityFor([{ productId: opts.productId, variantKey: variantKey(opts.selectedAttributes) }])
+        .then((m) => {
+          const a = m.get(availabilityKey(opts.productId, variantKey(opts.selectedAttributes)));
+          if (!a) return null;
+          return variantKey(opts.selectedAttributes) ? a.exact + a.unassigned : a.productTotal;
+        }),
     ]);
     // NB: products.measurement_unit_code is the integer myDATA code, NOT our text unit label
     // (item/m²/…), so we don't seed the line's unit from it — the user picks it.
@@ -1676,21 +1702,66 @@ export const ordersService = {
     }
   },
 
-  /** Qty on hand per product, summed across the workspace's warehouses. Absent = not stocked. */
-  async getAvailableStock(productIds: string[], workspaceId: string): Promise<Map<string, number>> {
+  /**
+   * Free stock per (product, variant) — derived by `get_variant_availability` (#374 Phase 3).
+   *
+   * This used to sum `qty_on_hand - qty_reserved` per product_id in TypeScript, so the figure
+   * beside a line that had chosen Nero 60x60 was every colour and every size added together.
+   * The rule for "which rows can ship this line" belongs to the warehouse resolver, and
+   * restating it here would be a second derivation of the same answer.
+   *
+   * Three numbers, not one, because stock on an UNVARIANTED row is genuinely of unknown variant:
+   * the resolver will ship it for any line, so it is real availability, but folding it into every
+   * variant's figure would report the same units once per variant.
+   */
+  async availabilityFor(
+    pairs: Array<{ productId: string; variantKey?: string | null }>,
+  ): Promise<Map<string, VariantAvailability>> {
+    const out = new Map<string, VariantAvailability>();
+    const seen = new Set<string>();
+    const payload: Array<{ product_id: string; variant_key: string | null }> = [];
+    for (const p of pairs) {
+      if (!p?.productId) continue;
+      const vk = p.variantKey ?? null;
+      const k = availabilityKey(p.productId, vk);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      payload.push({ product_id: p.productId, variant_key: vk });
+    }
+    if (payload.length === 0) return out;
+    // Best-effort: a stock figure is an aid, and a line must stay editable when it is unavailable.
+    const { data, error } = await (supabase as any).rpc('get_variant_availability', { p_pairs: payload });
+    if (error) {
+      console.warn('[stock] availability unavailable:', error.message);
+      return out;
+    }
+    for (const r of (data ?? []) as Array<{
+      product_id: string; variant_key: string | null;
+      free_exact: number | string | null; free_unassigned: number | string | null;
+      free_product_total: number | string | null;
+    }>) {
+      out.set(availabilityKey(r.product_id, r.variant_key ?? null), {
+        exact: Number(r.free_exact ?? 0),
+        unassigned: Number(r.free_unassigned ?? 0),
+        productTotal: Number(r.free_product_total ?? 0),
+      });
+    }
+    return out;
+  },
+
+  /**
+   * Free stock per product across every variant. Correct for BROWSING (a catalog row has not
+   * chosen a variant yet); a line that HAS chosen one must use `availabilityFor` instead, or it
+   * reports colours it cannot ship.
+   */
+  async getAvailableStock(productIds: string[]): Promise<Map<string, number>> {
     const ids = [...new Set(productIds.filter(Boolean))];
     const out = new Map<string, number>();
     if (ids.length === 0) return out;
-    // FREE stock (on hand minus reserved), not raw on-hand.
-    // The picker dropdown already computed qty_on_hand - qty_reserved, so the two disagreed inside
-    // one dialog: the dropdown said "0 free / out of stock" while the shortfall banner beneath it
-    // stayed silent because on-hand was 5. Reserved stock is spoken for; offering it as available
-    // is how the same unit gets promised twice.
-    const { data } = await supabase.from('warehouse_items').select('product_id, qty_on_hand, qty_reserved')
-      .eq('workspace_id', workspaceId).in('product_id', ids);
-    for (const r of (data ?? []) as Array<{ product_id: string; qty_on_hand: number | null; qty_reserved: number | null }>) {
-      const free = Number(r.qty_on_hand ?? 0) - Number(r.qty_reserved ?? 0);
-      out.set(r.product_id, (out.get(r.product_id) ?? 0) + free);
+    const avail = await this.availabilityFor(ids.map((productId) => ({ productId })));
+    for (const id of ids) {
+      const a = avail.get(availabilityKey(id, null));
+      if (a) out.set(id, a.productTotal);
     }
     return out;
   },
