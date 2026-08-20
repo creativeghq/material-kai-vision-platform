@@ -398,6 +398,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
    * an un-invoiced order visible NOWHERE on this page except as an unexplained payment.
    */
   const [orderPos, setOrderPos] = useState<PartyOrderPosition | null>(null);
+  /** What we EARNED on this party, from the same RPC the CRM Account tab reads. */
+  const [profitability, setProfitability] = useState<Awaited<ReturnType<typeof financeService.getCustomerProfitability>> | null>(null);
   /** Their cash we hold that isn't settled against anything yet (unallocated money-in). */
   const [credit, setCredit] = useState(0);
   const [releaseOpen, setReleaseOpen] = useState(false);
@@ -593,11 +595,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const reload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
-    if (!party) { setInvoices([]); setBills([]); setPayments([]); setOrderPos(null); setCredit(0); return; }
+    if (!party) { setInvoices([]); setBills([]); setPayments([]); setOrderPos(null); setCredit(0); setProfitability(null); return; }
     void (async () => {
       try {
         setLoading(true);
-        const [res, bal, orders] = await Promise.all([
+        const [res, bal, orders, profit] = await Promise.all([
           financeService.getPartyDetail({
             workspaceId: party.workspace_id, partyType: party.party_type, partyId: party.party_id,
           }),
@@ -613,9 +615,17 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
             companyId: party.party_type === 'company' ? party.party_id : null,
             contactId: party.party_type === 'contact' ? party.party_id : null,
           }).catch(() => null),
+          // Margin earned on this party. Finance is where somebody goes to ASK what a customer is
+          // worth, and this drill-down was the one party surface that did not answer — the CRM
+          // Account tab has shown it since it shipped, so the two read as different features.
+          financeService.getCustomerProfitability(party.workspace_id, {
+            companyId: party.party_type === 'company' ? party.party_id : null,
+            contactId: party.party_type === 'contact' ? party.party_id : null,
+          }).catch(() => null),
         ]);
         setInvoices(res.invoices); setBills(res.bills); setPayments(res.payments);
         setOrderPos(orders);
+        setProfitability(profit);
         setCredit(Number(bal?.customer_credit ?? 0));
       } catch (err: any) {
         toast({ title: 'Failed to load detail', description: err?.message, variant: 'destructive' });
@@ -763,6 +773,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               credit={credit}
               creditReleasable={party.credit_releasable}
               onReleaseCredit={() => setReleaseOpen(true)}
+              profitability={profitability}
             />
 
             {/* Renders itself away when nothing has been released, so it costs a party who has

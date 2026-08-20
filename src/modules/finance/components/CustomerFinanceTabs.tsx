@@ -159,8 +159,14 @@ export const PartyAccountSummary: React.FC<{
    *
    * It still does not force the strip on by itself — that is the rule `showBalance` documents
    * above, and breaking it reprints the same number twice.
+   *
+   * `!!customer` alone was not "is this a customer" — it is "does `vw_customer_account_summary`
+   * have a row", and that view is built from quotes and invoices. A business that sells straight
+   * off orders has neither, so the tile disappeared for exactly the party whose money is hardest
+   * to account for: the page then said nothing at all about whether their payment had been
+   * allocated, which is the question the tile exists to answer.
    */
-  const showCreditTile = !!customer;
+  const showCreditTile = !!customer || (!supplier && !!orders);
   /**
    * Two rows ("As customer" / "As supplier") only earn their keep when the party IS both and the
    * sides net off. With one role the split labels a distinction that doesn't exist, and the top
