@@ -159,7 +159,11 @@ const PosPage: React.FC = () => {
         supabase
           .from('product_prices')
           .select('list_price, currency, unit, product:products(id, name, item_type, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail)')
-          .eq('workspace_id', activeWorkspaceId),
+          .eq('workspace_id', activeWorkspaceId)
+          // #374 — one till button per PRODUCT. Without this the grid repeats a product once
+          // per priced variant, and the operator cannot tell the buttons apart. Selling a
+          // specific variant from the POS needs a picker on the button, which is its own job.
+          .is('variant_key', null),
         supabase.from('finance_settings').select(
           'default_vat_rate, business_name, business_vat, business_tax_office, business_profession, business_address, business_street_number, business_postal_code, business_city, business_country, business_phone, business_email, business_gemi, business_company_type',
         ).eq('workspace_id', activeWorkspaceId).maybeSingle(),

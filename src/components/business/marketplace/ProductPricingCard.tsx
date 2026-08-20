@@ -6,6 +6,12 @@
  *  - a dealer on their OWN product → their sell price to the tier below.
  *
  * Writes product_prices (UNIQUE workspace_id,product_id,variant_key → upsert) + products.supply_mode.
+ *
+ * #374: a price is per VARIANT. `variant_key = null` is the row that applies to any variant —
+ * the only row this card could write before — and a specific variant gets its own row beside it.
+ * That is why the read below MUST filter on variant_key: with two rows present, an unfiltered
+ * `.maybeSingle()` raises rather than picking one, so enabling variant prices without this would
+ * have broken the card the first time anyone used the feature.
  * Only rendered for the price-owner (root, or the product's owning workspace) and only to
  * a supplier-capable user. For an operator-catalog product seen by a downstream dealer the
  * read-only WorkspaceCostBadge already shows their resolved cost, so this card stays hidden.
@@ -20,6 +26,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { variantKey } from '@/services/lineIdentityRules';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP'];
 
@@ -38,6 +46,12 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
   const [discountPct, setDiscountPct] = useState('');
   const [supplyMode, setSupplyMode] = useState<'platform_sold' | 'reference_only'>('platform_sold');
 
+  /** Which variant this price is for. Empty map = the "applies to any variant" row. */
+  const [variantAttrs, setVariantAttrs] = useState<Record<string, string>>({});
+  /** Variant keys that already carry their own price, so the operator can see what exists. */
+  const [overrides, setOverrides] = useState<Array<{ key: string; price: number | null; currency: string }>>([]);
+  const vkey = variantKey(variantAttrs);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -52,23 +66,34 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
       if (cancelled) return;
       if (!isPriceOwner) { setEligible(false); setLoading(false); return; }
 
-      const { data: price } = await supabase
+      // Filter on the variant, or `.maybeSingle()` raises as soon as a second row exists.
+      const base = supabase
         .from('product_prices')
         .select('list_price, currency, unit, discount_percent')
         .eq('product_id', productId)
-        .eq('workspace_id', activeWorkspaceId as string)
+        .eq('workspace_id', activeWorkspaceId as string);
+      const { data: price } = await (vkey ? base.eq('variant_key', vkey) : base.is('variant_key', null))
         .maybeSingle();
+      const { data: overrideRows } = await supabase
+        .from('product_prices')
+        .select('variant_key, list_price, currency')
+        .eq('product_id', productId)
+        .eq('workspace_id', activeWorkspaceId as string)
+        .not('variant_key', 'is', null);
       if (cancelled) return;
       setListPrice(price?.list_price != null ? String(price.list_price) : '');
       setCurrency(price?.currency || 'EUR');
       setUnit(price?.unit || '');
       setDiscountPct(price?.discount_percent != null ? String(price.discount_percent) : '');
+      setOverrides(((overrideRows ?? []) as Array<{ variant_key: string | null; list_price: number | null; currency: string | null }>)
+        .filter((r) => !!r.variant_key)
+        .map((r) => ({ key: r.variant_key as string, price: r.list_price, currency: r.currency || 'EUR' })));
       setSupplyMode((prod?.supply_mode as any) || 'platform_sold');
       setEligible(true);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [productId, activeWorkspaceId, activeWorkspace?.isRoot]);
+  }, [productId, activeWorkspaceId, activeWorkspace?.isRoot, vkey]);
 
   const save = async () => {
     if (!activeWorkspaceId) return;
@@ -81,6 +106,8 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
         .upsert({
           workspace_id: activeWorkspaceId,
           product_id: productId,
+          // #374 — null is the "any variant" row; a chosen variant gets its own price beside it.
+          variant_key: vkey,
           list_price: lp,
           currency,
           unit: unit || null,
@@ -116,6 +143,30 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
       <div className="text-xs font-medium flex items-center gap-1">
         <Tag className="h-3.5 w-3.5 text-primary" />
         {isRoot ? 'Catalog base price' : 'Your sell price'}
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Applies to</Label>
+        {/* Empty selection = the product-wide row, which is what every price was before #374.
+            The picker offers only axes the registry calls identity for this product AND that
+            genuinely have more than one value, so a product with no variants shows nothing. */}
+        <LineIdentityPicker
+          productId={productId}
+          value={variantAttrs}
+          onChange={(next) => setVariantAttrs(next.selected_attributes)}
+        />
+        <div className="text-[11px] text-muted-foreground">
+          {vkey ? 'Price for this variant only — the product-wide price still applies to the rest.'
+                : 'Applies to every variant. Choose one above to price it differently.'}
+        </div>
+        {overrides.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {overrides.map((o) => (
+              <span key={o.key} className="rounded-sm bg-surface-sunken px-1.5 py-0.5 text-[10px] text-muted-foreground tabular-nums">
+                {o.key}{o.price != null ? ` · ${o.price} ${o.currency}` : ''}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">

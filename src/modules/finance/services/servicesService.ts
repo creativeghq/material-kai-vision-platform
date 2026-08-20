@@ -107,6 +107,9 @@ export const servicesService = {
     await supabase.from('product_prices').upsert({
       workspace_id: workspaceId,
       product_id: productId,
+      // #374 — a SERVICE has no identity axes, so its price is the product-wide row by nature.
+      // Stated explicitly so the guard test can tell "no variants exist" from "forgot to pass".
+      variant_key: null,
       list_price: input.price,
       currency: input.currency || 'EUR',
       unit: input.unit || null,

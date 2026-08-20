@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { variantKey } from '@/services/lineIdentityRules';
+import { variantKey, availabilityKey, type VariantAvailability } from '@/services/lineIdentityRules';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { vatOf } from '@/modules/finance/lib/vatMath';
@@ -235,23 +235,8 @@ export interface NewOrderItem {
 }
 
 /** Customer-aware pricing for an order line (from the pricing resolver / catalog cost). */
-/** Free stock for one (product, variant), as `get_variant_availability` derives it (#374). */
-export interface VariantAvailability {
-  /** Rows keyed to this exact variant. */
-  exact: number;
-  /** Rows with NO variant — shippable for any line, so deliberately NOT folded into `exact`. */
-  unassigned: number;
-  /** The whole product, every variant. Only meaningful when nothing has been chosen. */
-  productTotal: number;
-}
-
-/**
- * Map key for an availability lookup. JSON-encoded rather than string-joined: a variant key
- * is operator-authored text, so any plain separator is a value it could itself contain, and
- * two different pairs would then collide on one key.
- */
-export const availabilityKey = (productId: string, vk: string | null | undefined): string =>
-  JSON.stringify([productId, vk ?? null]);
+export { availabilityKey } from '@/services/lineIdentityRules';
+export type { VariantAvailability } from '@/services/lineIdentityRules';
 
 export interface LinePricing {
   unit_price: number | null;

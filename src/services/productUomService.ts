@@ -41,6 +41,12 @@ export interface PriceBreak {
   level_key: string | null;
   is_active: boolean;
   notes: string | null;
+  /**
+   * #374 — which variant this break is for. null is the "applies to any variant" break, which
+   * is what every row was before. `get_product_price_break` prefers an exact-variant row and
+   * falls back to the null one, so "5 pallets of anything" and "5 pallets of Nero" coexist.
+   */
+  variant_key: string | null;
 }
 
 export const productUomService = {
@@ -77,10 +83,12 @@ export const productUomService = {
 
   // ── Quantity price breaks ───────────────────────────────────────────────────────────────
 
-  async listBreaks(workspaceId: string, productId: string): Promise<PriceBreak[]> {
-    const { data, error } = await supabase
+  /** Breaks for one variant. Pass `variantKey = null` for the product-wide ladder. */
+  async listBreaks(workspaceId: string, productId: string, variantKey: string | null = null): Promise<PriceBreak[]> {
+    const base = supabase
       .from('product_price_breaks').select('*')
-      .eq('workspace_id', workspaceId).eq('product_id', productId)
+      .eq('workspace_id', workspaceId).eq('product_id', productId);
+    const { data, error } = await (variantKey ? base.eq('variant_key', variantKey) : base.is('variant_key', null))
       .order('min_quantity');
     if (error) throw error;
     return (data ?? []) as PriceBreak[];
@@ -98,6 +106,7 @@ export const productUomService = {
       unit_price: row.unit_price ?? null,
       currency: row.currency ?? 'EUR',
       level_key: row.level_key ?? null,
+      variant_key: row.variant_key ?? null,
       is_active: row.is_active ?? true,
       notes: row.notes ?? null,
       updated_at: new Date().toISOString(),
@@ -116,6 +125,7 @@ export const productUomService = {
   /** What the resolver would actually charge for this quantity — the same RPC quotes use. */
   async previewPrice(
     workspaceId: string, productId: string, quantity: number, unit: string,
+    variantKey: string | null = null,
   ): Promise<Record<string, unknown> | null> {
     const { data, error } = await supabase.rpc('get_product_price_for_workspace', {
       p_workspace_id: workspaceId,
@@ -123,6 +133,9 @@ export const productUomService = {
       p_audience: 'seller',
       p_quantity: quantity,
       p_unit: unit,
+      // The preview must price the SAME variant the breaks above are being edited for, or it
+      // reassures the operator with a number the resolver would not actually charge.
+      p_variant_key: variantKey,
     });
     if (error) throw error;
     return (data ?? null) as Record<string, unknown> | null;

@@ -22,6 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { productUomService, type PriceBreak, type ProductUom } from '@/services/productUomService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { parseDecimal } from '@/utils/decimal';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { variantKey } from '@/services/lineIdentityRules';
 
 const num = (s: string): number | null => {
   const v = parseDecimal(s);
@@ -39,6 +41,15 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * #374 — which variant this ladder is for. Empty = the product-wide ladder, which is what
+   * every break was before. The two coexist: the resolver prefers an exact-variant break and
+   * falls back to the product-wide one, so "5 pallets of anything" and "5 pallets of Nero"
+   * are both expressible.
+   */
+  const [variantAttrs, setVariantAttrs] = useState<Record<string, string>>({});
+  const vkey = variantKey(variantAttrs);
+
   // New-break form
   const [qty, setQty] = useState('');
   const [unit, setUnit] = useState('pcs');
@@ -53,14 +64,14 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
 
   const load = useCallback(async () => {
     const [list, ladder] = await Promise.all([
-      productUomService.listBreaks(workspaceId, productId).catch(() => [] as PriceBreak[]),
+      productUomService.listBreaks(workspaceId, productId, vkey).catch(() => [] as PriceBreak[]),
       productUomService.getUom(productId).catch(() => null),
     ]);
     setRows(list);
     setUom(ladder);
     if (ladder) { setUnit(ladder.base_unit); setPreviewUnit(ladder.base_unit); }
     setLoading(false);
-  }, [workspaceId, productId]);
+  }, [workspaceId, productId, vkey]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -76,6 +87,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
       await productUomService.saveBreak({
         workspace_id: workspaceId, product_id: productId,
         min_quantity: q, unit,
+        variant_key: vkey,
         discount_percent: kind === 'percent' ? v : null,
         unit_price: kind === 'price' ? v : null,
       });
@@ -97,7 +109,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
     if (q == null || q <= 0) return;
     setPreviewing(true);
     try {
-      setPreview(await productUomService.previewPrice(workspaceId, productId, q, previewUnit));
+      setPreview(await productUomService.previewPrice(workspaceId, productId, q, previewUnit, vkey));
     } catch (err: any) {
       toast({ title: 'Preview failed', description: err?.message, variant: 'destructive' });
       setPreview(null);
@@ -115,6 +127,19 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
     <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3">
       <div className="text-xs font-medium flex items-center gap-1">
         <Percent className="h-3.5 w-3.5 text-primary" /> Quantity discounts
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Applies to</Label>
+        <LineIdentityPicker
+          productId={productId}
+          value={variantAttrs}
+          onChange={(next) => setVariantAttrs(next.selected_attributes)}
+        />
+        <div className="text-[11px] text-muted-foreground">
+          {vkey ? 'This variant only. The product-wide ladder still covers the rest.'
+                : 'Every variant. Choose one above to give it its own ladder.'}
+        </div>
       </div>
 
       {rows.length > 0 && (

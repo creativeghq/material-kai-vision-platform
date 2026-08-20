@@ -552,6 +552,11 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
           {
             workspace_id: activeWorkspaceId,
             product_id: productId,
+            // #374 — the KB proposal is for the product, not one of its variants, so this is
+            // deliberately the "applies to any variant" row. Stated rather than omitted: the
+            // column defaults to null either way, and an unstated default is indistinguishable
+            // from having forgotten to think about it.
+            variant_key: null,
             // Never NULL. This used to be `proposal?.list_price ?? null`, so a quick-mode pick or
             // a proposal without a list wrote a catalog row with no price at all — the one thing
             // the button exists to do.

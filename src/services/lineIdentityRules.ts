@@ -90,3 +90,44 @@ export function variantKey(attrs: Record<string, string> | null | undefined): st
     .map(([k, v]) => `${k}=${v}`);
   return parts.length ? parts.join(';') : null;
 }
+
+/**
+ * A variant key rendered for a human: `available_sizes=60x60;color=nero` reads as `60x60 · nero`.
+ *
+ * VALUES only, never the field names. The names a user should see are `label_by_category` in the
+ * field registry and differ per category ("Material" for kitchen, "Body Material" elsewhere), so
+ * a component that spelled them out here would be the hardcoded label map #368 was about. Where a
+ * surface needs the labels it must ask the registry; where it only needs to tell two rows apart —
+ * a stock table, a price-override chip — the values do that on their own.
+ *
+ * Display only: never parse this back. `variantKey` is the identity.
+ */
+export function formatVariantKey(key: string | null | undefined): string | null {
+  if (!key) return null;
+  const parts = key
+    .split(';')
+    .map((kv) => kv.slice(kv.indexOf('=') + 1).trim())
+    .filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/** Free stock for one (product, variant), as SQL `get_variant_availability` derives it (#374). */
+export interface VariantAvailability {
+  /** Rows keyed to this exact variant. */
+  exact: number;
+  /** Rows with NO variant — shippable for any line, so deliberately NOT folded into `exact`. */
+  unassigned: number;
+  /** The whole product, every variant. Only meaningful when nothing has been chosen. */
+  productTotal: number;
+}
+
+/**
+ * Map key for an availability lookup. JSON-encoded rather than string-joined: a variant key is
+ * operator-authored text, so any plain separator is a value it could itself contain, and two
+ * different pairs would then collide on one key.
+ *
+ * Lives here, not beside the service that uses it, for the reason stated at the top of this file:
+ * this module imports no IO, so a guard test can exercise it without a Supabase client in scope.
+ */
+export const availabilityKey = (productId: string, vk: string | null | undefined): string =>
+  JSON.stringify([productId, vk ?? null]);

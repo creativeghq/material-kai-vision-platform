@@ -20,6 +20,7 @@
  * "Who sees stock on the product record" in docs/warehouse-and-billing.md.
  */
 import React, { useEffect, useState } from 'react';
+import { formatVariantKey } from '@/services/lineIdentityRules';
 import { Loader2, Boxes, ArrowDownLeft, ArrowUpRight, Settings2, Store } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
@@ -154,6 +155,7 @@ export const ProductStockPanel: React.FC<Props> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Warehouse</TableHead>
+                <TableHead>Variant</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">On hand</TableHead>
                 <TableHead className="text-right">Reserved</TableHead>
@@ -175,6 +177,12 @@ export const ProductStockPanel: React.FC<Props> = ({
                       {r.warehouse_is_default && (
                         <span className="ml-1.5 text-[10px] text-muted-foreground">default</span>
                       )}
+                    </TableCell>
+                    {/* #374 — two rows for one product are now legal, and the ONLY thing that
+                        tells them apart is the variant. Without this column the table shows the
+                        same product twice with no way to see which is which. */}
+                    <TableCell className="text-muted-foreground">
+                      {formatVariantKey(r.variant_key) ?? <span title="Stock not attributed to a variant">—</span>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{r.location || '—'}</TableCell>
                     <TableCell className="text-right tabular-nums">{num(onHand)}</TableCell>

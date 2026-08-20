@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { variantKey } from '@/services/lineIdentityRules';
 import { isQuotaError } from '@/hooks/useQuotaErrorHandler';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl, getProductName } from '@/utils/productMetadata';
 import { mivaaApi } from '@/services/mivaaApiClient';
@@ -45,6 +46,13 @@ export interface WarehouseItem {
   reorder_point: number;
   location: string | null;
   serial_number: string | null;
+  /**
+   * #374 — WHICH variant this row holds, as `_variant_key` canonicalises it. null is an
+   * unvarianted row: legacy stock, or a product with no identity axes. This, not the SKU, is
+   * what the warehouse resolver matches on — the SKU is only a label, and two variants that
+   * differ by something other than size or colour can share one.
+   */
+  variant_key: string | null;
   // Physical + identity metadata, mostly parsed from the supplier line at intake.
   width_mm: number | null;
   length_mm: number | null;
@@ -247,6 +255,12 @@ export const warehouseService = {
   async createItem(input: {
     workspaceId: string; name: string; warehouse_id: string; sku?: string; unit?: string;
     qty_on_hand?: number; reorder_point?: number; location?: string; product_id?: string | null;
+    /**
+     * #374 — which variant this row holds, as the registry-keyed map a line would carry.
+     * Omit for an unvarianted row. Two rows for the same product in the same warehouse are
+     * legal only when their variants differ, so creating a second Bianco row still fails.
+     */
+    variant_attributes?: Record<string, string> | null;
   } & WarehouseItemCatalogFields & WarehouseItemPhysicalFields): Promise<string> {
     const { data, error } = await supabase.from('warehouse_items').insert({
       workspace_id: input.workspaceId,
@@ -258,6 +272,7 @@ export const warehouseService = {
       reorder_point: input.reorder_point ?? 0,
       location: input.location ?? null,
       product_id: input.product_id ?? null,
+      variant_key: variantKey(input.variant_attributes),
       serial_number: input.serial_number ?? null,
       width_mm: input.width_mm ?? null,
       length_mm: input.length_mm ?? null,
@@ -613,20 +628,40 @@ export const warehouseService = {
     return (data ?? []) as string[];
   },
 
-  /** The ladder's answer for ONE line at an edited cost — used while the operator types. */
+  /**
+   * The ladder's answer for ONE line — used while the operator edits it.
+   *
+   * `materialCategory` and `manufacturer` are what is ON SCREEN, not what is stored, because
+   * they are what approval is about to write onto the product and therefore what the ladder
+   * will see a moment later. Passing them is what stops the preview and the approval reaching
+   * different rungs: both were hardcoded null here, so a NEW product could only ever match the
+   * supplier rung or fall through to the workspace default.
+   */
   async previewIntakeSellPrice(
     id: string, cost: number | null,
-  ): Promise<{ sell: number | null; rung: PriceRung; markupPct: number | null; attributed: boolean }> {
-    const { data, error } = await supabase.rpc('preview_pending_item_sell_price', { p_id: id, p_cost: cost });
+    opts: { materialCategory?: string | null; manufacturer?: string | null } = {},
+  ): Promise<{
+    sell: number | null; rung: PriceRung; markupPct: number | null; attributed: boolean;
+    brandAttributed: boolean; maker: string | null;
+  }> {
+    const { data, error } = await supabase.rpc('preview_pending_item_sell_price', {
+      p_id: id,
+      p_cost: cost,
+      p_material_category: opts.materialCategory || null,
+      p_manufacturer: opts.manufacturer || null,
+    });
     if (error) throw error;
     const r = (data ?? {}) as {
-      suggested_sell?: number | null; rung?: PriceRung; markup_pct?: number | null; supplier_attributed?: boolean;
+      suggested_sell?: number | null; rung?: PriceRung; markup_pct?: number | null;
+      supplier_attributed?: boolean; brand_attributed?: boolean; maker?: string | null;
     };
     return {
       sell: r.suggested_sell != null ? Number(r.suggested_sell) : null,
       rung: r.rung ?? 'no_cost',
       markupPct: r.markup_pct != null ? Number(r.markup_pct) : null,
       attributed: r.supplier_attributed === true,
+      brandAttributed: r.brand_attributed === true,
+      maker: r.maker ?? null,
     };
   },
 
@@ -792,6 +827,12 @@ export interface IntakeLine {
   markup_pct: number | null;
   supplier_company_id: string | null;
   supplier_attributed: boolean;
+  /** The CRM company this line's maker resolves to, if any. */
+  brand_company_id: string | null;
+  /** False = the maker is not a CRM company, so the BRAND rung of the pricing ladder cannot
+   *  apply to this line at all. That is a different problem from "no brand rule is set", and
+   *  only the operator can fix it. */
+  brand_attributed: boolean;
 }
 
 /** The catalog-depth fields the intake approval can write, beyond the four on the row. */

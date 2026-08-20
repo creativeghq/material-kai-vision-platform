@@ -33,8 +33,12 @@ export const ProductPricePanel: React.FC<{ productId: string }> = ({ productId }
     try {
       const [p, row] = await Promise.all([
         marketplacePricingService.getProductPrice(activeWorkspaceId, productId),
+        // #374 — `.is('variant_key', null)` is load-bearing, not decoration: a product may now
+        // hold one price row per variant, and `.maybeSingle()` RAISES on multiple rows rather
+        // than picking one. This panel shows the product-wide price, so it asks for that row.
         supabase.from('product_prices').select('list_price, unit')
-          .eq('workspace_id', activeWorkspaceId).eq('product_id', productId).maybeSingle(),
+          .eq('workspace_id', activeWorkspaceId).eq('product_id', productId)
+          .is('variant_key', null).maybeSingle(),
       ]);
       // supabase-js RESOLVES on an RLS denial instead of throwing, so `row.error` has to be
       // checked by hand. Discarding it made a failed read indistinguishable from "no explicit
