@@ -301,10 +301,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'company_website_scrape',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createCompanyWebsiteScrapeTool',
-    description: 'Scrape a company website to extract structured information about the company, products, contact details, and verify if they are a B2B manufacturer.',
+    description: 'Scrape a company website to extract structured information about the company, products, and verify if they are a B2B manufacturer.',
     params: [
       { name: 'url', type: 'string', optional: false, description: 'Company website URL to scrape' },
       { name: 'extract', type: 'array', optional: true, description: 'Sections to extract: about, products, contact, certifications' },
+      { name: 'country', type: 'string', optional: true, description: '2-letter ISO country code of the company. Pass it whenever you know it: it is what lets a VAT number written bare under a local label ("P.IVA 01411010356", "ΑΦΜ: …") be recognised, and a VAT number is what unlocks the official registry name via create_company_from_vat.' },
     ],
   },
   {

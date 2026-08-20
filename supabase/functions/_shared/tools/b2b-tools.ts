@@ -44,6 +44,7 @@ import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, t
 import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
 import { transliterateToLatin } from '../transliterate.ts';
+import { extractContactDetails } from '../contact-extract.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -578,7 +579,7 @@ export const createCompanyWebsiteScrapeTool = (
   onProgress?: (status: string) => void,
 ) => {
   return tool(
-    async ({ url, extract }) => {
+    async ({ url, extract, country }) => {
       const _blocked = await b2bAffordabilityGate(userId, 15, 'company_website_scrape');
       if (_blocked) return _blocked;
       try {
@@ -620,8 +621,22 @@ export const createCompanyWebsiteScrapeTool = (
             },
             body: JSON.stringify({
               url: url,
-              formats: ['markdown'],
-              onlyMainContent: true,
+              // `links` carries the page's own `tel:` and `mailto:` hrefs — a phone number the site
+              // author declared, rather than a digit run a pattern guessed at. That distinction
+              // matters on this platform's targets, whose pages are full of article codes and size
+              // charts that any general phone regex matches perfectly.
+              formats: ['markdown', 'links'],
+              // onlyMainContent is a deterministic HTML filter that removes header, nav and FOOTER —
+              // and Firecrawl applies it to `links` as well as to the markdown. The footer and the
+              // imprint are exactly where a company publishes its switchboard number, its contact
+              // address and its VAT number, so leaving this on meant paying to fetch the page and
+              // then discarding the three fields most worth having, before asking a model to find
+              // contact details in text they had been stripped from.
+              //
+              // The cost of turning it off is some nav boilerplate in the markdown the analysis
+              // model reads. That trade is worth taking here: this tool profiles a COMPANY, and the
+              // legal footer is signal for that, not noise.
+              onlyMainContent: false,
             }),
             signal: controller.signal,
           });
@@ -772,11 +787,31 @@ ${markdown.substring(0, 15000)}`;
           };
         }
 
+        // Deterministic contact extraction, beside the model rather than through it. A regex that
+        // finds nothing is visibly empty; a model asked for a phone number returns something that
+        // looks like one. The `country` hint is what unlocks a VAT written bare under a local label
+        // ("P.IVA 01411010356", "ΑΦΜ: …") — without a country there is no telling a 9-digit Greek
+        // ΑΦΜ from a 9-digit German USt-IdNr, so that case is skipped rather than guessed.
+        const contacts = extractContactDetails(markdown, data.data?.links, country);
+
         const totalElapsed = Date.now() - startTime;
         return JSON.stringify({
           success: true,
           url: url,
           company_data: companyData,
+          contact_details: contacts,
+          // The VAT number is the point of all this. `create_company_from_vat` already turns one
+          // into an official ΑΑΔΕ / VIES record — legal name, registered address — and VIES covers
+          // all 27 member states, but discovery could never reach it because a web search yields a
+          // name and VIES needs a VAT. The company's own site is the link between the two.
+          ...(contacts.vat_numbers.length
+            ? {
+              next_step: `Found VAT ${contacts.vat_numbers[0].country_code}${contacts.vat_numbers[0].vat_number}. `
+                + `Call create_company_from_vat with country_code="${contacts.vat_numbers[0].country_code}" and `
+                + `vat_number="${contacts.vat_numbers[0].vat_number}" to pull the OFFICIAL registered name and `
+                + `address, which beats anything read off the page. Note Germany and Spain return no name.`,
+            }
+            : {}),
           page_title: metadata.title || '',
           page_description: metadata.description || '',
           elapsed_ms: totalElapsed,
@@ -791,10 +826,15 @@ ${markdown.substring(0, 15000)}`;
     },
     {
       name: 'company_website_scrape',
-      description: 'Scrape a company website to extract structured information about the company, products, contact details, and verify if they are a B2B manufacturer.',
+      description: 'Scrape a company website to extract structured information about the company, products, and verify if they are a B2B manufacturer. Also returns `contact_details` read straight off the page — phone numbers from its own tel: links, emails, and the VAT number from its footer or imprint. A VAT number here is worth more than anything else on the page: pass it to create_company_from_vat for the OFFICIAL registered name and address.',
       schema: z.object({
         url: z.string().describe('Company website URL to scrape'),
         extract: z.array(z.string()).optional().describe('Sections to extract: about, products, contact, certifications'),
+        country: z.string().optional().describe(
+          '2-letter ISO country code of the company. Pass it whenever you know it: it is what lets a VAT '
+          + 'number written bare under a local label ("P.IVA 01411010356", "ΑΦΜ: …") be recognised, and a VAT '
+          + 'number is what unlocks the official registry name via create_company_from_vat.',
+        ),
       }),
     }
   );
