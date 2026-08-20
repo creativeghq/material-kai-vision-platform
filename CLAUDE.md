@@ -82,6 +82,7 @@ swallowed); an endpoint 404-ing on 100% of calls for months; the Stripe webhook 
 - **`ops.test_artifacts_accumulating`** watches the reaper's OUTPUT, not its exit code. **When you add a janitor cron, add a probe on the mess it is supposed to clear.**
 - **`ops.integrity_registry_broken`** validates the registry itself: `run_data_integrity_checks` calls `detect_fn()` / `heal_fn()` with **no arguments** and expects heal to return `integer`. A wrong signature aborts the whole nightly sweep, which then reports nothing at all.
 - Probes are **hardcoded in the detect function on purpose** — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface. Adding a probe is a migration.
+- **Never rewrite `dic_detect__ops_silent_zero` with a whole-body `CREATE OR REPLACE` built from an older copy — append by surgery on `pg_get_functiondef`, with assertions.** The probes are inline and have accumulated across a dozen separate migrations, so a full replacement written from a stale source silently deletes the ones added since. That happened on 2026-08-10: three #342 probes landed at 12:16 and an unrelated migration erased them at 13:21; nobody noticed for ten days, because a detector with fewer probes just returns fewer rows. `ops.silent_zero_probe_missing` now holds the roster and fires when a name goes missing — **delete a probe deliberately and you must edit that roster too.**
 
 ## Data layering — the pipeline is Medallion; name the layers
 

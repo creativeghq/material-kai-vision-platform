@@ -116,7 +116,7 @@ toolkit cluster is stripped and unreachable.
 exception swallowed. An endpoint 404'd on 100% of calls for months. The Stripe webhook failed 100%
 from the day it shipped.
 
-- **Guarded by:** `ops.silent_zero`, `ops.test_artifacts_accumulating`, `ops.integrity_registry_broken`, and the `no-swallowed-write` semgrep rule
+- **Guarded by:** `ops.silent_zero`, `ops.test_artifacts_accumulating`, `ops.integrity_registry_broken`, `ops.silent_zero_probe_missing` (shape 4g — the detector's own probes going missing), and the `no-swallowed-write` semgrep rule
 - **Proven to fire:** 2026-08-01 — `no-swallowed-write` found 9 sites, 7 genuine: three lost `ai_usage_logs` billing rows, a lost ERGANI submission audit row, a lost `last_digest_at` double-notify guard, a lost `embedding_status='failed'` write, and a recovery cron incrementing its counter after an unchecked update.
 - **Note:** the **<5%** success-rate threshold matters. An exact-zero test reported this platform clean while two endpoints sat at 0.8% and 4.5%.
 - **Blind spot:** `ops.silent_zero` probes are hardcoded (deliberately — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface). A new metric gets no probe until someone writes a migration.
@@ -163,6 +163,31 @@ Same shape as `_deliver_order_line_core`.
   - **Guarded by:** `ops.cron_key_unwired` — `cron_billing_registry.caller_ref` (new) names the code that charges each key; NULL on a metered row is the finding. Deliberately a required field on the registry row rather than a key list in a test file: there is one place a key exists, and that place now has to say who calls it.
   - **Proven to fire:** 2026-08-10 — nulling one `caller_ref` in an aborted transaction produced exactly 1 finding; 0 with all keys wired. `dic_detect__ops_integrity_registry_broken` confirms the new check's signature, so it cannot abort the nightly sweep.
   - **Blind spot, and it is a real one:** `caller_ref` proves a caller was *declared*, not that it still exists. Nothing offline can join a DB column to two repos, so a deleted call site leaves the row looking healthy. `cron_metering:*` covers that for the keys whose work leaves an `ai_usage_logs` footprint; keys priced for a *send* rather than a spend (`job-research-digest`, `hr-checkin`, `email-campaign`) have no such backstop.
+
+### 4g. Guard erased by a rewrite that never mentioned it
+On 2026-08-10, migration `20260810121617` appended three `ops.silent_zero` probes for #342 — inbound
+email that never reaches a thread, order intakes that never produce a line, approved Inbox orders
+whose customer was never told. It did the append by **surgery** on `pg_get_functiondef`, asserted
+each probe had landed, and ran the detector once to prove it still executed. All three were watched
+to fire. Seventy minutes later, `20260810132154` — an unrelated change adding cron-metering probes —
+did a full `CREATE OR REPLACE` of the same function from a source that predated them, and dropped
+all three. Two further full replacements on 2026-08-16 kept them gone. The probes were absent for
+**ten days**, and the issue comment recording them as shipped was, by then, describing a database
+that no longer had them.
+
+Nothing could see it. A detect function with fewer probes returns fewer rows, and fewer rows is
+precisely what a healthy platform looks like — this is shape 4 turned on the machinery that exists
+to catch shape 4. Two properties of this repo make it specific rather than hypothetical: migrations
+are applied through MCP and never written to files, so **no repo-side test can read the SQL that is
+actually running** (`grep` over the checkout sees nothing); and `CREATE OR REPLACE` is by design a
+whole-body overwrite, so a stale source is not an error, it is a silent revert. Any function that
+accumulates inline entries across many separate migrations has this exposure — the silent-zero
+detector is simply the one with fifteen of them.
+
+- **Guarded by:** `ops.silent_zero_probe_missing` — a hardcoded roster of the probe names the detector is supposed to carry, compared against the live `pg_get_functiondef`. Hardcoded for the same reason the probes themselves are (an admin-editable roster run by a SECURITY DEFINER function is a privilege-escalation surface). Adding a probe needs no edit here; **deleting** one deliberately does, which is exactly the asymmetry wanted — an accidental deletion comes with no such edit and fires.
+- **Proven to fire:** 2026-08-20 — the detector was stubbed to an empty body inside an aborted subtransaction: 0 findings before, **15** during, 0 after, with the real definition restored. Verified separately that `dic_detect__ops_integrity_registry_broken` accepts the new check's signature, so it cannot abort the nightly sweep.
+- **Current state:** the three #342 probes are restored and the roster covers all 15.
+- **Blind spot:** the roster proves a probe is *present*, not that it is *calibrated*. A probe whose window or `min_activity` can never be reached passes this check while reporting clean forever — the failure mode already recorded under the agent-memory example above. It also covers only this one detector; the general hazard (an inline registry rebuilt from a stale source) has no automated coverage elsewhere.
 
 ### 4e. Wrong latent space — a vector that is the right SHAPE and the wrong MEANING
 Dimension is not identity. `voyage-4` and `voyage-multimodal-3.5` both return 1024D, so querying
@@ -407,6 +432,7 @@ for reading the SQL before writing the severity, not for leaving the check out.
 | `npm run lint:a11y` | CI | jsx-a11y, per-rule ratchet | partly — [tests/unit/a11yRatchet.test.ts](../tests/unit/a11yRatchet.test.ts) fails if a rule returns to `'off'` |
 | `npm run lint:tenancy` | CI | invariant 1, two-doors | **yes** — self-test runs before every scan |
 | `ops.silent_zero` | nightly | shape 4 | no |
+| `ops.silent_zero_probe_missing` | nightly | shape 4g — a probe silently dropped from the detector by a full `CREATE OR REPLACE` | **yes** — watched to go 0 → 15 → 0 with the detector stubbed inside an aborted subtransaction (2026-08-20) |
 | [tests/unit/zernioSecretResolution.test.ts](../tests/unit/zernioSecretResolution.test.ts) | `npm test`, blocking | shapes 3 + 4 — an admin-editable secret read through `Deno.env` on the edge, where the DB→env bootstrap cannot work | **yes** — mutation-tested by restoring one of the four original hand-rolled getters; 2 of 6 assertions failed, naming the file |
 | `ops.page_embeddings_never_written` | nightly | shape 4, page channel (#239) | no — but it was run against the live DB on introduction and returned clean |
 | [tests/unit/test_page_embeddings.py](../mivaa-pdf-extractor/tests/unit/test_page_embeddings.py) | `pytest`, blocking | shape 4e + Phase-0 isolation on `page_embeddings` | **yes** — every assertion was mutation-tested against a deliberately broken copy of the code it guards |
@@ -509,6 +535,7 @@ is a genuine *backstop* rather than a restatement of the constraint.
 | `ops.integrity_registry_broken` | registry row naming a `detect_fn` that does not exist |
 | `ops.cron_reported_success_but_no_effect` | fired on the real 2026-08-12 sweep failure; cleared on the fix |
 | `ops_upsert_arbiter_uninferable` | fired on `uq_customer_assets_order_item`; cleared on the fix |
+| `ops.silent_zero_probe_missing` | detector stubbed to an empty body in-txn — 15 findings, one per rostered probe |
 
 **Two checks were found broken by this exercise — the reason it was worth doing:**
 
