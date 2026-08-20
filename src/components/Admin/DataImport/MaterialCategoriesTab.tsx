@@ -44,6 +44,7 @@ import {
   TableRow,
 } from '@/components/core/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -364,7 +365,12 @@ export const MaterialCategoriesTab: React.FC = () => {
             Loading categories…
           </div>
         ) : rows.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">No categories yet. Create your first one.</div>
+          <HubEmptyState
+            icon={CornerDownRight}
+            title="No categories yet"
+            description="Categories drive the field registry — what fields a product of that kind has, what unit it defaults to, and how it renders."
+            action={<Button size="sm" onClick={() => openCreate()}><Plus className="h-4 w-4 mr-2" />New category</Button>}
+          />
         ) : (
           <Table>
             <TableHeader>

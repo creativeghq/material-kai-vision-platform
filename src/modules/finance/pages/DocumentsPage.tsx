@@ -13,6 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -271,8 +272,21 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     () => buildDocumentFilters(type as DocFilterType, { rows: baseRows, categories: sideCategories, categoryName, mydataTypes }),
     [type, baseRows, sideCategories, categoryMap, mydataTypes],
   );
-  const { values: filterValues, setValues: setFilterValues, filtered: activeRows, previewCount } =
+  const { values: filterValues, setValues: setFilterValues, filtered: activeRows, previewCount, activeCount, reset: resetFilters } =
     useFilters<any>(baseRows, filterGroups);
+
+  /*
+    Every table below renders a PAGE of `activeRows`, which is the FILTERED list. So an empty
+    table is two different facts wearing one sentence: "you have never recorded a cheque" and
+    "you have 40 cheques and this filter matches none of them". They need opposite offers —
+    create vs. clear the filter — so the distinction is passed down rather than re-derived per
+    table from a row count that cannot see it.
+  */
+  const emptyState = {
+    isFiltered: activeCount > 0,
+    totalUnfiltered: baseRows.length,
+    onClearFilters: resetFilters,
+  };
 
   // Switching document type carries no meaningful filter state across — start clean.
   useEffect(() => { setFilterValues({}); setPage(1); }, [type]);
@@ -458,16 +472,16 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (
                   creditSide === 'supplier'
-                    ? <SupplierCreditNoteTable rows={paginate(activeRows as SupplierCreditNote[], page)} />
+                    ? <SupplierCreditNoteTable rows={paginate(activeRows as SupplierCreditNote[], page)} {...emptyState} onNew={() => setNewCreditNoteOpen(true)} />
                     : <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} onChanged={() => void load()} />
                 ) : type === 'expenses' ? (
                   <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} />
                 ) : type === 'payments' ? (
-                  <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} financeBase={financeBase} />
+                  <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} financeBase={financeBase} {...emptyState} />
                 ) : type === 'delivery_notes' ? (
-                  <DeliveryNotesTable rows={paginate(activeRows as DeliveryNote[], page)} readOnly={isAccountant} onChanged={load} />
+                  <DeliveryNotesTable rows={paginate(activeRows as DeliveryNote[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewDeliveryOpen(true)} />
                 ) : type === 'cheques' ? (
-                  <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} />
+                  <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewChequeOpen(true)} />
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
@@ -691,7 +705,39 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
 
 const CHEQUE_STATUSES: Cheque['status'][] = ['pending', 'cleared', 'bounced', 'cancelled'];
 
-const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
+/**
+ * The empty row of a document table. Takes the filtered/unfiltered distinction from the page
+ * because the table only ever sees one page of the FILTERED list — from in here, "no rows" and
+ * "no rows matching" are indistinguishable, and they need opposite offers.
+ */
+type DocEmptyProps = {
+  isFiltered?: boolean;
+  totalUnfiltered?: number;
+  onClearFilters?: () => void;
+  onNew?: () => void;
+};
+const DocTableEmpty: React.FC<DocEmptyProps & { colSpan: number; noun: string; description: string; newLabel?: string }> = ({
+  isFiltered, totalUnfiltered = 0, onClearFilters, onNew, colSpan, noun, description, newLabel,
+}) => (
+  <tr><td colSpan={colSpan} className="p-0">
+    {isFiltered ? (
+      <HubEmptyState
+        variant="filtered"
+        title={`No ${noun} match the filters`}
+        description={`${totalUnfiltered} ${totalUnfiltered === 1 ? 'record exists' : 'records exist'} — the current filters exclude ${totalUnfiltered === 1 ? 'it' : 'them all'}.`}
+        action={onClearFilters ? <Button size="sm" variant="outline" onClick={onClearFilters}>Clear filters</Button> : undefined}
+      />
+    ) : (
+      <HubEmptyState
+        title={`No ${noun} yet`}
+        description={description}
+        action={onNew ? <Button size="sm" onClick={onNew}><Plus className="h-3.5 w-3.5 mr-1" /> {newLabel ?? 'New'}</Button> : undefined}
+      />
+    )}
+  </td></tr>
+);
+
+const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () => void } & DocEmptyProps> = ({ rows, readOnly, onChanged, ...empty }) => {
   const { toast } = useToast();
   const setStatus = async (id: string, status: Cheque['status']) => {
     try { await chequesService.setStatus(id, status); onChanged(); }
@@ -712,7 +758,13 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
       </thead>
       <tbody>
         {rows.length === 0 && (
-          <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No cheques recorded.</td></tr>
+          <DocTableEmpty
+            {...empty}
+            colSpan={6}
+            noun="cheques"
+            description="Post-dated cheques you have issued or received, with the bank and due date, so they surface before they land."
+            newLabel="New cheque"
+          />
         )}
         {rows.map((c) => (
           <tr key={c.id} className="border-b border-border/30">
@@ -738,7 +790,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
   );
 };
 
-const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; onChanged: () => void }> = ({ rows, readOnly, onChanged }) => {
+const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; onChanged: () => void } & DocEmptyProps> = ({ rows, readOnly, onChanged, ...empty }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const financeBase = FINANCE_BASE;
@@ -780,7 +832,13 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
       </thead>
       <tbody>
         {rows.length === 0 && (
-          <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">No delivery notes yet.</td></tr>
+          <DocTableEmpty
+            {...empty}
+            colSpan={5}
+            noun="delivery notes"
+            description="Goods moving in or out — a dispatch to a customer, a receipt from a supplier. A note can be turned into an invoice once it is issued."
+            newLabel="New delivery note"
+          />
         )}
         {rows.map((d) => (
           <tr key={d.id} className="border-b border-border/30">
@@ -903,7 +961,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
  * from Payables and then invisible. Read-only here on purpose — correcting one is a Payables
  * action against the bill it credits, not a document-list action.
  */
-const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] }> = ({ rows }) => (
+const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] } & DocEmptyProps> = ({ rows, ...empty }) => (
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
@@ -918,7 +976,13 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] }> = ({ row
     </thead>
     <tbody>
       {rows.length === 0 && (
-        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No supplier credit notes yet.</td></tr>
+        <DocTableEmpty
+          {...empty}
+          colSpan={7}
+          noun="supplier credit notes"
+          description="A credit a supplier has issued you — a return, a price correction, a rebate. It offsets what you owe them."
+          newLabel="New credit note"
+        />
       )}
       {rows.map((cn) => (
         <tr key={cn.id} className="border-b border-border/30">
@@ -934,7 +998,7 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] }> = ({ row
     </tbody>
   </table>
 );
-const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string }> = ({ rows, categoryName, financeBase }) => {
+const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string } & DocEmptyProps> = ({ rows, categoryName, financeBase, ...empty }) => {
   // Deep-link the party name to its CRM record. One address — CRM is workspace work and lives
   // at /crm; the `/admin/crm` twin this used to branch on is now only a redirect.
   const crmBase = '/crm';
@@ -955,7 +1019,17 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
     </thead>
     <tbody>
       {rows.length === 0 && (
-        <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
+        /*
+          No `onNew` on purpose: a payment is recorded against the thing it settles, from
+          Expenses / Payables / the Inbox, so "Record payment" here would be a payment with
+          nothing on the other side of it.
+        */
+        <DocTableEmpty
+          {...empty}
+          colSpan={9}
+          noun="payments"
+          description="Money that has actually moved. Payments are recorded against the invoice or expense they settle, so they arrive here from Expenses, Payables or the Inbox."
+        />
       )}
       {rows.map((p: any) => {
         // Both figures are DERIVED by `get_payment_remainders` and carried on the row by

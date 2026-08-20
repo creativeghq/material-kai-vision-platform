@@ -85,7 +85,14 @@ export function SchedulesSection({ workspaceId, canManage }: { workspaceId: stri
       <Card>
         <CardContent className="p-0">
           {schedules.length === 0 ? (
-            <EmptyState icon={CalendarClock} title="No schedules yet" hint="Build a weekly roster, then file it to Ergani as an Ε4." />
+            <EmptyState
+              icon={CalendarClock}
+              title="No schedules yet"
+              hint="Build a weekly roster, then file it to Ergani as an Ε4."
+              action={canManage && workspaceId && employees.length > 0
+                ? <ScheduleDialog workspaceId={workspaceId} employees={employees} onDone={load} />
+                : undefined}
+            />
           ) : (
             <Table>
               <TableHeader><TableRow>

@@ -5,7 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Send, Calendar, Users, Play, Pause, Trash2, MessageCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
@@ -151,13 +153,17 @@ export const MessagingCampaignsTab: React.FC = () => {
       {/* Campaigns List */}
       {campaigns.length === 0 ? (
         <div className="dashboard-card">
-          <div className="py-12 text-center">
-            <Send className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No messaging campaigns yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first messaging campaign to get started
-            </p>
-          </div>
+          {/*
+            This tab's own "Create campaign" button is permanently disabled — messaging campaigns
+            are authored on the Email page's Campaigns tab, where the channel is chosen. So the
+            way out of this empty screen is a link there, not a create action that cannot fire.
+          */}
+          <HubEmptyState
+            icon={Send}
+            title="No messaging campaigns yet"
+            description="WhatsApp campaigns are created on the Campaigns tab, where you pick the channel to send on. They appear here once they exist."
+            action={<Button asChild size="sm"><Link to="/emails">Go to Campaigns</Link></Button>}
+          />
         </div>
       ) : (
         <div className="dashboard-card">

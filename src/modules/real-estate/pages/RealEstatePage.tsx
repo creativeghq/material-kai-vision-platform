@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { realEstateService, feedUrl, inboundLeadUrl, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
 import { statusTone } from '@/utils/statusTone';
@@ -364,7 +365,19 @@ const LeadsPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
 
   if (rows === null) return <>{header}<InlineLoader /></>;
   const routing = <div className="mt-4"><LeadRoutingCard ws={ws} canManage={canManage} /></div>;
-  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Add one here, or they arrive from your public listing pages.</div>{routing}</>;
+  if (rows.length === 0) return (
+    <>{header}
+      <Card><CardContent className="p-0">
+        <HubEmptyState
+          icon={Users}
+          title="No leads yet"
+          description="Enquiries from your public listing pages land here on their own. You can also add one by hand — a walk-in, a phone call, a referral."
+          action={ws ? <AddLeadButton ws={ws} onAdded={load} /> : undefined}
+        />
+      </CardContent></Card>
+      {routing}
+    </>
+  );
   return (
     <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
@@ -833,6 +846,9 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
 // Completed sales + commission (the portfolio view of "how much have we earned").
 const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, canManage }) => {
   const navigate = useNavigate();
+  // Switching tabs is a search-param edit on whatever path this page is mounted at — reading the
+  // hook here rather than hardcoding "/real-estate?tab=" keeps the link correct if the route moves.
+  const [, setSearchParams] = useSearchParams();
   // Which sale's splits are expanded. Splits are per-sale detail, so they open in place rather than
   // adding a column nobody reads at a glance.
   const [openSplits, setOpenSplits] = useState<string | null>(null);
@@ -844,7 +860,19 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
   }, [ws, toast]);
   useEffect(() => { load(); }, [load]);
   if (rows === null) return <InlineLoader />;
-  if (rows.length === 0) return <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No completed sales yet. Close one from a listing’s Offers tab → “Complete sale & commission”.</div>;
+  // A sale is not created here — it is the OUTCOME of completing an accepted offer, so the way
+  // out of this empty screen is the listings tab, not a create button that would invent a sale
+  // with no offer behind it.
+  if (rows.length === 0) return (
+    <Card><CardContent className="p-0">
+      <HubEmptyState
+        icon={Handshake}
+        title="No completed sales yet"
+        description="A sale is recorded when you close an accepted offer — open a listing, go to its Offers tab, and use “Complete sale & commission”."
+        action={<Button size="sm" onClick={() => setSearchParams((p) => { const n = new URLSearchParams(p); n.set('tab', 'listings'); return n; }, { replace: true })}>Go to listings</Button>}
+      />
+    </CardContent></Card>
+  );
   // #356 `RE-11`. This summed `commission_base` across every row and then labelled the total
   // with `rows[0].currency`, so a €5,000 and a £4,000 commission rendered as "€9,000" — a number
   // that is not true in any currency. Money is only additive within one currency, so the total is
@@ -917,7 +945,18 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const { investments, portfolio } = data;
   const ccy = portfolio.currency;
   const header = ws ? <div className="mb-3 flex justify-end"><AddViaPropertyButton ws={ws} label="Add investment" tab="investment" /></div> : null;
-  if (investments.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No investment analysis yet. Add one here, or open a listing → <b>Investments</b> tab to model purchase, financing and rent.</div></>;
+  if (investments.length === 0) return (
+    <>{header}
+      <Card><CardContent className="p-0">
+        <HubEmptyState
+          icon={LineChart}
+          title="No investment analysis yet"
+          description="Model a purchase — price, financing and expected rent — and the portfolio figures above roll up from it. You can also start one from a listing’s Investments tab."
+          action={ws ? <AddViaPropertyButton ws={ws} label="Add investment" tab="investment" /> : undefined}
+        />
+      </CardContent></Card>
+    </>
+  );
   return (
     <>{header}
     <div className="space-y-4">

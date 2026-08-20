@@ -11,6 +11,7 @@
 // control: it cannot be forgotten on a field added later, and it covers the native <select> too.
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -139,7 +140,13 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
               )}
             </div>
           ))}
-          {schema.length === 0 && <div className="text-xs text-muted-foreground">No measurements yet.</div>}
+          {schema.length === 0 && (
+            <HubEmptyState
+              title="No measurements yet"
+              description="The dimensions a plan asks for — run length, ceiling height, wall depth. Task formulas read them by name."
+              action={!readOnly ? <Button size="sm" variant="outline" onClick={onAddDim}><Plus className="h-3.5 w-3.5 mr-1" /> Add measurement</Button> : undefined}
+            />
+          )}
         </div>
       </CardContent></Card>
 
@@ -162,8 +169,12 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
           </div>
         ))}
         {sections.length === 0 && (
-          <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-            No sections in this blueprint yet.
+          <div className="rounded-lg border border-dashed border-border">
+            <HubEmptyState
+              title="No sections yet"
+              description="A section groups the tasks of one stage — strip-out, first fix, tiling. Each task can price off a measurement above."
+              action={!readOnly ? <Button size="sm" variant="outline" onClick={onAddSection}><Plus className="h-3.5 w-3.5 mr-1" /> Add section</Button> : undefined}
+            />
           </div>
         )}
         {!readOnly && (

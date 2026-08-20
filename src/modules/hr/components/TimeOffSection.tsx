@@ -80,7 +80,16 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
       <SectionHeader title="Time Off" subtitle={pending ? `${pending} pending approval` : 'All caught up'} actions={canManage && workspaceId && employees.length > 0 ? <LogAbsenceDialog workspaceId={workspaceId} employees={employees} onDone={load} /> : undefined} />
       <Card>
         <CardContent className="p-0">
-          {absences.length === 0 ? <EmptyState icon={CalendarDays} title="No time off recorded" /> : (
+          {absences.length === 0 ? (
+            <EmptyState
+              icon={CalendarDays}
+              title="No time off recorded"
+              hint={canManage ? 'Holiday, sick leave and unpaid absence — logged here, then approved and filed.' : undefined}
+              action={canManage && workspaceId && employees.length > 0
+                ? <LogAbsenceDialog workspaceId={workspaceId} employees={employees} onDone={load} />
+                : undefined}
+            />
+          ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Type</TableHead><TableHead>From</TableHead><TableHead>To</TableHead><TableHead className="text-right">Days</TableHead><TableHead>Status</TableHead>{erganiOn && <TableHead>Ergani</TableHead>}<TableHead /></TableRow></TableHeader>
               <TableBody>

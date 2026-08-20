@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, FileText, Trash2, Loader2, Copy, Check } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -132,8 +133,22 @@ export const CatalogSourcesPage: React.FC = () => {
         </div>
       ) : sources.length === 0 ? (
         <Card>
-          <CardContent className="p-12 text-center text-muted-foreground">
-            No source PDFs uploaded yet.
+          <CardContent className="p-0">
+            <HubEmptyState
+              icon={FileText}
+              title="No source PDFs yet"
+              description="Upload a manufacturer catalog and the KAI agent can extract products, images and specifications straight out of it."
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => document.getElementById('catalog-source-upload')?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  Upload PDF
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : (

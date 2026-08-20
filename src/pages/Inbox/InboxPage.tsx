@@ -18,6 +18,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
@@ -769,12 +770,29 @@ const InboxPage: React.FC = () => {
             {loadingThreads ? (
               <div className="flex items-center justify-center h-32 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
             ) : visibleThreads.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm gap-2 px-4 text-center">
-                <MessageSquare className="w-8 h-8 opacity-40" />
-                {query ? 'No conversations match your search.'
-                  : showArchived ? 'Nothing archived. Deleted conversations rest here for 30 days before they’re removed for good.'
-                  : 'No conversations yet. WhatsApp and customer chats appear here automatically.'}
-              </div>
+              /*
+                Three different facts, and only one of them has an action. A search that matched
+                nothing is the user's own filter and clears in one press; an empty archive and an
+                empty inbox are both "nothing has happened yet" — conversations arrive on their
+                own, so there is nothing to offer and inventing a create button would be a lie.
+              */
+              query ? (
+                <HubEmptyState
+                  icon={MessageSquare}
+                  variant="filtered"
+                  title="No conversations match your search"
+                  description={`Nothing matching “${query}”${showArchived ? ' in the archive' : ''}.`}
+                  action={<Button size="sm" variant="outline" onClick={() => setQuery('')}>Clear search</Button>}
+                />
+              ) : (
+                <HubEmptyState
+                  icon={MessageSquare}
+                  title={showArchived ? 'Nothing archived' : 'No conversations yet'}
+                  description={showArchived
+                    ? 'Deleted conversations rest here for 30 days before they are removed for good.'
+                    : 'WhatsApp and customer chats appear here automatically as they come in.'}
+                />
+              )
             ) : groupedThreads.map(([bucket, items]) => (
               <div key={bucket}>
                 <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">{bucket}</div>

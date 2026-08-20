@@ -71,7 +71,14 @@ export function SeparationsSection({ workspaceId, canManage }: { workspaceId: st
       <Card>
         <CardContent className="p-0">
           {separations.length === 0 ? (
-            <EmptyState icon={UserMinus} title="No departures recorded" hint="Record a departure, then file it to Ergani as Ε5, Ε6 or Ε7." />
+            <EmptyState
+              icon={UserMinus}
+              title="No departures recorded"
+              hint="Record a departure, then file it to Ergani as Ε5, Ε6 or Ε7."
+              action={canManage && workspaceId && employees.length > 0
+                ? <SeparationDialog workspaceId={workspaceId} employees={employees} onDone={load} />
+                : undefined}
+            />
           ) : (
             <Table>
               <TableHeader><TableRow>

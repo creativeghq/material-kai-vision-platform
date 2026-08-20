@@ -18,6 +18,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
@@ -243,10 +244,26 @@ export const ChatStartersTab: React.FC = () => {
       {loading ? (
         <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
       ) : rows.length === 0 ? (
-        <div className="text-center py-16 border rounded-lg">
-          <ListChecks className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="font-medium">No starters yet</p>
-          <p className="text-sm text-muted-foreground">Click "New starter" to add one.</p>
+        <div className="border rounded-lg">
+          <HubEmptyState
+            icon={ListChecks}
+            title="No starters yet"
+            description="The suggested prompts an agent offers before anyone has typed anything — grouped per agent, so each one opens with its own."
+            action={<Button size="sm" onClick={() => setCreating(emptyStarter())}><Plus className="h-4 w-4 mr-2" />New starter</Button>}
+          />
+        </div>
+      ) : Object.keys(grouped).length === 0 ? (
+        // The agent filter excluded every starter. Without this branch the list renders as a
+        // blank area — no rows, no message — which reads as "the tab is broken", not "your
+        // filter is narrow". Offering "New starter" here would be wrong: starters exist.
+        <div className="border rounded-lg">
+          <HubEmptyState
+            icon={ListChecks}
+            variant="filtered"
+            title="No starters for this agent"
+            description={`${rows.length} ${rows.length === 1 ? 'starter exists' : 'starters exist'}, but none are assigned to the agent you picked.`}
+            action={<Button size="sm" variant="outline" onClick={() => setFilterAgent('all')}>Show all agents</Button>}
+          />
         </div>
       ) : (
         <div className="space-y-6">

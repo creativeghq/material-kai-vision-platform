@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, LayoutTemplate, Sparkles, Trash2, Pencil, Copy, Eye, ChevronLeft } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -225,8 +226,13 @@ export const BlueprintLibraryPage: React.FC = () => {
     re-filters what is already in memory.
   */
   const emptyOwn = (
-    <Card className="dashboard-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">
-      No blueprints yet. Create one with <span className="font-medium">Add New</span>, or copy a starter.
+    <Card className="dashboard-card"><CardContent className="p-0">
+      <HubEmptyState
+        icon={LayoutTemplate}
+        title="No blueprints yet"
+        description="A blueprint turns a room into a priced plan — zones, module rows and rate tables, so a kitchen quote is derived rather than typed."
+        action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add new</Button>}
+      />
     </CardContent></Card>
   );
 

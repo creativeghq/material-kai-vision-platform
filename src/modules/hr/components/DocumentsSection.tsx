@@ -52,7 +52,14 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
       <SectionHeader title="Documents" subtitle={`${docs.length} files`} actions={canManage && workspaceId ? <UploadDialog workspaceId={workspaceId} employees={employees} onDone={load} /> : undefined} />
       <Card>
         <CardContent className="p-0">
-          {docs.length === 0 ? <EmptyState icon={FolderOpen} title="No documents yet" hint={canManage ? 'Upload contracts, IDs, certificates and more.' : undefined} /> : (
+          {docs.length === 0 ? (
+            <EmptyState
+              icon={FolderOpen}
+              title="No documents yet"
+              hint={canManage ? 'Contracts, IDs, certificates and payslips — filed against the person they belong to.' : undefined}
+              action={canManage && workspaceId ? <UploadDialog workspaceId={workspaceId} employees={employees} onDone={load} /> : undefined}
+            />
+          ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Employee</TableHead><TableHead>Added</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>

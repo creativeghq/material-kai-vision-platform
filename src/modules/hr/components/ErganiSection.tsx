@@ -135,7 +135,16 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
           <Button size="sm" variant="ghost" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
         </CardHeader>
         <CardContent className="p-0">
-          {subs.length === 0 ? <EmptyState icon={FileText} title="No submissions yet" hint="Filings appear here with their Ergani protocol number." /> : (
+          {subs.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="No submissions yet"
+              hint="Filings appear here with the protocol number Ergani returns — that number is the proof the filing landed."
+              action={canManage && configured && workspaceId
+                ? <NewSubmissionDialog workspaceId={workspaceId} onDone={load} />
+                : undefined}
+            />
+          ) : (
             <Table>
               <TableHeader><TableRow>
                 <TableHead>Type</TableHead><TableHead>Entity</TableHead><TableHead>Status</TableHead>

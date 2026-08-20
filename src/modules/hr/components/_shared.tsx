@@ -2,6 +2,7 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { SectionHeader as SharedSectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub';
 import { formatMoney } from '@/utils/decimal';
 import { statusTone } from '@/utils/statusTone';
 
@@ -68,12 +69,32 @@ export function filingTone(status: string): string {
   return status === 'submitted' ? 'text-emerald-600 dark:text-emerald-400' : statusTone(status);
 }
 
-export function EmptyState({ icon: Icon, title, hint }: { icon?: LucideIcon; title: string; hint?: string }) {
-  return (
-    <div className="py-12 text-center text-muted-foreground">
-      {Icon && <Icon className="h-8 w-8 mx-auto mb-2 opacity-40" />}
-      <p className="text-sm font-medium">{title}</p>
-      {hint && <p className="text-xs mt-1">{hint}</p>}
-    </div>
-  );
+/**
+ * HR's empty state — now a thin adapter over the platform `HubEmptyState` rather than a second
+ * implementation of one.
+ *
+ * It had no `action` slot at all, across 42 call sites in 17 files. So the module's empty screens
+ * described the way out in prose — "Create departments to organise your team", "Create a run — it
+ * pulls active employees…", "Upload contracts, IDs, certificates" — and then made the reader go
+ * find the button themselves. `hint` maps to `description`; `action` is the addition.
+ *
+ * `variant` is forwarded because the distinction is load-bearing: "you have no employees" offers
+ * Add employee, "no employees match your filters" must offer Clear filters and NEVER the create
+ * action — inviting somebody with 400 employees and a department filter set to add a 401st is how
+ * duplicate people get onto a payroll.
+ */
+export function EmptyState({
+  icon,
+  title,
+  hint,
+  action,
+  variant,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+  variant?: 'empty' | 'filtered';
+}) {
+  return <HubEmptyState icon={icon} title={title} description={hint} action={action} variant={variant} />;
 }

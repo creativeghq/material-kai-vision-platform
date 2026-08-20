@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus,
   Loader2,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -75,6 +76,8 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [newTitle, setNewTitle] = useState('');
+  // The add field is always on screen above the list; the empty state points at it.
+  const titleRef = useRef<HTMLInputElement>(null);
   const [newRoomId, setNewRoomId] = useState<string>('');
   const [creating, setCreating] = useState(false);
 
@@ -182,6 +185,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-2">
             <Input
+              ref={titleRef}
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); }}
@@ -213,9 +217,22 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
         </div>
       ) : tasks.length === 0 ? (
         <Card className="dashboard-card">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            <CheckSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            {isOwner ? 'No tasks yet. Add one above to start tracking work.' : 'No tasks have been shared with you yet.'}
+          <CardContent className="p-0">
+            {/*
+              A collaborator sees only the client-visible subset, so their empty screen is a
+              different fact ("nothing has been shared") with no action they could take — the
+              owner controls what is shared. Only the owner gets the add affordance.
+            */}
+            <HubEmptyState
+              icon={CheckSquare}
+              title={isOwner ? 'No tasks yet' : 'Nothing shared with you yet'}
+              description={isOwner
+                ? 'Track the work on this project — tasks can hang off a room, and each one can be shared with the client or kept internal.'
+                : 'Tasks appear here once the project owner marks them visible to you.'}
+              action={isOwner ? (
+                <Button size="sm" onClick={() => titleRef.current?.focus()}><Plus className="h-4 w-4 mr-2" />Add a task</Button>
+              ) : undefined}
+            />
           </CardContent>
         </Card>
       ) : (

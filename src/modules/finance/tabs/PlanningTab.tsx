@@ -16,6 +16,7 @@ import {
   type DateRangeValue, type FilterGroupDef,
 } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub';
 
 interface Props { workspaceId: string }
 
@@ -91,7 +92,7 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
   const [markingId, setMarkingId] = useState<string | null>(null);
 
   const filterGroups = useMemo(() => buildPlanningFilters(rows), [rows]);
-  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, reset: resetFilters } =
     useFilters<PlannedPayment>(rows, filterGroups, { initial: { status: OPEN_STATUSES } });
 
   // The three server-side dimensions, read straight out of the values bag.
@@ -211,10 +212,26 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : filtered.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
-          {rows.length === 0
-            ? 'No planned payments. Click "Add planned payment" to schedule one.'
-            : 'No planned payments match the filters.'}
+        <Card><CardContent className="p-0">
+          {rows.length === 0 ? (
+            <HubEmptyState
+              icon={CalendarDays}
+              title="No planned payments"
+              description="Money you know is going out or coming in on a date — rent, a supplier instalment, a tax bill. Planned payments feed the cash-flow view before anything is actually paid."
+              action={<Button size="sm" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add planned payment</Button>}
+            />
+          ) : (
+            // Filters default to the OPEN statuses, so this branch is usually "everything here is
+            // already paid or cancelled" — offering to schedule another payment would answer a
+            // question nobody asked. Widening the view is the way out.
+            <HubEmptyState
+              icon={CalendarDays}
+              variant="filtered"
+              title="No planned payments match the filters"
+              description={`${rows.length} planned ${rows.length === 1 ? 'payment exists' : 'payments exist'} — the current filters exclude ${rows.length === 1 ? 'it' : 'them all'}.`}
+              action={<Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>}
+            />
+          )}
         </CardContent></Card>
       ) : groupedLayout ? (
         <div className="space-y-4">

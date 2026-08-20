@@ -77,7 +77,14 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
       />
       <Card>
         <CardContent className="p-0">
-          {runs.length === 0 ? <EmptyState icon={Wallet} title="No payroll runs yet" hint={canManage ? 'Create a run — it pulls active employees, computes deductions, and fills gross from salary.' : undefined} /> : (
+          {runs.length === 0 ? (
+            <EmptyState
+              icon={Wallet}
+              title="No payroll runs yet"
+              hint={canManage ? 'A run pulls active employees, computes EFKA and income tax, and fills gross from salary.' : undefined}
+              action={canManage ? <NewRunDialog workspaceId={workspaceId} onDone={load} /> : undefined}
+            />
+          ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Gross</TableHead><TableHead className="text-right">Net</TableHead><TableHead>Finance</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>

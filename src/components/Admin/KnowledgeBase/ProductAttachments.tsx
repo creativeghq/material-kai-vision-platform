@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Link as LinkIcon } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -258,9 +259,12 @@ export const ProductAttachments: React.FC = () => {
           {isLoading ? (
             <div className="text-center py-8">Loading attachments...</div>
           ) : attachments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No product attachments found. Link documents to products to get started.
-            </div>
+            <HubEmptyState
+              icon={LinkIcon}
+              title="No product attachments yet"
+              description="Tie a document to the product it describes — a spec sheet, an installation guide, a warranty — and it shows on that product everywhere."
+              action={<Button size="sm" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" />Link document to product</Button>}
+            />
           ) : (
             <Table>
               <TableHeader>

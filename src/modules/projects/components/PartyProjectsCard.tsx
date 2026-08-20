@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import { FolderKanban, Loader2, Plus, ExternalLink } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -67,10 +68,12 @@ export const PartyProjectsCard: React.FC<{
         {loading ? (
           <div className="p-6 text-center"><Loader2 className="inline h-4 w-4 animate-spin" /></div>
         ) : rows.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No projects attached yet. Use “New project” to open one for this {companyId ? 'company' : 'person'} —
-            moodboards, quotes and orders can then all hang off it.
-          </div>
+          <HubEmptyState
+            icon={FolderKanban}
+            title="No projects attached yet"
+            description={`Open a project for this ${companyId ? 'company' : 'person'} and moodboards, quotes and orders can all hang off it.`}
+            action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="mr-1 h-3.5 w-3.5" /> New project</Button>}
+          />
         ) : (
           <>
             <table className="w-full text-sm">

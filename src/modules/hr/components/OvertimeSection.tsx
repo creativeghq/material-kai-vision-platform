@@ -94,7 +94,14 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
       <Card>
         <CardContent className="p-0">
           {entries.length === 0 ? (
-            <EmptyState icon={Timer} title="No overtime recorded" hint="Log the hours worked beyond the schedule, then file them as an Ε8." />
+            <EmptyState
+              icon={Timer}
+              title="No overtime recorded"
+              hint="Log the hours worked beyond the schedule, then file them as an Ε8."
+              action={canManage && workspaceId && employees.length > 0
+                ? <OvertimeDialog workspaceId={workspaceId} employees={employees} onDone={load} />
+                : undefined}
+            />
           ) : (
             <Table>
               <TableHeader><TableRow>

@@ -43,7 +43,14 @@ export function DepartmentsSection({ workspaceId, canManage }: { workspaceId: st
       <SectionHeader title="Departments" subtitle={`${departments.length} departments`} actions={canManage && workspaceId ? <AddDepartmentDialog workspaceId={workspaceId} onDone={load} /> : undefined} />
       <Card>
         <CardContent className="p-0">
-          {departments.length === 0 ? <EmptyState icon={Network} title="No departments yet" hint={canManage ? 'Create departments to organise your team.' : undefined} /> : (
+          {departments.length === 0 ? (
+            <EmptyState
+              icon={Network}
+              title="No departments yet"
+              hint={canManage ? 'Group people into teams. Each department can have a head, and headcount rolls up per team.' : undefined}
+              action={canManage && workspaceId ? <AddDepartmentDialog workspaceId={workspaceId} onDone={load} /> : undefined}
+            />
+          ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Description</TableHead><TableHead>Head</TableHead><TableHead className="text-right">People</TableHead>{canManage && <TableHead />}</TableRow></TableHeader>
               <TableBody>

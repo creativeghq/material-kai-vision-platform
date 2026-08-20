@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Plus, Ship, RefreshCw, PackageCheck, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -79,7 +80,12 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">No shipments tracked yet. Add a container or BL number to follow it to your door.</div>
+          <HubEmptyState
+            icon={Ship}
+            title="No shipments tracked yet"
+            description="Add a container or BL number and the shipment is followed from the port to your door, with milestones as it moves."
+            action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" /> Track shipment</Button>}
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">

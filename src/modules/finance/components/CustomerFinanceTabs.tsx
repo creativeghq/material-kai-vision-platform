@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, CalendarClock, Plus, Coins } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -574,9 +575,14 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
         {loading ? (
           <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
         ) : rows.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No payments recorded for this party yet. Use “Record payment” above to add one, or record it against a specific order.
-          </div>
+          <HubEmptyState
+            icon={Wallet}
+            title="No payments recorded yet"
+            description="Money that has actually moved with this party. You can record it here against the party as a whole, or against a specific order from the order itself."
+            action={showCustomerActions ? (
+              <Button size="sm" onClick={() => setPayOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
+            ) : undefined}
+          />
         ) : (
           <>
           <table className="w-full text-sm">

@@ -4,6 +4,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BookText, Plus, Save, Trash2, Loader2, Pencil } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import ReactMarkdown from 'react-markdown';
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -197,7 +198,7 @@ const DocsPage: React.FC = () => {
   };
 
   const filterGroups = useMemo(() => buildDocsFilters(docs, user?.id), [docs, user?.id]);
-  const { values: filterValues, setValues: setFilterValues, filtered, previewCount } =
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount, reset: resetFilters } =
     useFilters<WorkspaceDoc>(docs, filterGroups);
 
   if (!activeWorkspaceId) {
@@ -232,7 +233,27 @@ const DocsPage: React.FC = () => {
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-6"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
             ) : filtered.length === 0 ? (
-              <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No docs yet. Click <strong>New</strong> to write one.</CardContent></Card>
+              // This branch tests the FILTERED list, so with a filter on it used to claim
+              // "No docs yet" and invite you to write another one — while the docs sat there,
+              // excluded. The two cases are different facts and need opposite offers.
+              <Card><CardContent className="p-0">
+                {docs.length === 0 ? (
+                  <HubEmptyState
+                    icon={BookText}
+                    title="No docs yet"
+                    description="Working notes, specs and briefs that live with the workspace rather than in someone's drive."
+                    action={<Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" /> New doc</Button>}
+                  />
+                ) : (
+                  <HubEmptyState
+                    icon={BookText}
+                    variant="filtered"
+                    title="No docs match your filters"
+                    description={`${docs.length} ${docs.length === 1 ? 'doc exists' : 'docs exist'} — the current filters exclude ${docs.length === 1 ? 'it' : 'them all'}.`}
+                    action={activeCount > 0 ? <Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button> : undefined}
+                  />
+                )}
+              </CardContent></Card>
             ) : (
               <div className="space-y-1">
                 {filtered.map((d) => (

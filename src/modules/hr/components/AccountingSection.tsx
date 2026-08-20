@@ -89,7 +89,16 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
       <Card>
         <CardContent className="p-0">
           {loading ? <div className="p-4"><Skeleton className="h-40 w-full" /></div> : docs.length === 0 ? (
-            <EmptyState icon={Receipt} title={`No documents for ${period}`} hint={canManage ? 'Upload the EFKA/tax payment slips for this month.' : undefined} />
+            <EmptyState
+              icon={Receipt}
+              title={`No documents for ${period}`}
+              hint={canManage ? 'Upload this month’s EFKA, tax and APD payment slips — the AI reads the Payment ID and amounts off them.' : undefined}
+              action={canManage ? (
+                <Button size="sm" disabled={busy === 'upload'} onClick={() => fileRef.current?.click()}>
+                  {busy === 'upload' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}Upload document
+                </Button>
+              ) : undefined}
+            />
           ) : (
             <div className="divide-y divide-border/40">
               {docs.map((d) => (

@@ -7,6 +7,7 @@ import { Loader2, Plus, Trash2, Clock, Search, FilePlus2, CheckCircle2, BarChart
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -161,7 +162,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       { key: 'work_date', type: 'dateRange', label: 'Date', accessor: (e: TimeEntry) => e.work_date },
     ],
   }], [unbilled, names]);
-  const { values: ubFilterValues, setValues: setUbFilterValues, filtered: unbilledView, previewCount: ubPreview } =
+  const { values: ubFilterValues, setValues: setUbFilterValues, filtered: unbilledView, previewCount: ubPreview, reset: resetUbFilters } =
     useFilters<TimeEntry>(unbilled, unbilledFilterGroups);
 
   const [unbilledPage, setUnbilledPage] = useState(1);
@@ -286,7 +287,14 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
           ) : unbilled.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No unbilled time. Log some above.</p>
           ) : unbilledView.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No entries match the filter.</p>
+            // Unbilled time exists — the filter is hiding it. Never offer "log time" here: the
+            // hours are already logged, and logging them twice is how a client gets billed twice.
+            <HubEmptyState
+              variant="filtered"
+              title="No entries match the filter"
+              description={`${unbilled.length} unbilled ${unbilled.length === 1 ? 'entry is' : 'entries are'} waiting — the current filter excludes ${unbilled.length === 1 ? 'it' : 'them all'}.`}
+              action={<Button size="sm" variant="outline" onClick={resetUbFilters}>Clear filters</Button>}
+            />
           ) : (
             <>
             <div className="divide-y divide-border/40">

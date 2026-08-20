@@ -3,6 +3,7 @@ import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -377,9 +378,14 @@ const TripCardDetail: React.FC<{
 
       <CardContent className="p-0">
         {items.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No expenses yet.{canEditItems && ' Click “Expense” to add the first line.'}
-          </div>
+          <HubEmptyState
+            icon={FileText}
+            title="No expenses yet"
+            description="Every line on this trip — travel, meals, accommodation. Approved billable lines can then be pushed into a draft customer invoice."
+            action={canEditItems ? (
+              <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add expense</Button>
+            ) : undefined}
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">

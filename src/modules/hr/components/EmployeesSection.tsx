@@ -66,7 +66,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
   const deptName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? '—';
 
   const filterGroups = useMemo(() => buildEmployeeFilters(employees, departments), [employees, departments]);
-  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount } =
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, activeCount, reset: resetFilters } =
     useFilters<Employee>(employees, filterGroups);
   // A narrowed roster is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterValues]);
@@ -91,8 +91,19 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
           {filtered.length === 0 ? (
             <EmptyState
               icon={Users}
+              variant={activeCount > 0 ? 'filtered' : 'empty'}
               title={activeCount > 0 ? 'No employees match your filters' : 'No employees yet'}
-              hint={activeCount > 0 ? 'Clear a constraint to widen the list.' : canManage ? 'Add your first employee.' : undefined}
+              hint={activeCount > 0
+                ? `${employees.length} ${employees.length === 1 ? 'person is' : 'people are'} on the roster — the current constraints exclude all of them.`
+                : canManage ? 'The roster the rest of HR reads: payroll, schedules, time off and Ergani filings all start from a person being here.' : undefined}
+              // Filtered-empty offers the way back to the full list, never "Add employee" —
+              // inviting somebody with a 400-person roster and a department filter set to add a
+              // 401st is how the same person ends up on the payroll twice.
+              action={activeCount > 0
+                ? <Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>
+                : canManage && workspaceId
+                  ? <AddEmployeeDialog workspaceId={workspaceId} departments={departments} onDone={load} />
+                  : undefined}
             />
           ) : (
             <Table>

@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Home, Loader2, Ruler } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -47,6 +48,9 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
   const [loading, setLoading] = useState(true);
 
   const [newName, setNewName] = useState('');
+  // The add form sits above the list, so the empty state's job is to point at it rather than
+  // open anything — focusing the field is the whole action.
+  const nameRef = useRef<HTMLInputElement>(null);
   const [newType, setNewType] = useState<RoomType | ''>('');
   const [newBudget, setNewBudget] = useState('');
   const [newDeadline, setNewDeadline] = useState('');
@@ -109,6 +113,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
           <Label className="text-sm">Add a room</Label>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
             <Input
+              ref={nameRef}
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Room name (e.g., Master Bath)"
@@ -151,9 +156,15 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
         </div>
       ) : rooms.length === 0 ? (
         <Card className="dashboard-card">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            <Home className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            No rooms yet. Single-space projects can skip this.
+          <CardContent className="p-0">
+            <HubEmptyState
+              icon={Home}
+              title="No rooms yet"
+              description="Split the project by space — each room carries its own budget and deadline, and products can be assigned to one. A single-space project can skip this."
+              action={isOwner ? (
+                <Button size="sm" onClick={() => nameRef.current?.focus()}><Plus className="h-4 w-4 mr-2" />Add a room</Button>
+              ) : undefined}
+            />
           </CardContent>
         </Card>
       ) : (

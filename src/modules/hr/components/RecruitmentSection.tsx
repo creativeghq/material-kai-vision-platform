@@ -47,7 +47,7 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
 
   // Status stays on the tab strip; the modal carries everything else.
   const filterGroups = useMemo(() => buildPostingFilters(postings, departments), [postings, departments]);
-  const { values: filterValues, setValues: setFilterValues, filtered: matched, previewCount } =
+  const { values: filterValues, setValues: setFilterValues, filtered: matched, previewCount, activeCount, reset: resetFilters } =
     useFilters<JobPosting>(postings, filterGroups);
 
   if (loading) return <Skeleton className="h-64 w-full" />;
@@ -104,7 +104,35 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
         )}
       </div>
       {shown.length === 0 ? (
-        <Card><CardContent><EmptyState icon={Briefcase} title={postings.length === 0 ? 'No job postings yet' : `No ${posFilter} positions`} hint={canManage && postings.length === 0 ? 'Create a job — the AI can draft the description for you.' : undefined} /></CardContent></Card>
+        <Card><CardContent>
+          {postings.length === 0 ? (
+            <EmptyState
+              icon={Briefcase}
+              title="No job postings yet"
+              hint={canManage ? 'Open a position and the AI can draft the description. Applicants land against it, and the careers page publishes it.' : undefined}
+              action={canManage ? <JobDialog workspaceId={workspaceId} departments={departments} onDone={load} /> : undefined}
+            />
+          ) : (
+            // Narrowed by the status tab or the filter modal — the way out is widening it, not
+            // opening a job nobody is hiring for.
+            <EmptyState
+              icon={Briefcase}
+              variant="filtered"
+              title={`No ${posFilter} positions`}
+              hint={`${postings.length} ${postings.length === 1 ? 'position exists' : 'positions exist'} — this view excludes ${postings.length === 1 ? 'it' : 'them all'}.`}
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {posFilter !== 'all' && (
+                    <Button size="sm" variant="outline" onClick={() => setPosFilter('all')}>Show all positions</Button>
+                  )}
+                  {activeCount > 0 && (
+                    <Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>
+                  )}
+                </div>
+              }
+            />
+          )}
+        </CardContent></Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((p) => (
@@ -194,7 +222,14 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, ca
       </div>
 
       {loading ? <Skeleton className="h-48 w-full" /> : apps.length === 0 ? (
-        <Card><CardContent><EmptyState icon={UserPlus} title="No applicants yet" hint={canManage ? 'Add candidates manually, or share the careers page and they’ll appear here.' : undefined} /></CardContent></Card>
+        <Card><CardContent>
+          <EmptyState
+            icon={UserPlus}
+            title="No applicants yet"
+            hint={canManage ? 'Add a candidate by hand, or share the careers page and applications land here on their own.' : undefined}
+            action={canManage ? <AddApplicantDialog workspaceId={workspaceId} postingId={posting.id} onDone={load} /> : undefined}
+          />
+        </CardContent></Card>
       ) : (
         <>
           <div className="grid gap-2">
