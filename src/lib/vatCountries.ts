@@ -60,3 +60,17 @@ export const VAT_COUNTRY_OPTIONS: VatCountryOption[] = [
   { code: 'AU', name: 'Australia',       eu: false },
   { code: 'JP', name: 'Japan',           eu: false },
 ];
+
+/**
+ * ISO-3166 country code → the VAT prefix letters that belong on a VAT number.
+ * The two agree everywhere except Greece: `GR` in an address, `EL` on the VAT
+ * number. A value that is already a VAT prefix passes through unchanged, so
+ * this is safe to apply to a field whose convention you are not sure of —
+ * which is the whole point, because `finance_settings.business_country_code`
+ * stores the ISO code while `crm_companies.country_code` stores the prefix,
+ * and a `GR` fed to VIES validates nothing and reports no error either.
+ */
+export const toVatPrefix = (code: string | null | undefined): string => {
+  const u = (code ?? '').trim().toUpperCase();
+  return u === 'GR' ? 'EL' : u;
+};

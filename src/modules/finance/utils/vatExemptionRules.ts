@@ -14,7 +14,7 @@
  * Codes are the ΑΑΔΕ catalog in [mydataExemptionCategories.ts](src/lib/mydataExemptionCategories.ts).
  */
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
-import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { VAT_COUNTRY_OPTIONS, toVatPrefix } from '@/lib/vatCountries';
 
 /** What is being supplied. The same destination gives different answers for each. */
 export type SupplyKind = 'goods' | 'services' | 'unknown';
@@ -40,12 +40,6 @@ export interface ExemptionSuggestion {
   /** The specific thing to verify before accepting. */
   caveat?: string;
 }
-
-/** VAT prefix letters, not ISO: Greece is `EL` on a VAT number and `GR` in an address. */
-const toVatPrefix = (c: string | null | undefined): string => {
-  const u = (c ?? '').trim().toUpperCase();
-  return u === 'GR' ? 'EL' : u;
-};
 
 const EU_PREFIXES = new Set(VAT_COUNTRY_OPTIONS.filter((o) => o.eu).map((o) => o.code));
 

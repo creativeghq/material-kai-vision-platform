@@ -672,6 +672,23 @@ of them is unvarianted.
 - **Proven to fire:** 2026-08-20 — in a rolled-back transaction, a product with a `color=nero` price row plus one order line with no `selected_attributes` produces the finding.
 - **Blind spot:** it cannot see a line that chose the *wrong* variant, only one that chose none. A key that no longer matches the registry (an axis renamed from `available_sizes` to something else) reads as "varianted" and passes.
 
+### `catalog.price_read_variant_blind` — the SQL half of the variant guard
+`product_prices` holds one row per variant since #374. Any SQL function that reads it without
+naming a variant therefore gets an arbitrary one — and the two offenders found on the day chose it
+by RECENCY (`order by updated_at desc limit 1`), so the number on a document depended on which
+variant an operator had edited most recently: `delivery_note_to_invoice` took an invoice line's
+unit price that way, `get_catalog_prices_for_workspace` took a currency.
+
+This is the same defect the TypeScript guard catches with its `.maybeSingle()` case. That test
+scans **repo files**, and this project's SQL lives only in `pg_proc` — so all of these were
+invisible to it. The SQL half needs a guard in SQL, exactly as `finance.money_fn_bypasses_derivation`
+is the SQL half of the money-derivation test.
+
+- **Proven to fire:** 2026-08-20 — flagged all four live offenders before they were fixed, and returns empty after.
+- **v1 was wrong in both directions, which is the point worth recording.** It required `limit 1` anywhere in the function. That MISSED `resolve_product_spec` and `get_embed_spec_options`, which read the table via a JOIN with no `limit` in sight — and `resolve_product_spec` selects the price from the joined row, so on an anonymous embed the same product came back once per variant at a different price each time. It also FLAGGED `list_granted_catalog_products`, whose `limit 1` belonged to an unrelated image subquery. Same over-broad-window mistake the TypeScript guard made in ITS first cut, two hours earlier, in a different language.
+- **The distinction that actually works** is not "does it limit" but "does it USE the row": `select 1 from product_prices` is an existence test and cannot return a wrong price however many variant rows exist; anything else must say which one it means.
+- **Blind spot:** it reasons about function text, so a reader that means "any variant" must SAY so (`and variant_key is null`) to clear — which is the correct thing to write anyway.
+
 ### `ops.upsert_arbiter_uninferable` — the guard that flagged the fix
 Worth recording as a guard-on-guard finding. The probe flags a partial unique index whose predicate
 is exactly `(col IS NOT NULL)` for a column already in the index, because a b-tree unique index

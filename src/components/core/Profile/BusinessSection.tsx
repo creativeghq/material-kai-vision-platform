@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, User as UserIcon, Pencil, Save, X, Loader2, ShieldCheck, ShieldAlert, ShieldQuestion, CornerDownLeft } from 'lucide-react';
+import { Building2, User as UserIcon, Pencil, Save, X, Loader2, ShieldCheck, ShieldAlert, ShieldQuestion, CornerDownLeft, CornerUpLeft, FileText, Link2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
+import { isAdmin } from '@/auth/roles';
+import { toVatPrefix } from '@/lib/vatCountries';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -50,6 +52,85 @@ const EMPTY_BUSINESS: BusinessForm = {
   street_number: '',
 };
 
+/**
+ * The columns of `finance_settings` that describe WHO IS ISSUING — the identity printed on every
+ * invoice and transmitted to myDATA. Read here because "am I a business?" was answerable from three
+ * unrelated places (`user_profiles.company` free text, `user_profiles.entity_type`+`business_id`,
+ * and this) and only this one is load-bearing, so it is the one an operator actually fills in.
+ * A workspace that invoices as a company while the profile calls the same person a solo entity is
+ * not a preference — it is the profile copy never having been told.
+ */
+const INVOICING_COLUMNS =
+  'business_name, business_name_en, business_vat, business_gemi, business_tax_office, business_tax_office_en, ' +
+  'business_profession, business_profession_en, business_address, business_address_en, business_street_number, ' +
+  'business_postal_code, business_city, business_city_en, business_country, business_country_en, ' +
+  'business_country_code, business_phone, business_email, contact_website';
+
+/** The workspace's invoicing identity, flattened to the shape this card edits. */
+export interface InvoicingIdentity extends BusinessForm {
+  gemi_number: string;
+}
+
+/**
+ * Bilingual finance fields carry an `_en` twin. English is the platform default for UI and
+ * documents, so the English value wins when it is filled and the native one is the fallback —
+ * never a merge. Whitespace is collapsed because the ΑΑΔΕ lookup that fills these pads names
+ * with runs of spaces (`MATERIALS   BANK   ΕΕ`), which is a formatting artefact, not the name.
+ */
+const preferEnglish = (english: unknown, native: unknown): string => {
+  const en = typeof english === 'string' ? english.trim() : '';
+  const raw = en || (typeof native === 'string' ? native : '');
+  return raw.replace(/\s+/g, ' ').trim();
+};
+
+/**
+ * Projects a `finance_settings` row onto the business form. Returns null for a row that exists but
+ * holds no identity — every workspace that ever opened Finance has a row, and an empty one must not
+ * be offered as "the company you already invoice as".
+ */
+export const readInvoicingIdentity = (row: Record<string, unknown> | null | undefined): InvoicingIdentity | null => {
+  if (!row) return null;
+  const vat = preferEnglish(null, row.business_vat).toUpperCase().replace(/\s+/g, '');
+  // `country_code` on crm_companies is the VAT PREFIX (EL), `business_country_code` is ISO (GR).
+  // Prefer the prefix the VAT number itself carries; fall back to translating the ISO code.
+  const prefixFromVat = /^[A-Z]{2}/.exec(vat)?.[0] ?? '';
+  const identity: InvoicingIdentity = {
+    name: preferEnglish(row.business_name_en, row.business_name),
+    vat_number: vat,
+    tax_office: preferEnglish(row.business_tax_office_en, row.business_tax_office),
+    profession: preferEnglish(row.business_profession_en, row.business_profession),
+    phone: preferEnglish(null, row.business_phone),
+    email: preferEnglish(null, row.business_email),
+    website: preferEnglish(null, row.contact_website),
+    country: preferEnglish(row.business_country_en, row.business_country),
+    country_code: prefixFromVat || toVatPrefix(preferEnglish(null, row.business_country_code)),
+    city: preferEnglish(row.business_city_en, row.business_city),
+    postal_code: preferEnglish(null, row.business_postal_code),
+    street: preferEnglish(row.business_address_en, row.business_address),
+    street_number: preferEnglish(null, row.business_street_number),
+    gemi_number: preferEnglish(null, row.business_gemi),
+  };
+  return identity.name || identity.vat_number ? identity : null;
+};
+
+/** The identity minus the fields this card does not edit — what the form and crm_companies take. */
+const toBusinessForm = ({ gemi_number: _gemi, ...form }: InvoicingIdentity): BusinessForm => form;
+
+/**
+ * Which of the shared fields disagree between the profile copy and the invoicing copy. Both are
+ * real records with real consumers (role applications read one, myDATA reads the other), so
+ * neither can be silently overwritten — but a difference nobody is shown is how they rot apart.
+ * Blank on one side is "not filled in here", not a conflict.
+ */
+const identityDrift = (profile: BusinessForm, invoicing: InvoicingIdentity): (keyof BusinessForm)[] => {
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  return (Object.keys(EMPTY_BUSINESS) as (keyof BusinessForm)[]).filter((key) => {
+    const mine = profile[key] ?? '';
+    const theirs = invoicing[key] ?? '';
+    return !!mine && !!theirs && !same(mine, theirs);
+  });
+};
+
 interface BusinessSectionProps {
   /** Notifies parent when entity_type / business_id flip so the parent can refresh anything that depends on it. */
   onEntityChanged?: (next: { entity_type: EntityType; business_id: string | null }) => void;
@@ -71,7 +152,7 @@ interface ViesCacheSnapshot {
 
 export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChanged }) => {
   const { user } = useAuth();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -92,11 +173,15 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   const [aadeChecking, setAadeChecking] = useState(false);
   const [aadeLastResult, setAadeLastResult] = useState<AadeLookupResult | null>(null);
 
+  /** The active workspace's invoicing identity, when it has one and this user is allowed to see it. */
+  const [invoicing, setInvoicing] = useState<InvoicingIdentity | null>(null);
+  const [adopting, setAdopting] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, activeWorkspaceId]);
 
   const load = async () => {
     if (!user) return;
@@ -148,6 +233,21 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     } else {
       setViesCache(null);
     }
+
+    // The invoicing identity is read through RLS on finance_settings, so a member with no finance
+    // visibility simply gets nothing back and is never offered the company — the gate is the policy,
+    // not a check written here. Adopting it additionally requires workspace admin (see canAdopt).
+    if (activeWorkspaceId) {
+      const { data: settings } = await supabase
+        .from('finance_settings')
+        .select(INVOICING_COLUMNS)
+        .eq('workspace_id', activeWorkspaceId)
+        .maybeSingle();
+      setInvoicing(readInvoicingIdentity(settings as Record<string, unknown> | null));
+    } else {
+      setInvoicing(null);
+    }
+
     setLoading(false);
   };
 
@@ -271,6 +371,73 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     } finally { setSyncingInvoicing(false); }
   };
 
+  /**
+   * Adopting the workspace's company onto YOUR profile is an identity claim — it is what
+   * `role-upgrade-requests` then checks to let you apply as a Dealer or Brand on that company's
+   * behalf. Finance *visibility* is not enough for that; an accountant can read the identity and
+   * must not be able to claim it. Workspace admin/owner only.
+   */
+  const canAdopt = !!invoicing && isAdmin(workspaceRole ?? undefined) && !!activeWorkspaceId;
+
+  /** Fills the open edit form from the invoicing identity — the same mapping as adopt, unsaved. */
+  const fillFromInvoicing = () => {
+    if (!invoicing) return;
+    setBusinessForm(toBusinessForm(invoicing));
+    setPendingEntityType('business');
+    toast({ title: 'Filled from your invoicing profile', description: 'Review it, then Save.' });
+  };
+
+  /**
+   * One click from "Solo entity" to the company this workspace already invoices as: writes the CRM
+   * company row the platform uses as your business identity and links it to the profile. It is a
+   * COPY, not a live view — `crm_companies` is what role review and CRM read, `finance_settings` is
+   * what myDATA reads — so the two are compared afterwards and any disagreement is shown rather
+   * than left to rot.
+   */
+  const adoptInvoicingIdentity = async () => {
+    if (!user || !invoicing || !activeWorkspaceId) return;
+    if (!isAdmin(workspaceRole ?? undefined)) {
+      toast({ title: 'Only a workspace admin can link the company', variant: 'destructive' });
+      return;
+    }
+    setAdopting(true);
+    try {
+      const payload = {
+        ...toBusinessForm(invoicing),
+        gemi_number: invoicing.gemi_number || null,
+      };
+
+      let nextBusinessId = businessId;
+      if (nextBusinessId) {
+        const { error } = await supabase.from('crm_companies').update(payload).eq('id', nextBusinessId);
+        if (error) throw error;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from('crm_companies')
+          .insert({ ...payload, workspace_id: activeWorkspaceId, created_by: user.id, is_customer: false, is_supplier: false })
+          .select('id')
+          .single();
+        if (error) throw error;
+        nextBusinessId = inserted.id;
+      }
+
+      const { error: profileErr } = await supabase
+        .from('user_profiles')
+        .update({ entity_type: 'business', business_id: nextBusinessId, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+      if (profileErr) throw profileErr;
+
+      toast({ title: 'Business linked', description: `Your profile now reads as ${invoicing.name || 'your registered company'}.` });
+      onEntityChanged?.({ entity_type: 'business', business_id: nextBusinessId });
+      await load();
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'Unknown error';
+      toast({ title: 'Could not link the business', description: detail, variant: 'destructive' });
+    } finally {
+      setAdopting(false);
+    }
+  };
+
   const startEdit = () => {
     setBusinessForm({ ...business });
     setPendingEntityType(entityType);
@@ -344,7 +511,9 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
         } else {
           const { data: inserted, error } = await supabase
             .from('crm_companies')
-            .insert({ ...payload, created_by: user.id, is_customer: false, is_supplier: false })
+            // workspace_id explicitly: the BEFORE-INSERT trigger stamps the user's DEFAULT
+            // workspace, which is not necessarily the one they are looking at.
+            .insert({ ...payload, ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {}), created_by: user.id, is_customer: false, is_supplier: false })
             .select('id')
             .single();
           if (error) throw error;
