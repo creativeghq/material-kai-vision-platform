@@ -643,7 +643,49 @@ Dimensionless rows are still accepted — they predate variant tracking and refu
 real stock — and this probe watches exactly that remaining tolerance.
 
 - **Proven to fire:** 2026-08-14 — with a 999-unit `600x600` row beside a 5-unit `300x300`, a line naming `300x300` now selects the 5-unit row; before the fix the ordering chose the 999. A line naming nothing still falls back to best-stocked, so existing behaviour is unchanged.
-- **Blind spot:** identity beyond dimensions. A finish or colour mismatch is still not a filter; only width/length/thickness are.
+- **Re-proven 2026-08-20 (#374), on the rewritten form.** In a rolled-back transaction: a line choosing `color=Nero` with stock shipped and only an *unvarianted* warehouse row present → the probe fires; attribute that row to `color=nero` → **the finding clears**. Both halves matter — a probe only watched to fire can still be one that never stops firing.
+- **Blind spot CLOSED by #374.** ~~identity beyond dimensions~~ — the match now filters on
+  `variant_key`, so finish, wood species, bowl shape and every other registry identity axis
+  disqualify a contradicting row, not just width/length/thickness. The dimensions filter survives
+  underneath it as the legacy path for rows that predate the column.
+- **The probe itself had to be rewritten, not merely re-pointed.** Its old test — "*every* warehouse
+  row for this product is dimensionless" — is close to unreachable once rows are created per
+  variant, so it was drifting toward reporting clean for structural reasons: the exact silent-zero
+  shape it exists to catch, inside the guard. It now asks whether any row carries the variant the
+  line chose.
+- **Remaining blind spot:** a line that chose NOTHING. An unvarianted line may still be filled from
+  any row, deliberately — refusing would strand real stock in a workspace mid-migration — so the
+  units can come off a varianted row and this cannot tell. That tolerance is the price of not
+  breaking dispatch, and it is why the picker's job is to stop lines being unvarianted in the first
+  place.
+
+### `catalog.variant_price_unreachable` — a surcharge that can never be charged
+#374 made prices settable per variant. The failure mode it introduces is this platform's dominant
+one: an operator sets "Nero costs €5 more", every screen looks right, and it is never charged once —
+because the *lines* for that product carry no variant, so the resolver falls back to the
+product-wide row every time. A plausible number sitting at zero forever, with nothing complaining.
+
+Not decidable from the price row alone: a freshly configured variant price is legitimately unused.
+So it carries the activity guard `ops.silent_zero` uses — the product has REAL lines, and every one
+of them is unvarianted.
+
+- **Proven to fire:** 2026-08-20 — in a rolled-back transaction, a product with a `color=nero` price row plus one order line with no `selected_attributes` produces the finding.
+- **Blind spot:** it cannot see a line that chose the *wrong* variant, only one that chose none. A key that no longer matches the registry (an axis renamed from `available_sizes` to something else) reads as "varianted" and passes.
+
+### `ops.upsert_arbiter_uninferable` — the guard that flagged the fix
+Worth recording as a guard-on-guard finding. The probe flags a partial unique index whose predicate
+is exactly `(col IS NOT NULL)` for a column already in the index, because a b-tree unique index
+treats NULLs as non-conflicting anyway — so the `WHERE` buys nothing and breaks `ON CONFLICT`
+inference. Correct, for a **default** unique index.
+
+It inverts under `NULLS NOT DISTINCT` (PG15+), where NULLs *do* conflict and the predicate is the
+only thing keeping many NULL-`col` rows legal. It fired on
+`warehouse_items_ws_wh_product_variant_key` (#374 Phase 0) and its own stated fix — "recreate the
+index without the WHERE clause" — would have broken unmatched intake rows, which arrive in bulk with
+a legitimately NULL `product_id`.
+
+- **Resolved by:** teaching the probe about `indnullsnotdistinct` rather than by changing the index. Verified empirically first, in a rolled-back transaction: the real writer converges on one row for a repeated variant and splits a distinct one, with **no 42P10** — because the `ON CONFLICT` restates the predicate, which is what such an index requires of its callers.
+- **The lesson generalises:** three findings survived the change and are genuine. A probe that is right three times out of four is exactly the kind that gets ignored on the fourth — the false positive was worth more than the true ones.
 
   **Measured, not assumed (2026-08-14).** The filter only engages when the line's size actually
   parses, so the parser's real-world coverage IS the guard's coverage. Against 266 sized rows in

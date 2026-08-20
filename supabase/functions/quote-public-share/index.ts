@@ -74,14 +74,19 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // NB the acceptance hash below covers [id, line_total] and the totals, NOT the variant, so
   // adding this changes nothing a previously-signed quote is verified against.
   const variantLabels: Record<string, string> = {};
+  // The canonical KEY, for the acceptance hash below. Not the label: a label is derived from
+  // the field registry, which an admin can edit, so hashing it would silently invalidate every
+  // past signature the next time somebody renamed a field.
+  const variantKeys: Record<string, string | null> = {};
   try {
     const { data: labels } = await supabase.rpc('get_variant_labels', {
       p_rows: (rawItems ?? []).map((it: any) => ({
         key: it.id, product_id: it.product_id ?? null, attributes: it.selected_attributes ?? {},
       })),
     });
-    for (const r of (labels ?? []) as Array<{ row_key: string; label: string | null }>) {
+    for (const r of (labels ?? []) as Array<{ row_key: string; label: string | null; variant_key: string | null }>) {
       if (r.label) variantLabels[r.row_key] = r.label;
+      variantKeys[r.row_key] = r.variant_key ?? null;
     }
   } catch { /* a missing label must never stop a customer opening their quote */ }
 
@@ -133,11 +138,18 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
         return jsonResponse({ error: 'This quote has optional extra(s) still to be decided. Please contact the sender.' }, 409);
       }
     }
+    // #374 — the signed content pins WHICH VARIANT, not just the money.
+    //
+    // This covered [line id, line total] only, so a customer could sign for "Nero 60x60" and
+    // the line could later be changed to Bianco at the same price with the signature still
+    // verifying. An e-signature whose subject can be swapped underneath it is not evidence of
+    // what was agreed. The variant KEY is hashed rather than the rendered label, so an admin
+    // editing a field's display name in the registry cannot invalidate signatures already given.
     const canonical = JSON.stringify({
       id: quote.id,
       grand_total: totals?.grand_total ?? null,
       subtotal: totals?.subtotal ?? null,
-      items: (rawItems ?? []).map((it: any) => [it.id, it.line_total]),
+      items: (rawItems ?? []).map((it: any) => [it.id, it.line_total, variantKeys[it.id] ?? null]),
     });
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
     const version_hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
