@@ -9,6 +9,7 @@ import { escapeHtml } from '../_shared/html.ts';
 import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { resolveDocumentEmailTemplate, withAllVars } from '../_shared/document-email-template.ts';
 
 
 const money = (v: number, c: string) => formatMoney(v, c);
@@ -61,6 +62,11 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   // Pay / view-online link → the hosted /pay/{token} page (pay online or just view).
   // The PDF step above mints a token when the invoice is payable; reuse it, mint as fallback.
   let payLinkHtml = '';
+  // The bare URL as well as the rendered button: a workspace template composes its own call to
+  // action, and it can only do that if it gets the address rather than our markup. (It could not
+  // receive markup anyway — email-api escapes every variable it substitutes, which is what keeps
+  // a tenant-authored template from being an HTML injection point.)
+  let payUrl = '';
   try {
     if (Number(inv.amount_due ?? 0) > 0.005 && inv.status !== 'void' && inv.status !== 'credit_noted') {
       const { data: fresh } = await supabase.from('invoices')
@@ -73,7 +79,8 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
       }
       if (token) {
         const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
-        payLinkHtml = `<p style="margin:18px 0"><a href="${base}/pay/${token}" style="display:inline-block;background:#7a1f5c;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">View / Pay online »</a></p>`;
+        payUrl = `${base}/pay/${token}`;
+        payLinkHtml = `<p style="margin:18px 0"><a href="${payUrl}" style="display:inline-block;background:#7a1f5c;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">View / Pay online »</a></p>`;
       }
     }
   } catch (e) {
@@ -111,10 +118,12 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   // (not just the attached PDF, and not the pay link) can still pay by bank transfer.
   // Same never-expiring code the PDF prints (ensureInvoiceRf is idempotent per amount).
   let rfHtml = '';
+  let rfCode = '';
   try {
     if (Number(inv.amount_due ?? 0) > 0.005 && inv.status !== 'void' && inv.status !== 'credit_noted') {
       const rf = await ensureInvoiceRf(supabase, invoice_id);
       if (rf?.rfCode) {
+        rfCode = rf.rfCode;
         rfHtml = `
       <div style="margin:16px 0;padding:12px 14px;background:#f6f2f5;border-radius:8px">
         <div style="color:#666;font-size:12px">Pay by bank transfer — no IBAN needed</div>
@@ -144,11 +153,39 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
       <p style="color:#999;font-size:12px;margin-top:24px">Sent via ${esc(sender)}.</p>
     </div>`;
 
+  // A workspace can replace this body with one of its own templates (Email Marketing →
+  // Templates → Use for → Invoice emails). Absent an assignment this is null and the built-in
+  // `html`/`subject` above send exactly as before — the override is opt-in, per workspace.
+  //
+  // Both are passed: email-api uses the template's own subject when it has one and falls back to
+  // ours, and the PDF attachment is independent of the body either way, so the invoice document
+  // itself can never be lost by branding the email around it.
+  const templateSlug = await resolveDocumentEmailTemplate(supabase, inv.workspace_id, 'invoice');
+  const templateVars = templateSlug
+    ? withAllVars('invoice', {
+        invoice_number: number,
+        customer_name: name,
+        sender_name: sender,
+        total,
+        currency: inv.currency,
+        due_date: inv.due_at,
+        pay_url: payUrl,
+        rf_code: rfCode,
+        fiscal_mark: inv.fiscal_mark,
+        fiscal_qr_url: inv.fiscal_qr_url,
+      })
+    : undefined;
+
   const { data: dispatch, error: dispatchErr } = await supabase.functions.invoke('email-api', {
     // Tenant business mail (invoice to the tenant's customer) → must send from the workspace's
     // own BYOK Resend, never the shared platform domain. requireWorkspaceSender makes email-api
     // 503 (code=workspace_sender_required) until BYOK is configured; the operator's root workspace is exempt.
-    body: { action: 'send', to: email, subject, html, emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id }, attachments, workspace_id: inv.workspace_id, requireWorkspaceSender: true },
+    body: {
+      action: 'send', to: email, subject, html,
+      ...(templateSlug ? { templateSlug, variables: templateVars } : {}),
+      emailType: 'transactional', tags: { feature: 'invoice_email', invoice_id },
+      attachments, workspace_id: inv.workspace_id, requireWorkspaceSender: true,
+    },
   });
   if (dispatchErr || !(dispatch as any)?.success) {
     return json({ ok: false, error: dispatchErr?.message ?? 'email send failed' }, 502);

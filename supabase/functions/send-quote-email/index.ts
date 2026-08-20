@@ -12,7 +12,8 @@
  *   1. Auth + owner/admin check.
  *   2. Ensure the public share link is enabled (mints a token if needed) so the
  *      email can deep-link to /q/:token — viewable without logging in.
- *   3. Compose inline HTML (no template dependency) + dispatch via email-api.
+ *   3. Compose the built-in HTML, or render the workspace's assigned quote template when it
+ *      has one (Email Marketing → Templates → Use for → Quote emails), + dispatch via email-api.
  *
  * Sender (from:) is resolved by email-api from email_settings.
  */
@@ -20,6 +21,7 @@ import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { resolveDocumentEmailTemplate, withAllVars } from '../_shared/document-email-template.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,6 +147,28 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
     viewUrl,
   });
 
+  // Optional per-workspace override of the body. Null (the default) sends the built-in HTML
+  // above unchanged. The share link is minted BEFORE this either way, so a template can address
+  // `{{view_url}}` — and the assignment guard refuses a quote template that omits it, because a
+  // quote email whose only job is to open the quote is useless without the link.
+  const templateSlug = await resolveDocumentEmailTemplate(supabase, quote.workspace_id, 'quote');
+  const { data: qfs } = quote.workspace_id
+    ? await supabase.from('finance_settings').select('business_name').eq('workspace_id', quote.workspace_id).maybeSingle()
+    : { data: null };
+  const templateVars = templateSlug
+    ? withAllVars('quote', {
+        quote_title: title,
+        quote_number: quote.quote_number,
+        customer_name: recipientName,
+        sender_name: (qfs as { business_name?: string } | null)?.business_name ?? '',
+        total,
+        currency: quote.currency || 'EUR',
+        expires_at: quote.expires_at,
+        view_url: viewUrl,
+        message: body.message?.trim() || '',
+      })
+    : undefined;
+
   try {
     const { data: dispatch, error: dErr } = await supabase.functions.invoke('email-api', {
       body: {
@@ -152,6 +176,7 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
         to: recipient,
         subject,
         html,
+        ...(templateSlug ? { templateSlug, variables: templateVars } : {}),
         emailType: 'transactional',
         tags: { feature: 'quotes', quote_id: quote.id },
         workspace_id: quote.workspace_id ?? undefined,

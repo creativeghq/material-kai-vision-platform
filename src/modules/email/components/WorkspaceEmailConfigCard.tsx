@@ -14,13 +14,18 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
-import { Loader2, Save, Mail, ExternalLink, ShieldCheck, Send } from 'lucide-react';
+import { Loader2, Save, Mail, ExternalLink, ShieldCheck, Send, SlidersHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { emailService, isSenderNotConfigured } from '@/modules/email/services/emailService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { Link } from 'react-router-dom';
 
 export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?: () => void }> = ({ workspaceId, onSaved }) => {
   const { toast } = useToast();
+  // The operator edits the PLATFORM sender itself (email_settings) at
+  // /admin/modules/email/settings. Everyone else can only bring their own Resend.
+  const { isPlatformOperator } = useWorkspace();
   const [apiKey, setApiKey] = useState('');
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
@@ -35,6 +40,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
   const [testing, setTesting] = useState(false);
   // Set when sends currently resolve to the platform default sender (no own Resend in effect).
   const [platformSender, setPlatformSender] = useState<{ email: string | null; name: string | null } | null>(null);
+  const [platformReply, setPlatformReply] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +57,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
       setLimit(c?.effective_daily_limit ?? null);
       setSentToday(c?.sent_today ?? 0);
       setPlatformSender(c?.source === 'platform' ? { email: c.platform_from_email, name: c.platform_from_name } : null);
+      setPlatformReply(c?.platform_reply_to ?? '');
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -101,6 +108,13 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
 
   if (loading) return <Card><CardContent className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>;
 
+  // What a send resolves to right now: your own values when you have them, the platform's
+  // otherwise. The form fields hold YOUR override and stay empty until you set one — these are
+  // what actually goes on the message.
+  const effectiveFrom = fromEmail.trim() || platformSender?.email || '';
+  const effectiveName = fromName.trim() || (fromEmail.trim() ? '' : platformSender?.name || '');
+  const platformReplyTo = platformSender ? platformReply : '';
+
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
@@ -124,6 +138,17 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
               <code className="font-mono">{platformSender.name ? `${platformSender.name} <${platformSender.email ?? ''}>` : platformSender.email}</code>.
               Nothing to set up — add your own Resend below only to send from your own domain instead.
             </p>
+            {/* For the operator this IS their sending identity, and it is editable — just not
+                here. Without the link the page showed the address and no way to change it, which
+                reads as "not configurable" rather than "configured somewhere else". */}
+            {isPlatformOperator && (
+              <Link
+                to="/admin/modules/email/settings"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <SlidersHorizontal className="h-3 w-3" /> Edit the platform sender
+              </Link>
+            )}
           </div>
         )}
         {/* One description, because this card has one job. It used to carry a second, conditional
@@ -142,31 +167,39 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
           <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="new-password" placeholder={hasKey ? '•••••••• (configured — leave blank to keep)' : 're_...'} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Placeholders show the INHERITED value, not an invented example. An empty field under
+              a "sender configured" banner reads as broken; the same field showing the address that
+              is actually in use reads as "inherited, override if you want" — which is the truth. */}
           <div className="space-y-1">
             <Label className="text-xs">From email</Label>
-            <Input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="billing@yourdomain.com" />
+            <Input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder={platformSender?.email || 'billing@yourdomain.com'} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">From name <span className="text-muted-foreground">(optional)</span></Label>
-            <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your Company" />
+            <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder={platformSender?.name || 'Your Company'} />
           </div>
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Reply-to <span className="text-muted-foreground">(optional)</span></Label>
-          <Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="Same as From email" type="email" />
+          <Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder={platformReplyTo || 'Same as From email'} type="email" />
           <p className="text-[11px] text-muted-foreground">
             Where customer replies go. Leave blank to reply to the From email. Applied to every email
             you send — quotes, invoices, statements, catalog and campaigns.
           </p>
         </div>
-        {/* What the recipient actually sees on the message. */}
-        {fromEmail.trim() && (
+        {/* What the recipient actually sees — for the sender that is IN EFFECT, which is the
+            platform one until you save your own. This used to render only when `fromEmail` was
+            filled, so the one workspace whose fields are legitimately empty (the operator's, on
+            the platform sender) was also the one shown nothing. */}
+        {effectiveFrom && (
           <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs space-y-0.5">
-            <div className="text-muted-foreground">Recipients will see:</div>
+            <div className="text-muted-foreground">
+              Recipients will see{!fromEmail.trim() && platformSender ? ' (from the platform sender)' : ''}:
+            </div>
             <div><span className="text-muted-foreground">From:</span>{' '}
-              <code className="font-mono">{fromName.trim() ? `${fromName.trim()} <${fromEmail.trim()}>` : fromEmail.trim()}</code></div>
+              <code className="font-mono">{effectiveName ? `${effectiveName} <${effectiveFrom}>` : effectiveFrom}</code></div>
             <div><span className="text-muted-foreground">Reply-to:</span>{' '}
-              <code className="font-mono">{replyTo.trim() || fromEmail.trim()}</code></div>
+              <code className="font-mono">{replyTo.trim() || platformReplyTo || effectiveFrom}</code></div>
           </div>
         )}
         <div className="flex items-center justify-between rounded-md border border-border/60 p-3">

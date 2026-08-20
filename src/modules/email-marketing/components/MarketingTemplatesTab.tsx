@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, FileText, Loader2, Copy, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Loader2, Copy, Check, Mail } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
@@ -14,7 +14,14 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { marketingService, type MarketingTemplate } from '../services/marketingService';
+import {
+  marketingService, DOCUMENT_EMAIL_KINDS,
+  type MarketingTemplate, type DocumentEmailKind,
+} from '../services/marketingService';
+import { Badge } from '@/components/core/ui/badge';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 
 export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const navigate = useNavigate();
@@ -27,6 +34,8 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [copied, setCopied] = useState<string | null>(null);
+  /** document kind → template id. Absent = that document keeps its built-in email body. */
+  const [assignments, setAssignments] = useState<Partial<Record<DocumentEmailKind, string>>>({});
 
   const copySlug = async (slug: string) => {
     try {
@@ -52,8 +61,13 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const load = async () => {
     setLoading(true);
     try {
-      const rows = await marketingService.listTemplates(workspaceId);
+      const [rows, assigned] = await Promise.all([
+        marketingService.listTemplates(workspaceId),
+        // Best-effort: a member who cannot read the mapping still gets their template list.
+        marketingService.listDocumentAssignments(workspaceId).catch(() => ({})),
+      ]);
       setTemplates(rows);
+      setAssignments(assigned);
       // Deleting a template can shrink the list — don't strand the user on a now-empty page.
       setPage((p) => clampPage(p, rows.length));
     } catch (e: any) {
@@ -74,6 +88,35 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message || 'Failed to create template', variant: 'destructive' });
       setCreating(false);
+    }
+  };
+
+  /**
+   * Point a document kind at this template, or clear it.
+   *
+   * The DB trigger is the real gate — it refuses a Draft template, one belonging to another
+   * workspace, and one that never mentions the document (no `{{invoice_number}}` / `{{total}}`
+   * on an invoice, no `{{view_url}}` on a quote). Its message is shown verbatim, because
+   * "your template does not say which invoice this is" is the actual answer, and a generic
+   * "failed to save" would send the operator back to guess.
+   */
+  const toggleAssignment = async (t: MarketingTemplate, kind: DocumentEmailKind) => {
+    const clearing = assignments[kind] === t.id;
+    try {
+      await marketingService.setDocumentAssignment(workspaceId, kind, clearing ? null : t.id);
+      setAssignments((a) => {
+        const next = { ...a };
+        if (clearing) delete next[kind];
+        else next[kind] = t.id;
+        return next;
+      });
+      const label = DOCUMENT_EMAIL_KINDS.find((k) => k.kind === kind)?.label ?? kind;
+      toast({
+        title: clearing ? `${label} back to the built-in design` : `${label} now use "${t.name}"`,
+        description: clearing ? undefined : 'Sent from now on — existing documents are unaffected.',
+      });
+    } catch (e: any) {
+      toast({ title: 'Could not use this template', description: e?.message || 'Assignment refused', variant: 'destructive' });
     }
   };
 
@@ -123,6 +166,10 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
                     built here was unreachable from automation without reading the database. */}
                 <th className="text-left py-3 px-4 font-medium">Slug</th>
                 <th className="text-left py-3 px-4 font-medium">Status</th>
+                {/* Which document sends now use this template instead of the built-in body. This
+                    is the answer to "I designed a template — how do I actually send with it?":
+                    before it existed a template could only ever brand a campaign. */}
+                <th className="text-left py-3 px-4 font-medium">Used for</th>
                 <th className="text-right py-3 px-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -147,6 +194,44 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
                   </td>
                   <td className="py-3 px-4">
                     <span className={`text-sm capitalize ${statusTone(t.is_active ? 'active' : 'draft')}`}>{t.is_active ? 'Ready' : 'Draft'}</span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-auto px-1.5 py-1">
+                          {DOCUMENT_EMAIL_KINDS.some((k) => assignments[k.kind] === t.id) ? (
+                            <span className="flex flex-wrap gap-1">
+                              {DOCUMENT_EMAIL_KINDS.filter((k) => assignments[k.kind] === t.id).map((k) => (
+                                <Badge key={k.kind} variant="info">{k.label}</Badge>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                              <Mail className="h-3 w-3" /> Use for…
+                            </span>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64">
+                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                          Replace the built-in email body for:
+                        </DropdownMenuLabel>
+                        {DOCUMENT_EMAIL_KINDS.map((k) => (
+                          <DropdownMenuCheckboxItem
+                            key={k.kind}
+                            checked={assignments[k.kind] === t.id}
+                            onCheckedChange={() => toggleAssignment(t, k.kind)}
+                          >
+                            <span>
+                              {k.label}
+                              <span className="block text-[10px] text-muted-foreground">
+                                needs {k.required.map((r) => `{{${r}}}`).join(' + ')}
+                              </span>
+                            </span>
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-1">

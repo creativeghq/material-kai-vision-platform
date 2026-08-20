@@ -77,6 +77,32 @@ function randomSlugSuffix(): string {
   return Math.random().toString(16).slice(2, 10).padEnd(8, '0');
 }
 
+/**
+ * A business document whose email body a workspace template can replace.
+ *
+ * The vocabulary exists in three places and all three must agree: this list, the CHECK on
+ * `workspace_document_email_templates.document_kind`, and `DOCUMENT_EMAIL_VARIABLES` in the edge
+ * helper that fills the placeholders. Adding a kind without the third is an assignment that
+ * saves, shows as assigned, and changes nothing about the email.
+ */
+export const DOCUMENT_EMAIL_KINDS = [
+  {
+    kind: 'invoice' as const,
+    label: 'Invoice emails',
+    /** Refused by `assert_document_email_template_binding` when the template omits one. */
+    required: ['invoice_number', 'total'],
+    variables: ['invoice_number', 'customer_name', 'sender_name', 'total', 'currency', 'due_date', 'pay_url', 'rf_code', 'fiscal_mark', 'fiscal_qr_url'],
+  },
+  {
+    kind: 'quote' as const,
+    label: 'Quote emails',
+    required: ['view_url'],
+    variables: ['quote_title', 'quote_number', 'customer_name', 'sender_name', 'total', 'currency', 'expires_at', 'view_url', 'message'],
+  },
+] as const;
+
+export type DocumentEmailKind = typeof DOCUMENT_EMAIL_KINDS[number]['kind'];
+
 class MarketingService {
   // ── Templates ──────────────────────────────────────────────────────────────
   async listTemplates(workspaceId: string): Promise<MarketingTemplate[]> {
@@ -114,6 +140,54 @@ class MarketingService {
       .single();
     if (error) throw error;
     return data.id as string;
+  }
+
+  // ── Document email assignments ─────────────────────────────────────────────
+  //
+  // Which template replaces the built-in body of an invoice / quote email. Absent = the built-in
+  // body, which is what every workspace gets until it deliberately assigns one.
+
+  /** Current assignments for a workspace, as `{ invoice: <templateId>, ... }`. */
+  async listDocumentAssignments(workspaceId: string): Promise<Partial<Record<DocumentEmailKind, string>>> {
+    const { data, error } = await supabase
+      .from('workspace_document_email_templates')
+      .select('document_kind, template_id')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    const out: Partial<Record<DocumentEmailKind, string>> = {};
+    for (const r of (data ?? []) as Array<{ document_kind: DocumentEmailKind; template_id: string }>) {
+      out[r.document_kind] = r.template_id;
+    }
+    return out;
+  }
+
+  /**
+   * Point a document kind at a template, or clear it (`templateId = null`) to go back to the
+   * built-in body. The DB trigger refuses a template from another workspace, an inactive one, or
+   * one missing the placeholders that kind requires — so a rejection here is a real answer to
+   * show the operator, not a failure to swallow.
+   */
+  async setDocumentAssignment(workspaceId: string, kind: DocumentEmailKind, templateId: string | null): Promise<void> {
+    if (!templateId) {
+      const { error } = await supabase
+        .from('workspace_document_email_templates')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('document_kind', kind);
+      if (error) throw error;
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from('workspace_document_email_templates')
+      .upsert({
+        workspace_id: workspaceId,
+        document_kind: kind,
+        template_id: templateId,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      }, { onConflict: 'workspace_id,document_kind' });
+    if (error) throw error;
   }
 
   async deleteTemplate(id: string): Promise<void> {
