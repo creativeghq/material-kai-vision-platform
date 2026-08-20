@@ -26,6 +26,18 @@
  *   • `stripComments` removes the comment text. Use it when asserting on WHAT the source says.
  *   • `blankComments` replaces it with spaces, preserving every byte offset, line and column.
  *     Use it when reporting a line number, slicing by index, or comparing positions.
+ *
+ * `stripComments` NORMALIZES CRLF to LF; `blankComments` deliberately does not, because it would
+ * cost exactly the byte-for-byte alignment that is its whole reason to exist. A guard's anchor
+ * describes source STRUCTURE — say `"from('quote_items')\n      .insert({"` — not a byte
+ * encoding, and on a Windows checkout with `core.autocrlf=true` every one of those newlines is
+ * CR LF on disk, so the anchor cannot match. `quoteCostBasis` failed exactly that way locally
+ * while passing in CI, where the checkout is LF. A guard that is red on one platform and green on
+ * the other teaches people to stop reading `npm test`, which is the same muting problem the rest
+ * of this file exists to prevent.
+ *
+ * A `blankComments` caller that needs both alignment AND a multi-line anchor must normalize the
+ * source itself, before reading, so that offsets and anchors agree on one representation.
  */
 
 type Mode = 'strip' | 'blank';
@@ -109,9 +121,12 @@ function scan(src: string, mode: Mode): string {
   return parts.join('');
 }
 
-/** Source with comment TEXT removed. Newlines are preserved; offsets are not. */
+/**
+ * Source with comment TEXT removed, and CRLF normalized to LF. Newlines are preserved; offsets
+ * are not — which is what makes the normalization free here and impossible in `blankComments`.
+ */
 export function stripComments(src: string): string {
-  return scan(src, 'strip');
+  return scan(src.indexOf('\r') === -1 ? src : src.replace(/\r\n/g, '\n'), 'strip');
 }
 
 /**
