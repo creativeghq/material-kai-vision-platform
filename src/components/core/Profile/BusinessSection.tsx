@@ -458,7 +458,9 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
           </CardTitle>
           {!editing ? (
             <div className="flex gap-2">
-              {entityType === 'business' && business.name && activeWorkspaceId && (
+              {/* Pointless when the identity came FROM invoicing — it would copy the values onto
+                  themselves. Only a separate profile copy can have anything to push. */}
+              {identity.source === 'profile' && business.name && activeWorkspaceId && (
                 <Button size="sm" variant="outline" onClick={copyToInvoicing} disabled={syncingInvoicing}
                   title="Copy this identity into Finance → Business Identity (the copy invoices + myDATA use)">
                   {syncingInvoicing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CornerDownLeft className="h-3.5 w-3.5 mr-1.5" />}
