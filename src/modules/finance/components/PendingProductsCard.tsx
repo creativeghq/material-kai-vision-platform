@@ -726,7 +726,13 @@ const IntakeLineList: React.FC<{
   const [bulkBusy, setBulkBusy] = useState(false);
   /** The ladder's answer at an operator-typed cost, keyed by line id. Only the row being edited
    *  is re-asked; the rest keep the value `warehouse_intake_lines` already derived for them. */
-  const [repriced, setRepriced] = useState<Record<string, { sell: number | null; rung: PriceRung; markupPct: number | null }>>({});
+  const [repriced, setRepriced] = useState<Record<string, {
+    sell: number | null; rung: PriceRung; markupPct: number | null;
+    brandAttributed: boolean; maker: string | null;
+  }>>({});
+  /** The maker the operator is putting into the CRM, if any. Making a maker a CRM company is
+   *  the ONLY way the brand rung becomes reachable for it — see the warning below. */
+  const [brandFor, setBrandFor] = useState<{ lineId: string; name: string } | null>(null);
   /** What the deterministic parser read out of each line's text, kept so the row can show its
    *  evidence. A silently applied guess is the thing this screen must never do again. */
   const [parsed, setParsed] = useState<Record<string, ParsedSupplierLine>>({});
@@ -819,19 +825,34 @@ const IntakeLineList: React.FC<{
   });
 
   /**
-   * Re-ask the ladder for ONE line, because the operator changed its cost.
+   * Re-ask the ladder for ONE line, because the operator changed something the ladder reads.
+   *
+   * That is not only the cost. The maker decides the BRAND rung and the material category
+   * decides the CATEGORY rung, and approval writes both onto the product before deriving the
+   * price — so a preview that ignores them answers a different question from the one the
+   * approval will answer a second later. Both were previously hardcoded null all the way down
+   * to `_pricing_markup_explain`, which is why a line that plainly says EGGER on it reported
+   * that no pricing rule matched.
    *
    * Debounced, and scoped to the edited row. The old card re-ran every row's preview on every
    * debounce tick, so typing a digit into one cost field fired 929 requests.
    */
   const repriceTimers = useRef<Record<string, number>>({});
-  const repriceOne = (id: string, typed: string) => {
+  const repriceOne = (id: string, patch?: Partial<LineEdit>) => {
     window.clearTimeout(repriceTimers.current[id]);
     repriceTimers.current[id] = window.setTimeout(async () => {
-      const cost = typed === '' ? null : parseDecimalOr(typed, 0);
+      const e = { ...edits[id], ...patch } as LineEdit;
+      if (!e) return;
+      const cost = e.unit_cost === '' ? null : parseDecimalOr(e.unit_cost, 0);
       try {
-        const r = await warehouseService.previewIntakeSellPrice(id, cost);
-        setRepriced((m) => ({ ...m, [id]: { sell: r.sell, rung: r.rung, markupPct: r.markupPct } }));
+        const r = await warehouseService.previewIntakeSellPrice(id, cost, {
+          materialCategory: e.material_category,
+          manufacturer: e.manufacturer,
+        });
+        setRepriced((m) => ({
+          ...m,
+          [id]: { sell: r.sell, rung: r.rung, markupPct: r.markupPct, brandAttributed: r.brandAttributed, maker: r.maker },
+        }));
       } catch { /* no suggestion is better than a wrong one */ }
     }, 400);
   };
@@ -1077,6 +1098,10 @@ const IntakeLineList: React.FC<{
               const drift = netValueDrift(stated, Number.isFinite(qtyNum) ? qtyNum : null, costNum);
               const unitIssue = unitQuantityIssue(e.unit, Number.isFinite(qtyNum) ? qtyNum : null);
               const unitStated = l.measurement_unit_code != null;
+              // Whether a BRAND rule could reach this line at all. `rep` is the live answer for a
+              // row being edited; the page-level one is what SQL derived from the stored maker.
+              const maker = (e.manufacturer || l.manufacturer || '').trim();
+              const brandAttributed = rep ? rep.brandAttributed : l.brand_attributed;
 
               return (
                 <div key={l.id} className="space-y-2 rounded-sm border border-hairline bg-card px-3 py-2.5">
@@ -1157,7 +1182,7 @@ const IntakeLineList: React.FC<{
                       <label htmlFor={`intake-cost-${l.id}`} className="text-[10px] text-muted-foreground">Unit cost (paid)</label>
                       <Input id={`intake-cost-${l.id}`} className="h-8 text-right text-sm tabular-nums" type="text" inputMode="decimal"
                         value={e.unit_cost}
-                        onChange={(ev) => { setEdit(l.id, { unit_cost: ev.target.value }); repriceOne(l.id, ev.target.value); }}
+                        onChange={(ev) => { setEdit(l.id, { unit_cost: ev.target.value }); repriceOne(l.id, { unit_cost: ev.target.value }); }}
                         placeholder="0.00" />
                     </div>
                     <div className="space-y-0.5">
@@ -1364,6 +1389,25 @@ const IntakeLineList: React.FC<{
                     </div>
                   )}
 
+                  {/* The same shape one rung up, and the one that actually bites: the BRAND is the
+                      primary pricing dimension in a resale model, so a maker the CRM does not know
+                      makes that rung unreachable no matter how carefully the name is typed. This is
+                      not "no rule is set" — it is "no rule CAN apply", and only the operator can
+                      change it. Offered here rather than as a trip to another module, because this
+                      is where the consequence is being reported. */}
+                  {maker && !brandAttributed && (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[hsl(var(--warning))]">
+                      <span>
+                        <strong className="font-medium">{maker}</strong> is not a CRM company, so no brand pricing
+                        rule can apply to this product — and the brand is the first rung the ladder tries.
+                      </span>
+                      <button type="button" className="underline underline-offset-2"
+                        onClick={() => setBrandFor({ lineId: l.id, name: maker })}>
+                        Add {maker} as a manufacturer
+                      </button>
+                    </div>
+                  )}
+
                   {detailsOpen && (
                     <div className="space-y-2 rounded-sm border border-hairline bg-surface-sunken px-3 py-2.5">
                       <p className="text-[11px] text-muted-foreground">
@@ -1372,13 +1416,18 @@ const IntakeLineList: React.FC<{
                       </p>
                       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                         <DetailField label="Manufacturer" id={`mfr-${l.id}`} value={e.manufacturer}
-                          onChange={(v) => setEdit(l.id, { manufacturer: v })} placeholder="e.g. Jowat" />
+                          onChange={(v) => { setEdit(l.id, { manufacturer: v }); repriceOne(l.id, { manufacturer: v }); }}
+                          placeholder="e.g. Jowat" />
                         <DetailField label="Supplier item code" id={`sup-${l.id}`} value={e.supplier_product_code}
                           onChange={(v) => setEdit(l.id, { supplier_product_code: v })} placeholder="their code" />
                         <div className="space-y-0.5">
                           <label htmlFor={`mat-${l.id}`} className="text-[10px] text-muted-foreground">Material category</label>
                           <Select value={e.material_category || '__none'}
-                            onValueChange={(v) => setEdit(l.id, { material_category: v === '__none' ? '' : v })}>
+                            onValueChange={(v) => {
+                              const next = v === '__none' ? '' : v;
+                              setEdit(l.id, { material_category: next });
+                              repriceOne(l.id, { material_category: next });
+                            }}>
                             <SelectTrigger id={`mat-${l.id}`} className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__none">— None —</SelectItem>
@@ -1449,6 +1498,26 @@ const IntakeLineList: React.FC<{
       <TablePagination
         page={page} total={total} pageSize={INTAKE_LINE_PAGE_SIZE}
         onPageChange={setPage} label="lines"
+      />
+
+      {/* A maker becomes a CRM company through the SAME duplicate probe as every other party.
+          `resolve_brand_company` would have found-or-created one in a single call, and that is
+          exactly what must not happen from a free-text field on an invoice line: the value is as
+          likely to be a typo, an abbreviation or the distributor's name as the maker's. */}
+      <QuickAddCompanyDialog
+        open={!!brandFor}
+        onOpenChange={(v) => { if (!v) setBrandFor(null); }}
+        workspaceId={workspaceId}
+        initialName={brandFor?.name ?? ''}
+        role="manufacturer"
+        title="Add manufacturer to CRM"
+        description="This maker is named on the invoice line but is not a CRM company, so no brand pricing rule can reach the products it makes. Look it up to pull the official name and registry details."
+        onCreated={async () => {
+          const lineId = brandFor?.lineId;
+          setBrandFor(null);
+          // The brand rung just became reachable, so this row's suggested price may change.
+          if (lineId) repriceOne(lineId);
+        }}
       />
     </div>
   );

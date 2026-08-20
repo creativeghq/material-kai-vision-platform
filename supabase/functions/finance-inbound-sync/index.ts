@@ -436,6 +436,10 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
               unit: unitFromMydataCode(unitCode) ?? s?.unit ?? null,
               measurement_unit_code: unitCode,
               supplier_product_code: itemCode || null,
+              // Feeds `products.brand_company_id` at approval, which is the only thing that makes
+              // the BRAND rung of the pricing ladder reachable. Left null, every product intake
+              // creates is priced as though it had no maker.
+              manufacturer: String(s?.manufacturer ?? '').trim() || null,
               mydata_vat_category: l.vat_category != null ? Number(l.vat_category) : null,
               quantity: qty, unit_cost: unitCost, net_value: netValue,
               currency: d.currency ?? 'EUR',

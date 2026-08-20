@@ -140,9 +140,28 @@ raised a constraint violation and that rung could never hold a row.
 
 Two RPCs expose it so no caller ever re-implements a rung:
 
-- `preview_pending_item_sell_price(pending_item_id, cost)` — the invoice queue's suggestion. For a
-  matched line it prices the real product; for a new one the ladder honestly reduces to
-  supplier → workspace default, because nothing about a fresh invoice line says "tiles".
+- `preview_pending_item_sell_price(pending_item_id, cost, material_category, manufacturer)` — the
+  invoice queue's suggestion. For a matched line it prices the real product; for a new one the last
+  two arguments are what makes the **brand** and **category** rungs reachable at all.
+
+  They were added on 2026-08-20 because both were hardcoded `NULL` — along with the brand argument
+  in `warehouse_intake_lines` — so a new product could only ever match the supplier rung or fall
+  through to the workspace default. An EGGER worktop reported *"No pricing rule matches and the
+  workspace default markup is 0% — this would be sold at cost"* while a `brand` rule for EGGER sat
+  in the table unreachable. Worse, approval called `_pricing_retail` on the product it had just
+  written, and *that* reads `metadata->>'material_category'` and `brand_company_id` off the row — so
+  the preview and the approval could reach different rungs and show different numbers. Measured
+  against the live functions: rung `unpriced` at €53.60 became rung `brand` at €76.11, and approval
+  produced €76.11. Guarded by the "intake preview passes the maker and the material category" case
+  in [tests/unit/pricingChain.test.ts](../tests/unit/pricingChain.test.ts).
+
+  The brand rung also needs `products.brand_company_id`, which nothing on the intake path ever set.
+  Approval now resolves it from the maker with **`_brand_company_match`** — the SELECT half of
+  `resolve_brand_company`, split out so intake can match without minting. `resolve_brand_company`
+  find-or-CREATEs, which is right for catalog ingestion (a PDF names its own maker) and wrong for a
+  free-text field on an invoice line, where the value is as likely to be a typo, an abbreviation or
+  the distributor. A maker the CRM does not know stays unresolved, and the queue says so with an
+  "Add … as a manufacturer" action that goes through the usual duplicate probe.
 - `preview_markup_ladder_price(workspace, cost, …)` — the generic form, used to seed the
   receive-to-warehouse form.
 

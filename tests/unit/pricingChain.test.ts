@@ -190,6 +190,48 @@ describe('one markup derivation', () => {
   });
 
   /**
+   * Calling the resolver is not enough — it has to be asked the WHOLE question.
+   *
+   * `_pricing_markup_explain` takes (workspace, cost, product, material_category, brand, supplier).
+   * Both intake previews passed NULL for product, material_category AND brand, so for a line about
+   * to become a new product only the supplier rung and the workspace default were reachable: an
+   * invoice line that plainly said EGGER on it reported "No pricing rule matches and the workspace
+   * default markup is 0% — this would be sold at cost". Approval then called `_pricing_retail` on
+   * the product it had just written, which DOES read the category and the brand off the row — so
+   * the two could reach different rungs and produce different numbers, while the card's own header
+   * said they ran the same ladder.
+   *
+   * Measured after the fix, against the live function: rung `unpriced` at €53.60 became rung
+   * `brand` at €76.11, and approval produced €76.11.
+   *
+   * The client half is what this can see: the preview call must still carry what the operator has
+   * on screen. Drop either argument and the divergence is back, silently and with a plausible
+   * number.
+   */
+  it('the intake preview passes the maker and the material category, not just the cost', () => {
+    const src = stripComments(readFileSync(
+      join(ROOT, 'src/services/warehouseService.ts'), 'utf8',
+    ));
+    const call = /rpc\(\s*['"]preview_pending_item_sell_price['"][\s\S]{0,400}?\)/.exec(src)?.[0] ?? '';
+    expect(call, 'the preview call was not found at all').not.toBe('');
+    for (const arg of ['p_material_category', 'p_manufacturer']) {
+      expect(
+        call.includes(arg),
+        `${arg} is not passed, so the preview asks a narrower question than the approval answers ` +
+        'and the two silently disagree about which rung applies',
+      ).toBe(true);
+    }
+    // And the caller has to actually supply them rather than hardcode null at the next layer up.
+    const card = stripComments(readFileSync(
+      join(ROOT, 'src/modules/finance/components/PendingProductsCard.tsx'), 'utf8',
+    ));
+    expect(
+      /previewIntakeSellPrice\([\s\S]{0,300}?materialCategory:[\s\S]{0,120}?manufacturer:/.test(card),
+      'PendingProductsCard calls the preview without the category and the maker it has on screen',
+    ).toBe(true);
+  });
+
+  /**
    * A resolver nothing calls is as inert as the arithmetic it replaced.
    *
    * Asserted as a CALL (`rpc('name'`), not as a mention. A bare `includes()` is satisfied by the

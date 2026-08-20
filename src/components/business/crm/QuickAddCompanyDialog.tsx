@@ -41,7 +41,11 @@ interface Props {
   initialVat?: string;
   /** What this business is to us. Both flags are ALWAYS sent: the crm-api POST treats a request
    *  that names neither as "it's a customer", so a supplier would silently become one too. */
-  role?: 'supplier' | 'customer' | 'both';
+  /** Which flags the created (or adopted) company gets. `manufacturer` is the maker/brand case:
+   *  it is what makes the BRAND rung of the pricing ladder reachable, and it is deliberately a
+   *  role on THIS dialog rather than a silent `resolve_brand_company` insert, so a maker still
+   *  goes through the duplicate probe like every other CRM party. */
+  role?: 'supplier' | 'customer' | 'both' | 'manufacturer';
   onCreated: (company: QuickCreatedCompany) => void;
   title?: string;
   description?: string;
@@ -138,6 +142,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
     const flags: Record<string, boolean> = {};
     if (role === 'supplier' || role === 'both') flags.is_supplier = true;
     if (role === 'customer' || role === 'both') flags.is_customer = true;
+    if (role === 'manufacturer') { flags.is_manufacturer = true; flags.is_brand = true; }
     try {
       if (Object.keys(flags).length) await companiesAPI.updateCompany(duplicate.id, flags);
     } catch {
@@ -159,6 +164,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
         is_supplier: role === 'supplier' || role === 'both',
         is_customer: role === 'customer' || role === 'both',
       });
+      if (role === 'manufacturer') { payload.is_manufacturer = true; payload.is_brand = true; }
       // A typed email beats one the web research guessed — same rule as the name.
       if (email.trim()) payload.email = email.trim();
       const { data } = await companiesAPI.createCompany({ ...payload, workspace_id: workspaceId });

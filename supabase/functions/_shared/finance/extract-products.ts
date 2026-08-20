@@ -8,7 +8,19 @@ import type { DbClient } from '../supabase-client.ts';
 
 export interface ExpenseLineInput { index: number; description: string; quantity?: number | null }
 export interface ProductSuggestion {
-  index: number; name: string; sku: string | null; unit: string | null; size: string | null; attributes: string | null;
+  index: number; name: string; sku: string | null; unit: string | null; size: string | null;
+  attributes: string | null;
+  /**
+   * The maker named in the line.
+   *
+   * Added because its absence was structural, not cosmetic: `products.brand_company_id` is set
+   * from it, and the BRAND rung is the primary pricing dimension in a resale model — so with no
+   * manufacturer, every product intake creates is unreachable by any brand pricing rule, and the
+   * queue reports "no pricing rule matches" for a line that plainly says EGGER on it. The
+   * client-side parser only recognises makers the CRM already knows, so it cannot fill this gap
+   * for a maker nobody has entered yet, which is exactly the case that matters.
+   */
+  manufacturer: string | null;
 }
 
 const Schema = z.object({
@@ -19,6 +31,7 @@ const Schema = z.object({
     unit: z.string().nullable(),
     size: z.string().nullable(),
     attributes: z.string().nullable(),
+    manufacturer: z.string().nullable(),
   })),
 });
 
