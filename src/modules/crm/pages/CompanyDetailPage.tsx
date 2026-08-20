@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers, Wrench } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
+import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
@@ -768,8 +769,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2"/>Account</TabsTrigger>
                 )}
                 <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2"/>Contacts ({company.contacts?.length || 0})</TabsTrigger>
-                <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2"/>Projects</TabsTrigger>
-                <TabsTrigger value="warranties" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wrench className="h-4 w-4 mr-2"/>Warranties</TabsTrigger>
+                <TabsTrigger value="work" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2"/>Work</TabsTrigger>
                 {company.is_supplier && (
                   <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Products</TabsTrigger>
                 )}
@@ -1153,24 +1153,28 @@ export const CompanyDetailPage: React.FC = () => {
               the customer-only cards (repeat-buy, pricing rules) are hidden. */}
           {/* Projects — the same shared element the contact record mounts. Includes projects
               booked against this company's people, since that's still the company's work. */}
-          <TabsContent value="projects" className="space-y-4">
-            {company.id ? (
-              <PartyProjectsCard
-                companyId={company.id}
-                partyName={company.name}
-                memberContactIds={(company.contacts ?? []).map((c: any) => c.id).filter(Boolean)}
-              />
-            ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to attach projects.</CardContent></Card>
-            )}
-          </TabsContent>
+          {/*
+            Work (#376) — one tab for "what is going on with this company?". It replaced Projects
+            and absorbed Warranties, which were two tabs answering the same question about the
+            same record.
 
-          {/* Warranties — the installed base (#343). */}
-          <TabsContent value="warranties" className="space-y-4">
+            The roll-up is READ-ONLY and derived by `get_party_work`; the panels below it are the
+            surfaces that CREATE things. Equipment is excluded from the roll-up precisely because
+            `WarrantiesTab` owns it — listing it in both would show the same rows twice.
+          */}
+          <TabsContent value="work" className="space-y-4">
             {company.id ? (
-              <WarrantiesTab companyId={company.id} />
+              <>
+                <PartyProjectsCard
+                  companyId={company.id}
+                  partyName={company.name}
+                  memberContactIds={(company.contacts ?? []).map((c: any) => c.id).filter(Boolean)}
+                />
+                <PartyWorkTab partyKind="company" partyId={company.id} excludeKinds={['project', 'asset']} />
+                <WarrantiesTab companyId={company.id} />
+              </>
             ) : (
-              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to register equipment.</CardContent></Card>
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to attach work to it.</CardContent></Card>
             )}
           </TabsContent>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles, Loader2, RefreshCw, FolderKanban, Wrench } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -50,6 +50,7 @@ import { useModule } from '@/modules/_core';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
+import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { scoreLead, leadScoreTint } from '@/modules/crm/services/leadScoring';
@@ -819,11 +820,7 @@ export const ContactDetailPage: React.FC = () => {
                 {hasCompany && (
                   <TabsTrigger value="company" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Building2 className="h-4 w-4 mr-2" />Company</TabsTrigger>
                 )}
-                <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2" />Projects</TabsTrigger>
-                <TabsTrigger value="warranties" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wrench className="h-4 w-4 mr-2" />Warranties</TabsTrigger>
-                {realEstateEnabled && (
-                  <TabsTrigger value="property" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Home className="h-4 w-4 mr-2" />Property</TabsTrigger>
-                )}
+                <TabsTrigger value="work" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2" />Work</TabsTrigger>
               </TabsList>
 
               {/* Activity — the shared record-activity element (identical to the company
@@ -1170,32 +1167,33 @@ export const ContactDetailPage: React.FC = () => {
                   </Card>
                 </TabsContent>
               )}
-              {/* Projects — the same shared element the company record mounts. */}
-              <TabsContent value="projects" className="space-y-4">
+              {/*
+                Work (#376) — the same shared element the company record mounts, plus the two
+                management panels it absorbed. Projects, Warranties and Property were three tabs
+                answering one question about one person.
+
+                Real estate stays behind its `ModuleTabGate`: the roll-up above will already list
+                a tenancy or a sale for a workspace that has the module, and the gate is what
+                upsells the ones that do not — so the section appears here rather than the whole
+                tab disappearing, which is what used to happen.
+              */}
+              <TabsContent value="work" className="space-y-4">
                 {contact.id ? (
-                  <PartyProjectsCard contactId={contact.id} partyName={contact.name} />
+                  <>
+                    <PartyProjectsCard contactId={contact.id} partyName={contact.name} />
+                    <PartyWorkTab partyKind="contact" partyId={contact.id} excludeKinds={['project', 'asset']} />
+                    <WarrantiesTab contactId={contact.id} />
+                    {realEstateEnabled && (
+                      <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate"
+                        blurb="See this contact's property interests, viewings and buyer requirements.">
+                        <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
+                      </ModuleTabGate>
+                    )}
+                  </>
                 ) : (
-                  <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to attach projects.</CardContent></Card>
+                  <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to attach work to it.</CardContent></Card>
                 )}
               </TabsContent>
-
-              {/* Warranties — the installed base (#343). */}
-              <TabsContent value="warranties" className="space-y-4">
-                {contact.id ? (
-                  <WarrantiesTab contactId={contact.id} />
-                ) : (
-                  <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to register equipment.</CardContent></Card>
-                )}
-              </TabsContent>
-
-              {realEstateEnabled && (
-                <TabsContent value="property" className="space-y-4">
-                  <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate"
-                    blurb="See this contact's property interests, viewings and buyer requirements.">
-                    <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
-                  </ModuleTabGate>
-                </TabsContent>
-              )}
             </Tabs>
           </div>
         </div>
