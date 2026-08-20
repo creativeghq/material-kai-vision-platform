@@ -732,7 +732,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
-      'company_registry_lookup',
+      'company_registry_lookup', 'industrial_facility_search',
       'contact_discovery', 'email_validate', 'save_to_crm',
       // Material scraping — pull products off a supplier page (#347)
       'scrape_materials_from_url', 'suggest_extraction_fields',
@@ -921,7 +921,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup',
-      'contact_discovery', 'email_validate', 'save_to_crm',
+      'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
       'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
       'related_products', 'find_products_by_spec', 'products_in_project', 'projects_using_product',
@@ -1413,7 +1413,7 @@ async function executeAgent(
   const needsOps = config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
   const needsDb = config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
-  const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
+  const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   // SEO agent toolkit (conversational research surface — separate from the article pipeline)
@@ -1538,6 +1538,7 @@ async function executeAgent(
   const createFieldSuggestTool = matScrapeMod?.createFieldSuggestTool;
   const createCompanyEnrichmentTool = b2bMod?.createCompanyEnrichmentTool;
   const createCompanyRegistryLookupTool = b2bMod?.createCompanyRegistryLookupTool;
+  const createIndustrialFacilitySearchTool = b2bMod?.createIndustrialFacilitySearchTool;
   const createContactDiscoveryTool = b2bMod?.createContactDiscoveryTool;
   const createEmailValidateTool = b2bMod?.createEmailValidateTool;
   const createSaveToCRMTool = b2bMod?.createSaveToCRMTool;
@@ -2254,6 +2255,9 @@ async function executeAgent(
     }
     if (config.tools.includes('company_registry_lookup')) {
       tools.push(createCompanyRegistryLookupTool(userId, sendProgress));
+    }
+    if (config.tools.includes('industrial_facility_search')) {
+      tools.push(createIndustrialFacilitySearchTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('contact_discovery')) {
       tools.push(createContactDiscoveryTool(userId, sendProgress));

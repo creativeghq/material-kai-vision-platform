@@ -295,6 +295,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'company_name', type: 'string', optional: false, description: 'Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required.' },
       { name: 'country', type: 'string', optional: true, description: '2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE have a national register wired; anywhere else still gets GLEIF). Narrows every source.' },
       { name: 'registration_id', type: 'string', optional: true, description: 'A known national registration number, if you have one — Polish KRS, Romanian CUI. Usually unnecessary: GLEIF supplies it.' },
+      { name: 'domain', type: 'string', optional: true, description: 'The company website domain, if you have one. Adds a free age check (domain registration date, falling back to the Internet Archive): a maker trading for decades has an old domain, and a real-on-paper company whose site appeared last month is worth a second look.' },
     ],
   },
   {
@@ -703,6 +704,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'product_id', type: 'string', optional: false },
       { name: 'include_sources', type: 'boolean', optional: true, description: 'Include the discovered retailer rows (adds one backend read).' },
+    ],
+  },
+  {
+    name: 'industrial_facility_search',
+    file: 'supabase/functions/_shared/tools/b2b-tools.ts',
+    factory: 'createIndustrialFacilitySearchTool',
+    description: 'Find real FACTORIES from the EU Industrial Emissions Database — ceramics, glass, cement, stone, steel, foundries, wood panels and more, across EU27 plus the UK, Switzerland, Norway and Iceland. FREE: no credits, no AP…',
+    params: [
+      { name: 'sector', type: 'enum', enum: ['ceramics', 'glass', 'cement_lime', 'stone_minerals', 'quarrying', 'steel', 'metal_processing', 'foundry', 'non_ferrous', 'metal_finishing', 'wood_panels', 'paper', 'chemicals'], optional: true, description: 'Industrial sector. ceramics = tiles, sanitaryware, bricks and refractories fired in a kiln; stone_minerals = mineral substances and fibres; wood_panels = chipboard, fibreboard, plywood.' },
+      { name: 'country', type: 'string', optional: true, description: '2-letter ISO country code (PL, IT, ES, GR…).' },
+      { name: 'company_name', type: 'string', optional: true, description: 'Operator or facility name, if you are checking a specific maker. Less reliable than sector + country.' },
+      { name: 'city', type: 'string', optional: true, description: 'Town or city, to narrow a sector search to one industrial district.' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max facilities to return, 1-50. Default 15.' },
     ],
   },
   {

@@ -287,6 +287,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   my_hr_timeoff_requested: 'Time-off request submitted',
   my_hr_documents: 'My HR documents',
   my_hr_punches: 'My clock-ins',
+  // B2B — the EU industrial facility register. A direct-run quick-start skips the LLM, so this
+  // chunk is the only thing that puts the factories on screen.
+  industrial_facilities: 'Factories found',
   // Price monitoring
   price_tracking_started: 'Price tracking started',
   price_summary: 'Competitor prices',
@@ -5106,7 +5109,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 setCanvasHidden((v) => !v);
               }
             }}
-            className={cn('rounded-full relative shrink-0', !isMobile && !railMode && 'gap-2')}
+            className={cn('relative shrink-0', !isMobile && !railMode && 'gap-2')}
             title={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
             aria-label={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
           >
@@ -5132,7 +5135,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => setChatCollapsed(true)}
-              className="rounded-full shrink-0"
+              className="shrink-0"
               title="Collapse chat"
               aria-label="Collapse chat"
             >
@@ -5143,7 +5146,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             variant="ghost"
             size={railMode ? 'icon' : 'sm'}
             onClick={() => setConvManagerOpen(true)}
-            className={cn('rounded-full shrink-0', !railMode && 'gap-2')}
+            className={cn('shrink-0', !railMode && 'gap-2')}
             title="Conversations (⌘K)"
             aria-label="Conversations"
           >
@@ -5155,7 +5158,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             variant="outline"
             size={railMode ? 'icon' : 'sm'}
             onClick={handleNewConversation}
-            className={cn('rounded-full shrink-0', !railMode && 'gap-1.5')}
+            className={cn('shrink-0', !railMode && 'gap-1.5')}
             style={{ borderColor: 'var(--glass-border)' }}
             title="New conversation"
             aria-label="New conversation"
@@ -5829,7 +5832,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             </div>
                             <button
                               onClick={() => window.location.href = '/billing/credits'}
-                              className="self-start flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold transition-colors shadow-md"
+                              className="self-start flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold transition-colors shadow-md"
                             >
                               Buy Credits
                             </button>
@@ -6210,7 +6213,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       has to ask follow-up questions in a second turn. */}
                   <button
                     onClick={() => setShowNewDesignModal(true)}
-                    className="flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors bg-primary text-primary-foreground border-primary hover:opacity-90"
+                    className="flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors bg-primary text-primary-foreground border-primary hover:opacity-90"
                     title="Design a room from scratch — pick room type, style, and details upfront"
                   >
                     <Sparkles className="w-3 h-3" />
@@ -6220,7 +6223,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   {/* Floor Plan → 3D Render — guided capture (photo-first) */}
                   <button
                     onClick={() => launchInteriorQuickStart('Floor plan → 3D')}
-                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'floor-plan-render' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'}`}
+                    className={`flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors ${selectedGenerationMode === 'floor-plan-render' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'}`}
                     title="Convert a floor plan to a photorealistic eye-level interior perspective"
                   >
                     <LayoutTemplate className="w-3 h-3" />
@@ -6252,7 +6255,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         launchInteriorQuickStart('Redesign from a photo');
                       }
                     }}
-                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${(selectedGenerationMode === 'redesign' || selectedGenerationMode === 'copy-style') ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700'}`}
+                    className={`flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors ${(selectedGenerationMode === 'redesign' || selectedGenerationMode === 'copy-style') ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700'}`}
                     title={attachedImages.length >= 2 ? 'Image 1 = inspiration style, Image 2 = your room (layout preserved)' : 'Redesign room keeping exact layout — uses Flux Depth Pro'}
                   >
                     <Layers className="w-3 h-3" />
@@ -6262,7 +6265,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   {/* Edit Image — guided capture (photo-first), then the targeted-edit builder */}
                   <button
                     onClick={() => launchInteriorQuickStart('Edit a photo')}
-                    className={`flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
+                    className={`flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors ${selectedGenerationMode === 'image-edit' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 hover:bg-violet-100 border-violet-200 text-violet-700'}`}
                     title="Make targeted changes — change floor, lighting, plants, style, and more"
                   >
                     <Pencil className="w-3 h-3" />
@@ -6272,7 +6275,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   {/* Virtual Staging — guided capture (photo-first), then the staging wizard */}
                   <button
                     onClick={() => launchInteriorQuickStart('Stage a room')}
-                    className="flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs font-medium transition-colors bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
+                    className="flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
                     title="Virtually stage this room with AI-generated furniture (20 credits)"
                   >
                     <Sparkles className="w-3 h-3" />
@@ -6318,7 +6321,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => setInput('Generate an interior design incorporating my pinned materials. Use their exact colors, textures, and finishes for the walls, floors, and surfaces.')}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-800 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-xs font-medium text-amber-800 transition-colors"
                   title="Generate a design using all pinned catalog materials"
                 >
                   <Sparkles className="w-3 h-3" />
@@ -6326,7 +6329,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </button>
                 <button
                   onClick={() => setInput('Create a materials selection board showcasing all my pinned materials in a professional layout.')}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full text-xs font-medium text-amber-800 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-xs font-medium text-amber-800 transition-colors"
                   title="Create a professional materials board from pinned catalog materials"
                 >
                   <Layers className="w-3 h-3" />
@@ -6360,7 +6363,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 hover:bg-muted text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-muted/60 hover:bg-muted text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         title="Switch agent"
                       >
                         <AgentAvatar agentId={currentAgent?.id} className={cn('h-4 w-4', currentAgent?.color)} />
@@ -6646,7 +6649,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   })}
                 <button
                   onClick={() => setShowToolkitPicker(true)}
-                  className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border/60 hover:border-primary/40 hover:text-primary transition px-2 py-0.5 text-[10px] text-muted-foreground"
+                  className="inline-flex items-center gap-0.5 border border-dashed border-border/60 hover:border-primary/40 hover:text-primary transition px-2 py-0.5 text-[10px] text-muted-foreground"
                 >
                   <Layers className="h-2.5 w-2.5" /> + Toolkit
                 </button>

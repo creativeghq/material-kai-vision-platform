@@ -45,6 +45,7 @@ import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
 import { transliterateToLatin } from '../transliterate.ts';
 import { extractContactDetails } from '../contact-extract.ts';
+import { FACILITY_SECTORS, lookupDomainAge, searchIndustrialFacilities, type FacilitySector } from '../eea-facilities.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -1460,7 +1461,7 @@ const REGISTRY_COUNTRIES = Object.keys(NATIONAL_REGISTRIES).sort();
 
 export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (status: string) => void) => {
   return tool(
-    async ({ company_name, country, registration_id }) => {
+    async ({ company_name, country, registration_id, domain }) => {
       const name = String(company_name || '').trim();
       if (!name) return JSON.stringify({ success: false, error: 'Provide a company name.' });
       const cc = String(country || '').trim().toUpperCase().slice(0, 2) || undefined;
@@ -1501,7 +1502,15 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
             return registry.lookup({ name, registrationId: id });
           });
 
-      const [gleif, national] = await Promise.all([gleifPromise, nationalPromise]);
+      // Domain age runs beside the registers because it answers the same question from the only
+      // angle they cannot: a factory trading since 1998 has a domain registered around then, and a
+      // company that is real on paper but whose website appeared last month is worth a second look.
+      // Free, and it never blocks — no domain, no probe.
+      const [gleif, national, domainAge] = await Promise.all([
+        gleifPromise,
+        nationalPromise,
+        domain ? lookupDomainAge(String(domain)) : Promise.resolve(null),
+      ]);
 
       const sources: Record<string, RegistrySource> = { gleif };
       if (registry && cc) sources[cc.toLowerCase()] = national;
@@ -1532,6 +1541,7 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
         // Stated explicitly so a miss on an uncovered country reads as "we have no register wired
         // for Bulgaria", not as "this company does not exist". Those are opposite conclusions and
         // the agent has no other way to tell them apart.
+        ...(domainAge ? { domain_age: domainAge } : {}),
         coverage: {
           national_register: registry ? registry.register : null,
           countries_with_a_national_register: REGISTRY_COUNTRIES,
@@ -1565,6 +1575,118 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
         // a national register are the only ones this tool can answer for.
         country: z.string().optional().describe('2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE have a national register wired; anywhere else still gets GLEIF). Narrows every source.'),
         registration_id: z.string().optional().describe('A known national registration number, if you have one — Polish KRS, Romanian CUI. Usually unnecessary: GLEIF supplies it.'),
+        domain: z.string().optional().describe(
+          'The company website domain, if you have one. Adds a free age check (domain registration date, '
+          + 'falling back to the Internet Archive): a maker trading for decades has an old domain, and a '
+          + 'real-on-paper company whose site appeared last month is worth a second look.',
+        ),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: industrial facilities — the only DISCOVERY source here, and free.
+ *
+ * The registries answer "is this company real". This answers "which factories exist", which is a
+ * different and, for sourcing, more useful question — and it returns the PLANT address rather than
+ * the registered office, which for most manufacturers is an accountant's in another town.
+ */
+export const createIndustrialFacilitySearchTool = (_userId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
+  return tool(
+    async ({ sector, country, company_name, city, limit }) => {
+      const cc = String(country || '').trim().toUpperCase().slice(0, 2) || undefined;
+      if (!sector && !company_name && !cc) {
+        return JSON.stringify({
+          success: false,
+          error: 'Give at least a sector, a country or a company name — an unfiltered scan of every '
+            + 'industrial installation in Europe is not a useful answer.',
+        });
+      }
+
+      const describes = [
+        sector ? FACILITY_SECTORS[sector as FacilitySector].label : 'industrial installations',
+        cc ? `in ${cc}` : null,
+        city ? `near ${city}` : null,
+        company_name ? `operated by "${company_name}"` : null,
+      ].filter(Boolean).join(' ');
+      onProgress?.(`Searching the EU industrial register: ${describes}…`);
+
+      const r = await searchIndustrialFacilities({
+        sector: sector as FacilitySector | undefined,
+        country: cc,
+        companyName: company_name,
+        city,
+        limit,
+      });
+
+      if (r.status === 'unavailable') {
+        return JSON.stringify({
+          success: false,
+          retryable: true,
+          error: `The EU industrial register did not answer (${r.error}). This is free and optional — `
+            + 'say so and carry on with what you have rather than retrying in a loop.',
+        });
+      }
+
+      // A `run:` quick-start calls this deterministically, with no model turn to narrate the
+      // result, so the chunk IS the output — without it the user gets the cheerful `done` copy
+      // over an empty screen. Registered in AGENT_RESULT_TITLES.
+      if (r.status === 'hit') {
+        onChunk?.({
+          type: 'industrial_facilities',
+          data: { query_describes: describes, facilities: r.facilities ?? [] },
+          timestamp: Date.now(),
+        });
+      }
+
+      return JSON.stringify({
+        success: true,
+        found: r.status === 'hit',
+        query_describes: describes,
+        results: r.facilities ?? [],
+        facilities: r.facilities ?? [],
+        count: r.facilities?.length ?? 0,
+        cost: { credits: 0, note: 'EU Industrial Emissions Database — public, no key, no charge.' },
+        ...(r.status === 'miss'
+          ? {
+            // A miss here has two very different meanings and the agent cannot tell them apart
+            // without being told, so it is told.
+            note: 'No installation matched. That is NOT evidence the company does not exist: reporting '
+              + 'is mandatory only above capacity thresholds, so a workshop-scale maker is legitimately '
+              + 'absent, and `parentCompanyName` is self-reported so a trading BRAND often differs from '
+              + 'the operator name on file. Searching by sector + country is far more reliable than by name.',
+          }
+          : {
+            note: '`parent_company` is the operator on file, which is a legal entity and may differ from '
+              + 'the brand. Run it through company_registry_lookup to get the registered identity.',
+          }),
+      });
+    },
+    {
+      name: 'industrial_facility_search',
+      description:
+        'Find real FACTORIES from the EU Industrial Emissions Database — ceramics, glass, cement, '
+        + 'stone, steel, foundries, wood panels and more, across EU27 plus the UK, Switzerland, Norway '
+        + 'and Iceland. FREE: no credits, no API key. Unlike a company register, this returns the PLANT '
+        + '(name, operator, city, street, coordinates) rather than the registered office. It is the only '
+        + 'tool here that can DISCOVER manufacturers rather than verify one you already named: ask for a '
+        + 'sector and a country to enumerate the plants. Searching by sector + country is much more '
+        + 'reliable than by company name, because the operator on file is often a legal entity rather '
+        + 'than the trading brand.',
+      schema: z.object({
+        sector: z.enum([
+          'ceramics', 'glass', 'cement_lime', 'stone_minerals', 'quarrying', 'steel',
+          'metal_processing', 'foundry', 'non_ferrous', 'metal_finishing', 'wood_panels',
+          'paper', 'chemicals',
+        ]).optional().describe(
+          'Industrial sector. ceramics = tiles, sanitaryware, bricks and refractories fired in a kiln; '
+          + 'stone_minerals = mineral substances and fibres; wood_panels = chipboard, fibreboard, plywood.',
+        ),
+        country: z.string().optional().describe('2-letter ISO country code (PL, IT, ES, GR…).'),
+        company_name: z.string().optional().describe('Operator or facility name, if you are checking a specific maker. Less reliable than sector + country.'),
+        city: z.string().optional().describe('Town or city, to narrow a sector search to one industrial district.'),
+        limit: z.number().optional().describe('Max facilities to return, 1-50. Default 15.'),
       }),
     }
   );

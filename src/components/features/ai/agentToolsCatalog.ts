@@ -761,6 +761,17 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'industrial_facility_search', name: 'Find Factories', category: 'B2B Research',
+    adminOnly: true, credits: 0,
+    desc: 'EU Industrial Emissions Database — real production plants by sector and country '
+      + '(ceramics, glass, cement, stone, steel, wood panels). Returns the PLANT, not the registered '
+      + 'office. Free: no key, no credits.',
+    examples: [
+      'Find ceramic tile factories in Poland',
+      'Which glass plants are there in Greece?',
+    ],
+  },
+  {
     id: 'save_to_crm', name: 'Save to CRM', category: 'B2B Research',
     adminOnly: true,
     desc: 'Persist a discovered company / contact to the CRM.',
@@ -2947,10 +2958,22 @@ export const TOOLKITS: ToolkitDefinition[] = [
     adminOnly: true,
     tool_ids: [
       'b2b_manufacturer_search', 'company_website_scrape', 'company_registry_lookup',
-      'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm',
+      'industrial_facility_search', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
     ],
     quick_starts: [
+      {
+        label: 'Find factories', description: 'Real plants from the EU industrial register',
+        icon: 'Factory',
+        prompt: 'Find ceramic tile factories in Poland',
+        done: 'Here are the plants on the EU industrial register.',
+        promptTemplate: 'Find {{sector}} factories in {{country}}',
+        run: { tool: 'industrial_facility_search' },
+        // autoFields derives the `sector` select — all 13 of them — from the tool's own z.enum.
+        // Hand-writing them is how five tools' options went stale and invisible (CLAUDE.md →
+        // Agent tools); the manifest is the single source and the form reads it.
+        autoFields: true,
+      },
       {
         label: 'Scrape materials from a page', description: 'Pull products off a supplier URL',
         icon: 'Globe',

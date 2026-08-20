@@ -19,7 +19,7 @@ import {
   Package, PackagePlus, AlertTriangle,
   Banknote, Calculator, CalendarDays, FileText, Flame, Link, ListPlus, Network,
   Pencil, Percent, Radar, RefreshCw, ShoppingCart, Tag, UserPlus, Video, Wallet,
-  Inbox, Code2,
+  Inbox, Code2, Factory,
 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ import type { ToolkitDefinition, ToolkitQuickStart } from '../agentToolsCatalog'
 // Wallet, …) rendered identically for months. Held to the catalog by
 // tests/unit/toolkitCoverage.test.ts, which used to check only the PICKER's map.
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Factory,
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle,
