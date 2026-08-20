@@ -75,6 +75,38 @@ export function isUncodedMydataUnit(unit: string | null | undefined): boolean {
   return UNCODED_MYDATA_UNITS.has(String(unit ?? '').trim().toLowerCase());
 }
 
+/**
+ * AADE `measurement_unit` code → our canonical unit key.
+ *
+ * The inverse of the `mydataCode` field on `src/lib/units.ts`, and the OTHER direction of the
+ * same twin: `UNCODED_MYDATA_UNITS` above stops an uncoded unit going OUT to AADE, this stops us
+ * ignoring a coded unit coming IN. myDATA states the unit on the line it delivers, so on an
+ * inbound document this code IS the unit — `src/lib/units.ts` says so in as many words ("never
+ * infer the unit from a product description instead") and the intake queue writer inferred it
+ * anyway, from a Haiku reading of the description, for every line it has ever queued. Measured
+ * 2026-08-20: 2,022 of 3,643 inbound lines carry the code; 82 queued rows ended up as a
+ * fractional quantity of `pcs`, which is not a thing that can be in a warehouse.
+ *
+ * **Twin of the `mydataCode` values in [src/lib/units.ts](../../../../src/lib/units.ts)**, held
+ * equal by [tests/unit/fiscalUnitParity.test.ts](../../../../tests/unit/fiscalUnitParity.test.ts).
+ * An edge function cannot import from `src/`; a hand-copied map with no test is how the six unit
+ * lists that preceded `units.ts` drifted apart.
+ */
+export const MYDATA_UNIT_BY_CODE: Record<number, string> = {
+  1: 'pcs', 2: 'kg', 3: 'lt', 4: 'm', 5: 'm2', 6: 'm3',
+};
+
+/** The unit AADE stated on a line, or null when the document omitted it. */
+// `code` is typed to include `string` because that is what AADE actually sends: the myDATA
+// payload carries it as XML/JSON text, so an empty element arrives as '' rather than null.
+// Narrowing this to `number` makes the `=== ''` guard a type error and, worse, drops the
+// only signal that the document omitted the unit.
+export function unitFromMydataCode(code: number | string | null | undefined): string | null {
+  if (code == null || code === '') return null;
+  const n = Number(code);
+  return Number.isFinite(n) ? (MYDATA_UNIT_BY_CODE[n] ?? null) : null;
+}
+
 export interface FiscalLine {
   lineNumber: number;
   code?: string;

@@ -102,7 +102,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
 
     const { data: cfg } = await db
       .from('workspace_viva_config')
-      .select('workspace_id, merchant_id, api_key, environment')
+      .select('workspace_id, merchant_id, api_key, environment, webhook_key')
       .eq('workspace_id', workspaceId)
       .maybeSingle();
 
@@ -114,12 +114,45 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     // Merchant-level token fetch is BASIC auth with merchant_id:api_key (NOT the
     // Smart Checkout OAuth pair) and lives on the www./demo. host.
     const hosts = vivaHosts((cfg.environment ?? 'demo') !== 'production');
-    const res = await fetch(`${hosts.www}/api/messages/config/token`, {
-      headers: { Authorization: `Basic ${btoa(`${cfg.merchant_id}:${cfg.api_key}`)}` },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.error('[viva-webhooks] key fetch failed', res.status, body.slice(0, 200));
+    let payload: unknown = null;
+    try {
+      const res = await fetch(`${hosts.www}/api/messages/config/token`, {
+        headers: {
+          Authorization: `Basic ${btoa(`${cfg.merchant_id}:${cfg.api_key}`)}`,
+          // Viva is behind Akamai bot management; an unidentified client is likelier to
+          // be challenged. Name ourselves rather than arriving anonymous.
+          'User-Agent': 'MaterialsHub/1.0 (+https://app.materialshub.gr)',
+        },
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error('[viva-webhooks] key fetch failed', res.status, body.slice(0, 200));
+      } else {
+        payload = await res.json();
+        const fetched = (payload as Record<string, unknown> | null)?.Key
+          ?? (payload as Record<string, unknown> | null)?.key;
+        if (typeof fetched === 'string' && fetched) {
+          await db
+            .from('workspace_viva_config')
+            .update({ webhook_key: fetched, webhook_key_fetched_at: new Date().toISOString() })
+            .eq('workspace_id', workspaceId);
+        }
+      }
+    } catch (err) {
+      console.error('[viva-webhooks] key fetch threw', err);
+    }
+
+    // Fall back to the last key Viva issued us. Their endpoint sits behind Akamai and
+    // intermittently refuses us (observed 2026-08-20: three verifications passed, the
+    // fourth 502'd, and it was healthy two minutes later). Failing the handshake tells
+    // the tenant "URL not verified", pointing them at the one thing that was never wrong.
+    // The key is per-merchant and stable, so the cached copy is the same answer.
+    if (payload === null && cfg.webhook_key) {
+      console.warn('[viva-webhooks] serving cached verification key for', workspaceId);
+      payload = { Key: cfg.webhook_key };
+    }
+    if (payload === null) {
+      // Never fetched one — nothing to echo, so fail closed rather than invent.
       return json({ error: 'could not fetch the verification key from Viva' }, 502);
     }
 
@@ -137,7 +170,6 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
 
     // Echo Viva's own casing back rather than hardcoding it — merchant docs show
     // {"Key":...} while the ISV schema shows {"key":...}.
-    const payload = await res.json();
     return json(payload);
   }
 
