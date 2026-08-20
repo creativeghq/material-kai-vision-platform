@@ -261,7 +261,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <QuoteStatusBadge status={quote.status} />
             {/* Reuse this quote's shape on the next job (#322). */}
-            <Button variant="outline" size="sm" className="rounded-full" onClick={() => setSaveTemplateOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)}>
               <Layers className="h-4 w-4 mr-2" /> Save as template
             </Button>
             {quote.status === 'draft' && (
@@ -282,7 +282,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
               <Button
                 onClick={handleAcceptQuote}
                 disabled={!canAcceptQuote || acceptingQuote}
-                className="rounded-full bg-green-500/80 hover:bg-green-500 text-white border border-green-400/30"
+                className="bg-green-500/80 hover:bg-green-500 text-white border border-green-400/30"
               >
                 {acceptingQuote ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -312,7 +312,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                   }
                 }}
                 disabled={payingNow}
-                className="rounded-full bg-primary hover:bg-primary/90"
+                className="bg-primary hover:bg-primary/90"
               >
                 {payingNow ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
                 Pay {formatMoney(openInvoice.amount_due, openInvoice.currency)} by card

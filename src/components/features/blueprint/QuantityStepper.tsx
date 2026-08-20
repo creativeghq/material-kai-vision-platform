@@ -29,7 +29,7 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
   return (
     <div className="flex items-center gap-1 shrink-0">
       <Button
-        type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full"
+        type="button" variant="outline" size="icon" className="h-8 w-8"
         disabled={disabled || value <= min}
         aria-label={`One fewer ${label}`}
         onClick={() => onChange(clamp(value - 1))}
@@ -38,7 +38,7 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
       </Button>
       <span className="w-7 text-center text-sm tabular-nums" aria-label={`${label} quantity`}>{value}</span>
       <Button
-        type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full"
+        type="button" variant="outline" size="icon" className="h-8 w-8"
         disabled={disabled || (max != null && value >= max)}
         aria-label={`One more ${label}`}
         onClick={() => onChange(clamp(value + 1))}

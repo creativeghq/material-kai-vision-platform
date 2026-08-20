@@ -220,7 +220,7 @@ export default function MaterialComparePage() {
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div>
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full -ml-2 mb-3">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2 mb-3">
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back
         </Button>
@@ -230,7 +230,7 @@ export default function MaterialComparePage() {
           actions={products.length < MAX_COMPARE ? (
             <Popover open={searchOpen} onOpenChange={setSearchOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="rounded-full gap-2">
+                <Button variant="outline" className="gap-2">
                   <Plus className="h-4 w-4" />
                   Add material
                 </Button>
@@ -278,7 +278,7 @@ export default function MaterialComparePage() {
           </div>
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
-              <Button className="rounded-full">
+              <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Add material
               </Button>
@@ -322,7 +322,7 @@ export default function MaterialComparePage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="absolute top-2 right-2 h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-destructive"
+                        className="absolute top-2 right-2 h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => removeProduct(p.id)}
                       >
                         <X className="h-3 w-3" />
@@ -354,7 +354,7 @@ export default function MaterialComparePage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full rounded-full text-xs"
+                        className="w-full text-xs"
                         onClick={() => navigate(`/compare?ids=${p.id}`)}
                       >
                         View Details

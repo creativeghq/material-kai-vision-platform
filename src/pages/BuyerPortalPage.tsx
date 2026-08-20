@@ -107,10 +107,10 @@ export default function BuyerPortalPage() {
                     <div className="mt-2 flex items-center gap-1.5">
                       {l.public_listing_token && (
                         <Link to={`/p/${l.public_listing_token}`} target="_blank" className="flex-1">
-                          <Button size="sm" variant="outline" className="w-full rounded-full"><ExternalLink className="mr-1 h-3.5 w-3.5" /> View</Button>
+                          <Button size="sm" variant="outline" className="w-full"><ExternalLink className="mr-1 h-3.5 w-3.5" /> View</Button>
                         </Link>
                       )}
-                      <Button size="sm" className="flex-1 rounded-full" disabled={requested.has(l.id)} onClick={() => requestViewing(l.id)}>
+                      <Button size="sm" className="flex-1" disabled={requested.has(l.id)} onClick={() => requestViewing(l.id)}>
                         <CalendarPlus className="mr-1 h-3.5 w-3.5" /> {requested.has(l.id) ? 'Requested' : 'Viewing'}
                       </Button>
                     </div>

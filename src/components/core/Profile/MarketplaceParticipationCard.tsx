@@ -86,14 +86,14 @@ export const MarketplaceParticipationCard: React.FC = () => {
             <span className="text-sm text-muted-foreground">
               {status === 'rejected' ? 'Your previous application was declined. You can re-apply.' : 'Your workspace is not on the marketplace yet.'}
             </span>
-            <Button className="rounded-full" disabled={busy} onClick={apply}>
+            <Button disabled={busy} onClick={apply}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : status === 'rejected' ? 'Re-apply' : 'Apply to join'}
             </Button>
           </div>
         ) : status === 'pending' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-amber-600 dark:text-amber-400">Application pending operator approval.</span>
-            <Button variant="outline" className="rounded-full" disabled={busy} onClick={() => setEnabled(false)}>Withdraw</Button>
+            <Button variant="outline" disabled={busy} onClick={() => setEnabled(false)}>Withdraw</Button>
           </div>
         ) : status === 'approved' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -102,14 +102,14 @@ export const MarketplaceParticipationCard: React.FC = () => {
                 ? <span className="text-emerald-600 dark:text-emerald-400">Active — you can list &amp; browse the marketplace.</span>
                 : <span className="text-muted-foreground">Approved, currently paused.</span>}
             </span>
-            <Button variant={enabled ? 'outline' : 'default'} className="rounded-full" disabled={busy} onClick={() => setEnabled(!enabled)}>
+            <Button variant={enabled ? 'outline' : 'default'} disabled={busy} onClick={() => setEnabled(!enabled)}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : enabled ? 'Pause' : 'Enable'}
             </Button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-destructive">Application declined.</span>
-            <Button className="rounded-full" disabled={busy} onClick={apply}>Re-apply</Button>
+            <Button disabled={busy} onClick={apply}>Re-apply</Button>
           </div>
         )}
       </CardContent>

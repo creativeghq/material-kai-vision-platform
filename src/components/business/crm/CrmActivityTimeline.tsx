@@ -357,7 +357,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                       type="button"
                       onClick={() => toggleAttendee(p.id)}
                       className={[
-                        'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+                        'border px-2.5 py-0.5 text-xs transition-colors',
                         on ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:border-primary hover:text-foreground',
                       ].join(' ')}
                     >

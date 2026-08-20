@@ -129,7 +129,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
       {/* Header — hidden when embedded as a tab (host page supplies the header) */}
       {!embedded && (
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="rounded-full" onClick={() => navigate('/admin')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -200,7 +200,6 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
                   key={n}
                   variant={limit === n ? 'default' : 'outline'}
                   size="sm"
-                  className="rounded-full"
                   onClick={() => setLimit(n)}
                 >
                   {n}
@@ -212,7 +211,6 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
           <Button
             onClick={runBatch}
             disabled={running || !workspaceId}
-            className="rounded-full"
           >
             {running ? (
               <>

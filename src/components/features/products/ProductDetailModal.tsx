@@ -1262,7 +1262,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <Badge
                   key={cert}
                   variant="outline"
-                  className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 border-primary/30 text-primary"
+                  className="text-[11px] font-semibold px-2.5 py-0.5 bg-primary/10 border-primary/30 text-primary"
                 >
                   {cert}
                 </Badge>
@@ -2235,7 +2235,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex items-center gap-1.5 text-xs rounded-full"
+                    className="flex items-center gap-1.5 text-xs"
                     onClick={() => { onUseIn3DScene(currentImage.url, product.name); onClose(); }}
                   >
                     <Box className="h-3.5 w-3.5" />
@@ -2246,7 +2246,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex items-center gap-1.5 text-xs rounded-full"
+                    className="flex items-center gap-1.5 text-xs"
                     disabled={vrGenerating}
                     onClick={() => { onGenerateVR(currentImage.url, { prompt: product.name }); onClose(); }}
                   >
@@ -2258,7 +2258,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex items-center gap-1.5 text-xs rounded-full"
+                    className="flex items-center gap-1.5 text-xs"
                     onClick={() => { onGenerateVideo(currentImage.url); onClose(); }}
                   >
                     <Video className="h-3.5 w-3.5" />
@@ -2274,7 +2274,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-1.5 text-xs rounded-full"
+                className="flex items-center gap-1.5 text-xs"
                 onClick={() => {
                   navigate(buildTestOnRoomUrl({ productId: product.id, productName: product.name, productImage: currentImage?.url }));
                   onClose();
@@ -2343,7 +2343,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {chips.map(c => (
-                      <Badge key={c} variant="outline" className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-muted/40 border-border/50">
+                      <Badge key={c} variant="outline" className="text-[11px] font-semibold px-2.5 py-0.5 bg-muted/40 border-border/50">
                         {c}
                       </Badge>
                     ))}
@@ -2359,7 +2359,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {showLowConfidence && (
                     <Badge
                       variant="outline"
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                      className="text-[10px] font-semibold px-2 py-0.5 bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400"
                       title={`Vision confidence: ${(visionConfidence * 100).toFixed(0)}% — fields below were extracted with low certainty`}
                     >
                       Low confidence ({(visionConfidence * 100).toFixed(0)}%)
@@ -2473,7 +2473,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <Badge
                       key={t}
                       variant="outline"
-                      className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-muted/40 border-border/50"
+                      className="text-[11px] font-mono px-2.5 py-0.5 bg-muted/40 border-border/50"
                     >
                       {t}
                     </Badge>
@@ -2920,7 +2920,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                className="text-xs rounded-full"
+                className="text-xs"
                 onClick={() => setPriceLookupOpen(true)}
                 title="Get price from Pricing Knowledge Base"
               >

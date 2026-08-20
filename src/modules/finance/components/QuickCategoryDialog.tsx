@@ -90,7 +90,7 @@ export const QuickCategoryDialog: React.FC<{
             value={name} onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void add(); }}
           />
-          <Button size="sm" className="rounded-full" onClick={add} disabled={busy}>
+          <Button size="sm" onClick={add} disabled={busy}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             <span className="ml-1">Add</span>
           </Button>

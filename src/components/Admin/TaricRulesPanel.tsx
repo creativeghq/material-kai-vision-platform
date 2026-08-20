@@ -114,7 +114,7 @@ export const TaricRulesPanel: React.FC = () => {
                       <Button
                         size="sm"
                         variant={r.is_confirmed ? 'ghost' : 'outline'}
-                        className="rounded-full h-7 text-xs"
+                        className="h-7 text-xs"
                         disabled={busyId === r.id}
                         onClick={() => toggle(r)}
                       >

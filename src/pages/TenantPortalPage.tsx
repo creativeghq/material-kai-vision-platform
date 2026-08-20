@@ -113,7 +113,7 @@ export default function TenantPortalPage() {
           {sent && <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Sent — you can report something else below.</p>}
           <Input required placeholder="What's wrong? (e.g. boiler not heating)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <Textarea rows={3} placeholder="Any detail that would help (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <Button type="submit" className="w-full rounded-full" disabled={sending || !form.title.trim()}>
+          <Button type="submit" className="w-full" disabled={sending || !form.title.trim()}>
             {sending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Report to my agent
           </Button>
           <p className="text-[11px] text-muted-foreground">Urgent safety issues — gas, electricity, flooding — should be phoned in, not reported here.</p>

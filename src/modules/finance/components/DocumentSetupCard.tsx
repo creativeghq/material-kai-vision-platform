@@ -169,7 +169,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">Numbering series &amp; next number</span>
                           {addingFor !== t.code && (
-                            <Button size="sm" variant="outline" className="rounded-full" onClick={() => startAdd(t.code)}><Plus className="h-3.5 w-3.5 mr-1" /> Add series</Button>
+                            <Button size="sm" variant="outline" onClick={() => startAdd(t.code)}><Plus className="h-3.5 w-3.5 mr-1" /> Add series</Button>
                           )}
                         </div>
 
@@ -217,7 +217,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                                 </Select>
                               </div>
                             )}
-                            <Button size="sm" className="h-7 rounded-full" onClick={() => submitNewSeries(t.code)}>Add</Button>
+                            <Button size="sm" className="h-7" onClick={() => submitNewSeries(t.code)}>Add</Button>
                             <Button size="sm" variant="ghost" className="h-7" onClick={() => setAddingFor(null)}>Cancel</Button>
                           </div>
                         )}

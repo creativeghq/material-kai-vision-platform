@@ -425,14 +425,14 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                   <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-3">
                     <TabsTrigger
                       value="details"
-                      className="flex items-center gap-2 rounded-full"
+                      className="flex items-center gap-2"
                     >
                       <FileText className="h-3 w-3" />
                       Details
                     </TabsTrigger>
                     <TabsTrigger
                       value="embeddings"
-                      className="flex items-center gap-2 rounded-full"
+                      className="flex items-center gap-2"
                     >
                       <Database className="h-3 w-3" />
                       Embeddings

@@ -86,7 +86,7 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
           </p>
         </div>
         {canManage && !draft && (
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDraft({ party_type: 'listing_agent', basis: 'pct', pct: '50', fixed_amount: '', label: '' })}>
+          <Button size="sm" variant="outline" onClick={() => setDraft({ party_type: 'listing_agent', basis: 'pct', pct: '50', fixed_amount: '', label: '' })}>
             <Plus className="mr-1 h-4 w-4" /> Add split
           </Button>
         )}
@@ -104,10 +104,10 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
               : <span className="text-xs text-amber-600 dark:text-amber-400">unpaid</span>}
             {canManage && (
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => markPaid(s)}>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => markPaid(s)}>
                   <Check className="mr-1 h-3 w-3" /> {s.paid_at ? 'Unpay' : 'Paid'}
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-destructive" onClick={() => remove(s)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => remove(s)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             )}
           </div>
@@ -146,8 +146,8 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
               <div><Label className="text-xs">Label (optional)</Label><Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Co-broke agency" /></div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDraft(null)}>Cancel</Button>
-              <Button size="sm" className="rounded-full" disabled={busy} onClick={add}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Add</Button>
+              <Button size="sm" variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+              <Button size="sm" disabled={busy} onClick={add}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Add</Button>
             </div>
           </div>
         )}

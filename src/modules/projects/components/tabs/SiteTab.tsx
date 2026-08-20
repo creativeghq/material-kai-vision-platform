@@ -183,7 +183,7 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
             <Checkbox checked={showClosed} onCheckedChange={(v) => setShowClosed(!!v)} /> Show closed
           </label>
           {isOwner && (
-            <Button size="sm" className="rounded-full" onClick={() => setAdding(true)}>
+            <Button size="sm" onClick={() => setAdding(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Raise snag
             </Button>
           )}
@@ -338,7 +338,7 @@ const AddSnagDialog: React.FC<{
           </label>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Raise snag'}
             </Button>
           </div>
@@ -500,7 +500,7 @@ const AddSiteLogDialog: React.FC<{ projectId: string; onClose: () => void; onSav
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save entry'}
             </Button>
           </div>

@@ -201,14 +201,13 @@ export const ProductSceneCard: React.FC<Props> = ({ productId, workspaceId }) =>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <Button size="sm" className="rounded-full" disabled={saving} onClick={() => persist('product')}>
+        <Button size="sm" disabled={saving} onClick={() => persist('product')}>
           {saving && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
           Save for this product
         </Button>
         <Button
           size="sm"
           variant="outline"
-          className="rounded-full"
           disabled={saving}
           onClick={() => persist('workspace')}
         >
@@ -219,7 +218,6 @@ export const ProductSceneCard: React.FC<Props> = ({ productId, workspaceId }) =>
           <Button
             size="sm"
             variant="ghost"
-            className="rounded-full"
             disabled={saving}
             onClick={async () => {
               await sceneSettingsService.clear(workspaceId, { productId });
@@ -234,7 +232,6 @@ export const ProductSceneCard: React.FC<Props> = ({ productId, workspaceId }) =>
         <Button
           size="sm"
           variant="ghost"
-          className="rounded-full"
           onClick={() => patch({ ...SCENE_DEFAULTS, workspace_id: workspaceId } as Partial<SceneSettings>)}
         >
           Reset the sliders

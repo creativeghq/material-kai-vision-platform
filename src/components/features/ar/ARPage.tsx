@@ -136,7 +136,6 @@ const ARPage: React.FC = () => {
           </div>
           <Button
             variant="outline"
-            className="rounded-full"
             onClick={() => navigate('/')}
           >
             <ArrowLeft className="mr-1.5 h-4 w-4" />

@@ -237,10 +237,10 @@ export function JobResearchSitesEditor() {
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="font-normal">{config.label}</CardTitle>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setBulkOpen(true)}>
+                <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
                   <ListPlus className="h-3 w-3 mr-1" />Bulk paste
                 </Button>
-                <Button size="sm" className="rounded-full" onClick={() => setAddOpen(true)}>
+                <Button size="sm" onClick={() => setAddOpen(true)}>
                   <Plus className="h-3 w-3 mr-1" />Add resource
                 </Button>
               </div>

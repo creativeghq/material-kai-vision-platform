@@ -56,7 +56,7 @@ export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onC
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-full gap-2">
+        <Button variant="outline" size="sm" className="gap-2">
           <Share2 className="h-4 w-4" />
           Share
         </Button>
@@ -84,13 +84,13 @@ export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onC
                 {shareUrl}
               </code>
               <div className="flex items-center gap-2">
-                <Button size="sm" className="rounded-full gap-1 flex-1" onClick={copy}>
+                <Button size="sm" className="gap-1 flex-1" onClick={copy}>
                   <Copy className="h-3.5 w-3.5" /> Copy link
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="rounded-full gap-1"
+                  className="gap-1"
                   onClick={() => window.open(shareUrl, '_blank')}
                 >
                   <ExternalLink className="h-3.5 w-3.5" /> Open

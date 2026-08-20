@@ -177,11 +177,11 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
         </div>
         {canManage && (
           <div className="flex items-center gap-2">
-            {run.status === 'draft' && <Button size="sm" className="rounded-full" disabled={busy} onClick={() => setStatus('approved')}><CheckCircle2 className="h-4 w-4 mr-1" />Approve</Button>}
-            {run.status === 'approved' && <Button size="sm" className="rounded-full" disabled={busy} onClick={() => setStatus('paid')}><Banknote className="h-4 w-4 mr-1" />Mark paid</Button>}
-            {run.status !== 'draft' && !run.posted_finance_ref && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={postFinance}><ArrowUpRight className="h-4 w-4 mr-1" />Post to finance</Button>}
+            {run.status === 'draft' && <Button size="sm" disabled={busy} onClick={() => setStatus('approved')}><CheckCircle2 className="h-4 w-4 mr-1" />Approve</Button>}
+            {run.status === 'approved' && <Button size="sm" disabled={busy} onClick={() => setStatus('paid')}><Banknote className="h-4 w-4 mr-1" />Mark paid</Button>}
+            {run.status !== 'draft' && !run.posted_finance_ref && <Button size="sm" variant="outline" disabled={busy} onClick={postFinance}><ArrowUpRight className="h-4 w-4 mr-1" />Post to finance</Button>}
             {run.posted_finance_ref && <Badge variant="outline" className="gap-1"><ArrowUpRight className="h-3 w-3" />In Finance</Badge>}
-            {run.status !== 'draft' && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={makePayslips}><FileText className="h-4 w-4 mr-1" />Payslips</Button>}
+            {run.status !== 'draft' && <Button size="sm" variant="outline" disabled={busy} onClick={makePayslips}><FileText className="h-4 w-4 mr-1" />Payslips</Button>}
           </div>
         )}
       </div>
@@ -272,7 +272,7 @@ function NewRunDialog({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New run</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />New run</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>New Payroll Run</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -280,8 +280,8 @@ function NewRunDialog({ workspaceId, onDone }: { workspaceId: string; onDone: ()
           <p className="text-xs text-muted-foreground">Pulls all active employees, fills gross from their salary, and computes EFKA + income tax from your payroll settings. Adjust each line before approving.</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Create</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Create</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -333,7 +333,7 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) loadSettings(); }}>
-      <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-full"><Settings2 className="h-4 w-4 mr-2" />Settings</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm" variant="outline"><Settings2 className="h-4 w-4 mr-2" />Settings</Button></DialogTrigger>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Payroll Settings</DialogTitle></DialogHeader>
         {loading || !s ? <Skeleton className="h-40 w-full" /> : (
@@ -399,8 +399,8 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={saving || !s}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save settings</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving || !s}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save settings</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

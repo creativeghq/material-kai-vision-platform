@@ -360,7 +360,7 @@ export default function HomePage() {
           }}
         />
         <div className="container mx-auto max-w-5xl px-4 py-20 sm:py-28 text-center">
-          <Badge variant="outline" className="rounded-full mb-6 gap-1.5">
+          <Badge variant="outline" className="mb-6 gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             AI-powered materials platform
           </Badge>
@@ -470,7 +470,7 @@ export default function HomePage() {
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {INTEGRATIONS.map((name) => (
-            <Badge key={name} variant="outline" className="rounded-full font-normal">
+            <Badge key={name} variant="outline" className="font-normal">
               {name}
             </Badge>
           ))}
@@ -492,7 +492,7 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-2 mt-4">
                 {TOOLS.map((t) => (
                   <Link key={t.to} to={t.to}>
-                    <Badge variant="outline" className="rounded-full hover:border-primary/40 cursor-pointer">
+                    <Badge variant="outline" className="hover:border-primary/40 cursor-pointer">
                       {t.label}
                     </Badge>
                   </Link>

@@ -83,7 +83,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
         title="Templates"
         subtitle="Design reusable email templates for your campaigns."
         actions={
-          <Button onClick={() => { setName(''); setDescription(''); setShowCreate(true); }} className="rounded-full">
+          <Button onClick={() => { setName(''); setDescription(''); setShowCreate(true); }}>
             <Plus className="h-4 w-4 mr-2" /> New template
           </Button>
         }
@@ -96,7 +96,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
           <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No templates yet</h3>
           <p className="text-sm text-muted-foreground mb-4">Create your first email template to build a campaign.</p>
-          <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> New template</Button>
+          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-2" /> New template</Button>
         </div>
       ) : (
         <div className="dashboard-card">

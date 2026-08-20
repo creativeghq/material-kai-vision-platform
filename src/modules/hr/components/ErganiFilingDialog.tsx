@@ -97,8 +97,8 @@ export function ErganiFilingDialog({
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)} disabled={filing}>Cancel</Button>
-          <Button className="rounded-full" onClick={file} disabled={filing || loading || !doc.trim()}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={filing}>Cancel</Button>
+          <Button onClick={file} disabled={filing || loading || !doc.trim()}>
             {filing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}File to Ergani
           </Button>
         </DialogFooter>

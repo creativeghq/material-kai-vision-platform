@@ -172,12 +172,12 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
                   <td className="px-4 py-2 text-right tabular-nums">{r.lead_time_days != null ? `${r.lead_time_days}d` : '—'}</td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     {!r.is_preferred && (
-                      <Button size="sm" variant="ghost" className="rounded-full h-8" disabled={busyId === r.id} onClick={() => prefer(r)} title="Make preferred">
+                      <Button size="sm" variant="ghost" className="h-8" disabled={busyId === r.id} onClick={() => prefer(r)} title="Make preferred">
                         <Star className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" className="rounded-full h-8" onClick={() => setEditing(r)}>Edit</Button>
-                    <Button size="sm" variant="ghost" className="rounded-full h-8 text-destructive" disabled={busyId === r.id} onClick={() => remove(r)}>
+                    <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditing(r)}>Edit</Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-destructive" disabled={busyId === r.id} onClick={() => remove(r)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </td>
@@ -310,8 +310,8 @@ const SupplierRowDialog: React.FC<{
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={onClose}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
           </Button>
         </DialogFooter>

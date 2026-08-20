@@ -158,7 +158,7 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
                   mediaTitle={design.title}
                 >
                   <button
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-full text-xs font-medium text-rose-700 transition-colors shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-medium text-rose-700 transition-colors shadow-sm"
                     title="Save this design to a moodboard"
                   >
                     <BookmarkPlus className="h-3.5 w-3.5" />
@@ -177,7 +177,7 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
                       }
                     }}
                     disabled={vrGenerating}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-full text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
                     title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
                   >
                     {vrGenerating ? (

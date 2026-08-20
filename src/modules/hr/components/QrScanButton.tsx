@@ -76,7 +76,7 @@ export function QrScanButton({ onVat }: { onVat: (vat: string) => void }) {
 
   return (
     <>
-      <Button variant="outline" onClick={start} className="w-full h-12 rounded-full"><QrCode className="h-5 w-5 mr-2" />Scan QR code</Button>
+      <Button variant="outline" onClick={start} className="w-full h-12"><QrCode className="h-5 w-5 mr-2" />Scan QR code</Button>
       {open && (
         <div
           ref={overlayRef}
@@ -91,7 +91,7 @@ export function QrScanButton({ onVat }: { onVat: (vat: string) => void }) {
           </div>
           <p className="text-white/80 text-sm mt-4">{error ?? 'Point the camera at your work-card QR'}</p>
           {error && <Loader2 className="hidden" />}
-          <Button variant="secondary" onClick={close} className="rounded-full mt-4"><X className="h-4 w-4 mr-2" />Cancel</Button>
+          <Button variant="secondary" onClick={close} className="mt-4"><X className="h-4 w-4 mr-2" />Cancel</Button>
         </div>
       )}
     </>

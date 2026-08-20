@@ -1642,7 +1642,7 @@ function AvailabilitySettings() {
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save Availability'}
             </Button>
             {availability.size > 0 && (

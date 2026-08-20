@@ -226,8 +226,8 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="rounded-full" onClick={matchNow} disabled={busy}>Match now</Button>
-            <Button size="sm" variant="outline" className="rounded-full" onClick={syncNow} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={matchNow} disabled={busy}>Match now</Button>
+            <Button size="sm" variant="outline" onClick={syncNow} disabled={busy}>
               <RefreshCw className="mr-1 h-3.5 w-3.5" />Sync
             </Button>
           </div>
@@ -301,7 +301,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     </div>
                   </div>
                   {suggestions.slice(0, 1).map((inv) => (
-                    <Button key={inv.id} size="sm" variant="outline" className="rounded-full text-xs" disabled={busy}
+                    <Button key={inv.id} size="sm" variant="outline" className="text-xs" disabled={busy}
                       onClick={() => settleInvoice(r, inv.id)}>
                       Settle {inv.internal_number}
                     </Button>

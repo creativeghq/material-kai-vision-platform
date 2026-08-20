@@ -160,7 +160,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                     </td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.reorder_point}</td>
                     <td className="px-4 py-2 text-right">
-                      <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={reordering === it.id} onClick={() => reorder(it)}>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" disabled={reordering === it.id} onClick={() => reorder(it)}>
                         {reordering === it.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ShoppingCart className="h-3.5 w-3.5 mr-1" /> Reorder</>}
                       </Button>
                     </td>

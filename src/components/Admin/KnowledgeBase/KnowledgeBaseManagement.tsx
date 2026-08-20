@@ -196,7 +196,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
             </TabsList>
             <Button
               variant="outline"
-              className="rounded-full gap-2"
+              className="gap-2"
               onClick={() => window.open('/knowledge-base', '_blank')}
             >
               <ExternalLink className="h-4 w-4" />

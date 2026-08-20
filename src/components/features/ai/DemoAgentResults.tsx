@@ -64,7 +64,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           <h3 className="text-sm font-semibold text-foreground">
             {result.message || 'Product Results'}
           </h3>
-          <Badge className="bg-primary/10 text-primary border-0 rounded-full text-xs font-medium">
+          <Badge className="bg-primary/10 text-primary border-0 text-xs font-medium">
             {result.data.length} products
           </Badge>
         </div>

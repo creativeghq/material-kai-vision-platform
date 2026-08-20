@@ -255,7 +255,7 @@ export const SocialAccountsTab: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
                   onClick={() => handleDisconnect(account.id, platform?.label ?? account.platform)}
                   disabled={disconnecting === account.id}
                 >
@@ -285,7 +285,6 @@ export const SocialAccountsTab: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-full"
                 onClick={() => handleConnect(platform.id)}
                 disabled={connecting === platform.id}
               >
@@ -308,7 +307,7 @@ export const SocialAccountsTab: React.FC = () => {
       <Button
         variant="ghost"
         size="sm"
-        className="rounded-full text-muted-foreground"
+        className="text-muted-foreground"
         onClick={loadAccounts}
       >
         <RefreshCw className="h-3 w-3 mr-1" />

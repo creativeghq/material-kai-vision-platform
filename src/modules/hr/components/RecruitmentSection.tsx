@@ -75,7 +75,7 @@ export function RecruitmentSection({ workspaceId, canManage }: { workspaceId: st
         actions={
           <div className="flex items-center gap-2">
             {careersUrl && (
-              <Button variant="outline" size="sm" className="rounded-full" onClick={() => window.open(careersUrl, '_blank')} title={careersUrl}>
+              <Button variant="outline" size="sm" onClick={() => window.open(careersUrl, '_blank')} title={careersUrl}>
                 <ExternalLink className="h-4 w-4 mr-1" />Careers page
               </Button>
             )}
@@ -202,7 +202,7 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, ca
           <div className="flex items-center gap-2">
             {careersSlug && posting.status === 'open' && (
               <Button
-                variant="outline" size="sm" className="rounded-full"
+                variant="outline" size="sm"
                 onClick={() => window.open(`${window.location.origin}/careers/${careersSlug}/${posting.slug || posting.id}`, '_blank')}
                 title="Open the public posting"
               >
@@ -210,10 +210,10 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, ca
               </Button>
             )}
             <JobDialog workspaceId={workspaceId} departments={departments} posting={posting} onDone={onRefresh} />
-            <Button variant="outline" size="sm" className="rounded-full" disabled={busyPosting} onClick={toggleStatus}>
+            <Button variant="outline" size="sm" disabled={busyPosting} onClick={toggleStatus}>
               {posting.status === 'closed' ? <><LockOpen className="h-4 w-4 mr-1" />Reopen</> : <><Lock className="h-4 w-4 mr-1" />Close</>}
             </Button>
-            <Button variant="outline" size="sm" className="rounded-full text-destructive hover:text-destructive" disabled={busyPosting} onClick={removePosting}>
+            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={busyPosting} onClick={removePosting}>
               <Trash2 className="h-4 w-4" />
             </Button>
             <AddApplicantDialog workspaceId={workspaceId} postingId={posting.id} onDone={load} />
@@ -311,7 +311,7 @@ function ApplicantRow({ app, workspaceId, canManage, onChanged }: { app: Applica
             {hasCv
               ? <Button variant="ghost" size="sm" className="h-8" disabled={busy === 'cv'} onClick={viewCv} title="View CV">{busy === 'cv' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}</Button>
               : <Button variant="ghost" size="sm" className="h-8" disabled={busy === 'cv'} onClick={() => fileRef.current?.click()} title="Upload CV (PDF)">{busy === 'cv' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}</Button>}
-            {hasCv && <Button variant="outline" size="sm" className="rounded-full h-8" disabled={busy === 'ai'} onClick={screen} title="AI-screen this CV against the job">{busy === 'ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wand2 className="h-4 w-4 mr-1" />AI screen</>}</Button>}
+            {hasCv && <Button variant="outline" size="sm" className="h-8" disabled={busy === 'ai'} onClick={screen} title="AI-screen this CV against the job">{busy === 'ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wand2 className="h-4 w-4 mr-1" />AI screen</>}</Button>}
           </>
         )}
 
@@ -323,7 +323,7 @@ function ApplicantRow({ app, workspaceId, canManage, onChanged }: { app: Applica
         ) : <Badge variant="secondary">{APP_STAGE_LABELS[app.stage]}</Badge>}
 
         {canManage && app.stage !== 'hired' && app.stage !== 'rejected' && (
-          <Button size="sm" className="rounded-full h-8" disabled={!!busy} onClick={hire}>{busy === 'hire' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><GraduationCap className="h-4 w-4 mr-1" />Hire</>}</Button>
+          <Button size="sm" className="h-8" disabled={!!busy} onClick={hire}>{busy === 'hire' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><GraduationCap className="h-4 w-4 mr-1" />Hire</>}</Button>
         )}
         {app.stage === 'hired' && <Badge variant="default">Hired</Badge>}
       </div>
@@ -349,7 +349,7 @@ function AddApplicantDialog({ workspaceId, postingId, onDone }: { workspaceId: s
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><UserPlus className="h-4 w-4 mr-2" />Add applicant</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><UserPlus className="h-4 w-4 mr-2" />Add applicant</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Add Applicant</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -362,8 +362,8 @@ function AddApplicantDialog({ workspaceId, postingId, onDone }: { workspaceId: s
           <div className="space-y-1"><Label>Source</Label><Input value={f.source} onChange={(e) => upd('source', e.target.value)} placeholder="LinkedIn / Referral / Website" /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -467,8 +467,8 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild>
         {isEdit
-          ? <Button variant="outline" size="sm" className="rounded-full"><Pencil className="h-4 w-4 mr-1" />Edit</Button>
-          : <Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New job</Button>}
+          ? <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Edit</Button>
+          : <Button size="sm"><Plus className="h-4 w-4 mr-2" />New job</Button>}
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{isEdit ? 'Edit job posting' : 'New job posting'}</DialogTitle></DialogHeader>
@@ -511,7 +511,7 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <Label className="flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> AI job description</Label>
-              <Button size="sm" variant="outline" className="rounded-full h-8" onClick={generate} disabled={aiBusy}>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate'}</Button>
+              <Button size="sm" variant="outline" className="h-8" onClick={generate} disabled={aiBusy}>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate'}</Button>
             </div>
             <Input value={f.keywords} onChange={(e) => upd('keywords', e.target.value)} placeholder="Must-haves / keywords (e.g. Figma, design systems, 5+ yrs)" />
           </div>
@@ -530,7 +530,7 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
           <div className="rounded-xl border border-border/60 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <Label>Compensation by region <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Button size="sm" variant="outline" className="rounded-full h-8" onClick={addComp}><Plus className="h-3.5 w-3.5 mr-1" />Add region</Button>
+              <Button size="sm" variant="outline" className="h-8" onClick={addComp}><Plus className="h-3.5 w-3.5 mr-1" />Add region</Button>
             </div>
             {comp.length === 0 ? (
               <p className="text-xs text-muted-foreground">Leave empty to show the single salary range above.</p>
@@ -575,13 +575,13 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
         </div>
         <DialogFooter>
           {isEdit ? (
-            <Button className="rounded-full" onClick={() => submit(posting!.status)} disabled={saving}>
+            <Button onClick={() => submit(posting!.status)} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save changes
             </Button>
           ) : (
             <>
-              <Button variant="outline" className="rounded-full" onClick={() => submit('draft')} disabled={saving}>Save draft</Button>
-              <Button className="rounded-full" onClick={() => submit('open')} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Publish</Button>
+              <Button variant="outline" onClick={() => submit('draft')} disabled={saving}>Save draft</Button>
+              <Button onClick={() => submit('open')} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Publish</Button>
             </>
           )}
         </DialogFooter>

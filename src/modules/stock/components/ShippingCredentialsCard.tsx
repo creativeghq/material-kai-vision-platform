@@ -124,7 +124,7 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
         <div>
-          <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
+          <Button size="sm" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
           </Button>
         </div>
@@ -146,7 +146,7 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
             <div className="space-y-1"><Label className="text-xs">API key</Label><Input type="password" value={srKey} onChange={(e) => setSrKey(e.target.value)} autoComplete="new-password" placeholder={srHasKey ? `${srMasked ?? '••••'} (configured — blank keeps)` : 'SeaRates API key / token'} /></div>
           </div>
           <div>
-            <Button size="sm" variant="outline" onClick={saveSearates} disabled={savingSr} className="rounded-full">
+            <Button size="sm" variant="outline" onClick={saveSearates} disabled={savingSr}>
               {savingSr ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save SeaRates
             </Button>
           </div>

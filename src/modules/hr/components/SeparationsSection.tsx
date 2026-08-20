@@ -160,7 +160,7 @@ function SeparationDialog({ workspaceId, employees, onDone }: { workspaceId: str
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Record departure</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Record departure</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Record Departure</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -190,8 +190,8 @@ function SeparationDialog({ workspaceId, employees, onDone }: { workspaceId: str
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Record departure</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Record departure</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

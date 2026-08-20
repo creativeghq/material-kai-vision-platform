@@ -122,8 +122,8 @@ function EditDepartmentDialog({ workspaceId, department, onClose, onDone }: { wo
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -147,7 +147,7 @@ function AddDepartmentDialog({ workspaceId, onDone }: { workspaceId: string; onD
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New department</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />New department</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>New Department</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -155,8 +155,8 @@ function AddDepartmentDialog({ workspaceId, onDone }: { workspaceId: string; onD
           <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Create</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Create</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -418,15 +418,15 @@ export const EmbedKeysCard: React.FC = () => {
                     <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs">
                       {key.api_key}
                     </code>
-                    <Button size="sm" variant="outline" className="rounded-full shrink-0"
+                    <Button size="sm" variant="outline" className="shrink-0"
                       onClick={() => copy(key.api_key, 'Key')}>
                       <Copy className="h-3.5 w-3.5 mr-1" />Copy
                     </Button>
-                    <Button size="sm" variant="outline" className="rounded-full shrink-0"
+                    <Button size="sm" variant="outline" className="shrink-0"
                       onClick={() => copy(usageSnippet(key.api_key), 'Embed snippet')}>
                       Embed code
                     </Button>
-                    <Button size="sm" variant="ghost" className="rounded-full shrink-0"
+                    <Button size="sm" variant="ghost" className="shrink-0"
                       onClick={() => copy(apiSnippet(key.api_key), 'API snippet')}>
                       API
                     </Button>
@@ -655,8 +655,8 @@ export const EmbedKeysCard: React.FC = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setCreating(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={handleCreate} disabled={saving}>
+            <Button variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Create key
             </Button>
           </DialogFooter>

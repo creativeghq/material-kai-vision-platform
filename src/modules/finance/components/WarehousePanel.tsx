@@ -189,8 +189,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button size="sm" variant="outline" onClick={() => setAddWhOpen(true)} className="rounded-full"><Plus className="h-4 w-4 mr-1" /> Warehouse</Button>
-          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="rounded-full" disabled={!selectedWh}><Upload className="h-4 w-4 mr-1" /> Import</Button>
+          <Button size="sm" variant="outline" onClick={() => setAddWhOpen(true)}><Plus className="h-4 w-4 mr-1" /> Warehouse</Button>
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} disabled={!selectedWh}><Upload className="h-4 w-4 mr-1" /> Import</Button>
           <Button size="sm" onClick={() => setAddOpen(true)} disabled={!selectedWh}><Plus /> Add item</Button>
         </div>
       </CardHeader>
@@ -396,8 +396,8 @@ const ImportOpeningStockDialog: React.FC<{
           {parsed.bad > 0 && <span className="text-amber-500"> · {parsed.bad} unparseable line{parsed.bad === 1 ? '' : 's'} skipped</span>}
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button className="rounded-full" onClick={run} disabled={busy || parsed.lines.length === 0}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={run} disabled={busy || parsed.lines.length === 0}>
             {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
             Import {parsed.lines.length || ''}
           </Button>
@@ -552,7 +552,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
               </div>
               <div className="flex items-center justify-between pt-1">
                 <span className="text-xs text-muted-foreground">Not in the catalog yet?</span>
-                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setNewOpen(true)}>
+                <Button size="sm" variant="outline" onClick={() => setNewOpen(true)}>
                   <Plus className="h-4 w-4 mr-1" /> Create new product
                 </Button>
               </div>

@@ -169,7 +169,7 @@ export const ProductMaterialMapsCard: React.FC<Props> = ({
               key={b.tier}
               size="sm"
               variant="outline"
-              className="rounded-full h-8 text-xs"
+              className="h-8 text-xs"
               disabled={busy !== null}
               onClick={() => generate(b.tier, b.label)}
             >

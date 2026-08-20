@@ -352,7 +352,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               The dropdown options shown on PDF upload and XML import. Disabled rows are hidden from the dropdowns but kept for historical reference.
             </CardDescription>
           </div>
-          <Button onClick={() => openCreate()} className="rounded-full shrink-0">
+          <Button onClick={() => openCreate()} className="shrink-0">
             <Plus className="h-4 w-4 mr-2" />
             New category
           </Button>
@@ -539,10 +539,10 @@ export const MaterialCategoriesTab: React.FC = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditorOpen(false)} className="rounded-full">
+            <Button variant="outline" onClick={() => setEditorOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="rounded-full">
+            <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               {isEditing ? 'Save changes' : 'Create category'}
             </Button>
@@ -587,7 +587,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={addAlias} disabled={aliasBusy} className="rounded-full h-9">
+          <Button onClick={addAlias} disabled={aliasBusy} className="h-9">
             {aliasBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
             Add alias
           </Button>

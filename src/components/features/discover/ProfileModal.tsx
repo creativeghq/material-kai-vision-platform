@@ -79,7 +79,7 @@ function ServiceRow({ service, onHire, isLast }: { service: ServiceItem; onHire:
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
           )}
-          <Button size="sm" variant="outline" className="h-7 text-xs rounded-full gap-1 px-3"
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-3"
             onClick={() => onHire(service.id)}>
             <Mail className="h-3 w-3" />Hire
           </Button>
@@ -343,7 +343,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-xl font-semibold tracking-tight">{displayName}</h2>
                         {profile.professional_type && (
-                          <Badge className="text-xs rounded-full bg-primary/10 text-primary border-primary/20 font-normal">
+                          <Badge className="text-xs bg-primary/10 text-primary border-primary/20 font-normal">
                             {PROFESSIONAL_TYPE_LABELS[profile.professional_type] ?? profile.professional_type}
                           </Badge>
                         )}
@@ -370,7 +370,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                       currentUserId={user?.id}
                       onToggle={(nowFollowing) => setFollowerCount((c) => c + (nowFollowing ? 1 : -1))}
                     />
-                    <Button className="rounded-full gap-2 px-4" size="sm" onClick={() => openHireModal()}>
+                    <Button className="gap-2 px-4" size="sm" onClick={() => openHireModal()}>
                       <Mail className="h-3.5 w-3.5" />Hire me
                     </Button>
                     {/* Request access to this factory's catalog (verified-factory profiles only). */}
@@ -501,7 +501,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                             {isOwnProfile ? (
                               <>
                                 <p className="text-sm">Your profile is empty.</p>
-                                <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                                <Button asChild variant="outline" size="sm" className="mt-3">
                                   <Link to="/profile" onClick={onClose}><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
                                 </Button>
                               </>

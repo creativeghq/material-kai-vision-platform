@@ -277,7 +277,6 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full"
             onClick={onClose}
           >
             <X className="h-4 w-4" />
@@ -402,7 +401,6 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full"
               onClick={handleDownload}
             >
               <Download className="mr-1.5 h-4 w-4" />
@@ -411,7 +409,6 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
             <Button
               variant="default"
               size="sm"
-              className="rounded-full"
               onClick={onClose}
             >
               Close

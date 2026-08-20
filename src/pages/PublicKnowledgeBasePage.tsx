@@ -108,7 +108,7 @@ function KbRelatedProducts({ doc }: { doc: KBDocument }) {
         ))}
       </div>
       {!user && (
-        <Button className="rounded-full mt-4" onClick={() => navigate(signupHref)}>
+        <Button className="mt-4" onClick={() => navigate(signupHref)}>
           Create a free account to see our catalog
         </Button>
       )}
@@ -417,7 +417,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4 text-center">
         <SeoHead title="Article not found" noIndex canonicalPath={`/knowledge-base/${slug || ''}`} />
         <p className="text-lg font-light">That article doesn’t exist or isn’t public.</p>
-        <Button className="rounded-full" onClick={() => navigate('/knowledge-base')}>Browse the knowledge base</Button>
+        <Button onClick={() => navigate('/knowledge-base')}>Browse the knowledge base</Button>
       </div>
     );
   }
@@ -500,7 +500,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
             <span className="text-sm font-medium truncate max-w-xs">{selectedDoc.title}</span>
             <div className="ml-auto">
-              <Button variant="secondary" size="sm" className="rounded-full gap-1.5" onClick={() => navigate('/')}>
+              <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => navigate('/')}>
                 <LayoutDashboard className="h-3.5 w-3.5" />
                 Back to platform
               </Button>
@@ -530,7 +530,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
 
             <div className="flex items-start justify-between gap-4 mb-4">
               <h1 className="text-3xl font-light tracking-tight leading-tight">{selectedDoc.title}</h1>
-              <Button className="rounded-full gap-2 shrink-0" onClick={handleAskAI} disabled={askingAI}>
+              <Button className="gap-2 shrink-0" onClick={handleAskAI} disabled={askingAI}>
                 {askingAI ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Bot className="h-4 w-4" />}
                 Ask AI
               </Button>
@@ -579,7 +579,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 <p className="font-medium text-sm">Have questions about this article?</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Chat with JARVIS and get instant answers based on this content.</p>
               </div>
-              <Button variant="outline" className="rounded-full gap-2 shrink-0" onClick={handleAskAI} disabled={askingAI}>
+              <Button variant="outline" className="gap-2 shrink-0" onClick={handleAskAI} disabled={askingAI}>
                 <Sparkles className="h-4 w-4" />
                 Ask AI
               </Button>
@@ -669,7 +669,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 type="button"
                 onClick={() => setCmdOpen(true)}
                 aria-label="Open quick search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 rounded-full border border-white/40 px-2 py-0.5 text-[10px] text-white/90 hover:bg-white/15 transition"
+                className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 border border-white/40 px-2 py-0.5 text-[10px] text-white/90 hover:bg-white/15 transition"
               >
                 <span className="font-sans">⌘</span>K
               </button>
@@ -698,7 +698,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 <button
                   key={cat.id}
                   onClick={() => navigate(`/knowledge-base?cat=${cat.id}`)}
-                  className="text-xs text-white bg-white/15 hover:bg-white/25 transition-colors rounded-full px-3 py-1"
+                  className="text-xs text-white bg-white/15 hover:bg-white/25 transition-colors px-3 py-1"
                 >
                   {cat.name}
                 </button>
@@ -710,7 +710,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="text-white/90 hover:text-white hover:bg-white/15 rounded-full gap-1.5"
+            className="text-white/90 hover:text-white hover:bg-white/15 gap-1.5"
             onClick={() => navigate('/')}
           >
             <LayoutDashboard className="h-3.5 w-3.5" />

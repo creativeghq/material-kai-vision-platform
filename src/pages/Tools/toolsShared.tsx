@@ -258,7 +258,7 @@ export function PriceResultsCard({ data }: { data: PublicPriceScanResponse }) {
             )}
           </div>
           {data.from_cache && (
-            <Badge variant="secondary" className="gap-1.5 rounded-full">
+            <Badge variant="secondary" className="gap-1.5">
               <CheckCircle2 className="h-3 w-3" />
               Cached · instant
             </Badge>
@@ -311,7 +311,7 @@ function PriceResultRow({ r, isLowest }: { r: PublicPriceResult; isLowest: boole
           <span className="font-medium truncate">{r.retailer_name}</span>
           {r.verified && <VerifiedPill />}
           {isLowest && (
-            <Badge variant="outline" className="gap-1 rounded-full border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] h-5 px-2">
+            <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] h-5 px-2">
               <TrendingDown className="h-2.5 w-2.5" />
               best price
             </Badge>
@@ -335,7 +335,7 @@ function PriceResultRow({ r, isLowest }: { r: PublicPriceResult; isLowest: boole
           <div className="flex items-center justify-end gap-1.5 mt-0.5">
             <span className="text-xs text-muted-foreground line-through tabular-nums">{formatPrice(r.original_price, r.currency)}</span>
             {discount && discount > 0 && (
-              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-0 text-[10px] h-4 px-1.5 rounded-full">
+              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-0 text-[10px] h-4 px-1.5">
                 −{discount}%
               </Badge>
             )}
@@ -434,7 +434,7 @@ export function ProductResultsCard({ data, isAuthenticated }: { data: PublicProd
             {data.total_results} material{data.total_results === 1 ? '' : 's'} found
           </CardTitle>
           {data.from_cache && (
-            <Badge variant="secondary" className="gap-1.5 rounded-full">
+            <Badge variant="secondary" className="gap-1.5">
               <CheckCircle2 className="h-3 w-3" />
               Cached · instant
             </Badge>
@@ -521,7 +521,7 @@ export function MentionResultsCard({ data }: { data: PublicMentionScanResponse }
             <p className="text-xs text-muted-foreground mt-1">News, blogs, and editorial coverage from across the web.</p>
           </div>
           {data.from_cache && (
-            <Badge variant="secondary" className="gap-1.5 rounded-full">
+            <Badge variant="secondary" className="gap-1.5">
               <CheckCircle2 className="h-3 w-3" />
               Cached · instant
             </Badge>

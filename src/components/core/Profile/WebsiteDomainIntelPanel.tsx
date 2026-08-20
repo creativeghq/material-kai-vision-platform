@@ -95,7 +95,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
               {s ? <> · captured {timeAgo(s.captured_at)}</> : null}
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="rounded-full" onClick={run} disabled={running}>
+          <Button variant="outline" size="sm" onClick={run} disabled={running}>
             {running ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
             {s ? 'Refresh' : 'Snapshot now'}
           </Button>

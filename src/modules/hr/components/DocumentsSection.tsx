@@ -110,7 +110,7 @@ function UploadDialog({ workspaceId, employees, onDone }: { workspaceId: string;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Upload</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Upload</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Upload Document</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -133,8 +133,8 @@ function UploadDialog({ workspaceId, employees, onDone }: { workspaceId: string;
           <div className="space-y-1"><Label>File *</Label><input ref={fileRef} type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-primary-foreground file:cursor-pointer" /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Upload</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Upload</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

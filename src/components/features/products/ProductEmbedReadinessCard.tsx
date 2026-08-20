@@ -99,7 +99,7 @@ export const ProductEmbedReadinessCard: React.FC<Props> = ({ productId }) => {
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full h-7 text-[11px]"
+                className="h-7 text-[11px]"
                 onClick={() => {
                   navigator.clipboard.writeText(snippet).then(
                     () => toast({ title: 'Snippet copied' }),

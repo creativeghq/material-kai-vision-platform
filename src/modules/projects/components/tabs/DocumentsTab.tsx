@@ -142,7 +142,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {d.current && (
-                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => open(d.current!)}>
+                      <Button size="sm" variant="outline" onClick={() => open(d.current!)}>
                         <Download className="h-3.5 w-3.5 mr-1" /> Open
                       </Button>
                     )}
@@ -237,7 +237,7 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
           </label>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create'}
             </Button>
           </div>
@@ -305,7 +305,7 @@ const UploadRevisionDialog: React.FC<{
           </p>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Upload'}
             </Button>
           </div>

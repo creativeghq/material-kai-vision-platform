@@ -156,10 +156,10 @@ export const BookingModal: React.FC<{
           </div>
 
           <div className="flex gap-3 pt-1">
-            <Button className="flex-1 rounded-full" onClick={submit} disabled={saving}>
+            <Button className="flex-1" onClick={submit} disabled={saving}>
               {saving ? 'Booking…' : 'Confirm Booking'}
             </Button>
-            <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
           </div>

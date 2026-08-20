@@ -213,7 +213,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
               size="sm" variant="outline"
               onClick={fireResearch}
               disabled={refreshing}
-              className="rounded-full text-xs">
+              className="text-xs">
               <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
               {research ? 'Refresh' : 'Run audit'}
             </Button>

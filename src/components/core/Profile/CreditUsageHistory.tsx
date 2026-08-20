@@ -154,7 +154,7 @@ export const CreditUsageHistory: React.FC = () => {
                   key={w.days}
                   type="button"
                   onClick={() => setWindowDays(w.days)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
                     windowDays === w.days
                       ? 'bg-background text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'

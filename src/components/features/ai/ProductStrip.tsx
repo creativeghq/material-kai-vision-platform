@@ -75,7 +75,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-medium text-muted-foreground">{title}</h4>
-        <Badge className="bg-primary/10 text-primary border-0 rounded-full text-xs font-medium">
+        <Badge className="bg-primary/10 text-primary border-0 text-xs font-medium">
           {products.length}
         </Badge>
       </div>

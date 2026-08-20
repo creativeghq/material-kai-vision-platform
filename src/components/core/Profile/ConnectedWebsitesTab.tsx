@@ -432,7 +432,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
             <Button variant="ghost" onClick={() => { setAdding(false); setEditing(null); }} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="rounded-full">
+            <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
               {editing ? 'Save Changes' : 'Add & Preview'}
             </Button>
@@ -532,7 +532,6 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
             </Button>
             <Button
               onClick={handleProceedFullCrawl}
-              className="rounded-full"
               disabled={!previewResult?.result.ok}
             >
               <RefreshCw className="w-4 h-4 mr-1" />

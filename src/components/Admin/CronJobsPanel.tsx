@@ -231,7 +231,6 @@ export const CronJobsPanel: React.FC = () => {
             size="sm"
             onClick={fetchJobs}
             disabled={loading}
-            className="rounded-full"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh

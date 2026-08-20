@@ -86,7 +86,7 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
             </p>
           </div>
           {!readOnly && (
-            <Button variant="outline" size="sm" className="rounded-full" onClick={addZone}>
+            <Button variant="outline" size="sm" onClick={addZone}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add zone
             </Button>
           )}

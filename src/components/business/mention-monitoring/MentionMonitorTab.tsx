@@ -282,7 +282,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
             <span className="text-xs text-muted-foreground">{enabled ? 'Active' : 'Off'}</span>
             <Switch checked={enabled} onCheckedChange={handleToggle} />
             {admin && enabled && (
-              <Button onClick={handleRefresh} disabled={refreshing} size="sm" variant="outline" className="rounded-full">
+              <Button onClick={handleRefresh} disabled={refreshing} size="sm" variant="outline">
                 <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
@@ -564,7 +564,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                   </p>
                 </div>
                 {admin && (
-                  <Button size="sm" onClick={handleProbeLlm} disabled={probing} className="rounded-full">
+                  <Button size="sm" onClick={handleProbeLlm} disabled={probing}>
                     <Bot className={`h-3 w-3 mr-1 ${probing ? 'animate-spin' : ''}`} />
                     {probing ? 'Probing...' : 'Run probe (2 cr)'}
                   </Button>

@@ -897,10 +897,10 @@ export const CompanyDetailPage: React.FC = () => {
                                 THIS company; a CRM party is never created from a template. */}
                             {!isNew && id && (
                               <div className="flex items-center gap-1">
-                                <Button variant="outline" size="sm" className="rounded-full" onClick={() => setTermsPickerOpen(true)}>
+                                <Button variant="outline" size="sm" onClick={() => setTermsPickerOpen(true)}>
                                   <Layers className="h-3.5 w-3.5 mr-1" /> Apply terms
                                 </Button>
-                                <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSaveTermsOpen(true)} title="Save these terms as a reusable preset">
+                                <Button variant="ghost" size="sm" onClick={() => setSaveTermsOpen(true)} title="Save these terms as a reusable preset">
                                   Save as preset
                                 </Button>
                               </div>

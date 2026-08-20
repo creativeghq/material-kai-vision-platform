@@ -145,7 +145,7 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
               to a 60 × 60 cm placeholder, and inviting someone to "place it to scale" at a size
               nobody measured is the opposite of what the feature promises. */}
           {models.length > 0 && (
-            <Button asChild variant="outline" size="sm" className="rounded-full text-xs">
+            <Button asChild variant="outline" size="sm" className="text-xs">
               <Link to={`/room-planner?product=${productId}`}>
                 <Ruler className="mr-1.5 h-3.5 w-3.5" />
                 Place in a room
@@ -155,7 +155,7 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
           <Button
             variant="outline"
             size="sm"
-            className="rounded-full text-xs"
+            className="text-xs"
             disabled={busy}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -192,7 +192,7 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-full"
+                className="h-7 w-7"
                 onClick={() => handleDelete(m)}
                 title="Remove model"
               >
@@ -232,7 +232,7 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
           <Button
             variant="outline"
             size="sm"
-            className="rounded-full text-xs"
+            className="text-xs"
             disabled={models.length === 0}
             onClick={handleSaveDims}
           >

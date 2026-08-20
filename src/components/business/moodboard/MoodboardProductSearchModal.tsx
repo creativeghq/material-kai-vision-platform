@@ -154,7 +154,7 @@ export const MoodboardProductSearchModal: React.FC<MoodboardProductSearchModalPr
           </div>
           <Button
             variant="outline"
-            className="rounded-full gap-1.5 shrink-0"
+            className="gap-1.5 shrink-0"
             onClick={handleAdvancedSearch}
             title="Search with the KAI agent — added products return to this moodboard"
           >
@@ -177,7 +177,7 @@ export const MoodboardProductSearchModal: React.FC<MoodboardProductSearchModalPr
           ) : results.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm mb-3">No products found for "{query}"</p>
-              <Button variant="outline" className="rounded-full gap-1.5" onClick={handleAdvancedSearch}>
+              <Button variant="outline" className="gap-1.5" onClick={handleAdvancedSearch}>
                 <Sparkles className="h-4 w-4" />
                 Try advanced search
               </Button>
@@ -210,7 +210,7 @@ export const MoodboardProductSearchModal: React.FC<MoodboardProductSearchModalPr
                       <Button
                         size="sm"
                         variant={done ? 'secondary' : 'default'}
-                        className="rounded-full h-7 text-xs w-full"
+                        className="h-7 text-xs w-full"
                         disabled={done || addingId === hit.id}
                         onClick={() => handleAdd(hit)}
                       >

@@ -259,7 +259,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     type="button"
                     onClick={() => setSelection((s) => ({ ...s, [group.id]: value.id }))}
                     aria-pressed={active}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    className={`flex items-center gap-2 border px-3 py-1.5 text-sm transition-colors ${
                       active ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted'
                     }`}
                   >
@@ -345,7 +345,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" className="rounded-full" onClick={save} disabled={saving}>
+            <Button variant="outline" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
               Save
             </Button>

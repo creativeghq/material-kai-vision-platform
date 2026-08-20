@@ -111,11 +111,11 @@ export const ProjectsListPage: React.FC = () => {
         subtitle="Container above moodboards and quotes — rooms, budget vs actual, tasks"
         actions={
           <>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/blueprints')}>
+            <Button variant="outline" size="sm" onClick={() => navigate('/blueprints')}>
               <ClipboardList className="h-4 w-4 mr-2" />
               Blueprints
             </Button>
-            <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-full">
+            <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New project
             </Button>
@@ -146,7 +146,7 @@ export const ProjectsListPage: React.FC = () => {
                 <>
                   <h3 className="text-lg font-light text-foreground mb-1">No projects match your filters</h3>
                   <p className="text-sm text-muted-foreground mb-4">Clear a constraint to widen the list.</p>
-                  <Button variant="outline" onClick={() => setFilterValues({})} className="rounded-full">
+                  <Button variant="outline" onClick={() => setFilterValues({})}>
                     Clear filters
                   </Button>
                 </>
@@ -156,7 +156,7 @@ export const ProjectsListPage: React.FC = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     A project is a container for one engagement — its rooms, moodboards, quotes, and tasks.
                   </p>
-                  <Button onClick={() => setShowCreate(true)} className="rounded-full">
+                  <Button onClick={() => setShowCreate(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create your first project
                   </Button>

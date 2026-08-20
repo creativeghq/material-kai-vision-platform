@@ -213,7 +213,7 @@ export const AddDealerProductDialog: React.FC<{
                     </button>
                   </div>
                   {!dupes[0].hasCatalogAccess && (
-                    <Button type="button" size="sm" variant="outline" className="rounded-full h-7"
+                    <Button type="button" size="sm" variant="outline" className="h-7"
                       disabled={requested === (dupes[0].factoryName ?? '*')}
                       onClick={() => requestAccess(dupes[0].factoryName)}>
                       <span className="text-xs">

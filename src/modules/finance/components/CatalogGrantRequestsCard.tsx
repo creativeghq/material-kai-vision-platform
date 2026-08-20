@@ -116,14 +116,14 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
                   <td className="px-4 py-2 text-right">
                     <div className="flex justify-end gap-1">
                       {r.status === 'requested' && (
-                        <Button size="sm" variant="outline" className="rounded-full h-7"
+                        <Button size="sm" variant="outline" className="h-7"
                           disabled={busy === r.id} onClick={() => decide(r.id, 'active')}>
                           {busy === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                           <span className="ml-1 text-xs">Grant</span>
                         </Button>
                       )}
                       {r.status === 'active' && (
-                        <Button size="sm" variant="ghost" className="rounded-full h-7"
+                        <Button size="sm" variant="ghost" className="h-7"
                           disabled={busy === r.id} onClick={() => decide(r.id, 'revoked')}>
                           <X className="h-3.5 w-3.5" />
                           <span className="ml-1 text-xs">Revoke</span>

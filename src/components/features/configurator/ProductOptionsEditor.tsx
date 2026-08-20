@@ -324,7 +324,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                     }))}
                   />
                 </div>
-                <Button size="sm" variant="outline" className="rounded-full"
+                <Button size="sm" variant="outline"
                   onClick={() => addValue(group)} disabled={busy}>
                   <Plus className="mr-1 h-3.5 w-3.5" />Add choice
                 </Button>
@@ -394,7 +394,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                   </SelectContent>
                 </Select>
               </div>
-              <Button size="sm" variant="outline" className="rounded-full"
+              <Button size="sm" variant="outline"
                 onClick={addRule} disabled={busy || !newRule.when || !newRule.then}>
                 <Plus className="mr-1 h-3.5 w-3.5" />Add rule
               </Button>
@@ -426,7 +426,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                 onChange={(e) => setNewGroup((g) => ({ ...g, target: e.target.value }))} />
             )}
           </div>
-          <Button size="sm" className="rounded-full" onClick={addGroup} disabled={busy || !newGroup.label.trim()}>
+          <Button size="sm" onClick={addGroup} disabled={busy || !newGroup.label.trim()}>
             <Plus className="mr-1 h-3.5 w-3.5" />Add option
           </Button>
         </div>

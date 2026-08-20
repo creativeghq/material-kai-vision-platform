@@ -88,10 +88,10 @@ export default function RealEstatePage() {
         actions={canManage ? (
           <>
             {/* Same draft, with the shape you always start from (#322). */}
-            <Button variant="outline" onClick={() => setTemplatePickerOpen(true)} className="rounded-full">
+            <Button variant="outline" onClick={() => setTemplatePickerOpen(true)}>
               <Layers className="mr-2 h-4 w-4" /> From template
             </Button>
-            <Button onClick={createDraft} disabled={creating} className="rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button>
+            <Button onClick={createDraft} disabled={creating}><Plus className="mr-2 h-4 w-4" /> New listing</Button>
           </>
         ) : undefined} />
 
@@ -245,8 +245,8 @@ const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
           </div>
           <div className="flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2 py-1.5 text-[11px]">{s.feed_enabled ? url : 'Enable the feed to reveal the URL'}</code>
-            <Button variant="ghost" size="sm" className="rounded-full" disabled={!s.feed_enabled} onClick={() => { void navigator.clipboard.writeText(url); toast({ title: 'Feed URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="sm" className="rounded-full" disabled={busy} title="Rotate token" onClick={async () => { setBusy(true); try { setS(await realEstateService.rotateFeedToken(ws)); toast({ title: 'Token rotated — update your portals' }); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); } }}><RefreshCw className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="sm" disabled={!s.feed_enabled} onClick={() => { void navigator.clipboard.writeText(url); toast({ title: 'Feed URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="sm" disabled={busy} title="Rotate token" onClick={async () => { setBusy(true); try { setS(await realEstateService.rotateFeedToken(ws)); toast({ title: 'Token rotated — update your portals' }); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); } }}><RefreshCw className="h-3.5 w-3.5" /></Button>
           </div>
         </>
       )}
@@ -273,9 +273,9 @@ const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
           <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2 py-1.5 text-[11px]">
             {s.inbound_lead_token && s.inbound_leads_enabled ? inboundLeadUrl(s.inbound_lead_token) : s.inbound_lead_token ? 'Enable inbound leads to reveal the URL' : 'No token yet'}
           </code>
-          <Button variant="ghost" size="sm" className="rounded-full" disabled={!s.inbound_lead_token || !s.inbound_leads_enabled}
+          <Button variant="ghost" size="sm" disabled={!s.inbound_lead_token || !s.inbound_leads_enabled}
             onClick={() => { void navigator.clipboard.writeText(inboundLeadUrl(s.inbound_lead_token as string)); toast({ title: 'Inbound URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>
-          <Button variant="ghost" size="sm" className="rounded-full" disabled={busy} title={s.inbound_lead_token ? 'Rotate token' : 'Generate token'}
+          <Button variant="ghost" size="sm" disabled={busy} title={s.inbound_lead_token ? 'Rotate token' : 'Generate token'}
             onClick={async () => { setBusy(true); try { setS(await realEstateService.rotateInboundToken(ws)); toast({ title: s.inbound_lead_token ? 'Token rotated — re-point your forwarders' : 'Token generated' }); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); } }}><RefreshCw className="h-3.5 w-3.5" /></Button>
         </div>
       )}
@@ -308,8 +308,8 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
       <p className="text-sm text-muted-foreground">No listings yet.{canManage ? ' Create your first property, or import the book you already have.' : ''}</p>
       {canManage && (
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Button onClick={onCreate} disabled={creating} className="rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)} className="rounded-full"><Upload className="mr-2 h-4 w-4" /> Import listings</Button>
+          <Button onClick={onCreate} disabled={creating}><Plus className="mr-2 h-4 w-4" /> New listing</Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" /> Import listings</Button>
         </div>
       )}
       {importer}
@@ -319,7 +319,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
     <>
     {canManage && (
       <div className="mb-3 flex justify-end">
-        <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="rounded-full"><Upload className="mr-1.5 h-4 w-4" /> Import</Button>
+        <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="mr-1.5 h-4 w-4" /> Import</Button>
       </div>
     )}
     {importer}
@@ -409,7 +409,7 @@ const AddPartyButton: React.FC<{ ws: string; role: 'seller' | 'buyer'; onAdded: 
   };
   return (
     <>
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add {role}</Button>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add {role}</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle className="capitalize">Add a {role}</DialogTitle></DialogHeader>
@@ -418,8 +418,8 @@ const AddPartyButton: React.FC<{ ws: string; role: 'seller' | 'buyer'; onAdded: 
             <ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder={`Search CRM contacts to add as ${role}…`} />
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button className="rounded-full capitalize" onClick={save} disabled={!contactId || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add {role}</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="capitalize" onClick={save} disabled={!contactId || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add {role}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -461,7 +461,7 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
   };
   return (
     <>
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Schedule viewing</Button>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Schedule viewing</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule a Viewing</DialogTitle></DialogHeader>
@@ -475,8 +475,8 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
             <div><span className="mb-1 block text-xs text-muted-foreground">Attendee (optional)</span><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Link a CRM contact…" /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={save} disabled={!propertyId || !when || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Schedule</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!propertyId || !when || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Schedule</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -510,7 +510,7 @@ const AddBuyerButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onA
   const field = (k: string, ph: string, t = 'text') => <input type={t} placeholder={ph} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={c[k] ?? ''} onChange={(e) => setC((p) => ({ ...p, [k]: e.target.value }))} />;
   return (
     <>
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add buyer</Button>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add buyer</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add a Buyer</DialogTitle></DialogHeader>
@@ -523,8 +523,8 @@ const AddBuyerButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onA
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={save} disabled={!contactId || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add buyer</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!contactId || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add buyer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -540,7 +540,7 @@ const AddViaPropertyButton: React.FC<{ ws: string; label: string; tab: string }>
   const [propertyId, setPropertyId] = useState('');
   return (
     <>
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> {label}</Button>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> {label}</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader>
@@ -549,8 +549,8 @@ const AddViaPropertyButton: React.FC<{ ws: string; label: string; tab: string }>
             <PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} />
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={() => propertyId && navigate(`/properties/${propertyId}?tab=${tab}`)} disabled={!propertyId}>Continue</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={() => propertyId && navigate(`/properties/${propertyId}?tab=${tab}`)} disabled={!propertyId}>Continue</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -579,7 +579,7 @@ const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAd
   const field = (k: 'name' | 'email' | 'phone', ph: string, t = 'text') => <input type={t} placeholder={ph} className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={f[k] ?? ''} onChange={(e) => setF((p) => ({ ...p, [k]: e.target.value }))} />;
   return (
     <>
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add lead</Button>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add lead</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add a Lead</DialogTitle></DialogHeader>
@@ -590,8 +590,8 @@ const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAd
             <textarea id="realestatepage-property-they-re-interested-in" placeholder="Notes / What they’re after…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message ?? ''} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={save} disabled={!propertyId || !f.name?.trim() || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add lead</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!propertyId || !f.name?.trim() || busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add lead</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -614,8 +614,8 @@ const DeleteIconButton: React.FC<{ title: string; confirmText: string; onDelete:
           <DialogHeader><DialogTitle>{title}?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{confirmText}</p>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button variant="destructive" className="rounded-full" onClick={go} disabled={busy}>{busy ? 'Deleting…' : 'Delete'}</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={go} disabled={busy}>{busy ? 'Deleting…' : 'Delete'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -664,8 +664,8 @@ const LeadRow: React.FC<{ ws: string; q: PropertyInquiry; onChanged: () => void 
             <textarea placeholder="Notes…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setEditing(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={saveEdit} disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button>
+            <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -686,7 +686,7 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const cmaButton = ws ? (
     <div className="mb-3 flex justify-end gap-2">
       <AddPartyButton ws={ws} role="seller" onAdded={load} />
-      <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCmaOpen(true)}><LineChart className="mr-1.5 h-4 w-4" /> Generate CMA</Button>
+      <Button size="sm" variant="outline" onClick={() => setCmaOpen(true)}><LineChart className="mr-1.5 h-4 w-4" /> Generate CMA</Button>
       <CmaReportDialog ws={ws} open={cmaOpen} onOpenChange={setCmaOpen} />
     </div>
   ) : null;
@@ -703,7 +703,7 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
               <div className="font-medium">{s.contact?.name || 'Seller'} <span className="text-xs text-muted-foreground">{s.contact?.email}</span></div>
               <div className="mt-0.5 truncate text-xs text-muted-foreground">{s.owned_property_address || '—'}{s.owned_property_value != null ? ` · est. ${money(s.owned_property_value, 'EUR')}` : ''}</div>
             </div>
-            {s.contact?.lead_score != null && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title="Lead score">{s.contact.lead_score}</Badge>}
+            {s.contact?.lead_score != null && <Badge className="border-0 bg-primary/15 text-[11px] text-primary" title="Lead score">{s.contact.lead_score}</Badge>}
             <span className={`text-[11px] capitalize ${statusTone(s.contact?.lead_status || 'new')}`}>{(s.contact?.lead_status || 'new').replace('_', ' ')}</span>
           </button>
           <div className="pr-3"><DeleteIconButton title="Remove seller" confirmText={`Remove ${s.contact?.name || 'this person'} from the sellers list? Their CRM contact stays — only the seller role is removed.`} onDelete={() => realEstateService.unlinkContact(ws as string, s.crm_contact_id).then(load)} /></div>
@@ -780,7 +780,7 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
             <div className="mt-0.5 truncate text-xs text-muted-foreground">{summariseCriteria(r.criteria)}</div>
           </button>
           {!r.is_active && <span className={`text-[11px] ${statusTone('paused')}`}>paused</span>}
-          <Button size="sm" variant="ghost" className="rounded-full" title="Copy buyer portal link" onClick={() => copyPortal(r.portal_token)}><LinkIcon className="mr-1 h-3.5 w-3.5" /> Portal</Button>
+          <Button size="sm" variant="ghost" title="Copy buyer portal link" onClick={() => copyPortal(r.portal_token)}><LinkIcon className="mr-1 h-3.5 w-3.5" /> Portal</Button>
           <DeleteIconButton title="Delete buyer" confirmText={`Delete the saved search for ${r.contact?.name || 'this buyer'}? Their CRM contact stays.`} onDelete={() => realEstateService.deleteBuyerRequirement(ws as string, r.id).then(load)} />
         </div>
       ))}
@@ -827,7 +827,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       </div>
       {work.length > 0 && (
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Open maintenance <Badge className="rounded-full border-0 bg-amber-500/15 text-[10px] text-amber-500">{work.length}</Badge></div>
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Open maintenance <Badge className="border-0 bg-amber-500/15 text-[10px] text-amber-500">{work.length}</Badge></div>
           <Card><CardContent className="p-0"><div className="divide-y divide-border">
             {work.map((w) => (
               <button key={w.id} onClick={() => navigate(`/properties/${w.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-muted/40">
@@ -908,7 +908,7 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
               </div>
             </button>
             <div className="flex shrink-0 items-center gap-1 pr-3">
-              <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setOpenSplits(openSplits === s.id ? null : s.id)}>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpenSplits(openSplits === s.id ? null : s.id)}>
                 <Percent className="mr-1 h-3 w-3" /> Splits
               </Button>
               <DeleteIconButton title="Delete sale" confirmText="Delete this completed sale? Its commission is removed from your reporting. This does not delete any linked invoice." onDelete={() => realEstateService.deleteSale(ws as string, s.id).then(load)} />

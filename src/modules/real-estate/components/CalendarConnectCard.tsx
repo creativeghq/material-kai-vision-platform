@@ -70,8 +70,8 @@ export const CalendarConnectCard: React.FC<{ ws: string | null }> = ({ ws }) => 
       </div>
       <div className="ml-auto">
         {state.connected
-          ? <Button size="sm" variant="ghost" className="rounded-full" disabled={busy} onClick={disconnect}>Disconnect</Button>
-          : <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={connect}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Connect</Button>}
+          ? <Button size="sm" variant="ghost" disabled={busy} onClick={disconnect}>Disconnect</Button>
+          : <Button size="sm" variant="outline" disabled={busy} onClick={connect}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Connect</Button>}
       </div>
     </CardContent></Card>
   );

@@ -62,7 +62,7 @@ export const CmaReportDialog: React.FC<{ ws: string; propertyId?: string; open: 
             </div>
             <div><Label className="text-xs">Town</Label><Input value={f.town} onChange={(e) => setF((p) => ({ ...p, town: e.target.value }))} placeholder="e.g. Athens" /></div>
             <div><Label className="text-xs">Area m²</Label><Input type="number" value={f.area} onChange={(e) => setF((p) => ({ ...p, area: e.target.value }))} /></div>
-            <div className="col-span-3"><Button className="rounded-full" disabled={loading} onClick={() => run({ property_type: f.property_type, town: f.town || undefined, area: f.area ? Number(f.area) : undefined })}>Generate report</Button></div>
+            <div className="col-span-3"><Button disabled={loading} onClick={() => run({ property_type: f.property_type, town: f.town || undefined, area: f.area ? Number(f.area) : undefined })}>Generate report</Button></div>
           </div>
         )}
 
@@ -114,8 +114,8 @@ export const CmaReportDialog: React.FC<{ ws: string; propertyId?: string; open: 
             )}
 
             <div className="flex justify-end gap-2">
-              {!propertyId && <Button variant="ghost" className="rounded-full" onClick={() => setReport(null)}>New</Button>}
-              <Button className="rounded-full" onClick={print}><Printer className="mr-1.5 h-4 w-4" /> Save as PDF</Button>
+              {!propertyId && <Button variant="ghost" onClick={() => setReport(null)}>New</Button>}
+              <Button onClick={print}><Printer className="mr-1.5 h-4 w-4" /> Save as PDF</Button>
             </div>
           </div>
         )}

@@ -139,7 +139,7 @@ export const TaricReferencePanel: React.FC = () => {
           <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,text/csv" className="hidden"
             aria-label="TARIC nomenclature CSV file"
             onChange={(e) => onFile(e.target.files)} />
-          <Button size="sm" variant="outline" className="rounded-full" disabled={importing}
+          <Button size="sm" variant="outline" disabled={importing}
             onClick={() => fileRef.current?.click()}>
             {importing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
             Upload CSV
@@ -165,7 +165,7 @@ export const TaricReferencePanel: React.FC = () => {
               placeholder="https://circabc.europa.eu/sd/a/…/goods-nomenclature.csv"
             />
           </div>
-          <Button size="sm" className="rounded-full" disabled={importing || !url.trim()} onClick={onUrl}>
+          <Button size="sm" disabled={importing || !url.trim()} onClick={onUrl}>
             {importing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Fetch &amp; import
           </Button>

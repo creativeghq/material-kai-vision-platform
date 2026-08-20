@@ -137,8 +137,8 @@ export const TemplatePickerDialog: React.FC<{
         )}
 
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="ghost" className="rounded-full" onClick={() => { onOpenChange(false); navigate('/templates'); }}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => { onOpenChange(false); navigate('/templates'); }}>
             Manage templates
           </Button>
         </DialogFooter>

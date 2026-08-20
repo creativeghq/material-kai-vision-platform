@@ -243,7 +243,7 @@ export default function PublicQuotePage() {
               )}
             </div>
             {issuedDoc.pdf_url && (
-              <Button size="sm" variant="outline" className="gap-2 rounded-full ml-auto" onClick={() => window.open(issuedDoc.pdf_url!, '_blank')}>
+              <Button size="sm" variant="outline" className="gap-2 ml-auto" onClick={() => window.open(issuedDoc.pdf_url!, '_blank')}>
                 <Download className="h-4 w-4" />
                 {issuedDoc.kind === 'receipt' ? 'Download receipt' : 'Download invoice'}
               </Button>
@@ -333,7 +333,7 @@ export default function PublicQuotePage() {
                     <> · a deposit of {money(payable.deposit_amount, payable.currency)} ({payable.deposit_pct}%) is enough to get started.</>
                   )}
                 </p>
-                <Button className="rounded-full gap-2" onClick={() => navigate(`/pay/${payable.pay_token}`)}>
+                <Button className="gap-2" onClick={() => navigate(`/pay/${payable.pay_token}`)}>
                   <CreditCard className="h-4 w-4" />
                   {payable.deposit_amount != null
                     ? `Pay deposit ${money(payable.deposit_amount, payable.currency)}`
@@ -351,7 +351,7 @@ export default function PublicQuotePage() {
               <Input placeholder="Email (optional)" value={signerEmail} onChange={(e) => setSignerEmail(e.target.value)} />
             </div>
             {acceptError && <div className="text-xs text-destructive">{acceptError}</div>}
-            <Button className="rounded-full" disabled={accepting || !signerName.trim()} onClick={handleAccept}>
+            <Button disabled={accepting || !signerName.trim()} onClick={handleAccept}>
               {accepting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
               Sign &amp; Accept
             </Button>
@@ -361,11 +361,11 @@ export default function PublicQuotePage() {
         {/* PDF actions */}
         {pdfUrl && (
           <div className="flex items-center gap-2 flex-wrap pt-2">
-            <Button size="sm" className="gap-2 rounded-full" onClick={handleDownload}>
+            <Button size="sm" className="gap-2" onClick={handleDownload}>
               <Download className="h-4 w-4" />
               Download PDF
             </Button>
-            <Button variant="ghost" size="sm" className="gap-2 rounded-full" onClick={() => window.open(pdfUrl, '_blank')}>
+            <Button variant="ghost" size="sm" className="gap-2" onClick={() => window.open(pdfUrl, '_blank')}>
               <ExternalLink className="h-4 w-4" />
               Open in new tab
             </Button>

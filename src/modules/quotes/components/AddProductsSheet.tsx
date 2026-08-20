@@ -628,8 +628,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
             {/* Footer */}
             <div className="border-t pt-4 flex gap-3">
-              <Button variant="outline" className="flex-1 rounded-full" onClick={() => handleOpenChange(false)}>Cancel</Button>
-              <Button className="flex-1 rounded-full" onClick={handleAddCatalogToQuote} disabled={selectedProducts.length === 0 || adding}>
+              <Button variant="outline" className="flex-1" onClick={() => handleOpenChange(false)}>Cancel</Button>
+              <Button className="flex-1" onClick={handleAddCatalogToQuote} disabled={selectedProducts.length === 0 || adding}>
                 {adding ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</> : <><Check className="h-4 w-4 mr-2" />Add {selectedProducts.length} Product{selectedProducts.length !== 1 ? 's' : ''}</>}
               </Button>
             </div>
@@ -727,11 +727,11 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                   <div className="space-y-1.5">
                     <Label htmlFor="cp-qty">Quantity</Label>
                     <div className="flex items-center gap-1">
-                      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full flex-shrink-0" onClick={() => setCustomField('quantity', Math.max(1, customForm.quantity - 1))}>
+                      <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={() => setCustomField('quantity', Math.max(1, customForm.quantity - 1))}>
                         <Minus className="h-3 w-3" />
                       </Button>
                       <Input id="cp-qty" type="number" min="1" value={customForm.quantity} onChange={e => setCustomField('quantity', parseInt(e.target.value) || 1)} className="text-center" />
-                      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full flex-shrink-0" onClick={() => setCustomField('quantity', customForm.quantity + 1)}>
+                      <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0" onClick={() => setCustomField('quantity', customForm.quantity + 1)}>
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
@@ -790,8 +790,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
             {/* Footer */}
             <div className="border-t pt-4 flex gap-3">
-              <Button variant="outline" className="flex-1 rounded-full" onClick={() => handleOpenChange(false)}>Cancel</Button>
-              <Button className="flex-1 rounded-full" onClick={handleAddCustomToQuote} disabled={!customForm.name.trim() || adding}>
+              <Button variant="outline" className="flex-1" onClick={() => handleOpenChange(false)}>Cancel</Button>
+              <Button className="flex-1" onClick={handleAddCustomToQuote} disabled={!customForm.name.trim() || adding}>
                 {adding ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</> : <><Check className="h-4 w-4 mr-2" />Add Custom Product</>}
               </Button>
             </div>

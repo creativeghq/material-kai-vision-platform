@@ -101,9 +101,8 @@ export const MydataSyncDialog: React.FC<{
         </div>
 
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)} disabled={syncing}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={syncing}>Cancel</Button>
           <Button
-            className="rounded-full"
             disabled={invalid || syncing}
             onClick={() => onConfirm({ dateFrom: range.from, dateTo: range.to })}
           >

@@ -183,7 +183,7 @@ const MultiSelect: React.FC<{
             key={o.value}
             type="button"
             onClick={() => onChange(active ? [...set].filter((v) => v !== o.value) : [...set, o.value])}
-            className={`px-2.5 py-1 rounded-full text-xs border ${active ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'}`}
+            className={`px-2.5 py-1 text-xs border ${active ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'}`}
           >
             {o.label}
           </button>

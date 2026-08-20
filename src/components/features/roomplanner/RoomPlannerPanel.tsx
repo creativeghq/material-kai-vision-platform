@@ -355,13 +355,12 @@ export const RoomPlannerPanel: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button size="sm" variant="outline" className="rounded-full" onClick={createLayout}>
+          <Button size="sm" variant="outline" onClick={createLayout}>
             <Plus className="mr-1 h-3.5 w-3.5" />New plan
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="rounded-full"
             onClick={() => setView((v) => (v === '2d' ? '3d' : '2d'))}
             aria-pressed={view === '3d'}
           >
@@ -406,7 +405,6 @@ export const RoomPlannerPanel: React.FC = () => {
             <Button
               size="sm"
               variant="outline"
-              className="rounded-full"
               disabled={quoting}
               onClick={addToQuote}
             >

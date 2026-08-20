@@ -112,7 +112,7 @@ export const LeadRoutingCard: React.FC<{ ws: string | null; canManage: boolean }
             {canManage && (
               <div className="ml-auto flex items-center gap-2">
                 <Switch checked={r.is_active} onCheckedChange={(v) => toggle(r, v)} />
-                <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-destructive" onClick={() => remove(r)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => remove(r)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             )}
           </div>
@@ -130,8 +130,8 @@ export const LeadRoutingCard: React.FC<{ ws: string | null; canManage: boolean }
             </div>
             <p className="text-[11px] text-muted-foreground">Every agent must be a member of this workspace — the API rejects anyone who isn’t.</p>
             <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDraft(null)}>Cancel</Button>
-              <Button size="sm" className="rounded-full" disabled={busy || !draft.name.trim()} onClick={save}>
+              <Button size="sm" variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+              <Button size="sm" disabled={busy || !draft.name.trim()} onClick={save}>
                 {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Save rule
               </Button>
             </div>

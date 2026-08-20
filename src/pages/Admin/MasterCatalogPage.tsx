@@ -164,7 +164,7 @@ export default function MasterCatalogPage() {
                               {d.list_price} {d.list_price_currency ?? ''}
                             </td>
                             <td className="px-4 py-2 text-right">
-                              <Button size="sm" className="rounded-full h-8" disabled={busyId === d.master_product_id} onClick={() => accept(d)}>
+                              <Button size="sm" className="h-8" disabled={busyId === d.master_product_id} onClick={() => accept(d)}>
                                 {busyId === d.master_product_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" /> Accept</>}
                               </Button>
                             </td>
@@ -230,10 +230,10 @@ export default function MasterCatalogPage() {
                               : <span className="text-muted-foreground">From our extraction</span>}
                           </td>
                           <td className="px-4 py-2 text-right whitespace-nowrap">
-                            <Button size="sm" variant="ghost" className="rounded-full h-8" onClick={() => openHistory(r)}>
+                            <Button size="sm" variant="ghost" className="h-8" onClick={() => openHistory(r)}>
                               <History className="h-3.5 w-3.5" />
                             </Button>
-                            <Button size="sm" className="rounded-full h-8 ml-1" onClick={() => setEditing(r)}>
+                            <Button size="sm" className="h-8 ml-1" onClick={() => setEditing(r)}>
                               <Send className="h-3.5 w-3.5 mr-1" /> Publish
                             </Button>
                           </td>
@@ -381,7 +381,7 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label className="text-xs text-muted-foreground">Volume tiers</Label>
-              <Button type="button" size="sm" variant="outline" className="h-7 rounded-full text-xs" onClick={addTier}>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addTier}>
                 Add tier
               </Button>
             </div>
@@ -414,8 +414,8 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={onClose}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Publish'}
           </Button>
         </DialogFooter>

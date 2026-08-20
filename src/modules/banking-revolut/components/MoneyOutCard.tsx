@@ -133,7 +133,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
               <Label className="text-xs" htmlFor="mo-amount">Amount</Label>
               <Input id="mo-amount" inputMode="decimal" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
             </div>
-            <Button size="sm" variant="outline" className="rounded-full" onClick={makeLink} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={makeLink} disabled={busy}>
               {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Link2 className="mr-1 h-3.5 w-3.5" />}Create link
             </Button>
           </div>

@@ -98,7 +98,7 @@ const PublicInboxThreadPage: React.FC = () => {
           <div className="truncate">{subject || 'Conversation'}</div>
           <div className="text-xs text-muted-foreground">{status}</div>
         </div>
-        <Button variant="outline" size="sm" className="rounded-full" onClick={() => setShowConvert(true)}>
+        <Button variant="outline" size="sm" onClick={() => setShowConvert(true)}>
           <UserPlus className="w-4 h-4 mr-1" /> Create account
         </Button>
       </header>
@@ -128,7 +128,7 @@ const PublicInboxThreadPage: React.FC = () => {
             className="flex-1 min-h-[44px] max-h-32 resize-none"
             disabled={status === 'closed'}
           />
-          <Button className="rounded-full" onClick={send} disabled={sending || status === 'closed' || (!draft.trim() && !attachment)}>
+          <Button onClick={send} disabled={sending || status === 'closed' || (!draft.trim() && !attachment)}>
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
         </div>
@@ -142,8 +142,8 @@ const PublicInboxThreadPage: React.FC = () => {
             Your messages here will be linked to your new account.
           </p>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setShowConvert(false)}>Not now</Button>
-            <Button className="rounded-full" onClick={() => navigate(`/auth?mode=signup&inbox_token=${encodeURIComponent(token)}&redirect=/inbox`)}>
+            <Button variant="outline" onClick={() => setShowConvert(false)}>Not now</Button>
+            <Button onClick={() => navigate(`/auth?mode=signup&inbox_token=${encodeURIComponent(token)}&redirect=/inbox`)}>
               Create free account
             </Button>
           </DialogFooter>

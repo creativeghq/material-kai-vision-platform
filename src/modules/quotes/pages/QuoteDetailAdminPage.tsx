@@ -604,7 +604,7 @@ export const QuoteDetailPage: React.FC = () => {
                 size="sm"
                 onClick={handleSendQuote}
                 disabled={sendingQuote}
-                className="rounded-full bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white"
               >
                 {sendingQuote ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Sending...</>
@@ -633,7 +633,6 @@ export const QuoteDetailPage: React.FC = () => {
                     toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                   }
                 }}
-                className="rounded-full"
               >
                 <FilePlus2 className="h-4 w-4 mr-1" />
                 Issue revision
@@ -661,7 +660,6 @@ export const QuoteDetailPage: React.FC = () => {
                     toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                   }
                 }}
-                className="rounded-full"
               >
                 <FilePlus2 className="h-4 w-4 mr-1" />
                 Generate for end user
@@ -673,7 +671,6 @@ export const QuoteDetailPage: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full"
                 onClick={async () => {
                   try {
                     await masterRequestsService.submit(quote.id);

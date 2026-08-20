@@ -198,16 +198,16 @@ export const BlueprintLibraryPage: React.FC = () => {
         <div className="mt-auto pt-2 flex items-center gap-2">
           {b.is_platform_starter ? (
             <>
-              <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${b.id}`)}>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/blueprints/${b.id}`)}>
                 <Eye className="h-3.5 w-3.5 mr-1" /> View
               </Button>
-              <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => duplicateStarter(b)}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => duplicateStarter(b)}>
                 <Copy className="h-3.5 w-3.5 mr-1" /> Copy to my library
               </Button>
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${b.id}`)}>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/blueprints/${b.id}`)}>
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
               </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" onClick={() => remove(b)}>
@@ -254,15 +254,15 @@ export const BlueprintLibraryPage: React.FC = () => {
         />
         <div className="flex shrink-0 items-center gap-2 pt-1">
           {selected.is_platform_starter ? (
-            <Button size="sm" className="rounded-full" disabled={busy} onClick={() => duplicateStarter(selected)}>
+            <Button size="sm" disabled={busy} onClick={() => duplicateStarter(selected)}>
               <Copy className="h-4 w-4 mr-1" /> Copy to my library
             </Button>
           ) : (
-            <Button size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${selected.id}`)}>
+            <Button size="sm" onClick={() => navigate(`/blueprints/${selected.id}`)}>
               <Pencil className="h-4 w-4 mr-1" /> Edit
             </Button>
           )}
-          <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/blueprints/${selected.id}`)}>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/blueprints/${selected.id}`)}>
             <Eye className="h-4 w-4 mr-1" /> Open
           </Button>
         </div>
@@ -299,7 +299,7 @@ export const BlueprintLibraryPage: React.FC = () => {
         title="Blueprints"
         subtitle="Reusable scope-of-works templates. Build once, reuse on every project."
         actions={
-          <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/projects')}>
+          <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
             <ChevronLeft className="h-4 w-4 mr-1" /> Projects
           </Button>
         }
@@ -314,7 +314,7 @@ export const BlueprintLibraryPage: React.FC = () => {
         >
           {/* Left column: create first, then the source filter — the /templates layout. */}
           <div className="w-full shrink-0 space-y-2 lg:w-56">
-            <Button size="sm" className="w-full gap-1.5 rounded-full" onClick={() => setCreateOpen(true)}>
+            <Button size="sm" className="w-full gap-1.5" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" /> Add New
             </Button>
 
@@ -378,8 +378,8 @@ export const BlueprintLibraryPage: React.FC = () => {
               onKeyDown={(e) => { if (e.key === 'Enter') createBlueprint(); }} />
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" disabled={busy || !title.trim()} onClick={createBlueprint}>Create</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button disabled={busy || !title.trim()} onClick={createBlueprint}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -448,7 +448,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         key={sideKey}
                         type="button"
                         onClick={() => { setCreditSide(sideKey); setPage(1); }}
-                        className={`rounded-full px-3 py-1 transition ${creditSide === sideKey ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                        className={`px-3 py-1 transition ${creditSide === sideKey ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                       >
                         {sideKey === 'customer' ? 'Issued to customers' : 'Received from suppliers'}
                       </button>

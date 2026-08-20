@@ -1161,7 +1161,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onGenerateVideo && selectedImage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-full text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm">
                             <Video className="w-3.5 h-3.5" />
                             Generate Video
                             <ChevronDown className="w-3 h-3" />
@@ -1211,7 +1211,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       <button
                         onClick={() => { if (!vrGenerating) onGenerateVR(selectedImage!.url, { prompt: selectedImage!.name }); }}
                         disabled={vrGenerating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-full text-xs font-medium text-violet-700 dark:text-violet-300 disabled:opacity-50 transition-colors shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 text-xs font-medium text-violet-700 dark:text-violet-300 disabled:opacity-50 transition-colors shadow-sm"
                         title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
                       >
                         {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
@@ -1222,7 +1222,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       <button
                         onClick={() => setShowVirtualStagingModal(true)}
                         disabled={virtualStagingGenerating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700 disabled:opacity-50 transition-colors shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-xs font-medium text-emerald-700 disabled:opacity-50 transition-colors shadow-sm"
                         title="Virtually stage this room with AI-generated furniture (20 credits)"
                       >
                         {virtualStagingGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
@@ -1233,7 +1233,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onEditImage && selectedImage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors shadow-sm">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-medium text-sky-700 transition-colors shadow-sm">
                             <Sun className="w-3.5 h-3.5" />
                             Lighting Variants
                             <ChevronDown className="w-3 h-3 ml-0.5" />
@@ -1267,7 +1267,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onGenerateMaterialsBoard && selectedImage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-full text-xs font-medium text-amber-700 dark:text-amber-300 transition-colors shadow-sm">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-xs font-medium text-amber-700 dark:text-amber-300 transition-colors shadow-sm">
                             <Layers className="w-3.5 h-3.5" />
                             Materials Board
                             <ChevronDown className="w-3 h-3 ml-0.5" />
@@ -1297,7 +1297,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     {onGenerateMaterialsBoard && selectedImage && (
                       <button
                         onClick={() => onGenerateMaterialsBoard(selectedImage.url, 'photorealistic-render')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-full text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-xs font-medium text-rose-700 dark:text-rose-300 transition-colors shadow-sm"
                         title="Generate ultra-detailed magazine-quality photorealistic render (15 credits)"
                       >
                         <Camera className="w-3.5 h-3.5" />
@@ -1311,7 +1311,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         mediaTitle={selectedImage.name || 'Generated Design'}
                       >
                         <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-full text-xs font-medium text-pink-700 transition-colors shadow-sm"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 text-xs font-medium text-pink-700 transition-colors shadow-sm"
                           title="Save this design to a moodboard"
                         >
                           <BookmarkPlus className="w-3.5 h-3.5" />
@@ -1538,7 +1538,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     <button
                                       onClick={() => generateMaskFromZone(seg)}
                                       disabled={generatingMask}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground text-[11px] font-semibold rounded-full transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground text-[11px] font-semibold transition-colors w-full justify-center"
                                     >
                                       {generatingMask
                                         ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -1549,7 +1549,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onAskJARVIS && (
                                     <button
                                       onClick={() => onAskJARVIS(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-medium rounded-full transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-medium transition-colors w-full justify-center"
                                     >
                                       <ExternalLink className="w-3 h-3" />
                                       Search Relevant
@@ -1558,7 +1558,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onFindMaterial && (
                                     <button
                                       onClick={() => onFindMaterial(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium rounded-full transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium transition-colors w-full justify-center"
                                     >
                                       <Search className="w-3 h-3" />
                                       Find This Material
@@ -1568,7 +1568,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     <button
                                       onClick={() => generateMaskFromZone(seg)}
                                       disabled={generatingMask}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-[11px] font-medium rounded-full transition-colors w-full justify-center"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-[11px] font-medium transition-colors w-full justify-center"
                                     >
                                       {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
                                       Replace with "{pendingReplacement.name}"
@@ -1585,7 +1585,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   <button
                                     onClick={() => generateMaskFromZone(seg)}
                                     disabled={generatingMask}
-                                    className="flex items-center gap-1 px-2 py-1 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground text-[11px] font-semibold rounded-full transition-colors w-full justify-center"
+                                    className="flex items-center gap-1 px-2 py-1 bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-primary-foreground text-[11px] font-semibold transition-colors w-full justify-center"
                                   >
                                     {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
                                     {generatingMask ? 'Generating mask…' : 'Replace Material'}
@@ -1595,7 +1595,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onAskJARVIS && (
                                     <button
                                       onClick={() => onAskJARVIS(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-medium rounded-full transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-medium transition-colors"
                                     >
                                       <ExternalLink className="w-3 h-3" />
                                       Search Relevant
@@ -1604,7 +1604,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                   {onFindMaterial && (
                                     <button
                                       onClick={() => onFindMaterial(seg)}
-                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium rounded-full transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-medium transition-colors"
                                     >
                                       <Search className="w-3 h-3" />
                                       Find This Material
@@ -1614,7 +1614,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     <button
                                       onClick={() => generateMaskFromZone(seg)}
                                       disabled={generatingMask}
-                                      className="flex items-center gap-1 px-2 py-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-[11px] font-medium rounded-full transition-colors"
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-[11px] font-medium transition-colors"
                                     >
                                       {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
                                       Replace here

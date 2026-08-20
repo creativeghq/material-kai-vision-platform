@@ -165,7 +165,6 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
             <Button
               variant={!bulkMode ? 'default' : 'outline'}
               size="sm"
-              className="rounded-full"
               onClick={() => setBulkMode(false)}
             >
               <Link2 className="h-3.5 w-3.5 mr-1.5" />
@@ -174,7 +173,6 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
             <Button
               variant={bulkMode ? 'default' : 'outline'}
               size="sm"
-              className="rounded-full"
               onClick={() => setBulkMode(true)}
             >
               <Plus className="h-3.5 w-3.5 mr-1.5" />
@@ -194,7 +192,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                     placeholder="https://www.pinterest.com/pin/123456789/"
                     onKeyDown={e => e.key === 'Enter' && handleExtract()}
                   />
-                  <Button onClick={handleExtract} disabled={extracting || !pinUrl.trim()} className="rounded-full flex-shrink-0">
+                  <Button onClick={handleExtract} disabled={extracting || !pinUrl.trim()} className="flex-shrink-0">
                     {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -211,7 +209,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                   <div className="p-3 space-y-2">
                     {extractedPin.title && <p className="text-sm font-medium">{extractedPin.title}</p>}
                     {extractedPin.author && <p className="text-xs text-muted-foreground">by {extractedPin.author}</p>}
-                    <Button onClick={handleImport} disabled={importing} className="w-full rounded-full">
+                    <Button onClick={handleImport} disabled={importing} className="w-full">
                       {importing ? (
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
                       ) : (
@@ -284,7 +282,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
     image name would just be noise. (audit #302 finding 6) */}
                             {m.image_url && <img src={m.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />}
                             <span className="flex-1 truncate font-medium">{m.product_name}</span>
-                            <Badge variant="secondary" className="text-[10px] rounded-full">{Math.round(m.similarity * 100)}%</Badge>
+                            <Badge variant="secondary" className="text-[10px]">{Math.round(m.similarity * 100)}%</Badge>
                           </div>
                         ))}
                       </div>
@@ -310,7 +308,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                 </p>
               </div>
 
-              <Button onClick={handleBulkImport} disabled={bulkImporting} className="w-full rounded-full">
+              <Button onClick={handleBulkImport} disabled={bulkImporting} className="w-full">
                 {bulkImporting ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
                 ) : (

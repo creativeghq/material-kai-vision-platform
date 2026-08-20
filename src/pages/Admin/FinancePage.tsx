@@ -87,7 +87,8 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers } from 'lucide-react';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers, CheckCircle2 } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -413,10 +414,10 @@ const FinancePage: React.FC = () => {
   const arGroups = useMemo(() => buildAgingFilters('ar', { rows: ar, categories: incomeCats }), [ar, incomeCats]);
   const apGroups = useMemo(() => buildAgingFilters('ap', { rows: ap, categories: expenseCats }), [ap, expenseCats]);
   const {
-    values: arValues, setValues: setArValues, filtered: arFiltered, previewCount: arPreview,
+    values: arValues, setValues: setArValues, filtered: arFiltered, previewCount: arPreview, reset: resetArFilters,
   } = useFilters<AgingRow>(ar, arGroups, { urlKey: AR_FILTER_KEY });
   const {
-    values: apValues, setValues: setApValues, filtered: apFiltered, previewCount: apPreview,
+    values: apValues, setValues: setApValues, filtered: apFiltered, previewCount: apPreview, reset: resetApFilters,
   } = useFilters<AgingRow>(ap, apGroups, { urlKey: AP_FILTER_KEY });
 
   // Follow-ups (quotes needing a nudge) — unbounded list, so give it search / status / value / idle.
@@ -433,7 +434,7 @@ const FinancePage: React.FC = () => {
       ],
     }];
   }, [followUps]);
-  const { values: fuValues, setValues: setFuValues, filtered: followUpsView, previewCount: fuPreview } =
+  const { values: fuValues, setValues: setFuValues, filtered: followUpsView, previewCount: fuPreview, reset: resetFuFilters } =
     useFilters<FollowUpRow>(followUps, followUpGroups);
 
   // Clicking a bucket card toggles the SAME field the modal edits — never a parallel piece of state.
@@ -871,7 +872,24 @@ const FinancePage: React.FC = () => {
                   </thead>
                   <tbody>
                     {arFiltered.length === 0 && (
-                      <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">{ar.length === 0 ? 'No open receivables.' : 'No receivables match the filters.'}</td></tr>
+                      <tr><td colSpan={10} className="p-0">
+                        {ar.length === 0 ? (
+                          // Nothing is owed to you — a good state with nothing to press. An aging
+                          // row is DERIVED from an invoice; there is no "add a receivable".
+                          <HubEmptyState
+                            icon={CheckCircle2}
+                            title="No open receivables"
+                            description="Nothing is outstanding from a customer. Rows appear here on their own as invoices are issued and go unpaid."
+                          />
+                        ) : (
+                          <HubEmptyState
+                            variant="filtered"
+                            title="No receivables match the filters"
+                            description={`${ar.length} open ${ar.length === 1 ? 'receivable is' : 'receivables are'} outstanding — the current filters exclude ${ar.length === 1 ? 'it' : 'them all'}.`}
+                            action={<Button size="sm" variant="outline" onClick={resetArFilters}>Clear filters</Button>}
+                          />
+                        )}
+                      </td></tr>
                     )}
                     {paginate(arFiltered, arPage).map((r) => {
                       const isOrder = r.entry_kind === 'order';
@@ -1060,7 +1078,22 @@ const FinancePage: React.FC = () => {
                   </thead>
                   <tbody>
                     {apFiltered.length === 0 && (
-                      <tr><td colSpan={isAccountant ? 9 : 10} className="px-4 py-8 text-center text-muted-foreground">{ap.length === 0 ? 'No open payables.' : 'No payables match the filters.'}</td></tr>
+                      <tr><td colSpan={isAccountant ? 9 : 10} className="p-0">
+                        {ap.length === 0 ? (
+                          <HubEmptyState
+                            icon={CheckCircle2}
+                            title="No open payables"
+                            description="You owe nothing right now. Rows appear here as supplier invoices and expenses are booked."
+                          />
+                        ) : (
+                          <HubEmptyState
+                            variant="filtered"
+                            title="No payables match the filters"
+                            description={`${ap.length} open ${ap.length === 1 ? 'payable is' : 'payables are'} outstanding — the current filters exclude ${ap.length === 1 ? 'it' : 'them all'}.`}
+                            action={<Button size="sm" variant="outline" onClick={resetApFilters}>Clear filters</Button>}
+                          />
+                        )}
+                      </td></tr>
                     )}
                     {paginate(apFiltered, apPage).map((r) => {
                       const isOrder = r.entry_kind === 'order';
@@ -1244,7 +1277,12 @@ const FinancePage: React.FC = () => {
                 {followUps.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">No follow-ups outstanding.</div>
                 ) : followUpsView.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-muted-foreground">No follow-ups match the filter.</div>
+                  <HubEmptyState
+                    variant="filtered"
+                    title="No follow-ups match the filter"
+                    description={`${followUps.length} ${followUps.length === 1 ? 'quote needs' : 'quotes need'} a nudge — the current filter excludes ${followUps.length === 1 ? 'it' : 'them all'}.`}
+                    action={<Button size="sm" variant="outline" onClick={resetFuFilters}>Clear filters</Button>}
+                  />
                 ) : (
                   <>
                   <table className="w-full text-sm">

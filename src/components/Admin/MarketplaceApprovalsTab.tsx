@@ -85,12 +85,12 @@ export const MarketplaceApprovalsTab: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {r.status !== 'approved' && (
-                    <Button size="sm" className="rounded-full gap-1" disabled={busy === r.workspace_id} onClick={() => review(r.workspace_id, true)}>
+                    <Button size="sm" className="gap-1" disabled={busy === r.workspace_id} onClick={() => review(r.workspace_id, true)}>
                       {busy === r.workspace_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Approve
                     </Button>
                   )}
                   {r.status !== 'rejected' && (
-                    <Button size="sm" variant="outline" className="rounded-full gap-1" disabled={busy === r.workspace_id} onClick={() => review(r.workspace_id, false)}>
+                    <Button size="sm" variant="outline" className="gap-1" disabled={busy === r.workspace_id} onClick={() => review(r.workspace_id, false)}>
                       <X className="h-3.5 w-3.5" /> Reject
                     </Button>
                   )}

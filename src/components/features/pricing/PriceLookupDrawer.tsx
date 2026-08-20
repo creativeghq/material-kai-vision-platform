@@ -622,7 +622,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
               type="button"
               onClick={() => { setMode('ai'); if (open) { setTimeout(() => runAILookup(), 0); } }}
               disabled={loading || committing}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs transition-colors ${
                 mode === 'ai' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
               title="AI composes a reasoning chain from matching docs (uses LLM tokens)"
@@ -634,7 +634,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
               type="button"
               onClick={() => { setMode('quick'); if (open) { setTimeout(() => runQuickLookup(), 0); } }}
               disabled={loading || committing}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs transition-colors ${
                 mode === 'quick' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Fetch raw matches from Knowledge Base (no LLM, no cost)"

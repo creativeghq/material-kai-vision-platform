@@ -157,14 +157,14 @@ export const TemplateEditorPage: React.FC = () => {
         subtitle={`${adapter.label} template${readOnly ? ' — starter example, read-only' : ''}`}
         actions={
           <>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/templates')}>
+            <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
               <ChevronLeft className="h-4 w-4 mr-1" /> Templates
             </Button>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={use}>
+            <Button variant="outline" size="sm" onClick={use}>
               <Play className="h-4 w-4 mr-1" /> Use
             </Button>
             {!readOnly && (
-              <Button size="sm" className="rounded-full" disabled={saving} onClick={save}>
+              <Button size="sm" disabled={saving} onClick={save}>
                 {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
               </Button>
             )}
@@ -256,7 +256,7 @@ export const TemplateEditorPage: React.FC = () => {
                   <CardDescription>{rows.length} row{rows.length === 1 ? '' : 's'}</CardDescription>
                 </div>
                 {!readOnly && (
-                  <Button variant="outline" size="sm" className="rounded-full"
+                  <Button variant="outline" size="sm"
                     onClick={() => setRows(spec.table, [...rows, {}])}>
                     <Plus className="h-3.5 w-3.5 mr-1" /> Add
                   </Button>
@@ -328,7 +328,7 @@ export const TemplateEditorPage: React.FC = () => {
                           {formatDate(v.created_at, { withTime: true })}
                         </span>
                       </div>
-                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => restore(v.version)}>
+                      <Button variant="outline" size="sm" onClick={() => restore(v.version)}>
                         <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
                       </Button>
                     </div>

@@ -116,7 +116,7 @@ export function DimensionCanvas({
         <div className="bg-white/5 rounded-full p-1 flex">
           <button
             onClick={() => { setMode('dimension'); setPendingStart(null); }}
-            className={`px-3 py-1 rounded-full flex items-center gap-1 ${
+            className={`px-3 py-1 flex items-center gap-1 ${
               mode === 'dimension' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
             }`}
           >
@@ -125,7 +125,7 @@ export function DimensionCanvas({
           </button>
           <button
             onClick={() => { setMode('tile'); setPendingStart(null); }}
-            className={`px-3 py-1 rounded-full flex items-center gap-1 ${
+            className={`px-3 py-1 flex items-center gap-1 ${
               mode === 'tile' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
             }`}
           >

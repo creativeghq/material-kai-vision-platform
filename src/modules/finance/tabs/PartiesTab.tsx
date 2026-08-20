@@ -671,7 +671,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
             {party && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="shrink-0 rounded-full">
+                  <Button variant="outline" size="sm" className="shrink-0">
                     {busyStatement || (researchHere && research.busy) ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                     Actions <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
                   </Button>

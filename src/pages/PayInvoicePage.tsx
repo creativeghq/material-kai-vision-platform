@@ -208,8 +208,8 @@ const PayInvoicePage: React.FC = () => {
           </p>
         )}
         <div className="mt-4 flex justify-center gap-2">
-          <Button variant="outline" className="rounded-full" onClick={() => window.location.reload()}>Refresh</Button>
-          <Button className="rounded-full" onClick={() => { window.location.href = `${window.location.origin}/pay/${token}`; }}>
+          <Button variant="outline" onClick={() => window.location.reload()}>Refresh</Button>
+          <Button onClick={() => { window.location.href = `${window.location.origin}/pay/${token}`; }}>
             Try again
           </Button>
         </div>
@@ -223,7 +223,7 @@ const PayInvoicePage: React.FC = () => {
         <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
         <h1 className="mt-4 text-xl font-semibold">Payment cancelled</h1>
         <p className="mt-2 text-sm text-muted-foreground">You closed the checkout window. Nothing was charged.</p>
-        <Button className="mt-6 rounded-full" onClick={() => window.location.assign(`/pay/${token}`)}>
+        <Button className="mt-6" onClick={() => window.location.assign(`/pay/${token}`)}>
           <CreditCard className="h-4 w-4 mr-2" /> Try again
         </Button>
       </div>,
@@ -260,7 +260,7 @@ const PayInvoicePage: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="mt-3 rounded-full"
+            className="mt-3"
             onClick={() => { void navigator.clipboard.writeText(bankRef.rf_code); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2500); }}
           >
             <Copy className="h-3.5 w-3.5 mr-2" /> {codeCopied ? 'Copied!' : 'Copy code'}
@@ -421,7 +421,7 @@ const PayInvoicePage: React.FC = () => {
         </div>
       ) : (
         <>
-          <Button className="w-full rounded-full" onClick={pay} disabled={busy}>
+          <Button className="w-full" onClick={pay} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               : selected?.method === 'bank_reference'
                 ? <Landmark className="h-4 w-4 mr-2" />

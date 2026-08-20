@@ -101,7 +101,7 @@ export const BrandKnowledgePage: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-4 text-center">
         <SeoHead title="Brand not found" noIndex canonicalPath={`/brand/${slug}`} />
         <p className="text-lg font-light">No brand page found for “{slug}”.</p>
-        <Button className="rounded-full" onClick={() => navigate('/brands')}>Browse all brands</Button>
+        <Button onClick={() => navigate('/brands')}>Browse all brands</Button>
       </div>
     );
   }
@@ -187,7 +187,7 @@ export const BrandKnowledgePage: React.FC = () => {
                 <Package className="h-5 w-5 text-primary" /> Products
               </h2>
               {!user && (
-                <Button size="sm" className="rounded-full" onClick={() => navigate(signupHref)}>
+                <Button size="sm" onClick={() => navigate(signupHref)}>
                   Sign up to view catalog
                 </Button>
               )}
@@ -235,7 +235,7 @@ export const BrandKnowledgePage: React.FC = () => {
                 : 'Create a free account to view the full catalog — specs, pricing and availability.'}
             </p>
           </div>
-          <Button className="rounded-full shrink-0" onClick={() => navigate(user ? '/discover' : signupHref)}>
+          <Button className="shrink-0" onClick={() => navigate(user ? '/discover' : signupHref)}>
             {user ? 'Open catalog' : 'Create a free account'}
           </Button>
         </section>

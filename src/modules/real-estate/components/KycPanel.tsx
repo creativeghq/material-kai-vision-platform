@@ -80,9 +80,9 @@ export const KycPanel: React.FC<{ ws: string | null; contactId: string | null; c
                   {busy === t
                     ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     : <>
-                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => record(t, 'passed')}>Pass</Button>
-                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-destructive" onClick={() => record(t, 'failed')}>Fail</Button>
-                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => record(t, 'waived')}>Waive</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => record(t, 'passed')}>Pass</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive" onClick={() => record(t, 'failed')}>Fail</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => record(t, 'waived')}>Waive</Button>
                       </>}
                 </div>
               )}

@@ -332,7 +332,7 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
           <button
             onClick={clearMask}
             disabled={!hasMask}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-border text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 border border-border text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Trash2 className="w-3 h-3" /> Clear
           </button>
@@ -351,7 +351,7 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
           <Button
             onClick={handleApply}
             disabled={!canApply || applying}
-            className="rounded-full gap-1.5 shrink-0"
+            className="gap-1.5 shrink-0"
           >
             <Sparkles className="w-4 h-4" />
             {applying ? 'Applying…' : 'Apply'}

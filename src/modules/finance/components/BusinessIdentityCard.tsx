@@ -234,7 +234,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
         <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Business Profile (Invoicing &amp; myDATA)</CardTitle>
         <div className="flex items-center gap-2">
           <LangToggle lang={lang} onChange={setLang} />
-          <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
+          <Button size="sm" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
           </Button>
         </div>
@@ -331,7 +331,7 @@ const LangToggle: React.FC<{ lang: Lang; onChange: (l: Lang) => void }> = ({ lan
         key={l}
         type="button"
         onClick={() => onChange(l)}
-        className={`rounded-full px-3 py-1 font-medium transition-colors ${lang === l ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        className={`px-3 py-1 font-medium transition-colors ${lang === l ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
       >
         {l === 'en' ? 'EN' : 'GR'}
       </button>

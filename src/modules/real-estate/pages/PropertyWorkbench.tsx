@@ -88,7 +88,7 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
             {Object.entries(DOC_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
-          <Button size="sm" className="rounded-full" disabled={busy} onClick={() => fileRef.current?.click()}>
+          <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
             {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />} Upload document
           </Button>
           <span className="text-[11px] text-muted-foreground">Private — links expire after an hour.</span>
@@ -102,8 +102,8 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
               <span className="font-medium">{d.title || 'Document'}</span>
               <span className="text-xs text-muted-foreground">{DOC_TYPE_LABELS[d.doc_type] ?? d.doc_type}</span>
               <span className="ml-auto text-xs text-muted-foreground">{formatDate(d.created_at)}</span>
-              {d.url && <a href={d.url} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><ExternalLink className="mr-1 h-3 w-3" /> Open</Button></a>}
-              {canManage && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-destructive" onClick={() => remove(d.id)}><Trash2 className="h-3 w-3" /></Button>}
+              {d.url && <a href={d.url} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-primary"><ExternalLink className="mr-1 h-3 w-3" /> Open</Button></a>}
+              {canManage && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive" onClick={() => remove(d.id)}><Trash2 className="h-3 w-3" /></Button>}
             </div>
           ))}
         </div></CardContent></Card>
@@ -323,21 +323,21 @@ export default function PropertyWorkbench() {
       <PageHeader icon={Building2} title={property.title || 'Untitled listing'} subtitle={property.reference_code ? `#${property.reference_code}` : 'Listing workbench'}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate('/properties')}><ArrowLeft className="mr-1 h-4 w-4" /> Portfolio</Button>
-            <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
+            <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}><ArrowLeft className="mr-1 h-4 w-4" /> Portfolio</Button>
+            <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
               setBusy(true);
               try { const r = await realEstateService.generateBrochure(id); if (r.pdf_url) window.open(r.pdf_url, '_blank'); toast({ title: 'Brochure ready', description: `${r.page_count} page(s)` }); }
               catch (e) { toast({ title: 'Brochure failed', description: (e as Error).message, variant: 'destructive' }); }
               finally { setBusy(false); }
             }}><FileText className="mr-1 h-4 w-4" /> Brochure</Button>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={() => setCmaOpen(true)}><LineChart className="mr-1 h-4 w-4" /> CMA</Button>
+            <Button variant="outline" size="sm" onClick={() => setCmaOpen(true)}><LineChart className="mr-1 h-4 w-4" /> CMA</Button>
             {editable && (property.is_public
-              ? <Button variant="outline" size="sm" className="rounded-full" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
-              : <Button size="sm" className="rounded-full" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
-            {editable && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
+              ? <Button variant="outline" size="sm" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
+              : <Button size="sm" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
+            {editable && <Button size="sm" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
             {/* Reuse this listing's shape — type, condition, features, boilerplate copy (#322). */}
-            {editable && <Button variant="outline" size="sm" className="rounded-full" onClick={() => setSaveTemplateOpen(true)} title="Save the listing shape as a reusable template"><Layers className="mr-1 h-4 w-4" /> Template</Button>}
-            {editable && <Button variant="ghost" size="sm" className="rounded-full text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
+            {editable && <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)} title="Save the listing shape as a reusable template"><Layers className="mr-1 h-4 w-4" /> Template</Button>}
+            {editable && <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
           </div>
         } />
 
@@ -346,8 +346,8 @@ export default function PropertyWorkbench() {
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-2 text-sm">
             <Globe className="h-4 w-4 text-emerald-500" /> <span className="text-muted-foreground">Live at</span>
             <code className="truncate text-xs">{publicUrl}</code>
-            <Button variant="ghost" size="sm" className="ml-auto rounded-full" onClick={copyPublicLink}><Copy className="mr-1 h-3.5 w-3.5" /> Copy</Button>
-            <a href={publicUrl} target="_blank" rel="noreferrer"><Button variant="ghost" size="sm" className="rounded-full"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Open</Button></a>
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={copyPublicLink}><Copy className="mr-1 h-3.5 w-3.5" /> Copy</Button>
+            <a href={publicUrl} target="_blank" rel="noreferrer"><Button variant="ghost" size="sm"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Open</Button></a>
           </div>
         )}
 
@@ -360,10 +360,10 @@ export default function PropertyWorkbench() {
         <Tabs value={activeTab} onValueChange={(v) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true })}>
           <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="overview" className={RE_TAB}><Home className="h-4 w-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="media" className={RE_TAB}><ImageIcon className="h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="inquiries" className={RE_TAB}><Contact className="h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="media" className={RE_TAB}><ImageIcon className="h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-0.5 border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="inquiries" className={RE_TAB}><Contact className="h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-0.5 border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="offers" className={RE_TAB}><Gavel className="h-4 w-4" /> Offers</TabsTrigger>
-            <TabsTrigger value="viewings" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="viewings" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-0.5 border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="documents" className={RE_TAB}><FileText className="h-4 w-4" /> Documents</TabsTrigger>
             <TabsTrigger value="performance" className={RE_TAB}><LineChart className="h-4 w-4" /> Performance</TabsTrigger>
             {isShortLet && <TabsTrigger value="shortlet" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Short-let</TabsTrigger>}
@@ -395,7 +395,7 @@ export default function PropertyWorkbench() {
                 const active = i === step;
                 return (
                   <button key={s.id} onClick={() => setStep(i)}
-                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'}`}>
+                    className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'}`}>
                     <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{s.label}</span>
                     <span className="ml-0.5 rounded-full bg-black/10 px-1.5 text-[10px] dark:bg-white/10">{i + 1}</span>
                   </button>
@@ -561,7 +561,7 @@ export default function PropertyWorkbench() {
                 <FormSection title="Content" icon={FileText}>
                   {editable && (
                     <div className="sm:col-span-2 lg:col-span-3">
-                      <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={async () => {
+                      <Button variant="outline" size="sm" disabled={busy} onClick={async () => {
                         if (!ws) return;
                         setBusy(true);
                         try {
@@ -592,11 +592,11 @@ export default function PropertyWorkbench() {
 
             {/* Step nav */}
             <div className="flex items-center justify-between">
-              <Button variant="outline" size="sm" className="rounded-full" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}><ChevronLeft className="mr-1 h-4 w-4" /> Back</Button>
+              <Button variant="outline" size="sm" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}><ChevronLeft className="mr-1 h-4 w-4" /> Back</Button>
               <span className="text-xs text-muted-foreground">Step {step + 1} of {STEPS.length} · {STEPS[step].label}</span>
               {step < STEPS.length - 1
-                ? <Button size="sm" className="rounded-full" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Next <ChevronRight className="ml-1 h-4 w-4" /></Button>
-                : (editable && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>)}
+                ? <Button size="sm" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Next <ChevronRight className="ml-1 h-4 w-4" /></Button>
+                : (editable && <Button size="sm" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>)}
             </div>
           </TabsContent>
 
@@ -604,9 +604,9 @@ export default function PropertyWorkbench() {
           <TabsContent value="media">
             <div className="mb-4 flex flex-wrap gap-2">
               <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onUpload} />
-              {editable && <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()} disabled={busy}><Upload className="mr-2 h-4 w-4" /> Upload photos</Button>}
+              {editable && <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}><Upload className="mr-2 h-4 w-4" /> Upload photos</Button>}
               {editable && photos.length > 0 && (
-                <Button variant="outline" className="rounded-full" disabled={busy} onClick={async () => {
+                <Button variant="outline" disabled={busy} onClick={async () => {
                   if (!ws) return;
                   setBusy(true);
                   try { const r = await realEstateService.analyzePhotos(ws, id); await load(); toast({ title: 'Photos analyzed', description: `Tagged ${r.tagged}, cover auto-picked · ${r.credits} credit(s)` }); }
@@ -638,7 +638,7 @@ export default function PropertyWorkbench() {
                     </React.Suspense>
                   </div>
                   {editable && (
-                    <Button variant="outline" size="sm" className="rounded-full text-xs" disabled={busy}
+                    <Button variant="outline" size="sm" className="text-xs" disabled={busy}
                       onClick={async () => { await realEstateService.updateProperty(ws!, id, { vr_world_id: null }); await load(); }}>
                       <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove walkthrough
                     </Button>
@@ -649,7 +649,7 @@ export default function PropertyWorkbench() {
                   <p className="text-xs text-muted-foreground">Upload at least one photo first — the walkthrough is generated from the cover photo.</p>
                 ) : (
                   <div>
-                    <Button variant="outline" className="rounded-full" disabled={busy} onClick={async () => {
+                    <Button variant="outline" disabled={busy} onClick={async () => {
                       if (!ws) return;
                       setBusy(true);
                       try {
@@ -687,7 +687,7 @@ export default function PropertyWorkbench() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {!q.crm_contact_id && editable && (
-                        <Button variant="outline" size="sm" className="rounded-full text-xs" disabled={busy} onClick={async () => {
+                        <Button variant="outline" size="sm" className="text-xs" disabled={busy} onClick={async () => {
                           setBusy(true);
                           try { await realEstateService.convertInquiry(ws!, q.id); await load(); toast({ title: 'Converted to CRM lead' }); }
                           catch (e) { toast({ title: 'Convert failed', description: (e as Error).message, variant: 'destructive' }); }
@@ -726,7 +726,7 @@ export default function PropertyWorkbench() {
             {editable && (
               <div className="flex flex-wrap items-end gap-2">
                 <input type="datetime-local" value={newViewingAt} onChange={(e) => setNewViewingAt(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm" />
-                <Button size="sm" className="rounded-full" disabled={!newViewingAt || busy} onClick={async () => {
+                <Button size="sm" disabled={!newViewingAt || busy} onClick={async () => {
                   if (!ws || !newViewingAt) return;
                   setBusy(true);
                   try {
@@ -772,7 +772,7 @@ export default function PropertyWorkbench() {
                 <div className="mb-3 flex flex-wrap items-end gap-2">
                   <input type="datetime-local" value={newOpenHouseAt} onChange={(e) => setNewOpenHouseAt(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm" />
                   <Input className="h-9 w-56" placeholder="Note (optional)" value={newOpenHouseNote} onChange={(e) => setNewOpenHouseNote(e.target.value)} />
-                  <Button size="sm" variant="outline" className="rounded-full" disabled={!newOpenHouseAt || busy} onClick={async () => {
+                  <Button size="sm" variant="outline" disabled={!newOpenHouseAt || busy} onClick={async () => {
                     if (!ws || !newOpenHouseAt) return;
                     setBusy(true);
                     try {
@@ -791,7 +791,7 @@ export default function PropertyWorkbench() {
                       <span>{formatDate(o.starts_at, { withTime: true })}</span>
                       {o.note && <span className="text-xs text-muted-foreground">{o.note}</span>}
                       {editable && (
-                        <Button size="sm" variant="ghost" className="ml-auto h-7 rounded-full px-2 text-xs text-destructive" onClick={async () => {
+                        <Button size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs text-destructive" onClick={async () => {
                           try { await realEstateService.deleteOpenHouse(ws!, o.id); setOpenHouses((prev) => prev.filter((x) => x.id !== o.id)); }
                           catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
                         }}><Trash2 className="h-3 w-3" /></Button>
@@ -822,8 +822,8 @@ export default function PropertyWorkbench() {
           <DialogHeader><DialogTitle>Delete This Listing?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">This permanently removes “{property.title || 'this listing'}” and its offers, viewings, photos and related records. This cannot be undone.</p>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setDelOpen(false)}>Cancel</Button>
-            <Button variant="destructive" className="rounded-full" onClick={del} disabled={busy}>{busy ? 'Deleting…' : 'Delete listing'}</Button>
+            <Button variant="outline" onClick={() => setDelOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={del} disabled={busy}>{busy ? 'Deleting…' : 'Delete listing'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -954,8 +954,8 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
             <div><Label className="text-xs">End date</Label><Input type="date" value={f.end_date ?? ''} onChange={(e) => setF((p) => ({ ...p, end_date: e.target.value }))} /></div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" className="rounded-full" onClick={saveTenancy} disabled={busy}>Save tenancy</Button>
-            {tenancy && <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setEditing(false)}>Cancel</Button>}
+            <Button size="sm" onClick={saveTenancy} disabled={busy}>Save tenancy</Button>
+            {tenancy && <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>}
           </div>
         </CardContent></Card>
       ) : (
@@ -964,13 +964,13 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
             <div className="text-lg font-semibold">{offerMoney(tenancy.rent_amount, ccy)}<span className="text-xs font-normal text-muted-foreground"> / {tenancy.rent_frequency}</span></div>
             <div className="text-xs text-muted-foreground">{tenancy.tenant?.name || 'No tenant set'} · from {formatDate(tenancy.start_date)}</div>
           </div>
-          <Badge className="rounded-full border-0 bg-primary/15 text-[11px] capitalize">{tenancy.status}</Badge>
+          <Badge className="border-0 bg-primary/15 text-[11px] capitalize">{tenancy.status}</Badge>
           {tenancy.deposit != null && <div className="text-xs text-muted-foreground">Deposit {offerMoney(tenancy.deposit, ccy)}</div>}
           {tenancy.end_date && <div className="text-xs text-muted-foreground">Ends {formatDate(tenancy.end_date)}</div>}
           {canManage && (
             <div className="ml-auto flex gap-1.5">
-              <Button size="sm" variant="ghost" className="rounded-full" onClick={renew}><RotateCw className="mr-1 h-3.5 w-3.5" /> Renew</Button>
-              <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setEditing(true)}>Edit</Button>
+              <Button size="sm" variant="ghost" onClick={renew}><RotateCw className="mr-1 h-3.5 w-3.5" /> Renew</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>Edit</Button>
             </div>
           )}
         </CardContent></Card>
@@ -1009,12 +1009,12 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                 <div className="flex h-9 items-center gap-2 text-sm">
                   <span className="capitalize">{tenancy.notice_given_by} gave notice {formatDate(tenancy.notice_given_at)}</span>
                   {tenancy.termination_date && <span className="text-muted-foreground">· ends {formatDate(tenancy.termination_date)}</span>}
-                  <Button size="sm" variant="ghost" className="ml-auto h-7 rounded-full px-2 text-xs" onClick={() => void saveLifecycle({ notice_given_by: null })}>Withdraw</Button>
+                  <Button size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs" onClick={() => void saveLifecycle({ notice_given_by: null })}>Withdraw</Button>
                 </div>
               ) : (
                 <div className="flex h-9 items-center gap-2">
-                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => void serveNotice('landlord')}>Landlord serves notice</Button>
-                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => void serveNotice('tenant')}>Tenant gave notice</Button>
+                  <Button size="sm" variant="outline" onClick={() => void serveNotice('landlord')}>Landlord serves notice</Button>
+                  <Button size="sm" variant="outline" onClick={() => void serveNotice('tenant')}>Tenant gave notice</Button>
                 </div>
               )}
             </div>
@@ -1028,10 +1028,10 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
               {tenancy.portal_token ? `${window.location.origin}/tenant/${tenancy.portal_token}` : 'Not shared yet'}
             </code>
             {tenancy.portal_token && (
-              <Button size="sm" variant="ghost" className="rounded-full" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}/tenant/${tenancy.portal_token}`); toast({ title: 'Tenant link copied' }); }}>Copy</Button>
+              <Button size="sm" variant="ghost" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}/tenant/${tenancy.portal_token}`); toast({ title: 'Tenant link copied' }); }}>Copy</Button>
             )}
-            <Button size="sm" variant="outline" className="rounded-full" onClick={() => void rotateTenantLink(false)}>{tenancy.portal_token ? 'Rotate' : 'Create link'}</Button>
-            {tenancy.portal_token && <Button size="sm" variant="ghost" className="rounded-full text-destructive" onClick={() => void rotateTenantLink(true)}>Revoke</Button>}
+            <Button size="sm" variant="outline" onClick={() => void rotateTenantLink(false)}>{tenancy.portal_token ? 'Rotate' : 'Create link'}</Button>
+            {tenancy.portal_token && <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void rotateTenantLink(true)}>Revoke</Button>}
           </div>
         </CardContent></Card>
       )}
@@ -1048,7 +1048,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
         <div>
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-sm font-semibold"><Receipt className="h-4 w-4" /> Rent ledger</div>
-            {canManage && <Button size="sm" variant="outline" className="rounded-full" onClick={genSchedule} disabled={busy}>Generate 12 periods</Button>}
+            {canManage && <Button size="sm" variant="outline" onClick={genSchedule} disabled={busy}>Generate 12 periods</Button>}
           </div>
           {charges.length === 0 ? <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">No rent charges yet. Generate a schedule to start the ledger.</div> : (
             <Card><CardContent className="p-0"><div className="divide-y divide-border">
@@ -1062,15 +1062,15 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                   {c.payment_status === 'partial' && <span className="text-[10px] text-muted-foreground">{offerMoney(c.settled, c.currency)} of {offerMoney(c.amount, c.currency)}</span>}
                   <div className="ml-auto flex items-center gap-1.5">
                     {c.invoice_id
-                      ? <Link to={`/finance/invoices/${c.invoice_id}`}><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><FileText className="mr-1 h-3 w-3" /> Invoice</Button></Link>
-                      : canManage && c.payment_status !== 'waived' && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => invoiceRent(c.id)}><FileText className="mr-1 h-3 w-3" /> Invoice</Button>}
+                      ? <Link to={`/finance/invoices/${c.invoice_id}`}><Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-primary"><FileText className="mr-1 h-3 w-3" /> Invoice</Button></Link>
+                      : canManage && c.payment_status !== 'waived' && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => invoiceRent(c.id)}><FileText className="mr-1 h-3 w-3" /> Invoice</Button>}
                     {/* Manual settlement is offered ONLY while the charge is uninvoiced. Once it is
                         invoiced the ledger owns it — the API rejects the hand-set with a 409, so
                         offering the button here would just be a button that always fails. */}
                     {canManage && !c.invoice_id && c.payment_status !== 'paid' && c.payment_status !== 'waived' && (
                       <>
-                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => markPaid(c.id, 'paid')}><Check className="mr-1 h-3 w-3" /> Paid</Button>
-                        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => markPaid(c.id, 'paid')}><Check className="mr-1 h-3 w-3" /> Paid</Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
                       </>
                     )}
                     {c.payment_status === 'paid' && c.paid_at && <span className="text-xs text-muted-foreground">Paid {formatDate(c.paid_at)}</span>}
@@ -1085,7 +1085,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
       <div>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Maintenance</div>
-          {canManage && !woAdding && <Button size="sm" variant="outline" className="rounded-full" onClick={() => setWoAdding(true)}>Add work order</Button>}
+          {canManage && !woAdding && <Button size="sm" variant="outline" onClick={() => setWoAdding(true)}>Add work order</Button>}
         </div>
         {woAdding && (
           <Card className="mb-3"><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
@@ -1094,7 +1094,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
             <NumInput v={wf.cost} on={(x) => setWf((p) => ({ ...p, cost: x }))} />
             <div className="sm:col-span-1"><Sel value={wf.priority} opts={['low', 'normal', 'high', 'urgent']} onChange={(v) => setWf((p) => ({ ...p, priority: v }))} /></div>
             <Textarea placeholder="Description" className="sm:col-span-3" value={wf.description ?? ''} onChange={(e) => setWf((p) => ({ ...p, description: e.target.value }))} />
-            <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={addWo} disabled={busy || !wf.title}>Add</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setWoAdding(false)}>Cancel</Button></div>
+            <div className="col-span-full flex gap-2"><Button size="sm" onClick={addWo} disabled={busy || !wf.title}>Add</Button><Button size="sm" variant="ghost" onClick={() => setWoAdding(false)}>Cancel</Button></div>
           </CardContent></Card>
         )}
         {wos.length === 0 ? <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">No maintenance work orders.</div> : (
@@ -1108,8 +1108,8 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                 </div>
                 {canManage && w.status !== 'completed' && w.status !== 'cancelled' && (
                   <div className="flex shrink-0 gap-1.5">
-                    {w.status === 'open' && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setWoStatus(w.id, 'in_progress')}>Start</Button>}
-                    <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setWoStatus(w.id, 'completed')}><Check className="mr-1 h-3 w-3" /> Done</Button>
+                    {w.status === 'open' && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setWoStatus(w.id, 'in_progress')}>Start</Button>}
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setWoStatus(w.id, 'completed')}><Check className="mr-1 h-3 w-3" /> Done</Button>
                   </div>
                 )}
               </div>
@@ -1188,7 +1188,7 @@ const InvestmentTab: React.FC<{ ws: string | null; propertyId: string; canManage
             </div>
           ))}
         </div>
-        {canManage && <Button size="sm" className="rounded-full" onClick={save} disabled={busy}>Save &amp; recalculate</Button>}
+        {canManage && <Button size="sm" onClick={save} disabled={busy}>Save &amp; recalculate</Button>}
       </CardContent></Card>
       {metrics && (
         <Card><CardContent className="grid grid-cols-2 gap-x-6 gap-y-1.5 p-4 text-sm sm:grid-cols-4">
@@ -1261,7 +1261,7 @@ const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; propert
           <div><Label className="text-xs">Fixed fee (optional)</Label><NumInput v={f.commission_fixed} on={(x) => setF((p) => ({ ...p, commission_fixed: x }))} /></div>
         </div>
         <div className="flex items-center gap-3">
-          <Button size="sm" className="rounded-full" onClick={complete} disabled={busy || !f.sale_price}>Mark sold &amp; calculate</Button>
+          <Button size="sm" onClick={complete} disabled={busy || !f.sale_price}>Mark sold &amp; calculate</Button>
           {f.sale_price && (Number(f.commission_pct) || Number(f.commission_fixed)) ? (
             <span className="text-xs text-muted-foreground">≈ {offerMoney(Number(f.sale_price) * (Number(f.commission_pct) || 0) / 100 + (Number(f.commission_fixed) || 0), ccy)} commission (+ VAT at invoice)</span>
           ) : null}
@@ -1284,17 +1284,17 @@ const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; propert
           <div className="text-xs text-muted-foreground">Commission {sale.commission_pct ? `(${sale.commission_pct}%${sale.commission_fixed ? ` + ${offerMoney(sale.commission_fixed, ccy)}` : ''})` : ''}</div>
           <div className="text-lg font-semibold text-emerald-500">{offerMoney(sale.commission_base, ccy)}<span className="text-xs font-normal text-muted-foreground"> + VAT</span></div>
         </div>
-        <Badge className="rounded-full border-0 bg-emerald-500/15 text-[11px] text-emerald-500">Sold {formatDate(sale.completed_at)}</Badge>
+        <Badge className="border-0 bg-emerald-500/15 text-[11px] text-emerald-500">Sold {formatDate(sale.completed_at)}</Badge>
       </div>
       {canManage && (
         <div className="flex items-center gap-3">
           {sale.invoice_id ? (
             <>
-              <Badge className="rounded-full border-0 bg-primary/15 text-[11px] capitalize">Invoice {sale.invoice_status || 'issued'}</Badge>
-              <Link to={`/finance/invoices/${sale.invoice_id}`}><Button size="sm" variant="ghost" className="rounded-full"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Open invoice</Button></Link>
+              <Badge className="border-0 bg-primary/15 text-[11px] capitalize">Invoice {sale.invoice_status || 'issued'}</Badge>
+              <Link to={`/finance/invoices/${sale.invoice_id}`}><Button size="sm" variant="ghost"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Open invoice</Button></Link>
             </>
           ) : sale.seller_contact_id ? (
-            <Button size="sm" className="rounded-full" onClick={() => setInvoiceOpen(true)}><FileText className="mr-1.5 h-4 w-4" /> Issue commission invoice</Button>
+            <Button size="sm" onClick={() => setInvoiceOpen(true)}><FileText className="mr-1.5 h-4 w-4" /> Issue commission invoice</Button>
           ) : (
             <span className="text-xs text-muted-foreground">Set the vendor/seller contact in <b>Basics</b> to invoice the commission.</span>
           )}
@@ -1354,9 +1354,9 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
           <Input placeholder="Buyer name" value={f.buyer_name ?? ''} onChange={(e) => setF((p) => ({ ...p, buyer_name: e.target.value }))} />
           <Input placeholder="Terms (optional)" className="sm:col-span-2" value={f.terms ?? ''} onChange={(e) => setF((p) => ({ ...p, terms: e.target.value }))} />
           <ChkGrid items={[['proof_of_funds', 'Proof of funds'], ['mortgage_in_principle', 'Mortgage in principle'], ['chain_free', 'Chain-free']]} form={f} set={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
-          <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={add} disabled={busy || !f.amount}>Record offer</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setAdding(false)}>Cancel</Button></div>
+          <div className="col-span-full flex gap-2"><Button size="sm" onClick={add} disabled={busy || !f.amount}>Record offer</Button><Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button></div>
         </CardContent></Card>
-      ) : <Button variant="outline" size="sm" className="rounded-full" onClick={() => setAdding(true)}><Gavel className="mr-1.5 h-4 w-4" /> Record an offer</Button>)}
+      ) : <Button variant="outline" size="sm" onClick={() => setAdding(true)}><Gavel className="mr-1.5 h-4 w-4" /> Record an offer</Button>)}
 
       {offers.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No offers yet.</div> : (
         <Card><CardContent className="p-0"><div className="divide-y divide-border">
@@ -1437,9 +1437,9 @@ const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit:
           <Input type="email" placeholder="Counterparty email" value={f.counterparty_email ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_email: e.target.value }))} />
           <Input type="number" placeholder="Value (optional)" value={f.value ?? ''} onChange={(e) => setF((p) => ({ ...p, value: e.target.value }))} />
           <Textarea placeholder="Body / Terms (markdown)" className="col-span-full" rows={3} value={f.body_markdown ?? ''} onChange={(e) => setF((p) => ({ ...p, body_markdown: e.target.value }))} />
-          <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={create} disabled={busy || !f.title}>Create</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setAdding(false)}>Cancel</Button></div>
+          <div className="col-span-full flex gap-2"><Button size="sm" onClick={create} disabled={busy || !f.title}>Create</Button><Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button></div>
         </CardContent></Card>
-      ) : <Button variant="outline" size="sm" className="rounded-full" onClick={() => setAdding(true)}><FileSignature className="mr-1.5 h-4 w-4" /> New transaction document</Button>)}
+      ) : <Button variant="outline" size="sm" onClick={() => setAdding(true)}><FileSignature className="mr-1.5 h-4 w-4" /> New transaction document</Button>)}
 
       {(rows ?? []).length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No transaction documents yet. Create a Memorandum of Sale or agency agreement and send it for e-signature.</div> : (
         <Card><CardContent className="p-0"><div className="divide-y divide-border">
@@ -1450,7 +1450,7 @@ const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit:
                 <div className="text-xs text-muted-foreground capitalize">{(c.contract_type ?? '').replace(/_/g, ' ')}{c.counterparty_name ? ` · ${c.counterparty_name}` : ''}</div>
               </div>
               <span className={`text-[11px] capitalize ${statusTone(c.status)}`}>{c.status}</span>
-              {canEdit && c.status === 'draft' && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={() => send(c.id)}><Send className="mr-1 h-3.5 w-3.5" /> Send</Button>}
+              {canEdit && c.status === 'draft' && <Button size="sm" variant="outline" disabled={busy} onClick={() => send(c.id)}><Send className="mr-1 h-3.5 w-3.5" /> Send</Button>}
             </div>
           ))}
         </div></CardContent></Card>
@@ -1522,7 +1522,7 @@ const PhotoCard: React.FC<{ photo: PropertyPhoto; ws: string; canManage: boolean
   return (
     <div className="group relative overflow-hidden rounded-lg border bg-muted">
       <div className="aspect-[4/3] w-full">{url ? <img src={url} alt={photo.caption ?? ''} className="h-full w-full object-cover" /> : <Skeleton className="h-full w-full" />}</div>
-      {photo.is_cover && <Badge className="absolute left-2 top-2 rounded-full border-0 bg-emerald-500 text-[10px] text-white">Cover</Badge>}
+      {photo.is_cover && <Badge className="absolute left-2 top-2 border-0 bg-emerald-500 text-[10px] text-white">Cover</Badge>}
       {canManage && (
         <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
           {!photo.is_cover && <Button size="icon" variant="ghost" className="h-7 w-7 text-white hover:bg-white/20" onClick={onCover} title="Set as cover"><Star className="h-3.5 w-3.5" /></Button>}

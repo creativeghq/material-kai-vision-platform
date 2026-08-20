@@ -129,7 +129,7 @@ export default function PublicMoodBoardPage() {
           <p className="text-muted-foreground text-sm max-w-sm">
             This moodboard is private or doesn't exist. Ask the owner to make it public and share the link again.
           </p>
-          <Button className="rounded-full gap-2" onClick={() => navigate('/')}>
+          <Button className="gap-2" onClick={() => navigate('/')}>
             Go to platform
             <ArrowRight className="h-4 w-4" />
           </Button>
@@ -147,7 +147,7 @@ export default function PublicMoodBoardPage() {
 
   const RequestQuoteButton = ({ className = '' }: { className?: string }) => (
     <Button
-      className={`rounded-full gap-2 ${className}`}
+      className={`gap-2 ${className}`}
       onClick={handleRequestQuote}
       disabled={requesting || requested}
     >
@@ -186,7 +186,7 @@ export default function PublicMoodBoardPage() {
         <Button
           variant="outline"
           size="sm"
-          className="absolute top-4 right-4 rounded-full gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
+          className="absolute top-4 right-4 gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
           onClick={() => navigate('/auth')}
         >
           Create your own
@@ -294,7 +294,7 @@ export default function PublicMoodBoardPage() {
           <p className="text-sm text-muted-foreground">
             Create your own moodboards and discover materials on Materials Hub
           </p>
-          <Button variant="outline" className="rounded-full gap-2" onClick={() => navigate('/auth')}>
+          <Button variant="outline" className="gap-2" onClick={() => navigate('/auth')}>
             <Palette className="h-4 w-4" />
             Get started free
           </Button>

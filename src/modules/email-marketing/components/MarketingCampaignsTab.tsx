@@ -63,7 +63,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
         title="Campaigns"
         subtitle="Send bulk email to your CRM audiences from your own Resend domain."
         actions={
-          <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> Create campaign</Button>
+          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-2" /> Create campaign</Button>
         }
       />
 
@@ -74,7 +74,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
           <Send className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No campaigns yet</h3>
           <p className="text-sm text-muted-foreground mb-4">Create your first email campaign to reach your audience.</p>
-          <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> Create campaign</Button>
+          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-2" /> Create campaign</Button>
         </div>
       ) : (
         <div className="dashboard-card">

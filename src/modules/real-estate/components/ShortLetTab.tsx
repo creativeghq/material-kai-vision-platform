@@ -85,7 +85,7 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <CardTitle className="flex items-center gap-2 text-base"><CalendarDays className="h-4 w-4" /> Bookings</CardTitle>
           {canManage && !draft && (
-            <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDraft({ check_in: '', check_out: '', guest_name: '', nightly_rate: '', channel: 'direct' })}>
+            <Button size="sm" variant="outline" onClick={() => setDraft({ check_in: '', check_out: '', guest_name: '', nightly_rate: '', channel: 'direct' })}>
               <Plus className="mr-1 h-4 w-4" /> Add booking
             </Button>
           )}
@@ -101,7 +101,7 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
               {b.total_amount != null && <span className="text-xs tabular-nums">{money(b.total_amount, b.currency)}</span>}
               <span className={`ml-auto text-xs capitalize ${statusTone(b.status)}`}>{b.status}</span>
               {canManage && (
-                <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-destructive"
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive"
                   onClick={async () => { if (!ws) return; try { await realEstateService.deleteBooking(ws, b.id); await load(); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } }}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -125,8 +125,8 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
               </div>
               <p className="text-[11px] text-muted-foreground">Check-out is the morning of departure — the same day can be another guest’s check-in.</p>
               <div className="flex justify-end gap-2">
-                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDraft(null)}>Cancel</Button>
-                <Button size="sm" className="rounded-full" disabled={busy || !draft.check_in || !draft.check_out} onClick={addBooking}>
+                <Button size="sm" variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+                <Button size="sm" disabled={busy || !draft.check_in || !draft.check_out} onClick={addBooking}>
                   {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Add
                 </Button>
               </div>
@@ -147,7 +147,7 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
               {t.assignee_name && <span className="text-xs">{t.assignee_name}</span>}
               <span className={`ml-auto text-xs capitalize ${statusTone(t.status)}`}>{t.status.replace('_', ' ')}</span>
               {canManage && (
-                <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setTaskStatus(t, 'done')}><Check className="mr-1 h-3 w-3" /> Done</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setTaskStatus(t, 'done')}><Check className="mr-1 h-3 w-3" /> Done</Button>
               )}
             </div>
           ))}
@@ -184,9 +184,9 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
               <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2 py-1.5 text-[11px]">
                 {icalToken ? icalFeedUrl(icalToken) : 'Not shared yet'}
               </code>
-              {icalToken && <Button size="sm" variant="ghost" className="rounded-full" onClick={() => { void navigator.clipboard.writeText(icalFeedUrl(icalToken)); toast({ title: 'Calendar URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>}
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => rotateToken(false)}>{icalToken ? 'Rotate' : 'Create link'}</Button>
-              {icalToken && <Button size="sm" variant="ghost" className="rounded-full text-destructive" onClick={() => rotateToken(true)}>Revoke</Button>}
+              {icalToken && <Button size="sm" variant="ghost" onClick={() => { void navigator.clipboard.writeText(icalFeedUrl(icalToken)); toast({ title: 'Calendar URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>}
+              <Button size="sm" variant="outline" onClick={() => rotateToken(false)}>{icalToken ? 'Rotate' : 'Create link'}</Button>
+              {icalToken && <Button size="sm" variant="ghost" className="text-destructive" onClick={() => rotateToken(true)}>Revoke</Button>}
             </div>
             <p className="text-[11px] text-muted-foreground">The feed publishes blocked nights only — never a guest name, contact detail or price.</p>
           </CardContent>

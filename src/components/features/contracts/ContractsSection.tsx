@@ -323,7 +323,7 @@ export const ContractsSection: React.FC<{
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New {createContext} contract</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Button variant="outline" className="w-full rounded-full" disabled={busy} onClick={() => setTemplatePickerOpen(true)}>
+            <Button variant="outline" className="w-full" disabled={busy} onClick={() => setTemplatePickerOpen(true)}>
               <Layers className="h-4 w-4 mr-2" /> Start from a template
             </Button>
             {pickCategory && (

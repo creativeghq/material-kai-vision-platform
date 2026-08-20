@@ -281,7 +281,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
                     onClick={() => toggleRecipient(c.email)}
                     title={c.email}
                     className={[
-                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                      'inline-flex items-center gap-1.5 border px-2.5 py-1 text-xs transition-colors',
                       on ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:border-primary hover:text-foreground',
                     ].join(' ')}
                   >

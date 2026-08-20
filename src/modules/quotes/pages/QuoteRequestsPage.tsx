@@ -166,7 +166,7 @@ export const QuoteRequestsPage: React.FC = () => {
           <div className="dashboard-card rounded-2xl border-0 shadow-sm flex flex-col items-center justify-center py-14 text-center">
             <FileText className="h-12 w-12 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground mb-4">No quote requests yet</p>
-            <Button onClick={() => setShowCreateModal(true)} className="rounded-full gap-1.5">
+            <Button onClick={() => setShowCreateModal(true)} className="gap-1.5">
               <Plus className="h-4 w-4" />
               Create your first quote request
             </Button>

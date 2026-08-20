@@ -156,7 +156,7 @@ function LogAbsenceDialog({ workspaceId, employees, onDone }: { workspaceId: str
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Log time off</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Log time off</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Log Time Off</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -182,8 +182,8 @@ function LogAbsenceDialog({ workspaceId, employees, onDone }: { workspaceId: str
           <div className="space-y-1"><Label>Note</Label><Textarea rows={2} value={f.note} onChange={(e) => upd('note', e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Log time off</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Log time off</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -212,7 +212,7 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="rounded-full h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File</Button>
+        <Button size="sm" variant="outline" className="h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>File Leave to Ergani</DialogTitle></DialogHeader>
@@ -235,8 +235,8 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}File to Ergani</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}File to Ergani</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

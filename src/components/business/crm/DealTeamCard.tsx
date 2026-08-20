@@ -38,7 +38,7 @@ export const DealTeamCard: React.FC<{ dealId: string; workspaceId: string | null
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border/60 px-5 py-3">
         <CardTitle className="text-base">Deal team</CardTitle>
-        <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-[11px]" onClick={() => setAdding((v) => !v)}>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={() => setAdding((v) => !v)}>
           <Plus className="mr-1 h-3.5 w-3.5" /> Add
         </Button>
       </CardHeader>

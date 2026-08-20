@@ -84,7 +84,7 @@ export const CampaignStatsDialog: React.FC<Props> = ({ campaignId, campaignName,
 
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-muted-foreground">Opens/clicks come from your Resend account.</p>
-          <Button size="sm" variant="outline" onClick={sync} disabled={syncing} className="rounded-full">
+          <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
             {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />} Refresh from Resend
           </Button>
         </div>

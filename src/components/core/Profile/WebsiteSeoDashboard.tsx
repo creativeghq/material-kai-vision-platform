@@ -126,7 +126,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="rounded-full" onClick={handleRecrawl} disabled={recrawling}>
+        <Button variant="outline" size="sm" onClick={handleRecrawl} disabled={recrawling}>
           {recrawling ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
           Recrawl
         </Button>

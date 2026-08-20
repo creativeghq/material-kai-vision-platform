@@ -810,7 +810,7 @@ export const CRMManagement: React.FC = () => {
                                 <ExternalLink className="h-3 w-3 shrink-0" />
                               </button>
                               {(contact as any).lead_score != null && (
-                                <Badge className={`${leadScoreTint((contact as any).lead_score)} rounded-full border-0 text-[10px]`} title="Lead score">{(contact as any).lead_score}</Badge>
+                                <Badge className={`${leadScoreTint((contact as any).lead_score)} border-0 text-[10px]`} title="Lead score">{(contact as any).lead_score}</Badge>
                               )}
                             </div>
                           </TableCell>

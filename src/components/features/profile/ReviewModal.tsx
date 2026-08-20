@@ -166,10 +166,10 @@ export const ReviewModal: React.FC<{
           </div>
 
           <div className="flex gap-3 pt-1">
-            <Button className="flex-1 rounded-full" onClick={save} disabled={saving || overall === 0}>
+            <Button className="flex-1" onClick={save} disabled={saving || overall === 0}>
               {saving ? 'Saving…' : existingReview ? 'Update Review' : 'Submit Review'}
             </Button>
-            <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
           </div>

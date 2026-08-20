@@ -103,11 +103,11 @@ export const BlueprintEditorPage: React.FC = () => {
         subtitle={bp.title}
         actions={
           <>
-            <Button variant="outline" className="rounded-full" onClick={() => navigate('/blueprints')}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
+            <Button variant="outline" onClick={() => navigate('/blueprints')}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
             {readOnly ? (
-              <Button className="rounded-full" disabled={saving} onClick={copyToEdit}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Copy className="h-4 w-4 mr-1" />} Copy to my library</Button>
+              <Button disabled={saving} onClick={copyToEdit}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Copy className="h-4 w-4 mr-1" />} Copy to my library</Button>
             ) : (
-              <Button className="rounded-full" disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save</Button>
+              <Button disabled={saving} onClick={save}>{saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save</Button>
             )}
           </>
         }

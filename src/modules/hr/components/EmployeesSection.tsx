@@ -129,7 +129,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                           ? <span className="text-sm text-emerald-600 dark:text-emerald-400" title={`Protocol ${hireFilings.get(e.id)?.protocol}`}>Filed · {hireFilings.get(e.id)?.protocol}</span>
                           : canManage && workspaceId
                             ? <ErganiFilingDialog
-                                trigger={<Button size="sm" variant="outline" className="rounded-full h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File Ε3</Button>}
+                                trigger={<Button size="sm" variant="outline" className="h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File Ε3</Button>}
                                 title="File Hire Announcement"
                                 description="Built from Ergani’s live Ε3 template using this employee’s record. Review the values, complete anything left blank, then file. Codes you fill in repeatedly can be saved on the employee so they prefill next time."
                                 loadPreview={() => hrService.submitHire(workspaceId, { employee_id: e.id, preview: true })}
@@ -204,7 +204,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Add employee</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Add employee</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add Employee</DialogTitle>
@@ -259,8 +259,8 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
           <div className="space-y-1 w-1/2"><Label>Dependent children <span className="text-muted-foreground text-xs">(tax credit)</span></Label><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add employee</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add employee</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -294,8 +294,8 @@ function InviteButton({ workspaceId, employee, onDone }: { workspaceId: string; 
           <div className="space-y-1"><Label>Work email *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Send invite</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Send invite</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -393,8 +393,8 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
           <ContractsSection workspaceId={workspaceId} context="hr" subject={{ hr_employee_id: employee.id }} heading="Employment contracts" defaultCounterparty={{ name: empName(employee), email: employee.contact?.email }} />
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -415,7 +415,7 @@ function WorkingTimeFields({ start, end, days, onStart, onEnd, onToggleDay }: {
       <div className="flex gap-1 flex-wrap">
         {WEEKDAYS.map(([lbl, n]) => (
           <button type="button" key={n} onClick={() => onToggleDay(n)}
-            className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${days.includes(n) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}>
+            className={`px-2.5 py-1 text-xs border transition-colors ${days.includes(n) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}>
             {lbl}
           </button>
         ))}

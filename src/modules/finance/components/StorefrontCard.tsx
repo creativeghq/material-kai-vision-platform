@@ -96,7 +96,7 @@ export const StorefrontCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
             <Input value={cfg.subheadline ?? ''} onChange={(e) => setCfg({ ...cfg, subheadline: e.target.value })} placeholder="Curated materials, shipped to you" />
           </div>
         </div>
-        <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+        <Button size="sm" onClick={save} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Save store settings
         </Button>
 

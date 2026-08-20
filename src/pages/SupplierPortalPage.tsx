@@ -69,7 +69,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
       {orders.length > 0 && (
         <FilterBar groups={filterGroups} values={filterValues} onChange={setFilterValues} previewCount={previewCount} title="Filter incoming orders" />
       )}
-      <Button size="sm" variant="outline" onClick={load} disabled={loading} className="rounded-full">
+      <Button size="sm" variant="outline" onClick={load} disabled={loading}>
         <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
       </Button>
     </div>
@@ -137,16 +137,16 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
               ))}
             </div>
             <div className="flex items-center gap-2 pt-3">
-              <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busyId === o.order_id || o.supplier_status === 'acknowledged' || o.supplier_status === 'shipped'} onClick={() => act(o.order_id, 'acknowledged')}>
+              <Button size="sm" variant="outline" className="h-8" disabled={busyId === o.order_id || o.supplier_status === 'acknowledged' || o.supplier_status === 'shipped'} onClick={() => act(o.order_id, 'acknowledged')}>
                 <PackageCheck className="h-3.5 w-3.5 mr-1" /> Acknowledge
               </Button>
-              <Button size="sm" className="rounded-full h-8" disabled={busyId === o.order_id || o.supplier_status === 'shipped'} onClick={() => act(o.order_id, 'shipped')}>
+              <Button size="sm" className="h-8" disabled={busyId === o.order_id || o.supplier_status === 'shipped'} onClick={() => act(o.order_id, 'shipped')}>
                 {busyId === o.order_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Truck className="h-3.5 w-3.5 mr-1" /> Mark shipped</>}
               </Button>
               {/* In-app handoff: the buyer's PO already materialized a draft sales order in THIS
                   workspace — fulfil it with the normal order machinery, don't retype it. */}
               {o.linked_order_id && (
-                <Button size="sm" variant="ghost" className="rounded-full h-8" asChild>
+                <Button size="sm" variant="ghost" className="h-8" asChild>
                   <Link to={`/finance/orders/${o.linked_order_id}`}>
                     <FileText className="h-3.5 w-3.5 mr-1" /> Open draft order
                   </Link>

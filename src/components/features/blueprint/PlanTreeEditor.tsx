@@ -183,11 +183,11 @@ export function PlanTreeEditor({ items, currency, subtotal, busy, onPatch, onDel
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={onAddSection}>
+          <Button variant="outline" size="sm" disabled={busy} onClick={onAddSection}>
             <Plus className="h-3.5 w-3.5 mr-1" /> Add section
           </Button>
           {onAddFromLibrary && (
-            <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={onAddFromLibrary}>
+            <Button variant="outline" size="sm" disabled={busy} onClick={onAddFromLibrary}>
               <Layers className="h-3.5 w-3.5 mr-1" /> Add from library
             </Button>
           )}

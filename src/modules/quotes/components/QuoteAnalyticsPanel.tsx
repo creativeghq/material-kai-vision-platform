@@ -156,10 +156,10 @@ export const QuoteAnalyticsPanel: React.FC<Props> = ({
               <code className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-1 min-w-0 truncate">
                 {shareUrl}
               </code>
-              <Button variant="outline" size="sm" className="rounded-full gap-1" onClick={copyLink}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={copyLink}>
                 <Copy className="h-3.5 w-3.5" /> Copy
               </Button>
-              <Button variant="ghost" size="sm" className="rounded-full gap-1" onClick={() => window.open(shareUrl, '_blank')}>
+              <Button variant="ghost" size="sm" className="gap-1" onClick={() => window.open(shareUrl, '_blank')}>
                 <ExternalLink className="h-3.5 w-3.5" /> Open
               </Button>
             </div>

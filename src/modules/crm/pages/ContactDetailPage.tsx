@@ -901,10 +901,10 @@ export const ContactDetailPage: React.FC = () => {
                           <div className="mb-3 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-muted-foreground">Lead score</span>
                             {contact.lead_score != null
-                              ? <Badge className={`${leadScoreTint(contact.lead_score)} rounded-full border-0`}>{contact.lead_score}/100</Badge>
+                              ? <Badge className={`${leadScoreTint(contact.lead_score)} border-0`}>{contact.lead_score}/100</Badge>
                               : <span className="text-xs text-muted-foreground">Not scored</span>}
-                            {contact.health_score != null && <Badge className={`${leadScoreTint(contact.health_score)} rounded-full border-0`} title="Relationship health">Health {contact.health_score}</Badge>}
-                            <Button variant="ghost" size="sm" className="ml-auto rounded-full" disabled={scoringLead} onClick={runLeadScore}>
+                            {contact.health_score != null && <Badge className={`${leadScoreTint(contact.health_score)} border-0`} title="Relationship health">Health {contact.health_score}</Badge>}
+                            <Button variant="ghost" size="sm" className="ml-auto" disabled={scoringLead} onClick={runLeadScore}>
                               <Sparkles className="mr-1 h-3.5 w-3.5" /> {scoringLead ? 'Scoring…' : 'AI score'}
                             </Button>
                           </div>

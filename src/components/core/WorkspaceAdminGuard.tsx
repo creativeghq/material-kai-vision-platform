@@ -56,7 +56,7 @@ export const WorkspaceAdminGuard: React.FC<{ children: React.ReactNode; fallback
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full rounded-full" onClick={() => navigate(fallbackPath)}>
+            <Button variant="outline" className="w-full" onClick={() => navigate(fallbackPath)}>
               <ArrowLeft className="w-4 h-4 mr-2" /> Go back
             </Button>
           </CardContent>

@@ -170,7 +170,7 @@ export function GenerationProviderHealth() {
             traffic — a provider with no traffic and no funds looked healthy for two months that way.
           </p>
         </div>
-        <Button variant="outline" size="sm" className="rounded-full shrink-0" onClick={() => void load()} disabled={loading}>
+        <Button variant="outline" size="sm" className="shrink-0" onClick={() => void load()} disabled={loading}>
           {loading ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
           Refresh
         </Button>
@@ -203,7 +203,7 @@ export function GenerationProviderHealth() {
             <p className="mt-1 text-sm text-muted-foreground">{p.verdict.action}</p>
 
             {p.verdict.tone === 'critical' && BILLING_URL[p.provider] && (
-              <Button asChild size="sm" className="mt-3 rounded-full">
+              <Button asChild size="sm" className="mt-3">
                 <a href={BILLING_URL[p.provider]} target="_blank" rel="noopener noreferrer">
                   Add funds at {p.provider}
                   <ExternalLink className="ml-2 h-3.5 w-3.5" />

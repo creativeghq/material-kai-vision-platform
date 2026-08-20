@@ -77,7 +77,7 @@ const MentionMonitoringDashboard: React.FC = () => {
         title="Mention Monitoring"
         subtitle="All tracked subjects across the catalog: news, blogs, RSS, YouTube, and LLM visibility."
         actions={(
-          <Button onClick={load} disabled={loading} variant="outline" className="rounded-full">
+          <Button onClick={load} disabled={loading} variant="outline">
             <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} /> Reload
           </Button>
         )}

@@ -145,10 +145,10 @@ export const SecretsManagerCard: React.FC<Props> = ({ scope, title, description,
                   )}
                 </div>
                 {secret.value_present && !isDirty && (
-                  <Button variant="outline" size="sm" onClick={() => handleClear(secret.key)} className="rounded-full">Clear</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleClear(secret.key)}>Clear</Button>
                 )}
                 {isDirty && (
-                  <Button variant="ghost" size="sm" onClick={() => setDrafts(d => ({ ...d, [secret.key]: UNCHANGED }))} className="rounded-full">Reset</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setDrafts(d => ({ ...d, [secret.key]: UNCHANGED }))}>Reset</Button>
                 )}
               </div>
 
@@ -180,7 +180,7 @@ export const SecretsManagerCard: React.FC<Props> = ({ scope, title, description,
 
         {dirtyKeys.length > 0 && (
           <div className="flex items-center justify-end pt-3 border-t border-white/10">
-            <Button onClick={handleSaveAll} disabled={savingAll} className="rounded-full">
+            <Button onClick={handleSaveAll} disabled={savingAll}>
               {savingAll
                 ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving…</>
                 : <><Save className="h-4 w-4 mr-1" /> Save {dirtyKeys.length} change{dirtyKeys.length === 1 ? '' : 's'}</>}

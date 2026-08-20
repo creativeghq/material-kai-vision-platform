@@ -216,7 +216,7 @@ const DocsPage: React.FC = () => {
         icon={BookText}
         title="Docs"
         subtitle="Internal team documentation — searchable by the KAI agent"
-        actions={<Button size="sm" onClick={openNew} className="gap-1 rounded-full"><Plus className="h-4 w-4" /> New doc</Button>}
+        actions={<Button size="sm" onClick={openNew} className="gap-1"><Plus className="h-4 w-4" /> New doc</Button>}
       />
       <div className="px-3 sm:px-6 py-4 sm:py-6">
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">

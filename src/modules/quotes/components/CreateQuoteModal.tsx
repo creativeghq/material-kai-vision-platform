@@ -153,7 +153,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
         <div className="space-y-4 mt-4">
           <Button
             variant="outline"
-            className="w-full rounded-full"
+            className="w-full"
             disabled={processing}
             onClick={() => setTemplatePickerOpen(true)}
           >

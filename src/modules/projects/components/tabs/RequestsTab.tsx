@@ -90,7 +90,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Checkbox checked={showClosed} onCheckedChange={(v) => setShowClosed(!!v)} /> Show closed
           </label>
-          <Button size="sm" className="rounded-full" onClick={() => setCreating(true)}>
+          <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="h-3.5 w-3.5 mr-1" /> Raise request
           </Button>
         </div>
@@ -165,10 +165,10 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
 
                       {isOwner && r.kind === 'approval_request' && !r.approval_decision && (
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="rounded-full" onClick={() => decide(r, 'approved')}>
+                          <Button size="sm" variant="outline" onClick={() => decide(r, 'approved')}>
                             <Check className="h-3.5 w-3.5 mr-1" /> Approve
                           </Button>
-                          <Button size="sm" variant="outline" className="rounded-full" onClick={() => decide(r, 'declined')}>
+                          <Button size="sm" variant="outline" onClick={() => decide(r, 'declined')}>
                             <X className="h-3.5 w-3.5 mr-1" /> Decline
                           </Button>
                         </div>
@@ -180,7 +180,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                           placeholder="Write a reply…"
                           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(r); } }}
                         />
-                        <Button size="sm" className="rounded-full" onClick={() => send(r)} disabled={sending || !reply.trim()}>
+                        <Button size="sm" onClick={() => send(r)} disabled={sending || !reply.trim()}>
                           {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                         </Button>
                       </div>
@@ -271,7 +271,7 @@ const NewRequestDialog: React.FC<{
           )}
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Raise request'}
             </Button>
           </div>

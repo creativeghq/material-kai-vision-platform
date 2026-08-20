@@ -271,7 +271,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
             {selectedRows.length > 0 && (
               <>
                 <span className="text-muted-foreground">{selectedRows.length} selected · {formatMoney(selectedTotal)}</span>
-                <Button size="sm" className="rounded-full" disabled={billing || mixedCustomers} onClick={bill}>
+                <Button size="sm" disabled={billing || mixedCustomers} onClick={bill}>
                   {billing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5 mr-1" />} Create invoice
                 </Button>
               </>

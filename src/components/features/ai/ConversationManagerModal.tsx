@@ -329,7 +329,7 @@ export const ConversationManagerModal: React.FC<ConversationManagerModalProps> =
               onNew();
               onOpenChange(false);
             }}
-            className="ml-auto gap-2 rounded-full"
+            className="ml-auto gap-2"
           >
             <Plus className="h-4 w-4" />
             New conversation

@@ -249,7 +249,7 @@ export const ProductAttachments: React.FC = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Product Attachments</CardTitle>
-            <Button onClick={handleCreate} className="rounded-full">
+            <Button onClick={handleCreate}>
               <Plus className="h-4 w-4 mr-2" />
               Link document to product
             </Button>
@@ -392,10 +392,10 @@ export const ProductAttachments: React.FC = () => {
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" className="rounded-full" onClick={() => setShowEditor(false)}>
+              <Button variant="outline" onClick={() => setShowEditor(false)}>
                 Cancel
               </Button>
-              <Button className="rounded-full" onClick={handleSave}>Create link</Button>
+              <Button onClick={handleSave}>Create link</Button>
             </div>
           </div>
         </DialogContent>

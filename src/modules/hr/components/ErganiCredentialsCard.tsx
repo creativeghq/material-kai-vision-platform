@@ -123,7 +123,7 @@ export const ErganiCredentialsCard: React.FC<{ workspaceId: string }> = ({ works
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
         <div>
-          <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
+          <Button size="sm" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
           </Button>
         </div>

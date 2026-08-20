@@ -211,7 +211,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
           <Input className="h-8 text-xs" inputMode="decimal" value={value}
             onChange={(e) => setValue(e.target.value)} placeholder={kind === 'percent' ? '15' : '450'} />
         </div>
-        <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={add} disabled={busy}>
+        <Button size="sm" variant="outline" className="h-8" onClick={add} disabled={busy}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
           Add
         </Button>
@@ -229,7 +229,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
             <SelectTrigger className="h-8 text-xs w-24"><SelectValue /></SelectTrigger>
             <SelectContent>{units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
           </Select>
-          <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={runPreview} disabled={previewing}>
+          <Button size="sm" variant="outline" className="h-8" onClick={runPreview} disabled={previewing}>
             {previewing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Check'}
           </Button>
           {preview && (

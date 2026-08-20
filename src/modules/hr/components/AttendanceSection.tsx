@@ -85,7 +85,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
               <div className="text-sm font-medium">Public clock-in kiosk is live</div>
               <div className="text-xs text-muted-foreground truncate">{kioskUrl}</div>
             </div>
-            <Button size="sm" variant="outline" className="rounded-full shrink-0" onClick={copyKiosk}>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={copyKiosk}>
               {copied ? <Check className="h-4 w-4 mr-1 text-emerald-500" /> : <Copy className="h-4 w-4 mr-1" />}Copy link
             </Button>
           </CardContent>
@@ -120,7 +120,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 items-center">
                         <PunchHistoryDialog workspaceId={workspaceId!} employeeId={r.employee_id} name={r.name} onChanged={load} />
-                        <Button size="sm" variant={r.clocked_in ? 'outline' : 'default'} className="rounded-full h-8"
+                        <Button size="sm" variant={r.clocked_in ? 'outline' : 'default'} className="h-8"
                           disabled={busyId === r.employee_id} onClick={() => clock(r)}>
                           {busyId === r.employee_id ? <Loader2 className="h-4 w-4 animate-spin" /> : r.clocked_in ? <><LogOut className="h-4 w-4 mr-1" />Out</> : <><LogIn className="h-4 w-4 mr-1" />In</>}
                         </Button>
@@ -167,7 +167,7 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-full"><Settings className="h-4 w-4 mr-2" />Settings</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm" variant="outline"><Settings className="h-4 w-4 mr-2" />Settings</Button></DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Attendance & Clock-In Settings</DialogTitle></DialogHeader>
         <div className="space-y-5">
@@ -208,8 +208,8 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

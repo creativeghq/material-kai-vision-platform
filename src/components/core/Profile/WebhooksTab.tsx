@@ -287,8 +287,8 @@ export const WebhooksTab: React.FC = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" onClick={create} disabled={saving || !url || selected.length === 0}>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={create} disabled={saving || !url || selected.length === 0}>
               {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Create
             </Button>
           </DialogFooter>
@@ -307,12 +307,12 @@ export const WebhooksTab: React.FC = () => {
           </DialogHeader>
           <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 p-3">
             <code className="flex-1 break-all font-mono text-xs">{revealedSecret}</code>
-            <Button size="sm" variant="outline" className="rounded-full shrink-0" onClick={copySecret}>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={copySecret}>
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>
           <DialogFooter>
-            <Button className="rounded-full" onClick={() => setRevealedSecret(null)}>Done</Button>
+            <Button onClick={() => setRevealedSecret(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

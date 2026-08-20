@@ -510,7 +510,7 @@ const InboxPage: React.FC = () => {
     <>
       {(activeThread.metadata as any)?.marketplace_inquiry_id && (
         <Button
-          variant="default" size="sm" className="rounded-full"
+          variant="default" size="sm"
           title="Accept this surplus inquiry — creates a draft purchase order in the buyer's workspace"
           onClick={async () => {
             try {
@@ -524,7 +524,7 @@ const InboxPage: React.FC = () => {
       )}
       <Button
         variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
-        size="icon" className="rounded-full h-9 w-9"
+        size="icon" className="h-9 w-9"
         title={
           activeThread.agent_state === 'active'
             ? 'AI assistant is handling this — click to take back'
@@ -553,7 +553,7 @@ const InboxPage: React.FC = () => {
       />
       {activeThread.thread_type !== 'internal' && (
         <Button
-          variant="outline" size="icon" className="rounded-full h-9 w-9"
+          variant="outline" size="icon" className="h-9 w-9"
           title="Copy a private share link for the customer"
           onClick={async () => {
             try {
@@ -566,17 +566,17 @@ const InboxPage: React.FC = () => {
           <Link2 className="w-4 h-4" />
         </Button>
       )}
-      <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
+      <Button variant="outline" size="icon" className="h-9 w-9" title="Add a teammate" onClick={() => setShowAdd(true)}>
         <UserPlus className="w-4 h-4" />
       </Button>
       {activeThread.archived_at ? (
-        <Button variant="outline" size="sm" className="rounded-full" title="Restore this conversation" onClick={restoreActive}>
+        <Button variant="outline" size="sm" title="Restore this conversation" onClick={restoreActive}>
           <ArchiveRestore className="w-4 h-4 mr-1.5" /> Restore
         </Button>
       ) : (
         <Button
           variant="outline" size="icon"
-          className="rounded-full h-9 w-9 text-muted-foreground hover:text-destructive"
+          className="h-9 w-9 text-muted-foreground hover:text-destructive"
           title="Delete — moves to Archived for 30 days, then permanently removed"
           onClick={archiveActive}
         >
@@ -609,7 +609,7 @@ const InboxPage: React.FC = () => {
           isPlatformOperator ? (
             <Button
               variant={allWorkspaces ? 'default' : 'outline'}
-              size="sm" className="rounded-full"
+              size="sm"
               title="Show conversations across every workspace on the platform"
               onClick={() => setAllWorkspaces((v) => !v)}
             >
@@ -636,7 +636,7 @@ const InboxPage: React.FC = () => {
           </div>
           {isMember && (
             <div className="p-3">
-              <Button className="w-full rounded-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
+              <Button className="w-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
                 <Plus className="w-4 h-4 mr-1.5" /> Compose
               </Button>
             </div>
@@ -723,20 +723,20 @@ const InboxPage: React.FC = () => {
               </div>
               {/* Mobile compose — the sidebar (with its Compose) is desktop-only */}
               {isMember && (
-                <Button size="icon" className="rounded-full h-10 w-10 shrink-0 md:hidden" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} title="Compose">
+                <Button size="icon" className="h-10 w-10 shrink-0 md:hidden" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} title="Compose">
                   <Plus className="w-4 h-4" />
                 </Button>
               )}
             </div>
             {/* Mobile folder + label filters (they live in the sidebar on desktop) */}
             <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
-              <button onClick={() => { setShowArchived(false); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${!showArchived && !unreadOnly ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><InboxIcon className="w-3 h-3" />All</button>
-              <button onClick={() => { setShowArchived(false); setUnreadOnly(true); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${unreadOnly && !showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Mail className="w-3 h-3" />Unread</button>
-              <button onClick={() => { setShowArchived(true); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Archive className="w-3 h-3" />Archived</button>
+              <button onClick={() => { setShowArchived(false); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${!showArchived && !unreadOnly ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><InboxIcon className="w-3 h-3" />All</button>
+              <button onClick={() => { setShowArchived(false); setUnreadOnly(true); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${unreadOnly && !showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Mail className="w-3 h-3" />Unread</button>
+              <button onClick={() => { setShowArchived(true); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Archive className="w-3 h-3" />Archived</button>
               {wsLabels.map((l) => {
                 const on = labelFilter === l.id;
                 return (
-                  <button key={l.id} onClick={() => setLabelFilter(on ? null : l.id)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border ${labelChipClass(l.color)} ${on ? 'ring-1 ring-inset ring-current' : 'opacity-70'}`}>
+                  <button key={l.id} onClick={() => setLabelFilter(on ? null : l.id)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${labelChipClass(l.color)} ${on ? 'ring-1 ring-inset ring-current' : 'opacity-70'}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} />{l.name}
                   </button>
                 );
@@ -895,7 +895,7 @@ const InboxPage: React.FC = () => {
                   variant="outline" size="sm"
                   onClick={() => setShowDetails(true)}
                   title="Customer profile — contact, quotes, invoices & projects"
-                  className="shrink-0 rounded-full gap-1.5"
+                  className="shrink-0 gap-1.5"
                 >
                   <UserIcon className="w-4 h-4" /> <span className="hidden sm:inline">Profile</span>
                 </Button>
@@ -944,13 +944,13 @@ const InboxPage: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setIsNote(false)}
-                      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-colors ${!isNote ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
+                      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 transition-colors ${!isNote ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
                     >
                       <Send className="w-3 h-3" /> Reply
                     </button>
                     <button
                       onClick={() => setIsNote(true)}
-                      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-colors ${isNote ? 'bg-amber text-black' : 'text-muted-foreground hover:bg-accent'}`}
+                      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 transition-colors ${isNote ? 'bg-amber text-black' : 'text-muted-foreground hover:bg-accent'}`}
                     >
                       <StickyNote className="w-3 h-3" /> Private note
                     </button>
@@ -959,7 +959,7 @@ const InboxPage: React.FC = () => {
                         onClick={aiSuggest}
                         disabled={aiDrafting || waBlocked}
                         title="Let the assistant draft a reply you can edit before sending (1 credit)"
-                        className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
+                        className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
                       >
                         {aiDrafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Draft with AI
                       </button>
@@ -993,7 +993,7 @@ const InboxPage: React.FC = () => {
                     className={`flex-1 min-h-[44px] max-h-32 resize-none rounded-xl ${isNote ? 'border-amber/40 focus-visible:ring-amber/30' : ''}`}
                     disabled={waBlocked}
                   />
-                  <Button className="rounded-full h-11 w-11 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment)}>
+                  <Button className="h-11 w-11 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment)}>
                     {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -1292,12 +1292,12 @@ const KitchenEstimatePanel: React.FC<{ thread: InboxThread }> = ({ thread }) => 
                 Open the project plan <ChevronRight className="h-3 w-3" />
               </a>
             )}
-            <Button size="sm" className="rounded-full" disabled={busy} onClick={makeQuote}>
+            <Button size="sm" disabled={busy} onClick={makeQuote}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create quote'}
             </Button>
           </div>
         ) : (
-          <Button size="sm" className="rounded-full w-full mt-1" disabled={busy} onClick={approve}>
+          <Button size="sm" className="w-full mt-1" disabled={busy} onClick={approve}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create project & plan'}
           </Button>
         )}
@@ -2071,7 +2071,7 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="AI assistant settings">
+        <Button variant="outline" size="icon" className="h-9 w-9" title="AI assistant settings">
           <Settings2 className="w-4 h-4" />
         </Button>
       </PopoverTrigger>
@@ -2249,7 +2249,7 @@ const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
             <span className="text-xs text-muted-foreground shrink-0">@{domain}</span>
           </div>
           <Button
-            size="sm" variant="outline" className="rounded-full w-full"
+            size="sm" variant="outline" className="w-full"
             disabled={busy || !chosen.trim()}
             onClick={() => allocate(chosen.trim())}
           >
@@ -2383,7 +2383,7 @@ const LabelManagerPopover: React.FC<{
               placeholder="New label"
               className="h-8 text-sm"
             />
-            <Button size="sm" className="rounded-full h-8 shrink-0" onClick={create} disabled={busy || !newName.trim()}>
+            <Button size="sm" className="h-8 shrink-0" onClick={create} disabled={busy || !newName.trim()}>
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             </Button>
           </div>
@@ -2423,7 +2423,7 @@ const LabelAssignButton: React.FC<{
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="rounded-full h-9 w-9" title="Labels">
+        <Button variant="outline" size="icon" className="h-9 w-9" title="Labels">
           <Tag className="w-4 h-4" />
         </Button>
       </PopoverTrigger>
@@ -2478,7 +2478,7 @@ const LabelAssignButton: React.FC<{
                 placeholder="Label name"
                 className="h-8 text-sm"
               />
-              <Button size="sm" className="rounded-full h-8 shrink-0" onClick={create} disabled={busy || !newName.trim()}>
+              <Button size="sm" className="h-8 shrink-0" onClick={create} disabled={busy || !newName.trim()}>
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               </Button>
             </div>
@@ -2601,13 +2601,13 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
             </DialogHeader>
             <div className="flex items-center gap-2">
               <Input readOnly value={shareUrl} className="text-sm" onFocus={(e) => e.currentTarget.select()} />
-              <Button className="rounded-full shrink-0" onClick={() => { navigator.clipboard.writeText(shareUrl); toast({ title: 'Link copied' }); }}>
+              <Button className="shrink-0" onClick={() => { navigator.clipboard.writeText(shareUrl); toast({ title: 'Link copied' }); }}>
                 Copy
               </Button>
             </div>
             <DialogFooter>
-              <Button variant="outline" className="rounded-full" onClick={onClose}>Close</Button>
-              <Button className="rounded-full" onClick={() => createdThreadId && onCreated(createdThreadId)}>Open conversation</Button>
+              <Button variant="outline" onClick={onClose}>Close</Button>
+              <Button onClick={() => createdThreadId && onCreated(createdThreadId)}>Open conversation</Button>
             </DialogFooter>
           </>
         ) : (
@@ -2643,8 +2643,8 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                   {selected.length === 0 && <p className="text-[11px] text-muted-foreground mt-1.5">Pick at least one teammate to start the conversation with.</p>}
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" className="rounded-full" onClick={onClose}>Cancel</Button>
-                  <Button className="rounded-full" onClick={createTeam} disabled={busy || selected.length === 0}>
+                  <Button variant="outline" onClick={onClose}>Cancel</Button>
+                  <Button onClick={createTeam} disabled={busy || selected.length === 0}>
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start conversation'}
                   </Button>
                 </DialogFooter>
@@ -2690,8 +2690,8 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                   Contacts with an account see this in their inbox. For others you'll get a private link to send them.
                 </p>
                 <DialogFooter>
-                  <Button variant="outline" className="rounded-full" onClick={onClose}>Cancel</Button>
-                  <Button className="rounded-full" onClick={createCustomer} disabled={busy || !contactId}>
+                  <Button variant="outline" onClick={onClose}>Cancel</Button>
+                  <Button onClick={createCustomer} disabled={busy || !contactId}>
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start conversation'}
                   </Button>
                 </DialogFooter>

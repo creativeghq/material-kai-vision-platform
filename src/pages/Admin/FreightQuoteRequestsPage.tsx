@@ -79,7 +79,7 @@ export default function FreightQuoteRequestsPage() {
                       <td className="px-4 py-2 text-xs text-muted-foreground">{formatDate(q.created_at, { withTime: true })}</td>
                       <td className="px-4 py-2 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button size="sm" className="rounded-full h-7 text-xs" onClick={() => setAnswer(q)}><Send className="h-3.5 w-3.5 mr-1" /> Answer</Button>
+                          <Button size="sm" className="h-7 text-xs" onClick={() => setAnswer(q)}><Send className="h-3.5 w-3.5 mr-1" /> Answer</Button>
                           <Button size="sm" variant="ghost" onClick={() => decline(q)}><XCircle className="h-4 w-4 text-destructive" /></Button>
                         </div>
                       </td>
@@ -151,7 +151,7 @@ const AnswerDialog: React.FC<{ request: PendingQuoteRequest | null; onOpenChange
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Enter offers, or pull them from your own SeaRates account.</span>
-            <Button size="sm" variant="outline" className="rounded-full" disabled={fetching} onClick={fetchViaSearates}>
+            <Button size="sm" variant="outline" disabled={fetching} onClick={fetchViaSearates}>
               {fetching ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />} Fetch via SeaRates
             </Button>
           </div>
@@ -165,7 +165,7 @@ const AnswerDialog: React.FC<{ request: PendingQuoteRequest | null; onOpenChange
                 <div className="col-span-1"><Button size="sm" variant="ghost" onClick={() => setOffers((r) => r.length > 1 ? r.filter((_, j) => j !== i) : r)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div>
               </div>
             ))}
-            <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOffers((r) => [...r, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add offer</Button>
+            <Button size="sm" variant="outline" onClick={() => setOffers((r) => [...r, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add offer</Button>
           </div>
           <div className="space-y-1"><Label className="text-xs">Note to the tenant (optional)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. rates valid 7 days, incl. THC" /></div>
         </div>

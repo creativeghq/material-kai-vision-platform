@@ -141,7 +141,7 @@ function ServiceRow({
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
           )}
-          <Button size="sm" variant="outline" className="h-7 text-xs rounded-full gap-1 px-3"
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-3"
             onClick={() => onHire(service.id)}>
             <Mail className="h-3 w-3" />Hire
           </Button>
@@ -340,7 +340,7 @@ export const PublicProfilePage: React.FC = () => {
         <Lock className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Profile not found</h2>
         <p className="text-muted-foreground max-w-xs">This profile is either private or doesn't exist.</p>
-        <Button asChild variant="outline" className="rounded-full">
+        <Button asChild variant="outline">
           <Link to="/">Go home</Link>
         </Button>
       </div>
@@ -381,7 +381,7 @@ export const PublicProfilePage: React.FC = () => {
             </button>
             <Link to="/discover" className="text-muted-foreground hover:text-foreground transition-colors">Browse</Link>
             {isOwnProfile && (
-              <Button asChild size="sm" variant="outline" className="rounded-full gap-1.5">
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
                 <Link to="/profile"><Pencil className="h-3 w-3" />Edit Profile</Link>
               </Button>
             )}
@@ -421,7 +421,7 @@ export const PublicProfilePage: React.FC = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-semibold tracking-tight">{displayName}</h1>
                   {profile.professional_type && (
-                    <Badge className="text-xs rounded-full bg-primary/10 text-primary border-primary/20 font-normal">
+                    <Badge className="text-xs bg-primary/10 text-primary border-primary/20 font-normal">
                       {PROFESSIONAL_TYPE_LABELS[profile.professional_type] ?? profile.professional_type}
                     </Badge>
                   )}
@@ -448,7 +448,7 @@ export const PublicProfilePage: React.FC = () => {
                 currentUserId={user?.id}
                 onToggle={(nowFollowing) => setFollowerCount((c) => c + (nowFollowing ? 1 : -1))}
               />
-              <Button className="rounded-full gap-2 px-5" onClick={() => openHireModal()}>
+              <Button className="gap-2 px-5" onClick={() => openHireModal()}>
                 <Mail className="h-4 w-4" />
                 Hire me
               </Button>
@@ -596,7 +596,7 @@ export const PublicProfilePage: React.FC = () => {
                   {isOwnProfile ? (
                     <>
                       <p className="text-sm">Your profile is empty.</p>
-                      <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                      <Button asChild variant="outline" size="sm" className="mt-3">
                         <Link to="/profile"><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
                       </Button>
                     </>
@@ -616,7 +616,7 @@ export const PublicProfilePage: React.FC = () => {
                     <>
                       <p className="font-medium text-foreground mb-1">No public moodboards yet</p>
                       <p className="text-sm text-muted-foreground mb-4">Make a moodboard public to show it here.</p>
-                      <Button asChild variant="outline" size="sm" className="rounded-full">
+                      <Button asChild variant="outline" size="sm">
                         <Link to="/moodboard">Open Moodboards</Link>
                       </Button>
                     </>
@@ -690,7 +690,7 @@ export const PublicProfilePage: React.FC = () => {
                   <Tag className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">{isOwnProfile ? 'Add skills from your profile settings.' : 'No skills listed yet.'}</p>
                   {isOwnProfile && (
-                    <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                    <Button asChild variant="outline" size="sm" className="mt-3">
                       <Link to="/profile"><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
                     </Button>
                   )}
@@ -724,7 +724,7 @@ export const PublicProfilePage: React.FC = () => {
                   <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">{isOwnProfile ? 'Add services from your profile settings.' : 'No services listed yet.'}</p>
                   {isOwnProfile && (
-                    <Button asChild variant="outline" size="sm" className="rounded-full mt-3">
+                    <Button asChild variant="outline" size="sm" className="mt-3">
                       <Link to="/profile"><Pencil className="h-3.5 w-3.5 mr-1" />Edit Profile</Link>
                     </Button>
                   )}

@@ -100,7 +100,7 @@ export const ImportListingsDialog: React.FC<{
             <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
             <input ref={fileRef} type="file" accept=".csv,.xml,text/csv,text/xml,application/xml" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }} />
-            <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()}>
+            <Button variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload className="mr-1 h-4 w-4" /> Choose a CSV or Kyero XML file
             </Button>
             {fileName && (
@@ -146,11 +146,11 @@ export const ImportListingsDialog: React.FC<{
         </div>
 
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button variant="outline" className="rounded-full" disabled={busy || (!rows?.length && !xml)} onClick={() => run(true)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          <Button variant="outline" disabled={busy || (!rows?.length && !xml)} onClick={() => run(true)}>
             {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Preview
           </Button>
-          <Button className="rounded-full" disabled={busy || !preview || preview.summary.created + preview.summary.updated === 0} onClick={() => run(false)}>
+          <Button disabled={busy || !preview || preview.summary.created + preview.summary.updated === 0} onClick={() => run(false)}>
             Import {preview ? preview.summary.created + preview.summary.updated : ''}
           </Button>
         </DialogFooter>

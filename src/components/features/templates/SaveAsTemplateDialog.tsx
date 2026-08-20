@@ -146,8 +146,8 @@ export const SaveAsTemplateDialog: React.FC<{
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button className="rounded-full" disabled={busy || (targetId === NEW && !title.trim())} onClick={save}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={busy || (targetId === NEW && !title.trim())} onClick={save}>
             {busy && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {targetId === NEW ? 'Save template' : 'Update template'}
           </Button>

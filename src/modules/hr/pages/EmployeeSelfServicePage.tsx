@@ -98,7 +98,7 @@ export default function EmployeeSelfServicePage() {
                 </div>
                 <Button
                   size="lg"
-                  className="rounded-full h-16 w-56 text-base"
+                  className="h-16 w-56 text-base"
                   variant={currentlyIn ? 'destructive' : 'default'}
                   disabled={busy === 'clock'}
                   onClick={() => clock(currentlyIn ? 'departure' : 'arrival')}
@@ -241,7 +241,7 @@ function RequestTimeOffDialog({ workspaceId, onDone }: { workspaceId: string; on
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Request time off</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Request time off</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Request Time Off</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -259,8 +259,8 @@ function RequestTimeOffDialog({ workspaceId, onDone }: { workspaceId: string; on
           <div className="space-y-1"><Label>Note</Label><Textarea rows={2} value={f.note} onChange={(e) => upd('note', e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Submit</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Submit</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

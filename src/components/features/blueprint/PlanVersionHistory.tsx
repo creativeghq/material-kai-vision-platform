@@ -65,7 +65,7 @@ export function PlanVersionHistory({ open, onOpenChange, planId, onRestored }: P
                     {formatDate(v.created_at, { withTime: true })}{v.note ? ` · ${v.note}` : ''}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-full" disabled={restoring !== null} onClick={() => restore(v.version)}>
+                <Button variant="outline" size="sm" disabled={restoring !== null} onClick={() => restore(v.version)}>
                   {restoring === v.version ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore</>}
                 </Button>
               </div>

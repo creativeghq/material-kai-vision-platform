@@ -456,7 +456,7 @@ const ScheduleEditDialog: React.FC<{
                 <option value="">Add a predecessor…</option>
                 {candidates.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
               </select>
-              <Button size="sm" variant="outline" className="rounded-full" onClick={addDep} disabled={!predecessor}>
+              <Button size="sm" variant="outline" onClick={addDep} disabled={!predecessor}>
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -464,7 +464,7 @@ const ScheduleEditDialog: React.FC<{
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
             </Button>
           </div>

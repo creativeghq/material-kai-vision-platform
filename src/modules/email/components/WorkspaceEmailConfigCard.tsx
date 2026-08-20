@@ -184,7 +184,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
           </p>
         )}
         <div>
-          <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
+          <Button size="sm" onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save
           </Button>
         </div>
@@ -194,7 +194,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
           <Label className="text-xs">Send a test email</Label>
           <div className="flex items-center gap-2">
             <Input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@example.com" type="email" className="flex-1" />
-            <Button size="sm" variant="outline" onClick={sendTest} disabled={testing} className="rounded-full shrink-0">
+            <Button size="sm" variant="outline" onClick={sendTest} disabled={testing} className="shrink-0">
               {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} Send test
             </Button>
           </div>

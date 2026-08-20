@@ -250,7 +250,7 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
             <a href="https://portal.timologisi.online" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
               Open Novus portal <ExternalLink className="h-3 w-3" />
             </a>
-            <Button size="sm" onClick={saveAuth} disabled={saving} className="rounded-full">
+            <Button size="sm" onClick={saveAuth} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save status
             </Button>
           </div>

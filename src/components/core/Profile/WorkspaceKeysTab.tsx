@@ -57,7 +57,7 @@ const ConnectionRow: React.FC<{
       <p className="text-xs text-muted-foreground">{description}</p>
     </div>
     <div className="shrink-0">{status}</div>
-    <Button asChild size="sm" variant="outline" className="rounded-full shrink-0">
+    <Button asChild size="sm" variant="outline" className="shrink-0">
       <Link to={to}>{manageLabel}<ArrowRight className="h-3.5 w-3.5 ml-1" /></Link>
     </Button>
   </div>

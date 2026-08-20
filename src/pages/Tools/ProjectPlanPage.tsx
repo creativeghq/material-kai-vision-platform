@@ -159,7 +159,7 @@ export default function ProjectPlanPage() {
                     if (locked) { toast({ title: `${s.title} unlocks after sign-up`, description: 'Create a free account to use this template — the Full Home Renovation estimate is free to try right now.' }); return; }
                     setSelectedId(s.id);
                   }}
-                  className={`rounded-full border px-3.5 py-1.5 text-sm transition inline-flex items-center gap-1.5 ${active ? 'border-primary bg-primary/10 text-foreground' : locked ? 'border-dashed border-border text-muted-foreground/70 hover:bg-muted/30' : 'border-border text-muted-foreground hover:bg-muted/40'}`}>
+                  className={`border px-3.5 py-1.5 text-sm transition inline-flex items-center gap-1.5 ${active ? 'border-primary bg-primary/10 text-foreground' : locked ? 'border-dashed border-border text-muted-foreground/70 hover:bg-muted/30' : 'border-border text-muted-foreground hover:bg-muted/40'}`}>
                   {locked && <Lock className="h-3 w-3" />}{s.title}
                 </button>
               );
@@ -187,7 +187,7 @@ export default function ProjectPlanPage() {
                 <div className="font-medium">Make this yours</div>
                 <div className="text-muted-foreground">Save your edited plan and we'll import it after you sign up — keep refining with your own rates and turn it into a client quote.</div>
               </div>
-              <Button className="rounded-full whitespace-nowrap" onClick={saveAndSignUp}>Save &amp; create free account</Button>
+              <Button className="whitespace-nowrap" onClick={saveAndSignUp}>Save &amp; create free account</Button>
             </CardContent>
           </Card>
 

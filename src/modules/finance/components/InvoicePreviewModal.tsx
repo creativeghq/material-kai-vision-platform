@@ -169,11 +169,11 @@ export function InvoicePreviewModal({
         <div className="flex items-center justify-between gap-3 px-4 h-14 shrink-0 border-b border-border/40 bg-background">
           <span className="text-sm font-medium">Invoice preview</span>
           <div className="flex items-center gap-2">
-            <Button size="sm" className="rounded-full gap-2" onClick={handleDownload} disabled={downloading || !resolved}>
+            <Button size="sm" className="gap-2" onClick={handleDownload} disabled={downloading || !resolved}>
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Download PDF
             </Button>
-            <Button size="sm" variant="ghost" className="rounded-full gap-1.5" onClick={() => onOpenChange(false)}>
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onOpenChange(false)}>
               <X className="h-4 w-4" /> Close
             </Button>
           </div>

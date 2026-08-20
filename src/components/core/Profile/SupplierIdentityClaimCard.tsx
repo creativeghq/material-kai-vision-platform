@@ -90,7 +90,7 @@ export const SupplierIdentityClaimCard: React.FC = () => {
             {/* Without this the publish surface has no entry point for a manufacturer —
                 they are not an admin, so the operator dashboard is not theirs to browse. */}
             {status.is_confirmed_contact && (
-              <Button size="sm" variant="outline" className="rounded-full h-8" asChild>
+              <Button size="sm" variant="outline" className="h-8" asChild>
                 <Link to="/catalog-master">
                   <Boxes className="h-3.5 w-3.5 mr-1" /> Manage your catalog
                 </Link>
@@ -122,7 +122,7 @@ export const SupplierIdentityClaimCard: React.FC = () => {
                   Claim <span className="font-medium">{status.own_vat}</span>
                   <span className="text-muted-foreground"> · {status.own_country}</span>
                 </span>
-                <Button size="sm" className="rounded-full h-8" onClick={submit} disabled={busy}>
+                <Button size="sm" className="h-8" onClick={submit} disabled={busy}>
                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Send className="h-3.5 w-3.5 mr-1" /> Request confirmation</>}
                 </Button>
               </div>

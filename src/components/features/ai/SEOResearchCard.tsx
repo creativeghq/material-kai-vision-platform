@@ -128,7 +128,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-3 py-1 rounded-full transition ${
+              className={`px-3 py-1 transition ${
                 tab === t
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-foreground'

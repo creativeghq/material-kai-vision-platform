@@ -192,7 +192,7 @@ function ToolCard({ tool }: { tool: ToolEntry }) {
             <div className="rounded-xl bg-primary/10 p-2.5">
               <Icon className="h-5 w-5 text-primary" />
             </div>
-            <Badge variant="outline" className="rounded-full text-[10px]">
+            <Badge variant="outline" className="text-[10px]">
               {tool.badge}
             </Badge>
           </div>

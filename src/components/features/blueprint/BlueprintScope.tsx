@@ -124,7 +124,7 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
         <div className="flex items-center justify-between">
           <div className="text-sm font-medium">Measurements</div>
           {!readOnly && (
-            <Button variant="outline" size="sm" className="rounded-full" onClick={onAddDim}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
+            <Button variant="outline" size="sm" onClick={onAddDim}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
           )}
         </div>
         <p className="text-xs text-muted-foreground">These drive the parametric formulas (use the <code>key</code> in a task formula, e.g. <code>= floor_area * 1.1</code>).</p>
@@ -178,7 +178,7 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
           </div>
         )}
         {!readOnly && (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={onAddSection}><Plus className="h-3.5 w-3.5 mr-1" /> Add section</Button>
+          <Button variant="outline" size="sm" onClick={onAddSection}><Plus className="h-3.5 w-3.5 mr-1" /> Add section</Button>
         )}
       </div>
     </fieldset>

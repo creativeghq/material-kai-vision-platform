@@ -657,7 +657,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         type="button"
                         size="sm"
                         variant={selected ? 'default' : 'outline'}
-                        className="rounded-full"
                         onClick={() => {
                           const cur = document.allowed_agents ?? [];
                           const next = selected ? cur.filter((x) => x !== a.id) : [...cur, a.id];

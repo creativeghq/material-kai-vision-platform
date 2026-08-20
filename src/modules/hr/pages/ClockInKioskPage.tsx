@@ -110,7 +110,7 @@ export default function ClockInKioskPage() {
               </div>
             )}
             {error && <p className="text-sm text-destructive text-center">{error}</p>}
-            <Button onClick={() => lookup()} disabled={busy} className="w-full h-14 rounded-full text-base">
+            <Button onClick={() => lookup()} disabled={busy} className="w-full h-14 text-base">
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Continue'}
             </Button>
             <QrScanButton onVat={onScannedVat} />
@@ -126,7 +126,7 @@ export default function ClockInKioskPage() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button onClick={() => doClock(emp.clocked_in ? 'departure' : 'arrival')} disabled={busy}
-              variant={emp.clocked_in ? 'destructive' : 'default'} className="w-full h-16 rounded-full text-lg">
+              variant={emp.clocked_in ? 'destructive' : 'default'} className="w-full h-16 text-lg">
               {busy ? <Loader2 className="h-6 w-6 animate-spin" /> : emp.clocked_in ? <><LogOut className="h-6 w-6 mr-2" />Clock out</> : <><LogIn className="h-6 w-6 mr-2" />Clock in</>}
             </Button>
             <button onClick={reset} className="text-xs text-muted-foreground underline">Not you? Start over</button>
@@ -139,7 +139,7 @@ export default function ClockInKioskPage() {
             <h1 className="text-xl font-semibold">{result.clocked_in ? 'Clocked in' : 'Clocked out'}</h1>
             <p className="text-sm text-muted-foreground">{result.name}</p>
             {result.is_late && <p className="text-sm text-amber-500">Marked late</p>}
-            <Button onClick={reset} variant="outline" className="rounded-full mt-2">Done</Button>
+            <Button onClick={reset} variant="outline" className="mt-2">Done</Button>
           </div>
         )}
       </div>

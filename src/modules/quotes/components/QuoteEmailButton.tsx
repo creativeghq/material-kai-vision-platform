@@ -71,7 +71,7 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
 
   return (
     <>
-      <Button variant="outline" size="sm" className="rounded-full gap-2" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
         <Mail className="h-4 w-4" />
         Email quote
       </Button>
@@ -108,10 +108,10 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)} disabled={sending} className="rounded-full">
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={sending}>
               Cancel
             </Button>
-            <Button onClick={send} disabled={sending} className="rounded-full gap-2">
+            <Button onClick={send} disabled={sending} className="gap-2">
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Send
             </Button>

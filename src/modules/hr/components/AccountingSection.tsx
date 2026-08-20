@@ -79,7 +79,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
             {canManage && (
               <>
                 <input ref={fileRef} type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
-                <Button size="sm" className="rounded-full" disabled={busy === 'upload'} onClick={() => fileRef.current?.click()}>{busy === 'upload' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}Upload</Button>
+                <Button size="sm" disabled={busy === 'upload'} onClick={() => fileRef.current?.click()}>{busy === 'upload' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}Upload</Button>
               </>
             )}
           </div>
@@ -111,7 +111,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
                     </div>
                     <span className={`text-xs capitalize ${statusTone(d.status)}`}>{d.status}</span>
                     {canManage && d.status !== 'analyzed' && (
-                      <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busy === d.id} onClick={() => analyze(d)} title="AI OCR — credits charged by actual usage">
+                      <Button size="sm" variant="outline" className="h-8" disabled={busy === d.id} onClick={() => analyze(d)} title="AI OCR — credits charged by actual usage">
                         {busy === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ScanLine className="h-4 w-4 mr-1" />Analyze</>}
                       </Button>
                     )}
@@ -138,7 +138,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
       {canManage && analyzedCount > 0 && (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground">Reconcile the analyzed documents against the {period} payroll run — the AI matches each obligation to its payment and stamps the Payment IDs onto Finance.</p>
-          <Button size="sm" variant="outline" className="rounded-full" disabled={busy === 'prepare'} onClick={prepare} title="AI reconciliation — credits charged by actual usage">
+          <Button size="sm" variant="outline" disabled={busy === 'prepare'} onClick={prepare} title="AI reconciliation — credits charged by actual usage">
             {busy === 'prepare' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}Prepare &amp; reconcile
           </Button>
         </div>

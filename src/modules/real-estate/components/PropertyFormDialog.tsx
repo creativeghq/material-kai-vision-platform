@@ -309,8 +309,8 @@ export const PropertyFormDialog: React.FC<{
         )}
 
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={saving || loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving || loading}>
             {saving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
             {propertyId ? 'Save changes' : 'Add property'}
           </Button>

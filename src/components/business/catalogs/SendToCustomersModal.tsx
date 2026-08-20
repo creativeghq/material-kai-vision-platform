@@ -177,7 +177,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
                                   key={c.id}
                                   onClick={() => !empty && toggleCategory(c.id)}
                                   disabled={empty}
-                                  className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition border ${
+                                  className={`px-3 py-1.5 text-xs flex items-center gap-1.5 transition border ${
                                     active ? 'bg-primary text-primary-foreground border-primary' :
                                     empty ? 'opacity-40 cursor-not-allowed border-border' :
                                     'border-border hover:border-primary/50'

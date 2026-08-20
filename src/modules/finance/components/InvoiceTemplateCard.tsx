@@ -122,7 +122,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <Label className="text-xs">Colors</Label>
-            <Button size="sm" variant="ghost" className="rounded-full gap-1.5 h-7 text-xs" onClick={resetColors}>
+            <Button size="sm" variant="ghost" className="gap-1.5 h-7 text-xs" onClick={resetColors}>
               <RotateCcw className="h-3 w-3" /> Reset to defaults
             </Button>
           </div>
@@ -174,7 +174,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         </div>
 
         <div className="flex justify-end">
-          <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+          <Button size="sm" onClick={save} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
             Save template
           </Button>

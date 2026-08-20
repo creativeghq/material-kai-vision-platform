@@ -46,9 +46,8 @@ export const ConnectEmailModal: React.FC<{
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" className="rounded-full" onClick={onClose}>Not now</Button>
+          <Button variant="ghost" onClick={onClose}>Not now</Button>
           <Button
-            className="rounded-full"
             onClick={() => { onClose(); navigate(CONNECT_EMAIL_PATH); }}
           >
             Connect email <ArrowRight className="h-4 w-4 ml-1.5" />

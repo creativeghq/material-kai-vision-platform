@@ -261,17 +261,17 @@ export const TemplateLibraryPage: React.FC = () => {
           )}
 
           <div className="mt-auto pt-2 flex items-center gap-2">
-            <Button size="sm" className="rounded-full" disabled={busyId === tpl.id} onClick={() => use(tpl)}>
+            <Button size="sm" disabled={busyId === tpl.id} onClick={() => use(tpl)}>
               {busyId === tpl.id ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1" />}
               Use
             </Button>
             {tpl.is_platform_starter ? (
-              <Button variant="outline" size="sm" className="rounded-full" disabled={busyId === tpl.id} onClick={() => copyToWorkspace(tpl)}>
+              <Button variant="outline" size="sm" disabled={busyId === tpl.id} onClick={() => copyToWorkspace(tpl)}>
                 <Copy className="h-3.5 w-3.5 mr-1" /> Copy to edit
               </Button>
             ) : (
               <>
-                <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/templates/${tpl.id}`)}>
+                <Button variant="outline" size="sm" onClick={() => navigate(`/templates/${tpl.id}`)}>
                   <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                 </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" onClick={() => remove(tpl)}>
@@ -405,7 +405,7 @@ export const TemplateLibraryPage: React.FC = () => {
               then the type rail. Both used to be buried: "Add New" did not exist at all, and "your
               templates" was a heading halfway down whichever panel you happened to be on. */}
           <div className="w-full shrink-0 space-y-2 lg:w-56">
-            <Button size="sm" className="w-full gap-1.5 rounded-full" onClick={openCreate}>
+            <Button size="sm" className="w-full gap-1.5" onClick={openCreate}>
               <Plus className="h-4 w-4" /> Add New
             </Button>
 
@@ -493,8 +493,8 @@ export const TemplateLibraryPage: React.FC = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setCreating(false)}>Cancel</Button>
-            <Button className="rounded-full gap-1.5" disabled={createBusy || !newType || !newTitle.trim()} onClick={create}>
+            <Button variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
+            <Button className="gap-1.5" disabled={createBusy || !newType || !newTitle.trim()} onClick={create}>
               {createBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create
             </Button>
           </DialogFooter>

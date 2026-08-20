@@ -73,7 +73,7 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
               <SelectContent><SelectItem value="arrival">Clock in</SelectItem><SelectItem value="departure">Clock out</SelectItem></SelectContent>
             </Select>
             <Input type="datetime-local" value={add.at} onChange={(e) => setAdd((a) => ({ ...a, at: e.target.value }))} className="flex-1" />
-            <Button size="sm" className="rounded-full" onClick={addManual} disabled={busy === 'add'}>{busy === 'add' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}</Button>
+            <Button size="sm" onClick={addManual} disabled={busy === 'add'}>{busy === 'add' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}</Button>
           </div>
         </div>
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> : punches.length === 0 ? (
@@ -132,14 +132,14 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-full"><CalendarRange className="h-4 w-4 mr-2" />Timesheet</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm" variant="outline"><CalendarRange className="h-4 w-4 mr-2" />Timesheet</Button></DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Timesheet</DialogTitle></DialogHeader>
         <div className="flex items-end gap-2">
           <div className="space-y-1"><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
           <div className="space-y-1"><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-          <Button size="sm" className="rounded-full" onClick={run} disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run'}</Button>
-          <Button size="sm" variant="outline" className="rounded-full ml-auto" onClick={exportCsv} disabled={!rows.length}><Download className="h-4 w-4 mr-1" />CSV</Button>
+          <Button size="sm" onClick={run} disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Run'}</Button>
+          <Button size="sm" variant="outline" className="ml-auto" onClick={exportCsv} disabled={!rows.length}><Download className="h-4 w-4 mr-1" />CSV</Button>
         </div>
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> : rows.length === 0 ? (
           <EmptyState icon={CalendarRange} title="No data for this range" />

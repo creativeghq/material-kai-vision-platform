@@ -119,7 +119,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
                     <td className="px-4 py-2 text-muted-foreground truncate max-w-[16rem]">{c.note ?? '—'}</td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{c.adjusted_lines ?? '—'}</td>
                     <td className="px-4 py-2 text-right">
-                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpenCountId(c.id)}>
+                      <Button size="sm" variant="ghost" onClick={() => setOpenCountId(c.id)}>
                         {c.status === 'draft' ? 'Open' : 'View'}
                       </Button>
                     </td>

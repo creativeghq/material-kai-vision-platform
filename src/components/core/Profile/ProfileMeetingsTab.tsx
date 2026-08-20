@@ -67,7 +67,7 @@ export const ProfileMeetingsTab: React.FC = () => {
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {m.party_name && m.target_id && (
             <button type="button" onClick={() => openParty(m)}
-              className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-accent">
+              className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-accent">
               {m.target_kind === 'company' ? <Building2 className="h-3 w-3" /> : <User className="h-3 w-3" />}
               {m.party_name}
             </button>

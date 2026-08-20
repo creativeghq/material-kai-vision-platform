@@ -130,7 +130,7 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
                   <SelectItem value="project" className="text-xs">About a project</SelectItem>
                 </SelectContent>
               </Select>
-              <Button size="sm" className="w-full rounded-full" onClick={createType} disabled={busy}>
+              <Button size="sm" className="w-full" onClick={createType} disabled={busy}>
                 <Plus className="mr-1 h-3.5 w-3.5" /> Add type
               </Button>
             </div>
@@ -210,7 +210,7 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
                       onKeyDown={(e) => { if (e.key === 'Enter' && newStage.trim()) { void guard(async () => { await dealTypesAdmin.addStage(selected.id, newStage, (stages.at(-1)?.sort ?? 0) + 10); setNewStage(''); }); } }}
                       placeholder="Add stage…" aria-label="New stage name" className="h-8 text-sm"
                     />
-                    <Button size="sm" className="h-8 rounded-full px-3" disabled={busy || !newStage.trim()}
+                    <Button size="sm" className="h-8 px-3" disabled={busy || !newStage.trim()}
                       onClick={() => guard(async () => { await dealTypesAdmin.addStage(selected.id, newStage, (stages.at(-1)?.sort ?? 0) + 10); setNewStage(''); })}>
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
@@ -221,7 +221,7 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
           </div>
         </div>
 
-        <DialogFooter><Button variant="ghost" className="rounded-full" onClick={onClose}>Done</Button></DialogFooter>
+        <DialogFooter><Button variant="ghost" onClick={onClose}>Done</Button></DialogFooter>
       </DialogContent>
 
       {emailFor && selected && (
@@ -307,9 +307,9 @@ const StageEmailDialog: React.FC<{
           </div>
         </div>
         <DialogFooter className="gap-2">
-          {rule && <Button variant="ghost" className="mr-auto rounded-full text-red-500" onClick={remove} disabled={busy}>Remove</Button>}
-          <Button variant="ghost" className="rounded-full" onClick={onClose}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={busy}>{rule ? 'Save' : 'Turn on'}</Button>
+          {rule && <Button variant="ghost" className="mr-auto text-red-500" onClick={remove} disabled={busy}>Remove</Button>}
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={busy}>{rule ? 'Save' : 'Turn on'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

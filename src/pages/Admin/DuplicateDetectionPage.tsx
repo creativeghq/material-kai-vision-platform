@@ -345,7 +345,7 @@ export function DuplicateDetectionPage() {
         <Button
           onClick={triggerBatchScan}
           disabled={scanning || !workspaceId}
-          className="rounded-full gap-2"
+          className="gap-2"
         >
           <RefreshCw className={`h-4 w-4 ${scanning ? 'animate-spin' : ''}`} />
           {scanning ? 'Scanning…' : 'Run Scan'}
@@ -550,11 +550,11 @@ export function DuplicateDetectionPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setMergeTarget(null)}>
+            <Button variant="outline" onClick={() => setMergeTarget(null)}>
               Cancel
             </Button>
             <Button
-              className="rounded-full gap-2"
+              className="gap-2"
               onClick={handleMerge}
               disabled={merging}
             >

@@ -157,7 +157,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
                       {ext.owned_property_value != null ? `~${money2(Number(ext.owned_property_value), 'EUR')}` : '—'}
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <Button size="sm" variant="ghost" className="rounded-full text-xs"
+                      <Button size="sm" variant="ghost" className="text-xs"
                         onClick={() => openNew({
                           address: ext.owned_property_address ?? '',
                           price: ext.owned_property_value != null ? Number(ext.owned_property_value) : null,
@@ -185,14 +185,14 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
 
       <Card><CardContent className="p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / Seller profile</span>
-          {score && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}
-          <Button size="sm" variant="ghost" className="ml-auto rounded-full" disabled={scoring} onClick={async () => {
+          {score && <Badge className="border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}
+          <Button size="sm" variant="ghost" className="ml-auto" disabled={scoring} onClick={async () => {
             if (!ws) return; setScoring(true);
             try { const s = await scoreLead(ws, contactId); setScore(s); toast({ title: `Lead scored ${s.lead_score}/100`, description: `${s.rationale ?? ''} · ${s.credits} credit(s)` }); }
             catch (e) { toast({ title: 'Scoring failed', description: (e as Error).message, variant: 'destructive' }); }
             finally { setScoring(false); }
           }}><Sparkles className="mr-1 h-3.5 w-3.5" /> {scoring ? 'Scoring…' : 'AI score'}</Button>
-          <Button size="sm" variant="outline" className="rounded-full" onClick={saveExt} disabled={savingExt}><Save className="mr-1 h-3.5 w-3.5" /> Save</Button>
+          <Button size="sm" variant="outline" onClick={saveExt} disabled={savingExt}><Save className="mr-1 h-3.5 w-3.5" /> Save</Button>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Fld label="Role"><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={ext.contact_role ?? ''} onChange={(e) => setE('contact_role', e.target.value)}>
@@ -212,7 +212,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
 
       <Card><CardContent className="p-4">
         <div className="mb-3 flex items-center gap-2"><Search className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Saved searches</span>
-          <Button size="sm" variant="outline" className="ml-auto rounded-full" onClick={() => setAdding((v) => !v)}><Plus className="mr-1 h-3.5 w-3.5" /> Add</Button>
+          <Button size="sm" variant="outline" className="ml-auto" onClick={() => setAdding((v) => !v)}><Plus className="mr-1 h-3.5 w-3.5" /> Add</Button>
         </div>
         {adding && <NewSearchForm ws={ws} contactId={contactId} onSaved={async () => { setAdding(false); await load(); }} />}
         {reqs.length === 0 && !adding ? <p className="text-sm text-muted-foreground">No saved searches yet.</p> : (
@@ -261,7 +261,7 @@ const NewSearchForm: React.FC<{ ws: string | null; contactId: string; onSaved: (
         <Input type="number" placeholder="Min beds" value={f.beds ?? ''} onChange={(e) => set('beds', e.target.value)} />
         <Input type="number" placeholder="Min baths" value={f.baths ?? ''} onChange={(e) => set('baths', e.target.value)} />
         <Input placeholder="Features (comma)" className="sm:col-span-3" value={f.features ?? ''} onChange={(e) => set('features', e.target.value)} />
-        <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>Add search</Button>
+        <Button size="sm" onClick={save} disabled={saving}>Add search</Button>
       </div>
     </div>
   );
@@ -284,7 +284,7 @@ const SearchRow: React.FC<{ ws: string | null; req: BuyerRequirement; onDelete: 
     <div className="rounded-lg border p-3">
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{req.label || 'Saved search'}</div><div className="truncate text-xs text-muted-foreground">{summary || 'no criteria'}</div></div>
-        <Button size="sm" variant="outline" className="rounded-full" onClick={runMatch} disabled={loading}><Search className="mr-1 h-3.5 w-3.5" /> {loading ? '…' : 'Match'}</Button>
+        <Button size="sm" variant="outline" onClick={runMatch} disabled={loading}><Search className="mr-1 h-3.5 w-3.5" /> {loading ? '…' : 'Match'}</Button>
         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onDelete}><Trash2 className="h-3.5 w-3.5" /></Button>
       </div>
       {matches && (
@@ -293,7 +293,7 @@ const SearchRow: React.FC<{ ws: string | null; req: BuyerRequirement; onDelete: 
             <div className="space-y-1">{matches.slice(0, 8).map((m) => (
               <Link key={m.id} to={`/properties/${m.id}`} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/50">
                 <span className="min-w-0 flex-1 truncate">{m.title || 'Listing'} <span className="text-muted-foreground">{[m.town, m.region].filter(Boolean).join(', ')}</span></span>
-                <Badge className="rounded-full border-0 bg-muted text-[10px]">{m.price != null ? `${m.currency} ${formatNumber(m.price)}` : '—'}</Badge>
+                <Badge className="border-0 bg-muted text-[10px]">{m.price != null ? `${m.currency} ${formatNumber(m.price)}` : '—'}</Badge>
               </Link>
             ))}<div className="px-1.5 text-[11px] text-muted-foreground">{matches.length} match(es)</div></div>
           )}

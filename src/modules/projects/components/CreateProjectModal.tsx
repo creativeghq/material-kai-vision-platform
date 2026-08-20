@@ -183,7 +183,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           {/* Start from a saved project shape (#322) — rooms + the whole task tree come with it. */}
           <Button
             variant="outline"
-            className="w-full rounded-full"
+            className="w-full"
             disabled={processing}
             onClick={() => setTemplatePickerOpen(true)}
           >

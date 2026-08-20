@@ -102,7 +102,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               key={c.key}
               type="button"
               onClick={() => onChange({ ...values, [c.key]: undefined })}
-              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-foreground"
+              className="inline-flex items-center gap-1 border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-foreground"
               title="Remove filter"
             >
               {c.label}

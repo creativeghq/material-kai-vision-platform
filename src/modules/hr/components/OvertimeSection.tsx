@@ -79,7 +79,7 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
           <div className="flex gap-2">
             {erganiOn && selectedIds.length > 0 && (
               <ErganiFilingDialog
-                trigger={<Button size="sm" variant="outline" className="rounded-full"><Send className="h-4 w-4 mr-2" />File {selectedIds.length} to Ergani</Button>}
+                trigger={<Button size="sm" variant="outline"><Send className="h-4 w-4 mr-2" />File {selectedIds.length} to Ergani</Button>}
                 title="File Overtime"
                 description="One Ε8 carrying every selected entry, built from Ergani’s live template. Review the values, complete anything left blank, then file."
                 loadPreview={() => hrService.submitOvertime(workspaceId, { overtime_ids: selectedIds, preview: true })}
@@ -193,7 +193,7 @@ function OvertimeDialog({ workspaceId, employees, onDone }: { workspaceId: strin
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Log overtime</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Log overtime</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Log Overtime</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -219,8 +219,8 @@ function OvertimeDialog({ workspaceId, employees, onDone }: { workspaceId: strin
           <div className="space-y-1"><Label>Note</Label><Textarea rows={2} value={f.note} onChange={(e) => upd('note', e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Record overtime</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Record overtime</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

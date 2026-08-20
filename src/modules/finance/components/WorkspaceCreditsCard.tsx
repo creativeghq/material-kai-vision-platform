@@ -114,7 +114,7 @@ export const WorkspaceCreditsCard: React.FC<{ workspaceId: string }> = ({ worksp
                     key={p}
                     type="button"
                     onClick={() => setAmount(p)}
-                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                    className={`border px-3 py-1 text-sm transition-colors ${
                       amount === p ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'
                     }`}
                   >€{p}</button>
@@ -132,7 +132,7 @@ export const WorkspaceCreditsCard: React.FC<{ workspaceId: string }> = ({ worksp
                   You get <span className="font-semibold text-foreground">{formatNumber(quote.credits)}</span> credits
                   {quote.discount > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{quote.discount}% off</Badge>}
                 </span>
-                <Button size="sm" className="rounded-full" onClick={fund} disabled={funding}>
+                <Button size="sm" onClick={fund} disabled={funding}>
                   {funding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
                   Fund pool
                 </Button>

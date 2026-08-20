@@ -115,10 +115,10 @@ export default function PublicListingPage() {
 
             {safeHttpUrl(l.video_url) && (videoEmbedUrl(l.video_url)
               ? <div><h2 className="mb-2 font-semibold">Video</h2><iframe src={videoEmbedUrl(l.video_url)!} title="Property video" className="aspect-video w-full rounded-xl border" allow="fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" /></div>
-              : <Button asChild variant="outline" className="rounded-full"><a href={safeHttpUrl(l.video_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Watch video</a></Button>)}
+              : <Button asChild variant="outline"><a href={safeHttpUrl(l.video_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Watch video</a></Button>)}
 
             {safeHttpUrl(l.virtual_tour_url) && (
-              <Button asChild variant="outline" className="rounded-full">
+              <Button asChild variant="outline">
                 <a href={safeHttpUrl(l.virtual_tour_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Open virtual tour</a>
               </Button>
             )}
@@ -186,7 +186,7 @@ const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
         Optional — email me other properties that match what I’m looking for. You can unsubscribe at any time.
       </label>
       {err && <p className="text-xs text-destructive">{err}</p>}
-      <Button type="submit" className="w-full rounded-full" disabled={state === 'sending'}>{state === 'sending' ? 'Sending…' : 'Send enquiry'}</Button>
+      <Button type="submit" className="w-full" disabled={state === 'sending'}>{state === 'sending' ? 'Sending…' : 'Send enquiry'}</Button>
     </form>
   );
 };

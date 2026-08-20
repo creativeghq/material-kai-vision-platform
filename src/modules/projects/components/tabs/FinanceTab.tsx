@@ -92,7 +92,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
               <p className="text-sm font-medium">{money(total, currency)}</p>
               <p className="text-[11px] text-muted-foreground">{money(due, currency)} due</p>
             </div>
-            <Button size="sm" variant="outline" className="rounded-full" onClick={() => setPicker(kind)}>
+            <Button size="sm" variant="outline" onClick={() => setPicker(kind)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Attach
             </Button>
           </div>
@@ -243,7 +243,7 @@ const AttachDialog: React.FC<{
                   <p className="text-xs text-muted-foreground">{KIND_LABEL[c.kind] || c.kind} · {c.status}</p>
                 </div>
                 <span className="text-sm">{money(c.total, c.currency)}</span>
-                <Button size="sm" className="rounded-full" onClick={() => attach(c)} disabled={busy === c.id}>
+                <Button size="sm" onClick={() => attach(c)} disabled={busy === c.id}>
                   {busy === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Attach'}
                 </Button>
               </div>

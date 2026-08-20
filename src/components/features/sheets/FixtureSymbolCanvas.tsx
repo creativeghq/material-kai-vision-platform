@@ -358,7 +358,7 @@ export function FixtureSymbolCanvas({
             <button
               key={def.kind}
               onClick={() => setActiveRunKind(def.kind)}
-              className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 border flex items-center gap-1.5 ${
                 activeRunKind === def.kind ? 'border-primary text-foreground' : 'border-white/15 text-muted-foreground'
               }`}
             >
@@ -376,7 +376,7 @@ export function FixtureSymbolCanvas({
           <button
             key={def.type}
             onClick={() => setActiveType(def.type)}
-            className={`px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+            className={`px-2.5 py-1 border flex items-center gap-1 ${
               activeType === def.type
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'border-white/15 text-muted-foreground'

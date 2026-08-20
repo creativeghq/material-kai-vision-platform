@@ -321,7 +321,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                 disabled={rfqBusy}
                 size="sm"
                 variant="outline"
-                className="rounded-full gap-1.5"
+                className="gap-1.5"
                 title="Ask the supplier to price the call-for-price lines"
               >
                 {rfqBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -329,7 +329,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
               </Button>
             )}
             {showAddButton && onAddProducts && (
-              <Button onClick={onAddProducts} size="sm" className="rounded-full gap-1.5">
+              <Button onClick={onAddProducts} size="sm" className="gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
                 Add products
               </Button>
@@ -444,13 +444,13 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               )}
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(item.selected_size || selectedSize) && (
-                                  <Badge variant="secondary" className="text-[10px] rounded-full gap-1 font-normal px-1.5 py-0">
+                                  <Badge variant="secondary" className="text-[10px] gap-1 font-normal px-1.5 py-0">
                                     <Ruler className="h-2 w-2" />
                                     {item.selected_size || selectedSize}
                                   </Badge>
                                 )}
                                 {item.selected_color && (
-                                  <Badge variant="secondary" className="text-[10px] rounded-full font-normal px-1.5 py-0">
+                                  <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">
                                     {item.selected_color}
                                   </Badge>
                                 )}
@@ -561,7 +561,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                           {onUpdateQuantity ? (
                             <div className="flex items-center justify-center gap-1">
                               <Button
-                                variant="outline" size="icon" className="h-6 w-6 rounded-full"
+                                variant="outline" size="icon" className="h-6 w-6"
                                 disabled={isUpdating || item.quantity <= 1}
                                 onClick={e => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity - 1); }}
                               >
@@ -574,7 +574,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 disabled={isUpdating}
                               />
                               <Button
-                                variant="outline" size="icon" className="h-6 w-6 rounded-full"
+                                variant="outline" size="icon" className="h-6 w-6"
                                 disabled={isUpdating}
                                 onClick={e => { e.stopPropagation(); handleQuantityChange(item.id, item.quantity + 1); }}
                               >
@@ -583,7 +583,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                             </div>
                           ) : (
                             <div className="flex justify-center">
-                              <Badge variant="secondary" className="rounded-full text-xs font-normal px-3">{item.quantity}</Badge>
+                              <Badge variant="secondary" className="text-xs font-normal px-3">{item.quantity}</Badge>
                             </div>
                           )}
                         </td>
@@ -743,7 +743,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
             <Package className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground mb-4">{emptyMessage}</p>
             {showAddButton && onAddProducts && (
-              <Button onClick={onAddProducts} variant="outline" className="rounded-full gap-1.5">
+              <Button onClick={onAddProducts} variant="outline" className="gap-1.5">
                 <Plus className="h-4 w-4" />
                 {emptyButtonText}
               </Button>

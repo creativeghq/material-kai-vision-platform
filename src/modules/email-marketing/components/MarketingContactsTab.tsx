@@ -92,7 +92,7 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
           title="Resend Audience"
           subtitle="Contacts synced into your Resend account for campaigns."
           actions={
-            <Button onClick={sync} disabled={syncing} className="rounded-full">
+            <Button onClick={sync} disabled={syncing}>
               {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />} Sync now
             </Button>
           }

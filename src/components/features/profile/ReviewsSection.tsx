@@ -181,7 +181,7 @@ export const ReviewsSection: React.FC<{
           <Button
             variant={myReview ? 'outline' : 'default'}
             size="sm"
-            className="rounded-full gap-2"
+            className="gap-2"
             onClick={() => setModalOpen(true)}
           >
             <Star className="h-3.5 w-3.5" />
@@ -332,13 +332,13 @@ function ReviewCard({
           />
           {replyError && <p className="text-xs text-destructive">{replyError}</p>}
           <div className="flex gap-2">
-            <Button size="sm" className="rounded-full h-7 text-xs" onClick={saveReply} disabled={saving}>
+            <Button size="sm" className="h-7 text-xs" onClick={saveReply} disabled={saving}>
               {saving ? 'Saving…' : 'Save Reply'}
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="rounded-full h-7 text-xs"
+              className="h-7 text-xs"
               onClick={() => { setReplyOpen(false); setReplyText(review.reply ?? ''); }}
             >
               Cancel

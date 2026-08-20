@@ -319,10 +319,10 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
               and it prices itself; then turn it into a quote in one click.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button className="rounded-full" onClick={() => setPickerOpen(true)}>
+              <Button onClick={() => setPickerOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Import a blueprint
               </Button>
-              <Button variant="outline" className="rounded-full" disabled={busy} onClick={startBlankPlan}>
+              <Button variant="outline" disabled={busy} onClick={startBlankPlan}>
                 <ClipboardList className="h-4 w-4 mr-1" /> Start a blank plan
               </Button>
             </div>
@@ -352,30 +352,30 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
             </select>
           )}
         </div>
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => setPickerOpen(true)}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => setPickerOpen(true)}>
           <Plus className="h-3.5 w-3.5 mr-1" /> New
         </Button>
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={refreshPricing}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={refreshPricing}>
           <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh pricing
         </Button>
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={saveVersion}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={saveVersion}>
           <Save className="h-3.5 w-3.5 mr-1" /> Save version
         </Button>
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => setHistoryOpen(true)}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => setHistoryOpen(true)}>
           <History className="h-3.5 w-3.5 mr-1" /> History
         </Button>
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={() => { setSaveAsTitle(plan.title); setSaveAsOpen(true); }}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => { setSaveAsTitle(plan.title); setSaveAsOpen(true); }}>
           <Sparkles className="h-3.5 w-3.5 mr-1" /> Save as blueprint
         </Button>
-        <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={generateMaterialList}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={generateMaterialList}>
           <Package className="h-3.5 w-3.5 mr-1" /> Material list
         </Button>
         {plan.status === 'approved' ? (
-          <Button size="sm" className="rounded-full" disabled={busy} onClick={createChangeOrder}>
+          <Button size="sm" disabled={busy} onClick={createChangeOrder}>
             <FileText className="h-3.5 w-3.5 mr-1" /> Change order
           </Button>
         ) : (
-          <Button size="sm" className="rounded-full" disabled={busy} onClick={createQuote}>
+          <Button size="sm" disabled={busy} onClick={createQuote}>
             <FileText className="h-3.5 w-3.5 mr-1" /> Create quote
           </Button>
         )}
@@ -436,8 +436,8 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
             <Input value={saveAsTitle} onChange={(e) => setSaveAsTitle(e.target.value)} placeholder="e.g. Standard Bathroom Reno" />
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setSaveAsOpen(false)}>Cancel</Button>
-            <Button className="rounded-full" disabled={busy || !saveAsTitle.trim()} onClick={saveAsBlueprint}>Save</Button>
+            <Button variant="outline" onClick={() => setSaveAsOpen(false)}>Cancel</Button>
+            <Button disabled={busy || !saveAsTitle.trim()} onClick={saveAsBlueprint}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -753,8 +753,8 @@ export const ReceiveToWarehouseDialog: React.FC<{
         )}
 
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={busy || loading || includedCount === 0}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || loading || includedCount === 0}>
             {busy
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Receiving…</>
               : `Receive ${includedCount || ''} ${includedCount === 1 ? 'product' : 'products'}`.replace(/\s+/g, ' ').trim()}
@@ -1117,7 +1117,7 @@ const LineCard: React.FC<{
                 ))}
                 <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
                   onChange={(e) => { onImages(e.target.files); e.currentTarget.value = ''; }} />
-                <Button type="button" size="sm" variant="outline" className="rounded-full h-8"
+                <Button type="button" size="sm" variant="outline" className="h-8"
                   disabled={row.uploading} onClick={() => fileRef.current?.click()}>
                   {row.uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
                   <span className="ml-1 text-xs">Add photo</span>
@@ -1262,7 +1262,7 @@ const CatalogMatchPicker: React.FC<{
     <div className="space-y-1">
       <Label className="text-[11px] text-muted-foreground">Catalog product</Label>
       {!open ? (
-        <Button type="button" size="sm" variant="outline" className="rounded-full h-8 w-full justify-start"
+        <Button type="button" size="sm" variant="outline" className="h-8 w-full justify-start"
           onClick={() => setOpen(true)}>
           <Search className="h-3.5 w-3.5 mr-1" />
           <span className="text-xs">Match to an existing product…</span>

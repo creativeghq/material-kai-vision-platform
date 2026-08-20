@@ -281,7 +281,7 @@ export const MarketplaceTab: React.FC = () => {
         {/* Surplus alerts — saves the CURRENT filter set as a want list. */}
         <Popover open={alertsOpen} onOpenChange={setAlertsOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8 rounded-full shrink-0 relative" title="Surplus alerts" aria-label="Surplus alerts">
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 relative" title="Surplus alerts" aria-label="Surplus alerts">
               <Bell className="h-3.5 w-3.5" />
               {wantLists.length > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
             </Button>

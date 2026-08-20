@@ -144,7 +144,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
                         type="button"
                         onClick={() => toggle(c.id)}
                         disabled={saving}
-                        className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition border ${
+                        className={`px-3 py-1.5 text-xs flex items-center gap-1.5 transition border ${
                           active ? 'bg-primary text-primary-foreground border-primary'
                                  : 'border-border hover:border-primary/50'
                         }`}

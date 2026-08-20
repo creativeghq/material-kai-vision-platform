@@ -176,7 +176,7 @@ export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: 
               </div>
             </div>
             {canManage && vendor.vendor?.email && (
-              <Button size="sm" variant="outline" className="rounded-full" disabled={sending} onClick={sendReport}>
+              <Button size="sm" variant="outline" disabled={sending} onClick={sendReport}>
                 {sending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Mail className="mr-1 h-4 w-4" />} Send now
               </Button>
             )}

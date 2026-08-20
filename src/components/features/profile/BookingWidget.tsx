@@ -229,7 +229,7 @@ export const BookingWidget: React.FC<{
         </div>
 
         <Button
-          className="w-full rounded-full"
+          className="w-full"
           size="sm"
           disabled={!selectedDate || !selectedSlot}
           onClick={() => setBookingOpen(true)}

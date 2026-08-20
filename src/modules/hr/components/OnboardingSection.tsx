@@ -154,7 +154,7 @@ function AddTaskDialog({ workspaceId, employees, onDone }: { workspaceId: string
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Add task</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-2" />Add task</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Add Onboarding Task</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -169,8 +169,8 @@ function AddTaskDialog({ workspaceId, employees, onDone }: { workspaceId: string
           <div className="space-y-1"><Label>Due date</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add task</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add task</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

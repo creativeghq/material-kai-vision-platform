@@ -92,7 +92,7 @@ export const SEODashboardPanel: React.FC = () => {
           Fire a research call from <a href="/agent-hub" className="text-primary hover:underline">KAI chat</a> or
           persistent monitoring below.
         </p>
-        <Button onClick={loadStats} variant="outline" className="rounded-full">
+        <Button onClick={loadStats} variant="outline">
           <RefreshCw className="h-3 w-3 mr-1" /> Refresh stats
         </Button>
       </div>
@@ -222,12 +222,12 @@ const KeywordResearchTab: React.FC = () => {
         <div className="flex items-center gap-2">
           <Button
             size="sm" variant={filter === 'all' ? 'default' : 'outline'}
-            onClick={() => setFilter('all')} className="rounded-full text-xs">
+            onClick={() => setFilter('all')} className="text-xs">
             All
           </Button>
           <Button
             size="sm" variant={filter === 'starred' ? 'default' : 'outline'}
-            onClick={() => setFilter('starred')} className="rounded-full text-xs">
+            onClick={() => setFilter('starred')} className="text-xs">
             Starred
           </Button>
           <Input
@@ -355,7 +355,7 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tracked Domains</CardTitle>
-          <Button onClick={() => setShowAdd(true)} size="sm" className="rounded-full">
+          <Button onClick={() => setShowAdd(true)} size="sm">
             <Plus className="h-3 w-3 mr-1" /> Track domain
           </Button>
         </CardHeader>
@@ -396,11 +396,11 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
                         size="sm" variant="outline"
                         onClick={() => handleAuditNow(d)}
                         disabled={auditingId === d.id}
-                        className="rounded-full text-xs">
+                        className="text-xs">
                         <RefreshCw className={`h-3 w-3 mr-1 ${auditingId === d.id ? 'animate-spin' : ''}`} />
                         Audit
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openHistory(d)} className="rounded-full text-xs">
+                      <Button size="sm" variant="ghost" onClick={() => openHistory(d)} className="text-xs">
                         <TrendingUp className="h-3 w-3 mr-1" /> History
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => handleDelete(d)} className="h-8 w-8 p-0">
@@ -526,8 +526,8 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="rounded-full">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Track domain'}
           </Button>
         </DialogFooter>

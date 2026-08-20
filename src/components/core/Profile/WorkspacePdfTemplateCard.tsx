@@ -215,12 +215,12 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void onPick(slot, f); }}
                   />
                   <div className="flex gap-1">
-                    <Button size="sm" variant="outline" className="flex-1 rounded-full h-7 text-[11px] px-2" disabled={isBusy} onClick={() => inputs[slot].current?.click()}>
+                    <Button size="sm" variant="outline" className="flex-1 h-7 text-[11px] px-2" disabled={isBusy} onClick={() => inputs[slot].current?.click()}>
                       {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3 mr-1" />}
                       {url ? 'Replace' : 'Upload'}
                     </Button>
                     {url && (
-                      <Button size="sm" variant="ghost" className="rounded-full h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={isBusy} onClick={() => onClear(slot)}>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={isBusy} onClick={() => onClear(slot)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     )}

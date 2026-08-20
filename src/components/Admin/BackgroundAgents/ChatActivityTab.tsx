@@ -164,7 +164,7 @@ export function ChatActivityTab() {
               <button
                 key={name}
                 onClick={() => setFilterValues({ ...filterValues, tool: [name] })}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs hover:bg-muted/50"
+                className="inline-flex items-center gap-1.5 px-2 py-1 border text-xs hover:bg-muted/50"
               >
                 <Wrench className="h-3 w-3" />
                 <span className="font-mono">{name}</span>

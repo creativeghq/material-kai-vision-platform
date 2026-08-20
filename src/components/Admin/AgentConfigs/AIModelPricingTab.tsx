@@ -786,7 +786,6 @@ export const AIModelPricingTab: React.FC = () => {
                 size="sm"
                 onClick={() => syncPricesNow(false)}
                 disabled={syncing}
-                className="rounded-full"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                 Sync now
@@ -796,7 +795,6 @@ export const AIModelPricingTab: React.FC = () => {
                 size="sm"
                 onClick={() => syncPricesNow(true)}
                 disabled={syncing}
-                className="rounded-full"
               >
                 Sync All
               </Button>

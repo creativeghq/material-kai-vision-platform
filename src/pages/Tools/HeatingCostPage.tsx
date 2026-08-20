@@ -170,7 +170,7 @@ export default function HeatingCostPage() {
                             <div className="flex items-center gap-2">
                               <span className="font-medium truncate">{m.label}</span>
                               {m.rank === 1 && (
-                                <Badge variant="outline" className="rounded-full text-[10px] border-primary/40 text-primary h-5">
+                                <Badge variant="outline" className="text-[10px] border-primary/40 text-primary h-5">
                                   best
                                 </Badge>
                               )}

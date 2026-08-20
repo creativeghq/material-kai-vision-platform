@@ -194,7 +194,7 @@ export const ProjectDetailPage: React.FC = () => {
               </Button>
             )}
             {isOwner && (
-              <Button size="sm" onClick={() => setShowInvite(true)} className="rounded-full">
+              <Button size="sm" onClick={() => setShowInvite(true)}>
                 <UserPlus className="h-4 w-4 mr-1" />
                 Invite client
               </Button>

@@ -96,11 +96,11 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {flagged.length > 0 && (
-            <Button size="sm" variant="outline" className="rounded-full" disabled={bulkBusy || loading} onClick={reorderAll}>
+            <Button size="sm" variant="outline" disabled={bulkBusy || loading} onClick={reorderAll}>
               {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShoppingCart className="h-4 w-4 mr-1" /> Reorder all flagged ({flagged.length})</>}
             </Button>
           )}
-          <Button size="sm" className="rounded-full" disabled={aiBusy || loading || rows.length === 0} onClick={runAi}>
+          <Button size="sm" disabled={aiBusy || loading || rows.length === 0} onClick={runAi}>
             {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> AI forecast (5 cr)</>}
           </Button>
         </div>
@@ -149,7 +149,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
                     </td>
                   )}
                   <td className="px-4 py-2 text-right">
-                    <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={!c.has_supplier || bulkBusy || reordering === c.warehouse_item_id} title={c.has_supplier ? 'Draft a purchase order' : 'No supplier configured for this product'} onClick={() => reorder(c)}>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!c.has_supplier || bulkBusy || reordering === c.warehouse_item_id} title={c.has_supplier ? 'Draft a purchase order' : 'No supplier configured for this product'} onClick={() => reorder(c)}>
                       {reordering === c.warehouse_item_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ShoppingCart className="h-3.5 w-3.5 mr-1" /> Reorder</>}
                     </Button>
                   </td>

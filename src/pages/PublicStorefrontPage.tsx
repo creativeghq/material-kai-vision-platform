@@ -128,7 +128,7 @@ const PublicStorefrontPage: React.FC = () => {
                   <CardContent className="p-3">
                     <div className="line-clamp-2 text-sm font-medium">{p.name}</div>
                     <div className="mt-1 text-sm text-primary">{money(p.price, p.currency)}{p.unit ? <span className="text-muted-foreground">/{p.unit}</span> : ''}</div>
-                    <Button size="sm" variant="outline" className="mt-2 w-full rounded-full" onClick={() => setQty(p.product_id, 1)}>
+                    <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => setQty(p.product_id, 1)}>
                       <Plus className="mr-1 h-3.5 w-3.5" /> Add
                     </Button>
                   </CardContent>

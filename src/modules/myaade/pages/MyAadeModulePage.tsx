@@ -131,7 +131,7 @@ const MyAadeModulePage: React.FC = () => {
                 maxLength={9}
                 className="flex-1 font-mono"
               />
-              <Button onClick={runLookup} disabled={loading} className="rounded-full">
+              <Button onClick={runLookup} disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
                 Look up
               </Button>

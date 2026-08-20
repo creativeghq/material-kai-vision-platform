@@ -221,7 +221,6 @@ export const WebhooksPanel: React.FC = () => {
             size="sm"
             onClick={fetchAll}
             disabled={loading}
-            className="rounded-full"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh

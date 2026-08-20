@@ -31,10 +31,10 @@ export const RequestFactoryAccessButton: React.FC<{ factoryUserId: string; show:
   if (!show || loading || !activeWorkspaceId) return null;
 
   if (status === 'approved') {
-    return <Badge className="rounded-full bg-green-500/10 text-green-600 border-green-500/30 gap-1"><Check className="h-3 w-3" /> Catalog access</Badge>;
+    return <Badge className="bg-green-500/10 text-green-600 border-green-500/30 gap-1"><Check className="h-3 w-3" /> Catalog access</Badge>;
   }
   if (status === 'pending') {
-    return <Badge variant="outline" className="rounded-full gap-1"><Loader2 className="h-3 w-3" /> Access requested</Badge>;
+    return <Badge variant="outline" className="gap-1"><Loader2 className="h-3 w-3" /> Access requested</Badge>;
   }
 
   const request = async () => {
@@ -49,7 +49,7 @@ export const RequestFactoryAccessButton: React.FC<{ factoryUserId: string; show:
   };
 
   return (
-    <Button variant="outline" size="sm" className="rounded-full gap-2 px-4" onClick={request} disabled={busy}>
+    <Button variant="outline" size="sm" className="gap-2 px-4" onClick={request} disabled={busy}>
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
       {status === 'rejected' ? 'Request access again' : 'Request catalog access'}
     </Button>

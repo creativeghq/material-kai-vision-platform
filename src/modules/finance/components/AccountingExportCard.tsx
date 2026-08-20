@@ -112,13 +112,13 @@ export const AccountingExportCard: React.FC<{ workspaceId: string }> = ({ worksp
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" className="rounded-full" disabled={!!busy} onClick={() => run('sales')}>
+          <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run('sales')}>
             {busy === 'sales' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} Sales journal
           </Button>
-          <Button size="sm" variant="outline" className="rounded-full" disabled={!!busy} onClick={() => run('purchases')}>
+          <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run('purchases')}>
             {busy === 'purchases' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} Purchases journal
           </Button>
-          <Button size="sm" variant="outline" className="rounded-full" disabled={!!busy} onClick={() => run('summary')}>
+          <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run('summary')}>
             {busy === 'summary' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} VAT summary
           </Button>
         </div>

@@ -95,7 +95,7 @@ export const KbCommandSearch: React.FC<Props> = ({ open, onOpenChange, allDocs, 
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1 text-xs transition ${
+      className={`shrink-0 border px-3 py-1 text-xs transition ${
         active ? 'bg-primary text-primary-foreground border-transparent' : 'text-muted-foreground hover:text-foreground'
       }`}
     >

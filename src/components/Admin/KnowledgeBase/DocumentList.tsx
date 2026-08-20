@@ -560,7 +560,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             {embedBacklog > 0 && (
               <Button
                 variant="outline"
-                className="rounded-full gap-2"
+                className="gap-2"
                 disabled={backfilling}
                 onClick={runBackfill}
                 title="Generate embeddings for docs that are pending or failed, so agents can retrieve them"

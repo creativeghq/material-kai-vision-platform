@@ -219,8 +219,8 @@ export const PayViaRevolutDialog: React.FC<{
               </div>
             )}
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" className="rounded-full" onClick={onClose} disabled={busy}>Cancel</Button>
-              <Button className="rounded-full" onClick={send} disabled={busy}>
+              <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+              <Button onClick={send} disabled={busy}>
                 {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1 h-3.5 w-3.5" />}
                 {direct ? 'Send payment' : 'Create draft'}
               </Button>

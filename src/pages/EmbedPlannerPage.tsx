@@ -205,7 +205,7 @@ export default function EmbedPlannerPage() {
               key={p.product_id}
               size="sm"
               variant="outline"
-              className="rounded-full text-xs"
+              className="text-xs"
               onClick={() => place(p)}
             >
               <Plus className="mr-1 h-3 w-3" />
@@ -223,7 +223,6 @@ export default function EmbedPlannerPage() {
           <Button
             size="sm"
             variant="outline"
-            className="rounded-full"
             onClick={() => setItems((cur) => cur.map((i) => (
               i.id === selectedId ? { ...i, rotation_deg: (Number(i.rotation_deg) + 90) % 360 } : i
             )))}
@@ -234,7 +233,6 @@ export default function EmbedPlannerPage() {
           <Button
             size="sm"
             variant="outline"
-            className="rounded-full"
             onClick={() => {
               setItems((cur) => cur.filter((i) => i.id !== selectedId));
               setSelectedId(null);

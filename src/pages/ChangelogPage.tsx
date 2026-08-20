@@ -175,7 +175,7 @@ export default function ChangelogPage() {
       {/* Hero */}
       <section className="border-b border-border/40">
         <div className="container mx-auto max-w-4xl px-4 py-14 sm:py-20">
-          <Badge variant="outline" className="rounded-full mb-5 gap-1.5">
+          <Badge variant="outline" className="mb-5 gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             Product updates
           </Badge>

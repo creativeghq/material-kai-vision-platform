@@ -178,7 +178,7 @@ function AppointmentDetailDrawer({
           {appt.status === 'pending' && (
             <div className="flex gap-2">
               <Button
-                className="flex-1 rounded-full gap-2"
+                className="flex-1 gap-2"
                 onClick={() => updateStatus('confirmed')}
                 disabled={saving}
               >
@@ -187,7 +187,7 @@ function AppointmentDetailDrawer({
               </Button>
               <Button
                 variant="outline"
-                className="flex-1 rounded-full gap-2"
+                className="flex-1 gap-2"
                 onClick={() => updateStatus('cancelled')}
                 disabled={saving}
               >
@@ -200,7 +200,7 @@ function AppointmentDetailDrawer({
           {appt.status === 'confirmed' && (
             <Button
               variant="outline"
-              className="w-full rounded-full gap-2"
+              className="w-full gap-2"
               onClick={() => updateStatus('completed')}
               disabled={saving}
             >
@@ -212,7 +212,7 @@ function AppointmentDetailDrawer({
           {/* Inbox shortcut */}
           <Button
             variant="secondary"
-            className="w-full rounded-full gap-2"
+            className="w-full gap-2"
             onClick={openInbox}
           >
             <Inbox className="h-4 w-4" />
@@ -234,7 +234,7 @@ function AppointmentDetailDrawer({
             <Button
               size="sm"
               variant="outline"
-              className="rounded-full h-7 text-xs"
+              className="h-7 text-xs"
               onClick={saveNotes}
               disabled={saving}
             >

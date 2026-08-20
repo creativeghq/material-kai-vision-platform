@@ -129,7 +129,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             {status?.last_sync_error && (
               <div className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{status.last_sync_error}</div>
             )}
-            <Button onClick={connect} disabled={connecting} className="rounded-full">
+            <Button onClick={connect} disabled={connecting}>
               {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Connect Search Console
             </Button>
@@ -149,7 +149,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
         </CardHeader>
         <CardContent className="space-y-2">
           {!props ? (
-            <Button variant="outline" className="rounded-full" onClick={pickProperties}>Load my properties</Button>
+            <Button variant="outline" onClick={pickProperties}>Load my properties</Button>
           ) : props.length === 0 ? (
             <Empty text="This Google account has no Search Console properties. Add and verify your site in Search Console first, then reload." />
           ) : (
@@ -193,7 +193,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             </CardDescription>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Button variant="outline" size="sm" className="rounded-full" onClick={sync} disabled={syncing}>
+            <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
               {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}Sync
             </Button>
             <Button variant="ghost" size="icon" title="Disconnect" className="text-destructive hover:text-destructive" onClick={disconnect}><Unplug className="w-4 h-4" /></Button>
@@ -250,7 +250,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
           <div className="inline-flex rounded-full bg-muted p-0.5 text-xs flex-wrap">
             {(['queries', 'pages', 'countries', 'appearance'] as const).map((v) => (
               <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-1 rounded-full capitalize ${view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{v}</button>
+                className={`px-3 py-1 capitalize ${view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{v}</button>
             ))}
           </div>
         </CardHeader>

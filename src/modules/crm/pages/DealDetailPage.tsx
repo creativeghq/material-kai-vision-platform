@@ -66,7 +66,7 @@ export const DealDetailPage: React.FC = () => {
       <div className="mx-auto max-w-md py-24 text-center">
         <h1 className="font-display text-lg">Deal not found</h1>
         <p className="mt-1 text-sm text-muted-foreground">It may have been deleted, or belong to a listing you cannot see.</p>
-        <Button variant="ghost" className="mt-4 rounded-full" onClick={() => navigate('/crm?tab=pipeline')}>Back to the pipeline</Button>
+        <Button variant="ghost" className="mt-4" onClick={() => navigate('/crm?tab=pipeline')}>Back to the pipeline</Button>
       </div>
     );
   }
@@ -84,11 +84,11 @@ export const DealDetailPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate('/crm?tab=pipeline')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/crm?tab=pipeline')}>
           <ArrowLeft className="mr-1.5 h-4 w-4" /> Pipeline
         </Button>
         <h1 className="font-display text-xl">{label}</h1>
-        {type && <Badge className="rounded-full border-0 bg-muted text-[11px]">{type.label}</Badge>}
+        {type && <Badge className="border-0 bg-muted text-[11px]">{type.label}</Badge>}
         {deal.status === 'won' && <span className="text-xs font-medium text-emerald-600">Won</span>}
         {deal.status === 'lost' && <span className="text-xs font-medium text-muted-foreground">Lost{deal.lost_reason ? ` · ${deal.lost_reason}` : ''}</span>}
       </div>
@@ -120,7 +120,7 @@ export const DealDetailPage: React.FC = () => {
                 <div className="flex items-center gap-2 text-sm">
                   {deal.status === 'won' ? <Trophy className="h-4 w-4 text-emerald-600" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
                   <span>{stageLabel}</span>
-                  <Button size="sm" variant="ghost" className="ml-auto rounded-full text-xs" disabled={busy}
+                  <Button size="sm" variant="ghost" className="ml-auto text-xs" disabled={busy}
                     onClick={() => act(() => dealsService.updateDeal(deal.id, { status: 'open', lost_reason: null }))}>
                     Reopen
                   </Button>

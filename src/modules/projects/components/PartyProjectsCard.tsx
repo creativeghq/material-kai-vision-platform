@@ -60,7 +60,7 @@ export const PartyProjectsCard: React.FC<{
             {companyId ? 'Work booked against this company or its people.' : 'Work booked against this person.'}
           </p>
         </div>
-        <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCreateOpen(true)}>
+        <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-3.5 w-3.5" /> New project
         </Button>
       </CardHeader>

@@ -66,7 +66,7 @@ export const PartyDealsCard: React.FC<Props> = ({ workspaceId, contactId, compan
                   {formatMoney(d.value, d.currency || 'EUR', { decimals: 0, fallback: '' })}
                 </span>
               )}
-              <Badge className={`shrink-0 rounded-full border-0 text-[10px] ${d.status === 'won' ? 'bg-emerald-500/15 text-emerald-600' : d.status === 'lost' ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary'}`}>
+              <Badge className={`shrink-0 border-0 text-[10px] ${d.status === 'won' ? 'bg-emerald-500/15 text-emerald-600' : d.status === 'lost' ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary'}`}>
                 {d.status === 'open' ? d.stage_label : d.status === 'won' ? 'Won' : 'Lost'}
               </Badge>
               {d.expected_close_date && d.status === 'open' && (

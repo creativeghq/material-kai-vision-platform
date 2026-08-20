@@ -97,7 +97,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
         subtitle="Ministry of Labour filings — work card, leaves, hires, schedules"
         actions={canManage && configured ? (
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="rounded-full" onClick={testConnection} disabled={testing}>
+            <Button size="sm" variant="outline" onClick={testConnection} disabled={testing}>
               {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plug className="h-4 w-4 mr-2" />}Test connection
             </Button>
             <NewSubmissionDialog workspaceId={workspaceId!} onDone={load} />
@@ -226,7 +226,7 @@ function NewSubmissionDialog({ workspaceId, onDone }: { workspaceId: string; onD
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" className="rounded-full"><Send className="h-4 w-4 mr-2" />New submission</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Send className="h-4 w-4 mr-2" />New submission</Button></DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>New Ergani Submission</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -242,7 +242,7 @@ function NewSubmissionDialog({ workspaceId, onDone }: { workspaceId: string; onD
                 <SelectContent>{types.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} · {t.description}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <Button variant="outline" className="rounded-full" onClick={loadSchema} disabled={!code || loadingSchema}>
+            <Button variant="outline" onClick={loadSchema} disabled={!code || loadingSchema}>
               {loadingSchema ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}Load schema
             </Button>
           </div>
@@ -252,8 +252,8 @@ function NewSubmissionDialog({ workspaceId, onDone }: { workspaceId: string; onD
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
-          <Button className="rounded-full" onClick={submit} disabled={submitting || !doc.trim() || !code}>{submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Submit</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting || !doc.trim() || !code}>{submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Submit</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

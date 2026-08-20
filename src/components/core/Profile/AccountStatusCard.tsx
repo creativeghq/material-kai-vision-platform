@@ -110,7 +110,7 @@ export const AccountStatusCard: React.FC = () => {
           <li>Your <strong>customers move to the operator immediately</strong>, and re-enabling does not move them back.</li>
           <li>Only the operator can re-enable the account afterwards.</li>
         </ul>
-        <Button variant="outline" className="rounded-full text-destructive" onClick={() => setOpen(true)}>
+        <Button variant="outline" className="text-destructive" onClick={() => setOpen(true)}>
           <PowerOff className="mr-1 h-4 w-4" /> Disable account
         </Button>
       </CardContent>
@@ -138,10 +138,9 @@ export const AccountStatusCard: React.FC = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              className="rounded-full"
               disabled={busy || confirmName.trim() !== workspaceName.trim()}
               onClick={disable}
             >

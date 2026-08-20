@@ -196,7 +196,7 @@ export default function PageWatchesPage() {
                 : 'Every detected change has been reviewed.'}
             </p>
           </div>
-          <Button size="sm" className="rounded-full" onClick={() => setAdding(true)}>
+          <Button size="sm" onClick={() => setAdding(true)}>
             <Plus className="h-4 w-4 mr-1" /> Watch a page
           </Button>
         </CardHeader>
@@ -268,7 +268,7 @@ export default function PageWatchesPage() {
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-end gap-1">
                         <Button
-                          size="sm" variant="ghost" className="rounded-full h-8"
+                          size="sm" variant="ghost" className="h-8"
                           disabled={busyId === w.id}
                           onClick={() => void act(w.id, () => pageWatchService.run(activeWorkspaceId!, w.id), 'Check started')}
                           title="Check now (uses one Firecrawl credit)"
@@ -276,7 +276,7 @@ export default function PageWatchesPage() {
                           <RefreshCw className={`h-3.5 w-3.5 ${busyId === w.id ? 'animate-spin' : ''}`} />
                         </Button>
                         <Button
-                          size="sm" variant="ghost" className="rounded-full h-8"
+                          size="sm" variant="ghost" className="h-8"
                           disabled={busyId === w.id}
                           onClick={() => void act(
                             w.id,
@@ -287,7 +287,7 @@ export default function PageWatchesPage() {
                           {w.is_active ? 'Pause' : 'Resume'}
                         </Button>
                         <Button
-                          size="sm" variant="ghost" className="rounded-full h-8 text-destructive"
+                          size="sm" variant="ghost" className="h-8 text-destructive"
                           disabled={busyId === w.id}
                           onClick={() => void act(w.id, () => pageWatchService.remove(activeWorkspaceId!, w.id), 'Watch removed')}
                         >
@@ -368,9 +368,8 @@ export default function PageWatchesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-full" onClick={() => setAdding(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
             <Button
-              className="rounded-full"
               disabled={saving || !form.name.trim() || !form.url.trim()}
               onClick={() => void submit()}
             >
@@ -410,7 +409,7 @@ export default function PageWatchesPage() {
                       <span className="text-xs text-muted-foreground">reviewed</span>
                     ) : (
                       <Button
-                        size="sm" variant="outline" className="rounded-full h-8"
+                        size="sm" variant="outline" className="h-8"
                         onClick={() => void acknowledge(c.id)}
                       >
                         <Check className="h-3.5 w-3.5 mr-1" /> Mark reviewed

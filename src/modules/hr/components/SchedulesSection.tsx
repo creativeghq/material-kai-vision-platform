@@ -209,7 +209,7 @@ function ScheduleDialog({ workspaceId, employees, existing, onDone }: {
       <DialogTrigger asChild>
         {existing
           ? <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
-          : <Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New schedule</Button>}
+          : <Button size="sm"><Plus className="h-4 w-4 mr-2" />New schedule</Button>}
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>{existing ? 'Edit Work Schedule' : 'New Work Schedule'}</DialogTitle></DialogHeader>
@@ -241,7 +241,7 @@ function ScheduleDialog({ workspaceId, employees, existing, onDone }: {
 
           <div className="flex items-center justify-between pt-1">
             <Label>Weekly pattern</Label>
-            <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" onClick={copyFromEmployee}>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyFromEmployee}>
               <Copy className="h-3.5 w-3.5 mr-1" />Copy contract hours
             </Button>
           </div>
@@ -270,8 +270,8 @@ function ScheduleDialog({ workspaceId, employees, existing, onDone }: {
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-          <Button className="rounded-full" onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}{existing ? 'Save changes' : 'Create schedule'}</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}{existing ? 'Save changes' : 'Create schedule'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -325,7 +325,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
         title="Client Views"
         subtitle="Bundle sheets from any of this project's moodboards into one client-ready PDF + online presentation."
         actions={!editorOpen && (
-          <Button onClick={openCreate} className="rounded-full">
+          <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" /> New client view
           </Button>
         )}
@@ -394,7 +394,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                         key={s.id}
                         type="button"
                         onClick={() => toggleSheet(s.id)}
-                        className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs hover:bg-muted transition"
+                        className="flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs hover:bg-muted transition"
                       >
                         <Plus className="h-3 w-3" />
                         {s.title || SHEET_TYPE_LABELS[s.sheet_type as SheetType] || s.sheet_type}
@@ -484,12 +484,12 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">
-              <Button onClick={() => save(true)} disabled={saving} className="rounded-full">
+              <Button onClick={() => save(true)} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
                 Save &amp; generate PDF
               </Button>
-              <Button variant="outline" onClick={() => save(false)} disabled={saving} className="rounded-full">Save draft</Button>
-              <Button variant="ghost" onClick={() => setEditorOpen(false)} className="rounded-full">Cancel</Button>
+              <Button variant="outline" onClick={() => save(false)} disabled={saving}>Save draft</Button>
+              <Button variant="ghost" onClick={() => setEditorOpen(false)}>Cancel</Button>
             </div>
           </CardContent>
         </Card>
@@ -532,37 +532,37 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                       )}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Button size="sm" variant="outline" className="rounded-full" disabled={busyId === view.id} onClick={() => doGenerate(view.id)}>
+                      <Button size="sm" variant="outline" disabled={busyId === view.id} onClick={() => doGenerate(view.id)}>
                         {busyId === view.id ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
                         {view.pdf_storage_path ? 'Regenerate' : 'Generate'}
                       </Button>
                       {view.pdf_storage_path && (
-                        <Button size="sm" variant="ghost" className="rounded-full" disabled={busyId === view.id} onClick={() => openPdf(view)}>
+                        <Button size="sm" variant="ghost" disabled={busyId === view.id} onClick={() => openPdf(view)}>
                           <FileText className="h-3.5 w-3.5 mr-1" /> PDF
                         </Button>
                       )}
                       {view.public_share_enabled ? (
                         <>
-                          <Button size="sm" variant="ghost" className="rounded-full" onClick={() => copyExisting(view)}>
+                          <Button size="sm" variant="ghost" onClick={() => copyExisting(view)}>
                             <Link2 className="h-3.5 w-3.5 mr-1" /> Copy link
                           </Button>
                           {view.public_share_token && (
-                            <Button asChild size="sm" variant="ghost" className="rounded-full">
+                            <Button asChild size="sm" variant="ghost">
                               <a href={`/cv/${view.public_share_token}`} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</a>
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" className="rounded-full text-muted-foreground" disabled={busyId === view.id} onClick={() => revoke(view)}>Disable link</Button>
+                          <Button size="sm" variant="ghost" className="text-muted-foreground" disabled={busyId === view.id} onClick={() => revoke(view)}>Disable link</Button>
                         </>
                       ) : (
-                        <Button size="sm" variant="outline" className="rounded-full" disabled={busyId === view.id || !view.pdf_storage_path} onClick={() => share(view)}>
+                        <Button size="sm" variant="outline" disabled={busyId === view.id || !view.pdf_storage_path} onClick={() => share(view)}>
                           <Share2 className="h-3.5 w-3.5 mr-1" /> Share
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => loadFeedback(view)}>
+                      <Button size="sm" variant="ghost" onClick={() => loadFeedback(view)}>
                         <MessageSquare className="h-3.5 w-3.5 mr-1" /> Feedback
                       </Button>
-                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => openEdit(view)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="ghost" className="rounded-full text-destructive" disabled={busyId === view.id} onClick={() => remove(view)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(view)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="text-destructive" disabled={busyId === view.id} onClick={() => remove(view)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
 

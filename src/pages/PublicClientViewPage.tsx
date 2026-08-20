@@ -176,7 +176,7 @@ export default function PublicClientViewPage() {
               <iframe title="Presentation deck" src={view.pdf_url} className="w-full h-full" />
             </div>
             <div className="mt-3">
-              <Button asChild variant="outline" size="sm" className="rounded-full">
+              <Button asChild variant="outline" size="sm">
                 <a href={view.pdf_url} target="_blank" rel="noreferrer">
                   <FileText className="h-4 w-4 mr-1" /> Download PDF
                 </a>
@@ -260,7 +260,7 @@ export default function PublicClientViewPage() {
                 <p className="text-sm text-muted-foreground mb-3">
                   Walk through an explorable 3D reconstruction of the design.
                 </p>
-                <Button asChild className="rounded-full">
+                <Button asChild>
                   <a href={vrUrl} target="_blank" rel="noreferrer">Open 3D walkthrough</a>
                 </Button>
               </div>
@@ -286,7 +286,6 @@ export default function PublicClientViewPage() {
                   key={p.label}
                   size="sm"
                   variant={i === lightIdx ? 'default' : 'outline'}
-                  className="rounded-full"
                   onClick={() => setLightIdx(i)}
                 >
                   {p.label}
@@ -405,7 +404,6 @@ export default function PublicClientViewPage() {
                   />
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      className="rounded-full"
                       disabled={submitting}
                       onClick={() => submitFeedback('approval', 'approved')}
                     >
@@ -413,7 +411,6 @@ export default function PublicClientViewPage() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="rounded-full"
                       disabled={submitting || !comment}
                       onClick={() => submitFeedback('change_request', 'changes_requested')}
                     >
@@ -421,7 +418,6 @@ export default function PublicClientViewPage() {
                     </Button>
                     <Button
                       variant="ghost"
-                      className="rounded-full"
                       disabled={submitting || !comment}
                       onClick={() => submitFeedback('comment')}
                     >

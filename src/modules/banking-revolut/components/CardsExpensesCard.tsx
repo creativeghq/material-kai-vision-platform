@@ -140,14 +140,14 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
               <Label className="text-xs" htmlFor="ce-label">Card label</Label>
               <Input id="ce-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Site expenses" maxLength={30} />
             </div>
-            <Button size="sm" className="rounded-full" onClick={issueCard} disabled={busy !== null}>
+            <Button size="sm" onClick={issueCard} disabled={busy !== null}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Issue virtual card
             </Button>
             <div className="w-52 space-y-1">
               <Label className="text-xs" htmlFor="ce-invite">Not in Revolut yet? Invite by email</Label>
               <div className="flex gap-1">
                 <Input id="ce-invite" className="h-9 text-xs" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="new.hire@company.gr" />
-                <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
+                <Button size="sm" variant="outline" className="text-xs" disabled={busy !== null}
                   onClick={() => run('Invite', async () => {
                     await callRevolutApi('create-card-invitation', workspaceId, { email: inviteEmail.trim() });
                     setInviteEmail('');
@@ -177,7 +177,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
                       <span className="flex items-center gap-1">
                         <Input className="h-7 w-24 text-xs" inputMode="decimal" autoFocus placeholder="€ / month"
                           value={limitAmount} onChange={(e) => setLimitAmount(e.target.value)} />
-                        <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
+                        <Button size="sm" variant="outline" className="text-xs" disabled={busy !== null}
                           onClick={() => run('Limit', async () => {
                             const amt = Number(limitAmount);
                             if (!(amt > 0)) { toast({ title: 'Enter a positive monthly amount', variant: 'destructive' }); return; }
@@ -187,15 +187,15 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
                           })}>
                           Set
                         </Button>
-                        <Button size="sm" variant="ghost" className="rounded-full text-xs" onClick={() => setLimitCardId(null)}>Cancel</Button>
+                        <Button size="sm" variant="ghost" className="text-xs" onClick={() => setLimitCardId(null)}>Cancel</Button>
                       </span>
                     ) : (
-                      <Button size="sm" variant="ghost" className="rounded-full text-xs" disabled={busy !== null}
+                      <Button size="sm" variant="ghost" className="text-xs" disabled={busy !== null}
                         onClick={() => { setLimitCardId(c.id); setLimitAmount(''); }}>
                         Limit
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null} onClick={() => toggleFreeze(c)}>
+                    <Button size="sm" variant="outline" className="text-xs" disabled={busy !== null} onClick={() => toggleFreeze(c)}>
                       {c.state === 'frozen' ? 'Unfreeze' : 'Freeze'}
                     </Button>
                   </div>
@@ -208,7 +208,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-medium"><Receipt className="h-3.5 w-3.5" /> Recent expenses (90 days)</div>
-              <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
+              <Button size="sm" variant="outline" className="text-xs" disabled={busy !== null}
                 onClick={() => run('Import', async () => {
                   const out = await callRevolutApi<{ imported: number; unmatchedPerson: number; receipts: number }>('import-expenses', workspaceId);
                   toast({

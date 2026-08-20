@@ -81,10 +81,10 @@ export const ProjectExpensesCard: React.FC<{
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setLinking(true)}>
+          <Button size="sm" variant="outline" onClick={() => setLinking(true)}>
             <Link2 className="h-3.5 w-3.5 mr-1" /> Link existing
           </Button>
-          <Button size="sm" className="rounded-full" onClick={() => setAdding(true)}>
+          <Button size="sm" onClick={() => setAdding(true)}>
             <Plus className="h-3.5 w-3.5 mr-1" /> Add expense
           </Button>
         </div>
@@ -223,7 +223,7 @@ const AddProjectExpenseDialog: React.FC<{
           </p>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Add expense'}
             </Button>
           </div>
@@ -280,7 +280,7 @@ const LinkExpenseDialog: React.FC<{
                   </p>
                 </div>
                 <span className="shrink-0 tabular-nums text-sm">{money(Number(c.amount), c.currency)}</span>
-                <Button size="sm" className="rounded-full" onClick={() => link(c)} disabled={busy === c.id}>
+                <Button size="sm" onClick={() => link(c)} disabled={busy === c.id}>
                   {busy === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Link'}
                 </Button>
               </div>

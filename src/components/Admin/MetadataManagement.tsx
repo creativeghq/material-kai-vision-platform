@@ -714,7 +714,6 @@ export const MetadataManagement: React.FC = () => {
                         key={n}
                         variant={batchLimit === n ? 'default' : 'outline'}
                         size="sm"
-                        className="rounded-full"
                         onClick={() => setBatchLimit(n)}
                       >
                         {n}
@@ -723,7 +722,7 @@ export const MetadataManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <Button onClick={runBatch} disabled={batchRunning || !batchWorkspaceId} className="rounded-full">
+                <Button onClick={runBatch} disabled={batchRunning || !batchWorkspaceId}>
                   {batchRunning ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

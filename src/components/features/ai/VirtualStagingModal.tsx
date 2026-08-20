@@ -218,7 +218,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
               <Button
                 onClick={handleRoomNext}
                 disabled={!selectedRoom}
-                className="w-full rounded-full"
+                className="w-full"
               >
                 Next — choose style
                 <ChevronRight className="w-4 h-4 ml-1" />
@@ -286,7 +286,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
               <Button
                 onClick={handleGenerate}
                 disabled={generating || (!isDesign && !furnitureItems.trim())}
-                className="w-full rounded-full gap-2"
+                className="w-full gap-2"
               >
                 {generating ? (
                   <>Generating…</>

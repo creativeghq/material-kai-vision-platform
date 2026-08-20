@@ -82,7 +82,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
       size="default"
       onClick={toggle}
       disabled={loading}
-      className="rounded-full gap-2"
+      className="gap-2"
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />

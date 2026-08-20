@@ -144,7 +144,7 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
                 const on = team.includes(u.user_id);
                 return (
                   <button key={u.user_id} type="button" onClick={() => toggleMember(u.user_id)}
-                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${on ? 'border-primary bg-primary/15 text-primary' : 'border-border/60 text-muted-foreground hover:bg-muted/40'}`}>
+                    className={`flex items-center gap-1 border px-2.5 py-1 text-xs transition ${on ? 'border-primary bg-primary/15 text-primary' : 'border-border/60 text-muted-foreground hover:bg-muted/40'}`}>
                     {on && <Check className="h-3 w-3" />}{u.name}
                   </button>
                 );

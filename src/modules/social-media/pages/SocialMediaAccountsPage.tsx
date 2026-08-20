@@ -143,7 +143,7 @@ export const SocialMediaAccountsPage: React.FC = () => {
                 {activeAccounts.length} active account{activeAccounts.length !== 1 ? 's' : ''} across the workspace
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={loadAccounts}>
+            <Button variant="outline" size="sm" onClick={loadAccounts}>
               <RefreshCw className="h-3 w-3 mr-1" />
               Refresh
             </Button>

@@ -88,7 +88,7 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
                 <button
                   key={opt.value}
                   onClick={() => setFocus(opt.value)}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                  className={`px-3 py-1.5 text-xs border transition-colors ${
                     focus === opt.value
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background border-border hover:border-primary/50 hover:bg-muted/40'
@@ -114,7 +114,7 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
           <Button
             onClick={handleSubmit}
             disabled={!url.trim()}
-            className="gap-2 rounded-full"
+            className="gap-2"
           >
             Find materials
             <ArrowRight className="h-4 w-4" />

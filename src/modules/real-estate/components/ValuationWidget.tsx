@@ -61,7 +61,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
         <h3 className="font-semibold">Thinking of selling? Get a free valuation</h3>
       </div>
       {!open ? (
-        <Button className="mt-3 rounded-full" onClick={() => setOpen(true)}>Value my property</Button>
+        <Button className="mt-3" onClick={() => setOpen(true)}>Value my property</Button>
       ) : (
         <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Input required placeholder="Your name" value={f.name} onChange={(e) => set('name', e.target.value)} />
@@ -82,7 +82,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
             Optional — send me market updates and properties that may interest me. Unsubscribe at any time.
           </label>
           {err && <p className="col-span-full text-xs text-destructive">{err}</p>}
-          <Button type="submit" className="col-span-full rounded-full" disabled={state === 'sending'}>
+          <Button type="submit" className="col-span-full" disabled={state === 'sending'}>
             {state === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Get my estimate'}
           </Button>
         </form>

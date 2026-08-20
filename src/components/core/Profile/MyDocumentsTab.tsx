@@ -307,8 +307,8 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
               <div className="flex items-center justify-between gap-2 pt-1.5">
                 <span className="text-muted-foreground">New total {money(preview.total, order.currency)}</span>
                 <span className="flex items-center gap-2">
-                  <Button size="sm" variant="ghost" className="rounded-full h-7" disabled={reordering} onClick={() => setPreview(null)}>Cancel</Button>
-                  <Button size="sm" className="rounded-full h-7" disabled={reordering} onClick={submitReorder}>
+                  <Button size="sm" variant="ghost" className="h-7" disabled={reordering} onClick={() => setPreview(null)}>Cancel</Button>
+                  <Button size="sm" className="h-7" disabled={reordering} onClick={submitReorder}>
                     {reordering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}Confirm reorder
                   </Button>
                 </span>
@@ -316,7 +316,7 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
             </div>
           ) : (
             <div className="mt-2 flex justify-end">
-              <Button size="sm" variant="outline" className="rounded-full" disabled={reordering} onClick={orderAgain}>
+              <Button size="sm" variant="outline" disabled={reordering} onClick={orderAgain}>
                 {reordering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Repeat className="h-3.5 w-3.5 mr-1" />}
                 Order again
               </Button>

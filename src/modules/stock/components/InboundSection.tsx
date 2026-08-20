@@ -74,7 +74,7 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <CardTitle className="flex items-center gap-2"><Ship className="h-4 w-4" /> Inbound shipments</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">Track containers/BLs in transit and receive them into stock on arrival.</p>
         </div>
-        <Button size="sm" className="rounded-full shrink-0" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" /> Track shipment</Button>
+        <Button size="sm" className="shrink-0" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" /> Track shipment</Button>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (

@@ -40,7 +40,7 @@ export const PropertyDiscoveryTab: React.FC = () => {
         </select>
         <Input type="number" placeholder="Max €" className="w-28" value={filters.price_max ?? ''} onChange={(e) => set('price_max', e.target.value === '' ? '' : Number(e.target.value))} />
         <Input type="number" placeholder="Min beds" className="w-24" value={filters.bedrooms_min ?? ''} onChange={(e) => set('bedrooms_min', e.target.value === '' ? '' : Number(e.target.value))} />
-        <Button className="rounded-full" onClick={() => run(filters)} disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
+        <Button onClick={() => run(filters)} disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
       </div>
 
       {listings === null || loading

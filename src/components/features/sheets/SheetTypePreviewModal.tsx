@@ -230,7 +230,7 @@ export function SheetTypePreviewModal({ open, sheetType, onCancel, onContinue }:
           <Button variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button className="rounded-full gap-2" onClick={() => onContinue(sheetType)}>
+          <Button className="gap-2" onClick={() => onContinue(sheetType)}>
             <Sparkles className="h-4 w-4" />
             Continue with KAI
           </Button>

@@ -85,14 +85,14 @@ export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ worksp
             <span className="font-medium">{p.name}</span>
             {entitled
               ? <span className={`inline-flex items-center text-[10px] capitalize ${statusTone('enabled')}`}><CheckCircle2 className="mr-1 h-3 w-3" />Enabled</span>
-              : price ? <Badge className="rounded-full border-0 bg-muted text-[10px]">{price}</Badge> : null}
+              : price ? <Badge className="border-0 bg-muted text-[10px]">{price}</Badge> : null}
           </div>
           <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{p.description}</div>
         </div>
         {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           : entitled
-            ? <Button size="sm" variant="outline" className="rounded-full" onClick={() => setConfiguring({ slug: p.slug, name: p.name })}><Sliders className="mr-1.5 h-3.5 w-3.5" /> Configure</Button>
-            : <Button size="sm" className="rounded-full" onClick={() => enable(p.slug, p.name)} disabled={busy === p.slug}>
+            ? <Button size="sm" variant="outline" onClick={() => setConfiguring({ slug: p.slug, name: p.name })}><Sliders className="mr-1.5 h-3.5 w-3.5" /> Configure</Button>
+            : <Button size="sm" onClick={() => enable(p.slug, p.name)} disabled={busy === p.slug}>
                 {busy === p.slug ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
                 {canActivate ? (price ? `Enable · ${price}` : 'Enable') : 'Request'}
               </Button>}

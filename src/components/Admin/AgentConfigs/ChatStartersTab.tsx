@@ -233,7 +233,7 @@ export const ChatStartersTab: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => setCreating(emptyStarter())} className="rounded-full">
+            <Button onClick={() => setCreating(emptyStarter())}>
               <Plus className="h-4 w-4 mr-2" />New starter
             </Button>
           </>
@@ -531,7 +531,7 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
           <div className="sm:col-span-2 pt-4 border-t">
             <div className="flex items-center justify-between mb-2">
               <Label className="text-sm font-semibold">Variables</Label>
-              <Button size="sm" variant="outline" onClick={addVar} className="rounded-full">
+              <Button size="sm" variant="outline" onClick={addVar}>
                 <Plus className="h-3 w-3 mr-1" />Add variable
               </Button>
             </div>

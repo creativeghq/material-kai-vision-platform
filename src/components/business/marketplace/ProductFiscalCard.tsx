@@ -344,7 +344,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
               triggerClassName="h-8 text-xs w-full" />
           </FieldBox>
           <div className="flex items-end pb-0.5">
-            <Button type="button" size="sm" variant="outline" className="rounded-full h-8 text-xs"
+            <Button type="button" size="sm" variant="outline" className="h-8 text-xs"
               onClick={suggest} disabled={classifying}>
               {classifying
                 ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
@@ -390,10 +390,10 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
               </div>
             </div>
             <div className="flex gap-2">
-              <Button type="button" size="sm" className="rounded-full h-7 text-xs" onClick={acceptSuggestion}>
+              <Button type="button" size="sm" className="h-7 text-xs" onClick={acceptSuggestion}>
                 <Check className="h-3 w-3 mr-1" /> Accept
               </Button>
-              <Button type="button" size="sm" variant="outline" className="rounded-full h-7 text-xs" onClick={rejectSuggestion}>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={rejectSuggestion}>
                 <X className="h-3 w-3 mr-1" /> Dismiss
               </Button>
             </div>
@@ -415,7 +415,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         </Grid>
       </Section>
 
-      <Button size="sm" variant="outline" onClick={save} disabled={saving} className="w-full rounded-full">
+      <Button size="sm" variant="outline" onClick={save} disabled={saving} className="w-full">
         {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
         Save product data
       </Button>

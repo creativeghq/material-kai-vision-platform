@@ -445,7 +445,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                     <div className="flex flex-wrap gap-2">
                       {COLOR_FINISHES.map((f) => (
                         <button key={f} onClick={() => toggleSub(f)}
-                          className={cn('px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
+                          className={cn('px-3 py-1.5 border text-xs font-medium transition-all',
                             selectedSub[0] === f ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40')}
                         >{f}</button>
                       ))}
@@ -488,7 +488,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                     <div className="flex flex-wrap gap-2">
                       {FLOORING_GROUT.map((g) => (
                         <button key={g} onClick={() => toggleSub(g)}
-                          className={cn('px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
+                          className={cn('px-3 py-1.5 border text-xs font-medium transition-all',
                             selectedSub[0] === g ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40')}
                         >{g}</button>
                       ))}
@@ -604,7 +604,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                   setStep(3);
                 }}
                 disabled={!canProceedToStep3}
-                className="w-full rounded-full gap-2"
+                className="w-full gap-2"
                 variant="outline"
               >
                 Next — Review & Model
@@ -665,7 +665,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
               <Button
                 onClick={handleApply}
                 disabled={generating || !canApply}
-                className="w-full rounded-full gap-2"
+                className="w-full gap-2"
               >
                 {generating ? (
                   <>Generating…</>

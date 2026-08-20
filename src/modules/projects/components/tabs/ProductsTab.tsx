@@ -324,8 +324,8 @@ const AddProductDialog: React.FC<{
         <DialogHeader><DialogTitle>Add Product to Project</DialogTitle></DialogHeader>
 
         <div className="flex gap-2">
-          <Button size="sm" variant={tab === 'catalog' ? 'default' : 'outline'} className="rounded-full flex-1" onClick={() => setTab('catalog')}>From catalog</Button>
-          <Button size="sm" variant={tab === 'custom' ? 'default' : 'outline'} className="rounded-full flex-1" onClick={() => setTab('custom')}>Custom line</Button>
+          <Button size="sm" variant={tab === 'catalog' ? 'default' : 'outline'} className="flex-1" onClick={() => setTab('catalog')}>From catalog</Button>
+          <Button size="sm" variant={tab === 'custom' ? 'default' : 'outline'} className="flex-1" onClick={() => setTab('custom')}>Custom line</Button>
         </div>
 
         {tab === 'catalog' ? (

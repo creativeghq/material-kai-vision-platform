@@ -75,7 +75,7 @@ export default function PublicJobPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
         <p className="text-muted-foreground">{error || 'This position is no longer open.'}</p>
-        <Button variant="outline" className="rounded-full" onClick={() => navigate(`/careers/${slug}`)}>See all open roles</Button>
+        <Button variant="outline" onClick={() => navigate(`/careers/${slug}`)}>See all open roles</Button>
       </div>
     );
   }
@@ -155,14 +155,14 @@ export default function PublicJobPage() {
                   </div>
                 )}
                 {!job.description && !job.requirements && <p className="text-muted-foreground">Full details coming soon — apply and we’ll be in touch.</p>}
-                <Button className="rounded-full mt-8" onClick={() => setTab('application')}>Apply for this role</Button>
+                <Button className="mt-8" onClick={() => setTab('application')}>Apply for this role</Button>
               </div>
             ) : applied ? (
               <div className="rounded-2xl border border-border/60 p-10 text-center">
                 <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-primary" />
                 <h2 className="text-lg font-display font-semibold">{applied}</h2>
                 <p className="text-sm text-muted-foreground mt-1">We’ll be in touch if there’s a fit.</p>
-                <Button variant="outline" className="rounded-full mt-5" onClick={() => navigate(`/careers/${slug}`)}>Back to openings</Button>
+                <Button variant="outline" className="mt-5" onClick={() => navigate(`/careers/${slug}`)}>Back to openings</Button>
               </div>
             ) : (
               <ApplicationForm slug={slug} job={job} siteKey={siteKey} onDone={setApplied} />
@@ -254,7 +254,7 @@ function ApplicationForm({ slug, job, siteKey, onDone }: {
             onDrop={(e) => { e.preventDefault(); setDragging(false); takeFile(e.dataTransfer.files?.[0] ?? null); }}
             className={`flex items-center justify-center gap-4 rounded-xl border border-dashed px-4 py-8 transition-colors ${dragging ? 'border-primary bg-primary/5' : 'border-border/60'}`}
           >
-            <Button type="button" variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()}>
+            <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
               <Paperclip className="h-4 w-4 mr-2" />Upload file
             </Button>
             <span className="text-sm text-muted-foreground">or drag and drop here</span>
@@ -277,7 +277,7 @@ function ApplicationForm({ slug, job, siteKey, onDone }: {
 
       {siteKey && <TurnstileWidget ref={turnstileRef} siteKey={siteKey} action="careers_apply" onVerify={setToken} onExpired={() => setToken('')} />}
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <Button className="rounded-full" onClick={submit} disabled={submitting}>
+      <Button onClick={submit} disabled={submitting}>
         {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Submit application
       </Button>
     </div>

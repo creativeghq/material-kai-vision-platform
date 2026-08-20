@@ -455,7 +455,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                             setRectW(String(r.width_mm));
                             setRectH(String(r.length_mm));
                           }}
-                          className={`px-2.5 py-1 rounded-full border text-xs ${
+                          className={`px-2.5 py-1 border text-xs ${
                             roomId === r.id ? 'border-primary text-foreground' : 'border-white/15 text-muted-foreground'
                           }`}
                         >

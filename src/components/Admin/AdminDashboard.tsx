@@ -314,7 +314,7 @@ const AdminDashboard: React.FC = () => {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 rounded-full">
+                <Button variant="outline" size="sm" className="gap-2">
                   Tools
                   <ChevronDown className="h-3.5 w-3.5" />
                 </Button>

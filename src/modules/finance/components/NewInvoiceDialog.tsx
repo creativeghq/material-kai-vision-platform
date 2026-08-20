@@ -1113,7 +1113,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         key={code}
                         type="button"
                         onClick={() => { setDocumentType(code); applyDocDefault(code); }}
-                        className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${documentType === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                        className={`px-3.5 py-1.5 text-sm font-medium transition-colors ${documentType === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
                       >
                         {label}
                       </button>
@@ -1256,7 +1256,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   {/* Row defaults — apply measurement unit / VAT / income classification to every row */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button size="sm" variant="outline" className="rounded-full">
+                      <Button size="sm" variant="outline">
                         Row defaults{(gUnit || gVat || gIncType || gIncCat) ? ' •' : ''}
                       </Button>
                     </PopoverTrigger>
@@ -1280,7 +1280,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       </Select>
                     </PopoverContent>
                   </Popover>
-                  <Button size="sm" variant="outline" className="rounded-full" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
+                  <Button size="sm" variant="outline" onClick={addLine}><Plus className="h-3 w-3 mr-1" /> Add row</Button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1593,7 +1593,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           <div className="hidden lg:flex w-[620px] xl:w-[680px] shrink-0 flex-col border-l border-border/60 bg-muted/40">
             <div className="flex items-center justify-between px-4 h-10 shrink-0 border-b border-border/60 bg-background/60">
               <span className="text-xs uppercase tracking-wide text-muted-foreground">Live preview</span>
-              <Button size="sm" variant="ghost" className="h-7 rounded-full gap-1.5 text-xs" onClick={() => setShowPreview(true)}>
+              <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => setShowPreview(true)}>
                 <Eye className="h-3.5 w-3.5" /> Full size
               </Button>
             </div>
@@ -1618,7 +1618,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           <div className="absolute inset-0 z-50 flex flex-col bg-muted/40">
             <div className="flex items-center justify-between border-b border-border/60 bg-background px-4 h-14 shrink-0">
               <span className="text-sm font-medium">Invoice preview</span>
-              <Button size="sm" variant="ghost" className="rounded-full gap-1.5" onClick={() => setShowPreview(false)}><ChevronLeft className="h-4 w-4" /> Back to edit</Button>
+              <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setShowPreview(false)}><ChevronLeft className="h-4 w-4" /> Back to edit</Button>
             </div>
             <div className="flex-1 overflow-auto flex justify-center px-6 py-6 no-card-hover">
               <div className="h-fit"><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>

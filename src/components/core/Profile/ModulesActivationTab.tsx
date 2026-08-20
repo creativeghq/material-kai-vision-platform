@@ -284,7 +284,7 @@ export const ModulesActivationTab: React.FC = () => {
       type="button"
       onClick={() => setFilter(id)}
       className={cn(
-        'rounded-full border px-3 py-1 text-xs transition-colors',
+        'border px-3 py-1 text-xs transition-colors',
         filter === id
           ? 'border-transparent bg-primary text-primary-foreground'
           : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',

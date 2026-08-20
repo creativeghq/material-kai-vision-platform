@@ -270,7 +270,6 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
             variant="outline"
             onClick={() => rebuildAspects(['color', 'texture', 'style', 'material'], 'admin manual rebuild — all aspects')}
             disabled={rebuildingAspect !== null || !va.present}
-            className="rounded-full"
           >
             {rebuildingAspect === 'color,texture,style,material' ? (
               <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -357,7 +356,7 @@ const AspectRow: React.FC<{
           variant="ghost"
           onClick={onRebuild}
           disabled={disabled}
-          className="h-7 px-2 rounded-full"
+          className="h-7 px-2"
         >
           {isRebuilding ? (
             <Loader2 className="h-3 w-3 animate-spin" />

@@ -115,10 +115,10 @@ export default function SupplierClaimsPage() {
               )}
 
               <div className="flex items-center justify-end gap-2">
-                <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busyId === c.id} onClick={() => decide(c, false)}>
+                <Button size="sm" variant="outline" className="h-8" disabled={busyId === c.id} onClick={() => decide(c, false)}>
                   <X className="h-3.5 w-3.5 mr-1" /> Reject
                 </Button>
-                <Button size="sm" className="rounded-full h-8" disabled={busyId === c.id || !!c.already_claimed_by} onClick={() => decide(c, true)}>
+                <Button size="sm" className="h-8" disabled={busyId === c.id || !!c.already_claimed_by} onClick={() => decide(c, true)}>
                   {busyId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" /> Approve</>}
                 </Button>
               </div>

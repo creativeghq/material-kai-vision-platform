@@ -255,7 +255,7 @@ export const ZoneConfigurator: React.FC<ZoneConfiguratorProps> = ({
 
                             <div className="flex items-center gap-1">
                               <Button
-                                type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full"
+                                type="button" variant="outline" size="icon" className="h-8 w-8"
                                 disabled={readOnly || row.qty <= 1}
                                 aria-label={`One fewer ${mod.label}`}
                                 onClick={() => patchRow(zone.key, row.id, { qty: Math.max(1, row.qty - 1) })}
@@ -264,7 +264,7 @@ export const ZoneConfigurator: React.FC<ZoneConfiguratorProps> = ({
                               </Button>
                               <span className="w-7 text-center text-sm tabular-nums">{row.qty}</span>
                               <Button
-                                type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full"
+                                type="button" variant="outline" size="icon" className="h-8 w-8"
                                 disabled={readOnly}
                                 aria-label={`One more ${mod.label}`}
                                 onClick={() => patchRow(zone.key, row.id, { qty: row.qty + 1 })}
@@ -320,7 +320,7 @@ export const ZoneConfigurator: React.FC<ZoneConfiguratorProps> = ({
                       <div className="flex flex-wrap gap-2 pt-1">
                         {(zone.modules ?? []).map((m) => (
                           <Button
-                            key={m.key} type="button" variant="outline" size="sm" className="rounded-full"
+                            key={m.key} type="button" variant="outline" size="sm"
                             onClick={() => addRow(zone, m)}
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" />{m.label}

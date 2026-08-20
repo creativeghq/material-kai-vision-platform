@@ -75,7 +75,7 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
               {health ? <> · last checked {timeAgo(health.created_at)}</> : null}
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="rounded-full" onClick={run} disabled={running}>
+          <Button variant="outline" size="sm" onClick={run} disabled={running}>
             {running ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
             {health ? 'Re-check' : 'Run check'}
           </Button>

@@ -525,7 +525,7 @@ function SendEstimateDialog({
         if (!v) { setError(null); setReference(null); }
       }}
     >
-      <Button className="rounded-full whitespace-nowrap gap-2" onClick={() => setOpen(true)}>
+      <Button className="whitespace-nowrap gap-2" onClick={() => setOpen(true)}>
         <Send className="h-4 w-4" />
         Get this quoted
       </Button>
@@ -540,9 +540,9 @@ function SendEstimateDialog({
               Thanks — we have your configuration at {formatMoney(subtotal, currency)} and will come back
               to you with a firm quote.
             </p>
-            <Badge variant="outline" className="rounded-full">Reference {reference}</Badge>
+            <Badge variant="outline">Reference {reference}</Badge>
             <div>
-              <Button variant="ghost" className="rounded-full mt-2" onClick={() => setOpen(false)}>Close</Button>
+              <Button variant="ghost" className="mt-2" onClick={() => setOpen(false)}>Close</Button>
             </div>
           </div>
         ) : (
@@ -594,7 +594,7 @@ function SendEstimateDialog({
               )}
               {error && <p className="text-sm text-destructive">{error}</p>}
 
-              <Button className="w-full rounded-full gap-2" disabled={sending} onClick={submit}>
+              <Button className="w-full gap-2" disabled={sending} onClick={submit}>
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 Send my estimate
               </Button>

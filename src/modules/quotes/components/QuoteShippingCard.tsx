@@ -101,7 +101,7 @@ export const QuoteShippingCard: React.FC<{ quoteId: string; editable: boolean; o
                         <td className="px-3 py-2 text-right font-medium">{money(o.amount, o.currency)}</td>
                         <td className="px-3 py-2 text-right">
                           {editable && (
-                            <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={adding === `${q.id}:${i}`} onClick={() => addOfferAsLine(q, o, `${q.id}:${i}`)}>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" disabled={adding === `${q.id}:${i}`} onClick={() => addOfferAsLine(q, o, `${q.id}:${i}`)}>
                               {adding === `${q.id}:${i}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" /> Add to quote</>}
                             </Button>
                           )}
