@@ -189,8 +189,29 @@ RPC `finance_mydata_reconciliation(...)` — every issued legal document buckete
 - `summarize(...)` — groups by `(section × effective rate)`.
 - **CSV**: 13 columns (`Date, Kind, myDATA type, Number, Series, Counterpart, VAT No, Net, VAT, Total, Rate %, MARK, Status`), UTF-8 BOM-prefixed for Excel Greek support. Imports into Epsilon Net / SoftOne / Megasoft via column mapping — plain delimited CSV, no proprietary format.
 
+### When revenue counts — one derivation, one predicate
+Not every sale becomes an invoice here: plenty are sold, delivered and paid straight off the order. So
+**`vw_uninvoiced_sales_order_lines`** (line level) and **`vw_uninvoiced_sales_orders`** (its per-order
+aggregate) hold the whole recognition rule: *a sales order counts as revenue once it leaves `draft`,
+and stops counting the moment a live invoice exists for it* — the invoice takes over, so nothing is
+counted twice. Moving recognition to fulfilment is a one-line edit to that predicate and every
+consumer follows.
+
+`vw_monthly_pnl`, `report_customer_profitability`, `report_pnl_per_category` and the six sales reports
+all read it. They did not always: the rule was written out twice, missing from the rest, and a
+workspace selling on orders therefore read a profitable month as a pure loss in *P&L by category*
+(its costs were booked as supplier bills, its revenue existed nowhere) while the dashboard showed
+the margin. Two rules for consumers adding themselves:
+- **Take `revenue_net`, never the order's `cogs`, if you already count supplier bills** — that bill *is* the cost of goods, and counting both books it twice.
+- **Never add order VAT to a VAT figure.** An order declares nothing to AADE; `vat_income` feeds the VAT return and stays document-only.
+
 ### Additional reports
 All backed by `assert_workspace_member`-guarded RPCs: sales per day/customer/product/category/factory/designer; purchases per product; receipts per product; spend per supplier; payments in/out per counterparty; top customer/supplier outstanding; open tasks/follow-ups; customer top products. Plus views `vw_ar_aging`, `vw_ap_aging`, `vw_cash_flow_forecast`, `vw_monthly_pnl` (used by the digest + dashboard).
+
+The per-day / per-customer / per-designer three summed the INVOICE's `subtotal_net` across a join to
+`invoice_items`, so a 3-line invoice reported 3× its revenue. The count had been guarded with
+`COUNT(DISTINCT)` and the margin is per line, so revenue was the one number nobody watched. Margin is
+now folded per document *before* the sum — keep it that way when editing them.
 
 ---
 
