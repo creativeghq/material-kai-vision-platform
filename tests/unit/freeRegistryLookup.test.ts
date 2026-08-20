@@ -121,6 +121,44 @@ describe('company_registry_lookup stays the free path', () => {
   });
 
   /**
+   * GLEIF's `filter[fulltext]` searches every indexed field, not just the name, and its ranking
+   * reflects that. Searching Italy for "Marazzi" put **PRO-BIKE SRL first** — a different company
+   * entirely, with the word Marazzi nowhere in its name, carrying a real LEI and a real address.
+   * Six genuine MARAZZI companies ranked below it. Handed to the agent unranked, that is not a
+   * fuzzy match; it is the wrong company presented as a confident one.
+   *
+   * Re-ranked and NOT filtered, which is the half that is easy to get wrong on a later edit: GLEIF
+   * holds Karelia as `ΚΑΠΝΟΒΙΟΜΗΧΑΝΙΑ ΚΑΡΕΛΙΑ ΑΝΩΝΥΜΟΣ ΕΤΑΙΡΕΙΑ`, so a name in another script is a
+   * real match this check cannot always confirm. Dropping it would lose the Greek supplier — the
+   * exact case the platform's folding and transliteration machinery exists for.
+   */
+  it('re-ranks GLEIF by whether the name actually matches, and never drops the rest', () => {
+    expect(SRC, 'the name-match check is gone').toMatch(/function nameMatchesQuery\(/);
+    expect(SRC, 'every GLEIF match must carry the verdict').toMatch(/name_matches_query:\s*nameMatchesQuery\(/);
+
+    const fn = SRC.slice(SRC.indexOf('function nameMatchesQuery('));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+    expect(
+      body,
+      'the check must transliterate before folding. foldForSearch handles case and accents and '
+      + 'explicitly does NOT transliterate, so without this a Latin query never matches a Greek or '
+      + 'Cyrillic legal name and the supplier is silently ranked last.',
+    ).toMatch(/transliterateToLatin\(/);
+    expect(body, 'and it must fold — raw comparison misses Ż, ά and final sigma').toMatch(/foldForSearch\(/);
+
+    const from = SRC.indexOf('async function lookupGleif(');
+    expect(from, 'lookupGleif is gone — re-point this guard').toBeGreaterThan(-1);
+    const after = SRC.indexOf('\nconst NATIONAL_REGISTRIES', from);
+    const gleifBody = SRC.slice(from, after > -1 ? after : from + 4000);
+    expect(
+      gleifBody,
+      'non-matching GLEIF rows must still be RETURNED, just ranked below the matching ones — a '
+      + 'silent drop loses every company whose name is written in another script.',
+    ).toMatch(/matches:\s*\[\.\.\.byName,\s*\.\.\.rest\]/);
+    expect(gleifBody, 'a result set with no name match must say so').toMatch(/caution:/);
+  });
+
+  /**
    * The covered-country list is DERIVED from the table. Hand-listing it anywhere is how the tool
    * description ends up promising a register that was removed, which the model cannot detect.
    */

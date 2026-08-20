@@ -43,6 +43,7 @@ import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils
 import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
 import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
+import { transliterateToLatin } from '../transliterate.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -1037,10 +1038,37 @@ async function registryFetch(
 }
 
 /**
+ * Does the searched-for name actually appear in this company's legal name?
+ *
+ * GLEIF's `filter[fulltext]` searches every indexed field, not just the name — a director's
+ * surname, an "other name", an address line. Searching Italy for **Marazzi** returns
+ * **PRO-BIKE SRL as the top result**, and the word Marazzi is nowhere in that company's name. Six
+ * genuine MARAZZI companies rank below it. Handed straight to the agent that is not a bad match,
+ * it is a DIFFERENT COMPANY presented as a confident hit, with a real LEI and a real address on it.
+ *
+ * Transliterated before folding, because dropping a non-matching result would otherwise break the
+ * case this platform cares most about: GLEIF holds Karelia as `ΚΑΠΝΟΒΙΟΜΗΧΑΝΙΑ ΚΑΡΕΛΙΑ ΑΝΩΝΥΜΟΣ
+ * ΕΤΑΙΡΕΙΑ`, and a Latin query never touches Greek text. `foldForSearch` handles case and accents
+ * and explicitly does NOT transliterate — that is `transliterateToLatin`'s job, and both are needed.
+ */
+function nameMatchesQuery(query: string, legalName: unknown): boolean {
+  const fold = (v: unknown) => foldForSearch(transliterateToLatin(String(v ?? '')) ?? String(v ?? ''))
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+  const haystack = fold(legalName);
+  if (!haystack) return false;
+  // Tokens under 3 chars are legal-form noise ("sa", "srl", "ag") and match everything.
+  const tokens = fold(query).split(' ').filter((t) => t.length >= 3);
+  if (!tokens.length) return false;
+  return tokens.every((t) => haystack.includes(t));
+}
+
+/**
  * GLEIF fulltext search.
  *
  * `filter[entity.legalName]` is an exact-ish match and misses real companies — "KARELIA" returns
- * nothing through it and 15 records through fulltext. Use fulltext.
+ * nothing through it and 15 records through fulltext. Use fulltext, then re-rank by whether the
+ * name actually matches, because fulltext's own ranking does not (see `nameMatchesQuery`).
  */
 async function lookupGleif(name: string, country?: string): Promise<RegistrySource> {
   const params = new URLSearchParams({ 'filter[fulltext]': name, 'page[size]': '5' });
@@ -1051,10 +1079,7 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
   if (!r.ok) return { status: 'unavailable', error: r.error || `GLEIF HTTP ${r.status}` };
   const records = Array.isArray(r.body?.data) ? r.body.data : [];
   if (!records.length) return { status: 'miss' };
-  return {
-    status: 'hit',
-    total: r.body?.meta?.pagination?.total ?? records.length,
-    matches: records.map((rec: any) => {
+  const mapped = records.map((rec: any) => {
       const e = rec?.attributes?.entity ?? {};
       const addr = e.legalAddress;
       return {
@@ -1064,6 +1089,7 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
         status: e.status ?? null,
         registered_as: e.registeredAs ?? null,
         jurisdiction: e.jurisdiction ?? null,
+        name_matches_query: nameMatchesQuery(name, e.legalName?.name),
         registered_address: addr
           ? {
             lines: addr.addressLines ?? [],
@@ -1074,7 +1100,24 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
           }
           : null,
       };
+  });
+
+  // Re-ranked, never filtered. Dropping the non-matching ones would be wrong for the case this
+  // platform cares most about: a name written in another script is a legitimate match that this
+  // check cannot always confirm, and a silent drop there is worse than a flagged extra row.
+  const byName = mapped.filter((m: any) => m.name_matches_query);
+  const rest = mapped.filter((m: any) => !m.name_matches_query);
+
+  return {
+    status: 'hit',
+    total: r.body?.meta?.pagination?.total ?? mapped.length,
+    name_matched: byName.length,
+    ...(byName.length ? {} : {
+      caution: 'GLEIF matched these on some field OTHER than the legal name — a director\'s surname, '
+        + 'an address, a former name. Treat them as leads, not as this company, and confirm against '
+        + 'the national register before saving anything.',
     }),
+    matches: [...byName, ...rest],
   };
 }
 
