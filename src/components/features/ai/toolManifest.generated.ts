@@ -287,6 +287,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'company_registry_lookup',
+    file: 'supabase/functions/_shared/tools/b2b-tools.ts',
+    factory: 'createCompanyRegistryLookupTool',
+    description: 'Look a company up in the OFFICIAL public registries — GLEIF (worldwide legal entities), ARES (Czech business register), ANAF (Romanian tax authority).',
+    params: [
+      { name: 'company_name', type: 'string', optional: false, description: 'Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required.' },
+      { name: 'country', type: 'string', optional: true, description: '2-letter ISO country code (PL, CZ, RO, GR…). Narrows every source, and is what enables the national registers.' },
+      { name: 'registration_id', type: 'string', optional: true, description: 'A known national registration number, if you have one. A Romanian CUI unlocks the ANAF record (activity code, VAT status).' },
+    ],
+  },
+  {
     name: 'company_website_scrape',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createCompanyWebsiteScrapeTool',

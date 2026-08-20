@@ -962,6 +962,241 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
 };
 
 /**
+ * B2B Research Tool: Official-registry lookup — FREE, and deliberately so.
+ *
+ * The paid providers (Apollo here, Explee in #334) sell employee counts, revenue and
+ * technographics. Those are not the only things worth knowing about a factory, and they were the
+ * only things we were paying to learn. The official registries answer a different and, for a
+ * SOURCING workflow, more load-bearing question — is this a real, active legal entity, what is it
+ * called on paper, where is it registered, what is its registration number — and they answer it
+ * for nothing, from public endpoints that need no key and no account.
+ *
+ * This is NOT a second copy of `create_company_from_vat`. That tool goes VAT → company through
+ * ΑΑΔΕ / VIES, which is the right path when someone hands you a VAT number. Discovery runs the
+ * other way: `b2b_manufacturer_search` yields a NAME and a website and no VAT at all, so the VIES
+ * path cannot be entered from it. This closes that gap by starting from the name, and the
+ * registration id it recovers is what makes the existing VIES/ΑΑΔΕ path reachable afterwards.
+ * Chain them; do not reimplement either.
+ *
+ * Sources, all keyless, all verified against the live endpoints:
+ *   • GLEIF    — 3.4M legal entities worldwide. Legal name, legal form, status, registered and HQ
+ *                address, and `registeredAs` (the LOCAL registry number). Registration is
+ *                voluntary for non-financial firms, so a miss is a miss, not a failure.
+ *   • ARES     — the Czech business register. Name search returns IČO + registered address.
+ *   • ANAF     — the Romanian tax authority. Keyed by CUI, so it runs only when one is supplied;
+ *                returns the CAEN activity code, live VAT-registration status and a phone number.
+ *
+ * OpenStreetMap was built into this tool and then TAKEN BACK OUT, which is worth recording so it
+ * does not get re-added on the same reasoning. It looked like the one free source carrying a phone
+ * number. Measured: Overpass answers a country-wide name regex with a timeout (it is not a name
+ * search engine), and Nominatim — which is — found 3 of 4 test manufacturers and returned a phone
+ * for none of them. OSM has phones for the corner shop and the local water utility, not for
+ * industrial manufacturers. A source that reports `miss` forever is the silent-zero shape, so it
+ * is better absent than present.
+ *
+ * Every source reports `hit` / `miss` / `unavailable` SEPARATELY (pipeline convention 1). A single
+ * empty return would collapse "the Czech register has no such company" into "the Czech register
+ * was down", and only the first of those means the answer is actually no.
+ */
+const REGISTRY_TIMEOUT_MS = 12000;
+
+type RegistrySource = { status: 'hit' | 'miss' | 'unavailable'; error?: string; [k: string]: unknown };
+
+/** Fetch with a hard deadline. Never throws — an unreachable registry is a reported state, not a crash. */
+async function registryFetch(
+  url: string,
+  init: RequestInit & { timeoutMs?: number } = {},
+): Promise<{ ok: boolean; status: number; body: any; error?: string }> {
+  const { timeoutMs = REGISTRY_TIMEOUT_MS, ...rest } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { ...rest, signal: controller.signal });
+    const text = await r.text();
+    let body: any = null;
+    try { body = JSON.parse(text); } catch { body = text; }
+    return { ok: r.ok, status: r.status, body };
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === 'AbortError';
+    return {
+      ok: false,
+      status: 0,
+      body: null,
+      error: aborted ? `timed out after ${timeoutMs}ms` : (e instanceof Error ? e.message : 'fetch failed'),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * GLEIF fulltext search.
+ *
+ * `filter[entity.legalName]` is an exact-ish match and misses real companies — "KARELIA" returns
+ * nothing through it and 15 records through fulltext. Use fulltext.
+ */
+async function lookupGleif(name: string, country?: string): Promise<RegistrySource> {
+  const params = new URLSearchParams({ 'filter[fulltext]': name, 'page[size]': '5' });
+  if (country) params.set('filter[entity.legalAddress.country]', country);
+  const r = await registryFetch(`https://api.gleif.org/api/v1/lei-records?${params}`, {
+    headers: { Accept: 'application/vnd.api+json' },
+  });
+  if (!r.ok) return { status: 'unavailable', error: r.error || `GLEIF HTTP ${r.status}` };
+  const records = Array.isArray(r.body?.data) ? r.body.data : [];
+  if (!records.length) return { status: 'miss' };
+  return {
+    status: 'hit',
+    total: r.body?.meta?.pagination?.total ?? records.length,
+    matches: records.map((rec: any) => {
+      const e = rec?.attributes?.entity ?? {};
+      const addr = e.legalAddress;
+      return {
+        lei: rec?.attributes?.lei ?? null,
+        legal_name: e.legalName?.name ?? null,
+        legal_form: e.legalForm?.id ?? null,
+        status: e.status ?? null,
+        registered_as: e.registeredAs ?? null,
+        jurisdiction: e.jurisdiction ?? null,
+        registered_address: addr
+          ? {
+            lines: addr.addressLines ?? [],
+            city: addr.city ?? null,
+            region: addr.region ?? null,
+            postal_code: addr.postalCode ?? null,
+            country: addr.country ?? null,
+          }
+          : null,
+      };
+    }),
+  };
+}
+
+/** Czech business register (ARES) — name search. */
+async function lookupAres(name: string): Promise<RegistrySource> {
+  const r = await registryFetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ obchodniJmeno: name, pocet: 5 }),
+  });
+  if (!r.ok) return { status: 'unavailable', error: r.error || `ARES HTTP ${r.status}` };
+  const rows = Array.isArray(r.body?.ekonomickeSubjekty) ? r.body.ekonomickeSubjekty : [];
+  if (!rows.length) return { status: 'miss' };
+  return {
+    status: 'hit',
+    total: r.body?.pocetCelkem ?? rows.length,
+    matches: rows.map((row: any) => ({
+      registration_id: row.ico ?? null,
+      legal_name: row.obchodniJmeno ?? null,
+      address: row.sidlo?.textovaAdresa ?? null,
+      city: row.sidlo?.nazevObce ?? null,
+      country: row.sidlo?.kodStatu ?? 'CZ',
+    })),
+  };
+}
+
+/** Romanian tax authority (ANAF) — keyed by CUI, so it only runs when the caller already has one. */
+async function lookupAnaf(cui: string): Promise<RegistrySource> {
+  // UTC today is correct HERE, and it is not the `todayLocalISO()` case (CLAUDE.md 1b). This is not
+  // a date of record: it is "was this company VAT-registered as at date X" asked of a Romanian
+  // government API, and the operator's local midnight has no bearing on the answer.
+  const asAt = new Date().toISOString().slice(0, 10);
+  const r = await registryFetch('https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ cui: Number(cui), data: asAt }]),
+  });
+  if (!r.ok) return { status: 'unavailable', error: r.error || `ANAF HTTP ${r.status}` };
+  const found = Array.isArray(r.body?.found) ? r.body.found : [];
+  if (!found.length) return { status: 'miss' };
+  const g = found[0]?.date_generale ?? {};
+  return {
+    status: 'hit',
+    match: {
+      registration_id: g.cui ?? null,
+      legal_name: g.denumire ?? null,
+      address: g.adresa ?? null,
+      phone: g.telefon || null,
+      activity_code_caen: g.cod_CAEN ?? null,
+      legal_form: g.forma_juridica ?? null,
+      trade_register_no: g.nrRegCom ?? null,
+      registration_status: g.stare_inregistrare ?? null,
+      vat_registered: found[0]?.inregistrare_scop_Tva?.scpTVA ?? null,
+    },
+  };
+}
+
+export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ company_name, country, registration_id }) => {
+      const name = String(company_name || '').trim();
+      if (!name) return JSON.stringify({ success: false, error: 'Provide a company name.' });
+      const cc = String(country || '').trim().toUpperCase().slice(0, 2) || undefined;
+
+      onProgress?.(`Checking official registries for ${name}…`);
+      const startTime = Date.now();
+
+      // Concurrent, because the sources are independent and the slowest should set the wall clock
+      // rather than the sum. `registryFetch` never throws, so no source can take the others down.
+      const [gleif, ares, anaf] = await Promise.all([
+        lookupGleif(name, cc),
+        cc === 'CZ'
+          ? lookupAres(name)
+          : Promise.resolve<RegistrySource>({ status: 'miss', error: 'ARES covers Czech entities only' }),
+        registration_id && cc === 'RO'
+          ? lookupAnaf(String(registration_id))
+          : Promise.resolve<RegistrySource>({ status: 'miss', error: 'ANAF needs a Romanian CUI' }),
+      ]);
+
+      const sources = { gleif, ares, anaf };
+      const hits = Object.entries(sources).filter(([, s]) => s.status === 'hit').map(([k]) => k);
+      const down = Object.entries(sources).filter(([, s]) => s.status === 'unavailable').map(([k]) => k);
+
+      // ANAF is the only registry here that publishes a phone number, and it often leaves the
+      // field blank. Absent is `null`, never an empty string — a caller testing truthiness on ''
+      // and on null behaves the same, but a caller STORING it does not.
+      const phone = anaf.status === 'hit' ? ((anaf.match as any)?.phone || null) : null;
+
+      onProgress?.(hits.length ? `Found ${name} in: ${hits.join(', ')}` : `No registry record for ${name}`);
+
+      return JSON.stringify({
+        // Success means the LOOKUP RAN. `found` carries whether anything was there. A registry
+        // that legitimately holds no record of a company is a real and useful answer, and it must
+        // not read to the agent as a failed call it should retry.
+        success: true,
+        found: hits.length > 0,
+        results: hits,
+        company_name: name,
+        country: cc ?? null,
+        phone,
+        sources,
+        sources_hit: hits,
+        sources_unavailable: down,
+        cost: { credits: 0, note: 'Official public registries — no key, no account, no charge.' },
+        next_step: 'A `registered_as` / `registration_id` from these sources is what `create_company_from_vat` '
+          + 'needs to pull the ΑΑΔΕ / VIES record. Chain to that rather than looking the company up again.',
+        elapsed_ms: Date.now() - startTime,
+      });
+    },
+    {
+      name: 'company_registry_lookup',
+      description:
+        'Look a company up in the OFFICIAL public registries — GLEIF (worldwide legal entities), '
+        + 'ARES (Czech business register), ANAF (Romanian tax authority). FREE: no credits, no '
+        + 'API key. Returns the legal name, legal form, registered address, registration number and '
+        + 'whether the entity is still active — the things that tell you a factory is real. '
+        + 'Start here before any PAID enrichment: it costs nothing, and the registration number it '
+        + 'returns is what `create_company_from_vat` needs to reach ΑΑΔΕ / VIES. It does NOT return '
+        + 'employee counts, revenue or technologies — use `company_enrichment` for those.',
+      schema: z.object({
+        company_name: z.string().describe('Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required.'),
+        country: z.string().optional().describe('2-letter ISO country code (PL, CZ, RO, GR…). Narrows every source, and is what enables the national registers.'),
+        registration_id: z.string().optional().describe('A known national registration number, if you have one. A Romanian CUI unlocks the ANAF record (activity code, VAT status).'),
+      }),
+    }
+  );
+};
+
+/**
  * B2B Research Tool: Contact Discovery
  * Uses Hunter.io Email Finder + domain search, Apollo.io fallback, and ZeroBounce validation
  */

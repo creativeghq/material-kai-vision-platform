@@ -139,7 +139,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
   },
   'b2b': {
-    tool_ids: ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm', 'scrape_materials_from_url', 'suggest_extraction_fields'],
+    tool_ids: ['b2b_manufacturer_search', 'company_website_scrape', 'company_registry_lookup', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm', 'scrape_materials_from_url', 'suggest_extraction_fields'],
   },
   'sub-agents': {
     tool_ids: ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'],

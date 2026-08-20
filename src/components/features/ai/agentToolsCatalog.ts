@@ -750,6 +750,16 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'company_registry_lookup', name: 'Registry Lookup', category: 'B2B Research',
+    adminOnly: true, credits: 0,
+    desc: 'Official public registries — GLEIF, Czech ARES, Romanian ANAF. '
+      + 'Legal name, registration number, registered address, still-active. Free: no key, no credits.',
+    examples: [
+      'Look up Ceramika Paradyż in the official registries',
+      'Is VITKOVICE HEAVY MACHINERY a real registered company in CZ?',
+    ],
+  },
+  {
     id: 'save_to_crm', name: 'Save to CRM', category: 'B2B Research',
     adminOnly: true,
     desc: 'Persist a discovered company / contact to the CRM.',
@@ -2931,12 +2941,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'b2b',
     name: 'B2B Research',
-    description: 'Manufacturer search, website scrape, company enrichment, contact discovery, email validate, save to CRM. Admin-only.',
+    description: 'Manufacturer search, website scrape, official-registry lookup, company enrichment, contact discovery, email validate, save to CRM. Admin-only.',
     icon: 'Building2',
     adminOnly: true,
     tool_ids: [
-      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
-      'contact_discovery', 'email_validate', 'save_to_crm',
+      'b2b_manufacturer_search', 'company_website_scrape', 'company_registry_lookup',
+      'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
     ],
     quick_starts: [
