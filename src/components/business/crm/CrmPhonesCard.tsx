@@ -5,6 +5,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { HubEmptyState } from '@/components/core/hub';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
@@ -162,7 +163,12 @@ export const CrmPhonesCard: React.FC<Props> = ({ workspaceId, companyId, contact
             ))}
             {editingId === 'new' && editor}
             {rows.length === 0 && editingId === null && (
-              <p className="text-xs text-muted-foreground py-2">No extra numbers yet.</p>
+              <HubEmptyState
+                icon={Phone}
+                title="No extra numbers yet"
+                description="Beyond the main number on the record — reception, the warehouse, accounts, an after-hours line. Each one gets its own name, so whoever is calling knows which to use."
+                action={<Button size="sm" onClick={startAdd}><Plus className="h-3.5 w-3.5 mr-1" />Add number</Button>}
+              />
             )}
           </>
         )}

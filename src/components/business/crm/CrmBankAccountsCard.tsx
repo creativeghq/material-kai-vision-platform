@@ -5,6 +5,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { crmBankAccountsAPI, type CrmBankAccount, type CrmBankAccountInput } from '@/services/crm.service';
 import { isValidIban, normalizeIban } from '@/utils/iban';
@@ -240,7 +241,12 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
             ))}
             {editingId === 'new' && editor}
             {rows.length === 0 && editingId === null && (
-              <p className="text-xs text-muted-foreground py-2">No bank accounts yet.</p>
+              <HubEmptyState
+                icon={Landmark}
+                title="No bank accounts yet"
+                description="This party's own accounts — the ones offered when you record a Bank Payment involving them. Separate from your own accounts in Finance → Settings."
+                action={<Button size="sm" onClick={startAdd}><Plus className="h-3.5 w-3.5 mr-1" />Add bank</Button>}
+              />
             )}
           </>
         )}
