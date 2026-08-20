@@ -1093,6 +1093,39 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
  * reported as `unavailable` — the register saying nothing is not the same as the register being
  * down, and the whole point of the per-source verdicts is keeping those apart.
  */
+/**
+ * Pick the CURRENT entry out of a register's versioned list.
+ *
+ * Slovakia and Finland both return every name and address a company has ever had, each with a
+ * validity window. Taking the first — or the last — element gives you whichever one the register
+ * happened to order first: the Slovak lookup for "Slovenské magnezitové závody" returned the
+ * 1993 state-enterprise name, expired in 1995, presented as the company's name. A wrong-but-real
+ * company name is the money-number defect wearing different clothes: it is a valid string, so
+ * nothing raises, and the operator writes to a company that has not existed for thirty years.
+ *
+ * An open window (`validTo` / `endDate` absent) is current. Failing that, the latest start wins.
+ */
+function currentVersion<T extends Record<string, any>>(arr: unknown, from: string, to: string): T | null {
+  if (!Array.isArray(arr) || !arr.length) return null;
+  const open = arr.filter((x) => x && !x[to]);
+  const pool = open.length ? open : arr;
+  return pool.reduce((best, x) => (String(x?.[from] ?? '') > String(best?.[from] ?? '') ? x : best), pool[0]) as T;
+}
+
+/**
+ * Put the still-trading companies first, keeping the register's own order within each group.
+ *
+ * A national register ranks by string match, not by whether the company still exists. Searching
+ * RPO for "Slovenské magnezitové závody" returns four state enterprises wound up between 1994 and
+ * 1996 ABOVE the a.s. that succeeded them, and the live one is fifth. An agent reading match[0]
+ * gets a factory that closed thirty years ago, and every field on it is real — which is why this
+ * cannot be left to the caller to notice.
+ */
+function activeFirst<T extends { registration_status?: string | null }>(matches: T[]): T[] {
+  const isActive = (m: T) => !String(m.registration_status ?? '').startsWith('DISSOLVED');
+  return [...matches.filter(isActive), ...matches.filter((m) => !isActive(m))];
+}
+
 type RegistryLookupArgs = { name: string; registrationId?: string };
 type NationalRegistry = {
   /** Human name, used in the tool description and the response. */
@@ -1147,21 +1180,25 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
       return {
         status: 'hit',
         total: rows.length,
-        matches: rows.slice(0, 5).map((row: any) => {
-          // RPO returns every historical name and address with validity windows. The CURRENT one
-          // is the entry with no `validTo` — taking [0] gives you the company's 1993 name.
-          const current = (arr: any[]) => (Array.isArray(arr) ? (arr.find((x) => !x?.validTo) ?? arr[arr.length - 1]) : null);
-          const nm = current(row.fullNames);
-          const addr = current(row.addresses);
-          const ident = current(row.identifiers);
+        matches: activeFirst(rows.slice(0, 5).map((row: any) => {
+          const nm = currentVersion<any>(row.fullNames, 'validFrom', 'validTo');
+          const addr = currentVersion<any>(row.addresses, 'validFrom', 'validTo');
+          const ident = currentVersion<any>(row.identifiers, 'validFrom', 'validTo');
           return {
             registration_id: ident?.value ?? null,
             legal_name: nm?.value ?? null,
             address: addr ? [addr.street, addr.buildingNumber, addr.municipality?.value, addr.postalCodes?.[0]].filter(Boolean).join(' ') || null : null,
             city: addr?.municipality?.value ?? null,
+            // `currentVersion` prefers an OPEN window, so a closed one coming back means the
+            // company has no open version at all — it is dissolved, not merely renamed. RPO answers
+            // a name search with defunct entities ranked alongside live ones ("Slovenské magnezitové
+            // závody, štátny podnik" wound up in 1995 outranks the a.s. that succeeded it), and
+            // without this the agent would offer an operator a factory that closed thirty years ago
+            // as a sourcing candidate. Nothing about the record looks wrong; it is just over.
+            registration_status: nm?.validTo ? `DISSOLVED (${nm.validTo})` : 'ACTIVE',
             country: 'SK',
           };
-        }),
+        })),
       };
     },
   },
@@ -1205,18 +1242,20 @@ const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
       return {
         status: 'hit',
         total: r.body?.totalResults ?? rows.length,
-        matches: rows.slice(0, 5).map((row: any) => {
-          // Same historical-versions shape as Slovakia: `endDate` absent means current.
-          const nm = Array.isArray(row.names) ? (row.names.find((n: any) => !n?.endDate) ?? row.names[0]) : null;
-          const addr = Array.isArray(row.addresses) ? (row.addresses.find((a: any) => !a?.endDate) ?? row.addresses[0]) : null;
+        matches: activeFirst(rows.slice(0, 5).map((row: any) => {
+          // Same versioned shape as Slovakia, different field names.
+          const nm = currentVersion<any>(row.names, 'registrationDate', 'endDate');
+          const addr = currentVersion<any>(row.addresses, 'registrationDate', 'endDate');
           return {
             registration_id: row.businessId?.value ?? null,
             legal_name: nm?.name ?? null,
             address: addr ? [addr.street, addr.buildingNumber, addr.postCode, addr.postOffices?.[0]?.city].filter(Boolean).join(' ') || null : null,
             activity_code: row.mainBusinessLine?.type ?? null,
+            // Same reasoning as Slovakia: no open name version means the company is wound up.
+            registration_status: nm?.endDate ? `DISSOLVED (${nm.endDate})` : 'ACTIVE',
             country: 'FI',
           };
-        }),
+        })),
       };
     },
   },
