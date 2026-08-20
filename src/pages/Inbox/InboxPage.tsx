@@ -42,7 +42,7 @@ import {
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
-  type IntakeConfirmation, type UserEmailAddress,
+  type IntakeConfirmation, type IntakeMatchMethod, type UserEmailAddress,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -1288,12 +1288,291 @@ const KitchenEstimatePanel: React.FC<{ thread: InboxThread }> = ({ thread }) => 
   );
 };
 
+/** One editable intake line. `line_no === null` marks a line the member added themselves. */
+interface DraftLine {
+  key: string;
+  line_no: number | null;
+  product_id: string | null;
+  description: string;
+  raw_text: string;
+  quantity: string;
+  price: string;
+  priceTouched: boolean;
+  needsReview: boolean;
+  matchMethod: IntakeMatchMethod;
+}
+
+/**
+ * Repoint one line at a different product. Runs the same MIVAA → ilike ladder the extractor used,
+ * server-side, so the reviewer picks from the catalog the reading was drawn from rather than a
+ * second, differently-behaved search.
+ */
+const IntakeProductPicker: React.FC<{
+  threadId: string;
+  onPick: (hit: { product_id: string; name: string }) => void;
+}> = ({ threadId, onPick }) => {
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<Array<{ product_id: string; name: string; score: number | null }>>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setHits([]); return; }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await inboxApi.searchIntakeProducts(threadId, q);
+        if (!cancelled) setHits(res.candidates);
+      } catch {
+        if (!cancelled) setHits([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query, threadId]);
+
+  return (
+    <div className="space-y-2">
+      <Input
+        autoFocus
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search the catalog…"
+        aria-label="Search the catalog for a product"
+        className="h-8 text-sm"
+      />
+      {searching && <div className="text-[11px] text-muted-foreground px-1">Searching…</div>}
+      {!searching && query.trim().length >= 2 && hits.length === 0 && (
+        <div className="text-[11px] text-muted-foreground px-1">
+          Nothing matched. Leave the line as free text — an order can carry one.
+        </div>
+      )}
+      <div className="max-h-56 overflow-y-auto">
+        {hits.map((h) => (
+          <button
+            key={h.product_id}
+            type="button"
+            onClick={() => onPick(h)}
+            className="w-full text-left text-sm px-2 py-1.5 rounded-sm hover:bg-accent transition-colors"
+          >
+            <span className="block truncate">{h.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * The per-line editor (#342 §4).
+ *
+ * `update_intake_items` and `search_intake_products` shipped with the rest of the intake and had
+ * no caller — a handler nothing renders, which left a reviewer with only two moves: accept the
+ * model's whole reading, or dismiss it. One wrong line meant dismissing four right ones.
+ *
+ * Two rules the shape of this follows from:
+ *
+ *  • **A price the member did not type is never sent back.** Supplying `unit_price` is exactly
+ *    what stamps `unit_price_source='manual'`, and a line silently flipped to manual stops
+ *    re-pricing when the customer is assigned — which is the one thing assigning a customer is
+ *    for. So the payload carries a price only for a field that was actually touched.
+ *  • **`line_no` is the server's handle on the previous reading**, not a display order. An
+ *    existing line keeps its ORIGINAL number even after reordering or deletion above it; the
+ *    server renumbers on save. A member-added line sends none, so it inherits nothing.
+ *
+ * The arithmetic here is display only. `update_intake_items` re-resolves every price server-side
+ * and `recompute_order_totals` has the last word once the order exists — nothing computed in this
+ * component is ever stored.
+ */
+const IntakeLineEditor: React.FC<{
+  threadId: string;
+  intake: OrderIntake;
+  busy: boolean;
+  onSaved: (intake: OrderIntake, totals: IntakeTotals) => void;
+  onCancel: () => void;
+}> = ({ threadId, intake, busy, onSaved, onCancel }) => {
+  const { toast } = useToast();
+  const nextKey = useRef(0);
+  const makeKey = () => `l${nextKey.current++}`;
+
+  const [draft, setDraft] = useState<DraftLine[]>(() =>
+    intake.items.map((it) => ({
+      key: makeKey(),
+      line_no: it.line_no,
+      product_id: it.product_id,
+      description: it.description,
+      raw_text: it.raw_text,
+      quantity: String(it.quantity),
+      price: it.unit_price == null ? '' : String(it.unit_price),
+      priceTouched: false,
+      needsReview: it.needs_review,
+      matchMethod: it.match_method,
+    })),
+  );
+  const [saving, setSaving] = useState(false);
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
+
+  const patch = (key: string, changes: Partial<DraftLine>) =>
+    setDraft((rows) => rows.map((r) => (r.key === key ? { ...r, ...changes } : r)));
+
+  const addLine = () =>
+    setDraft((rows) => [...rows, {
+      key: makeKey(), line_no: null, product_id: null, description: '', raw_text: '',
+      quantity: '1', price: '', priceTouched: false, needsReview: true, matchMethod: 'manual',
+    }]);
+
+  const displayTotal = draft.reduce((sum, r) => {
+    const q = Number(r.quantity);
+    const p = Number(r.price);
+    return sum + (Number.isFinite(q) && Number.isFinite(p) && r.price !== '' ? q * p : 0);
+  }, 0);
+
+  const save = async () => {
+    if (draft.length === 0) {
+      toast({
+        title: 'An order needs at least one line',
+        description: 'Dismiss the whole thing instead if nothing here is real.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    for (const [i, r] of draft.entries()) {
+      const q = Number(r.quantity);
+      if (!Number.isFinite(q) || q <= 0) {
+        toast({ title: `Line ${i + 1} needs a quantity`, description: 'A quantity must be a positive number.', variant: 'destructive' });
+        return;
+      }
+      if (!r.product_id && !r.description.trim()) {
+        toast({ title: `Line ${i + 1} needs a description`, description: 'Pick a product, or say what it is in words.', variant: 'destructive' });
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const items = draft.map((r) => ({
+        ...(r.line_no === null ? {} : { line_no: r.line_no }),
+        product_id: r.product_id,
+        description: r.description.trim(),
+        raw_text: r.raw_text,
+        quantity: Number(r.quantity),
+        // Touched only. An untouched field means "whatever the resolver said", not "this number".
+        ...(r.priceTouched ? { unit_price: r.price.trim() === '' ? null : Number(r.price) } : {}),
+      }));
+      const res = await inboxApi.updateIntakeItems(threadId, items);
+      onSaved(res.intake, res.totals);
+      toast({ title: 'Lines saved', description: 'Prices were re-checked for anything you repointed.' });
+    } catch (e) {
+      toast({ title: 'Could not save the lines', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="space-y-2 mb-3">
+        {draft.map((r, i) => (
+          <div key={r.key} className="rounded-sm border border-hairline p-2 space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={r.quantity}
+                onChange={(e) => patch(r.key, { quantity: e.target.value })}
+                inputMode="decimal"
+                aria-label={`Quantity for line ${i + 1}`}
+                className="h-8 w-14 text-sm text-right tabular-nums px-1.5"
+              />
+              <Popover open={openPicker === r.key} onOpenChange={(o) => setOpenPicker(o ? r.key : null)}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex-1 min-w-0 text-left text-sm h-8 px-2 rounded-sm border border-hairline hover:bg-accent transition-colors"
+                  >
+                    <span className="block truncate">
+                      {r.description || <span className="text-muted-foreground">Pick a product…</span>}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 p-2">
+                  <IntakeProductPicker
+                    threadId={threadId}
+                    onPick={(hit) => {
+                      // Repointing clears any manual price: the whole reason to repoint is to get
+                      // THIS product's price for THIS customer, which only the resolver knows.
+                      patch(r.key, {
+                        product_id: hit.product_id,
+                        description: hit.name,
+                        price: '',
+                        priceTouched: false,
+                        matchMethod: 'manual',
+                        needsReview: false,
+                      });
+                      setOpenPicker(null);
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 shrink-0"
+                aria-label={`Remove line ${i + 1}`}
+                onClick={() => setDraft((rows) => rows.filter((x) => x.key !== r.key))}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={r.price}
+                onChange={(e) => patch(r.key, { price: e.target.value, priceTouched: true })}
+                inputMode="decimal"
+                placeholder="unit price"
+                aria-label={`Unit price for line ${i + 1}`}
+                className="h-7 w-24 text-xs text-right tabular-nums px-1.5"
+              />
+              <span className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">
+                {r.priceTouched
+                  ? 'your price'
+                  : r.price === ''
+                    ? 'no price yet — the resolver will try'
+                    : r.raw_text || 'from the price list'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Button size="sm" variant="outline" className="w-full mb-3" onClick={addLine} disabled={saving}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Add a line
+      </Button>
+
+      <div className="flex items-center justify-between text-sm border-t border-hairline pt-2.5 mb-3">
+        <span className="text-muted-foreground">Total (excl. VAT)</span>
+        <span className="tabular-nums" style={{ fontWeight: 600 }}>
+          {formatMoney(displayTotal, intake.currency)}
+        </span>
+      </div>
+
+      <div className="flex gap-2">
+        <Button size="sm" className="flex-1" disabled={saving || busy} onClick={save}>
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save lines'}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={saving} onClick={onCancel}>Cancel</Button>
+      </div>
+    </>
+  );
+};
+
 /**
  * Order intake (#342) — the "assign / set as an actual order" surface.
  *
- * Deliberately small: fix the customer, fix an obviously-wrong line, approve. It is NOT a second
- * order editor — per-line supplier, warehouse, customs, discounts and dispatch all already live
- * on the real order, and the panel links there the moment one exists.
+ * Deliberately small: fix the customer, fix the lines, approve. It is NOT a second order editor —
+ * per-line supplier, warehouse, customs, discounts and dispatch all already live on the real
+ * order, and the panel links there the moment one exists.
  */
 const OrderIntakePanel: React.FC<{
   thread: InboxThread;
@@ -1306,6 +1585,7 @@ const OrderIntakePanel: React.FC<{
   const [canApprove, setCanApprove] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1414,6 +1694,14 @@ const OrderIntakePanel: React.FC<{
         <p className="text-xs text-muted-foreground">
           Dismissed. A new message from this customer starts a fresh reading.
         </p>
+      ) : editing ? (
+        <IntakeLineEditor
+          threadId={thread.id}
+          intake={intake}
+          busy={busy}
+          onSaved={(next, nextTotals) => { setIntake(next); setTotals(nextTotals); setEditing(false); }}
+          onCancel={() => setEditing(false)}
+        />
       ) : (
         <>
           <div className="space-y-1.5 mb-3">
@@ -1436,17 +1724,24 @@ const OrderIntakePanel: React.FC<{
             ))}
           </div>
 
-          <div className="flex items-center justify-between text-sm border-t border-white/10 pt-2.5 mb-3">
+          <div className="flex items-center justify-between text-sm border-t border-hairline pt-2.5 mb-3">
             <span className="text-muted-foreground">Total (excl. VAT)</span>
-            <span style={{ fontWeight: 600 }}>{formatMoney(totals?.net ?? 0, intake.currency)}</span>
+            <span className="tabular-nums" style={{ fontWeight: 600 }}>{formatMoney(totals?.net ?? 0, intake.currency)}</span>
           </div>
 
           {reviewCount > 0 && (
             <div className="flex items-start gap-2 text-xs text-warning mb-3">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>{reviewCount} line{reviewCount === 1 ? '' : 's'} need a look before this is right.</span>
+              <span>
+                {reviewCount} line{reviewCount === 1 ? '' : 's'} need a look before this is right.
+                Fix {reviewCount === 1 ? 'it' : 'them'} below rather than dismissing the rest.
+              </span>
             </div>
           )}
+
+          <Button size="sm" variant="outline" className="w-full mb-3" disabled={busy} onClick={() => setEditing(true)}>
+            <Settings2 className="w-3.5 h-3.5 mr-1.5" /> Edit lines
+          </Button>
 
           {needsCustomer && (
             <div className="mb-3">
@@ -1454,7 +1749,7 @@ const OrderIntakePanel: React.FC<{
                 Assign a customer before approving — the price depends on who is buying.
               </p>
               {context?.contact?.id && (
-                <Button size="sm" variant="outline" className="rounded-full w-full" disabled={busy} onClick={assignThreadContact}>
+                <Button size="sm" variant="secondary" className="w-full" disabled={busy} onClick={assignThreadContact}>
                   Use {context.contact.name || 'this contact'}
                 </Button>
               )}
@@ -1465,13 +1760,13 @@ const OrderIntakePanel: React.FC<{
             <div className="flex gap-2">
               <Button
                 size="sm"
-                className="rounded-full flex-1"
+                className="flex-1"
                 disabled={busy || needsCustomer}
                 onClick={approve}
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Approve as pre-order'}
               </Button>
-              <Button size="sm" variant="ghost" className="rounded-full" disabled={busy} onClick={reject}>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={reject}>
                 Dismiss
               </Button>
             </div>

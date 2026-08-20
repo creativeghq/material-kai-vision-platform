@@ -432,7 +432,16 @@ export const inboxApi = {
   }) {
     return call<{ intake: OrderIntake; totals: IntakeTotals }>('update_intake', { thread_id, ...changes });
   },
-  /** Replace the lines wholesale — fix one, drop one, add one. */
+  /**
+   * Replace the lines wholesale — fix one, drop one, add one.
+   *
+   * Two things the caller has to get right, because the server cannot infer either:
+   *  • `line_no` names the PREVIOUS reading this line continues, so keep an existing line's
+   *    original number even after reordering; omit it entirely for a line the member added.
+   *  • Send `unit_price` ONLY for a price the member actually typed. Supplying it stamps
+   *    `unit_price_source='manual'`, and a manual line stops re-pricing when the customer
+   *    changes — so echoing back a resolver price silently freezes it.
+   */
   updateIntakeItems(thread_id: string, items: Array<Partial<IntakeItem>>) {
     return call<{ intake: OrderIntake; totals: IntakeTotals }>('update_intake_items', { thread_id, items });
   },

@@ -342,7 +342,29 @@ the notification is best-effort and visible. The outcome is stored on the intake
 ### Surface
 
 The details rail gains an **Order** panel above Customer value: proposed lines, needs-review
-markers, a customer picker, Approve / Dismiss. Approve is **hidden** for roles the RPC would refuse.
-It is deliberately small — not a second order editor; per-line supplier, warehouse, customs and
-dispatch stay on the real order, which it links to once one exists. The conversation list gains an
-**Order** badge and an order filter, so a proposal is visible without opening the thread.
+markers, a customer picker, **Edit lines**, Approve / Dismiss. Approve is **hidden** for roles the
+RPC would refuse. It is deliberately small — not a second order editor; per-line supplier,
+warehouse, customs and dispatch stay on the real order, which it links to once one exists. The
+conversation list gains an **Order** badge and an order filter, so a proposal is visible without
+opening the thread.
+
+**Edit lines** is what makes the panel usable on a reading that is *mostly* right. Without it a
+reviewer could only accept all of the model's lines or dismiss all of them, so one wrong line cost
+four right ones — and `update_intake_items` / `search_intake_products` existed, complete and
+routed, with nothing calling them. Each line takes a quantity, a catalog repoint (the same MIVAA →
+ilike ladder the extractor ran, so the reviewer picks from the catalog the reading came from), an
+optional price, and removal; a line the extractor missed can be added.
+
+Two rules the editor obeys, both of which are invisible when broken:
+
+- **A price the member did not type is never sent back.** Supplying `unit_price` is exactly what
+  stamps `unit_price_source='manual'`, and a manual line stops re-pricing when the customer is
+  assigned — the one thing assigning a customer is for. So the payload carries a price only for a
+  field that was actually touched, and repointing a line clears it, because the point of repointing
+  is to get *that* product's price for *this* customer.
+- **`line_no` is the server's handle on the previous reading**, not a display position. An existing
+  line keeps its original number through reordering and deletion; the server renumbers on save. A
+  member-added line sends none, so it inherits nothing from a neighbour.
+
+Reachability is guarded: [tests/unit/inboxApiReachability.test.ts](../tests/unit/inboxApiReachability.test.ts)
+fails the build for any `inbox-api` action with no caller in `src/`.
