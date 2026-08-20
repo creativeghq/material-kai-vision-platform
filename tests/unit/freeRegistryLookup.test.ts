@@ -31,11 +31,18 @@ const SRC = stripComments(
 
 /** The tool body, from its factory to the next top-level export. */
 const TOOL = (() => {
-  const from = SRC.indexOf('createCompanyRegistryLookupTool');
+  const from = SRC.indexOf('export const createCompanyRegistryLookupTool');
   expect(from, 'createCompanyRegistryLookupTool is gone — re-point this guard').toBeGreaterThan(-1);
-  const next = SRC.indexOf('export const create', from + 40);
+  const next = SRC.indexOf('export const create', from + 44);
   return SRC.slice(from, next > -1 ? next : undefined);
 })();
+
+/** The routing table, which is where the country coverage actually lives. */
+const TABLE = () => {
+  const from = SRC.indexOf('const NATIONAL_REGISTRIES');
+  expect(from, 'NATIONAL_REGISTRIES is gone — re-point this guard').toBeGreaterThan(-1);
+  return SRC.slice(from, SRC.indexOf('const REGISTRY_COUNTRIES'));
+};
 
 describe('company_registry_lookup stays the free path', () => {
   it('debits nothing', () => {
@@ -80,15 +87,52 @@ describe('company_registry_lookup stays the free path', () => {
     }
     expect(TOOL, 'the per-source verdicts must reach the caller').toMatch(/sources_unavailable/);
 
-    // Each source function has to be able to say all three, or its outages read as misses.
-    for (const fn of ['lookupGleif', 'lookupAres', 'lookupAnaf']) {
-      const at = SRC.indexOf(`async function ${fn}(`);
-      expect(at, `${fn} is gone — re-point this guard`).toBeGreaterThan(-1);
-      const body = SRC.slice(at, SRC.indexOf('\n}', at));
-      expect(body, `${fn} never reports 'unavailable' — an outage there would read as "not found"`)
+    const gleif = SRC.slice(SRC.indexOf('async function lookupGleif('));
+    expect(gleif.slice(0, gleif.indexOf('\n}'))).toMatch(/status:\s*'unavailable'/);
+  });
+
+  /**
+   * The routing table is what makes "add a country" one entry rather than a new branch, so every
+   * entry has to be able to say all three verdicts. A register that can only say hit-or-miss
+   * reports its own outage as "this company does not exist" — which is the opposite conclusion,
+   * and the one an operator would act on.
+   */
+  it('every national register can report an outage, not just a miss', () => {
+    const table = TABLE();
+    const countries = [...table.matchAll(/^ {2}([A-Z]{2}): \{$/gm)].map((m) => m[1]);
+    expect(
+      countries.length,
+      'fewer than 7 countries in NATIONAL_REGISTRIES — the table is the coverage, so a shrink is a '
+      + 'real loss of markets, not a refactor',
+    ).toBeGreaterThanOrEqual(7);
+
+    for (const cc of countries) {
+      const at = table.indexOf(`\n  ${cc}: {`);
+      const nextIdx = countries
+        .map((o) => table.indexOf(`\n  ${o}: {`))
+        .filter((i) => i > at)
+        .sort((a, b) => a - b)[0];
+      const entry = table.slice(at, nextIdx > -1 ? nextIdx : undefined);
+      expect(entry, `${cc} never reports 'unavailable' — its outages would read as "not found"`)
         .toMatch(/status:\s*'unavailable'/);
-      expect(body, `${fn} never reports 'miss'`).toMatch(/status:\s*'miss'/);
+      expect(entry, `${cc} declares no register name`).toMatch(/register:\s*'/);
+      expect(entry, `${cc} declares no keyedBy`).toMatch(/keyedBy:\s*'(name|id)'/);
     }
+  });
+
+  /**
+   * The covered-country list is DERIVED from the table. Hand-listing it anywhere is how the tool
+   * description ends up promising a register that was removed, which the model cannot detect.
+   */
+  it('derives the covered-country list from the table', () => {
+    expect(SRC).toMatch(/REGISTRY_COUNTRIES\s*=\s*Object\.keys\(NATIONAL_REGISTRIES\)/);
+    expect(TOOL, 'the response must tell the caller which countries have a national register')
+      .toMatch(/countries_with_a_national_register/);
+    expect(
+      TOOL,
+      'an uncovered country must say so. Otherwise "no national register for Bulgaria" and "this '
+      + 'company is not real" are the same answer, and they are opposite conclusions.',
+    ).toMatch(/No free national register wired for/);
   });
 
   /**

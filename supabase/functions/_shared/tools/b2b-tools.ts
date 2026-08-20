@@ -978,21 +978,28 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
  * registration id it recovers is what makes the existing VIES/ΑΑΔΕ path reachable afterwards.
  * Chain them; do not reimplement either.
  *
- * Sources, all keyless, all verified against the live endpoints:
- *   • GLEIF    — 3.4M legal entities worldwide. Legal name, legal form, status, registered and HQ
- *                address, and `registeredAs` (the LOCAL registry number). Registration is
- *                voluntary for non-financial firms, so a miss is a miss, not a failure.
- *   • ARES     — the Czech business register. Name search returns IČO + registered address.
- *   • ANAF     — the Romanian tax authority. Keyed by CUI, so it runs only when one is supplied;
- *                returns the CAEN activity code, live VAT-registration status and a phone number.
+ * GLEIF is the always-on source — 3.4M legal entities worldwide, so it answers for every one of
+ * the 30 `sourcing_markets`. On top of it sits `NATIONAL_REGISTRIES`, a ROUTING TABLE keyed by
+ * country: the authoritative national register, where that country publishes one for free.
  *
- * OpenStreetMap was built into this tool and then TAKEN BACK OUT, which is worth recording so it
- * does not get re-added on the same reasoning. It looked like the one free source carrying a phone
- * number. Measured: Overpass answers a country-wide name regex with a timeout (it is not a name
- * search engine), and Nominatim — which is — found 3 of 4 test manufacturers and returned a phone
- * for none of them. OSM has phones for the corner shop and the local water utility, not for
- * industrial manufacturers. A source that reports `miss` forever is the silent-zero shape, so it
- * is better absent than present.
+ * The table is the point. Adding a country is one entry — an endpoint and a mapper — not a new
+ * branch in the tool body, and the covered list is derived from the table in one place so the
+ * tool description, the response and the guard test cannot disagree about what is covered.
+ *
+ * Every entry below was run against the live endpoint before it was added. What did NOT survive
+ * that, and should not be re-added without re-measuring:
+ *   • Germany (OffeneRegister) — persistent 502. The service is down, not slow.
+ *   • Greece (ΓΕΜΗ)           — no public API. Greece is served by ΑΑΔΕ through
+ *                               `create_company_from_vat`, which needs the ΑΦΜ.
+ *   • BG, SI, HR, LT, LV, UA, IT, PT — no free machine-readable company lookup; the "open data"
+ *                               portals publish dataset CATALOGUES, not a company endpoint.
+ *   • UK (Companies House) and NL (KVK) — both 401. Free, but they need a registration key, so
+ *                               they are a decision to make rather than something to just wire.
+ *   • OpenStreetMap           — was in here as "the free phone source" and was removed. Overpass
+ *                               times out on a country-wide name regex (it is not a name search
+ *                               engine) and Nominatim returned a phone for none of four test
+ *                               manufacturers. It reported `unavailable` on 100% of calls while
+ *                               the tool still looked healthy — the silent-zero shape exactly.
  *
  * Every source reports `hit` / `miss` / `unavailable` SEPARATELY (pipeline convention 1). A single
  * empty return would collapse "the Czech register has no such company" into "the Czech register
@@ -1071,59 +1078,263 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
   };
 }
 
-/** Czech business register (ARES) — name search. */
-async function lookupAres(name: string): Promise<RegistrySource> {
-  const r = await registryFetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ obchodniJmeno: name, pocet: 5 }),
-  });
-  if (!r.ok) return { status: 'unavailable', error: r.error || `ARES HTTP ${r.status}` };
-  const rows = Array.isArray(r.body?.ekonomickeSubjekty) ? r.body.ekonomickeSubjekty : [];
-  if (!rows.length) return { status: 'miss' };
-  return {
-    status: 'hit',
-    total: r.body?.pocetCelkem ?? rows.length,
-    matches: rows.map((row: any) => ({
-      registration_id: row.ico ?? null,
-      legal_name: row.obchodniJmeno ?? null,
-      address: row.sidlo?.textovaAdresa ?? null,
-      city: row.sidlo?.nazevObce ?? null,
-      country: row.sidlo?.kodStatu ?? 'CZ',
-    })),
-  };
-}
+/**
+ * The national-registry routing table.
+ *
+ * `keyedBy` is the part that decides the call shape, not a detail:
+ *   • 'name' — the register has a name search, so it runs CONCURRENTLY with GLEIF.
+ *   • 'id'   — the register only answers on its own registration number (Poland's KRS, Romania's
+ *              CUI). Those wait for GLEIF, because GLEIF's `registeredAs` IS that number, which is
+ *              what turns "I have a company name" into a national-register hit with no VAT and no
+ *              paid provider in between.
+ *
+ * `timeoutMs` overrides the default only where a register is measurably slow. Slovakia's RPO takes
+ * ~5s consistently; the default 12s would be a coin-flip for it, and a timeout there would be
+ * reported as `unavailable` — the register saying nothing is not the same as the register being
+ * down, and the whole point of the per-source verdicts is keeping those apart.
+ */
+type RegistryLookupArgs = { name: string; registrationId?: string };
+type NationalRegistry = {
+  /** Human name, used in the tool description and the response. */
+  register: string;
+  keyedBy: 'name' | 'id';
+  /** What the id IS, so the agent can tell the operator what to go and find. */
+  idLabel?: string;
+  timeoutMs?: number;
+  lookup: (args: RegistryLookupArgs) => Promise<RegistrySource>;
+};
 
-/** Romanian tax authority (ANAF) — keyed by CUI, so it only runs when the caller already has one. */
-async function lookupAnaf(cui: string): Promise<RegistrySource> {
-  // UTC today is correct HERE, and it is not the `todayLocalISO()` case (CLAUDE.md 1b). This is not
-  // a date of record: it is "was this company VAT-registered as at date X" asked of a Romanian
-  // government API, and the operator's local midnight has no bearing on the answer.
-  const asAt = new Date().toISOString().slice(0, 10);
-  const r = await registryFetch('https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ cui: Number(cui), data: asAt }]),
-  });
-  if (!r.ok) return { status: 'unavailable', error: r.error || `ANAF HTTP ${r.status}` };
-  const found = Array.isArray(r.body?.found) ? r.body.found : [];
-  if (!found.length) return { status: 'miss' };
-  const g = found[0]?.date_generale ?? {};
-  return {
-    status: 'hit',
-    match: {
-      registration_id: g.cui ?? null,
-      legal_name: g.denumire ?? null,
-      address: g.adresa ?? null,
-      phone: g.telefon || null,
-      activity_code_caen: g.cod_CAEN ?? null,
-      legal_form: g.forma_juridica ?? null,
-      trade_register_no: g.nrRegCom ?? null,
-      registration_status: g.stare_inregistrare ?? null,
-      vat_registered: found[0]?.inregistrare_scop_Tva?.scpTVA ?? null,
+const NATIONAL_REGISTRIES: Record<string, NationalRegistry> = {
+  CZ: {
+    register: 'ARES (Czech business register)',
+    keyedBy: 'name',
+    lookup: async ({ name }) => {
+      const r = await registryFetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ obchodniJmeno: name, pocet: 5 }),
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `ARES HTTP ${r.status}` };
+      const rows = Array.isArray(r.body?.ekonomickeSubjekty) ? r.body.ekonomickeSubjekty : [];
+      if (!rows.length) return { status: 'miss' };
+      return {
+        status: 'hit',
+        total: r.body?.pocetCelkem ?? rows.length,
+        matches: rows.map((row: any) => ({
+          registration_id: row.ico ?? null,
+          legal_name: row.obchodniJmeno ?? null,
+          address: row.sidlo?.textovaAdresa ?? null,
+          city: row.sidlo?.nazevObce ?? null,
+          country: row.sidlo?.kodStatu ?? 'CZ',
+        })),
+      };
     },
-  };
-}
+  },
+
+  SK: {
+    register: 'RPO (Slovak register of legal entities)',
+    keyedBy: 'name',
+    // ~5s measured, every time. See the note above the table.
+    timeoutMs: 20000,
+    lookup: async ({ name }) => {
+      const r = await registryFetch(`https://api.statistics.sk/rpo/v1/search?fullName=${encodeURIComponent(name)}`, {
+        headers: { Accept: 'application/json' },
+        timeoutMs: 20000,
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `RPO HTTP ${r.status}` };
+      const rows = Array.isArray(r.body?.results) ? r.body.results : [];
+      if (!rows.length) return { status: 'miss' };
+      return {
+        status: 'hit',
+        total: rows.length,
+        matches: rows.slice(0, 5).map((row: any) => {
+          // RPO returns every historical name and address with validity windows. The CURRENT one
+          // is the entry with no `validTo` — taking [0] gives you the company's 1993 name.
+          const current = (arr: any[]) => (Array.isArray(arr) ? (arr.find((x) => !x?.validTo) ?? arr[arr.length - 1]) : null);
+          const nm = current(row.fullNames);
+          const addr = current(row.addresses);
+          const ident = current(row.identifiers);
+          return {
+            registration_id: ident?.value ?? null,
+            legal_name: nm?.value ?? null,
+            address: addr ? [addr.street, addr.buildingNumber, addr.municipality?.value, addr.postalCodes?.[0]].filter(Boolean).join(' ') || null : null,
+            city: addr?.municipality?.value ?? null,
+            country: 'SK',
+          };
+        }),
+      };
+    },
+  },
+
+  EE: {
+    register: 'Äriregister (Estonian business register)',
+    keyedBy: 'name',
+    lookup: async ({ name }) => {
+      const r = await registryFetch(`https://ariregister.rik.ee/est/api/autocomplete?q=${encodeURIComponent(name)}&results=5`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `Äriregister HTTP ${r.status}` };
+      const rows = Array.isArray(r.body?.data) ? r.body.data : [];
+      if (!rows.length) return { status: 'miss' };
+      return {
+        status: 'hit',
+        total: rows.length,
+        matches: rows.slice(0, 5).map((row: any) => ({
+          registration_id: row.reg_code != null ? String(row.reg_code) : null,
+          legal_name: row.name ?? null,
+          address: row.legal_address ?? null,
+          postal_code: row.zip_code ?? null,
+          // 'R' is registrisse kantud — entered in the register, i.e. active.
+          registration_status: row.status === 'R' ? 'ACTIVE' : (row.status ?? null),
+          country: 'EE',
+        })),
+      };
+    },
+  },
+
+  FI: {
+    register: 'PRH / YTJ (Finnish Patent and Registration Office)',
+    keyedBy: 'name',
+    lookup: async ({ name }) => {
+      const r = await registryFetch(`https://avoindata.prh.fi/opendata-ytj-api/v3/companies?name=${encodeURIComponent(name)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `PRH HTTP ${r.status}` };
+      const rows = Array.isArray(r.body?.companies) ? r.body.companies : [];
+      if (!rows.length) return { status: 'miss' };
+      return {
+        status: 'hit',
+        total: r.body?.totalResults ?? rows.length,
+        matches: rows.slice(0, 5).map((row: any) => {
+          // Same historical-versions shape as Slovakia: `endDate` absent means current.
+          const nm = Array.isArray(row.names) ? (row.names.find((n: any) => !n?.endDate) ?? row.names[0]) : null;
+          const addr = Array.isArray(row.addresses) ? (row.addresses.find((a: any) => !a?.endDate) ?? row.addresses[0]) : null;
+          return {
+            registration_id: row.businessId?.value ?? null,
+            legal_name: nm?.name ?? null,
+            address: addr ? [addr.street, addr.buildingNumber, addr.postCode, addr.postOffices?.[0]?.city].filter(Boolean).join(' ') || null : null,
+            activity_code: row.mainBusinessLine?.type ?? null,
+            country: 'FI',
+          };
+        }),
+      };
+    },
+  },
+
+  FR: {
+    register: 'Recherche Entreprises (INSEE / INPI, data.gouv.fr)',
+    keyedBy: 'name',
+    lookup: async ({ name }) => {
+      const r = await registryFetch(`https://recherche-entreprises.api.gouv.fr/search?q=${encodeURIComponent(name)}&per_page=5`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `Recherche Entreprises HTTP ${r.status}` };
+      const rows = Array.isArray(r.body?.results) ? r.body.results : [];
+      if (!rows.length) return { status: 'miss' };
+      return {
+        status: 'hit',
+        total: r.body?.total_results ?? rows.length,
+        matches: rows.slice(0, 5).map((row: any) => ({
+          registration_id: row.siren ?? null,
+          legal_name: row.nom_raison_sociale || row.nom_complet || null,
+          address: row.siege?.adresse ?? null,
+          city: row.siege?.libelle_commune ?? null,
+          postal_code: row.siege?.code_postal ?? null,
+          // NAF is the French NACE code — 23.44Z is "manufacture of other technical ceramic
+          // products", which is the single most useful field here for telling a factory from a
+          // reseller without reading a website.
+          activity_code_naf: row.siege?.activite_principale ?? null,
+          employee_range: row.tranche_effectif_salarie ?? null,
+          establishments: row.nombre_etablissements_ouverts ?? null,
+          registration_status: row.etat_administratif === 'A' ? 'ACTIVE' : (row.etat_administratif ?? null),
+          country: 'FR',
+        })),
+      };
+    },
+  },
+
+  PL: {
+    register: 'KRS (Polish National Court Register)',
+    keyedBy: 'id',
+    idLabel: 'KRS number (10 digits) — GLEIF returns it as `registered_as`',
+    lookup: async ({ registrationId }) => {
+      const krs = String(registrationId ?? '').replace(/\D/g, '').padStart(10, '0');
+      if (krs.length !== 10) return { status: 'miss', error: 'KRS needs a 10-digit KRS number' };
+      // Two registers share the numbering space: P (entrepreneurs) and S (associations). A factory
+      // is in P; try it first and fall back rather than reporting a miss on the wrong register.
+      for (const rejestr of ['P', 'S']) {
+        const r = await registryFetch(`https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/${krs}?rejestr=${rejestr}&format=json`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!r.ok) {
+          if (r.status === 404) continue;
+          return { status: 'unavailable', error: r.error || `KRS HTTP ${r.status}` };
+        }
+        const d = r.body?.odpis?.dane;
+        const head = r.body?.odpis?.naglowekA;
+        if (!d) continue;
+        const ident = d?.dzial1?.danePodmiotu ?? {};
+        const seat = d?.dzial1?.siedzibaIAdres ?? {};
+        return {
+          status: 'hit',
+          match: {
+            registration_id: head?.numerKRS ?? krs,
+            legal_name: ident?.nazwa ?? null,
+            legal_form: ident?.formaPrawna ?? null,
+            vat_number: ident?.identyfikatory?.nip ?? null,
+            statistical_id_regon: ident?.identyfikatory?.regon ?? null,
+            address: [seat?.adres?.ulica, seat?.adres?.nrDomu, seat?.adres?.kodPocztowy, seat?.adres?.miejscowosc].filter(Boolean).join(' ') || null,
+            city: seat?.siedziba?.miejscowosc ?? seat?.adres?.miejscowosc ?? null,
+            registered_since: head?.dataRejestracjiWKRS ?? null,
+            country: 'PL',
+          },
+        };
+      }
+      return { status: 'miss' };
+    },
+  },
+
+  RO: {
+    register: 'ANAF (Romanian tax authority)',
+    keyedBy: 'id',
+    idLabel: 'CUI / CIF (the Romanian tax id)',
+    lookup: async ({ registrationId }) => {
+      const cui = String(registrationId ?? '').replace(/\D/g, '');
+      if (!cui) return { status: 'miss', error: 'ANAF needs a Romanian CUI' };
+      // UTC today is correct HERE, and it is not the `todayLocalISO()` case (CLAUDE.md 1b). This is
+      // not a date of record: it is "was this company VAT-registered as at date X" asked of a
+      // Romanian government API, and the operator's local midnight has no bearing on the answer.
+      const asAt = new Date().toISOString().slice(0, 10);
+      const r = await registryFetch('https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ cui: Number(cui), data: asAt }]),
+      });
+      if (!r.ok) return { status: 'unavailable', error: r.error || `ANAF HTTP ${r.status}` };
+      const found = Array.isArray(r.body?.found) ? r.body.found : [];
+      if (!found.length) return { status: 'miss' };
+      const g = found[0]?.date_generale ?? {};
+      return {
+        status: 'hit',
+        match: {
+          registration_id: g.cui != null ? String(g.cui) : null,
+          legal_name: g.denumire ?? null,
+          address: g.adresa ?? null,
+          phone: g.telefon || null,
+          activity_code_caen: g.cod_CAEN ?? null,
+          legal_form: g.forma_juridica ?? null,
+          trade_register_no: g.nrRegCom ?? null,
+          registration_status: g.stare_inregistrare ?? null,
+          vat_registered: found[0]?.inregistrare_scop_Tva?.scpTVA ?? null,
+          country: 'RO',
+        },
+      };
+    },
+  },
+};
+
+/** Countries with a national register wired in, derived from the table so nothing can drift out of step. */
+const REGISTRY_COUNTRIES = Object.keys(NATIONAL_REGISTRIES).sort();
 
 export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (status: string) => void) => {
   return tool(
@@ -1137,24 +1348,49 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
 
       // Concurrent, because the sources are independent and the slowest should set the wall clock
       // rather than the sum. `registryFetch` never throws, so no source can take the others down.
-      const [gleif, ares, anaf] = await Promise.all([
-        lookupGleif(name, cc),
-        cc === 'CZ'
-          ? lookupAres(name)
-          : Promise.resolve<RegistrySource>({ status: 'miss', error: 'ARES covers Czech entities only' }),
-        registration_id && cc === 'RO'
-          ? lookupAnaf(String(registration_id))
-          : Promise.resolve<RegistrySource>({ status: 'miss', error: 'ANAF needs a Romanian CUI' }),
-      ]);
+      const registry = cc ? NATIONAL_REGISTRIES[cc] : undefined;
 
-      const sources = { gleif, ares, anaf };
+      // A name-keyed register runs alongside GLEIF; an id-keyed one has to wait for it, because
+      // GLEIF's `registeredAs` IS the id it needs. That chain is the whole trick: it turns a
+      // company NAME into a national-register record with no VAT number and no paid provider in
+      // between, which is the step discovery could not previously take at any price.
+      const gleifPromise = lookupGleif(name, cc);
+      const nationalPromise: Promise<RegistrySource> = !registry
+        ? Promise.resolve<RegistrySource>({
+          status: 'miss',
+          error: cc
+            ? `No free national register wired for ${cc}. Covered: ${REGISTRY_COUNTRIES.join(', ')}.`
+            : 'Pass `country` to reach a national register.',
+        })
+        : registry.keyedBy === 'name'
+          ? registry.lookup({ name })
+          : gleifPromise.then((g) => {
+            const fromGleif = g.status === 'hit'
+              ? ((g.matches as any[])?.find((m) => m.registered_as)?.registered_as ?? null)
+              : null;
+            const id = registration_id ? String(registration_id) : fromGleif;
+            if (!id) {
+              return {
+                status: 'miss',
+                error: `${registry.register} answers only on its ${registry.idLabel ?? 'registration number'}, `
+                  + `and neither the caller nor GLEIF supplied one.`,
+              } as RegistrySource;
+            }
+            return registry.lookup({ name, registrationId: id });
+          });
+
+      const [gleif, national] = await Promise.all([gleifPromise, nationalPromise]);
+
+      const sources: Record<string, RegistrySource> = { gleif };
+      if (registry && cc) sources[cc.toLowerCase()] = national;
+      else sources.national_register = national;
+
       const hits = Object.entries(sources).filter(([, s]) => s.status === 'hit').map(([k]) => k);
       const down = Object.entries(sources).filter(([, s]) => s.status === 'unavailable').map(([k]) => k);
 
-      // ANAF is the only registry here that publishes a phone number, and it often leaves the
-      // field blank. Absent is `null`, never an empty string — a caller testing truthiness on ''
-      // and on null behaves the same, but a caller STORING it does not.
-      const phone = anaf.status === 'hit' ? ((anaf.match as any)?.phone || null) : null;
+      // Absent is `null`, never an empty string. A caller testing truthiness cannot tell them
+      // apart; a caller STORING the value very much can.
+      const phone = national.status === 'hit' ? ((national.match as any)?.phone || null) : null;
 
       onProgress?.(hits.length ? `Found ${name} in: ${hits.join(', ')}` : `No registry record for ${name}`);
 
@@ -1171,6 +1407,17 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
         sources,
         sources_hit: hits,
         sources_unavailable: down,
+        // Stated explicitly so a miss on an uncovered country reads as "we have no register wired
+        // for Bulgaria", not as "this company does not exist". Those are opposite conclusions and
+        // the agent has no other way to tell them apart.
+        coverage: {
+          national_register: registry ? registry.register : null,
+          countries_with_a_national_register: REGISTRY_COUNTRIES,
+          note: registry
+            ? null
+            : 'GLEIF only for this country — it is worldwide, but registration is voluntary, so a miss '
+              + 'here is not evidence the company is fake.',
+        },
         cost: { credits: 0, note: 'Official public registries — no key, no account, no charge.' },
         next_step: 'A `registered_as` / `registration_id` from these sources is what `create_company_from_vat` '
           + 'needs to pull the ΑΑΔΕ / VIES record. Chain to that rather than looking the company up again.',
@@ -1180,17 +1427,22 @@ export const createCompanyRegistryLookupTool = (_userId: string, onProgress?: (s
     {
       name: 'company_registry_lookup',
       description:
-        'Look a company up in the OFFICIAL public registries — GLEIF (worldwide legal entities), '
-        + 'ARES (Czech business register), ANAF (Romanian tax authority). FREE: no credits, no '
-        + 'API key. Returns the legal name, legal form, registered address, registration number and '
-        + 'whether the entity is still active — the things that tell you a factory is real. '
-        + 'Start here before any PAID enrichment: it costs nothing, and the registration number it '
-        + 'returns is what `create_company_from_vat` needs to reach ΑΑΔΕ / VIES. It does NOT return '
-        + 'employee counts, revenue or technologies — use `company_enrichment` for those.',
+        'Look a company up in the OFFICIAL public registries. FREE: no credits, no API key, no '
+        + 'account. GLEIF covers legal entities WORLDWIDE, and on top of it the national register '
+        + 'for Czechia, Estonia, Finland, France, Poland, Romania and Slovakia. Returns the legal '
+        + 'name, legal form, registered address, registration number, activity code and whether the '
+        + 'entity is still active — the things that tell you a factory is real and actually makes '
+        + 'things. ALWAYS start here before any PAID enrichment: it costs nothing, and the '
+        + 'registration number it returns is what `create_company_from_vat` needs to reach ΑΑΔΕ / '
+        + 'VIES. It does NOT return employee counts, revenue or technologies — use '
+        + '`company_enrichment` for those, and only when they are actually needed.',
       schema: z.object({
         company_name: z.string().describe('Company name as found — a legal suffix (S.A., Sp. z o.o., a.s.) helps but is not required.'),
-        country: z.string().optional().describe('2-letter ISO country code (PL, CZ, RO, GR…). Narrows every source, and is what enables the national registers.'),
-        registration_id: z.string().optional().describe('A known national registration number, if you have one. A Romanian CUI unlocks the ANAF record (activity code, VAT status).'),
+        // Deliberately a plain string, not a z.enum of the covered countries: any country is worth
+        // asking about because GLEIF is worldwide, and an enum would advertise that the seven with
+        // a national register are the only ones this tool can answer for.
+        country: z.string().optional().describe('2-letter ISO country code (PL, CZ, SK, RO, FR, FI, EE have a national register wired; anywhere else still gets GLEIF). Narrows every source.'),
+        registration_id: z.string().optional().describe('A known national registration number, if you have one — Polish KRS, Romanian CUI. Usually unnecessary: GLEIF supplies it.'),
       }),
     }
   );

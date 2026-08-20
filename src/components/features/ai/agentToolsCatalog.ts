@@ -752,11 +752,12 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'company_registry_lookup', name: 'Registry Lookup', category: 'B2B Research',
     adminOnly: true, credits: 0,
-    desc: 'Official public registries — GLEIF, Czech ARES, Romanian ANAF. '
-      + 'Legal name, registration number, registered address, still-active. Free: no key, no credits.',
+    desc: 'Official public registries — GLEIF worldwide, plus the national register for CZ, EE, FI, FR, PL, RO, SK. '
+      + 'Legal name, registration number, registered address, activity code, still-active. Free: no key, no credits.',
     examples: [
       'Look up Ceramika Paradyż in the official registries',
       'Is VITKOVICE HEAVY MACHINERY a real registered company in CZ?',
+      'Check Hoganas Ceramique France in the French register',
     ],
   },
   {
