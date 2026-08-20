@@ -135,11 +135,18 @@ export function handleFromIdentity(fullName: string | null, email: string | null
  *
  * `no-reply` and friends are also on the sender-side suppression list in `inbound-email.ts`: an
  * address we would never auto-reply TO is not one we should let a person receive ON.
+ *
+ * `find` is the third reason and the sharpest: it is the platform's own FROM address
+ * (`email_settings.default_from_email`), so every platform email the outside world receives
+ * appears to come from it. Letting a tenant claim the handle would hand them the mailbox our
+ * whole user base replies to — and any of our mail that carries no Reply-To would land in their
+ * private Inbox. If the platform sender is ever changed, move this entry with it.
  */
 export const RESERVED_LOCAL_PARTS: ReadonlySet<string> = new Set([
   'postmaster', 'abuse', 'hostmaster', 'webmaster', 'security', 'root', 'admin', 'administrator',
   'mailer-daemon', 'daemon', 'no-reply', 'noreply', 'do-not-reply', 'donotreply', 'bounce',
   'info', 'support', 'sales', 'billing', 'accounts', 'help', 'contact', 'marketing', 'notifications',
+  'find',
 ]);
 
 /** Why a chosen local part was refused — the UI shows these verbatim. */

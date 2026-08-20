@@ -170,7 +170,9 @@ describe('#342 a chosen local part is validated before it reaches the column', (
   });
 
   it('refuses role addresses on the shared domain', () => {
-    for (const reserved of ['postmaster', 'abuse', 'no-reply', 'support', 'sales', 'admin']) {
+    // `find` is here for a different reason than the rest: it is the platform's own FROM
+    // address, so claiming it would divert every reply to our mail into a tenant's Inbox.
+    for (const reserved of ['postmaster', 'abuse', 'no-reply', 'support', 'sales', 'admin', 'find']) {
       expect(validateChosenLocalPart(reserved), `${reserved} was claimable`)
         .toEqual({ ok: false, reason: 'reserved' });
     }
