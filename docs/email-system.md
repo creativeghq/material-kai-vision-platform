@@ -458,6 +458,50 @@ Route Supabase Auth emails (magic links, confirmations, password resets) through
 > After changing it, test with a real password reset and re-read the Auth logs — a green
 > dashboard save proves nothing.
 
+### Step 3b: Deliverability — DMARC is the piece that is missing
+
+Audited 2026-08-21 against the live DNS (two independent resolvers) and Resend's own record of
+sent messages. Everything below is verified, not assumed.
+
+| Control | State | Where |
+|---|---|---|
+| DKIM | **passes and aligns** | `resend._domainkey.mail.materialshub.gr`, signs `d=mail.materialshub.gr` |
+| SPF (envelope) | **passes** | `send.mail.materialshub.gr` → `v=spf1 include:amazonses.com ~all` |
+| Custom Return-Path | set | `send.mail` — this is what makes SPF *align* under relaxed mode |
+| Bounce MX | set | `feedback-smtp.eu-west-1.amazonses.com` |
+| Open / click tracking | **off** | keep it off — see below |
+| **DMARC** | **ABSENT** | no record at `_dmarc.materialshub.gr` *or* `_dmarc.mail.materialshub.gr` |
+
+Both authentication checks pass **and align with the From domain**, so the only thing missing is the
+policy record. Gmail responds to that gap by showing recipients its "Be careful with this message /
+Looks safe?" interstitial — which on a *password reset* is the worst possible place to ask a user
+whether they trust the sender. One TXT record fixes it:
+
+```
+_dmarc.materialshub.gr   TXT   "v=DMARC1; p=none; rua=mailto:dmarc@materialshub.gr; fo=1"
+```
+
+DMARC resolves at the **organizational** domain, so this single record covers `mail.materialshub.gr`
+and every other subdomain. Start at `p=none`, read the aggregate reports for a week or two, then
+tighten to `p=quarantine` and finally `p=reject`. Do not start at `p=reject` — SPF and DKIM pass
+today, but the reports are how you find the sender you forgot about.
+
+**Never enable click tracking on this domain.** It rewrites every link through a tracking host, which
+on an auth email means the recovery link no longer points at the project's own domain — bad for the
+"is this phishing" signal and bad for the user reading the status bar.
+
+**Keep the sender at `find@mail.materialshub.gr`.** `mail.materialshub.gr` has MX records pointing at
+Cloudflare Email Routing, so that address genuinely *receives* mail. A sender address that accepts
+replies is a positive reputation signal; a black-hole `no-reply@` is not.
+
+> **A sender typo on a verified domain is invisible and it eats mail.** Resend accepts *any*
+> local-part on a verified domain, relays it, and reports `last_event: delivered` — `delivered` only
+> means the recipient's MX accepted the handoff. On 2026-08-21 the Auth SMTP sender was set to
+> `fin@mail.materialshub.gr` (a typo for `find@`); Resend reported it delivered and it never appeared
+> in the mailbox, while `find@` and `no-reply@` both landed in the inbox the same hour. Nothing
+> errored anywhere. Verify a sender change by looking in the **mailbox**, and check the local-part
+> character by character against `email_settings.default_from_email`.
+
 ### Step 4: Deploy Edge Functions
 
 ```bash
