@@ -12,7 +12,13 @@
  * field stops reaching the page.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
+import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
+import { getTemplateSpec, resolveColors, INVOICE_LABELS } from '@/modules/finance/invoice-templates';
 import { buildInvoiceRenderData } from '@/modules/finance/invoice-templates/renderData';
 import {
   resolvePrintedCounterparty,
@@ -216,5 +222,77 @@ describe('document header and fiscal footer', () => {
   it('prints the conversion rate only on a foreign-currency document', () => {
     expect(build({ currency: 'EUR', exchange_rate: 1 }, []).fx).toBeNull();
     expect(build({ currency: 'USD', exchange_rate: 0.92 }, []).fx).toEqual({ rate: 0.92, base: 'EUR' });
+  });
+});
+
+
+describe('document language — English unless the document says Greek', () => {
+  const ITEMS = [
+    { description: 'Tile', quantity: 1, unit_price: 100, net_value: 100, vat_percent: 24, vat_amount: 24 },
+    { description: 'Export', quantity: 1, unit_price: 50, net_value: 50, vat_percent: 0, vat_exemption_category: 16 },
+  ];
+
+  // Latin-only parties on purpose. A Greek tax-office name or customer name is DATA and is
+  // legitimately Greek whatever language the document is in; only the chrome is under test, so
+  // the fixture carries nothing Greek and any Greek glyph in the output is therefore ours.
+  const renderTemplate = (templateId: string, lang: 'el' | 'en') => {
+    const data = buildInvoiceRenderData({
+      invoice: { currency: 'EUR', doc_language: lang, document_type: '1.1', total: 174 },
+      items: ITEMS,
+      settings: { business_name: 'Kai Materials SA', business_vat: '090000045', base_currency: 'EUR' },
+      customer: { name: 'Papadopoulos Ltd', vat_number: '802349569', street: 'Tsimiski', city: 'Thessaloniki' },
+    });
+    const spec = getTemplateSpec(templateId);
+    return renderToStaticMarkup(
+      React.createElement(InvoiceDocument, { spec, colors: resolveColors(templateId, null), data }),
+    );
+  };
+
+  const TEMPLATES = ['classic', 'modern', 'minimal', 'commercial'];
+
+  // Greek belongs in `INVOICE_LABELS.el`, which is reached only when doc_language is 'el'.
+  // A glyph written straight into a renderer bypasses that switch entirely and prints on every
+  // document in every language — which is exactly what a bare Σ in the VAT-table sum row did.
+  it.each(TEMPLATES)('%s: an English document contains no Greek characters at all', (id) => {
+    const greek = [...renderTemplate(id, 'en')].filter((c) => c >= '\u0370' && c <= '\u03ff');
+    expect(
+      greek,
+      `The ${id} template leaked Greek glyphs onto an English document: ${JSON.stringify(greek)}. ` +
+        'Put the word in INVOICE_LABELS (both languages) and read it through `L`.',
+    ).toEqual([]);
+  });
+
+  it.each(TEMPLATES)('%s: a Greek document is actually in Greek', (id) => {
+    const html = renderTemplate(id, 'el');
+    expect(html).toContain('ΤΙΜΟΛΟΓΙΟ ΠΩΛΗΣΗΣ');
+    // Including the exemption ground, which is a legal statement and not a UI string.
+    expect(html).toContain('Χωρίς ΦΠΑ');
+  });
+});
+
+describe('label dictionaries — three hand-kept copies', () => {
+  it('el and en declare exactly the same keys', () => {
+    // A key present in one and missing from the other prints `undefined` on that language's
+    // document — a real word in one column and the string "undefined" in the other, with
+    // nothing failing. Six labels were added to both by hand for the myDATA column set.
+    const el = Object.keys(INVOICE_LABELS.el).sort();
+    const en = Object.keys(INVOICE_LABELS.en).sort();
+    expect(el, 'INVOICE_LABELS.el is missing keys that en declares').toEqual(en);
+  });
+
+  it('the pdf-lib generator carries every label the preview does', () => {
+    // supabase/functions/finance-invoice-pdf/index.ts keeps its own copy of the dictionary
+    // because it runs on Deno. labels.ts says the two "MUST stay identical"; until now nothing
+    // checked, so a label added on one side rendered `undefined` on the other.
+    const pdf = readFileSync(
+      join(__dirname, '..', '..', 'supabase', 'functions', 'finance-invoice-pdf', 'index.ts'),
+      'utf8',
+    );
+    const missing = Object.keys(INVOICE_LABELS.en).filter((k) => !pdf.includes(`${k}:`));
+    expect(
+      missing,
+      'These labels exist in src/modules/finance/invoice-templates/labels.ts but not in the ' +
+        'PDF generator\'s copy, so the PDF prints "undefined" where the preview prints a word.',
+    ).toEqual([]);
   });
 });

@@ -282,7 +282,7 @@ export function InvoiceDocument({
             ))}
             {data.vatAnalysis.length > 1 && (
               <tr>
-                <td style={{ ...vtdSum, textAlign: 'left' }}>{'\u03a3'}</td>
+                <td style={{ ...vtdSum, textAlign: 'left' }}>{L.total}</td>
                 <td style={vtdSum}>{money(sum((v) => v.net))}</td>
                 <td style={vtdSum}>{money(sum((v) => v.vat))}</td>
                 <td style={vtdSum}>{money(sum((v) => v.total))}</td>

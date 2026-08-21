@@ -1062,7 +1062,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
       ty += 3;
       page.drawLine({ start: { x, y: ty }, end: { x: edges[3], y: ty }, thickness: 0.4, color: LINE });
       ty -= 11;
-      text('\u03a3', x, ty, 8, bold, INK);
+      text(L.total, x, ty, 8, bold, INK);
       textR(money(netAfter), edges[1], ty, 8, bold);
       textR(money(vatAfter), edges[2], ty, 8, bold);
       textR(money(r2n(netAfter + vatAfter)), edges[3], ty, 8, bold);
