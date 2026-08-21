@@ -435,9 +435,28 @@ Route Supabase Auth emails (magic links, confirmations, password resets) through
 | Host | `smtp.resend.com` |
 | Port | `465` |
 | Username | `resend` |
-| Password | Your `RESEND_API_KEY` |
-| Sender email | `noreply@yourdomain.com` |
+| Password | A Resend key with **Full access** (or restricted to the verified domain) |
+| Sender email | An address **on a domain Resend has verified** — today that is `no-reply@mail.materialshub.gr` |
 | Sender name | `Material KAI` |
+
+> **Both of those rows are load-bearing, and getting either wrong fails SILENTLY from the app's
+> point of view** — the app's own Resend sends keep working, because they go over the HTTP API
+> with a different key and a sender the operator picked in `/admin/email`. Only Auth's mail
+> breaks: password resets, magic links (`signInWithOtp`) and signup confirmations.
+> Resend's SMTP relay answers `550 "The associated domain with your API key is not verified.
+> Please, create a new API key with full access or with a verified domain."` and GoTrue turns
+> that into a 500 on `/recover`. **It is only visible in the Supabase Auth logs** — there is no
+> row in `email_logs` (that table records the HTTP-API path only) and no `recovery_sent_at`
+> stamp on `auth.users`, because GoTrue writes that one *after* a successful send.
+> Two distinct causes produce the same 550:
+> 1. The **sender's domain** is not verified. Note the verified domain is the `mail.` subdomain —
+>    the `materialshub.gr` apex is NOT verified, so a plausible-looking `noreply@materialshub.gr`
+>    is rejected.
+> 2. The **key is a restricted, domain-scoped Resend key** bound to an unverified domain. The
+>    "associated domain with your API key" wording is specifically this one.
+>
+> After changing it, test with a real password reset and re-read the Auth logs — a green
+> dashboard save proves nothing.
 
 ### Step 4: Deploy Edge Functions
 

@@ -263,7 +263,7 @@ modal app stop paddleocr-vl     # tear down
 
 > **Migration note (2026-03-11):** Email provider migrated from Amazon SES to Resend. The following secrets have been removed: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_CONFIGURATION_SET_NAME`. Delete these from Supabase Edge Function secrets if they still exist.
 
-> **Supabase Auth SMTP:** Configure in Dashboard → Authentication → Email → SMTP Settings: Host `smtp.resend.com`, Port `465`, Username `resend`, Password = `RESEND_API_KEY`.
+> **Supabase Auth SMTP:** Configure in Dashboard → Authentication → Email → SMTP Settings: Host `smtp.resend.com`, Port `465`, Username `resend`, Password = a **full-access** Resend key, Sender = an address on a **Resend-verified** domain (`no-reply@mail.materialshub.gr` — *not* the unverified `materialshub.gr` apex). A restricted key or an unverified sender domain gets `550 "The associated domain with your API key is not verified"` from Resend, which breaks password resets and magic links only — the app's own email keeps working, so nothing else shows it. See [email-system.md](email-system.md) Step 3.
 
 #### **Agent Chat & AI Research Secrets**
 
