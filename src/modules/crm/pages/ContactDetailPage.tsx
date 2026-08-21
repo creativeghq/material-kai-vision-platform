@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -1179,17 +1179,33 @@ export const ContactDetailPage: React.FC = () => {
               */}
               <TabsContent value="work" className="space-y-4">
                 {contact.id ? (
-                  <>
-                    <PartyProjectsCard contactId={contact.id} partyName={contact.name} />
-                    <PartyWorkTab partyKind="contact" partyId={contact.id} excludeKinds={['project', 'asset']} />
-                    <WarrantiesTab contactId={contact.id} />
-                    {realEstateEnabled && (
-                      <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate"
-                        blurb="See this contact's property interests, viewings and buyer requirements.">
-                        <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
-                      </ModuleTabGate>
-                    )}
-                  </>
+                  <PartyWorkTab
+                    partyKind="contact"
+                    partyId={contact.id}
+                    excludeKinds={['project', 'asset']}
+                    panels={[
+                      {
+                        id: 'projects', label: 'Projects', icon: FolderKanban, group: 'Delivery',
+                        node: <PartyProjectsCard contactId={contact.id} partyName={contact.name} />,
+                      },
+                      {
+                        id: 'equipment', label: 'Equipment', icon: Wrench, group: 'After sale',
+                        node: <WarrantiesTab contactId={contact.id} />,
+                      },
+                      // Behind its module gate as before — the gate is what upsells a workspace
+                      // that has not enabled Real Estate, so the section appears and explains
+                      // itself rather than the surface silently not existing.
+                      ...(realEstateEnabled ? [{
+                        id: 'buyer-profile', label: 'Buyer profile', icon: Home, group: 'Property',
+                        node: (
+                          <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate"
+                            blurb="See this contact's property interests, viewings and buyer requirements.">
+                            <PropertyBuyerPanel contactId={contact.id} workspaceId={activeWorkspaceId} />
+                          </ModuleTabGate>
+                        ),
+                      }] : []),
+                    ]}
+                  />
                 ) : (
                   <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to attach work to it.</CardContent></Card>
                 )}

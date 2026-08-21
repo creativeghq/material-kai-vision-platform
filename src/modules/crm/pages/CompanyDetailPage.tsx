@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
@@ -1164,15 +1164,27 @@ export const CompanyDetailPage: React.FC = () => {
           */}
           <TabsContent value="work" className="space-y-4">
             {company.id ? (
-              <>
-                <PartyProjectsCard
-                  companyId={company.id}
-                  partyName={company.name}
-                  memberContactIds={(company.contacts ?? []).map((c: any) => c.id).filter(Boolean)}
-                />
-                <PartyWorkTab partyKind="company" partyId={company.id} excludeKinds={['project', 'asset']} />
-                <WarrantiesTab companyId={company.id} />
-              </>
+              <PartyWorkTab
+                partyKind="company"
+                partyId={company.id}
+                excludeKinds={['project', 'asset']}
+                panels={[
+                  {
+                    id: 'projects', label: 'Projects', icon: FolderKanban, group: 'Delivery',
+                    node: (
+                      <PartyProjectsCard
+                        companyId={company.id}
+                        partyName={company.name}
+                        memberContactIds={(company.contacts ?? []).map((c: any) => c.id).filter(Boolean)}
+                      />
+                    ),
+                  },
+                  {
+                    id: 'equipment', label: 'Equipment', icon: Wrench, group: 'After sale',
+                    node: <WarrantiesTab companyId={company.id} />,
+                  },
+                ]}
+              />
             ) : (
               <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to attach work to it.</CardContent></Card>
             )}

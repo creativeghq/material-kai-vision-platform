@@ -105,6 +105,33 @@ describe('the party Work tab', () => {
     ).toBe(true);
   });
 
+  it('uses the HubSideNav archetype rather than a hand-rolled rail', () => {
+    const src = read(TAB);
+    expect(
+      src.includes('<HubSideNav'),
+      'The section rail must be HubSideNav. CLAUDE.md: build the archetype, do not re-derive it ' +
+        'per page — it already carries the tinted-active-row treatment, the non-clickable group ' +
+        'headings, independent scrolling and the below-lg collapse, and a hand-rolled twin drifts ' +
+        'from all four.',
+    ).toBe(true);
+  });
+
+  it('lists every management panel, and only the derived kinds that have rows', () => {
+    const src = read(TAB);
+    // A panel carries the create action, so hiding it when empty hides the only way to fill it.
+    // A derived kind with no rows is just noise — twelve zeroes is what a brand-new client would
+    // otherwise open onto, which is the wall this rail exists to remove.
+    expect(
+      /panels\s*\?\?\s*\[\]\)\.map/.test(src),
+      'Panels must be mapped into the rail unconditionally — no count filter. A panel with no rows ' +
+        'is exactly the case where its create button is needed.',
+    ).toBe(true);
+    expect(
+      /KIND_ORDER\.filter\(\(k\) => byKind\.has\(k\)\)/.test(src),
+      'Derived kinds must be filtered to those with rows, or the rail opens on a column of zeroes.',
+    ).toBe(true);
+  });
+
   it('never links a satellite to its own id', () => {
     const src = read(TAB);
     // A tenancy / sale / offer id is not a route. `/properties/<tenancy_id>` renders the
