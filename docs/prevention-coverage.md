@@ -421,6 +421,27 @@ for reading the SQL before writing the severity, not for leaving the check out.
 - **The sweep is the point.** EX-1 was reported against `generate-interior-gemini` in an earlier sweep and closed nowhere, while four siblings had the identical shape and three others had already been fixed. A hand-kept list of call sites is a list of the sites somebody already looked at.
 - **Also covered there:** the provider hop (a body URL handed to Replicate / Veo / Kling is fetched from THEIR network before we download anything, so it is validated at the input, not at the download), the provider-output download (`fetchBinaryGuarded` — these were bare `fetch().arrayBuffer()`, so a redirect or an HTML error page went into the bucket as an mp4), a `succeeded` prediction with no output returning `success: true`, and an `ai_usage_logs` insert ending in `.then(() => {}, () => {})`.
 
+### 13. Link that does not travel — attached upstream, dropped downstream
+
+A record is deliberately attached to a parent (an order booked to a project), a second record is
+generated from that parent, and the generator does not copy the link down. Found 2026-08-21, #378.
+
+`get_project_pnl` reads a job's revenue from `invoices.project_id`, its cost from
+`supplier_bills.project_id`, its labour from `time_entries.project_id` and its committed cost from
+`orders.project_id`. Five functions that *create* those documents never named the column:
+`generate_invoice_from_order`, `generate_supplier_bill_from_order`, `delivery_note_to_invoice`,
+`generate_order_from_invoice`, `commit_sourcing_options`.
+
+**Why it is worse than an ordinary missing field.** The two halves fail in opposite directions and
+the error compounds: attach a purchase order to a job and its total lands as *committed* cost; bill
+it and the committed figure falls away while the actual cost never arrives to replace it. The margin
+therefore **improves as you spend**. Nothing raises, because a missing uuid is a valid null — the
+same reason shape 4 exists, one layer up.
+
+- **Guarded by:** `finance.project_attribution_drift` (a child with no job whose parent has one — auto-heals by copying the parent's down; a child pointed at a *different* job is an operator decision and is left alone) and `ops.chain_fn_drops_project` (any function inserting into `invoices` / `supplier_bills` / `orders` without naming `project_id`, minus a hardcoded exemption list with a stated reason per entry).
+- **Proven to fire:** 2026-08-21 — both, in rolled-back transactions. The drift check: a bill raised from a project-linked order carried the job (the fix), then had it nulled; detector 1 → heal 1 → detector 0. The shape check: a function inserting an invoice with no `project_id` was reported, and stopped being reported once it named the column.
+- **The exemption list is the interesting half.** Six functions legitimately create a document with no job, and two of them matter: `_generate_pre_invoice_on_accept` and `handoff_purchase_order_to_supplier` write into **another tenant's workspace**, where carrying the source project id would be a cross-tenant leak rather than a fix. `_inbound_doc_to_supplier_bill_core` and `create_order_from_thread_intake` have no upstream job to carry at all — for those the answer is letting the operator attach one afterwards (#378 L1), not inventing a source. `pos_issue_receipt` and `reorder_warehouse_item` are genuinely not job work.
+- **Blind spot:** a document created directly by the client rather than by a SQL function. The probe reads `pg_proc` only.
 
 ---
 
