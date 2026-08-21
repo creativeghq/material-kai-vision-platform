@@ -45,11 +45,11 @@ const ALL_MODULES = () => true;
 describe('global search — the material-search action is never the default', () => {
   it('renders results, then nav, then the material-search action', () => {
     const results = PALETTE.indexOf('groups.map((group)');
-    const nav = PALETTE.indexOf('navMatches.map((item)');
+    const nav = PALETTE.indexOf('navGroups.map((group)');
     const smart = PALETTE.indexOf('__smart_search__');
 
     expect(results, 'the palette must render `groups`').toBeGreaterThan(-1);
-    expect(nav, 'the palette must render `navMatches`').toBeGreaterThan(-1);
+    expect(nav, 'the palette must render `navGroups`').toBeGreaterThan(-1);
     expect(smart, 'the palette must still offer the deep material search').toBeGreaterThan(-1);
 
     // cmdk highlights the FIRST item, so this order IS the Enter target.
@@ -106,7 +106,10 @@ describe('global search kind catalogue', () => {
    * changing the search gate is what puts a result behind a wall.
    */
   it('gates each kind exactly as its destination route is guarded', () => {
-    const expected: Record<GlobalSearchKind, { caps?: Capability[]; module?: string }> = {
+    const expected: Record<
+      GlobalSearchKind,
+      { caps?: Capability[]; module?: string; wsManager?: boolean }
+    > = {
       // `/u/:id` is public; `/admin/crm/users/:id` is operator-only and the route function only
       // returns it for an operator. Server-side, search_workspace_people self-guards.
       person: {},
@@ -117,10 +120,17 @@ describe('global search kind catalogue', () => {
       product: { caps: ['marketplace.browse', 'moodboards.use', 'quotes.use', 'projects.use'] },
       // `/projects/:id` carries EntitlementGuard only — no CapabilityGuard.
       project: { module: 'projects' },
+      // `/moodboard/:id`, `/blueprints/:id` and `/templates/:id` are AuthGuard and nothing else,
+      // exactly like their nav items. RLS is what scopes the rows.
+      moodboard: {},
       quote: { caps: ['quotes.use'], module: 'quotes' },
       order: { caps: ['finance.manage'], module: 'sales-finance' },
       invoice: { caps: ['finance.manage'], module: 'sales-finance' },
       property: { caps: ['realestate.view'], module: 'real-estate' },
+      // `/catalogs/:id` is the one destination with the workspace-admin rung.
+      catalog: { module: 'presentation-catalogs', wsManager: true },
+      blueprint: {},
+      template: {},
     };
 
     for (const spec of GLOBAL_SEARCH_KINDS) {
@@ -129,21 +139,46 @@ describe('global search kind catalogue', () => {
       expect([...(spec.requireAnyCapability ?? [])].sort(), `${spec.kind} capability gate`)
         .toEqual([...(want.caps ?? [])].sort());
       expect(spec.moduleSlug ?? undefined, `${spec.kind} module gate`).toBe(want.module);
+      expect(spec.requireWorkspaceManager ?? false, `${spec.kind} workspace-admin gate`)
+        .toBe(want.wsManager ?? false);
     }
   });
 
+  it('covers every record type that has a page to open, and says why the rest are absent', () => {
+    // Not a style check — this list is the answer to "is search complete?", and it drifts the
+    // moment someone ships a record page without adding it here.
+    expect(GLOBAL_SEARCH_KINDS.map((s) => s.kind).sort()).toEqual(
+      [
+        'blueprint', 'catalog', 'company', 'contact', 'deal', 'invoice', 'moodboard',
+        'order', 'person', 'product', 'project', 'property', 'quote', 'template',
+      ].sort(),
+    );
+    // Absent ON PURPOSE, and each for a reason that would have to change first:
+    //   contracts / hr_employees / warehouse_items — no record route exists, only a list page.
+    //   kb_docs — its only reader is the PUBLIC article page (published + public), 3 of 677 rows.
+  });
+
   it('offers a persona only the kinds it can open', () => {
-    // Someone with no capabilities and no paid modules still gets people — that lookup is
-    // self-guarding server-side and both of its destinations are open to any signed-in user.
-    expect(allowedSearchKinds({ can: NO_CAPS, isModuleAvailable: () => false })).toEqual(['person']);
+    // With no capabilities and no paid modules you still get the kinds whose destination route
+    // is AuthGuard and nothing else — RLS is what decides you have no rows, not a gate here.
+    expect(
+      allowedSearchKinds({ can: NO_CAPS, isModuleAvailable: () => false, isWorkspaceManager: false }),
+    ).toEqual(['person', 'moodboard', 'blueprint', 'template']);
 
     // A capability without the module is still not a surface.
     expect(
-      allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: () => false }),
-    ).toEqual(['person', 'product']);
+      allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: () => false, isWorkspaceManager: true }),
+    ).toEqual(['person', 'product', 'moodboard', 'blueprint', 'template']);
 
-    expect(allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: ALL_MODULES }))
-      .toEqual(GLOBAL_SEARCH_KINDS.map((s) => s.kind));
+    // Catalogs are the one kind behind the workspace-admin rung, so a plain member loses exactly
+    // that one and keeps everything else.
+    expect(
+      allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: ALL_MODULES, isWorkspaceManager: false }),
+    ).toEqual(GLOBAL_SEARCH_KINDS.map((s) => s.kind).filter((k) => k !== 'catalog'));
+
+    expect(
+      allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: ALL_MODULES, isWorkspaceManager: true }),
+    ).toEqual(GLOBAL_SEARCH_KINDS.map((s) => s.kind));
   });
 });
 

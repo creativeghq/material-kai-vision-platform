@@ -33,7 +33,7 @@ import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { SIDEBAR_NAV_ITEMS, filterNavItems, type SidebarNavItem } from '@/config/nav-items';
+import { HUBS, SIDEBAR_NAV_ITEMS, filterNavItems, type SidebarNavItem } from '@/config/nav-items';
 import { PRODUCT_BROWSE_ANY } from '@/auth/capabilities';
 import {
   allowedSearchKinds,
@@ -69,8 +69,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
   // Only the kinds this persona actually has a surface for — a result that opens onto a
   // permission wall is its own broken process.
   const kinds = useMemo(
-    () => allowedSearchKinds({ can, isModuleAvailable }),
-    [can, isModuleAvailable],
+    () => allowedSearchKinds({ can, isModuleAvailable, isWorkspaceManager }),
+    [can, isModuleAvailable, isWorkspaceManager],
   );
 
   const routeCtx = useMemo(
@@ -144,10 +144,33 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
     return [...gated, { id: 'profile', label: 'Profile', path: '/profile', icon: User }];
   }, [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can]);
 
-  const navMatches = useMemo(() => {
+  /**
+   * Navigation, grouped.
+   *
+   * With a query it is one flat list of matches (label OR description, so "invoice" finds Finance).
+   * With no query it is the persona's WHOLE reachable surface, grouped the way the App Launcher
+   * groups it — an open palette should be a way to get anywhere, not a six-item teaser of a
+   * thirty-eight-item nav.
+   */
+  const navGroups = useMemo<{ key: string; heading: string; items: SidebarNavItem[] }[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return navItems.slice(0, 6);
-    return navItems.filter((i) => i.label.toLowerCase().includes(q)).slice(0, 8);
+    if (q) {
+      const matches = navItems.filter(
+        (i) => i.label.toLowerCase().includes(q) || (i.description ?? '').toLowerCase().includes(q),
+      );
+      return matches.length ? [{ key: 'go', heading: 'Go to', items: matches.slice(0, 10) }] : [];
+    }
+
+    const top = navItems.filter((i) => (i.surface ?? 'top') === 'top');
+    const groups = top.length ? [{ key: 'top', heading: 'Go to', items: top }] : [];
+    for (const hub of HUBS) {
+      const items = navItems.filter((i) => i.surface === 'app' && i.hub === hub.id);
+      if (items.length) groups.push({ key: hub.id, heading: hub.label, items });
+    }
+    // Apps with no hub — the launcher's catch-all bucket. Same convention here.
+    const more = navItems.filter((i) => i.surface === 'app' && !i.hub);
+    if (more.length) groups.push({ key: 'more', heading: 'More', items: more });
+    return groups;
   }, [navItems, query]);
 
   const go = (path: string) => {
@@ -242,20 +265,27 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
                 </CommandGroup>
               ))}
 
-              {navMatches.length > 0 && (
-                <CommandGroup heading="Go to">
-                  {navMatches.map((item) => (
+              {navGroups.map((group) => (
+                <CommandGroup key={group.key} heading={group.heading}>
+                  {group.items.map((item) => (
                     <CommandItem
                       key={item.id}
                       value={`nav-${item.id}`}
                       onSelect={() => go(item.path)}
                     >
                       <item.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                      {item.label}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{item.label}</span>
+                        {item.description && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {item.description}
+                          </span>
+                        )}
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
-              )}
+              ))}
 
               {/* Last, and named after where it goes. It is a deliberate action — a 7-vector pass
                   over the material catalog — not the fallback meaning of "search". */}

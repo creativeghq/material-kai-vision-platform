@@ -16,13 +16,17 @@
  * @see tests/unit/globalSearchKinds.test.ts — holds the catalogue honest.
  */
 import {
+  BookOpen,
   Building2,
   Contact,
+  DraftingCompass,
   FileText,
   FolderKanban,
   Handshake,
   Home,
+  Layers,
   Package,
+  Palette,
   Receipt,
   ShoppingCart,
   User,
@@ -39,10 +43,14 @@ export type GlobalSearchKind =
   | 'deal'
   | 'product'
   | 'project'
+  | 'moodboard'
   | 'quote'
   | 'order'
   | 'invoice'
-  | 'property';
+  | 'property'
+  | 'catalog'
+  | 'blueprint'
+  | 'template';
 
 export interface GlobalSearchHit {
   kind: GlobalSearchKind;
@@ -78,6 +86,11 @@ export interface GlobalSearchKindSpec {
   requireAnyCapability?: readonly Capability[];
   /** Paid-module gate. Same slug vocabulary as `nav-items.ts`. */
   moduleSlug?: string;
+  /**
+   * Owner/admin of the ACTIVE workspace — the `requireWorkspaceAdmin` rung on a module route,
+   * which is not a capability (it is standing in one workspace, `workspace_members.role`).
+   */
+  requireWorkspaceManager?: boolean;
   /** Where a hit of this kind opens. */
   route: (hit: GlobalSearchHit, ctx: SearchRouteContext) => string;
 }
@@ -139,6 +152,14 @@ export const GLOBAL_SEARCH_KINDS: readonly GlobalSearchKindSpec[] = [
     route: (hit) => `/projects/${hit.id}`,
   },
   {
+    kind: 'moodboard',
+    label: 'Moodboards',
+    icon: Palette,
+    // `/moodboard/:id` carries AuthGuard and nothing else, and so does the nav item. RLS scopes
+    // the rows to your own boards plus any on a project you collaborate on.
+    route: (hit) => `/moodboard/${hit.id}`,
+  },
+  {
     kind: 'quote',
     label: 'Quotes',
     icon: FileText,
@@ -173,6 +194,30 @@ export const GLOBAL_SEARCH_KINDS: readonly GlobalSearchKindSpec[] = [
     moduleSlug: 'real-estate',
     route: (hit) => `/properties/${hit.id}`,
   },
+  {
+    kind: 'catalog',
+    label: 'Catalogs',
+    icon: BookOpen,
+    // `/catalogs/:id` is EntitlementGuard('presentation-catalogs') + WorkspaceAdminGuard.
+    moduleSlug: 'presentation-catalogs',
+    requireWorkspaceManager: true,
+    route: (hit) => `/catalogs/${hit.id}`,
+  },
+  {
+    kind: 'blueprint',
+    label: 'Blueprints',
+    icon: DraftingCompass,
+    // AuthGuard only, like its nav item. Platform starters are openable by every workspace.
+    route: (hit) => `/blueprints/${hit.id}`,
+  },
+  {
+    kind: 'template',
+    label: 'Templates',
+    icon: Layers,
+    // Deliberately ungated, matching the nav item: every persona that can create a record can
+    // reuse one.
+    route: (hit) => `/templates/${hit.id}`,
+  },
 ];
 
 const SPEC_BY_KIND = new Map<GlobalSearchKind, GlobalSearchKindSpec>(
@@ -186,16 +231,18 @@ const CATALOGUE_ORDER = new Map<GlobalSearchKind, number>(
 export interface KindGateContext {
   can: (capability: Capability) => boolean;
   isModuleAvailable: (slug: string) => boolean;
+  isWorkspaceManager: boolean;
 }
 
 /**
- * The kinds this persona has a surface for. Same two gates `filterNavItems` applies, for the same
- * reason: a result nobody can open is worse than no result.
+ * The kinds this persona has a surface for. The same gates the route builder applies, for the
+ * same reason: a result nobody can open is worse than no result.
  */
 export function allowedSearchKinds(ctx: KindGateContext): GlobalSearchKind[] {
   return GLOBAL_SEARCH_KINDS.filter((spec) => {
     if (spec.requireAnyCapability?.length && !spec.requireAnyCapability.some(ctx.can)) return false;
     if (spec.moduleSlug && !ctx.isModuleAvailable(spec.moduleSlug)) return false;
+    if (spec.requireWorkspaceManager && !ctx.isWorkspaceManager) return false;
     return true;
   }).map((spec) => spec.kind);
 }
