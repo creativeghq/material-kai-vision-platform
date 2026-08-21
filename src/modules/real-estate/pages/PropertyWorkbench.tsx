@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
-  Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature, Send,
+  Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature,
   KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -29,7 +29,7 @@ import {
   type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement, type PropertySale,
   type InvestmentMetrics, type PropertyDocument, type OpenHouse, DOC_TYPE_LABELS,
 } from '../services/realEstateService';
-import { contractsService, type Contract } from '@/services/contractsService';
+import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { statusTone } from '@/utils/statusTone';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
@@ -1395,76 +1395,29 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
   );
 };
 
-// Transaction docs (Memorandum of Sale / agency agreement) via the Contracts module — e-sign reused.
-const RE_CONTRACT_TYPES = [
-  { v: 'memorandum_of_sale', label: 'Memorandum of Sale' },
-  { v: 'agency_agreement', label: 'Agency agreement' },
-  { v: 'reservation', label: 'Reservation agreement' },
-];
+/**
+ * Transaction documents — Memorandum of Sale, agency and reservation agreements.
+ *
+ * This was a hand-rolled SECOND contracts panel: its own list, its own create form, its own three
+ * type options, casting `as any` to pass `property_id` because the shared panel's subject type had
+ * never been widened for it. It was thinner in every direction — no templates, no filters, no
+ * void/decline, no download, and an empty state that offered nothing — and it drifted on its own
+ * schedule. Replaced by the shared `ContractsSection` (#378 L4), which carries the same three
+ * `realestate` types it declared.
+ *
+ * The edit gate is preserved: anyone who may manage the listing SEES the transaction file, and
+ * only an editor may add to it.
+ */
 const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit: boolean }> = ({ ws, propertyId, canEdit }) => {
-  const { toast } = useToast();
-  const [rows, setRows] = useState<Contract[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [f, setF] = useState<Record<string, any>>({ contract_type: 'memorandum_of_sale' });
-
-  const load = useCallback(async () => {
-    if (!ws) return;
-    try { setRows(await contractsService.list(ws, { context: 'realestate', property_id: propertyId } as any)); setErr(null); }
-    catch (e) { setErr((e as Error).message); setRows([]); }
-  }, [ws, propertyId]);
-  useEffect(() => { void load(); }, [load]);
-
-  const create = async () => {
-    if (!ws || !f.title) return;
-    setBusy(true);
-    try {
-      await contractsService.create(ws, { context: 'realestate', property_id: propertyId, contract_type: f.contract_type, title: f.title, counterparty_name: f.counterparty_name || undefined, counterparty_email: f.counterparty_email || undefined, value: f.value ? Number(f.value) : undefined, body_markdown: f.body_markdown || undefined } as any);
-      setF({ contract_type: 'memorandum_of_sale' }); setAdding(false); await load(); toast({ title: 'Document created' });
-    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
-  };
-  const send = async (id: string) => {
-    if (!ws) return;
-    setBusy(true);
-    try { const r = await contractsService.send(ws, id); const url = `${window.location.origin}${r.sign_path}`; void navigator.clipboard.writeText(url); await load(); toast({ title: 'Sent for signature', description: 'Sign link copied to clipboard.' }); }
-    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
-  };
-
-  if (rows === null && !err) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
+  if (!ws) return null;
   return (
-    <div className="space-y-4">
-      {canEdit && (adding ? (
-        <Card><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-2">
-          <select className="h-9 rounded-md border bg-background px-2 text-sm" value={f.contract_type} onChange={(e) => setF((p) => ({ ...p, contract_type: e.target.value }))}>
-            {RE_CONTRACT_TYPES.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
-          </select>
-          <Input placeholder="Title" value={f.title ?? ''} onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} />
-          <Input placeholder="Counterparty name (buyer/vendor)" value={f.counterparty_name ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_name: e.target.value }))} />
-          <Input type="email" placeholder="Counterparty email" value={f.counterparty_email ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_email: e.target.value }))} />
-          <Input type="number" placeholder="Value (optional)" value={f.value ?? ''} onChange={(e) => setF((p) => ({ ...p, value: e.target.value }))} />
-          <Textarea placeholder="Body / Terms (markdown)" className="col-span-full" rows={3} value={f.body_markdown ?? ''} onChange={(e) => setF((p) => ({ ...p, body_markdown: e.target.value }))} />
-          <div className="col-span-full flex gap-2"><Button size="sm" onClick={create} disabled={busy || !f.title}>Create</Button><Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button></div>
-        </CardContent></Card>
-      ) : <Button variant="outline" size="sm" onClick={() => setAdding(true)}><FileSignature className="mr-1.5 h-4 w-4" /> New transaction document</Button>)}
-
-      {(rows ?? []).length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No transaction documents yet. Create a Memorandum of Sale or agency agreement and send it for e-signature.</div> : (
-        <Card><CardContent className="p-0"><div className="divide-y divide-border">
-          {(rows ?? []).map((c) => (
-            <div key={c.id} className="flex items-center gap-4 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{c.title}</div>
-                <div className="text-xs text-muted-foreground capitalize">{(c.contract_type ?? '').replace(/_/g, ' ')}{c.counterparty_name ? ` · ${c.counterparty_name}` : ''}</div>
-              </div>
-              <span className={`text-[11px] capitalize ${statusTone(c.status)}`}>{c.status}</span>
-              {canEdit && c.status === 'draft' && <Button size="sm" variant="outline" disabled={busy} onClick={() => send(c.id)}><Send className="mr-1 h-3.5 w-3.5" /> Send</Button>}
-            </div>
-          ))}
-        </div></CardContent></Card>
-      )}
-    </div>
+    <ContractsSection
+      workspaceId={ws}
+      context="realestate"
+      subject={{ property_id: propertyId }}
+      heading="Transaction documents"
+      readOnly={!canEdit}
+    />
   );
 };
 

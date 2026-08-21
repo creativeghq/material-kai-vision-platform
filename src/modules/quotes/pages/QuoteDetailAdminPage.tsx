@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Timer, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Timer, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature } from 'lucide-react';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 
 import { Button } from '@/components/core/ui/button';
@@ -14,6 +14,8 @@ import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, QuoteWithItems, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
+import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
@@ -817,6 +819,24 @@ export const QuoteDetailPage: React.FC = () => {
           onSaved={loadQuoteDetails}
         />
 
+        {/* Which job this quote belongs to (#378 L3). It could previously be answered only in the
+            create modal, so a quote raised before its project existed — the normal order of
+            events — could never join one. An accepted quote is the job's CONTRACTED revenue in
+            get_project_pnl, and generate_order_from_quote carries the job onto the order, so a
+            quote with none starts a chain that has none either. */}
+        {quote.workspace_id && (
+          <div className="max-w-md">
+            <ProjectLinkField
+              workspaceId={quote.workspace_id}
+              projectId={(quote as any).project_id ?? null}
+              onChange={async (projectId) => {
+                await quotesService.updateQuote(quote.id, { project_id: projectId });
+                await loadQuoteDetails();
+              }}
+            />
+          </div>
+        )}
+
         {/* Bill-to address — choose the customer's main address or one of their sub-units.
             Self-hides when the party has no sub-units. Propagates to the invoice on conversion. */}
         {(quote.customer_company_id || quote.customer_contact_id) && (
@@ -883,6 +903,13 @@ export const QuoteDetailPage: React.FC = () => {
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <Eye className="h-4 w-4" />
               Analytics
+            </TabsTrigger>
+            {/* `contracts.quote_id` has always existed and contracts-api has always accepted it;
+                the panel was mounted on employees, projects and the standalone page only, so the
+                agreement a quote was won under sat invisible from it (#378 L4). */}
+            <TabsTrigger value="contracts" className="flex items-center gap-2">
+              <FileSignature className="h-4 w-4" />
+              Contracts
             </TabsTrigger>
           </TabsList>
 
@@ -1580,6 +1607,20 @@ export const QuoteDetailPage: React.FC = () => {
                 publicShareEnabled={(quote as any).public_share_enabled ?? false}
                 publicShareToken={(quote as any).public_share_token ?? null}
                 onShareChange={loadQuoteDetails}
+              />
+            )}
+          </TabsContent>
+
+          {/* The paper behind the quote. Counterparty prefilled from the quote's own customer, so
+              the signing email has a recipient without anyone retyping the name. */}
+          <TabsContent value="contracts" className="mt-5">
+            {quote.workspace_id && (
+              <ContractsSection
+                workspaceId={quote.workspace_id}
+                context="finance"
+                subject={{ quote_id: quote.id }}
+                heading="Contracts on this quote"
+                defaultCounterparty={{ name: quote.customer_name ?? null }}
               />
             )}
           </TabsContent>

@@ -24,6 +24,8 @@ import {
   type InvoiceWithItems,
 } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
@@ -55,6 +57,28 @@ const InvoiceDetailPage: React.FC = () => {
   const [fiscalBusy, setFiscalBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [projectSaving, setProjectSaving] = useState(false);
+  // Attributing revenue to a job is a finance decision, gated the same way the project's own
+  // Finance tab is. Everyone else sees the invoice without the control.
+  const { can } = usePermissions();
+  const canEditProject = can('finance.manage');
+
+  /**
+   * Re-point this invoice at a job (#378 L2). Saved on pick rather than behind a Save button:
+   * it is one attribute of the document, the same treatment the order header gives it, and a
+   * link that needs confirming is a link people abandon half-set.
+   */
+  const handleProjectChange = async (projectId: string | null) => {
+    if (!invoiceId) return;
+    setProjectSaving(true);
+    try {
+      await financeService.updateInvoice(invoiceId, { project_id: projectId } as any);
+      setInvoice((prev) => (prev ? ({ ...prev, project_id: projectId } as InvoiceWithItems) : prev));
+      toast({ title: projectId ? 'Invoice attached to the project' : 'Invoice detached from its project' });
+    } catch (e) {
+      toast({ title: 'Failed to update the project', description: (e as Error).message, variant: 'destructive' });
+    } finally { setProjectSaving(false); }
+  };
   /**
    * Consume `?action=` from InvoiceActionsMenu.
    *
@@ -223,6 +247,22 @@ const InvoiceDetailPage: React.FC = () => {
                 <> · <Link to={`${financeBase}/orders/${(invoice as any).order_id}`} className="text-primary hover:underline">View order</Link></>
               )}
             </p>
+            {/* Which job this invoice is revenue for (#378 L2). `get_project_pnl` reads billed
+                revenue off this column, so an invoice without one leaves the job showing cost and
+                no income — and until now it could only be set from inside the project, which is
+                the direction someone looking at an invoice does not have. Editable after issue:
+                the job is internal reporting, not a fiscal field. */}
+            {canEditProject && (
+              <div className="mt-2">
+                <ProjectLinkField
+                  workspaceId={(invoice as any).workspace_id}
+                  projectId={(invoice as any).project_id ?? null}
+                  onChange={handleProjectChange}
+                  disabled={projectSaving}
+                  compact
+                />
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">

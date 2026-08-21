@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
+import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
   DropdownMenuLabel,
@@ -2046,6 +2047,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     t.push('invoices', 'expenses', 'payments');
     if (order.order_type === 'purchase') t.push('match');
     t.push('customs');
+    // `contracts.order_id` has existed since contracts shipped and `contracts-api` has always
+    // accepted it; the panel was mounted on employees, projects and the standalone page only, so a
+    // supply agreement governing THIS order sat invisible from it (#378 L4). Both directions are
+    // real: a framework agreement behind a purchase, a signed sales contract behind an order.
+    t.push('contracts');
     return t;
   }, [order]);
 
@@ -3177,6 +3183,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 {orderTabs.includes('match') && <TabsTrigger value="match">3-Way Match</TabsTrigger>}
                 <TabsTrigger value="customs">Customs</TabsTrigger>
+                <TabsTrigger value="contracts">Contracts</TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="mt-3 space-y-4">
@@ -4189,6 +4196,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <OrderCustomsCard
                   orderId={order.id}
                   onAddCost={(s) => { setExpensePrefill({ amount: s.amount, description: `${order.order_number ?? order.id.slice(0, 8)} — ${s.description}` }); setExpenseOpen(true); }}
+                />
+              </TabsContent>
+
+              {/* The paper behind the order (#378 L4). Counterparty prefilled from the order's own
+                  party, so the signing email has a recipient without anyone retyping the name. */}
+              <TabsContent value="contracts" className="mt-3">
+                <ContractsSection
+                  workspaceId={order.workspace_id}
+                  context="finance"
+                  subject={{ order_id: order.id }}
+                  heading="Contracts on this order"
+                  defaultCounterparty={{ name: partyName }}
                 />
               </TabsContent>
             </Tabs>

@@ -34,7 +34,16 @@ const TYPE_OPTIONS: Record<ContractContext, string[]> = {
   realestate: ['memorandum_of_sale', 'agency_agreement', 'reservation'],
 };
 
-type Subject = Partial<Pick<Contract, 'hr_employee_id' | 'customer_company_id' | 'supplier_company_id' | 'order_id' | 'quote_id' | 'project_id'>>;
+/**
+ * Every column `contracts_subject_ck` accepts. It is spread straight into both the list filter and
+ * the create payload, so widening this type is all a new mount needs.
+ *
+ * `property_id` was missing until #378 L4 — `contracts-api` had accepted it from the start and the
+ * `realestate` context below has had its own type options all along, so a memorandum of sale could
+ * be stored against a building and shown nowhere near it.
+ */
+type Subject = Partial<Pick<Contract,
+  'hr_employee_id' | 'customer_company_id' | 'supplier_company_id' | 'order_id' | 'quote_id' | 'project_id' | 'property_id'>>;
 
 const CONTEXT_BADGE: Record<ContractContext, string> = {
   hr: 'text-violet-600 border-violet-500/40',
@@ -65,7 +74,9 @@ export const ContractsSection: React.FC<{
    * (`contracts_subject_ck`), so a template fills this form rather than creating a row of its own.
    */
   openWithTemplateId?: string | null;
-}> = ({ workspaceId, context, subject, heading = 'Contracts', defaultCounterparty, filterGroups: buildGroups, openWithTemplateId }) => {
+  /** List only — no create affordance. For a mount whose parent record the viewer cannot edit. */
+  readOnly?: boolean;
+}> = ({ workspaceId, context, subject, heading = 'Contracts', defaultCounterparty, filterGroups: buildGroups, openWithTemplateId, readOnly }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,10 +88,13 @@ export const ContractsSection: React.FC<{
   const [createContext, setCreateContext] = useState<ContractContext>(context === 'all' ? 'finance' : context);
   // Category picker is only shown on the cross-context 'all' tab — a specific tab IS the category.
   const pickCategory = context === 'all';
-  // Create is always available: entity-scoped mounts link the new row to the employee/project via
-  // `subject`; standalone mounts (incl. 'all') create with a free-text counterparty, category chosen
-  // by tab or by the in-dialog picker. The backend only requires context + title.
-  const canCreate = true;
+  // Create is available by default: entity-scoped mounts link the new row to the employee/project
+  // via `subject`; standalone mounts (incl. 'all') create with a free-text counterparty, category
+  // chosen by tab or by the in-dialog picker. The backend only requires context + title.
+  // `readOnly` is for a mount whose surrounding record is itself read-only to this user — the
+  // property workbench shows the transaction file to anyone who may manage the listing, but only
+  // an editor may add to it.
+  const canCreate = !readOnly;
 
   const [title, setTitle] = useState('');
   const [type, setType] = useState<string>(TYPE_OPTIONS[context === 'all' ? 'finance' : context][0]);

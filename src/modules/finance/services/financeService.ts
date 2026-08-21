@@ -1024,6 +1024,17 @@ const _financeServiceCore = {
     // so a generic patch never accidentally nulls the category. (Financial fields stay
     // locked by the DB immutability guard regardless.)
     if ('category_id' in patch) allowed.category_id = (patch as any).category_id;
+    /**
+     * Which job this invoice is revenue for (#378 L2). `get_project_pnl` reads billed revenue off
+     * exactly this column, so an invoice that never gets one leaves the job showing cost and no
+     * income. It was writable only from inside the project until now, and an invoice raised from a
+     * project-linked order arrives with it already set (#378 Phase 1) — this is how it gets
+     * CORRECTED, and how an invoice that predates its project joins one.
+     *
+     * Editable after issue on purpose: the project is internal reporting, not a fiscal field. The
+     * DB's immutability guard still locks everything AADE was told.
+     */
+    if ('project_id' in patch) allowed.project_id = (patch as any).project_id;
     const { data, error } = await supabase
       .from('invoices')
       .update(allowed)

@@ -570,6 +570,14 @@ export class QuotesService {
       // Pass exactly one; the other is nulled so the pair stays mutually exclusive.
       customer_company_id?: string | null;
       customer_contact_id?: string | null;
+      /**
+       * Which job this quote belongs to (#378 L3). It could previously be set only in the create
+       * modal, so a quote raised before its project existed — the normal order of events — could
+       * never join one. `get_project_pnl` reads accepted quotes off this column as the job's
+       * CONTRACTED revenue, and `generate_order_from_quote` carries it onto the order, so a quote
+       * with no job starts a chain that has none either.
+       */
+      project_id?: string | null;
     },
   ): Promise<Quote> {
     const { data: quote, error } = await supabase
