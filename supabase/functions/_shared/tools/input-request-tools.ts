@@ -30,13 +30,13 @@
 
 // `tool` is typed non-generically ON PURPOSE — see the note in toolkit-tools.ts. Inferring it
 // pulls @langchain/core's generic graph in and blows the edge typecheck heap.
-const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
+const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
     cfg: { name: string; description: string; schema: S; [k: string]: unknown },
   ) => any;
 };
-const { z } = await import('npm:zod@3.24.0');
+const { z } = await import('npm:zod@3.25.76');
 
 type ChunkSink = ((chunk: any) => void) | undefined;
 

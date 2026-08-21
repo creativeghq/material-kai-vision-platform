@@ -15,7 +15,7 @@
 // comparable 2.8k lines and checks fine). Erasing it here costs the `tool()` config shape, which
 // `npm run tools:manifest` + tests/unit/toolkitCoverage.test.ts already enforce from the AST, and
 // buys a compiler over the tool bodies, which nothing had before.
-const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
+const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
     cfg: { name: string; description: string; schema: S; [k: string]: unknown },
@@ -23,7 +23,7 @@ const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
   // to `unknown` would break them. The INPUT is what we want typed, and S gives us that.
   ) => any;
 };
-const { z } = await import('npm:zod@3.24.0');
+const { z } = await import('npm:zod@3.25.76');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';

@@ -62,22 +62,17 @@ const WRITE = process.argv.includes('--write-baseline');
  * This is a CAP ON COVERAGE, so it is reported loudly on every run and written into the
  * baseline — never silently skipped. Adding an entry needs a reason and a way out.
  *
- * `agent-chat` dynamically imports 41 tool modules pulling `@langchain/{anthropic,langgraph,core}`
- * + zod. langgraph's generics instantiate into a type graph that does not fit in 12 GB even
- * checked entirely alone — measured, not estimated: it OOMs at 4 GB in a batch, at 8 GB alone,
- * and at 12 GB alone. This dev machine has 15.7 GB total / 9.5 GB free and GitHub's standard
- * runners have 16 GB, so there is no heap setting that makes it pass anywhere we run.
- * `skipLibCheck` does not help — the cost is instantiating those types, not error-checking
- * their .d.ts files.
- *
- * The way out is to shrink the graph, which is already the house convention for the Python
- * side (CLAUDE.md pipeline §10: no SDK clients for AI providers). Until then, one unchecked
- * function named in every run beats a gate that is permanently red and therefore ignored.
+ * EMPTY, and it should stay that way. `agent-chat/index.ts` lived here on the grounds that
+ * langgraph's generics instantiated a type graph that would not fit in 12 GB. That was true
+ * when it was written and is not true now: on Deno 2.9 / TypeScript 6 with the LangChain
+ * packages upgraded (core 1.2.9 — whose 1.1.35 release replaced its exported Zod type
+ * references with structural interfaces precisely to stop this), the file checks CLEAN in
+ * about 5 seconds. Re-measure before ever adding an entry back; the exclusion cost us the
+ * only compiler that could see the platform's largest edge function, and while it was in
+ * force a `{ system, cache_control }` options object that ChatAnthropic silently discards sat
+ * in the hot path of every agent turn.
  */
-const UNCHECKABLE = new Map([
-  ['agent-chat/index.ts',
-   'type graph exceeds 12 GB even alone (@langchain/langgraph generics); no runner has the heap'],
-]);
+const UNCHECKABLE = new Map([]);
 
 /**
  * Entrypoints: supabase/functions/<name>/index.ts, skipping _shared and friends —

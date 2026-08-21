@@ -28,13 +28,13 @@
 // `tool` is typed non-generically ON PURPOSE — see the note in docs-tools.ts. Inferring it pulls
 // @langchain/core's generic graph into every module that defines a tool, which is what makes
 // agent-chat exceed the edge typecheck memory ceiling.
-const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
+const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
     cfg: { name: string; description: string; schema: S; [k: string]: unknown },
   ) => any;
 };
-const { z } = await import('npm:zod@3.24.0');
+const { z } = await import('npm:zod@3.25.76');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;

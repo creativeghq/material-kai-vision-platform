@@ -31,13 +31,13 @@
 
 // Typed non-generically for the same reason as graph-tools.ts: inferring `tool` pulls
 // @langchain/core's generic graph into the module and blows the edge typecheck's memory ceiling.
-const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
+const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
     cfg: { name: string; description: string; schema: S; [k: string]: unknown },
   ) => any;
 };
-const { z } = await import('npm:zod@3.24.0');
+const { z } = await import('npm:zod@3.25.76');
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 

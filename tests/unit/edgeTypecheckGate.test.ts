@@ -99,25 +99,30 @@ describe('edge-function typecheck gate', () => {
   });
 
   /**
-   * The coverage cap must SHRINK, never grow.
+   * The coverage cap must stay EMPTY.
    *
-   * `agent-chat` is excluded because its type graph does not fit in 12 GB even checked alone,
-   * and no runner we have (this machine: 15.7 GB; GitHub standard: 16 GB) can hold it. That is
-   * a real limitation, but it is also exactly the shape of hole that quietly swallows a gate:
-   * one exclusion is a known gap, five is "the gate does not really run". Every entry must name
-   * a function that exists and carry a reason, and the count is pinned here so adding another
-   * is a deliberate, reviewed act rather than a one-line escape hatch.
+   * `agent-chat/index.ts` used to be the one entry, on the grounds that langgraph's generics
+   * instantiated a type graph too large for any runner. It is now checked like everything else
+   * — clean, in about five seconds — after the LangChain packages were brought up to date
+   * (core 1.2.9 swapped its exported Zod types for structural interfaces to stop exactly this)
+   * and the blanket `let X: any` runtime singletons were given real types.
+   *
+   * That exclusion was not free while it lasted: it was the only compiler that could have seen
+   * agent-chat, and during it the model call passed `{ system, cache_control }` as call options
+   * that ChatAnthropic drops on the floor — so no agent turn carried its system prompt and no
+   * turn was ever cached. An entry here is a function nobody is checking. Adding one back needs
+   * a measurement, not a memory.
    */
-  it('the excluded-function list stays at exactly the one known offender', () => {
+  it('no edge function is excluded from typechecking', () => {
     const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as { uncheckable?: Record<string, string> };
     const excluded = base.uncheckable ?? {};
 
     expect(
       Object.keys(excluded).sort(),
-      'the edge-typecheck coverage cap changed. Removing an entry is good — regenerate the ' +
-      'baseline. ADDING one means a function is no longer typechecked at all: fix it or shrink ' +
-      'its type graph first, and only widen this after review.',
-    ).toEqual(['agent-chat/index.ts']);
+      'the edge-typecheck coverage cap changed. ADDING an entry means a function is no longer ' +
+      'typechecked at all: fix it or shrink its type graph first, and only widen this after ' +
+      'review — re-measure rather than trusting an older note that it cannot be checked.',
+    ).toEqual([]);
 
     for (const [file, reason] of Object.entries(excluded)) {
       expect(existsSync(join(FN_DIR, file)), `excluded ${file} does not exist — stale entry`).toBe(true);

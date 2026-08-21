@@ -12,8 +12,8 @@
 // in this directory (search-tools, generation-tools, etc.). Cast to `any` to
 // dodge LangChain's "Type instantiation is excessively deep" error on typecheck
 // without losing any runtime behavior.
-const toolsMod: any = await import('npm:@langchain/core@1.1.15/tools');
-const zodMod: any   = await import('npm:zod@3.24.0');
+const toolsMod: any = await import('npm:@langchain/core@1.2.9/tools');
+const zodMod: any   = await import('npm:zod@3.25.76');
 const tool = toolsMod.tool;
 const z    = zodMod.z;
 import { getSkill, getAllSkillSlugs } from '../skills-loader.ts';

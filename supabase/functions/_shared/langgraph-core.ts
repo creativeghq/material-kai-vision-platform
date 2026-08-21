@@ -13,6 +13,10 @@
  */
 
 import type { LogLevel } from './agents/types.ts';
+// Type-only — erased at compile time, so the lazy `npm:` imports below still do the actual
+// loading. Without it `BaseMessage` is only the runtime binding destructured inside the
+// function, and using it as a type is an error the edge typecheck gate reports.
+import type { BaseMessage as BaseMessageT } from 'npm:@langchain/core@1.2.9/messages';
 
 // ── Text extraction ────────────────────────────────────────────────────────────
 
@@ -82,19 +86,19 @@ export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
   }
 
   if (model.startsWith('gpt-') || model.startsWith('o1') || model.startsWith('o3')) {
-    const { ChatOpenAI } = await import('npm:@langchain/openai');
+    const { ChatOpenAI } = await import('npm:@langchain/openai@1.5.8');
     procEnv.OPENAI_API_KEY = openaiApiKey ?? '';
     return new ChatOpenAI({ model, openAIApiKey: openaiApiKey, maxTokens: 4096 });
   }
 
   if (model.startsWith('gemini-')) {
-    const { ChatGoogleGenerativeAI } = await import('npm:@langchain/google-genai');
+    const { ChatGoogleGenerativeAI } = await import('npm:@langchain/google-genai@2.3.0');
     procEnv.GOOGLE_API_KEY = googleApiKey ?? '';
     return new ChatGoogleGenerativeAI({ model, apiKey: googleApiKey, maxOutputTokens: 4096 });
   }
 
   // Default: Anthropic (claude-*)
-  const { ChatAnthropic } = await import('npm:@langchain/anthropic');
+  const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.5.6');
   procEnv.ANTHROPIC_API_KEY = anthropicApiKey;
   return new ChatAnthropic({ model, anthropicApiKey, maxTokens: 4096 });
 }
@@ -116,14 +120,14 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     onLog,
   } = opts;
 
-  const { StateGraph, Annotation, END, START }     = await import('npm:@langchain/langgraph');
-  const { BaseMessage, HumanMessage, ToolMessage } = await import('npm:@langchain/core/messages');
+  const { StateGraph, Annotation, END, START }     = await import('npm:@langchain/langgraph@1.4.12');
+  const { HumanMessage, SystemMessage, ToolMessage } = await import('npm:@langchain/core@1.2.9/messages');
 
   const llm = await buildLLM(opts);
 
   // State annotation
   const AgentState = Annotation.Root({
-    messages: Annotation<BaseMessage[]>({
+    messages: Annotation<BaseMessageT[]>({
       reducer:  (prev, next) => [...prev, ...next],
       default:  () => [],
     }),
@@ -157,7 +161,22 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     onLog?.('debug', `Agent iteration ${iteration}/${maxIterations}`);
 
     const modelWithTools = tools.length > 0 ? llm.bindTools(tools) : llm;
-    const response = await modelWithTools.invoke(state.messages, { system: systemPrompt });
+    // The system prompt travels as the FIRST message, never as a call option.
+    // `ChatAnthropic.invocationParams()` builds an allowlist and drops anything it does not
+    // recognise, and the Anthropic `system` field is read from `messages[0]` alone — so
+    // `invoke(msgs, { system })`, which is what this used to be, sent the model nothing at
+    // all. Every background agent ran without its instructions and still returned plausible
+    // text, so nothing ever failed. The same defect was live in agent-chat.
+    //
+    // Anthropic gets the prompt as a cached block (one breakpoint covers tools + system,
+    // which is the whole stable prefix); the other providers get a plain string, because
+    // `cache_control` is an Anthropic-only key and passing it to them is not defined.
+    const systemMessage = model.startsWith('claude-')
+      ? new SystemMessage({
+          content: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+        })
+      : new SystemMessage(systemPrompt);
+    const response = await modelWithTools.invoke([systemMessage, ...state.messages]);
 
     const usage        = (response as any).response_metadata?.usage;
     const inputTokens  = usage?.input_tokens  || 0;
@@ -234,7 +253,7 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     .addEdge('tools', 'agent')
     .compile();
 
-  const initialMessages: BaseMessage[] = [new HumanMessage(userMessage)];
+  const initialMessages: BaseMessageT[] = [new HumanMessage(userMessage)];
 
   // Guard against agents that get stuck in a tool loop or hit a slow model.
   // 5 minutes is generous for background agents; adjust via maxIterations if needed.

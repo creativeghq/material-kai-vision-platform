@@ -64,3 +64,12 @@ jobs:
 
       - name: Typecheck edge functions
         run: node scripts/check-edge-functions.mjs
+
+      # `deno check` resolves types; it does not EXECUTE the module graph, so it cannot see a
+      # dependency skew. On 2026-08-21 a regenerated agent-chat/deno.lock pinned langgraph
+      # against zod@3.24.0, which does not export the `zod/v4` subpath langgraph imports —
+      # every JARVIS turn 500'd in production while typecheck, lint and 2,200 unit tests were
+      # all green. This step builds the real graph against a stubbed Anthropic endpoint, so
+      # that failure is a red build instead of a customer finding it.
+      - name: Smoke-run the agent-chat dependency set
+        run: npm run smoke:agent-chat

@@ -35,9 +35,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // @langchain/core's graph generics into every module that defines a tool, and that
 // instantiation is what pushes agent-chat past the 12 GB typecheck ceiling.
 // Same lazy-import shape as b2b-tools, and the same pinned version the import map resolves.
-const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.3.10');
+const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.5.6');
 
-const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
+const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
     cfg: { name: string; description: string; schema: S; [k: string]: unknown },

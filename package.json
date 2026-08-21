@@ -10,6 +10,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:edge": "node scripts/check-edge-functions.mjs",
+    "smoke:agent-chat": "deno run -A --node-modules-dir=auto --config supabase/functions/agent-chat/deno.json scripts/smoke-agent-chat-runtime.ts",
     "schema:writers": "node scripts/schema-writers.mjs",
     "lint:a11y": "node scripts/check-a11y.mjs",
     "lint:tenancy": "node scripts/check-tenancy-parity.mjs",
