@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 // @ts-ignore - QueryClient types are available at runtime (react-query version conflict with React 18 types)
 import { HelmetProvider } from 'react-helmet-async';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 
 import { Toaster } from '@/components/core/ui/toaster';
 import { Toaster as Sonner } from '@/components/core/ui/sonner';
@@ -32,6 +32,20 @@ import HealthPage from './pages/Health';
 // Named exports use .then(m => ({ default: m.ExportName })) pattern.
 
 // Core user pages
+/**
+ * `/search` and `/search-hub` used to redirect to the product catalogue, which is the same
+ * defect the Cmd-K palette had: on this platform "search" had come to mean "product search", so
+ * looking for a person or an invoice silently became a material search. There is no general
+ * search PAGE — lookups belong in the palette (instant, deterministic) and questions belong to
+ * the agent, which can answer them and now owns `find_records` to look records up by name. So
+ * these forward to the agent, carrying whatever the user typed.
+ */
+const SearchEntryRedirect: React.FC = () => {
+  const [params] = useSearchParams();
+  const q = params.get('q')?.trim();
+  return <Navigate to={q ? `/agent-hub?q=${encodeURIComponent(q)}` : '/agent-hub'} replace />;
+};
+
 const Index = lazy(() => import('./pages/Index'));
 const RoomPlannerPage = lazy(() => import('./pages/RoomPlannerPage').then(m => ({ default: m.RoomPlannerPage })));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
@@ -623,11 +637,11 @@ const App = () => (
                     Mac-style Spotlight (⌘K) is the always-available quick-search entry point. */}
                 <Route
                   path="/search"
-                  element={<Navigate to="/discover?tab=products&mode=smart" replace />}
+                  element={<SearchEntryRedirect />}
                 />
                 <Route
                   path="/search-hub"
-                  element={<Navigate to="/discover?tab=products&mode=smart" replace />}
+                  element={<SearchEntryRedirect />}
                 />
                 <Route
                   path="/agent-hub"

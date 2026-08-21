@@ -561,6 +561,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'find_records',
+    file: 'supabase/functions/_shared/tools/record-search-tools.ts',
+    factory: 'createFindRecordsTool',
+    description: 'Find a RECORD in this workspace by its name, title or number — a person or teammate, a CRM company or contact, a deal, product, project, moodboard, quote, order, invoice, property, catalog, blueprint, template, email …',
+    params: [
+      { name: 'query', type: 'string', optional: false, description: 'The name, title or number to look for' },
+      { name: 'kinds', type: 'array', enum: ['person', 'company', 'contact', 'deal', 'product', 'project', 'moodboard', 'quote', 'order', 'invoice', 'property', 'catalog', 'blueprint', 'template', 'email_template', 'conversation', 'inbox_thread'], optional: true, description: 'Restrict to these record types. Omit to search everything the user can see.' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max results per record type (1-20)' },
+    ],
+  },
+  {
     name: 'generate_3d',
     file: 'supabase/functions/_shared/tools/generation-tools.ts',
     factory: 'create3DGenerationTool',

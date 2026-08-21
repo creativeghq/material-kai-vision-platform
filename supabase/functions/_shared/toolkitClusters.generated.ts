@@ -21,7 +21,7 @@ export interface ToolkitCluster {
 export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'core': {
     alwaysOn: true,
-    tool_ids: ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'],
+    tool_ids: ['find_records', 'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'],
   },
   'calculators': {
     alwaysOn: true,

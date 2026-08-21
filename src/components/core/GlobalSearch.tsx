@@ -12,7 +12,7 @@
 // silently ran a material search and dropped you in the product catalogue.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Sparkles, User, CornerDownLeft } from 'lucide-react';
+import { Search, Sparkles, User, Package, CornerDownLeft } from 'lucide-react';
 
 import {
   Dialog,
@@ -287,23 +287,39 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
                 </CommandGroup>
               ))}
 
-              {/* Last, and named after where it goes. It is a deliberate action — a 7-vector pass
-                  over the material catalog — not the fallback meaning of "search". */}
-              {browseOk && trimmed && (
+              {/* Last, and each named after where it goes.
+                  This palette answers LOOKUPS — a name, a title, a number — instantly and
+                  deterministically. A question ("unpaid invoices over 5k", "who supplied the
+                  tiles") is not a lookup, and the agent is where it belongs. Escalation is a
+                  choice the user makes here rather than a model turn charged to every keystroke:
+                  routing the whole palette through the agent would trade a ~50 ms answer for a
+                  multi-second one and an LLM call per search. */}
+              {trimmed && (
                 <CommandGroup heading="Actions">
                   <CommandItem
-                    value="__smart_search__"
-                    onSelect={() =>
-                      go(`/discover?tab=products&mode=smart&q=${encodeURIComponent(trimmed)}`)
-                    }
+                    value="__ask_agent__"
+                    onSelect={() => go(`/agent-hub?q=${encodeURIComponent(trimmed)}`)}
                   >
                     <Sparkles className="mr-2 h-4 w-4 text-primary" />
                     <span>
-                      Deep material search for “<span className="font-medium">{trimmed}</span>” in
-                      Discover
+                      Ask the agent about “<span className="font-medium">{trimmed}</span>”
                     </span>
                     <CornerDownLeft className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
                   </CommandItem>
+                  {browseOk && (
+                    <CommandItem
+                      value="__smart_search__"
+                      onSelect={() =>
+                        go(`/discover?tab=products&mode=smart&q=${encodeURIComponent(trimmed)}`)
+                      }
+                    >
+                      <Package className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span>
+                        Deep material search for “<span className="font-medium">{trimmed}</span>” in
+                        Discover
+                      </span>
+                    </CommandItem>
+                  )}
                 </CommandGroup>
               )}
             </CommandList>

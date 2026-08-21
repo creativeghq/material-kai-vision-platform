@@ -274,6 +274,9 @@ const AGENTS: AgentDefinition[] = [
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
+  // Cross-entity record lookup. The "Find a record" quick-start is a DIRECT run (no model turn),
+  // so this card is the only thing that puts the matches on screen.
+  record_search_results: 'Records found',
   // Deal pipeline (#311). Every onChunk type a tool emits MUST be here or the output is dropped
   // and the user sees "Done" with no data.
   crm_deals_list: 'Deal pipeline',

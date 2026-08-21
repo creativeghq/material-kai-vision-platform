@@ -718,6 +718,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      // Cross-entity record lookup — "find Tsatsos", "open the Botguard company". Before this the
+      // agent had 171 tools and none of them answered "find the record called X".
+      'find_records',
       // Docs module — internal workspace docs FTS. Currently a free tool for all workspaces
       // (the push site has NO entitlement gate); the docs UI is entitlement-gated but the agent tool
       // is not. If Docs becomes a paid/gated module, add an is_workspace_entitled('docs') check at
@@ -967,6 +970,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'knowledge_base_search', 'read_document_section', 'material_search',
+      // Trinity quotes and invoices, so it must be able to FIND one by number or customer name.
+      'find_records',
       'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
       // The verdict half of the same flow: Trinity quotes, so Trinity must be able to find out
       // whether there is a price to quote before it says one out loud.
@@ -1403,6 +1408,7 @@ async function executeAgent(
   // Loading them at boot exceeds the 2s Supabase Edge Runtime limit.
   const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
   const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs');
+  const needsRecordSearch = config.tools.includes('find_records');
   const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
   // These two gated on snake_case names no tool has ever had — the registrations below
   // key off `checkServerHealth` / `querySentry` / `queryDatabase`. So the modules never
@@ -1474,7 +1480,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1510,6 +1516,7 @@ async function executeAgent(
     needsInbox ? import('../_shared/tools/inbox-tools.ts') : null,
     needsReviews ? import('../_shared/tools/reviews-tools.ts') : null,
     needsAppointments ? import('../_shared/tools/appointments-tools.ts') : null,
+    needsRecordSearch ? import('../_shared/tools/record-search-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -1706,6 +1713,13 @@ async function executeAgent(
   // Docs module — internal workspace docs via Postgres FTS (no embeddings). The tool is
   // workspace-scoped + RLS-safe; docs is a free module available to all workspaces. For a future
   // paid/gated module, add an is_workspace_entitled check here.
+  // find_records — cross-entity record lookup, the same derivation the Cmd-K palette uses.
+  // Takes userJwt because global_search is SECURITY INVOKER: the caller's RLS is what scopes the
+  // answer, and a service-role call would both over-answer and silently return no people.
+  if (config.tools.includes('find_records') && recordSearchMod?.createFindRecordsTool) {
+    tools.push(recordSearchMod.createFindRecordsTool(workspaceId, userJwt, onChunk));
+  }
+
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
     tools.push(createDocsSearchTool(workspaceId));
   }

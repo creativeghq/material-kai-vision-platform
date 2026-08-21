@@ -59,6 +59,15 @@ export interface AgentDescriptor {
 const KAI_TOOLS: AgentToolEntry[] = [
   // ── Search (all users) ────────────────────────────────────────────
   {
+    id: 'find_records', name: 'Find a Record', category: 'Search',
+    desc: 'Find any record in this workspace by name, title or number — people, companies, contacts, deals, products, projects, moodboards, quotes, orders, invoices, properties, catalogs, blueprints, templates, email templates, past chats and inbox threads. Names and numbers, not content.',
+    examples: [
+      'Find Tsatsos',
+      'Open the Botguard company',
+      'Where is the kitchen renovation project?',
+    ],
+  },
+  {
     id: 'knowledge_base_search', name: 'Knowledge Base', category: 'Search',
     desc: 'Search platform knowledge base documents. Best for "how do we…" / "what is…" questions about the product itself.',
     examples: [
@@ -1286,9 +1295,21 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Compass',
     alwaysOn: true,
     tool_ids: [
+      'find_records',
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
     ],
     quick_starts: [
+      {
+        label: 'Find a record', description: 'Look anything up by name or number', icon: 'Search',
+        prompt: 'Find the record called Tsatsos.',
+        done: 'Here is what matched.',
+        promptTemplate: 'Find the record called {{query}}.',
+        run: { tool: 'find_records', argMap: { query: 'query' } },
+        autoFields: true,
+        form: [
+          { key: 'query', label: 'Name, title or number', kind: 'text', required: true, placeholder: 'Tsatsos' },
+        ],
+      },
       {
         label: 'Find materials', description: 'Search the catalog by description', icon: 'Search',
         prompt: 'Find me 5 cement-based grey tiles for a modern bathroom',

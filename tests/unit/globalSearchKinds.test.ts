@@ -43,24 +43,31 @@ const NO_CAPS = () => false;
 const ALL_MODULES = () => true;
 
 describe('global search — the material-search action is never the default', () => {
-  it('renders results, then nav, then the material-search action', () => {
+  it('renders results, then nav, then the escalation actions', () => {
     const results = PALETTE.indexOf('groups.map((group)');
     const nav = PALETTE.indexOf('navGroups.map((group)');
+    const agent = PALETTE.indexOf('__ask_agent__');
     const smart = PALETTE.indexOf('__smart_search__');
 
     expect(results, 'the palette must render `groups`').toBeGreaterThan(-1);
     expect(nav, 'the palette must render `navGroups`').toBeGreaterThan(-1);
+    expect(agent, 'the palette must offer escalation to the agent').toBeGreaterThan(-1);
     expect(smart, 'the palette must still offer the deep material search').toBeGreaterThan(-1);
 
     // cmdk highlights the FIRST item, so this order IS the Enter target.
     expect(results, 'entity results must render before nav').toBeLessThan(nav);
-    expect(nav, 'the material-search action must render last, after every real result').toBeLessThan(smart);
+    expect(nav, 'the actions must render last, after every real result').toBeLessThan(agent);
+    // Of the two actions the AGENT one comes first: it is the general answer to a query that
+    // matched no record. Putting the product search above it is how "search" became "product
+    // search" in the first place.
+    expect(agent, 'ask-the-agent must sit above the material search').toBeLessThan(smart);
   });
 
-  it('labels the material-search action with where it goes', () => {
+  it('labels both actions with where they go', () => {
     // "Search materials for X" reads like the generic meaning of search. It is not: it navigates
     // away to the product catalogue, so the label has to say so before the user presses Enter.
     expect(PALETTE).toMatch(/Deep material search[\s\S]{0,120}Discover/);
+    expect(PALETTE).toMatch(/Ask the agent about/);
   });
 
   it('searches more than products', () => {
