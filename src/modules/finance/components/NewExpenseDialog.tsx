@@ -467,14 +467,16 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           bankAccountId: paidNow ? (bankAccountId || null) : null,
           paymentMethod: method,
           notes: notes || undefined,
-          // The repeat inherits the same "what is this for?" link as the one-off expense, so every
-          // generated bill lands on the same project/order instead of floating unattributed.
-          // NOT the trip / property link: `recurring_expenses` has no column for either, so only
-          // the first bill carries it. Said here rather than silently dropped — a recurring cost
-          // ON a building (service charge, utilities) is a real case and wants those columns
-          // before this is called finished.
+          // The repeat inherits the WHOLE "what is this for?" link, not part of it — every
+          // generated bill lands on the same project / order / trip / property instead of the
+          // first one being attributed and every one after it floating.
+          // `run_due_recurring_expenses` stamps all four onto each bill it creates; a template
+          // carrying only some of them would look correct forever, because a missing uuid is a
+          // valid null and the bill is otherwise perfect.
           projectId: linkProjectId,
           orderId: effectiveOrderId ?? null,
+          tripReportId: linkTripReportId,
+          propertyId: linkPropertyId,
         });
         } catch (recErr: any) {
           recurringError = recErr?.message ?? 'the recurring template could not be created';

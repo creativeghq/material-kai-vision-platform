@@ -488,9 +488,16 @@ export interface RecurringExpense {
    * Defaults stamped onto each generated supplier_bill by `run_due_recurring_expenses`.
    * The BILL carries the real link — job costing reads the bill, never this template — so these
    * are a convenience, not a second place the project/order association lives.
+   *
+   * The trip/property pair is here for the same reason and matters MORE on a repeating cost than
+   * on a one-off: a service charge, a utility bill or a cleaning contract on a building is
+   * recurring by nature, and without these the second bill onward arrives unattributed while
+   * looking perfectly correct.
    */
   project_id: string | null;
   order_id: string | null;
+  trip_report_id: string | null;
+  property_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -2476,6 +2483,8 @@ const _financeServiceCore = {
     /** Stamped onto every generated bill — see RecurringExpense.project_id. */
     projectId?: string | null;
     orderId?: string | null;
+    tripReportId?: string | null;
+    propertyId?: string | null;
   }): Promise<RecurringExpense> {
     if (!input.supplierCompanyId && !input.supplierContactId) {
       throw new Error('A recurring expense needs a supplier / payee.');
@@ -2500,6 +2509,8 @@ const _financeServiceCore = {
       notes: input.notes ?? null,
       project_id: input.projectId ?? null,
       order_id: input.orderId ?? null,
+      trip_report_id: input.tripReportId ?? null,
+      property_id: input.propertyId ?? null,
     } as any).select().single();
     if (error) throw error;
     return data as RecurringExpense;
