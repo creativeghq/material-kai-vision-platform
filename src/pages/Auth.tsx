@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Eye, EyeOff, Store } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,15 +30,25 @@ export const Auth: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>('signup');
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  // AuthGuard stamps `state.from` when it bounces someone off a protected page. That
+  // person demonstrably has an account, so open on Sign In — the tab default is Sign Up
+  // because a cold visit to /auth is a signup funnel, and showing "Create an account" to
+  // someone who just got logged out reads as though their account is gone.
+  const cameFromGuard = Boolean((location.state as { from?: string } | null)?.from);
+  const [activeTab, setActiveTab] = useState<string>(cameFromGuard ? 'signin' : 'signup');
   // Supabase recovery links put tokens in the URL hash (#access_token=...&type=recovery).
   // Some project configs strip the ?reset=true query param, so also check the hash.
-  const hashHasRecovery =
-    typeof window !== 'undefined' && window.location.hash.includes('type=recovery');
+  // Read it ONCE and latch it: supabase-js clears the hash as soon as it has consumed the
+  // tokens, so a value re-read on every render flips to false mid-flow and yanks the
+  // set-a-new-password form out from under whoever is typing into it.
+  const [hashHadRecovery] = useState(
+    () => typeof window !== 'undefined' && window.location.hash.includes('type=recovery'),
+  );
   const [isRecoverySession, setIsRecoverySession] = useState(false);
   const isResetMode =
-    searchParams.get('reset') === 'true' || hashHasRecovery || isRecoverySession;
+    searchParams.get('reset') === 'true' || hashHadRecovery || isRecoverySession;
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   // Reseller onboarding: default signup is a plain consumer of the operator. Ticking this

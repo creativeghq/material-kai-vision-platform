@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { PageLoader } from '@/components/core/PageLoader';
@@ -11,12 +11,23 @@ interface AuthGuardProps {
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth', { replace: true });
-    }
-  }, [user, loading, navigate]);
+    if (loading || user) return;
+    // Carry the query and hash across the bounce instead of dropping them.
+    // A password-recovery link whose `redirect_to` is not allow-listed does not fail —
+    // GoTrue silently falls back to the project's Site URL, so the link lands HERE with
+    // its tokens still attached (`#...type=recovery`, or `?code=` under PKCE). Redirecting
+    // to a bare `/auth` threw those away, and /auth opens on the Sign Up tab: someone
+    // recovering an account they already have was shown "Create an account". Nothing
+    // errored — the tokens were simply gone. Preserving them lets Auth.tsx recognise the
+    // recovery and render the set-a-new-password form.
+    navigate(
+      { pathname: '/auth', search: location.search, hash: location.hash },
+      { replace: true, state: { from: location.pathname } },
+    );
+  }, [user, loading, navigate, location.pathname, location.search, location.hash]);
 
   if (loading) {
     // The SAME loader the route-level <Suspense> fallback uses. These two phases run
