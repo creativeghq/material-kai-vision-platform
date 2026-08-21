@@ -45,8 +45,12 @@ export const DOCUMENT_EMAIL_VARIABLES: Record<DocumentEmailKind, readonly string
 /**
  * The slug of the template assigned to (workspace, kind), or null to use the built-in body.
  *
- * Joins through to `email_templates` so an assignment whose template was deactivated after it was
- * made resolves to null rather than to a slug email-api will 404 on.
+ * One RPC, deliberately. The Supabase client here is untyped (`createClient as any` in the app,
+ * and no generated types on the edge side either), so a wrong column name or a mis-shaped
+ * PostgREST embed result would not be a compile error and is not reachable from a unit test —
+ * whereas `resolve_document_email_template` is one SQL function that can be probed directly.
+ * It also re-checks `is_active`, so an assignment whose template was deactivated after the fact
+ * resolves to null instead of to a slug email-api would 404 on mid-send.
  */
 export async function resolveDocumentEmailTemplate(
   supabase: DbClient,
@@ -55,19 +59,20 @@ export async function resolveDocumentEmailTemplate(
 ): Promise<string | null> {
   if (!workspaceId) return null;
   try {
-    const { data, error } = await supabase
-      .from('workspace_document_email_templates')
-      .select('email_templates!inner(slug, is_active)')
-      .eq('workspace_id', workspaceId)
-      .eq('document_kind', kind)
-      .maybeSingle();
-    if (error || !data) return null;
-    const tpl = (data as { email_templates?: { slug?: string; is_active?: boolean } }).email_templates;
-    if (!tpl?.slug || tpl.is_active !== true) return null;
-    return tpl.slug;
+    const { data, error } = await supabase.rpc('resolve_document_email_template', {
+      p_workspace_id: workspaceId,
+      p_document_kind: kind,
+    });
+    if (error) {
+      console.warn(`[document-email-template] ${kind} lookup failed, using built-in body:`, error.message);
+      return null;
+    }
+    return typeof data === 'string' && data.length > 0 ? data : null;
   } catch (err) {
-    // Never block a document send on the override lookup — fall back to the built-in body.
-    console.warn(`[document-email-template] ${kind} lookup failed, using built-in body:`, err);
+    // Never block a document send on the override lookup — fall back to the built-in body. An
+    // invoice that does not go out because a template lookup hiccuped is worse than one that
+    // goes out looking plain.
+    console.warn(`[document-email-template] ${kind} lookup threw, using built-in body:`, err);
     return null;
   }
 }

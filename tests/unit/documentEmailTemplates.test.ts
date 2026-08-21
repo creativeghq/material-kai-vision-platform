@@ -14,9 +14,17 @@
  * Declare a variable the UI advertises but the sender never fills and it lands as '' rather than
  * as data, so a template built around it quietly loses a line.
  *
- * The DB CHECK on `workspace_document_email_templates.document_kind` is the fourth copy and a
- * repo-file guard cannot see it — it lives in pg_catalog, not in the checkout. It is enforced the
- * other way round: an unknown kind is rejected by the constraint at write time, loudly.
+ * Two more copies live in the database and a repo-file guard cannot see either — they are in
+ * pg_catalog, not in the checkout. Both fail LOUDLY rather than silently, which is why they are
+ * left to the database instead of mirrored here:
+ *
+ *   • The CHECK on `workspace_document_email_templates.document_kind` — an unknown kind is
+ *     rejected at write time with a constraint violation.
+ *   • `document_email_required_tags(kind)` — the required-placeholder list, shared by the
+ *     assignment trigger and the edit-time drift trigger. If it required MORE than the `required`
+ *     list here advertises, the assignment is refused with a message naming the missing tag; if
+ *     it required LESS, a template the UI called non-compliant would be accepted and the author
+ *     sees the gap the first time they look at the mail. Neither is the silent shape.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

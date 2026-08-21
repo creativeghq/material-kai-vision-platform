@@ -730,8 +730,16 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
       }).eq('id', id);
       if (error) throw error;
       toast({ title: 'Saved', description: 'Template saved successfully.' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save template', variant: 'destructive' });
+    } catch (err: any) {
+      // Show the REASON. A save can now be refused with something the author can act on —
+      // "this template is in use for invoice emails and must keep {{invoice_number}}, {{total}}"
+      // — and a bare "Failed to save template" turns that into a mystery, which is how you end up
+      // deleting your work trying to find out what happened.
+      toast({
+        title: 'Could not save template',
+        description: err?.message || 'Failed to save template',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
