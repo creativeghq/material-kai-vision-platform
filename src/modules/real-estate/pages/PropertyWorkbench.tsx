@@ -37,6 +37,7 @@ import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ListingPerformancePanel } from '../components/ListingPerformancePanel';
 import { KycPanel } from '../components/KycPanel';
 import { ShortLetTab } from '../components/ShortLetTab';
+import { PropertyCommercialCard } from '../components/PropertyCommercialCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
@@ -387,6 +388,14 @@ export default function PropertyWorkbench() {
                   {isGRbuilding ? ' are required.' : ' are recommended.'}</span>
               </div>
             )}
+
+            {/* What has been bought, sold and spent ON this building — the read side of
+                `orders.property_id` / `supplier_bills.property_id`. Renders nothing until
+                something is linked, and the linking happens on the order or the expense, so this
+                never asks the agent to do anything. Not gated on `canManage`: an agent who can see
+                the listing can see what it cost, and the RPC is SECURITY INVOKER, so the real
+                boundary is each table's own RLS rather than this condition. */}
+            <PropertyCommercialCard propertyId={id} />
 
             {/* Stepper */}
             <div className="flex flex-wrap gap-1.5">

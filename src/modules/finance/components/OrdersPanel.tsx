@@ -68,7 +68,7 @@ import { PaymentReceiptActions } from '@/modules/finance/components/PaymentRecei
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
-  ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
+  ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL, propertyLabel,
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
   type ThreeWayMatch, type ThreeWayMatchStatus, type OrderLinkTarget, type OrderBalance,
 } from '@/modules/finance/services/ordersService';
@@ -1972,7 +1972,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       const r = data as { title?: string | null; address?: string | null; reference_code?: string | null } | null;
       setPropertyValue({
         kind: 'property', propertyId: order.property_id,
-        label: r?.title?.trim() || r?.address?.trim() || r?.reference_code?.trim() || 'Property',
+        // The SHARED `propertyLabel`, not a local copy. The local copy this replaces ended
+        // "|| 'Property'" where the canonical one ends "|| 'Untitled property'", so picking an
+        // untitled building showed one word and reopening the order showed another — the same
+        // control, the same building, two names, depending only on whether you had just chosen it.
+        label: propertyLabel({
+          title: r?.title ?? null, address: r?.address ?? null, reference_code: r?.reference_code ?? null,
+        }),
       });
     })();
     return () => { cancelled = true; };

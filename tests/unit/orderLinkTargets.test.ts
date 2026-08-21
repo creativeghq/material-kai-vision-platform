@@ -346,3 +346,49 @@ describe('order line totals are derived in SQL', () => {
     expect(body).not.toMatch(/\*\s*1\.\d+/);
   });
 });
+
+/**
+ * One name for a building, in the link surfaces.
+ *
+ * `propertyLabel` was hoisted out of the picker precisely because two surfaces need the SAME
+ * string — the dropdown that OFFERS a property, and the field showing the one a record is ALREADY
+ * linked to. It drifted immediately anyway: the order detail grew its own copy ending
+ * `|| 'Property'` where the shared one ends `|| 'Untitled property'`, so an untitled building was
+ * called one thing when you picked it and another when you reopened the order. Same control, same
+ * building, two names, depending only on how recently you had chosen it.
+ *
+ * Scoped to the link surfaces on purpose. The real-estate module has its own long-standing
+ * variants ('Untitled listing' in the workbench and the portfolio, a `title || name ||
+ * reference_code` chain in the pipeline board); unifying those is a separate change, and pretending
+ * this rule already covers them would make the test a claim it does not honour.
+ */
+describe('a property has one name in the link surfaces', () => {
+  const LINK_SURFACES = [
+    'src/modules/finance/components/OrdersPanel.tsx',
+    'src/modules/finance/components/OrderLinkPicker.tsx',
+    'src/modules/finance/components/EditSupplierBillDialog.tsx',
+    'src/modules/finance/components/NewExpenseDialog.tsx',
+  ];
+
+  it('nobody re-rolls the title -> address -> reference_code fallback', () => {
+    const offenders: string[] = [];
+    for (const rel of LINK_SURFACES) {
+      const src = read(join(ROOT, rel));
+      // The shape of the hand-rolled copy: a coalesce chain ending at reference_code. The shared
+      // helper is a call, so a caller of it cannot match this.
+      if (/address[^\n]*\|\|[^\n]*reference_code/.test(src)) {
+        offenders.push(`${rel}: hand-rolls the property-name fallback — call propertyLabel() instead`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  it('the surfaces that resolve a stored property use the shared helper', () => {
+    for (const rel of LINK_SURFACES) {
+      const src = read(join(ROOT, rel));
+      if (!/kind: 'property'/.test(src)) continue;   // this surface never labels one
+      expect(src, `${rel} builds a property link value without propertyLabel()`)
+        .toContain('propertyLabel(');
+    }
+  });
+});
