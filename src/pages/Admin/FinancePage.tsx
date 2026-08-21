@@ -1168,7 +1168,10 @@ const FinancePage: React.FC = () => {
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
                                   <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
                                 </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditBillId(r.id)} title="Edit details — bill #, dates, category, notes">
+                                {/* Also where an already-booked cost is attached to the order,
+                                    job, building or trip it belongs to (#378 L1) — the title says
+                                    so, because an action nobody can find is not an action. */}
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditBillId(r.id)} title="Edit details — bill #, dates, what it's for (order / project / building / trip), category, notes">
                                   <Pencil className="h-3.5 w-3.5" />
                                   <span className="sr-only">Edit details</span>
                                 </Button>

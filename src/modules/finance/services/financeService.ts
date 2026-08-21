@@ -2036,6 +2036,26 @@ const _financeServiceCore = {
     dueAt?: string | null;
     categoryId?: string | null;
     notes?: string | null;
+    /**
+     * "What is this cost for?" — re-answered after the fact (#378 L1). Until this existed the
+     * link could only be written at the moment the expense was born, so a transport invoice that
+     * landed a week after the goods, customs, or a second supplier on the same job had no route
+     * onto the order or the project it belonged to except from the order's own side.
+     *
+     * The five columns are ONE field and move as a SET, which is why this is a nested object
+     * rather than five optional keys: they are one answer to one question, and a caller able to
+     * set three of them can leave a bill booked to a job AND to somebody else's sales order.
+     * Pass all five, or omit `link` entirely and nothing here is touched.
+     */
+    link?: {
+      projectId: string | null;
+      /** The PURCHASE order this bill invoices, or rides along with as a cost of. */
+      orderId: string | null;
+      /** The SALES order this cost was incurred FOR — never `orderId`, which three-way match joins on. */
+      coversOrderId: string | null;
+      tripReportId: string | null;
+      propertyId: string | null;
+    };
   }): Promise<void> {
     const row: Record<string, string | null> = {};
     if ('supplierBillNumber' in patch) row.supplier_bill_number = patch.supplierBillNumber?.trim() || null;
@@ -2043,10 +2063,18 @@ const _financeServiceCore = {
     if ('dueAt' in patch) row.due_at = patch.dueAt || null;
     if ('categoryId' in patch) row.category_id = patch.categoryId || null;
     if ('notes' in patch) row.notes = patch.notes?.trim() || null;
+    if (patch.link) {
+      row.project_id = patch.link.projectId;
+      row.order_id = patch.link.orderId;
+      row.covers_order_id = patch.link.coversOrderId;
+      row.trip_report_id = patch.link.tripReportId;
+      row.property_id = patch.link.propertyId;
+    }
     if (Object.keys(row).length === 0) return;
     const { error } = await supabase.from('supplier_bills').update(row).eq('id', supplierBillId);
     if (error) throw error;
   },
+
 
   /**
    * Record a business operating expense (rent, utilities, fees, …). An expense IS a supplier

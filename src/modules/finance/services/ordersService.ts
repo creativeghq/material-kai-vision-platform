@@ -323,6 +323,19 @@ export interface LinkPropertySummary {
 }
 
 /**
+ * What we call a building in a link field. The RPC already coalesced title -> address ->
+ * reference code, so this is the last-resort guard.
+ *
+ * It lives beside the type rather than inside the picker because two surfaces need the SAME
+ * string: the dropdown that offers a property, and any field rendering the property a record is
+ * ALREADY linked to. A second copy is how a field comes to read `Untitled property` immediately
+ * after the operator picked one by name.
+ */
+export function propertyLabel(p: Pick<LinkPropertySummary, 'title' | 'address' | 'reference_code'>): string {
+  return p.title?.trim() || p.address?.trim() || p.reference_code?.trim() || 'Untitled property';
+}
+
+/**
  * What a cost is FOR. One field in the UI, five resolutions — every one of which writes a column
  * that already existed; this adds vocabulary, not schema.
  *

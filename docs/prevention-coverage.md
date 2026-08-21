@@ -16,6 +16,7 @@ that has silently stopped working — and this platform has shipped several:
 | edge typecheck sweeps | reported success | one exited 0 on an unresolved import, one OOM'd mid-batch, one used the wrong import maps |
 | MIVAA's 23 guard tests | all green, all well-named, several genuinely well-scoped | **scope narrower than their names.** The SSRF gate declared ONE file; `test_paid_route_metering` 3 doors in 2 files; `test_no_silent_degradation` 5 subtrees. Every finding across #14 and #15 landed in the difference. The one guard using a full-tree walk covers the class with the least evidence of defects |
 | outbound email | no alert of any kind | `default_from_email` sat on a domain Resend had dropped; **136 sends, 1 delivered** over three days in July and nobody was told. There was no guard at all — the gap was not a broken check, it was a missing one |
+| `OrderLinkPicker` call-site guard | a real rule, correctly failing a real bug class, with two call sites passing it | **judged each mount by searching its file for the kind.** A same-shaped helper in the same file answered on the handler's behalf: `linkToColumns` was broken on purpose to watch the guard fire and it did not, because `linkKey` — same `switch (v.kind)`, same `case 'trip':` — satisfied the search. Also: its call sites were a hand-written array, so a new mount was exempt by not being typed into a constant. Found 2026-08-21 by breaking it; the mounts are now discovered, and exhaustiveness is proven by CALLING the mapping ([tests/unit/billLink.test.ts](../tests/unit/billLink.test.ts)) |
 
 The pattern is identical every time: **a guard that reports nothing is indistinguishable from a
 clean codebase.** So "green" is not the question. "When did we last watch it fail on purpose?" is.
@@ -442,6 +443,18 @@ same reason shape 4 exists, one layer up.
 - **Proven to fire:** 2026-08-21 — both, in rolled-back transactions. The drift check: a bill raised from a project-linked order carried the job (the fix), then had it nulled; detector 1 → heal 1 → detector 0. The shape check: a function inserting an invoice with no `project_id` was reported, and stopped being reported once it named the column.
 - **The exemption list is the interesting half.** Six functions legitimately create a document with no job, and two of them matter: `_generate_pre_invoice_on_accept` and `handoff_purchase_order_to_supplier` write into **another tenant's workspace**, where carrying the source project id would be a cross-tenant leak rather than a fix. `_inbound_doc_to_supplier_bill_core` and `create_order_from_thread_intake` have no upstream job to carry at all — for those the answer is letting the operator attach one afterwards (#378 L1), not inventing a source. `pos_issue_receipt` and `reorder_warehouse_item` are genuinely not job work.
 - **Blind spot:** a document created directly by the client rather than by a SQL function. The probe reads `pg_proc` only.
+
+**The other half — the link that can never be answered again (#378 L1).** Propagation only helps a
+document that had a parent. A cost that arrives on its own — a transport invoice a week after the
+goods, customs, an installer, a second supplier on the same job — could be pointed at its order
+only at the moment it was created, or afterwards from the ORDER's side, which requires already
+knowing which order it was. That is the direction an operator looking at an unattributed row in
+Payables does not have. `EditSupplierBillDialog` now mounts the same `OrderLinkPicker`, so the
+question can be re-answered.
+
+- **Guarded by:** [tests/unit/billLink.test.ts](../tests/unit/billLink.test.ts) — every kind the picker can emit lands in the right column *and leaves every other one null* (a leftover from the previous answer books a bill to a job AND to somebody else's sales order), plus the precedence that decides which stored column the control displays; and the call-site rules in [tests/unit/orderLinkTargets.test.ts](../tests/unit/orderLinkTargets.test.ts), whose mounts are now **discovered rather than listed**.
+- **Proven to fire:** 2026-08-21 — `linkToColumns` broken for `trip`; two behavioural tests failed naming the exact column. The same break against the pre-existing *text* guard passed, which is the row added to the table at the top of this file.
+- **Blind spot:** a future mount that hand-rolls its own kind→column mapping instead of importing `billLink.ts` is covered only by the weaker text rule.
 
 ---
 

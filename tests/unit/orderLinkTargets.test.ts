@@ -25,8 +25,8 @@
  * created order cannot end up rated by two different rules.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
@@ -110,10 +110,47 @@ describe('a customer sales order is linked, never merged into', () => {
  * offered "New sales order for X" while its onChange only understood project / sales_order / none.
  */
 describe('every offered link kind is handled by its call site', () => {
-  const CALLERS = [
-    'src/modules/finance/components/OrdersPanel.tsx',
-    'src/modules/finance/components/NewExpenseDialog.tsx',
-  ];
+  /**
+   * DISCOVERED, never listed. A hand-kept array of call sites is a list of the sites somebody
+   * already looked at: `EditSupplierBillDialog` mounted this picker (#378 L1) and would have been
+   * exempt from every rule below purely by not being typed into a constant. Any file that renders
+   * an `<OrderLinkPicker>` is judged, from the moment it does.
+   */
+  const CALLERS = (() => {
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) { walk(full); continue; }
+        if (!e.name.endsWith('.tsx')) continue;
+        const src = readFileSync(full, 'utf8');
+        if (src.includes('<OrderLinkPicker')) found.push(relative(ROOT, full).replace(/\\/g, '/'));
+      }
+    };
+    walk(join(ROOT, 'src'));
+    return found.sort();
+  })();
+
+  it('finds the mounts at all — an empty sweep would vacuously pass every rule below', () => {
+    expect(CALLERS.length).toBeGreaterThanOrEqual(3);
+  });
+
+  /**
+   * Does this call site actually DO something with `kind`?
+   *
+   * Two handler shapes were recognised originally — an inline dispatch that decides on the spot,
+   * and a plain setter that defers to the file's save path. A third is just as correct and was
+   * being failed: the idiomatic discriminated-union `switch (v.kind) { case 'trip': … }`. The
+   * receiver is matched loosely (`.kind ===`) rather than pinned to the name `link`, because what
+   * the handler calls its parameter is not the invariant.
+   */
+  function handlesKind(usage: string, src: string, kind: string, inlineDispatch: boolean): boolean {
+    if (inlineDispatch) return new RegExp(`kind === '${kind}'`).test(usage);
+    if (new RegExp(`\\.kind === '${kind}'`).test(src)) return true;
+    // A `case` label only counts inside a file that switches on a `.kind` — otherwise any
+    // unrelated string switch in the file would vouch for a handler that does not exist.
+    return /switch\s*\([^)]*\.kind\)/.test(src) && new RegExp(`case '${kind}':`).test(src);
+  }
 
   it('a caller that offers "raise a customer order" actually creates one', () => {
     const offenders: string[] = [];
@@ -126,12 +163,8 @@ describe('every offered link kind is handled by its call site', () => {
         const usage = m[0];
         if (/allowRaiseCustomerOrder=\{false\}/.test(usage) || /allowCustomer=\{false\}/.test(usage)) continue;
 
-        // Two handler shapes. An INLINE dispatch decides on the spot, so it must cover 'customer'
-        // itself; a plain setter defers to the save path, so the file must cover it.
         const inlineDispatch = /onChange=\{\([^)]*\)\s*=>\s*\{[\s\S]*?kind === '/.test(usage);
-        const handled = inlineDispatch
-          ? /kind === 'customer'/.test(usage)
-          : /link\.kind === 'customer'/.test(src);
+        const handled = handlesKind(usage, src, 'customer', inlineDispatch);
         if (!handled) {
           offenders.push(`${rel}: a picker offers "New sales order for …" but its handler ignores kind === 'customer'`);
         }
@@ -166,9 +199,7 @@ describe('every offered link kind is handled by its call site', () => {
           const present = new RegExp(`\\b${prop}\\b`).test(usage);
           const off = new RegExp(`\\b${prop}=\\{false\\}`).test(usage);
           if (!present || off) continue;
-          const handled = inlineDispatch
-            ? new RegExp(`kind === '${kind}'`).test(usage)
-            : new RegExp(`link\\.kind === '${kind}'`).test(src);
+          const handled = handlesKind(usage, src, kind, inlineDispatch);
           if (!handled) {
             offenders.push(`${rel}: a picker sets ${prop} but its handler ignores kind === '${kind}'`);
           }
@@ -217,6 +248,79 @@ describe('the filing links reach a column', () => {
     const body = methodBody(fin, 'createSupplierBill');
     expect(body).toContain('trip_report_id: input.tripReportId');
     expect(body).toContain('property_id: input.propertyId');
+  });
+
+  it('the recurring template stamps them onto every generated bill, not just the first', () => {
+    const body = methodBody(fin, 'createRecurringExpense');
+    expect(body).toContain('trip_report_id: input.tripReportId');
+    expect(body).toContain('property_id: input.propertyId');
+  });
+
+  /**
+   * #378 L1 — the same link, re-answered after the bill exists. Before this, "what is this for?"
+   * could only be written at creation, so a cost that arrived after its goods (freight, customs,
+   * an installer) could reach its order only from the ORDER's side, which requires already
+   * knowing which order it was.
+   *
+   * The invariant that matters here is that the five columns move as ONE SET. A patch able to
+   * carry three of them can leave a bill booked to a job AND to somebody else's sales order —
+   * two answers to a question that has one, and both of them valid uuids.
+   */
+  it('an existing expense can be re-pointed, and all five columns move together', () => {
+    const body = methodBody(fin, 'updateSupplierBillMeta');
+    expect(body, 'the link must arrive as one nested object, not five independent optional keys')
+      .toMatch(/if\s*\(patch\.link\)/);
+    for (const col of ['project_id', 'order_id', 'covers_order_id', 'trip_report_id', 'property_id']) {
+      expect(body, `updateSupplierBillMeta does not write ${col}`).toContain(`row.${col} = patch.link.`);
+    }
+    // Assigned straight through, so `null` reaches the column: a truthiness guard here would make
+    // every link settable and none of them removable.
+    expect(body).not.toMatch(/row\.(project_id|order_id|covers_order_id|trip_report_id|property_id)\s*=\s*patch\.link\.\w+\s*\|\|/);
+  });
+
+  it('the payables row points at the dialog that now carries the link', () => {
+    const page = read(join(ROOT, 'src/pages/Admin/FinancePage.tsx'));
+    expect(page, 'the AP row should open EditSupplierBillDialog').toContain('EditSupplierBillDialog');
+    const dialog = read(join(ROOT, 'src/modules/finance/components/EditSupplierBillDialog.tsx'));
+    expect(dialog, 'the edit dialog should mount the link picker').toContain('<OrderLinkPicker');
+  });
+
+  /**
+   * The bug this exists to stop: a one-off expense files correctly, its "Repeat" twin inherits
+   * only SOME of the link, and from the second bill onward the cost floats — looking perfectly
+   * correct the whole time, because a missing uuid is a valid null. Derived from the one-off call
+   * rather than hard-coded, so a fifth link added later inherits the rule instead of quietly
+   * skipping the repeat.
+   */
+  const RECURRING_LINK_EXEMPT: Record<string, string> = {
+    // `finance_recurring_expenses` has no covers_order_id, deliberately: a covers link points at
+    // ONE customer sales order, which a template generating bills forever has no business pinning.
+    coversOrderId: 'no column, and a repeating cost should not pin one customer order',
+  };
+
+  it('the repeat inherits every filing link the one-off expense sets', () => {
+    const src = read(join(ROOT, 'src/modules/finance/components/NewExpenseDialog.tsx'));
+    const argsOf = (call: string) => {
+      const i = src.indexOf(call);
+      expect(i, `${call} should be called from NewExpenseDialog`).toBeGreaterThan(-1);
+      // Argument object up to its closing `});` — both calls are the sole statement of their line.
+      const rest = src.slice(i);
+      const end = rest.indexOf('\n      });') >= 0 ? rest.indexOf('\n      });') : rest.indexOf('});');
+      return rest.slice(0, end);
+    };
+    const oneOff = argsOf('financeService.createExpense({');
+    const repeat = argsOf('financeService.createRecurringExpense({');
+
+    const LINK_KEYS = ['projectId', 'orderId', 'coversOrderId', 'tripReportId', 'propertyId'];
+    const missing = LINK_KEYS
+      .filter((k) => new RegExp(`\\b${k}:`).test(oneOff))
+      .filter((k) => !RECURRING_LINK_EXEMPT[k])
+      .filter((k) => !new RegExp(`\\b${k}:`).test(repeat));
+    expect(
+      missing,
+      `the one-off expense files ${missing.join(', ')} but the recurring template does not — `
+        + 'every generated bill after the first would arrive unattributed',
+    ).toEqual([]);
   });
 });
 

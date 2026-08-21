@@ -6,8 +6,8 @@ import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import {
-  ordersService, type OrderLinkTarget, type LinkTargetSearch, type LinkOrderSummary, type OrderType,
-  type OrderListRow, type LinkPropertySummary,
+  ordersService, propertyLabel, type OrderLinkTarget, type LinkTargetSearch, type LinkOrderSummary,
+  type OrderType, type OrderListRow,
 } from '@/modules/finance/services/ordersService';
 
 /**
@@ -419,10 +419,6 @@ function tripDates(start: string | null, end: string | null): string {
   return start || end || 'no dates';
 }
 
-/** The RPC already coalesced title -> address -> reference code; this is the last-resort guard. */
-function propertyLabel(p: LinkPropertySummary): string {
-  return p.title?.trim() || p.address?.trim() || p.reference_code?.trim() || 'Untitled property';
-}
 
 const GroupHeading: React.FC<{ icon: React.ReactNode; text: string }> = ({ icon, text }) => (
   <div className="flex items-center gap-1.5 border-b border-border/40 bg-muted/50 px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
