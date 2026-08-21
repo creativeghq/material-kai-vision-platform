@@ -288,6 +288,33 @@ export interface PaymentWithAllocation extends Payment {
   }>;
 }
 
+/** What an order made, and how much of it has already been taken as profit. */
+export interface OrderProfitPosition {
+  order_id: string;
+  currency: string;
+  revenue_net: number;
+  cogs: number;
+  margin: number;
+  /** Already taken (non-reversed). */
+  allocated: number;
+  /** margin − allocated, never negative. */
+  available: number;
+}
+
+/** Margin taken off an order as profit (see `allocateOrderProfit`). */
+export interface ProfitAllocation {
+  id: string;
+  workspace_id: string;
+  order_id: string;
+  amount: number;
+  currency: string;
+  category_id: string | null;
+  allocated_on: string;
+  notes: string | null;
+  created_at: string;
+  reversed_at: string | null;
+}
+
 /** Customer credit we stopped holding and booked as income (see `releaseCustomerCredit`). */
 export interface CreditRelease {
   id: string;
@@ -1590,6 +1617,81 @@ const _financeServiceCore = {
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as CreditRelease[];
+  },
+
+  /**
+   * What an order made and how much of it has been taken as profit.
+   *
+   * `get_order_profit_positions` is the ONE derivation — the dialog's cap, the button's
+   * visibility, the panel's figures and the allocate RPC's own guard all read it, so the number
+   * offered and the number enforced cannot drift apart. Never recompute margin beside it.
+   */
+  async orderProfitPositions(orderIds: string[]): Promise<Map<string, OrderProfitPosition>> {
+    const ids = [...new Set(orderIds.filter(Boolean))];
+    if (ids.length === 0) return new Map();
+    const { data, error } = await (supabase as any).rpc('get_order_profit_positions', { p_order_ids: ids });
+    if (error) throw error;
+    const out = new Map<string, OrderProfitPosition>();
+    for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+      out.set(String(r.order_id), {
+        order_id: String(r.order_id),
+        currency: String(r.currency ?? 'EUR'),
+        revenue_net: Number(r.revenue_net ?? 0),
+        cogs: Number(r.cogs ?? 0),
+        margin: Number(r.margin ?? 0),
+        allocated: Number(r.allocated ?? 0),
+        available: Number(r.available ?? 0),
+      });
+    }
+    return out;
+  },
+
+  /**
+   * Take an order's margin (or part of it) as profit. The cash does not move — this records that
+   * the money the order made has been claimed, with a date, a category and an undo.
+   *
+   * `allocatedOn` is the OPERATOR's local day and is required by the RPC: the DB session is UTC,
+   * so a server-stamped date would read yesterday for a Greek operator before 03:00.
+   */
+  async allocateOrderProfit(input: {
+    orderId: string;
+    amount?: number | null;
+    categoryId?: string | null;
+    allocatedOn: string;
+    notes?: string | null;
+  }): Promise<{ allocated: number; available: number; allocation_id: string | null }> {
+    const { data, error } = await (supabase as any).rpc('allocate_order_profit', {
+      p_order_id: input.orderId,
+      p_amount: input.amount ?? undefined,
+      p_category_id: input.categoryId ?? undefined,
+      p_allocated_on: input.allocatedOn,
+      p_notes: input.notes ?? undefined,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as { allocated?: number; available?: number; allocation_id?: string | null };
+    return {
+      allocated: Number(r.allocated ?? 0),
+      available: Number(r.available ?? 0),
+      allocation_id: r.allocation_id ?? null,
+    };
+  },
+
+  /** Undo one profit allocation. Soft — the row stays, marked reversed, so the trail survives. */
+  async reverseProfitAllocation(allocationId: string): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('reverse_profit_allocation', { p_allocation_id: allocationId });
+    if (error) throw error;
+    return Number((data as { reversed?: number } | null)?.reversed ?? 0);
+  },
+
+  /** Profit already taken off an order (newest first) — the audit trail + undo list. */
+  async listProfitAllocations(workspaceId: string, opts: { orderId?: string | null } = {}): Promise<ProfitAllocation[]> {
+    let q = supabase.from('finance_profit_allocations').select('*')
+      .eq('workspace_id', workspaceId)
+      .order('allocated_on', { ascending: false });
+    if (opts.orderId) q = q.eq('order_id', opts.orderId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as unknown as ProfitAllocation[];
   },
 
   /**

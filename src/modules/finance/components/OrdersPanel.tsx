@@ -4,9 +4,10 @@ import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { FINANCE_BASE, ORDERS_FILTER_KEY } from '@/modules/finance/routes';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
+import { AllocateProfitDialog } from '@/modules/finance/components/AllocateProfitDialog';
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -30,6 +31,7 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import {
   formatMoney, financeService, VAT_CATEGORIES,
   type PaymentWithAllocation, type PaymentMethod,
+  type OrderProfitPosition, type ProfitAllocation,
 } from '@/modules/finance/services/financeService';
 import {
   salesDocumentKindFor,
@@ -1714,6 +1716,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    */
   const [partyCredit, setPartyCredit] = useState<{ display_name: string; on_account_credit: number; credit_releasable: boolean } | null>(null);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  /** What this order made and how much of it has been taken — from the ONE derivation, never
+   *  recomputed here (the panel's own margin row is a display of the same lines, not a second
+   *  answer to "how much may be taken"). */
+  const [profitPos, setProfitPos] = useState<OrderProfitPosition | null>(null);
+  const [profitAllocs, setProfitAllocs] = useState<ProfitAllocation[]>([]);
+  const [allocateOpen, setAllocateOpen] = useState(false);
   // The order's own party (customer / supplier) name — the order row carries only the id, and the
   // header has to say WHO this order is with before it can offer to open their CRM record.
   const [partyName, setPartyName] = useState<string | null>(null);
@@ -1788,13 +1796,43 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       setPartyCredit(credit);
       setMatch(threeWay);
       setHandoff(handoffInfo);
+      await loadProfit(id, res.order.order_type, res.order.workspace_id);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
+  /**
+   * The order's profit position + what has already been taken off it. Split out of `load` so
+   * allocating (or undoing) refreshes just these two without re-fetching the whole panel.
+   *
+   * Purchase orders are skipped: a purchase has a cost, not a margin, and offering to "take
+   * profit" on one would be inviting the operator to book the other side of a trade as earnings.
+   */
+  const loadProfit = async (id: string, orderType: string, workspaceId: string) => {
+    if (orderType !== 'sales') { setProfitPos(null); setProfitAllocs([]); return; }
+    const [pos, allocs] = await Promise.all([
+      financeService.orderProfitPositions([id]).then((m) => m.get(id) ?? null).catch(() => null),
+      financeService.listProfitAllocations(workspaceId, { orderId: id }).catch(() => []),
+    ]);
+    setProfitPos(pos);
+    setProfitAllocs(allocs.filter((a) => !a.reversed_at));
+  };
+
+  const undoAllocation = async (allocationId: string) => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const amount = await financeService.reverseProfitAllocation(allocationId);
+      toast({ title: amount > 0 ? `${formatMoney(amount, order.currency)} put back on the order` : 'Already reversed' });
+      await loadProfit(order.id, order.order_type, order.workspace_id);
+    } catch (err: any) {
+      toast({ title: 'Could not undo', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); setPartyCredit(null); setLineAssets(new Map()); setWarrantyPick(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); setPartyCredit(null); setLineAssets(new Map()); setWarrantyPick(null); setProfitPos(null); setProfitAllocs([]); setAllocateOpen(false); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -3474,6 +3512,53 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
+            {/* The order's margin, as a DECISION rather than an observation.
+                Shown for any sales order that made something, whether or not it has been invoiced —
+                plenty of sales here never become an invoice, and the margin is earned either way.
+                The figures come from `get_order_profit_positions`, the same derivation the RPC caps
+                against, so what is offered here and what is allowed cannot drift apart. */}
+            {isSalesOrder && profitPos && (profitPos.available > 0.005 || profitAllocs.length > 0) && (
+              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span className="text-xs">
+                    This order made{' '}
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {formatMoney(profitPos.margin, order.currency)}
+                    </span>
+                    {profitPos.allocated > 0.005 && (
+                      <> · <span className="text-muted-foreground">{formatMoney(profitPos.allocated, order.currency)} taken</span></>
+                    )}
+                    {profitPos.available > 0.005 && profitPos.allocated > 0.005 && (
+                      <> · <span className="font-medium">{formatMoney(profitPos.available, order.currency)} left</span></>
+                    )}
+                  </span>
+                  {profitPos.available > 0.005 && (
+                    <Button size="sm" variant="outline" className="ml-auto h-7 text-[11px]" onClick={() => setAllocateOpen(true)}>
+                      Allocate as profit
+                    </Button>
+                  )}
+                </div>
+                {/* The trail, with the undo beside it. Without this an allocation is a number that
+                    changed for reasons the next person cannot see. */}
+                {profitAllocs.map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className="tabular-nums font-medium text-foreground">{formatMoney(Number(a.amount), a.currency)}</span>
+                    <span>taken {formatDate(a.allocated_on)}</span>
+                    {a.notes && <span className="truncate">· {a.notes}</span>}
+                    <button
+                      type="button"
+                      className="ml-auto shrink-0 underline hover:text-foreground disabled:opacity-40"
+                      disabled={saving}
+                      onClick={() => void undoAllocation(a.id)}
+                    >
+                      Undo
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Realised cash on the order — money actually received minus money actually paid out.
                 (Distinct from the order's Profit-margin above, which is revenue − cost on the lines.) */}
             {fin && (
@@ -4117,6 +4202,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         available={partyCredit.on_account_credit}
         currency={order.currency}
         onDone={() => { void load(order.id); onChanged(); }}
+      />
+    )}
+    {/* Taking the order's margin as profit. Mounted for any sales order — the button that opens it
+        is what decides whether there is anything to take, from the shared derivation. */}
+    {order && order.order_type === 'sales' && (
+      <AllocateProfitDialog
+        workspaceId={order.workspace_id}
+        open={allocateOpen}
+        onOpenChange={setAllocateOpen}
+        orderId={order.id}
+        orderNumber={order.order_number}
+        position={profitPos}
+        onDone={() => { void loadProfit(order.id, order.order_type, order.workspace_id); onChanged(); }}
       />
     )}
     {/* The same link written against an expense that already exists, instead of a new one. */}
