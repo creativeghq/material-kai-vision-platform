@@ -45,6 +45,7 @@ import { splitByVatRate, splitGrossLikeTotals } from '@/modules/finance/utils/va
 import { warehouseService } from '@/services/warehouseService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { LinkExpenseToOrderDialog } from '@/modules/finance/components/LinkExpenseToOrderDialog';
 import { entityTemplatesService } from '@/services/entityTemplatesService';
@@ -575,6 +576,9 @@ export const NewOrderModal: React.FC<{
   onCreated: (orderId: string) => void;
 }> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, prefill, categories, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
+  // Properties are only offered where the workspace runs the real-estate module.
+  const { isModuleAvailable } = useEntitlements();
+  const realEstate = isModuleAvailable('real-estate');
   const [busy, setBusy] = useState(false);
   const orderType = preset.orderType;
   const [party, setParty] = useState<Party | null>(null);
@@ -1107,6 +1111,11 @@ export const NewOrderModal: React.FC<{
         // the same job rather than floating unattributed. Same thing raise_cover_purchase_orders does.
         : (link.kind === 'sales_order' ? link.projectId : null);
 
+      // Filing links — they answer "where does this show up", never "what does it cost". An order
+      // won on a trip is what finally lets the expense card state a return next to its spend.
+      const tripReportId = link.kind === 'trip' ? link.reportId : null;
+      const propertyId = link.kind === 'property' ? link.propertyId : null;
+
       const orderId = await ordersService.create({
         workspaceId,
         orderType,
@@ -1114,6 +1123,8 @@ export const NewOrderModal: React.FC<{
         currency,
         projectId,
         coversOrderId,
+        tripReportId,
+        propertyId,
         categoryId: categoryId === 'none' ? null : categoryId,
         expectedPaymentDate: expectedDate || null,
         discountType: isSales && dv > 0 ? discountType : null,
@@ -1253,6 +1264,8 @@ export const NewOrderModal: React.FC<{
               allowCustomer={!isSales}
               allowMerge={!locked && !!party}
               allowCostOf={costOfPossible}
+              allowTrip
+              allowProperty={realEstate}
               label="What is this for? (optional)"
               hint={attachingToOrder ? (
                 <p className="text-[11px] text-muted-foreground">
@@ -1636,6 +1649,8 @@ const MenuGroup: React.FC<{ children: React.ReactNode }> = ({ children }) => (
  *  surface as the list's row click — one order form, two entry points, no second copy. */
 export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
   const { toast } = useToast();
+  const { isModuleAvailable } = useEntitlements();
+  const realEstate = isModuleAvailable('real-estate');
   const navigate = useNavigate();
   const financeBase = FINANCE_BASE;
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
@@ -1863,6 +1878,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const saveMeta = async (patch: {
     categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null;
     projectId?: string | null; coversOrderId?: string | null;
+    tripReportId?: string | null; propertyId?: string | null;
   }) => {
     if (!order) return;
     // generate_invoice_from_order copies category_id and expected_payment_date -> invoices.due_at
@@ -1887,6 +1903,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         ...('notes' in patch ? { notes: patch.notes ?? null } : {}),
         ...('projectId' in patch ? { project_id: patch.projectId ?? null } : {}),
         ...('coversOrderId' in patch ? { covers_order_id: patch.coversOrderId ?? null } : {}),
+        ...('tripReportId' in patch ? { trip_report_id: patch.tripReportId ?? null } : {}),
+        ...('propertyId' in patch ? { property_id: patch.propertyId ?? null } : {}),
       });
       onChanged();
     } catch (err: any) {
@@ -1917,6 +1935,48 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     })();
     return () => { cancelled = true; };
   }, [order?.id, order?.project_id]);
+
+  /**
+   * The expense card this order was won on, and the building it is for. Two more filing links,
+   * resolved to a label exactly the way the project above is.
+   *
+   * The label read runs under RLS ON PURPOSE. `trip_reports_read` is (own card OR finance
+   * manager), so a rep who opens an order filed against a COLLEAGUE'S trip gets no row back and
+   * the control reads "Trip" instead of that colleague's destination and totals. Reaching for a
+   * service-role read to "fix" the blank would turn a correct withholding into a disclosure.
+   */
+  const [tripValue, setTripValue] = useState<OrderLinkTarget>({ kind: 'none' });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order?.trip_report_id) { setTripValue({ kind: 'none' }); return; }
+      const { data } = await supabase.from('trip_expense_reports')
+        .select('id, title').eq('id', order.trip_report_id).maybeSingle();
+      if (cancelled) return;
+      setTripValue({
+        kind: 'trip', reportId: order.trip_report_id,
+        label: (data?.title as string | null) ?? 'Trip',
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.trip_report_id]);
+
+  const [propertyValue, setPropertyValue] = useState<OrderLinkTarget>({ kind: 'none' });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order?.property_id) { setPropertyValue({ kind: 'none' }); return; }
+      const { data } = await supabase.from('properties')
+        .select('id, title, address, reference_code').eq('id', order.property_id).maybeSingle();
+      if (cancelled) return;
+      const r = data as { title?: string | null; address?: string | null; reference_code?: string | null } | null;
+      setPropertyValue({
+        kind: 'property', propertyId: order.property_id,
+        label: r?.title?.trim() || r?.address?.trim() || r?.reference_code?.trim() || 'Property',
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.property_id]);
   /**
    * The reverse view: purchase orders raised to cover THIS sale. `raise_cover_purchase_orders` has
    * been writing `covers_order_id` since it shipped and nothing ever displayed it, so the POs it
@@ -2875,6 +2935,58 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   compact
                   disabled={saving}
                 />
+                {/* The expense card this order was won on. Its own control, next to Project and
+                    not folded into it: they write different columns and answer different
+                    questions, and the one control that tried to do two things printed a
+                    customer's order number under the word "Project".
+
+                    Reporting only — no total moves. What it buys is the half of a trip card that
+                    never existed: the card has always known what the trip COST, and this is the
+                    first thing that can say what it EARNED. Offered on purchases too, because a
+                    buying trip is the same question asked in the other direction. */}
+                <Label className="text-xs text-muted-foreground">Trip</Label>
+                <OrderLinkPicker
+                  workspaceId={order.workspace_id}
+                  value={tripValue}
+                  onChange={(v) => {
+                    setTripValue(v);
+                    if (v.kind === 'trip') void saveMeta({ tripReportId: v.reportId });
+                    else if (v.kind === 'none') void saveMeta({ tripReportId: null });
+                  }}
+                  currency={order.currency}
+                  allowProject={false}
+                  allowCustomer={false}
+                  allowMerge={false}
+                  allowCostOf={false}
+                  allowTrip
+                  compact
+                  disabled={saving}
+                />
+                {/* The building. Gated on the module rather than always-on: a workspace that does
+                    not do real estate has no properties, so the control would be a permanently
+                    empty search — which reads as broken, not as scoped. */}
+                {realEstate && (
+                  <>
+                    <Label className="text-xs text-muted-foreground">Property</Label>
+                    <OrderLinkPicker
+                      workspaceId={order.workspace_id}
+                      value={propertyValue}
+                      onChange={(v) => {
+                        setPropertyValue(v);
+                        if (v.kind === 'property') void saveMeta({ propertyId: v.propertyId });
+                        else if (v.kind === 'none') void saveMeta({ propertyId: null });
+                      }}
+                      currency={order.currency}
+                      allowProject={false}
+                      allowCustomer={false}
+                      allowMerge={false}
+                      allowCostOf={false}
+                      allowProperty
+                      compact
+                      disabled={saving}
+                    />
+                  </>
+                )}
                 {/* Who this purchase was bought FOR. Purchase-only and deliberately separate from
                     Project: they answer different questions and write different columns, and the
                     one control that tried to do both printed a customer's order number under the

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
+  ShoppingCart, Receipt,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
@@ -18,6 +19,7 @@ import {
   tripExpenseService, TRIP_EXPENSE_CATEGORIES, TRIP_STATUS_LABEL,
   EXPENSE_CARD_TYPES, EXPENSE_CARD_TYPE_LABEL,
   type TripExpenseReport, type TripExpenseItem, type TripStatus, type ExpensePaymentMethod, type ExpenseCardType,
+  type TripCardLinks, type TripMoneyByCurrency,
 } from '@/modules/finance/services/tripExpenseService';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -192,6 +194,8 @@ const TripCardDetail: React.FC<{
   const [busy, setBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  /** What has been FILED against this card — see `tripExpenseService.cardLinks`. */
+  const [links, setLinks] = useState<TripCardLinks | null>(null);
 
   const isOwner = !!report && report.user_id === uid;
   const isDraft = report?.status === 'draft';
@@ -203,6 +207,9 @@ const TripCardDetail: React.FC<{
       setLoading(true);
       const { report: r, items: it } = await tripExpenseService.getReport(reportId);
       setReport(r); setItems(it);
+      // Best-effort: the card and its lines are the point of this screen, and a filing summary
+      // that fails to load must not blank them.
+      setLinks(await tripExpenseService.cardLinks(reportId).catch(() => null));
     } catch (err: any) {
       toast({ title: 'Failed to load card', description: err?.message, variant: 'destructive' });
     } finally {
@@ -328,6 +335,7 @@ const TripCardDetail: React.FC<{
   }
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 space-y-2">
         <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -453,8 +461,92 @@ const TripCardDetail: React.FC<{
         onAdded={refreshAll}
       />
     </Card>
+
+    <TripLinkedRecordsCard links={links} cardCurrency={report.currency} spent={Number(report.total_amount)} />
+    </div>
   );
 };
+
+/**
+ * The other half of an expense card. Until orders and bills could name a trip, a card could only
+ * ever state what it COST; this is the first surface that can put a return next to that spend.
+ *
+ * Rendered only when something is filed. An empty "nothing linked yet" panel on every card would
+ * be noise on the many cards that are purely a claim — and the way to link one is on the ORDER,
+ * not here, so there is no create action this empty state could honestly offer (which is exactly
+ * the case `HubEmptyState` says not to fake).
+ */
+const TripLinkedRecordsCard: React.FC<{
+  links: TripCardLinks | null;
+  cardCurrency: string;
+  /** The card's own claimed lines, for the spend-vs-return line. */
+  spent: number;
+}> = ({ links, cardCurrency, spent }) => {
+  if (!links || (links.orders.length === 0 && links.bills.length === 0)) return null;
+  const sales = links.orders.filter((o) => o.order_type === 'sales');
+  const purchases = links.orders.filter((o) => o.order_type === 'purchase');
+  return (
+    <Card>
+      <CardHeader className="border-b border-border/60 px-5 py-3">
+        <CardTitle className="text-sm">Filed against this card</CardTitle>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <Totals label="Claimed here" value={spent} currency={cardCurrency} />
+          {/* Each currency on its own tile. One figure spanning EUR and GBP is a wrong number
+              that still looks like a number, so the RPC groups and this renders the groups. */}
+          {links.earned.map((m: TripMoneyByCurrency) => (
+            <Totals key={`e:${m.currency}`} label="Orders won" value={Number(m.amount)} currency={m.currency} tone="green" />
+          ))}
+          {links.filed.map((m: TripMoneyByCurrency) => (
+            <Totals key={`f:${m.currency}`} label="Bills filed" value={Number(m.amount)} currency={m.currency} tone="amber" />
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {sales.length > 0 && <LinkRowGroup icon={<ShoppingCart className="h-3 w-3" />} text="Orders won" />}
+        {sales.map((o) => (
+          <div key={o.id} className="flex items-center justify-between border-b border-border/30 px-5 py-2 text-sm">
+            <span className="truncate">
+              <span className="font-medium">{o.order_number ?? o.id.slice(0, 8)}</span>
+              {o.party_name && <span className="text-muted-foreground"> · {o.party_name}</span>}
+              <span className={`ml-2 text-xs ${statusTone(o.status)}`}>{o.status}</span>
+            </span>
+            <span className="tabular-nums">{formatMoney(Number(o.total), o.currency)}</span>
+          </div>
+        ))}
+
+        {purchases.length > 0 && <LinkRowGroup icon={<ShoppingCart className="h-3 w-3" />} text="Purchases made" />}
+        {purchases.map((o) => (
+          <div key={o.id} className="flex items-center justify-between border-b border-border/30 px-5 py-2 text-sm">
+            <span className="truncate">
+              <span className="font-medium">{o.order_number ?? o.id.slice(0, 8)}</span>
+              {o.party_name && <span className="text-muted-foreground"> · {o.party_name}</span>}
+              <span className={`ml-2 text-xs ${statusTone(o.status)}`}>{o.status}</span>
+            </span>
+            <span className="tabular-nums">{formatMoney(Number(o.total), o.currency)}</span>
+          </div>
+        ))}
+
+        {links.bills.length > 0 && <LinkRowGroup icon={<Receipt className="h-3 w-3" />} text="Costs booked to the trip" />}
+        {links.bills.map((b) => (
+          <div key={b.id} className="flex items-center justify-between border-b border-border/30 px-5 py-2 text-sm">
+            <span className="truncate">
+              <span className="font-medium">{b.supplier_name || b.number || b.id.slice(0, 8)}</span>
+              {b.issued_at && <span className="text-muted-foreground"> · {formatDate(b.issued_at)}</span>}
+              <span className={`ml-2 text-xs ${statusTone(b.status)}`}>{b.status}</span>
+            </span>
+            <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+};
+
+const LinkRowGroup: React.FC<{ icon: React.ReactNode; text: string }> = ({ icon, text }) => (
+  <div className="flex items-center gap-1.5 border-b border-border/40 bg-surface-sunken px-5 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    {icon}{text}
+  </div>
+);
 
 const Totals: React.FC<{ label: string; value: number; currency: string; tone?: 'green' | 'red' | 'amber' }> = ({ label, value, currency, tone }) => (
   <div className="rounded-md border border-border/50 px-2.5 py-1.5">

@@ -28,6 +28,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { parseDecimalOr } from '@/utils/decimal';
 import { todayLocalISO } from '@/utils/datetime';
 
@@ -68,6 +69,11 @@ interface Props {
 
 export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, orderId, prefill }) => {
   const { toast } = useToast();
+  // Properties are only a sensible answer where the workspace actually sells/manages them.
+  // `isModuleAvailable` fails open while loading, which is harmless here: a workspace without the
+  // module has no properties, so the group renders nothing either way.
+  const { isModuleAvailable } = useEntitlements();
+  const realEstate = isModuleAvailable('real-estate');
   const [busy, setBusy] = useState(false);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -405,6 +411,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const linkProjectId = link.kind === 'project'
         ? link.projectId
         : (link.kind === 'sales_order' || link.kind === 'cost_of_order' ? link.projectId : null);
+      // Filing links. Neither changes a figure on the bill — they decide where it SHOWS UP: on the
+      // rep's expense card, and on the building. Kept separate from `linkProjectId` because a
+      // property is not a project and inferring one from the other invents a job nobody raised.
+      const linkTripReportId = link.kind === 'trip' ? link.reportId : null;
+      const linkPropertyId = link.kind === 'property' ? link.propertyId : null;
 
       const created = await financeService.createExpense({
         workspaceId,
@@ -417,6 +428,8 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         orderId: effectiveOrderId,
         projectId: linkProjectId,
         coversOrderId,
+        tripReportId: linkTripReportId,
+        propertyId: linkPropertyId,
         currency,
         subtotalNet: parseDecimalOr(subtotalNet, 0),
         vatAmount: parseDecimalOr(vatAmount, 0),
@@ -456,6 +469,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           notes: notes || undefined,
           // The repeat inherits the same "what is this for?" link as the one-off expense, so every
           // generated bill lands on the same project/order instead of floating unattributed.
+          // NOT the trip / property link: `recurring_expenses` has no column for either, so only
+          // the first bill carries it. Said here rather than silently dropped — a recurring cost
+          // ON a building (service charge, utilities) is a real case and wants those columns
+          // before this is called finished.
           projectId: linkProjectId,
           orderId: effectiveOrderId ?? null,
         });
@@ -586,6 +603,8 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             currency={currency}
             allowMerge={false}
             allowCostOf={!orderId}
+            allowTrip
+            allowProperty={realEstate}
             label="What is this for? (optional)"
           />
 

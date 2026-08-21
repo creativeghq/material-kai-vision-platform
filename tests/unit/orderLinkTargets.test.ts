@@ -139,6 +139,85 @@ describe('every offered link kind is handled by its call site', () => {
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
+
+  /**
+   * The opt-in groups. Each defaults to OFF precisely because a caller that offers a row it does
+   * not handle ships a row that silently does nothing — click it and the field closes having
+   * changed nothing at all. Same shape as an AgentHub chunk with no `AGENT_RESULT_TITLES` entry,
+   * and just as invisible to typecheck: the handler is a valid discriminated-union narrow that
+   * simply never mentions the case.
+   */
+  const OPT_IN_GROUPS: Array<{ prop: string; kind: string }> = [
+    { prop: 'allowCostOf', kind: 'cost_of_order' },
+    { prop: 'allowTrip', kind: 'trip' },
+    { prop: 'allowProperty', kind: 'property' },
+  ];
+
+  it('a caller that turns on an opt-in group handles the kind that group emits', () => {
+    const offenders: string[] = [];
+    for (const rel of CALLERS) {
+      const src = read(join(ROOT, rel));
+      for (const m of src.matchAll(/<OrderLinkPicker\b[\s\S]*?\/>/g)) {
+        const usage = m[0];
+        const inlineDispatch = /onChange=\{\([^)]*\)\s*=>\s*\{[\s\S]*?kind === '/.test(usage);
+        for (const { prop, kind } of OPT_IN_GROUPS) {
+          // "On" means present and not explicitly false. `allowProperty={realEstate}` is ON — a
+          // runtime-gated offer still has to be handled for the case where the gate opens.
+          const present = new RegExp(`\\b${prop}\\b`).test(usage);
+          const off = new RegExp(`\\b${prop}=\\{false\\}`).test(usage);
+          if (!present || off) continue;
+          const handled = inlineDispatch
+            ? new RegExp(`kind === '${kind}'`).test(usage)
+            : new RegExp(`link\\.kind === '${kind}'`).test(src);
+          if (!handled) {
+            offenders.push(`${rel}: a picker sets ${prop} but its handler ignores kind === '${kind}'`);
+          }
+        }
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  it('the picker actually renders a row for every opt-in group it advertises', () => {
+    const picker = read(LINK_PICKER);
+    for (const { prop, kind } of OPT_IN_GROUPS) {
+      expect(picker, `OrderLinkPicker accepts ${prop} but never emits kind: '${kind}'`)
+        .toMatch(new RegExp(`kind: '${kind}'`));
+    }
+  });
+});
+
+/**
+ * Offered → handled → WRITTEN. The first two are covered above; without this one a link can be
+ * picked, dispatched, threaded through a service argument and then quietly dropped before the
+ * insert — which reads as working right up until someone opens the trip card and finds it empty.
+ * A missing uuid is a valid null, so nothing raises.
+ */
+describe('the filing links reach a column', () => {
+  const svc = read(ORDERS_SERVICE);
+  const fin = read(join(ROOT, 'src/modules/finance/services/financeService.ts'));
+
+  it('ordersService.create writes both filing links', () => {
+    const body = methodBody(svc, 'create');
+    expect(body).toContain('trip_report_id: input.tripReportId');
+    expect(body).toContain('property_id: input.propertyId');
+  });
+
+  it('ordersService.updateMeta can set AND clear both', () => {
+    const body = methodBody(svc, 'updateMeta');
+    // `!== undefined` rather than a truthiness test: `null` is the "unlink me" instruction, and a
+    // truthy guard makes the link one-way — settable, never removable.
+    expect(body).toMatch(/patch\.tripReportId !== undefined/);
+    expect(body).toMatch(/patch\.propertyId !== undefined/);
+    expect(body).toContain('clean.trip_report_id');
+    expect(body).toContain('clean.property_id');
+  });
+
+  it('a supplier bill carries them too, so a cost can be filed as well as an order', () => {
+    const body = methodBody(fin, 'createSupplierBill');
+    expect(body).toContain('trip_report_id: input.tripReportId');
+    expect(body).toContain('property_id: input.propertyId');
+  });
 });
 
 describe('order line totals are derived in SQL', () => {

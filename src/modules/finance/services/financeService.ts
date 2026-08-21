@@ -1980,6 +1980,10 @@ const _financeServiceCore = {
      * a customer's order would corrupt the match.
      */
     coversOrderId?: string | null;
+    /** The expense card this cost is filed against. Reporting only — moves no money. */
+    tripReportId?: string | null;
+    /** The building this cost is for. Independent of `projectId`. */
+    propertyId?: string | null;
   }): Promise<SupplierBill> {
     const { data, error } = await supabase
       .from('supplier_bills')
@@ -2000,6 +2004,8 @@ const _financeServiceCore = {
         order_id: input.orderId ?? null,
         project_id: input.projectId ?? null,
         covers_order_id: input.coversOrderId ?? null,
+        trip_report_id: input.tripReportId ?? null,
+        property_id: input.propertyId ?? null,
       })
       .select()
       .single();
@@ -2069,6 +2075,9 @@ const _financeServiceCore = {
     /** What the cost is FOR — a project, and/or the customer's sales order it was incurred against. */
     projectId?: string | null;
     coversOrderId?: string | null;
+    /** …or an expense card, or a building. Filing links: neither changes a single figure. */
+    tripReportId?: string | null;
+    propertyId?: string | null;
   }): Promise<{ billId: string; paymentId: string | null }> {
     // A supplier bill needs a payee — a saved CRM supplier OR a one-off free-text name.
     if (!input.supplierCompanyId && !input.supplierContactId && !input.supplierName?.trim()) {
@@ -2100,6 +2109,8 @@ const _financeServiceCore = {
       orderId: input.orderId ?? undefined,
       projectId: input.projectId ?? null,
       coversOrderId: input.coversOrderId ?? null,
+      tripReportId: input.tripReportId ?? null,
+      propertyId: input.propertyId ?? null,
     });
 
     let paymentId: string | null = null;

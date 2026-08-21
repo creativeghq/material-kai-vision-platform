@@ -70,6 +70,14 @@ export interface Order {
   supplier_acknowledged_at: string | null;
   supplier_eta: string | null;
   supplier_note: string | null;
+  /**
+   * FILING links — neither affects a figure on this order. `trip_report_id` is the expense card it
+   * was won on (the other half of trip ROI: the card knows the spend, this is the return);
+   * `property_id` is the building it is for, deliberately independent of `project_id` because a
+   * tenancy repair or a fit-out routinely has a property and no job.
+   */
+  trip_report_id: string | null;
+  property_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -279,6 +287,39 @@ export interface LinkTargetSearch {
   customers: Array<LinkParty & { open_count: number; orders: LinkOrderSummary[] }>;
   /** Orders this order's lines may legally be APPENDED to. See `search_order_link_targets`. */
   merge_targets: Array<LinkOrderSummary & { party_name: string | null; line_count: number; covers_order_id: string | null }>;
+  /**
+   * Expense cards the CALLER may see. The RPC is SECURITY DEFINER, so it restates
+   * `trip_reports_read` inline — own cards, plus everyone's for a finance manager. `is_mine` is
+   * returned so a reviewer looking at four people's cards is not left guessing whose is whose.
+   */
+  trips: Array<LinkTripCard>;
+  /** Buildings in the workspace. Plain member-scoped, exactly as `properties_select` is. */
+  properties: Array<LinkPropertySummary>;
+}
+
+export interface LinkTripCard {
+  id: string;
+  title: string;
+  card_type: string;
+  destination: string | null;
+  status: string;
+  trip_start: string | null;
+  trip_end: string | null;
+  currency: string;
+  total_amount: number;
+  owner_name: string | null;
+  is_mine: boolean;
+}
+
+export interface LinkPropertySummary {
+  id: string;
+  /** Already coalesced by the RPC: title -> address -> reference code. Never blank in practice. */
+  title: string | null;
+  reference_code: string | null;
+  address: string | null;
+  town: string | null;
+  property_type: string | null;
+  listing_status: string | null;
 }
 
 /**
@@ -305,7 +346,20 @@ export type OrderLinkTarget =
   /** Append the lines to an existing order of the SAME type and party, instead of raising a new one. */
   | { kind: 'merge_order'; orderId: string; orderType: OrderType; projectId: string | null; label: string }
   /** Book this cost as an expense ON an existing purchase order — `supplier_bills.order_id`. */
-  | { kind: 'cost_of_order'; orderId: string; projectId: string | null; label: string };
+  | { kind: 'cost_of_order'; orderId: string; projectId: string | null; label: string }
+  /**
+   * FILE it against an expense card — `orders.trip_report_id` / `supplier_bills.trip_report_id`.
+   * Reporting only: it moves no money and creates nothing, which is why a trip is never a merge
+   * target. What it buys is the other half of trip ROI — the card already knows what the trip
+   * COST, and this is the first thing that can say what it EARNED.
+   */
+  | { kind: 'trip'; reportId: string; label: string }
+  /**
+   * The building this is for — `orders.property_id` / `supplier_bills.property_id`. Deliberately
+   * INDEPENDENT of the project: a tenancy repair or a fit-out routinely has a property and no
+   * project, and routing it through one would invent a job nobody raised.
+   */
+  | { kind: 'property'; propertyId: string; label: string };
 
 import { round2 as r2 } from '@/utils/decimal';
 import { productDetailService } from '@/services/productDetailService';
@@ -796,6 +850,10 @@ export const ordersService = {
     projectId?: string | null;
     /** The sales order this one is raised to serve (demand link, never a merge). */
     coversOrderId?: string | null;
+    /** The expense card this order was won on. Reporting only — never affects money. */
+    tripReportId?: string | null;
+    /** The building this order is for. Independent of `projectId`. */
+    propertyId?: string | null;
     currency?: string;
     notes?: string | null;
     categoryId?: string | null;
@@ -819,6 +877,8 @@ export const ordersService = {
         supplier_contact_id: input.supplierContactId ?? null,
         project_id: input.projectId ?? null,
         covers_order_id: input.coversOrderId ?? null,
+        trip_report_id: input.tripReportId ?? null,
+        property_id: input.propertyId ?? null,
         currency: input.currency ?? 'EUR',
         subtotal_net: subtotal,
         vat_amount: vatTotal,
@@ -929,6 +989,8 @@ export const ordersService = {
       projects: d.projects ?? [],
       customers: d.customers ?? [],
       merge_targets: d.merge_targets ?? [],
+      trips: d.trips ?? [],
+      properties: d.properties ?? [],
     };
   },
 
@@ -1421,6 +1483,8 @@ export const ordersService = {
     categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null;
     /** What the order is FOR. Was set-once-at-create until the link picker made it editable. */
     projectId?: string | null; coversOrderId?: string | null;
+    /** Filing links. `undefined` leaves them alone; `null` clears them. */
+    tripReportId?: string | null; propertyId?: string | null;
   }): Promise<void> {
     const clean: Record<string, any> = { updated_at: new Date().toISOString() };
     if (patch.categoryId !== undefined) clean.category_id = patch.categoryId;
@@ -1428,6 +1492,8 @@ export const ordersService = {
     if (patch.notes !== undefined) clean.notes = patch.notes;
     if (patch.projectId !== undefined) clean.project_id = patch.projectId;
     if (patch.coversOrderId !== undefined) clean.covers_order_id = patch.coversOrderId;
+    if (patch.tripReportId !== undefined) clean.trip_report_id = patch.tripReportId;
+    if (patch.propertyId !== undefined) clean.property_id = patch.propertyId;
     const { error } = await supabase.from('orders').update(clean).eq('id', id);
     if (error) throw error;
   },

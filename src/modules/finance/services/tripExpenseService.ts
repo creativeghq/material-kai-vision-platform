@@ -109,6 +109,24 @@ export interface TripExpenseItem {
   updated_at: string;
 }
 
+/** One currency's worth of a derived total. Never summed across currencies — see `cardLinks`. */
+export interface TripMoneyByCurrency { currency: string; amount: number }
+
+export interface TripCardLinks {
+  orders: Array<{
+    id: string; order_number: string | null; order_type: 'sales' | 'purchase'; status: string;
+    total: number; currency: string; created_at: string; party_name: string | null;
+  }>;
+  bills: Array<{
+    id: string; number: string | null; status: string; total: number; currency: string;
+    issued_at: string | null; supplier_name: string | null;
+  }>;
+  /** Sales orders won on this card. */
+  earned: TripMoneyByCurrency[];
+  /** Supplier bills filed against it. */
+  filed: TripMoneyByCurrency[];
+}
+
 export interface CreateReportInput {
   workspaceId: string;
   card_type?: ExpenseCardType;
@@ -181,6 +199,23 @@ export const tripExpenseService = {
     if (e1) throw e1;
     if (e2) throw e2;
     return { report: report as TripExpenseReport, items: (items ?? []) as TripExpenseItem[] };
+  },
+
+  /**
+   * What has been FILED against this card — the orders won on the trip and the supplier bills
+   * booked to it. Distinct from the card's own `trip_expense_items`, which are the rep's
+   * out-of-pocket claims; a filed bill is a company cost (a hotel invoiced to the company, a
+   * flight on the company card) that belongs to the trip without belonging to the claim.
+   *
+   * Totals come back DERIVED and grouped by currency — the client formats, it does not sum. Only
+   * SALES orders count as earned: a purchase made on a buying trip is spend, and netting the two
+   * directions into one figure is the money-derivation mistake this codebase already made once.
+   */
+  async cardLinks(reportId: string): Promise<TripCardLinks> {
+    const { data, error } = await (supabase as any).rpc('get_trip_card_links', { p_report_id: reportId });
+    if (error) throw error;
+    const d = (data ?? {}) as Partial<TripCardLinks>;
+    return { orders: d.orders ?? [], bills: d.bills ?? [], earned: d.earned ?? [], filed: d.filed ?? [] };
   },
 
   async createReport(input: CreateReportInput): Promise<TripExpenseReport> {
