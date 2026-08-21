@@ -135,7 +135,14 @@ export const createFindRecordsTool = (
           found: true,
           count: rows.length,
           records: rows,
-          note: 'These are records in the user\'s own workspace, already filtered to what they are allowed to see. Each carries a `path` — link to it so the user can open the record.',
+          note: [
+            'These are records in the user\'s own workspace, already filtered to what they are allowed to see.',
+            'Each carries a `path` — link to it so the user can open the record.',
+            '`badge` is a short internal tag for the UI, not a field name to show: say what it MEANS.',
+            'On a person it is "Team" (a member of this workspace) or "Platform" (an account outside it);',
+            'elsewhere it is a status or relationship such as "Supplier", "Starter" or "draft".',
+            'Never print a line like "Badge: Platform" — write it as prose or leave it out.',
+          ].join(' '),
         });
       } catch (err) {
         console.error('[find_records] tool error:', err);
