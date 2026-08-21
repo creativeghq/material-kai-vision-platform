@@ -46,8 +46,9 @@ describe('global search — the material-search action is never the default', ()
   it('renders results, then nav, then the escalation actions', () => {
     const results = PALETTE.indexOf('groups.map((group)');
     const nav = PALETTE.indexOf('navGroups.map((group)');
-    const agent = PALETTE.indexOf('__ask_agent__');
-    const smart = PALETTE.indexOf('__smart_search__');
+    // Match the JSX attribute, not the bare string — `topValue` names both ids above the JSX.
+    const agent = PALETTE.indexOf('value="__ask_agent__"');
+    const smart = PALETTE.indexOf('value="__smart_search__"');
 
     expect(results, 'the palette must render `groups`').toBeGreaterThan(-1);
     expect(nav, 'the palette must render `navGroups`').toBeGreaterThan(-1);
@@ -61,6 +62,19 @@ describe('global search — the material-search action is never the default', ()
     // matched no record. Putting the product search above it is how "search" became "product
     // search" in the first place.
     expect(agent, 'ask-the-agent must sit above the material search').toBeLessThan(smart);
+  });
+
+  it('drives the highlighted row from the data, not from cmdk', () => {
+    // Source order is necessary and NOT sufficient. Results arrive after the debounce, so for a
+    // moment the Actions group is the only item; cmdk selects it and keeps that selection when
+    // the results prepend. Measured in the real app before this was controlled: searching
+    // "tsatsos" left the highlight on "Ask the agent" with the person two rows above it.
+    expect(PALETTE, 'the Command must be a CONTROLLED cmdk value').toMatch(
+      /<Command[\s\S]{0,80}value=\{selected\}[\s\S]{0,80}onValueChange=\{setSelected\}/,
+    );
+    // ...and the value has to follow the top row, or controlling it changes nothing.
+    expect(PALETTE).toContain('const topValue');
+    expect(PALETTE).toMatch(/setSelected\(topValue\)/);
   });
 
   it('labels both actions with where they go', () => {

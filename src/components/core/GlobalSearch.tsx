@@ -173,6 +173,28 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
     return groups;
   }, [navItems, query]);
 
+  /**
+   * What Enter opens — driven from the DATA, not left to cmdk.
+   *
+   * Source order alone is not enough, and this is the original bug's last hiding place. Results
+   * arrive AFTER the 220 ms debounce, so for a moment the only rendered item is the Actions group;
+   * cmdk selects it, and it KEEPS that selection when the results prepend. Measured in the real
+   * app: searching "tsatsos" left the highlight on "Ask the agent" with the person sitting two
+   * rows above it, so Enter still did not open the thing the user typed. Re-pointing the selection
+   * whenever the top row changes is the fix; the escalation action is the target only when there
+   * is genuinely nothing else.
+   */
+  const topValue = useMemo(() => {
+    const firstHit = groups[0]?.hits[0];
+    if (firstHit) return `${groups[0].spec.kind}-${firstHit.id}`;
+    const firstNav = navGroups[0]?.items[0];
+    if (firstNav) return `nav-${firstNav.id}`;
+    return query.trim() ? '__ask_agent__' : '';
+  }, [groups, navGroups, query]);
+
+  const [selected, setSelected] = useState('');
+  useEffect(() => setSelected(topValue), [topValue]);
+
   const go = (path: string) => {
     setOpen(false);
     setQuery('');
@@ -220,6 +242,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
           {/* shouldFilter=false: results come pre-filtered from the DB and nav is filtered by
               us, so cmdk must not second-guess which items to hide. */}
           <Command
+            value={selected}
+            onValueChange={setSelected}
             shouldFilter={false}
             className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground"
           >
