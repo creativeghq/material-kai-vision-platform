@@ -923,7 +923,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
     const i = exemptionCodes.indexOf(code);
     return i < 0 ? '' : `(${i + 1})`;
   };
-  let totNet = 0, totVat = 0, totOtherTaxes = 0;
+  let totNet = 0, totOtherTaxes = 0;
   let lineNo = 0;
   // myDATA VAT category → percent (used when a line carries an explicit category).
   const VAT_PCT_BY_CAT: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
@@ -943,7 +943,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
       ? (Number(it.vat_exemption_category) || null)
       : null;
     if (exCode && !exemptionCodes.includes(exCode)) exemptionCodes.push(exCode);
-    totNet += net; totVat += vat; totOtherTaxes += lineOther;
+    totNet += net; totOtherTaxes += lineOther;
     lineNo += 1;
     const key = String(pct);
     vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
@@ -1019,8 +1019,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   // lines, so the per-rate aggregates above are pre-discount and every printed figure derived
   // from them has to be scaled by the same factor. This block used to print the per-rate rows
   // BEFORE cashFactor was even computed — pre-discount rows sitting beside post-discount
-  // totals on the same document — and separately rounded a running `totVat` for the total
-  // instead of summing the rows it had just printed. Both are fixed by deriving everything
+  // totals on the same document — and separately rounded its own running VAT sum for the
+  // total instead of summing the rows it had just printed. Both are fixed by deriving everything
   // below from `vatRows`, which is what the reader can actually add up.
   const cashPct = Number(inv.cash_discount_pct ?? 0);
   const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;

@@ -17,17 +17,25 @@ import { join } from 'node:path';
 
 import { MIRRORS, expectedMirror } from '../../scripts/gen-finance-mirrors.mjs';
 
+/**
+ * Line endings are not part of the contract. `core.autocrlf` is on for Windows clones, so the
+ * mirror git wrote at checkout carries CRLF while the string the generator builds carries
+ * whatever the source had. Comparing raw would fail a clean Windows clone for a reason that has
+ * nothing to do with drift, so both sides go through this first.
+ */
+const normalizeEol = (text: string): string => text.split('\r\n').join('\n');
+
 const root = join(__dirname, '..', '..');
 
 describe('finance cross-runtime mirrors', () => {
   it.each(MIRRORS)('%s → %s is up to date', (source: string, target: string) => {
     const onDisk = readFileSync(join(root, target), 'utf8');
     expect(
-      onDisk,
+      normalizeEol(onDisk),
       `${target} is not what ${source} would generate. Run \`npm run finance:mirror\` — and do ` +
         'NOT hand-edit the mirror: it exists so the printer and the myDATA transmission cannot ' +
         'answer "who is this addressed to" differently.',
-    ).toBe(expectedMirror(source));
+    ).toBe(normalizeEol(expectedMirror(source)));
   });
 
   it('every mirror source is import-free, so the mirror can stay a byte copy', () => {
