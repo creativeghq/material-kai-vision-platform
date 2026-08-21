@@ -1,11 +1,18 @@
 // Mac-Spotlight-style global search. Lives at the end of the top bar (after the App
 // Launcher) as a click-to-open search field, and opens app-wide on ⌘K / Ctrl+K.
-// It surfaces three things in one palette: quick product matches (live from the DB),
-// an action to run the full 7-vector "smart search" over materials (Discover → Products),
-// and navigation to any page/app the active persona can reach.
+//
+// It is a GENERAL search: people, CRM parties, deals, products, projects, quotes, orders,
+// invoices and properties come back from one `global_search` round trip (RLS-scoped), alongside
+// navigation to any page the active persona can reach.
+//
+// Order in this list is not cosmetic. cmdk highlights the first item, so whatever renders first
+// is what Enter opens. Real results therefore come FIRST, best match at the top, and the deep
+// material search is an explicitly-labelled action pinned to the BOTTOM. It used to be the only
+// item in the palette for any query that was not a product name — so searching for a colleague
+// silently ran a material search and dropped you in the product catalogue.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Sparkles, Package, User, CornerDownLeft } from 'lucide-react';
+import { Search, Sparkles, User, CornerDownLeft } from 'lucide-react';
 
 import {
   Dialog,
@@ -21,25 +28,22 @@ import {
   CommandGroup,
   CommandItem,
 } from '@/components/core/ui/command';
-import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/core/ui/badge';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { SIDEBAR_NAV_ITEMS, filterNavItems, type SidebarNavItem } from '@/config/nav-items';
 import { PRODUCT_BROWSE_ANY } from '@/auth/capabilities';
 import {
-  PRODUCT_IMAGE_SELECT,
-  getManufacturer,
-  getProductImageUrl,
-  getProductName,
-} from '@/utils/productMetadata';
-
-interface ProductHit {
-  id: string;
-  name: string;
-  img: string | null;
-  brand: string | null;
-}
+  allowedSearchKinds,
+  attachProductImages,
+  globalSearch,
+  groupHits,
+  MIN_QUERY_LENGTH,
+  type GlobalSearchGroup,
+  type GlobalSearchHit,
+} from '@/services/globalSearchService';
 
 interface GlobalSearchProps {
   /** `bar` → full search field (desktop); `icon` → icon-only trigger (mobile top bar). */
@@ -49,18 +53,30 @@ interface GlobalSearchProps {
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) => {
   const navigate = useNavigate();
   const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
-  const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent, isWorkspaceManager } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
+  const { activeWorkspaceId } = useWorkspace();
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [products, setProducts] = useState<ProductHit[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [groups, setGroups] = useState<GlobalSearchGroup[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  // Product lookups + the full material search both land on Discover → Products, open to anyone
-  // who works with the catalog (marketplace buyers + clients building moodboards/quotes). For
-  // personas without any of those (finance-only, HR-only) we keep the palette to page navigation.
+  // The deep 7-vector material search lands on Discover → Products, so it is offered to anyone
+  // who works with the catalog (marketplace buyers + clients building moodboards/quotes).
   const browseOk = PRODUCT_BROWSE_ANY.some(can);
+
+  // Only the kinds this persona actually has a surface for — a result that opens onto a
+  // permission wall is its own broken process.
+  const kinds = useMemo(
+    () => allowedSearchKinds({ can, isModuleAvailable }),
+    [can, isModuleAvailable],
+  );
+
+  const routeCtx = useMemo(
+    () => ({ isPlatformOperator, isWorkspaceManager }),
+    [isPlatformOperator, isWorkspaceManager],
+  );
 
   // ── ⌘K / Ctrl+K toggles the palette anywhere. Only one GlobalSearch mounts at a time
   //    (Sidebar renders either the desktop bar OR the mobile icon), so no double-binding. ──
@@ -79,43 +95,39 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
   useEffect(() => {
     if (open) {
       setQuery('');
-      setProducts([]);
+      setGroups([]);
     }
   }, [open]);
 
-  // Debounced live product search.
+  // Debounced cross-entity search.
   useEffect(() => {
-    if (!open || !browseOk) return;
+    if (!open) return;
     const q = query.trim();
-    if (q.length < 2) {
-      setProducts([]);
-      setLoadingProducts(false);
+    if (q.length < MIN_QUERY_LENGTH) {
+      setGroups([]);
+      setSearching(false);
       return;
     }
     let active = true;
-    setLoadingProducts(true);
+    setSearching(true);
     const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from('products')
-        .select(`id, name, metadata, ${PRODUCT_IMAGE_SELECT}`)
-        .ilike('name', `%${q}%`)
-        .limit(6);
-      if (!active) return;
-      setProducts(
-        (data ?? []).map((p: any) => ({
-          id: p.id,
-          name: getProductName(p),
-          img: getProductImageUrl(p),
-          brand: getManufacturer(p.metadata),
-        })),
-      );
-      setLoadingProducts(false);
+      try {
+        const hits = await globalSearch(activeWorkspaceId, q, kinds);
+        const withImages = await attachProductImages(hits);
+        if (!active) return;
+        setGroups(groupHits(withImages));
+      } catch {
+        // A failed search shows "No results", never a blank palette or a thrown dialog.
+        if (active) setGroups([]);
+      } finally {
+        if (active) setSearching(false);
+      }
     }, 220);
     return () => {
       active = false;
       clearTimeout(t);
     };
-  }, [query, open, browseOk]);
+  }, [query, open, activeWorkspaceId, kinds]);
 
   // Navigation targets the active persona can reach (top bar + App Launcher), plus Profile.
   const navItems = useMemo<SidebarNavItem[]>(() => {
@@ -142,6 +154,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
     setOpen(false);
     setQuery('');
     navigate(path);
+  };
+
+  const openHit = (group: GlobalSearchGroup, hit: GlobalSearchHit) => {
+    go(group.spec.route(hit, routeCtx));
   };
 
   const trimmed = query.trim();
@@ -176,9 +192,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
         <DialogContent className="overflow-hidden p-0 shadow-lg max-w-xl top-[15%] translate-y-0">
           <DialogTitle className="sr-only">Search</DialogTitle>
           <DialogDescription className="sr-only">
-            Search products, run a smart material search, or jump to any page.
+            Search people, customers, records and products, or jump to any page.
           </DialogDescription>
-          {/* shouldFilter=false: products come pre-filtered from the DB and nav is filtered by
+          {/* shouldFilter=false: results come pre-filtered from the DB and nav is filtered by
               us, so cmdk must not second-guess which items to hide. */}
           <Command
             shouldFilter={false}
@@ -187,55 +203,44 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
             <CommandInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Search products, pages, actions…"
+              placeholder="Search people, customers, records, products, pages…"
             />
             <CommandList className="max-h-[60vh]">
-              <CommandEmpty>{loadingProducts ? 'Searching…' : 'No results.'}</CommandEmpty>
+              <CommandEmpty>{searching ? 'Searching…' : 'No results.'}</CommandEmpty>
 
-              {browseOk && trimmed && (
-                <CommandGroup heading="Actions">
-                  <CommandItem
-                    value="__smart_search__"
-                    onSelect={() =>
-                      go(`/discover?tab=products&mode=smart&q=${encodeURIComponent(trimmed)}`)
-                    }
-                  >
-                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
-                    <span>
-                      Smart search materials for “<span className="font-medium">{trimmed}</span>”
-                    </span>
-                    <CornerDownLeft className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-                  </CommandItem>
-                </CommandGroup>
-              )}
-
-              {browseOk && products.length > 0 && (
-                <CommandGroup heading="Products">
-                  {products.map((p) => (
+              {/* Records first, best match at the top — this is what Enter opens. */}
+              {groups.map((group) => (
+                <CommandGroup key={group.spec.kind} heading={group.spec.label}>
+                  {group.hits.map((hit) => (
                     <CommandItem
-                      key={p.id}
-                      value={`product-${p.id}`}
-                      onSelect={() => go(`/discover?product=${p.id}`)}
+                      key={`${group.spec.kind}-${hit.id}`}
+                      value={`${group.spec.kind}-${hit.id}`}
+                      onSelect={() => openHit(group, hit)}
                     >
-                      <span className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/50">
-                        {p.img ? (
-                          <img src={p.img} alt="" className="h-full w-full object-cover" />
+                      <span className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-sunken">
+                        {hit.imageUrl ? (
+                          <img src={hit.imageUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <Package className="h-4 w-4 text-muted-foreground/60" />
+                          <group.spec.icon className="h-4 w-4 text-muted-foreground" />
                         )}
                       </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm">{p.name}</span>
-                        {p.brand && (
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">{hit.title}</span>
+                        {hit.subtitle && (
                           <span className="block truncate text-xs text-muted-foreground">
-                            {p.brand}
+                            {hit.subtitle}
                           </span>
                         )}
                       </span>
+                      {hit.badge && (
+                        <Badge variant="neutral" className="ml-2 shrink-0">
+                          {hit.badge}
+                        </Badge>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
-              )}
+              ))}
 
               {navMatches.length > 0 && (
                 <CommandGroup heading="Go to">
@@ -249,6 +254,26 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
                       {item.label}
                     </CommandItem>
                   ))}
+                </CommandGroup>
+              )}
+
+              {/* Last, and named after where it goes. It is a deliberate action — a 7-vector pass
+                  over the material catalog — not the fallback meaning of "search". */}
+              {browseOk && trimmed && (
+                <CommandGroup heading="Actions">
+                  <CommandItem
+                    value="__smart_search__"
+                    onSelect={() =>
+                      go(`/discover?tab=products&mode=smart&q=${encodeURIComponent(trimmed)}`)
+                    }
+                  >
+                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                    <span>
+                      Deep material search for “<span className="font-medium">{trimmed}</span>” in
+                      Discover
+                    </span>
+                    <CornerDownLeft className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                  </CommandItem>
                 </CommandGroup>
               )}
             </CommandList>
