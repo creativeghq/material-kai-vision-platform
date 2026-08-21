@@ -131,6 +131,11 @@ describe('global search kind catalogue', () => {
       catalog: { module: 'presentation-catalogs', wsManager: true },
       blueprint: {},
       template: {},
+      // `/emails/templates/:id/edit` — EntitlementGuard('email') + WorkspaceAdminGuard.
+      email_template: { module: 'email', wsManager: true },
+      // `/agent-hub` is AuthGuard only; the page already reads `?conversation=`.
+      conversation: {},
+      inbox_thread: { caps: ['inbox.use'], module: 'inbox' },
     };
 
     for (const spec of GLOBAL_SEARCH_KINDS) {
@@ -149,13 +154,19 @@ describe('global search kind catalogue', () => {
     // moment someone ships a record page without adding it here.
     expect(GLOBAL_SEARCH_KINDS.map((s) => s.kind).sort()).toEqual(
       [
-        'blueprint', 'catalog', 'company', 'contact', 'deal', 'invoice', 'moodboard',
-        'order', 'person', 'product', 'project', 'property', 'quote', 'template',
+        'blueprint', 'catalog', 'company', 'contact', 'conversation', 'deal', 'email_template',
+        'inbox_thread', 'invoice', 'moodboard', 'order', 'person', 'product', 'project',
+        'property', 'quote', 'template',
       ].sort(),
     );
-    // Absent ON PURPOSE, and each for a reason that would have to change first:
-    //   contracts / hr_employees / warehouse_items — no record route exists, only a list page.
-    //   kb_docs — its only reader is the PUBLIC article page (published + public), 3 of 677 rows.
+    // Absent ON PURPOSE. Every route in the app was enumerated and diffed against this list;
+    // what is left is blocked on the same thing — there is no page that opens ONE of them:
+    //   contracts, hr_employees, warehouse_items, flows, campaigns, crm_meetings,
+    //   trip_expense_reports, page_watches, tech_radar_subjects, hr_job_postings,
+    //   customer_assets, workspace_docs.
+    // kb_docs is absent for a different reason: its only reader is the PUBLIC article page
+    // (published + public), which is 3 of 677 rows — a kind that would look like coverage and
+    // deliver almost none.
   });
 
   it('offers a persona only the kinds it can open', () => {
@@ -163,18 +174,22 @@ describe('global search kind catalogue', () => {
     // is AuthGuard and nothing else — RLS is what decides you have no rows, not a gate here.
     expect(
       allowedSearchKinds({ can: NO_CAPS, isModuleAvailable: () => false, isWorkspaceManager: false }),
-    ).toEqual(['person', 'moodboard', 'blueprint', 'template']);
+    ).toEqual(['person', 'moodboard', 'blueprint', 'template', 'conversation']);
 
     // A capability without the module is still not a surface.
     expect(
       allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: () => false, isWorkspaceManager: true }),
-    ).toEqual(['person', 'product', 'moodboard', 'blueprint', 'template']);
+    ).toEqual(['person', 'product', 'moodboard', 'blueprint', 'template', 'conversation']);
 
-    // Catalogs are the one kind behind the workspace-admin rung, so a plain member loses exactly
-    // that one and keeps everything else.
+    // Catalogs and email templates are the kinds behind the workspace-admin rung, so a plain
+    // member loses exactly those two and keeps everything else.
     expect(
       allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: ALL_MODULES, isWorkspaceManager: false }),
-    ).toEqual(GLOBAL_SEARCH_KINDS.map((s) => s.kind).filter((k) => k !== 'catalog'));
+    ).toEqual(
+      GLOBAL_SEARCH_KINDS.map((s) => s.kind).filter(
+        (k) => k !== 'catalog' && k !== 'email_template',
+      ),
+    );
 
     expect(
       allowedSearchKinds({ can: ALL_CAPS, isModuleAvailable: ALL_MODULES, isWorkspaceManager: true }),

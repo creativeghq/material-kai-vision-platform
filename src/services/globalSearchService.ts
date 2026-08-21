@@ -24,7 +24,10 @@ import {
   FolderKanban,
   Handshake,
   Home,
+  Inbox,
   Layers,
+  Mail,
+  MessageSquare,
   Package,
   Palette,
   Receipt,
@@ -50,7 +53,10 @@ export type GlobalSearchKind =
   | 'property'
   | 'catalog'
   | 'blueprint'
-  | 'template';
+  | 'template'
+  | 'email_template'
+  | 'conversation'
+  | 'inbox_thread';
 
 export interface GlobalSearchHit {
   kind: GlobalSearchKind;
@@ -217,6 +223,32 @@ export const GLOBAL_SEARCH_KINDS: readonly GlobalSearchKindSpec[] = [
     // Deliberately ungated, matching the nav item: every persona that can create a record can
     // reuse one.
     route: (hit) => `/templates/${hit.id}`,
+  },
+  {
+    kind: 'email_template',
+    label: 'Email templates',
+    icon: Mail,
+    // `/emails/templates/:id/edit` is EntitlementGuard('email') + WorkspaceAdminGuard.
+    moduleSlug: 'email',
+    requireWorkspaceManager: true,
+    route: (hit) => `/emails/templates/${hit.id}/edit`,
+  },
+  {
+    kind: 'conversation',
+    label: 'Agent chats',
+    icon: MessageSquare,
+    // `/agent-hub` is AuthGuard only, and AgentHub already reads `?conversation=`. RLS scopes
+    // the rows to your own chats.
+    route: (hit) => `/agent-hub?conversation=${hit.id}`,
+  },
+  {
+    kind: 'inbox_thread',
+    label: 'Inbox',
+    icon: Inbox,
+    requireAnyCapability: ['inbox.use'],
+    moduleSlug: 'inbox',
+    // InboxPage already seeds its open thread from `?thread=`.
+    route: (hit) => `/inbox?thread=${hit.id}`,
   },
 ];
 
