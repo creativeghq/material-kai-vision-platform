@@ -202,7 +202,9 @@ all read it. They did not always: the rule was written out twice, missing from t
 workspace selling on orders therefore read a profitable month as a pure loss in *P&L by category*
 (its costs were booked as supplier bills, its revenue existed nowhere) while the dashboard showed
 the margin. Two rules for consumers adding themselves:
-- **Take `revenue_net`, never the order's `cogs`, if you already count supplier bills** — that bill *is* the cost of goods, and counting both books it twice.
+- **Take both halves, or neither.** Revenue without its cost is the same defect facing the other way: recognising a €3,000 order and leaving its €2,580 of goods on the supplier bill's own date reported €3,000 of profit for a month that made €420. Cost of goods follows the **sale**, not the bill.
+- **Cost comes from the lines' `unit_cost` snapshot, never from the attached bills.** Every other margin surface uses the snapshot, and on live data the two disagree by thousands: a bill on a sales order is often a partial record of the same goods. Two sources for one money quantity is the rule this whole section exists to prevent.
+- **Then exclude those bills from the expense side.** `report_pnl_per_category` drops any `supplier_bills` row sitting on a counted sales order, or on the purchase order raised to cover one — its cost has already arrived with the sale. The exclusion is deliberately *not* period-scoped, because the bill and the sale routinely fall in different months.
 - **Never add order VAT to a VAT figure.** An order declares nothing to AADE; `vat_income` feeds the VAT return and stays document-only.
 
 ### Additional reports
