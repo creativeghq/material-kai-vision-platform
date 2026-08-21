@@ -1,3 +1,7 @@
+// GENERATED MIRROR of src/lib/mydataExemptionCategories.ts — do not edit here.
+// Regenerate: npm run finance:mirror (part of gen:all). Freshness is enforced by
+// tests/unit/financeMirrors.test.ts, which fails the build on any drift.
+
 /** myDATA VAT-exemption categories (ΑΑΔΕ "Κατηγορία Αιτίας Εξαίρεσης ΦΠΑ"), codes
  * 1–31. Required by myDATA on every 0%/exempt invoice line (vatCategory 7/8) —
  * see `vatExemptionCategory` in

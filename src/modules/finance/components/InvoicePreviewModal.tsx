@@ -91,6 +91,27 @@ export function InvoicePreviewModal({
           order = data;
         }
 
+        // The sub-unit the goods go to. It is also the myDATA branch number on the transmitted
+        // envelope, so the preview has to show it or the preview lies about where it ships.
+        let addressUnit: Record<string, any> | null = null;
+        if (invoice.customer_address_unit_id) {
+          const { data } = await supabase.from('crm_address_units').select('*')
+            .eq('id', invoice.customer_address_unit_id).maybeSingle();
+          addressUnit = data;
+        }
+
+        // AADE authentication code — issued with the MARK, stored on the submission row.
+        let authCode: string | null = null;
+        if (invoice.fiscal_mark) {
+          const { data } = await supabase.from('fiscal_submissions')
+            .select('authentication_code, created_at')
+            .eq('invoice_id', invoice.id)
+            .not('authentication_code', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1).maybeSingle();
+          authCode = (data as any)?.authentication_code ?? null;
+        }
+
         let logoUrl: string | null = null;
         if (settings?.business_logo_path) {
           const { data: signed } = await supabase.storage.from('generation-images')
@@ -129,7 +150,10 @@ export function InvoicePreviewModal({
           } catch { /* informational only */ }
         }
 
-        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, order, logoUrl, bankAccounts, payUrl, priorBalance });
+        const data = buildInvoiceRenderData({
+          invoice, items: items ?? [], settings, customer, addressUnit, authCode,
+          branch, order, logoUrl, bankAccounts, payUrl, priorBalance,
+        });
 
         if (!cancelled) setResolved({ spec, colors, data });
       } catch (err: any) {

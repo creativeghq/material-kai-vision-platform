@@ -54,13 +54,25 @@ export interface InvoiceLineRow {
   qty: number;
   unit: string;
   unitPrice: number;
+  /** Line discount AMOUNT in currency (invoice_items.discounted_price). 0 when none.
+   *  NOT a discounted unit price — on the QUOTE side the same column name means the
+   *  opposite thing, so never copy one into the other without converting. */
+  discount: number;
   net: number;
   vatPct: number;
   vatAmount: number;
-  lineTotal: number; // net + vat
+  /** Per-line myDATA "other taxes" (invoice_items.other_taxes_amount). 0 when none. */
+  otherTaxes: number;
+  /** myDATA VAT-exemption category (1..31) on a 0%/exempt line. The legal ground for
+   *  charging no VAT MUST be printed on the document, so this drives a footnote marker. */
+  exemptionCode?: number | null;
+  lineTotal: number; // net + vat + other taxes
 }
 
-export interface VatAnalysisRow { pct: number; net: number; vat: number }
+export interface VatAnalysisRow { pct: number; net: number; vat: number; total: number }
+
+/** One distinct exemption ground cited by the lines, printed under the items table. */
+export interface VatExemptionNote { marker: string; code: number; label: string }
 export interface TotalsExtraRow { label: string; value: number; negative?: boolean }
 
 export interface InvoiceRenderData {
@@ -73,10 +85,12 @@ export interface InvoiceRenderData {
   labels: Record<string, string>;
   issuer: { name: string; lines: string[]; logoUrl?: string | null };
   customer: InvoiceParty;
-  /** Right-column meta rows (number, series, date, due, related). */
+  /** Right-column meta rows (type, number, series, date, time, payment method, related). */
   meta: { label: string; value: string }[];
   items: InvoiceLineRow[];
   vatAnalysis: VatAnalysisRow[];
+  /** Distinct exemption grounds cited by the 0%-VAT lines, in marker order. */
+  vatExemptions: VatExemptionNote[];
   totals: {
     subtotalNet: number;        // Price (pre-discount net)
     discount: number;           // order-level (paid-upfront) discount, 0 if none
@@ -89,6 +103,11 @@ export interface InvoiceRenderData {
   };
   payment: { method?: string; info?: string; accounts: string[] };
   shipping?: { rows: string[] } | null;
+  /** Third party panel — where the goods go, when it differs from the billing party
+   *  (a chosen crm_address_units sub-unit, or the document's ship-to). */
+  delivery?: { name?: string; lines: string[] } | null;
+  /** Non-base currency: the rate this document was converted at. Never printed for EUR. */
+  fx?: { rate: number; base: string } | null;
   notes?: string | null;
   /** Customer note entered when the order was placed (shown under the invoice notes). */
   orderNotes?: string | null;
@@ -99,5 +118,5 @@ export interface InvoiceRenderData {
   priorBalance?: number | null;
   /** Hosted /pay/{token} URL — prints a "Pay / view online" link + QR. */
   payUrl?: string | null;
-  fiscal?: { mark?: string; uid?: string; qrUrl?: string | null } | null;
+  fiscal?: { mark?: string; uid?: string; authCode?: string | null; qrUrl?: string | null } | null;
 }

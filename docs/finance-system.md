@@ -273,9 +273,19 @@ customer silently rewrote who every past invoice was addressed to.
   same rule as `resolveContactBillingSource`, because that is the identity the document showed.
 - Credit notes deliberately have **no** snapshot of their own — they resolve from the invoice they
   correct, snapshot included.
-- Readers go through `resolveCounterparty` in `_shared/fiscal/invoice-builder.ts`, which feeds the
-  snapshot to the same `partyFromCrm` used for live rows, so the billing-identity precedence rules
-  exist once and cannot drift between frozen and live documents.
+- The **transmission** reads it through `resolveCounterparty` in `_shared/fiscal/invoice-builder.ts`,
+  which feeds the snapshot to the same `partyFromCrm` used for live rows, so the billing-identity
+  precedence rules exist once and cannot drift between frozen and live documents.
+- The **printers** read it through `resolvePrintedCounterparty`
+  ([src/modules/finance/invoice-templates/counterparty.ts](../src/modules/finance/invoice-templates/counterparty.ts),
+  mirrored to `_shared/finance/invoice-party.ts` by `npm run finance:mirror`). Until 2026-08-21
+  they did not: both the React preview and the pdf-lib generator re-read `crm_companies` live, so
+  the paper and the envelope could name different parties — a renamed customer rewrote every past
+  PDF, a party with a separate billing identity was transmitted under it and printed under its
+  visiting address, and a re-homed customer rendered with no name at all.
+- A party panel prints **only** fields the allowlist above actually freezes. A field outside it
+  (`gemi_number`, `kad_primary_description`) would render on a draft, which reads the live row, and
+  vanish the moment the document is issued.
 
 ---
 

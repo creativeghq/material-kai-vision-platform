@@ -4,17 +4,27 @@ import {
   INVOICE_LABELS, invoiceDocTitle, PAYMENT_METHOD_LABELS,
   VAT_PCT_BY_CAT, UNIT_LABEL_BY_CODE, type Lang,
 } from './labels';
-import type { InvoiceRenderData, InvoiceLineRow, VatAnalysisRow, TotalsExtraRow } from './types';
+import type {
+  InvoiceRenderData, InvoiceLineRow, VatAnalysisRow, TotalsExtraRow, VatExemptionNote,
+} from './types';
+import { resolvePrintedCounterparty, applyAddressUnit, partyAddressLines } from './counterparty';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
+import { mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 
 export interface BuildRenderInput {
   invoice: Record<string, any>;
   items: Record<string, any>[];
   /** finance_settings row (issuer identity + bank accounts). */
   settings: Record<string, any> | null;
-  /** crm_companies | crm_contacts row, or null. */
+  /** crm_companies | crm_contacts row, or null. Used ONLY when the document carries no
+   *  `counterparty_snapshot` — an issued document prints the identity frozen at issue. */
   customer: Record<string, any> | null;
+  /** crm_address_units row when invoice.customer_address_unit_id is set — the sub-unit the
+   *  goods go to, which is also the branch number transmitted to myDATA. */
+  addressUnit?: Record<string, any> | null;
+  /** fiscal_submissions.authentication_code for this document, when it has been transmitted. */
+  authCode?: string | null;
   /** finance_branches row when invoice.branch_code > 0. */
   branch?: Record<string, any> | null;
   /** Linked order (orders row) when invoice.order_id is set — for the order number + note. */
@@ -40,7 +50,10 @@ export function formatInvoiceMoney(value: any, currency: string, lang: Lang): st
 }
 
 export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderData {
-  const { invoice: inv, items, settings: fs, customer, branch, order, logoUrl, bankAccounts, priorBalance, payUrl } = input;
+  const {
+    invoice: inv, items, settings: fs, customer, addressUnit, authCode, branch, order,
+    logoUrl, bankAccounts, priorBalance, payUrl,
+  } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
   const L = INVOICE_LABELS[lang];
@@ -58,7 +71,11 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     [fs?.business_postal_code, bizCity].filter(Boolean).join(' '),
     fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
     bizTaxOffice ? `${L.taxOffice}: ${bizTaxOffice}` : '',
-    bizProfession ? `${L.profession}: ${bizProfession}` : '',
+    // ONE activity line. `business_profession` is the ΑΑΔΕ "Δραστηριότητα" and wins; the coarse
+    // `main_activity` picklist stands in only for a workspace that never filled the free-text
+    // field. Printing both gave the document two lines labelled "Activity", which reads as an
+    // error rather than as extra detail.
+    bizProfession || fs?.main_activity ? `${L.profession}: ${bizProfession || fs?.main_activity}` : '',
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
     fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
@@ -66,29 +83,51 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   ].filter(Boolean) as string[];
 
   // ── Customer ──
-  const custName = customer
-    ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—')
-    : '—';
-  const custLines = customer ? ([
-    [customer.street ?? customer.address, customer.street_number].filter(Boolean).join(' '),
-    [customer.postal_code, customer.city].filter(Boolean).join(' '),
-    customer.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
-    customer.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
-    [customer.phone ? `${L.phone} ${customer.phone}` : '', customer.email || ''].filter(Boolean).join('  ·  '),
-  ].filter(Boolean) as string[]) : [];
+  // The BILLING party, resolved exactly as the myDATA envelope resolves it: the identity frozen
+  // onto the document at issue wins over the live CRM row, and a separate billing identity wins
+  // over the party's own. Printing the live row is how the paper and the transmission drift.
+  const billTo = resolvePrintedCounterparty(inv.counterparty_snapshot?.row ?? null, customer);
+  const custName = billTo?.name || '—';
+  const custLines = billTo ? partyAddressLines(billTo, L) : [];
+
+  // ── Delivery party ── the goods go to the chosen sub-unit; shown only when it actually
+  // differs from the billing address, so an ordinary invoice does not grow an empty panel.
+  const deliveryParty = billTo && addressUnit ? applyAddressUnit(billTo, addressUnit) : null;
+  const delivery = deliveryParty
+    ? { name: addressUnit?.name || undefined, lines: partyAddressLines(deliveryParty, L, { compact: true }) }
+    : null;
+
+  // Payment method is resolved before the meta block because a Greek παραστατικό carries it
+  // in the header band, not only down beside the bank details.
+  const paymentMethodLabel = inv.payment_method_code
+    ? (PAYMENT_METHOD_LABELS[Number(inv.payment_method_code)] ?? String(inv.payment_method_code))
+    : undefined;
 
   // ── Meta (right column) ──
+  const locale = lang === 'el' ? 'el-GR' : 'en-GB';
   const meta: { label: string; value: string }[] = [];
+  // The myDATA document-type code (1.1, 2.1, 11.2 …) is what an auditor matches against the
+  // transmitted envelope; the title alone does not identify it.
+  if (inv.document_type) meta.push({ label: L.docType, value: String(inv.document_type) });
   meta.push({ label: L.number, value: String(inv.internal_number ?? inv.legal_number ?? '') });
   if (inv.series) meta.push({ label: L.series, value: String(inv.series) });
-  if (inv.issued_at) meta.push({ label: L.date, value: new Date(inv.issued_at).toLocaleDateString(lang === 'el' ? 'el-GR' : 'en-GB') });
+  if (inv.issued_at) {
+    const d = new Date(inv.issued_at);
+    meta.push({ label: L.date, value: d.toLocaleDateString(locale) });
+    // Issue TIME is part of the record for a document numbered sequentially by date — two
+    // invoices on the same day are ordered by it. It was already stored and never printed.
+    meta.push({ label: L.time, value: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
+  }
   if (order?.order_number) meta.push({ label: L.order, value: String(order.order_number) });
   if (inv.due_at) meta.push({ label: L.due, value: String(inv.due_at) });
-  if (inv.related_document) meta.push({ label: L.related, value: String(inv.related_document) });
+  if (paymentMethodLabel) meta.push({ label: L.paymentMethod, value: paymentMethodLabel });
+  if (inv.related_document) meta.push({ label: L.correlated, value: String(inv.related_document) });
 
   // ── Line items + VAT analysis ──
   const vatByRate: Record<string, { net: number; vat: number }> = {};
+  const exemptionCodes: number[] = [];
   let totNet = 0;
+  let totOtherTaxes = 0;
   const rows: InvoiceLineRow[] = (items ?? []).map((it) => {
     const qty = Number(it.quantity ?? 1);
     const net = Number(it.net_value ?? it.line_total ?? Number(it.unit_price ?? 0) * qty);
@@ -105,15 +144,37 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       it.line_comments,
     ].filter(Boolean).join(' — ');
     const unit = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL_BY_CODE[Number(it.measurement_unit_code)] : '') ?? '';
+    // `discounted_price` holds a discount AMOUNT on an invoice line (`net = qty × price − disc`),
+    // NOT a discounted unit price the way the identically-named quote column does. Without this
+    // column on the document a discounted line reads as "2 × 100.00 → Net 150.00", which is a
+    // valid number that nothing can flag — the customer just sees arithmetic that does not work.
+    const discount = Number(it.discounted_price ?? 0) || 0;
+    const otherTaxes = Number(it.other_taxes_amount ?? 0) || 0;
+    totOtherTaxes += otherTaxes;
+    // The exemption ground is a legal requirement on any 0%/exempt line, and we already store
+    // and transmit it. Collected here so identical grounds share one footnote marker.
+    const exemptionCode = pct === 0 && it.vat_exemption_category != null
+      ? (Number(it.vat_exemption_category) || null)
+      : null;
+    if (exemptionCode && !exemptionCodes.includes(exemptionCode)) exemptionCodes.push(exemptionCode);
     return {
       description: it.description ?? 'Item',
       detail: detail || undefined,
       sku: it.sku || undefined,
       qty, unit: unit || '',
       unitPrice: Number(it.unit_price ?? 0),
-      net, vatPct: pct, vatAmount: vat, lineTotal: net + vat,
+      discount,
+      net, vatPct: pct, vatAmount: vat, otherTaxes, exemptionCode,
+      lineTotal: r2(net + vat + otherTaxes),
     };
   });
+
+  // Footnote markers: (1), (2)… in first-cited order, so a line points at its own ground.
+  const vatExemptions: VatExemptionNote[] = exemptionCodes.map((code, i) => ({
+    marker: `(${i + 1})`,
+    code,
+    label: mydataExemptionLabel(code, lang) ?? String(code),
+  }));
   // paid-upfront (cash) discount is order-level; line items + per-rate VAT are PRE-discount
   // (the discount is not distributed to lines), so multiply by the cash factor to get the
   // post-discount taxable figures. "Price" = pre-discount net; "Price after Discount" = taxable.
@@ -134,7 +195,14 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // pre-discount figures scaled by cashFactor at render, so Σ rows ≠ invoices.subtotal_net when
   // cash_discount_pct > 0 — by design, not by drift.
   const vatAnalysis: VatAnalysisRow[] = Object.entries(vatByRate)
-    .map(([pct, agg]) => ({ pct: Number(pct), net: r2(agg.net * cashFactor), vat: r2(agg.vat * cashFactor) }))
+    .map(([pct, agg]) => {
+      const net = r2(agg.net * cashFactor);
+      const vat = r2(agg.vat * cashFactor);
+      // `total` is derived from the two PRINTED figures, never re-derived from the raw
+      // aggregates, for the same reason the VAT total is the sum of the printed rows: the
+      // table exists so a reader can add it up, and it must add up.
+      return { pct: Number(pct), net, vat, total: r2(net + vat) };
+    })
     .sort((a, b) => b.pct - a.pct);
 
   const priceNet = r2(totNet);
@@ -145,7 +213,9 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // ── Totals ──
   const fees = Number(inv.total_fees_amount ?? 0);
   const stamp = Number(inv.total_stamp_duty_amount ?? 0);
-  const otherTax = Number(inv.total_other_taxes_amount ?? 0);
+  // Header total when the document carries one, else the sum of the per-line amounts — a line
+  // can carry `other_taxes_amount` on a document whose header total was never stamped.
+  const otherTax = Number(inv.total_other_taxes_amount ?? 0) || r2(totOtherTaxes);
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   const deductions = Number(inv.total_deductions_amount ?? 0);
   const withheld = Number(inv.total_withheld_amount ?? 0);
@@ -189,17 +259,26 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     meta,
     items: rows,
     vatAnalysis,
+    vatExemptions,
     totals: {
       subtotalNet: priceNet, discount: cashDisc, priceAfterDiscount: netAfter,
       totalVat: vatAfter, extras, grand,
       amountPaid: Number(inv.amount_paid ?? 0), amountDue: Number(inv.amount_due ?? grand),
     },
     payment: {
-      method: inv.payment_method_code ? (PAYMENT_METHOD_LABELS[Number(inv.payment_method_code)] ?? String(inv.payment_method_code)) : undefined,
+      method: paymentMethodLabel,
       info: inv.payment_method_info || undefined,
       accounts,
     },
     shipping,
+    delivery,
+    // Only meaningful on a foreign-currency document: the reader needs the rate the figures
+    // were converted at. Stored on every invoice and never printed until now.
+    fx: (() => {
+      const rate = Number(inv.exchange_rate ?? inv.fx_rate_to_base ?? 0);
+      const base = fs?.base_currency ?? 'EUR';
+      return currency !== base && rate > 0 ? { rate, base } : null;
+    })(),
     // Effective notes: invoice notes, else the workspace default footer.
     notes: inv.print_terms !== false ? (inv.notes || fs?.default_invoice_notes || null) : null,
     orderNotes: order?.notes || null,
@@ -210,6 +289,9 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     fiscal: inv.fiscal_mark ? {
       mark: String(inv.fiscal_mark),
       uid: inv.fiscal_uid || undefined,
+      // The AADE authentication code is issued alongside the MARK and is what a reader uses
+      // to verify the document off-line. Stored on `fiscal_submissions` since day one.
+      authCode: authCode ?? null,
       qrUrl: inv.print_online_code !== false ? (inv.fiscal_qr_url || null) : null,
     } : null,
   };

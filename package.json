@@ -24,11 +24,12 @@
     "openapi:edge": "node scripts/build-openapi-edge.mjs",
     "tools:manifest": "node scripts/gen-tool-manifest.mjs",
     "skills:sync": "node scripts/gen-skill-ts.mjs",
-    "gen:all": "npm run tools:manifest && npm run skills:sync && npm run blueprint:mirror",
+    "gen:all": "npm run tools:manifest && npm run skills:sync && npm run blueprint:mirror && npm run finance:mirror",
     "build:embed": "vite build --config vite.embed.config.ts",
     "models:generate": "node scripts/gen-generation-models.mjs",
     "categories:generate": "node scripts/gen-category-vocab.mjs",
-    "blueprint:mirror": "node scripts/gen-blueprint-mirror.mjs"
+    "blueprint:mirror": "node scripts/gen-blueprint-mirror.mjs",
+    "finance:mirror": "node scripts/gen-finance-mirrors.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -61,6 +61,18 @@ wrong number is a valid `number`, so no typecheck could either.
 - **Never** re-pick a half by order type, re-compute `total − settled`, or hand-roll an allocation-by-direction query in the frontend. [tests/unit/moneyDerivation.test.ts](tests/unit/moneyDerivation.test.ts) fails the build if you do (verified against all 5 historical offenders).
 - Applying this to a NEW money quantity: derive it in SQL, return it derived, and add a drift check comparing any cached copy against the derivation.
 
+### 1c. The PRINTED document must say what the TRANSMITTED one says.
+
+An invoice exists twice: as the myDATA envelope built by `_shared/fiscal/invoice-builder.ts`, and
+as the paper the customer holds. Until 2026-08-21 the two were built from different reads, and
+every difference was invisible — a wrong document is a valid PDF.
+
+- **The party comes from `resolvePrintedCounterparty`, never from a live `crm_companies` read.** It prefers `invoices.counterparty_snapshot.row` (frozen at issue) and applies the same `billing_*` precedence `partyFromCrm` applies. Reading the live row means renaming a customer rewrites every past PDF, and a re-homed customer re-renders with no name at all.
+- **A figure that is stored and transmitted is PRINTED.** Per-line discount (`discounted_price` — a discount AMOUNT on an invoice line, a discounted unit PRICE on a quote line), per-line `vat_amount` and `other_taxes_amount`, the `vat_exemption_category` article on every 0% line, `fiscal_submissions.authentication_code`, the issue time, the document-type code. All six were captured, sent to AADE, and left off the customer's copy.
+- **Every figure the reader can add up must add up.** The per-rate VAT total is the sum of the PRINTED rows, never a parallel running sum, and the fallback grand total is built from those same rows.
+- **`counterparty.ts` and `mydataExemptionCategories.ts` are the sources; the Deno copies under `_shared/finance/` are GENERATED** — `npm run finance:mirror`, part of `gen:all`. Never hand-edit a mirror; both sources stay import-free so the mirror can be a byte copy.
+- Guarded by [tests/unit/invoiceDocumentFields.test.ts](tests/unit/invoiceDocumentFields.test.ts) + [tests/unit/financeMirrors.test.ts](tests/unit/financeMirrors.test.ts).
+
 ### 1b. A date of record is the OPERATOR'S calendar day, never UTC.
 `new Date().toISOString().slice(0, 10)` is the UTC date. Greek customers are UTC+2/+3, so between
 local midnight and 02:00–03:00 it returns **yesterday** — on the invoice `issueDate` (a fiscal record
