@@ -11,7 +11,7 @@ import { AccountingExportCard } from '@/modules/finance/components/AccountingExp
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 type ReportKind =
-  | 'cashflow_per_day' | 'pnl_per_category'
+  | 'cashflow_per_day' | 'pnl_per_category' | 'profit_taken'
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
   | 'sales_per_factory' | 'sales_per_designer'
   | 'purchases_per_product' | 'receipts_per_product'
@@ -30,6 +30,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   // Overview (Oxygen Ταμείο)
   { value: 'cashflow_per_day', label: 'Daily cash flow',   group: 'overview', period: 'range' },
   { value: 'pnl_per_category', label: 'P&L by category',   group: 'overview', period: 'range' },
+  { value: 'profit_taken',     label: 'Profit taken',      group: 'overview', period: 'range' },
   // Sales
   { value: 'sales_per_day',       label: 'Sales per day',           group: 'sales',       period: 'range' },
   { value: 'sales_per_customer',  label: 'Sales per customer',      group: 'sales',       period: 'range' },
@@ -126,6 +127,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportCashflowPerDay(workspaceId, range.from, range.to); break;
         case 'pnl_per_category':
           data = await financeService.reportPnlPerCategory(workspaceId, range.from, range.to); break;
+        case 'profit_taken':
+          data = await financeService.reportProfitTaken(workspaceId, range.from, range.to); break;
         case 'sales_per_day':
           data = await financeService.reportSalesPerDay(workspaceId, range.from, range.to); break;
         case 'sales_per_customer':
@@ -346,6 +349,8 @@ function primarySortKey(report: ReportKind): string {
       return 'period';
     case 'pnl_per_category':
       return 'net';
+    case 'profit_taken':
+      return 'amount';
     case 'sales_per_day':
     case 'sales_per_customer':
     case 'sales_per_product':
@@ -386,6 +391,14 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
         { label: 'Receipts (in)', value: formatMoney(inAmt) },
         { label: 'Payments (out)', value: formatMoney(outAmt) },
         { label: 'Net movement', value: formatMoney(inAmt - outAmt) },
+      ];
+    }
+    case 'profit_taken': {
+      let amount = 0, orders = 0;
+      for (const r of rows) { amount += Number(r.amount || 0); orders += Number(r.order_count || 0); }
+      return [
+        { label: 'Orders drawn from', value: String(orders) },
+        { label: 'Profit taken', value: formatMoney(amount) },
       ];
     }
     case 'pnl_per_category': {
@@ -515,6 +528,15 @@ function renderReport(
     return (
       <Table headers={['Date', 'Receipts', 'Payments', 'Difference']} totals={totals} rows={rows.map((r: any) => [
         r.period, formatMoney(Number(r.receipts || 0)), formatMoney(Number(r.payments || 0)), formatMoney(Number(r.difference || 0)),
+      ])} />
+    );
+  }
+  if (report === 'profit_taken') {
+    return (
+      <Table headers={['Category', 'Orders', 'Profit taken']} totals={totals} rows={rows.map((r: any) => [
+        r.category_name,
+        String(r.order_count ?? 0),
+        formatMoney(Number(r.amount || 0), r.currency || 'EUR'),
       ])} />
     );
   }

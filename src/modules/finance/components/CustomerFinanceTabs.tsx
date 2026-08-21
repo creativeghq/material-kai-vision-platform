@@ -84,6 +84,10 @@ export const PartyAccountSummary: React.FC<{
   profitability?: {
     revenue_net: number; cogs: number; gross_margin: number;
     gross_margin_pct: number | null; cost_coverage_pct: number | null;
+    /** How much of that margin has been taken as profit, and what is left. Reported BESIDE the
+     *  margin rather than added to it: an allocation is the act of claiming money the revenue and
+     *  cost above already account for, not a second earning of it. */
+    profit_allocated?: number; profit_unallocated?: number;
   } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
 }> = ({ customer, supplier, aging, orders, credit, onReleaseCredit, creditReleasable, profitability, meta }) => {
@@ -330,6 +334,18 @@ export const PartyAccountSummary: React.FC<{
                 {profitability.cost_coverage_pct != null && profitability.cost_coverage_pct < 99 && (
                   <div className="mt-0.5 text-[10px] text-amber-500" title="Lines with no cost snapshot count as pure margin, so the real figure is lower.">
                     only {profitability.cost_coverage_pct}% of revenue has a cost
+                  </div>
+                )}
+                {/* How much of it has actually been taken. Rendered only once something has, so a
+                    party nobody has allocated from does not carry a permanent "€0.00 taken" — but
+                    once one euro is taken, both halves are stated, because "€420 margin" alone
+                    stops being the whole answer the moment part of it is spoken for. */}
+                {(profitability.profit_allocated ?? 0) > 0.005 && (
+                  <div className="mt-1 text-[10px] text-muted-foreground" title="Margin you have taken as profit on this party's orders, and what is still on them. Taking it does not move cash and is not counted as income twice — the revenue and cost above already are the P&L.">
+                    {formatMoney(profitability.profit_allocated ?? 0)} taken
+                    {(profitability.profit_unallocated ?? 0) > 0.005
+                      ? <> · {formatMoney(profitability.profit_unallocated ?? 0)} left</>
+                      : <> · all of it</>}
                   </div>
                 )}
               </CardContent>

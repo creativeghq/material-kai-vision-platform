@@ -315,6 +315,15 @@ export interface ProfitAllocation {
   reversed_at: string | null;
 }
 
+/** One row of the "Profit taken" report — allocations grouped by category. */
+export interface ProfitTakenRow {
+  category_id: string | null;
+  category_name: string;
+  order_count: number;
+  amount: number;
+  currency: string;
+}
+
 /** Customer credit we stopped holding and booked as income (see `releaseCustomerCredit`). */
 export interface CreditRelease {
   id: string;
@@ -1683,6 +1692,21 @@ const _financeServiceCore = {
     return Number((data as { reversed?: number } | null)?.reversed ?? 0);
   },
 
+  /**
+   * "Profit taken" — allocations grouped by category, by the day they were TAKEN.
+   *
+   * Deliberately a different date basis from the per-party `profit_allocated` figure, which is
+   * scoped by the order's date so that "earned" and "of which taken" describe the same orders.
+   * This one answers a different question: what was drawn out of the business this period.
+   */
+  async reportProfitTaken(workspaceId: string, from: string, to: string): Promise<ProfitTakenRow[]> {
+    const { data, error } = await (supabase as any).rpc('report_profit_taken', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to,
+    });
+    if (error) throw error;
+    return (data ?? []) as ProfitTakenRow[];
+  },
+
   /** Profit already taken off an order (newest first) — the audit trail + undo list. */
   async listProfitAllocations(workspaceId: string, opts: { orderId?: string | null } = {}): Promise<ProfitAllocation[]> {
     let q = supabase.from('finance_profit_allocations').select('*')
@@ -1706,6 +1730,10 @@ const _financeServiceCore = {
     revenue_net: number; cogs: number; gross_margin: number;
     gross_margin_pct: number | null; cost_coverage_pct: number | null;
     line_count: number; currency: string;
+    /** Of that margin, how much has been taken as profit (non-reversed allocations). */
+    profit_allocated: number;
+    /** What is left to take. `gross_margin − profit_allocated`, never negative. */
+    profit_unallocated: number;
   }> {
     const { data, error } = await supabase.rpc('report_customer_profitability', {
       p_workspace_id: workspaceId,
