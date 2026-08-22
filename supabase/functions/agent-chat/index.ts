@@ -1028,6 +1028,16 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
+      // The ENDING. Vision is the agent a customer describes a room to, and it could take them all
+      // the way to a specification and then had no way to price it or record it — so the only
+      // available ending was a plausible number it invented, which is the single failure the
+      // design-to-quote skill exists to prevent. Both tools are already bound for kai/erp; this
+      // lists them for the agent whose whole conversation leads here.
+      //
+      // Adding the skill to Vision without these would be worse than not adding it: the skill's
+      // central rule is "never state a number that did not come from price_my_spec", and an agent
+      // instructed to call a tool it cannot reach falls back to inventing one.
+      'price_my_spec', 'raise_quote_request',
     ],
     // systemPrompt loaded from database
     // generate_3d triggers async generation and returns job ID immediately

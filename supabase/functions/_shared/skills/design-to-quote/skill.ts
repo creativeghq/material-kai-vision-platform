@@ -9,7 +9,7 @@ export default `---
 name: Design to Quote
 slug: design-to-quote
 description: Turn "I want something like this" into a spec, show it, then price it or raise a quote request — never an invented number. Use when a customer describes a product they want rather than naming one, asks "how much would X cost", "do you have X in Y", or wants something the catalogue may not stock.
-agents: [kai, erp]
+agents: [kai, erp, interior-designer]
 tags: [sales, quotes, pricing, embed, spec]
 ---
 
