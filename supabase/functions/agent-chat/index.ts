@@ -2341,7 +2341,17 @@ async function executeAgent(
     // Chip modes (floor-plan-render, floor-plan-text, image-edit) are precise Gemini-only
     // operations — Replicate models can't preserve furniture positions or follow exact
     // edit instructions, so they'd just produce off-prompt full redesigns.
-    const GEMINI_ONLY_MODES = ['floor-plan-render', 'copy-style', 'floor-plan-text', 'image-edit'];
+    //
+    // The three PRODUCT modes are here for a different reason, and it is worth stating
+    // because it looks like an omission: every Replicate model in the interior grid is a
+    // ROOM-restyling specialist (adirik/interior-design, comfyui-interior-remodel,
+    // stabledesign, the stable-interiors forks...). Point one at "this chair on seamless
+    // white" and it renders a room, confidently and off-brief. A product studio needs a
+    // product-capable roster — seedream-4, flux-2-pro and the like — not this one.
+    const GEMINI_ONLY_MODES = [
+      'floor-plan-render', 'copy-style', 'floor-plan-text', 'image-edit',
+      'product-shot', 'product-lifestyle', 'material-texture',
+    ];
     if (!generationMode || !GEMINI_ONLY_MODES.includes(generationMode)) {
       tools.push(create3DGenerationTool(userId, workspaceId, onChunk, toolImages, conversationImages));
     }

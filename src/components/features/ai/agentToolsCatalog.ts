@@ -2617,6 +2617,70 @@ export const TOOLKITS: ToolkitDefinition[] = [
           { key: 'notes', label: 'Style / Notes (optional)', kind: 'textarea', placeholder: 'e.g. warm minimal, oak floors, large windows' },
         ],
       },
+      // ── Product studio ────────────────────────────────────────────────────
+      // generate_gemini has served `product-shot`, `product-lifestyle` and
+      // `material-texture` since it shipped — each with its own prompt builder in
+      // _shared/product-prompt-builder.ts — and NOTHING in the product could reach
+      // them. No quick-start, no button anywhere. Same shape as generate_3d: the
+      // capability existed and the entry point did not, so the only way in was
+      // phrasing a free-text prompt the agent happened to route correctly.
+      //
+      // The product photo is optional in all three: the modes render from a name and
+      // a spec when no photo exists, which is the case that matters — a catalogue
+      // item with no photography yet.
+      {
+        label: 'Product shot',
+        description: 'Render one product on seamless white — a catalog hero image',
+        icon: 'Package',
+        prompt: 'Render a catalog hero shot of this product on seamless white.',
+        promptTemplate: 'Render a catalog hero shot of "{{product}}" on a seamless white background. {{details}}',
+        generation: { imageKeys: ['photo'], mode: 'product-shot' },
+        form: [
+          { key: 'product', label: 'Product name', kind: 'text', required: true, placeholder: 'e.g. Fenwick oak lounge chair' },
+          { key: 'photo', label: 'Product photo (optional)', kind: 'image', help: 'Upload one if you have it — the product is preserved. Without it the shot is built from the name and details.' },
+          { key: 'details', label: 'Materials, finish, dimensions (optional)', kind: 'textarea', placeholder: 'e.g. solid oak frame, boucle upholstery, 78cm wide' },
+        ],
+      },
+      {
+        label: 'Product in a room',
+        description: 'Stage a product in a styled room — a lifestyle shot',
+        icon: 'Palette',
+        prompt: 'Stage this product in a styled room.',
+        promptTemplate: 'Stage "{{product}}" in a {{style}} {{roomType}}, photographed as a lifestyle shot. {{details}}',
+        generation: { imageKeys: ['photo'], mode: 'product-lifestyle' },
+        form: [
+          { key: 'product', label: 'Product name', kind: 'text', required: true, placeholder: 'e.g. Fenwick oak lounge chair' },
+          { key: 'photo', label: 'Product photo (optional)', kind: 'image', help: 'With a photo the product is preserved and only the room is generated around it.' },
+          // Keyed `roomType` and valued with generate_gemini's OWN documented vocabulary,
+          // not prose. Keying it `room` matched virtual_staging.room — a different tool
+          // with a different enum ("Living Room", "Balcony", "Swimming Pool") — and the
+          // options-drift guard caught the collision immediately.
+          { key: 'roomType', label: 'Room', kind: 'select', default: 'living_room', options: [
+            { value: 'living_room', label: 'Living room' },
+            { value: 'bedroom', label: 'Bedroom' },
+            { value: 'kitchen', label: 'Kitchen' },
+            { value: 'bathroom', label: 'Bathroom' },
+            { value: 'dining_room', label: 'Dining room' },
+            { value: 'home_office', label: 'Home office' },
+            { value: 'outdoor', label: 'Outdoor' },
+          ] },
+          { key: 'style', label: 'Style', kind: 'text', required: true, placeholder: 'e.g. warm minimal, Japandi, Mediterranean' },
+          { key: 'details', label: 'Notes (optional)', kind: 'textarea', placeholder: 'e.g. morning light, plants, low camera angle' },
+        ],
+      },
+      {
+        label: 'Seamless texture',
+        description: 'Turn a material into a tileable swatch you can apply anywhere',
+        icon: 'Grid3x3',
+        prompt: 'Create a seamless tileable texture of this material.',
+        promptTemplate: 'Create a seamless, tileable texture swatch of "{{material}}". {{details}}',
+        generation: { imageKeys: ['photo'], mode: 'material-texture' },
+        form: [
+          { key: 'material', label: 'Material', kind: 'text', required: true, placeholder: 'e.g. olive green boucle, honed Carrara marble, brushed brass' },
+          { key: 'photo', label: 'Swatch photo (optional)', kind: 'image', help: 'A close-up of the real material, if you have one.' },
+          { key: 'details', label: 'Scale / Notes (optional)', kind: 'textarea', placeholder: 'e.g. fine grain, matte, subtle variation' },
+        ],
+      },
       {
         label: 'VR world',
         description: 'Build an explorable Gaussian Splat world from a room image',

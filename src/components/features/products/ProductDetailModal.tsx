@@ -18,9 +18,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, Package, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
+import { buildTestOnRoomUrl, buildProductStudioUrl } from '@/utils/testOnRoom';
 import { Product } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -2282,6 +2282,49 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               >
                 <Wand2 className="h-3.5 w-3.5" />
                 Test on a room
+              </Button>
+
+              {/* Build with this product — the other direction.
+                  "Test on a room" applies this material TO the user's photo; these
+                  photograph the PRODUCT ITSELF. All three modes have existed in
+                  generate_gemini since it shipped, each with its own prompt builder,
+                  and nothing in the product could reach them until now.
+                  No product photo is required: the modes render from the name and spec,
+                  which is exactly the case worth serving — a catalogue item that has no
+                  photography yet. */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5 text-xs"
+                onClick={() => {
+                  navigate(buildProductStudioUrl({
+                    productId: product.id,
+                    productName: product.name,
+                    productImage: currentImage?.url,
+                    mode: 'product-shot',
+                  }));
+                  onClose();
+                }}
+              >
+                <Package className="h-3.5 w-3.5" />
+                Catalog shot
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5 text-xs"
+                onClick={() => {
+                  navigate(buildProductStudioUrl({
+                    productId: product.id,
+                    productName: product.name,
+                    productImage: currentImage?.url,
+                    mode: 'product-lifestyle',
+                  }));
+                  onClose();
+                }}
+              >
+                <Palette className="h-3.5 w-3.5" />
+                Stage in a room
               </Button>
             </div>
           </div>
