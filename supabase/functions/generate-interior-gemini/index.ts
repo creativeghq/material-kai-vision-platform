@@ -570,7 +570,11 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // Debit BEFORE the paid Gemini call (invariant #10): the per-member cap is enforced atomically
     // at debit time, so concurrent over-cap requests can't all run paid compute before a debit lands.
     // Refunded in the catch below if generation fails.
-    await deductCredits(supabase, resolvedUserId, credits, `Interior design generation (${model}, ${mode})`, body.workspace_id);
+    // `modelLabel`, not `model`: `model` is only meaningful when the provider IS Gemini, so a
+    // Grok or Flux run wrote a ledger line reading "gemini-3.1-flash-image" beside the Grok
+    // charge. The amount was right and the description named a different model — the same
+    // split the routing module exists to close, one field further down.
+    await deductCredits(supabase, resolvedUserId, credits, `Interior design generation (${modelLabel}, ${mode})`, body.workspace_id);
     debited = true;
 
     let imageUrl: string;

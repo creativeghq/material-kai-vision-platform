@@ -98,7 +98,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "xai-aurora",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 30
   },
@@ -118,7 +118,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "flux-2-pro",
     "tier": "premium",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 40
   },
@@ -138,7 +138,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "playground-v2.5",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 50
   },
@@ -181,7 +181,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "adirik-interior-design",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 70
   },
@@ -204,7 +204,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "comfyui-interior-remodel",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 80
   },
@@ -227,7 +227,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interior-v2",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 90
   },
@@ -250,7 +250,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interiorly-gen1-dev",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 100
   },
@@ -273,7 +273,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "designer-architecture",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 110
   },
@@ -296,7 +296,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "erayyavuz-interior-ai",
     "tier": "standard",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 120
   },
@@ -319,7 +319,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interor-2",
     "tier": "budget",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 130
   },
@@ -342,7 +342,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "colourful-interiors",
     "tier": "budget",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 140
   },
@@ -365,7 +365,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "stable-interiors-v2-pb",
     "tier": "budget",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 150
   },
@@ -388,7 +388,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "stable-interiors-v2-yz",
     "tier": "budget",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 160
   },
@@ -411,7 +411,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interior-design-sdxl",
     "tier": "premium",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 170
   },
@@ -435,7 +435,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "flux-depth-pro",
     "tier": "premium",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 180
   },
@@ -527,7 +527,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "runway-gen4-turbo",
     "tier": "premium",
-    "status": "active",
+    "status": "degraded",
     "enabled": true,
     "sort_order": 220
   },
@@ -569,7 +569,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '9b51ef4992e30be6b5765983b7dbdb5c';
+export const PROJECTION_FINGERPRINT = '066eb5d2ccbbe5e13d1a48de83fd53f7';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
