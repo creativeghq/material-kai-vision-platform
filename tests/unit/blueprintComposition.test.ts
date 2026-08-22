@@ -38,6 +38,8 @@ import {
   rateChoices,
   rateItemsFromTables,
   snapshotRateTables,
+  SERVICE_YIELD_KEYS,
+  yieldMeta,
   zoneEnabled,
 } from '../../supabase/functions/_shared/blueprint/composition';
 import type { Composition, ZoneDef } from '../../supabase/functions/_shared/blueprint/composition';
@@ -561,6 +563,330 @@ describe('what the layout implies', () => {
     // which is a confident wrong answer where saying nothing is the honest one.
     const t = task(lemans({ default_selected: true, suggests_quantity: '= no_such_variable' }), 2);
     expect(t.suggested_quantity).toBeUndefined();
+  });
+});
+
+// ── Appliances ──────────────────────────────────────────────────────────────
+//
+// WHY THIS EXISTS
+// ---------------
+// An appliance is the one thing in a kitchen whose PRICE and whose CONSEQUENCES come apart. "I
+// already have a fridge-freezer" is the commonest answer on a kitchen survey; it takes the money to
+// zero and changes nothing at all about the 60cm aperture, the socket behind it or the tall housing
+// it goes in. Every failure mode below is silent by construction — a €0 line is a valid line, an
+// uncounted socket is a plausible absence, and a fridge placed in a tall unit that the layout does
+// not contain produces a perfectly confident total.
+
+const OVENS = 'Oven model';
+
+const applianceItems: Record<string, any>[] = [
+  ...items,
+  { id: 'oven-basic', parent_id: 'sec', sort_order: 10, kind: 'task', label: 'Basic oven', unit: 'pcs', option_group: OVENS, tier: 'good', material_cost: 400, margin_pct: 0 },
+  { id: 'oven-posh', parent_id: 'sec', sort_order: 11, kind: 'task', label: 'Pyrolytic oven', unit: 'pcs', option_group: OVENS, material_cost: 900, margin_pct: 0 },
+];
+
+const kitchen: ZoneDef[] = [
+  {
+    key: 'base', label: 'Bottom units', kind: 'units', length_var: 'run_length',
+    globals: [{ key: 'door_model', label: 'Door model', type: 'option', option_group: RATES, is_rate_source: true }],
+    modules: [
+      { key: 'door2', label: '2-door', default_width_cm: 80, price_mode: 'per_m' },
+      { key: 'dw_housing', label: 'Dishwasher housing', default_width_cm: 60, price_mode: 'per_m' },
+    ],
+  },
+  {
+    key: 'tall', label: 'Tall units', kind: 'units', length_var: 'tall_length',
+    globals: [{ key: 'door_model', label: 'Door model', type: 'option', option_group: RATES, is_rate_source: true }],
+    modules: [{ key: 'tall_housing', label: 'Tall appliance housing', default_width_cm: 60, price_mode: 'per_m' }],
+  },
+  {
+    key: 'appliances', label: 'Appliances', kind: 'appliances',
+    globals: [{
+      key: 'energy', label: 'Energy available', type: 'choice', multi: true, default: ['electricity'],
+      choices: [{ value: 'electricity', label: 'Electricity' }, { value: 'gas', label: 'Gas' }],
+    }],
+    appliances: [
+      {
+        key: 'fridge', label: 'Fridge-freezer', width_cm: 60, unit_price: 700, requires: { socket: 1 },
+        placements: [
+          { value: 'tall', label: 'In a tall unit', price: 120, housing: { zone: 'tall', module: 'tall_housing' } },
+          { value: 'standalone', label: 'Stand alone' },
+        ],
+      },
+      {
+        key: 'dishwasher', label: 'Dishwasher', width_cm: 60, unit_price: 500,
+        requires: { socket: 1, water_in: 1, waste_out: 1 },
+        placements: [{ value: 'under', label: 'Under the worktop', price: 90, housing: { zone: 'base', module: 'dw_housing' } }],
+      },
+      { key: 'hob_gas', label: 'Gas hob', unit_price: 300, energy: 'gas', requires: { gas_point: 1, worktop_cutout: 1 } },
+      { key: 'oven', label: 'Built-in oven', option_group: OVENS, requires: { socket_dedicated: 1 } },
+      {
+        key: 'hood', label: 'Cooker hood', unit_price: 250, requires: { socket: 1 },
+        options: [{
+          key: 'venting', label: 'Venting', default: 'extract',
+          choices: [
+            { value: 'extract', label: 'Extraction to outside', price: 60, yields: { duct_run: 1 } },
+            { value: 'recirc', label: 'Recirculation', yields: { carbon_filter: 1 } },
+          ],
+        }],
+      },
+      { key: 'small', label: 'Worktop appliance', default_supply: 'existing', requires: { socket: 1 } },
+    ],
+    default_appliances: [{ type: 'fridge' }, { type: 'small', qty: 4 }],
+  },
+  {
+    key: 'bar', label: 'Breakfast bar', kind: 'surface', length_var: 'bar_length',
+    globals: [
+      { key: 'diners', label: 'People dining', type: 'number', default: 4 },
+      { key: 'material', label: 'Material', type: 'option', option_group: SURFACES, is_rate_source: true },
+    ],
+    seats: { global: 'diners', cm_per_seat: 60, min_cm: 120 },
+    modules: [],
+  },
+];
+
+/** A kitchen with two base units and whichever appliances the case under test cares about. */
+const kcfg = (appliances: Record<string, any>[], over: Composition = {}): Composition => ({
+  base: { globals: { door_model: 'posh' }, modules: [
+    { id: 'b1', type: 'door2', width_cm: 80, qty: 2 },
+    { id: 'b2', type: 'dw_housing', width_cm: 60, qty: 1 },
+  ] },
+  tall: { globals: { door_model: 'posh' }, modules: [{ id: 't1', type: 'tall_housing', width_cm: 60, qty: 1 }] },
+  appliances: { globals: { energy: ['electricity'] }, appliances: appliances as never },
+  bar: { globals: { diners: 4, material: 'hpl' } },
+  ...over,
+});
+
+const appliance = (over: Record<string, any>) => ({ id: 'a1', supply: 'ours', qty: 1, ...over });
+
+describe('an appliance is priced by who supplies it and by nothing else', () => {
+  const fridge = (supply: string, placement = 'standalone') =>
+    deriveComposition(kitchen, kcfg([appliance({ type: 'fridge', supply, placement })]), applianceItems);
+
+  it('charges for one we supply and nothing for one the customer owns', () => {
+    expect(fridge('ours').appliances[0].total).toBe(700);
+    expect(fridge('existing').appliances[0].total).toBe(0);
+  });
+
+  it('books the same connections either way — this is the whole point', () => {
+    // A €0 line is a valid line, so nothing downstream can tell "the customer owns it" from
+    // "nobody thought about it". The socket is what proves the appliance was actually planned.
+    expect(fridge('ours').appliances[0].requires).toEqual({ socket: 1 });
+    expect(fridge('existing').appliances[0].requires).toEqual({ socket: 1 });
+    expect(fridge('existing').vars.total_socket).toBe(1);
+  });
+
+  it('still charges the housing and the fitting for an appliance we did not sell', () => {
+    // The aperture is cut, the door is hung on it and the trap is plumbed in regardless of whose
+    // dishwasher it is. Only the machine itself follows the supply answer.
+    expect(fridge('ours', 'tall').appliances[0].total).toBe(820);
+    expect(fridge('existing', 'tall').appliances[0].total).toBe(120);
+  });
+
+  it('multiplies both the money and the connections by the quantity', () => {
+    const d = deriveComposition(
+      kitchen,
+      kcfg([appliance({ type: 'small', supply: 'existing', qty: 4 })]),
+      applianceItems,
+    );
+    expect(d.appliances[0].total).toBe(0);
+    expect(d.vars.total_socket).toBe(4);
+  });
+
+  it('prices a model list per piece and defaults it to the good tier', () => {
+    const d = deriveComposition(kitchen, kcfg([appliance({ type: 'oven' })]), applianceItems);
+    expect(d.appliances[0].total).toBe(400);
+    expect(d.appliances[0].model_label).toBe('Basic oven');
+    const posh = deriveComposition(kitchen, kcfg([appliance({ type: 'oven', model: 'oven-posh' })]), applianceItems);
+    expect(posh.appliances[0].total).toBe(900);
+  });
+
+  it('never prices an appliance model list twice', () => {
+    // Same absorption trap as a zone's door-model list: the oven's money arrives through the
+    // appliance line, so the list must stop being a pick-one choice in the flat scope.
+    expect(absorbedGroups(kitchen)).toContain(OVENS);
+    const flat = computeBlueprint(applianceItems, {}, null, { schema: kitchen, config: kcfg([appliance({ type: 'oven' })]) })
+      .sections.flatMap((s) => s.tasks).map((t) => t.label);
+    expect(flat).not.toContain('Basic oven');
+    expect(flat).not.toContain('Pyrolytic oven');
+  });
+});
+
+describe('an appliance choice costs money only when it is ours, and counts always', () => {
+  const hood = (supply: string, venting: string) =>
+    deriveComposition(kitchen, kcfg([appliance({ type: 'hood', supply, options: { venting } })]), applianceItems);
+
+  it('adds the option price to one we supply', () => {
+    expect(hood('ours', 'extract').appliances[0].total).toBe(310);
+  });
+
+  it('runs the duct for a hood the customer already owns', () => {
+    // Extraction vs recirculation is a hole through a wall or a filter in a box. Which of the two
+    // it is has nothing to do with who paid for the hood.
+    expect(hood('existing', 'extract').appliances[0].total).toBe(0);
+    expect(hood('existing', 'extract').vars.total_duct_run).toBe(1);
+  });
+
+  it('swaps the consequence with the choice', () => {
+    const recirc = hood('ours', 'recirc');
+    expect(recirc.vars.total_carbon_filter).toBe(1);
+    expect(recirc.vars.total_duct_run).toBeUndefined();
+    expect(recirc.appliances[0].total).toBe(250);
+  });
+});
+
+describe('the layout has to be able to hold the appliances', () => {
+  it('names the missing cabinet rather than quietly adding one', () => {
+    // Inserting a tall housing on the customer's behalf would change their price without them
+    // asking; pricing the fridge anyway would produce a confident total for a kitchen that cannot
+    // be built. Saying so is the only honest option.
+    const noTall = kcfg([appliance({ type: 'fridge', placement: 'tall' })], {
+      tall: { globals: { door_model: 'posh' }, modules: [] },
+    });
+    const issues = deriveComposition(kitchen, noTall, applianceItems).issues;
+    expect(issues.some((i) => i.includes('Fridge-freezer') && i.includes('Tall appliance housing') && i.includes('Tall units'))).toBe(true);
+  });
+
+  it('counts the demand, not just the presence', () => {
+    // One housing and two fridges is the same problem as no housing at all, and it is the shape a
+    // presence check cannot see.
+    const two = kcfg([appliance({ type: 'fridge', placement: 'tall', qty: 2 })]);
+    expect(deriveComposition(kitchen, two, applianceItems).issues.some((i) => i.includes('the layout has 1'))).toBe(true);
+  });
+
+  it('says nothing when the housing is there', () => {
+    const ok = kcfg([appliance({ type: 'fridge', placement: 'tall' })]);
+    expect(deriveComposition(kitchen, ok, applianceItems).issues.some((i) => i.includes('Tall appliance housing'))).toBe(false);
+  });
+
+  it('raises nothing for a placement that needs no cabinet', () => {
+    const free = kcfg([appliance({ type: 'fridge', placement: 'standalone' })]);
+    expect(deriveComposition(kitchen, free, applianceItems).issues).toEqual([]);
+  });
+});
+
+describe('an appliance cannot run on a supply the property does not have', () => {
+  const hob = (energy: string[]) => deriveComposition(
+    kitchen,
+    kcfg([appliance({ type: 'hob_gas' })], { appliances: { globals: { energy }, appliances: [appliance({ type: 'hob_gas' })] as never } }),
+    applianceItems,
+  );
+
+  it('flags a gas hob in an all-electric kitchen', () => {
+    expect(hob(['electricity']).issues.some((i) => i.includes('Gas hob') && i.includes('gas'))).toBe(true);
+  });
+
+  it('stays quiet once the gas is listed', () => {
+    expect(hob(['electricity', 'gas']).issues.some((i) => i.includes('Gas hob'))).toBe(false);
+  });
+});
+
+describe('a spec answer is not a price list', () => {
+  it('publishes a flag per answer so a formula can react to one', () => {
+    const d = deriveComposition(kitchen, kcfg([]), applianceItems);
+    expect(d.vars.appliances_energy_electricity).toBe(1);
+    expect(d.vars.appliances_energy_gas).toBe(0);
+  });
+
+  it('holds several answers at once', () => {
+    const both = kcfg([], { appliances: { globals: { energy: ['electricity', 'gas'] }, appliances: [] } });
+    const d = deriveComposition(kitchen, both, applianceItems);
+    expect(d.vars.appliances_energy_gas).toBe(1);
+  });
+
+  it('absorbs nothing — a choice global owns no option_group', () => {
+    expect(absorbedGroups(kitchen).sort()).toEqual([RATES, SURFACES, OVENS].sort());
+  });
+
+  it('publishes zeroes for a zone that is switched off, never nothing', () => {
+    const off: ZoneDef[] = kitchen.map((z) => (z.key === 'appliances' ? { ...z, optional: true } : z));
+    const d = deriveComposition(off, kcfg([], { appliances: { enabled: false, globals: { energy: ['gas'] }, appliances: [] } }), applianceItems);
+    expect(d.vars.appliances_energy_gas).toBe(0);
+    expect(d.vars.appliances_enabled).toBe(0);
+  });
+});
+
+describe('a breakfast bar is as long as the people at it', () => {
+  const bar = (over: Record<string, any>) =>
+    deriveComposition(kitchen, kcfg([], { bar: { globals: { diners: 4, material: 'hpl' }, ...over } }), applianceItems);
+
+  it('derives the length from the seat count', () => {
+    expect(bar({}).vars.bar_length).toBe(2.4);
+    expect(bar({}).vars.bar_seats).toBe(4);
+  });
+
+  it('never goes below the minimum a bar can be built at', () => {
+    expect(bar({ globals: { diners: 1, material: 'hpl' } }).vars.bar_length).toBe(1.2);
+  });
+
+  it('lets an explicit length win, the way it does over an inherited run', () => {
+    expect(bar({ length_m: 3 }).vars.bar_length).toBe(3);
+  });
+});
+
+describe('appliances are not a run', () => {
+  it('leaves the run totals alone', () => {
+    // `total_runs` drives the gola end caps. Counting an appliance zone as a run would put two
+    // more profile caps on a kitchen for the crime of owning a fridge.
+    const d = deriveComposition(kitchen, kcfg([appliance({ type: 'fridge', placement: 'standalone' })]), applianceItems);
+    expect(d.vars.total_runs).toBe(2);   // bottom units + tall units
+    expect(d.vars.total_units).toBe(4);  // 2 doors + 1 dishwasher housing + 1 tall housing
+  });
+});
+
+describe('the services schedule', () => {
+  it('reaches the schedule under the same labels the hardware does', () => {
+    const d = deriveComposition(kitchen, kcfg([appliance({ type: 'dishwasher', supply: 'existing', placement: 'under' })]), applianceItems);
+    const byKey = Object.fromEntries(d.schedule.map((r) => [r.key, r]));
+    expect(byKey.socket).toMatchObject({ quantity: 1, label: 'Power sockets', unit: 'pcs' });
+    expect(byKey.water_in.quantity).toBe(1);
+    expect(byKey.waste_out.quantity).toBe(1);
+  });
+
+  it('gives every service key a real name, so the two lists cannot drift apart', () => {
+    // SERVICE_YIELD_KEYS splits the schedule for the two audiences that read it; a key in that set
+    // with no label would reach the electrician as a titleised variable name.
+    for (const key of SERVICE_YIELD_KEYS) {
+      const titleised = key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+      expect(yieldMeta(key).label).not.toBe(titleised);
+    }
+  });
+
+  it('raises the same completeness issue as a hinge nobody counts', () => {
+    // Nine sockets derived and no line counting them is the silent-zero shape: the kitchen needs
+    // first-fix electrics, the schedule says nothing, and the electrician finds out on site.
+    const issues = computeBlueprint(applianceItems, {}, null, {
+      schema: kitchen,
+      config: kcfg([appliance({ type: 'dishwasher', placement: 'under' })]),
+    }).composition!.issues;
+    expect(issues.some((i) => i.includes('total_socket'))).toBe(true);
+    expect(issues.some((i) => i.includes('total_waste_out'))).toBe(true);
+  });
+});
+
+describe('defaults — the appliances a kitchen usually has', () => {
+  const seeded = defaultComposition(kitchen, applianceItems);
+
+  it('opens on the blueprint’s typical appliance list', () => {
+    expect(seeded.appliances.appliances).toHaveLength(2);
+    expect(seeded.appliances.appliances![0]).toMatchObject({ type: 'fridge', supply: 'ours', placement: 'tall', qty: 1 });
+  });
+
+  it('starts an appliance most people already own on “I have one”', () => {
+    // Defaulting a kettle to "we supply" quietly adds a kettle to somebody's kitchen quote.
+    expect(seeded.appliances.appliances![1]).toMatchObject({ type: 'small', supply: 'existing', qty: 4 });
+  });
+
+  it('seeds a multi answer as a list and a single one as a value', () => {
+    expect(seeded.appliances.globals!.energy).toEqual(['electricity']);
+  });
+
+  it('resolves an appliance model list to the good tier, never to nothing', () => {
+    const withOven = defaultComposition(
+      [{ ...kitchen[2], default_appliances: [{ type: 'oven' }] }],
+      applianceItems,
+    );
+    expect(withOven.appliances.appliances![0].model).toBe('oven-basic');
   });
 });
 

@@ -15,6 +15,15 @@ export interface DimensionDef {
   label: string;
   unit?: string;
   default?: number;
+  /**
+   * What this number MEANS beyond being a number a formula can read.
+   *
+   * `budget` is the only role so far and it earns one: the customer's budget is the first thing a
+   * kitchen retailer's checklist asks and the last thing a configurator can afford to ignore, but
+   * it drives no quantity — showing it as another measurement slider is how "up to about €5,000"
+   * ends up beside a €9,000 estimate with nothing pointing that out.
+   */
+  role?: 'budget';
 }
 
 export interface Blueprint {

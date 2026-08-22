@@ -31,6 +31,15 @@
  * zone owns the selection. That also lets two zones (bottom and top units) bind the SAME price list
  * with INDEPENDENT selections — dark bottom, light top — without duplicating twelve rows.
  *
+ * APPLIANCES are the third thing a kitchen is made of and they are not cabinets. An appliance zone
+ * holds rows that each say WHAT it is, WHO SUPPLIES IT (us, or the customer already owns one),
+ * WHERE IT GOES (tall unit / highboard / under the worktop) and WHAT IT NEEDS (a socket, water in,
+ * waste out, gas, a duct to outside). Supply decides the MONEY and nothing else: an appliance the
+ * customer already owns is priced at nothing and still books its aperture and every one of its
+ * connections, because the cabinetmaker and the electrician do not care who paid for the fridge.
+ * Placement is CHECKED against the configured units — putting the fridge in a tall unit when the
+ * layout has no tall housing raises an issue rather than quietly inserting a cabinet nobody chose.
+ *
  * Every number here goes through `computeLinePricing`, the same function the flat task lines use.
  * There is no second pricing path. `src/utils/blueprintComposition.ts` mirrors this file for the
  * anonymous tool's optimistic preview and is held identical by tests/unit/blueprintComposition.test.ts.
@@ -46,13 +55,28 @@ export interface ZoneFactorBand {
   factor: number;
 }
 
+/**
+ * An answer that carries no price — "open-plan or separate", "electricity and gas", "45 or 60cm".
+ *
+ * A `choice` global is SPEC, not money. It publishes `<zone>_<key>_<value>` flags a formula can
+ * multiply by and it may contribute to the hardware schedule, but nothing is absorbed and no rate
+ * is read off it. That is the whole difference from an `option` global, which IS a price list.
+ */
+export interface GlobalChoiceDef {
+  value: string;
+  label: string;
+  /** What this answer adds to the schedule, once for the zone. */
+  yields?: Yields;
+}
+
 export interface ZoneGlobalDef {
   key: string;
   label: string;
-  type: 'number' | 'option';
+  type: 'number' | 'option' | 'choice';
   /** display unit for a number global ('cm') */
   unit?: string;
-  default?: number;
+  /** number → the number; option → nothing (the rate table decides); choice → the value(s). */
+  default?: number | string | string[];
   /**
    * `type:'option'` — the blueprint option_group whose members are the choices. Binding it here
    * ABSORBS that group: it is no longer priced as a standalone line, and the selection moves onto
@@ -63,6 +87,14 @@ export interface ZoneGlobalDef {
   is_rate_source?: boolean;
   /** `type:'number'` — size bands that scale per-metre modules. Absent/empty = no effect (×1). */
   factors?: ZoneFactorBand[];
+  /** `type:'choice'` — the answers on offer. Inline, because they are spec and carry no rate. */
+  choices?: GlobalChoiceDef[];
+  /**
+   * `type:'choice'` — more than one answer can be true at once. "What forms of energy are
+   * available" is electricity AND gas in plenty of kitchens, and forcing a pick-one there is how a
+   * gas hob ends up cross-checked against an answer nobody meant to give.
+   */
+  multi?: boolean;
 }
 
 /**
@@ -122,11 +154,66 @@ export interface ModuleTypeDef {
   fixed_width?: boolean;
 }
 
+/** Who is buying it. The checklist question "are existing appliances to be included?", modelled. */
+export type ApplianceSupply = 'ours' | 'existing';
+
+export interface AppliancePlacementDef {
+  value: string;
+  label: string;
+  /**
+   * The cabinet this placement needs to exist. CHECKED against the configured layout and reported
+   * as an issue when it is not there — never auto-added, because silently dropping a tall unit
+   * into somebody's kitchen changes their price without them asking.
+   */
+  housing?: { zone: string; module: string };
+  /** Housing / fitting work. Charged whoever supplies the appliance — see ApplianceTypeDef. */
+  price?: number;
+  yields?: Yields;
+}
+
+/**
+ * An appliance the kitchen has to accommodate.
+ *
+ * The money question ("do we supply it?") and the buildability question ("where does it go and
+ * what does it need?") are deliberately separate, because they have different answers. A fridge
+ * the customer already owns is €0 and still takes a 60cm aperture, a socket and, if it goes in a
+ * tall unit, a tall housing that has to be in the layout.
+ */
+export interface ApplianceTypeDef {
+  key: string;
+  label: string;
+  /** Flat price when WE supply it. Ignored for one the customer already owns. */
+  unit_price?: number;
+  /** …or a model list to pick from, ABSORBED exactly like a zone global's price list. */
+  option_group?: string;
+  margin_pct?: number;
+  /** Aperture the cabinetry has to leave, for the housing it is placed in. */
+  width_cm?: number;
+  /**
+   * What it must be connected to — `socket`, `water_in`, `waste_out`, `gas_point`, `duct_run`.
+   * Counted for an EXISTING appliance too: a fridge you already own still needs a socket behind it.
+   */
+  requires?: Yields;
+  /** Where it goes — "tall unit", "highboard", "under the worktop", "stand alone". */
+  placements?: AppliancePlacementDef[];
+  /** Choices with their own money and their own consequences — extraction vs recirculation. */
+  options?: ModuleOptionDef[];
+  /** The supply it runs on, cross-checked against the zone's energy choice global. */
+  energy?: string;
+  /** How many a fresh row starts at — one hob, but six sockets' worth of small appliances. */
+  default_qty?: number;
+  /** Start rows for this appliance on "already owned" rather than "we supply". */
+  default_supply?: ApplianceSupply;
+}
+
 export interface ZoneDef {
   key: string;
   label: string;
-  /** `units`: a list of modules, length derived from their widths. `surface`: one length × a material rate. */
-  kind: 'units' | 'surface';
+  /**
+   * `units`: a list of modules, length derived from their widths. `surface`: one length × a
+   * material rate. `appliances`: things the kitchen has to accommodate, priced only when ours.
+   */
+  kind: 'units' | 'surface' | 'appliances';
   /** An island is not in every kitchen. Optional zones start off unless `enabled_by_default`. */
   optional?: boolean;
   enabled_by_default?: boolean;
@@ -159,6 +246,28 @@ export interface ZoneDef {
    * close a gola profile, a run-length plinth. Applied once per enabled zone.
    */
   run_yields?: Yields;
+  /** `appliances` only — the catalogue of what can be accommodated. */
+  appliances?: ApplianceTypeDef[];
+  /** `appliances` only — the rows a fresh configuration starts with. */
+  default_appliances?: Array<{
+    type: string;
+    supply?: ApplianceSupply;
+    qty?: number;
+    placement?: string;
+    options?: Record<string, string>;
+  }>;
+  /**
+   * `appliances` only — which choice global lists the supplies the property actually has. An
+   * appliance declaring `energy` that is not in that list raises an issue. Defaults to `energy`;
+   * a zone without such a global asks nothing and therefore contradicts nothing.
+   */
+  energy_global?: string;
+  /**
+   * `surface` only — derive the length from a SEAT COUNT rather than from the run it sits on. A
+   * breakfast bar is as long as the people sitting at it, and "how many people eat here" is an
+   * answer the customer has; "how many metres of bar" is one they invent.
+   */
+  seats?: { global: string; cm_per_seat: number; min_cm?: number };
 }
 
 // ── Configuration (project_plans.composition) ───────────────────────────────
@@ -171,12 +280,30 @@ export interface ZoneModuleRow {
   options?: Record<string, string>;
 }
 
+/** One appliance the customer wants accommodated. */
+export interface ApplianceRow {
+  id: string;
+  type: string;
+  /** `ours` prices it; `existing` prices nothing and books the same space and connections. */
+  supply: ApplianceSupply;
+  qty: number;
+  placement?: string;
+  /** The chosen member of the type's `option_group`, when it is priced off a model list. */
+  model?: string;
+  options?: Record<string, string>;
+}
+
 export interface ZoneConfig {
   enabled?: boolean;
-  /** number globals hold a number; option globals hold the chosen item's id. */
-  globals?: Record<string, number | string>;
+  /**
+   * number globals hold a number; option globals hold the chosen item's id; choice globals hold
+   * the chosen value, or an array of them when the global is `multi`.
+   */
+  globals?: Record<string, number | string | string[]>;
   modules?: ZoneModuleRow[];
-  /** `surface` only — overrides the inherited length. */
+  /** `appliances` only. */
+  appliances?: ApplianceRow[];
+  /** `surface` only — overrides the inherited (or seat-derived) length. */
   length_m?: number;
 }
 
@@ -200,12 +327,33 @@ export interface DerivedLine {
 export interface DerivedZone {
   key: string;
   label: string;
+  /** Carried so a consumer can tell a RUN from a worktop from a list of appliances. */
+  kind: ZoneDef['kind'];
   enabled: boolean;
   length_m: number;
   unit_count: number;
   total: number;
   /** What this zone alone contributes to the hardware schedule. */
   yields: Record<string, number>;
+}
+
+/**
+ * One configured appliance, resolved: what it is, who supplies it, where it goes, what it costs us
+ * and what it books. `total` is 0 for an appliance the customer already owns; `requires` is not.
+ */
+export interface DerivedAppliance {
+  key: string;
+  zone_key: string;
+  type: string;
+  label: string;
+  supply: ApplianceSupply;
+  qty: number;
+  placement: string | null;
+  placement_label: string | null;
+  model_label: string | null;
+  total: number;
+  /** Connections this row books, already multiplied by its quantity. */
+  requires: Record<string, number>;
 }
 
 /** One row of the hardware schedule: how many of a thing the configured kitchen needs. */
@@ -231,10 +379,13 @@ export interface DerivedComposition {
   issues: string[];
   /**
    * The hardware schedule, summed across every enabled zone: doors, drawers, hinges, shelves, legs,
-   * gola profiles. Quantities only — these are priced when the plan becomes a quote, because a
-   * client is not quoted thirty hinges but a workshop absolutely has to order them.
+   * gola profiles — and every service connection the appliances book. Quantities only: these are
+   * priced when the plan becomes a quote, because a client is not quoted thirty hinges but a
+   * workshop absolutely has to order them, and an electrician has to be told about nine sockets.
    */
   schedule: ScheduleRow[];
+  /** Every configured appliance, whoever supplies it. Empty when the blueprint has no such zone. */
+  appliances: DerivedAppliance[];
 }
 
 /** Display names + units for the yields the schedule knows about. Anything else falls back. */
@@ -248,10 +399,50 @@ const YIELD_LABELS: Record<string, { label: string; unit: string }> = {
   gola_vertical: { label: 'Gola vertical profile', unit: 'pcs' },
   gola_end_cap: { label: 'Gola end caps', unit: 'pcs' },
   gola_joiner: { label: 'Gola corner joiners', unit: 'pcs' },
+  // Service connections. These come from the APPLIANCES and are the half of a kitchen survey that
+  // never reaches the workshop drawing — nine sockets behind a worktop is a first-fix electrical
+  // job, and finding that out on fitting day is the expensive way.
+  socket: { label: 'Power sockets', unit: 'pcs' },
+  socket_dedicated: { label: 'Dedicated circuits', unit: 'pcs' },
+  water_in: { label: 'Water supply points', unit: 'pcs' },
+  waste_out: { label: 'Waste connections', unit: 'pcs' },
+  gas_point: { label: 'Gas connections', unit: 'pcs' },
+  duct_run: { label: 'Extraction duct runs', unit: 'run' },
+  carbon_filter: { label: 'Recirculation filters', unit: 'pcs' },
+  worktop_cutout: { label: 'Worktop cut-outs', unit: 'pcs' },
+  appliance_housing: { label: 'Appliance housings', unit: 'pcs' },
 };
 
 const titleise = (key: string) =>
   key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/**
+ * The schedule keys that are a SERVICE CONNECTION rather than a piece of hardware.
+ *
+ * One list, here beside the labels, because two audiences read the schedule and they read
+ * different halves of it: a workshop orders the hinges, an electrician and a plumber are told
+ * about the sockets and the waste. A consumer splitting the two must not keep its own idea of
+ * which is which — that is how a key added here quietly stops reaching one of them.
+ */
+export const SERVICE_YIELD_KEYS: ReadonlySet<string> = new Set([
+  'socket',
+  'socket_dedicated',
+  'water_in',
+  'waste_out',
+  'gas_point',
+  'duct_run',
+  'carbon_filter',
+]);
+
+/**
+ * Display name + unit for a schedule key.
+ *
+ * Exported because an appliance's `requires` is the same bag of keys as the schedule, and a UI
+ * spelling them out beside the row must not invent its own second set of names for them.
+ */
+export function yieldMeta(key: string): { label: string; unit: string } {
+  return YIELD_LABELS[key] ?? { label: titleise(key), unit: 'pcs' };
+}
 
 /** The subset of a blueprint_item / project_plan_item this module needs to read a rate off. */
 export interface RateItemLike {
@@ -318,14 +509,68 @@ function resolveRateChoice(
   return wanted ?? choices.find((c) => c.tier === 'good') ?? choices[0];
 }
 
+/** Whatever a zone's globals currently hold. Widened once, here, rather than at every reader. */
+type GlobalsBag = Record<string, number | string | string[]>;
+
+/** A number global's current value, falling back to the schema default. */
+function numericGlobal(zone: ZoneDef, globals: GlobalsBag, key: string): number {
+  const def = asArray<ZoneGlobalDef>(zone.globals).find((g) => g.key === key);
+  return num(globals[key], num(def?.default));
+}
+
+/**
+ * The answers a choice global currently holds.
+ *
+ * A single-choice global with nothing stored falls to its default and then to its first answer —
+ * the same "never nothing" rule `resolveRateChoice` follows, because a spec field silently holding
+ * no value reads downstream as a deliberate answer. A MULTI global falls to nothing instead: an
+ * unanswered "what energy is available" must not quietly claim there is gas.
+ */
+function chosenValues(g: ZoneGlobalDef, raw: unknown): string[] {
+  const value = raw ?? g.default;
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === 'string' && value) return [value];
+  if (g.multi) return [];
+  const first = asArray<GlobalChoiceDef>(g.choices)[0];
+  return first ? [first.value] : [];
+}
+
+/**
+ * Publish `<zone>_<key>_<value>` for every answer a choice global offers and fold the chosen
+ * answers' yields into the zone.
+ *
+ * The flags are published for a DISABLED zone too, as zeroes — a missing variable makes every
+ * formula referencing it fail and fall back to a default quantity, which is a wrong number
+ * wearing the face of a right one.
+ */
+function applyChoiceGlobals(
+  zone: ZoneDef,
+  globals: GlobalsBag,
+  enabled: boolean,
+  vars: Record<string, number>,
+  zoneYields: Record<string, number>,
+): Record<string, string[]> {
+  const picked: Record<string, string[]> = {};
+  for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
+    if (g.type !== 'choice') continue;
+    const values = enabled ? chosenValues(g, globals[g.key]) : [];
+    picked[g.key] = values;
+    for (const c of asArray<GlobalChoiceDef>(g.choices)) {
+      vars[`${zone.key}_${g.key}_${c.value}`] = values.includes(c.value) ? 1 : 0;
+      if (values.includes(c.value)) addYields(zoneYields, c.yields, 1);
+    }
+  }
+  return picked;
+}
+
 /** Product of every size band that applies. A global with no bands contributes ×1. */
-function sizeFactor(zone: ZoneDef, globals: Record<string, number | string>): number {
+function sizeFactor(zone: ZoneDef, globals: GlobalsBag): number {
   let factor = 1;
   for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
     if (g.type !== 'number') continue;
     const bands = asArray<ZoneFactorBand>(g.factors);
     if (!bands.length) continue;
-    const value = num(globals[g.key], num(g.default));
+    const value = numericGlobal(zone, globals, g.key);
     const band = [...bands]
       .sort((a, b) => num(a.up_to) - num(b.up_to))
       .find((b) => value <= num(b.up_to));
@@ -335,13 +580,10 @@ function sizeFactor(zone: ZoneDef, globals: Record<string, number | string>): nu
 }
 
 /** Hinges one door of this height needs. No ladder = 2, right for base and wall, wrong for tall. */
-function hingesPerDoor(zone: ZoneDef, globals: Record<string, number | string>): number {
+function hingesPerDoor(zone: ZoneDef, globals: GlobalsBag): number {
   const bands = asArray<{ up_to: number; count: number }>(zone.hinge_bands);
   if (!bands.length) return 2;
-  const height = num(
-    globals[zone.door_height_global || 'height'],
-    num(asArray<ZoneGlobalDef>(zone.globals).find((g) => g.key === (zone.door_height_global || 'height'))?.default),
-  );
+  const height = numericGlobal(zone, globals, zone.door_height_global || 'height');
   const band = [...bands].sort((a, b) => num(a.up_to) - num(b.up_to)).find((b) => height <= num(b.up_to));
   return band ? num(band.count, 2) : num(bands[bands.length - 1]?.count, 2);
 }
@@ -377,10 +619,13 @@ export function defaultComposition(
 ): Composition {
   const out: Composition = {};
   for (const zone of asArray<ZoneDef>(schema)) {
-    const globals: Record<string, number | string> = {};
+    const globals: GlobalsBag = {};
     for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
       if (g.type === 'number') globals[g.key] = num(g.default);
-      else {
+      else if (g.type === 'choice') {
+        const values = chosenValues(g, undefined);
+        globals[g.key] = g.multi ? values : (values[0] ?? '');
+      } else {
         const pick = resolveRateChoice(items, g.option_group, undefined);
         if (pick) globals[g.key] = pick.id;
       }
@@ -391,28 +636,53 @@ export function defaultComposition(
     asArray<NonNullable<ZoneDef['default_modules']>[number]>(zone.default_modules).forEach((seed, idx) => {
       const mod = byKey[seed.type];
       if (!mod) return;
-      const options: Record<string, string> = { ...(seed.options ?? {}) };
-      for (const opt of asArray<ModuleOptionDef>(mod.options)) {
-        if (options[opt.key] == null) {
-          const fallback = opt.default ?? asArray<ModuleOptionChoice>(opt.choices)[0]?.value;
-          if (fallback != null) options[opt.key] = fallback;
-        }
-      }
       modules.push({
         id: makeId(zone.key, idx),
         type: seed.type,
         width_cm: num(seed.width_cm, mod.default_width_cm),
         qty: Math.max(1, Math.round(num(seed.qty, 1))),
-        options,
+        options: withOptionDefaults(mod.options, seed.options),
+      });
+    });
+    const applianceByKey: Record<string, ApplianceTypeDef> = {};
+    for (const a of asArray<ApplianceTypeDef>(zone.appliances)) applianceByKey[a.key] = a;
+    const appliances: ApplianceRow[] = [];
+    asArray<NonNullable<ZoneDef['default_appliances']>[number]>(zone.default_appliances).forEach((seed, idx) => {
+      const def = applianceByKey[seed.type];
+      if (!def) return;
+      const model = def.option_group ? resolveRateChoice(items, def.option_group, undefined) : null;
+      appliances.push({
+        id: makeId(`${zone.key}-appliance`, idx),
+        type: seed.type,
+        supply: seed.supply ?? def.default_supply ?? 'ours',
+        qty: Math.max(1, Math.round(num(seed.qty, num(def.default_qty, 1)))),
+        placement: seed.placement ?? asArray<AppliancePlacementDef>(def.placements)[0]?.value,
+        ...(model ? { model: model.id } : {}),
+        options: withOptionDefaults(def.options, seed.options),
       });
     });
     out[zone.key] = {
       enabled: zone.optional ? (zone.enabled_by_default ?? false) : true,
       globals,
       modules,
+      ...(appliances.length ? { appliances } : {}),
     };
   }
   return out;
+}
+
+/** A seed's explicit answers, topped up with each option's default so no choice starts unset. */
+function withOptionDefaults(
+  defs: ModuleOptionDef[] | undefined,
+  seeded: Record<string, string> | undefined,
+): Record<string, string> {
+  const options: Record<string, string> = { ...(seeded ?? {}) };
+  for (const opt of asArray<ModuleOptionDef>(defs)) {
+    if (options[opt.key] != null) continue;
+    const fallback = opt.default ?? asArray<ModuleOptionChoice>(opt.choices)[0]?.value;
+    if (fallback != null) options[opt.key] = fallback;
+  }
+  return options;
 }
 
 /** The option_groups a schema takes ownership of. Their items must never be priced on their own. */
@@ -421,6 +691,12 @@ export function absorbedGroups(schema: ZoneDef[]): string[] {
   for (const zone of asArray<ZoneDef>(schema)) {
     for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
       if (g.type === 'option' && g.option_group) out.add(g.option_group);
+    }
+    // An appliance priced off a model list owns that list exactly the way a zone global owns its
+    // rate table: the money arrives through the appliance line, so leaving the list priced in the
+    // flat scope charges the oven twice — a valid number, and invisible.
+    for (const a of asArray<ApplianceTypeDef>(zone.appliances)) {
+      if (a.option_group) out.add(a.option_group);
     }
   }
   return Array.from(out);
@@ -443,7 +719,10 @@ export function deriveComposition(
   const derivedZones: DerivedZone[] = [];
   const issues: string[] = [];
   const lengthByZone: Record<string, number> = {};
+  /** Per-zone module counts, so the appliance pass can check its housings actually exist. */
+  const moduleCountsByZone: Record<string, Record<string, number>> = {};
   const scheduleTotals: Record<string, number> = {};
+  const derivedAppliances: DerivedAppliance[] = [];
   let total = 0;
 
   const emit = (line: Omit<DerivedLine, 'line_total' | 'unit_price'>, rate: number, marginPct: number) => {
@@ -463,7 +742,7 @@ export function deriveComposition(
     if (zone.kind !== 'units') continue;
     const cfg = cfgAll[zone.key] ?? {};
     const enabled = zoneEnabled(zone, cfg);
-    const globals = (cfg.globals ?? {}) as Record<string, number | string>;
+    const globals = (cfg.globals ?? {}) as GlobalsBag;
     const modulesByKey: Record<string, ModuleTypeDef> = {};
     for (const m of asArray<ModuleTypeDef>(zone.modules)) modulesByKey[m.key] = m;
 
@@ -477,6 +756,9 @@ export function deriveComposition(
     let zoneTotal = 0;
     const perType: Record<string, number> = {};
     const zoneYields: Record<string, number> = {};
+    applyChoiceGlobals(zone, globals, enabled, vars, zoneYields);
+    // By reference: the appliance pass runs after this loop finishes, so it sees the final counts.
+    moduleCountsByZone[zone.key] = perType;
 
     if (enabled) {
       const rows = asArray<ZoneModuleRow>(cfg.modules);
@@ -557,22 +839,192 @@ export function deriveComposition(
     }
     for (const [key, value] of Object.entries(zoneYields)) vars[`${zone.key}_${key}`] = value;
     addYields(scheduleTotals, zoneYields, 1);
-    derivedZones.push({ key: zone.key, label: zone.label, enabled, length_m: length, unit_count: count, total: round2(zoneTotal), yields: zoneYields });
+    derivedZones.push({ key: zone.key, label: zone.label, kind: 'units', enabled, length_m: length, unit_count: count, total: round2(zoneTotal), yields: zoneYields });
   }
 
-  // Pass 2 — `surface` zones (worktop, splashback, island top): one length × a material rate.
+  // Pass 2 — `appliances` zones.
+  //
+  // Supply decides the money and nothing else. An appliance the customer already owns is priced at
+  // zero and still books its aperture, its socket and its waste — which is exactly the half of a
+  // kitchen survey that used to live in a notes field, be read by nobody, and turn up on fitting day.
+  const housingDemand: Record<string, { qty: number; wanted: Set<string> }> = {};
+  for (const zone of zones) {
+    if (zone.kind !== 'appliances') continue;
+    const cfg = cfgAll[zone.key] ?? {};
+    const enabled = zoneEnabled(zone, cfg);
+    const globals = (cfg.globals ?? {}) as GlobalsBag;
+    const typesByKey: Record<string, ApplianceTypeDef> = {};
+    for (const a of asArray<ApplianceTypeDef>(zone.appliances)) typesByKey[a.key] = a;
+
+    const zoneYields: Record<string, number> = {};
+    const picked = applyChoiceGlobals(zone, globals, enabled, vars, zoneYields);
+    // A blueprint that never asks which supplies exist cannot contradict an appliance about them.
+    const energyKey = zone.energy_global || 'energy';
+    const asksAboutEnergy = asArray<ZoneGlobalDef>(zone.globals).some((g) => g.key === energyKey && g.type === 'choice');
+    const available = asksAboutEnergy ? (picked[energyKey] ?? []) : null;
+
+    const perType: Record<string, number> = {};
+    let zoneTotal = 0;
+    let supplied = 0;
+    let existing = 0;
+
+    if (enabled) {
+      for (const row of asArray<ApplianceRow>(cfg.appliances)) {
+        const def = typesByKey[row.type];
+        if (!def) continue;
+        const qty = Math.max(0, Math.round(num(row.qty, 1)));
+        if (qty === 0) continue;
+        const ours = row.supply !== 'existing';
+        perType[def.key] = (perType[def.key] ?? 0) + qty;
+        if (ours) supplied += qty; else existing += qty;
+
+        const placements = asArray<AppliancePlacementDef>(def.placements);
+        const placement = placements.find((p) => p.value === row.placement) ?? placements[0] ?? null;
+
+        // What it books. Counted before any pricing decision, because none of it depends on one.
+        const rowRequires: Record<string, number> = {};
+        addYields(rowRequires, def.requires, qty);
+        addYields(rowRequires, placement?.yields, qty);
+
+        let rowTotal = 0;
+        let modelLabel: string | null = null;
+
+        if (ours) {
+          const model = def.option_group ? resolveRateChoice(items, def.option_group, row.model) : null;
+          modelLabel = model?.label ?? null;
+          if (def.option_group && !model) {
+            issues.push(`${zone.label}: no model chosen for ${def.label} — it prices at 0.`);
+          }
+          const price = model ? model.unit_price : num(def.unit_price);
+          if (price > 0) {
+            rowTotal += emit({
+              key: `${zone.key}:${row.id}`,
+              zone_key: zone.key,
+              zone_label: zone.label,
+              label: `${def.label}${modelLabel ? ` · ${modelLabel}` : ''}`,
+              unit: 'pcs',
+              quantity: qty,
+              line_kind: 'materials',
+            }, price, num(def.margin_pct));
+          }
+        }
+
+        // Housing and fitting are OURS whoever bought the appliance: a dishwasher you already own
+        // still needs the aperture, the door hung on it and the trap plumbed in.
+        if (placement && num(placement.price) > 0) {
+          rowTotal += emit({
+            key: `${zone.key}:${row.id}:placement`,
+            zone_key: zone.key,
+            zone_label: zone.label,
+            label: `${def.label} — ${placement.label}`,
+            unit: 'pcs',
+            quantity: qty,
+            line_kind: 'labor',
+          }, num(placement.price), num(def.margin_pct));
+        }
+
+        // Per-appliance choices. The CONSEQUENCE counts either way — an extracting hood needs a
+        // duct through the wall and a recirculating one needs a filter, and which of the two it is
+        // has nothing to do with who paid for the hood. Only the PRICE waits on that.
+        for (const opt of asArray<ModuleOptionDef>(def.options)) {
+          const chosen = (row.options ?? {})[opt.key] ?? opt.default;
+          const choice = asArray<ModuleOptionChoice>(opt.choices).find((c) => c.value === chosen);
+          addYields(rowRequires, choice?.yields, qty);
+          const price = num(choice?.price);
+          if (!ours || !choice || price === 0) continue;
+          rowTotal += emit({
+            key: `${zone.key}:${row.id}:${opt.key}`,
+            zone_key: zone.key,
+            zone_label: zone.label,
+            label: `${def.label} — ${choice.label}`,
+            unit: 'pcs',
+            quantity: qty,
+            line_kind: 'materials',
+          }, price, num(def.margin_pct));
+        }
+
+        if (placement?.housing) {
+          const slot = `${placement.housing.zone}:${placement.housing.module}`;
+          const want = housingDemand[slot] ?? (housingDemand[slot] = { qty: 0, wanted: new Set<string>() });
+          want.qty += qty;
+          want.wanted.add(def.label);
+        }
+        // Running on a supply the property does not have is not a pricing problem, it is a survey
+        // problem, and the one moment anybody will read it is while the kitchen is being specified.
+        if (def.energy && available && !available.includes(def.energy)) {
+          issues.push(`${def.label} runs on ${def.energy}, which this kitchen does not have.`);
+        }
+
+        addYields(zoneYields, rowRequires, 1);
+        zoneTotal += rowTotal;
+        derivedAppliances.push({
+          key: `${zone.key}:${row.id}`,
+          zone_key: zone.key,
+          type: def.key,
+          label: def.label,
+          supply: ours ? 'ours' : 'existing',
+          qty,
+          placement: placement?.value ?? null,
+          placement_label: placement?.label ?? null,
+          model_label: modelLabel,
+          total: round2(rowTotal),
+          requires: rowRequires,
+        });
+      }
+    }
+
+    vars[countVarOf(zone)] = supplied + existing;
+    vars[`${zone.key}_enabled`] = enabled ? 1 : 0;
+    vars[`${zone.key}_supplied`] = supplied;
+    vars[`${zone.key}_existing`] = existing;
+    for (const a of asArray<ApplianceTypeDef>(zone.appliances)) vars[`${zone.key}_${a.key}_count`] = perType[a.key] ?? 0;
+    for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
+      if (g.type === 'number') vars[`${zone.key}_${g.key}`] = enabled ? numericGlobal(zone, globals, g.key) : 0;
+    }
+    for (const [key, value] of Object.entries(zoneYields)) vars[`${zone.key}_${key}`] = value;
+    addYields(scheduleTotals, zoneYields, 1);
+    derivedZones.push({ key: zone.key, label: zone.label, kind: 'appliances', enabled, length_m: 0, unit_count: supplied + existing, total: round2(zoneTotal), yields: zoneYields });
+  }
+
+  // The layout has to actually contain the cabinets the appliances were placed in. Nothing is
+  // inserted on the customer's behalf — a fridge with nowhere to go is a conversation to have,
+  // not a cabinet that quietly appears on somebody's price.
+  for (const [slot, want] of Object.entries(housingDemand)) {
+    const [zoneKey, moduleKey] = slot.split(':');
+    const target = zones.find((z) => z.key === zoneKey);
+    const mod = asArray<ModuleTypeDef>(target?.modules).find((m) => m.key === moduleKey);
+    const have = moduleCountsByZone[zoneKey]?.[moduleKey] ?? 0;
+    if (have >= want.qty) continue;
+    issues.push(
+      `${Array.from(want.wanted).join(', ')}: ${want.qty} × ${mod?.label ?? moduleKey} needed in ${target?.label ?? zoneKey} — the layout has ${have}.`,
+    );
+  }
+
+  // Pass 3 — `surface` zones (worktop, splashback, breakfast bar): one length × a material rate.
   for (const zone of zones) {
     if (zone.kind !== 'surface') continue;
     const cfg = cfgAll[zone.key] ?? {};
     const enabled = zoneEnabled(zone, cfg);
-    const globals = (cfg.globals ?? {}) as Record<string, number | string>;
+    const globals = (cfg.globals ?? {}) as GlobalsBag;
     const rateGlobal = asArray<ZoneGlobalDef>(zone.globals).find((g) => g.type === 'option' && g.is_rate_source)
       ?? asArray<ZoneGlobalDef>(zone.globals).find((g) => g.type === 'option');
     const rateChoice = rateGlobal ? resolveRateChoice(items, rateGlobal.option_group, globals[rateGlobal.key]) : null;
     const factor = sizeFactor(zone, globals);
+    const zoneYields: Record<string, number> = {};
+    applyChoiceGlobals(zone, globals, enabled, vars, zoneYields);
 
+    // Length, in precedence order: an explicit override, then a SEAT COUNT, then the run it sits
+    // on. "How many people eat here" is an answer the customer has; "how many metres of bar" is
+    // one they invent, and inventing it is how a four-seat breakfast bar gets quoted at 1.2 m.
+    const seats = zone.seats;
+    const seatCount = seats ? Math.max(0, Math.round(numericGlobal(zone, globals, seats.global))) : 0;
+    const fromSeats = seats
+      ? Math.max(num(seats.min_cm) / 100, (seatCount * num(seats.cm_per_seat)) / 100)
+      : 0;
     const inherited = zone.length_from ? num(lengthByZone[zone.length_from]) : 0;
-    const length = enabled ? round2(cfg.length_m != null ? num(cfg.length_m) : inherited) : 0;
+    const length = enabled
+      ? round2(cfg.length_m != null ? num(cfg.length_m) : (seats ? fromSeats : inherited))
+      : 0;
     let zoneTotal = 0;
 
     if (enabled && length > 0) {
@@ -591,10 +1043,13 @@ export function deriveComposition(
     lengthByZone[zone.key] = length;
     vars[lengthVarOf(zone)] = length;
     vars[`${zone.key}_enabled`] = enabled ? 1 : 0;
+    if (seats) vars[`${zone.key}_seats`] = enabled ? seatCount : 0;
     for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
-      if (g.type === 'number') vars[`${zone.key}_${g.key}`] = enabled ? num(globals[g.key], num(g.default)) : 0;
+      if (g.type === 'number') vars[`${zone.key}_${g.key}`] = enabled ? numericGlobal(zone, globals, g.key) : 0;
     }
-    derivedZones.push({ key: zone.key, label: zone.label, enabled, length_m: length, unit_count: 0, total: round2(zoneTotal), yields: {} });
+    for (const [key, value] of Object.entries(zoneYields)) vars[`${zone.key}_${key}`] = value;
+    addYields(scheduleTotals, zoneYields, 1);
+    derivedZones.push({ key: zone.key, label: zone.label, kind: 'surface', enabled, length_m: length, unit_count: 0, total: round2(zoneTotal), yields: zoneYields });
   }
 
   // Totals are published BOTH as formula variables (`total_hinges`, so a schedule line can be an
@@ -603,14 +1058,16 @@ export function deriveComposition(
   for (const [key, quantity] of Object.entries(scheduleTotals)) {
     vars[`total_${key}`] = round2(quantity);
     if (quantity === 0) continue;
-    const meta = YIELD_LABELS[key];
-    schedule.push({ key, label: meta?.label ?? titleise(key), quantity: round2(quantity), unit: meta?.unit ?? 'pcs' });
+    const meta = yieldMeta(key);
+    schedule.push({ key, label: meta.label, quantity: round2(quantity), unit: meta.unit });
   }
   schedule.sort((a, b) => a.label.localeCompare(b.label));
   // Run-level totals, for anything fitted along every zone at once — a handleless profile runs the
   // length of each run, needs a vertical between units and a cap at each open end, so all three
   // shapes have to be expressible in a formula.
-  const liveRuns = derivedZones.filter((z) => z.enabled && z.unit_count > 0);
+  // `units` only. An appliance zone carries a unit_count too, and counting it as a run would put
+  // two more gola end caps on a kitchen for owning a fridge.
+  const liveRuns = derivedZones.filter((z) => z.kind === 'units' && z.enabled && z.unit_count > 0);
   vars.total_run_length = round2(liveRuns.reduce((sum, z) => sum + z.length_m, 0));
   vars.total_units = liveRuns.reduce((sum, z) => sum + z.unit_count, 0);
   vars.total_runs = liveRuns.length;
@@ -623,6 +1080,7 @@ export function deriveComposition(
     total: round2(total),
     issues,
     schedule,
+    appliances: derivedAppliances,
   };
 }
 

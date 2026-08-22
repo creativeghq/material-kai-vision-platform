@@ -43,7 +43,7 @@ import { composeEstimate, repriceItems, seedPlanItems, subtotalOf } from '@/util
 import { absorbedGroups, defaultComposition, deriveComposition, hasComposition } from '@/utils/blueprintComposition';
 import { evaluateFormula } from '@/utils/blueprintFormula';
 import type { Composition, ZoneDef } from '@/utils/blueprintComposition';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, parseDecimalOr } from '@/utils/decimal';
 import { ToolsShell, useToolsQuota } from './toolsShared';
 
 const KITCHEN_PROJECT_TYPE = 'kitchen_cabinets';
@@ -179,9 +179,51 @@ export default function KitchenCostPage() {
     return r.ok ? r.value : null;
   };
 
+  /**
+   * What the total does and does not cover, DERIVED.
+   *
+   * This line used to read "appliances and sink not included" as a constant, from back when the
+   * configurator had no way to say anything about an appliance at all. A standing disclaimer that
+   * contradicts the configuration above it is worse than no disclaimer: it tells somebody who has
+   * just picked an oven that the oven is not in the price.
+   */
+  const totalNote = useMemo(() => {
+    const appliances = derived?.appliances ?? [];
+    const ours = appliances.filter((a) => a.supply === 'ours').reduce((n, a) => n + a.qty, 0);
+    const theirs = appliances.filter((a) => a.supply === 'existing').reduce((n, a) => n + a.qty, 0);
+    const parts = ['Excluding VAT'];
+    if (ours > 0) parts.push(`${ours} ${ours === 1 ? 'appliance' : 'appliances'} included`);
+    if (theirs > 0) parts.push(`${theirs} of your own fitted`);
+    if (ours === 0 && theirs === 0) parts.push('appliances not included');
+    return parts.join(' · ');
+  }, [derived]);
+
+  /**
+   * The budget the customer came in with, and how the estimate sits against it.
+   *
+   * This is the FINANCE question every kitchen checklist opens with, and the answer is only worth
+   * collecting if something says what it means. Stated and then never mentioned again, it is a
+   * field; stated and compared, it is the reason somebody swaps a stone worktop for a laminate one
+   * before they call rather than after.
+   */
+  const budgetDim = useMemo(
+    () => (starter?.dimensions_schema ?? []).find((d) => d.role === 'budget') ?? null,
+    [starter],
+  );
+  const budgetLine = useMemo(() => {
+    if (!budgetDim) return null;
+    const budget = Number(dims[budgetDim.key] ?? 0);
+    if (!(budget > 0)) return null;
+    return subtotal <= budget
+      ? `${formatMoney(budget - subtotal, currency)} under the budget you gave us.`
+      : `${formatMoney(subtotal - budget, currency)} over the budget you gave us.`;
+  }, [budgetDim, dims, subtotal, currency]);
+
   // A dimension a zone already derives must not also get a slider — see the Measurements card.
+  // Nor does the budget: it is money, not a measurement, and it lives on the total instead.
   const loneDimensions = useMemo(
-    () => (starter?.dimensions_schema ?? []).filter((d) => !(d.key in (derived?.vars ?? {}))),
+    () => (starter?.dimensions_schema ?? [])
+      .filter((d) => d.role !== 'budget' && !(d.key in (derived?.vars ?? {}))),
     [starter, derived],
   );
 
@@ -236,8 +278,9 @@ export default function KitchenCostPage() {
         </div>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Kitchen cost calculator</h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Build your kitchen unit by unit — bottom cabinets, top cabinets, worktop, island — and pick
-          your finishes. The price updates as you go. Free, instant, no sign-up needed.
+          Build your kitchen unit by unit — bottom cabinets, top cabinets, worktop, island — pick
+          your finishes, and tell us which appliances you already own. The price updates as you go.
+          Free, instant, no sign-up needed.
         </p>
       </div>
 
@@ -425,8 +468,24 @@ export default function KitchenCostPage() {
                 Estimated total
               </div>
               <div className="text-2xl font-semibold tabular-nums">{formatMoney(subtotal, currency)}</div>
-              <div className="text-[11px] text-muted-foreground">Excluding VAT · appliances and sink not included</div>
+              <div className="text-[11px] text-muted-foreground">{totalNote}</div>
+              {budgetLine && <div className="text-[11px] text-muted-foreground mt-0.5">{budgetLine}</div>}
             </div>
+            {budgetDim && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground" htmlFor="kc-budget">
+                  {budgetDim.label}
+                </Label>
+                <Input
+                  id="kc-budget"
+                  className="w-32"
+                  inputMode="decimal"
+                  defaultValue={String(dims[budgetDim.key] ?? budgetDim.default ?? '')}
+                  onBlur={(e) => setDimension(budgetDim.key, parseDecimalOr(e.target.value, 0))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                />
+              </div>
+            )}
             <SendEstimateDialog
               blueprintId={starter.id}
               dimensions={dims}

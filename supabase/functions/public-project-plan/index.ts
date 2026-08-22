@@ -18,6 +18,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { computeBlueprint } from '../_shared/blueprint/compute.ts';
 import { computeLinePricing } from '../_shared/blueprint/formula.ts';
+import { SERVICE_YIELD_KEYS } from '../_shared/blueprint/composition.ts';
 import type { Composition, ZoneDef } from '../_shared/blueprint/composition.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { verifyTurnstile as verifyTurnstileShared } from '../_shared/turnstile.ts';
@@ -355,6 +356,27 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
         return `${s.label}\n${lines}`;
       })
       .join('\n\n');
+    // Appliances have to be listed SEPARATELY from the priced breakdown, because the ones that
+    // matter most to the callback are the ones the breakdown cannot show: an appliance the customer
+    // already owns has a line total of zero and would be filtered straight out of it, taking with it
+    // the fact that a 60cm aperture, a socket and a waste have to be planned around a machine we are
+    // not selling. Same for the connections and the issues — none of them are money.
+    const appliances = computed.composition?.appliances ?? [];
+    const applianceLines = appliances.length
+      ? ['Appliances', ...appliances.map((a) => {
+        const who = a.supply === 'existing' ? 'customer already owns' : `we supply${a.model_label ? `, ${a.model_label}` : ''}`;
+        const where = a.placement_label ? `, ${a.placement_label.toLowerCase()}` : '';
+        return `  ${a.label} × ${a.qty} — ${who}${where}`;
+      }), '']
+      : [];
+    const services = (computed.composition?.schedule ?? []).filter((r) => SERVICE_YIELD_KEYS.has(r.key));
+    const serviceLines = services.length
+      ? ['Connections to plan for', ...services.map((r) => `  ${r.label}: ${r.quantity} ${r.unit}`), '']
+      : [];
+    const issueLines = (computed.composition?.issues ?? []).length
+      ? ['Worth checking before you call back', ...computed.composition!.issues.map((i) => `  ${i}`), '']
+      : [];
+
     const messageBody = [
       `New kitchen estimate from the website (${reference}).`,
       '',
@@ -363,6 +385,9 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
       '',
       breakdown,
       '',
+      ...applianceLines,
+      ...serviceLines,
+      ...issueLines,
       `Estimated total: ${computed.subtotal.toFixed(2)} ${currency} (excl. VAT)`,
       '',
       'Contact',
@@ -408,6 +433,11 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
               unit_price: t.unit_price, line_total: t.line_total,
             })),
           })),
+          // Snapshotted beside `lines` for the same reason: the approval UI reads the estimate as
+          // it was sent. The `composition` above stays the spec that gets replayed.
+          appliances,
+          schedule: computed.composition?.schedule ?? [],
+          issues: computed.composition?.issues ?? [],
           contact: { name, email: email || null, phone: phone || null, shape: shape || null, notes: notes || null },
           source: 'kitchen_calculator',
           created_at: new Date().toISOString(),

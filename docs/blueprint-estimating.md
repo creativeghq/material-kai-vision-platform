@@ -77,6 +77,61 @@ The frontend must show the same number the engine will persist, but Vite can't i
 
 ---
 
+## Composition — zones, appliances and the survey
+
+A blueprint whose `composition_schema` is non-empty is driven by **zones** rather than by typed
+scalars. The derivation lives in
+[`_shared/blueprint/composition.ts`](../supabase/functions/_shared/blueprint/composition.ts) and is
+mirrored to `src/utils/blueprintComposition.ts` by `npm run blueprint:mirror`. Three zone kinds:
+
+| `kind` | What it holds | What it derives |
+|---|---|---|
+| `units` | module rows (kind × width × how many) | run length, unit counts, the hardware schedule |
+| `surface` | one length × a material rate | its length, from an override, a **seat count**, or the run it sits on |
+| `appliances` | appliance rows (what × who supplies it × where it goes) | the appliance list and the **service connections** |
+
+### An appliance is priced by who supplies it
+
+`supply: 'ours' | 'existing'`. That single answer decides the **money and nothing else**:
+
+- **`ours`** — the machine is priced, from a flat `unit_price` or from an `option_group` model list
+  (absorbed exactly like a zone global's rate table, so it can never be charged twice).
+- **`existing`** — the customer already owns it. Nothing is charged for the machine. The aperture,
+  the housing, the fitting and every connection it needs are unchanged.
+
+That asymmetry is the point. "I already have a fridge-freezer, a hob and a washing machine" is the
+commonest answer on a kitchen survey, and a €0 line is a valid line — without the connections still
+being counted, nothing downstream can distinguish *the customer owns one* from *nobody thought
+about it*.
+
+A **placement** (`tall unit` / `highboard` / `under the worktop` / `stand alone`) may declare the
+`housing` module it needs. That is **checked** against the configured layout and reported as an
+issue when it is missing or short — never satisfied by inserting the cabinet, which would change
+the customer's price without them asking.
+
+An appliance's `energy` is cross-checked against the zone's energy **choice global**: a gas hob in a
+kitchen that only lists electricity is a survey problem, and the moment to say so is while somebody
+is still specifying it.
+
+### Choice globals — the answers that carry no price
+
+`type: 'choice'` globals are spec: open-plan or separate, 45cm or 60cm, which supplies the property
+has. They publish `<zone>_<key>_<value>` flags a formula can multiply by, may contribute to the
+schedule through `yields`, and absorb nothing. `multi: true` holds several answers at once; an
+unanswered multi global resolves to **nothing**, never to its first answer.
+
+### The schedule has two audiences
+
+`socket`, `socket_dedicated`, `water_in`, `waste_out`, `gas_point`, `duct_run` and `carbon_filter`
+are service connections; everything else is hardware. `SERVICE_YIELD_KEYS` is the single list that
+splits them, because a workshop reads one half of the schedule and an electrician reads the other.
+Both halves are subject to the same completeness rule: a quantity derived and consumed by no
+schedule line raises an issue rather than sitting at zero unnoticed.
+
+Guarded by [`tests/unit/blueprintComposition.test.ts`](../tests/unit/blueprintComposition.test.ts).
+
+---
+
 ## Public estimator — `/tools/project-plan`
 
 Anonymous lead-gen, same family as the other [public tools](#related):

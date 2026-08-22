@@ -15,6 +15,14 @@
  *  - `Publishes as` is the formula variable the zone's derived length appears under. Point it at
  *    the variable your per-metre task lines already use (`run_length`) and those lines keep working
  *    untouched, now fed by the real composition instead of a number somebody typed.
+ *  - An APPLIANCES zone is priced by who supplies each row, not by what is in it. Anything the
+ *    customer already owns costs nothing and still books its housing and its connections, so the
+ *    two fields that matter most on an appliance are `Goes in` (which cabinet, checked against the
+ *    layout) and `Needs` (sockets, water, waste, gas, duct — counted whoever buys the machine).
+ *
+ * `Yields` / `Needs` are the hardware and services bag, written as `key:n` pairs — `doors:2,
+ * shelves:1` on a unit, `socket:1, water_in:1` on an appliance. They are what the schedule counts;
+ * a key nothing consumes raises an issue rather than sitting at zero unnoticed.
  *
  * Read-only is enforced by the parent's `<fieldset disabled>`, same as BlueprintScope.
  */
@@ -27,8 +35,11 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Switch } from '@/components/core/ui/switch';
 import type {
+  AppliancePlacementDef,
+  ApplianceTypeDef,
   ModuleOptionDef,
   ModuleTypeDef,
+  Yields,
   ZoneDef,
   ZoneGlobalDef,
 } from '@/utils/blueprintComposition';
@@ -43,6 +54,21 @@ export interface CompositionEditorProps {
 
 const selectClass = 'h-8 bg-transparent border border-border rounded px-1.5 text-xs min-w-0';
 const keyify = (v: string) => v.replace(/[^a-zA-Z0-9_]/g, '_');
+
+/** `{ doors: 2, shelves: 1 }` ⇄ `doors:2, shelves:1`. One text field for the whole counts bag. */
+const formatYields = (y: Yields | undefined): string =>
+  Object.entries(y ?? {}).filter(([, v]) => v != null).map(([k, v]) => `${k}:${v}`).join(', ');
+
+const parseYields = (raw: string): Yields | undefined => {
+  const out: Yields = {};
+  for (const part of raw.split(',')) {
+    const [key, value] = part.split(':').map((x) => x.trim());
+    const n = Number(value);
+    if (!key || !Number.isFinite(n) || n === 0) continue;
+    out[keyify(key)] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
+};
 
 export const CompositionEditor: React.FC<CompositionEditorProps> = ({
   schema, optionGroups, readOnly = false, onChange,
@@ -73,6 +99,17 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
     const mod = schema[zi].modules[mi];
     patchModule(zi, mi, { options: (mod.options ?? []).map((o, i) => (i === oi ? { ...o, ...patch } : o)) });
   };
+
+  const patchAppliance = (zi: number, ai: number, patch: Partial<ApplianceTypeDef>) =>
+    patchZone(zi, { appliances: (schema[zi].appliances ?? []).map((a, i) => (i === ai ? { ...a, ...patch } : a)) });
+
+  const patchPlacement = (zi: number, ai: number, pi: number, patch: Partial<AppliancePlacementDef>) => {
+    const app = (schema[zi].appliances ?? [])[ai];
+    patchAppliance(zi, ai, { placements: (app.placements ?? []).map((p, i) => (i === pi ? { ...p, ...patch } : p)) });
+  };
+
+  /** Only a `units` zone can house an appliance — a worktop is not somewhere a fridge goes. */
+  const unitZones = schema.filter((z) => z.kind === 'units');
 
   return (
     <Card className="dashboard-card">
@@ -125,6 +162,7 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                 >
                   <option value="units">Units</option>
                   <option value="surface">Surface</option>
+                  <option value="appliances">Appliances</option>
                 </select>
                 <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   Optional
@@ -161,18 +199,48 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                       />
                     </span>
                     {zone.kind === 'surface' && (
-                      <span className="flex items-center gap-1">
-                        Length follows
-                        <select
-                          className={selectClass} value={zone.length_from ?? ''}
-                          onChange={(e) => patchZone(zi, { length_from: e.target.value || undefined })}
-                        >
-                          <option value="">—</option>
-                          {schema.filter((z) => z.kind === 'units').map((z) => (
-                            <option key={z.key} value={z.key}>{z.label}</option>
-                          ))}
-                        </select>
-                      </span>
+                      <>
+                        <span className="flex items-center gap-1">
+                          Length follows
+                          <select
+                            className={selectClass} value={zone.length_from ?? ''}
+                            onChange={(e) => patchZone(zi, { length_from: e.target.value || undefined })}
+                          >
+                            <option value="">—</option>
+                            {unitZones.map((z) => (
+                              <option key={z.key} value={z.key}>{z.label}</option>
+                            ))}
+                          </select>
+                        </span>
+                        {/* …or from a seat count, which wins over the run. A breakfast bar is as
+                            long as the people at it, and "how many eat here" is the answer the
+                            customer actually has. */}
+                        <span className="flex items-center gap-1">
+                          or from seats
+                          <select
+                            className={selectClass} value={zone.seats?.global ?? ''}
+                            onChange={(e) => patchZone(zi, {
+                              seats: e.target.value
+                                ? { cm_per_seat: 60, ...(zone.seats ?? {}), global: e.target.value }
+                                : undefined,
+                            })}
+                          >
+                            <option value="">—</option>
+                            {(zone.globals ?? []).filter((g) => g.type === 'number').map((g) => (
+                              <option key={g.key} value={g.key}>{g.label}</option>
+                            ))}
+                          </select>
+                          {zone.seats && (
+                            <>
+                              <Input
+                                className="h-6 w-14 text-right" aria-label="Centimetres per seat"
+                                value={String(zone.seats.cm_per_seat ?? 60)}
+                                onChange={(e) => patchZone(zi, { seats: { ...zone.seats!, cm_per_seat: Number(e.target.value) || 0 } })}
+                              />cm each
+                            </>
+                          )}
+                        </span>
+                      </>
                     )}
                   </div>
 
@@ -197,12 +265,52 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                         <Input className="h-7 flex-1 min-w-[8rem]" value={g.label} placeholder="label" onChange={(e) => patchGlobal(zi, gi, { label: e.target.value })} />
                         <select className={selectClass} value={g.type} onChange={(e) => patchGlobal(zi, gi, { type: e.target.value as ZoneGlobalDef['type'] })}>
                           <option value="number">Number</option>
-                          <option value="option">Choice</option>
+                          <option value="option">Price list</option>
+                          <option value="choice">Answer (no price)</option>
                         </select>
                         {g.type === 'number' ? (
                           <>
                             <Input className="h-7 w-16" value={g.unit ?? ''} placeholder="unit" onChange={(e) => patchGlobal(zi, gi, { unit: e.target.value || undefined })} />
                             <Input className="h-7 w-20 text-right" value={String(g.default ?? 0)} placeholder="default" onChange={(e) => patchGlobal(zi, gi, { default: Number(e.target.value) || 0 })} />
+                          </>
+                        ) : g.type === 'choice' ? (
+                          <>
+                            {/* Spec, not money: these answers are published as `<zone>_<key>_<value>`
+                                flags a formula can multiply by, and nothing is absorbed. */}
+                            <div className="flex-1 min-w-[12rem] space-y-1">
+                              {(g.choices ?? []).map((c, ci) => (
+                                <div key={ci} className="flex items-center gap-1.5">
+                                  <Input
+                                    className="h-6 w-24" value={c.value} placeholder="value"
+                                    onChange={(e) => patchGlobal(zi, gi, { choices: (g.choices ?? []).map((x, i) => (i === ci ? { ...x, value: keyify(e.target.value) } : x)) })}
+                                  />
+                                  <Input
+                                    className="h-6 flex-1" value={c.label} placeholder="label"
+                                    onChange={(e) => patchGlobal(zi, gi, { choices: (g.choices ?? []).map((x, i) => (i === ci ? { ...x, label: e.target.value } : x)) })}
+                                  />
+                                  {!readOnly && (
+                                    <Button
+                                      variant="ghost" size="icon" className="h-6 w-6" aria-label={`Remove ${c.label}`}
+                                      onClick={() => patchGlobal(zi, gi, { choices: (g.choices ?? []).filter((_, i) => i !== ci) })}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                              {!readOnly && (
+                                <Button
+                                  variant="ghost" size="sm" className="h-6 text-[11px] text-muted-foreground"
+                                  onClick={() => patchGlobal(zi, gi, { choices: [...(g.choices ?? []), { value: `v${(g.choices ?? []).length + 1}`, label: 'New answer' }] })}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" /> Answer
+                                </Button>
+                              )}
+                            </div>
+                            <label className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
+                              More than one
+                              <Switch checked={!!g.multi} onCheckedChange={(v) => patchGlobal(zi, gi, { multi: v || undefined, default: undefined })} />
+                            </label>
                           </>
                         ) : (
                           <>
@@ -290,6 +398,17 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                               Margin
                               <Input className="h-6 w-14 text-right" value={String(m.margin_pct ?? 0)} onChange={(e) => patchModule(zi, mi, { margin_pct: Number(e.target.value) || 0 })} />%
                             </span>
+                            {/* What one piece is made of. Uncontrolled + onBlur: reformatting the
+                                bag on every keystroke would eat the colon you are still typing. */}
+                            <span className="flex items-center gap-1">
+                              Yields
+                              <Input
+                                className="h-6 w-56" placeholder="doors:2, shelves:1, legs:4"
+                                key={`${zone.key}-${m.key}-yields`}
+                                defaultValue={formatYields(m.yields)}
+                                onBlur={(e) => patchModule(zi, mi, { yields: parseYields(e.target.value) })}
+                              />
+                            </span>
                             {!readOnly && (
                               <Button
                                 variant="ghost" size="sm" className="h-6 text-[11px]"
@@ -358,6 +477,150 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                               ))}
                             </div>
                           ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Appliances ──────────────────────────────────────────
+                      Priced only when we supply the row. Everything else about an appliance —
+                      the housing it needs and the connections it books — applies whoever bought
+                      it, which is why `Goes in` and `Needs` sit next to the price rather than
+                      behind it. */}
+                  {zone.kind === 'appliances' && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">Appliances it can accommodate</span>
+                        {!readOnly && (
+                          <Button
+                            variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground"
+                            onClick={() => patchZone(zi, {
+                              appliances: [...(zone.appliances ?? []), { key: `a_${(zone.appliances ?? []).length + 1}`, label: 'New appliance' }],
+                            })}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Add appliance
+                          </Button>
+                        )}
+                      </div>
+
+                      {(zone.appliances ?? []).map((a, ai) => (
+                        <div key={ai} className="rounded-md border border-border/60 bg-background/40 px-2 py-1.5 space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Input className="h-7 w-24" value={a.key} placeholder="key" onChange={(e) => patchAppliance(zi, ai, { key: keyify(e.target.value) })} />
+                            <Input className="h-7 flex-1 min-w-[8rem]" value={a.label} placeholder="label" onChange={(e) => patchAppliance(zi, ai, { label: e.target.value })} />
+                            <select
+                              className={`${selectClass} min-w-[9rem]`} value={a.option_group ?? ''}
+                              onChange={(e) => patchAppliance(zi, ai, { option_group: e.target.value || undefined })}
+                            >
+                              <option value="">Flat price…</option>
+                              {optionGroups.map((og) => <option key={og} value={og}>{og}</option>)}
+                            </select>
+                            {!a.option_group && (
+                              <Input
+                                className="h-7 w-20 text-right" placeholder="price" value={a.unit_price != null ? String(a.unit_price) : ''}
+                                onChange={(e) => patchAppliance(zi, ai, { unit_price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                              />
+                            )}
+                            {!readOnly && (
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7" aria-label={`Remove ${a.label}`}
+                                onClick={() => patchZone(zi, { appliances: (zone.appliances ?? []).filter((_, i) => i !== ai) })}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3 pl-1 text-[11px] text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              Aperture
+                              <Input
+                                className="h-6 w-16 text-right" value={a.width_cm != null ? String(a.width_cm) : ''} placeholder="60"
+                                onChange={(e) => patchAppliance(zi, ai, { width_cm: e.target.value === '' ? undefined : Number(e.target.value) })}
+                              />cm
+                            </span>
+                            <span className="flex items-center gap-1">
+                              Runs on
+                              <Input
+                                className="h-6 w-24" value={a.energy ?? ''} placeholder="electricity"
+                                onChange={(e) => patchAppliance(zi, ai, { energy: keyify(e.target.value) || undefined })}
+                              />
+                            </span>
+                            <span className="flex items-center gap-1">
+                              Needs
+                              <Input
+                                className="h-6 w-56" placeholder="socket:1, water_in:1, waste_out:1"
+                                key={`${zone.key}-${a.key}-requires`}
+                                defaultValue={formatYields(a.requires)}
+                                onBlur={(e) => patchAppliance(zi, ai, { requires: parseYields(e.target.value) })}
+                              />
+                            </span>
+                            <label className="flex items-center gap-1">
+                              Usually already owned
+                              <Switch
+                                checked={a.default_supply === 'existing'}
+                                onCheckedChange={(v) => patchAppliance(zi, ai, { default_supply: v ? 'existing' : undefined })}
+                              />
+                            </label>
+                            {!readOnly && (
+                              <Button
+                                variant="ghost" size="sm" className="h-6 text-[11px]"
+                                onClick={() => patchAppliance(zi, ai, {
+                                  placements: [...(a.placements ?? []), { value: `p${(a.placements ?? []).length + 1}`, label: 'New position' }],
+                                })}
+                              >
+                                <Plus className="h-3 w-3 mr-1" /> Add a position
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* Where it can go, and which cabinet has to be in the layout for it. */}
+                          {(a.placements ?? []).map((p, pi) => {
+                            const housingZone = schema.find((z) => z.key === p.housing?.zone);
+                            return (
+                              <div key={pi} className="flex flex-wrap items-center gap-1.5 rounded border border-dashed border-border/70 p-1.5">
+                                <Input
+                                  className="h-6 w-24" value={p.value} placeholder="value"
+                                  onChange={(e) => patchPlacement(zi, ai, pi, { value: keyify(e.target.value) })}
+                                />
+                                <Input
+                                  className="h-6 flex-1 min-w-[7rem]" value={p.label} placeholder="label"
+                                  onChange={(e) => patchPlacement(zi, ai, pi, { label: e.target.value })}
+                                />
+                                <span className="text-[11px] text-muted-foreground">in</span>
+                                <select
+                                  className={selectClass} value={p.housing?.zone ?? ''}
+                                  onChange={(e) => patchPlacement(zi, ai, pi, {
+                                    housing: e.target.value ? { zone: e.target.value, module: '' } : undefined,
+                                  })}
+                                >
+                                  <option value="">nothing in particular</option>
+                                  {unitZones.map((z) => <option key={z.key} value={z.key}>{z.label}</option>)}
+                                </select>
+                                {p.housing && (
+                                  <select
+                                    className={selectClass} value={p.housing.module}
+                                    onChange={(e) => patchPlacement(zi, ai, pi, { housing: { zone: p.housing!.zone, module: e.target.value } })}
+                                  >
+                                    <option value="">choose a unit…</option>
+                                    {(housingZone?.modules ?? []).map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                                  </select>
+                                )}
+                                <Input
+                                  className="h-6 w-20 text-right" value={p.price != null ? String(p.price) : ''} placeholder="fitting"
+                                  onChange={(e) => patchPlacement(zi, ai, pi, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                />
+                                {!readOnly && (
+                                  <Button
+                                    variant="ghost" size="icon" className="h-6 w-6" aria-label={`Remove ${p.label}`}
+                                    onClick={() => patchAppliance(zi, ai, { placements: (a.placements ?? []).filter((_, i) => i !== pi) })}
+                                  >
+                                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ))}
                     </div>
