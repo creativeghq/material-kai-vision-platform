@@ -19,7 +19,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import {
   generateImageWithGemini,
   generateImageWithGrok,
@@ -537,7 +537,15 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // An image this platform generated is exempt — we made it, and re-classifying every
     // "warmer lighting" on our own render would tax the normal design loop for nothing.
     // Recognised by its storage path, not by the caller's word for it.
-    const isOurs = /\/generation-images\/.*\/gen\//.test(body.reference_image_url);
+    //
+    // This used to be a lone `/\/generation-images\/.*\/gen\//` regex, which matches ONLY the
+    // per-session layout. The multi-model grid never produces that layout: MIVAA calls this
+    // function with no conversation id, so every grid tile lands on the legacy `gemini/` prefix
+    // and was treated as third-party content — paying for a Claude classification on every edit,
+    // and refused outright whenever the classifier could not run. The rule now lives in
+    // storage-paths.ts next to the builder that creates these paths, as an allowlist that
+    // deliberately excludes `reference-images/` (same bucket, user-supplied).
+    const isOurs = isPlatformGeneratedImage(body.reference_image_url);
     const gate = await assertEditableSource(
       supabase,
       body.reference_image_url,
