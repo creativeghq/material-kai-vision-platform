@@ -30,6 +30,7 @@ import type {
   UpdateProductConfig,
   CreateTaskConfig,
   AdvanceDealStageConfig,
+  CreatePlannedPaymentConfig,
   RunEdgeFunctionConfig,
   LogEventConfig,
   SendAgentMessageConfig,
@@ -604,6 +605,68 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             onChange={(fields) => onChange({ ...cfg, fields })}
             hint="Allowlisted contact fields only (name, email, phone, status, lead_status…). Values may use {{trigger.data.x}}."
           />
+        </div>
+      );
+    }
+
+    case 'create_planned_payment': {
+      const cfg = config as CreatePlannedPaymentConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">What it is for</Label>
+            <Input
+              value={cfg.title || ''}
+              onChange={(e) => onChange({ ...cfg, title: e.target.value })}
+              placeholder="e.g. Chase {{trigger.data.invoice_number}}"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Amount</Label>
+              <Input
+                inputMode="decimal"
+                value={String(cfg.amount ?? '')}
+                onChange={(e) => onChange({ ...cfg, amount: Number(e.target.value) })}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Direction</Label>
+              <Select
+                value={cfg.direction || 'out'}
+                onValueChange={(v) => onChange({ ...cfg, direction: v as 'in' | 'out' })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in">Money in</SelectItem>
+                  <SelectItem value="out">Money out</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Currency</Label>
+              <Input
+                value={cfg.currency || ''}
+                onChange={(e) => onChange({ ...cfg, currency: e.target.value })}
+                placeholder="EUR"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Scheduled for</Label>
+            <Input
+              type="date"
+              value={cfg.scheduled_for || ''}
+              onChange={(e) => onChange({ ...cfg, scheduled_for: e.target.value })}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Required. Nothing here derives &quot;today&quot; — a schedule with no date is not a schedule.
+            </p>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            This adds a forecast entry and moves no money. Settling it is still a recorded payment.
+          </p>
         </div>
       );
     }

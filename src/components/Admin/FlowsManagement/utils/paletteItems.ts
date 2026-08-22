@@ -537,6 +537,10 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Move Deal Stage', description: 'Advance a deal along its pipeline', icon: 'Kanban', color: 'blue',
     defaultData: { label: 'Move Deal Stage', category: 'action', actionType: 'advance_deal_stage', config: { deal_id: '', stage: '' } } as ActionNodeData },
 
+  { type: 'actionNode', category: 'action', subType: 'create_planned_payment', group: 'Finance',
+    label: 'Schedule Payment', description: 'Add money expected in or out to the cash-flow forecast', icon: 'CalendarClock', color: 'blue',
+    defaultData: { label: 'Schedule Payment', category: 'action', actionType: 'create_planned_payment', config: { title: '', amount: 0, direction: 'out', scheduled_for: '' } } as ActionNodeData },
+
   // ── Data ──
   { type: 'actionNode', category: 'action', subType: 'update_product', group: 'Data',
     label: 'Update Product', description: 'Edit product fields', icon: 'PackageCheck', color: 'blue',

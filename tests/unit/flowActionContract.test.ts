@@ -99,6 +99,12 @@ describe('an action that CREATES a record is held to the prefill rule', () => {
    * Money-moving and legally-numbered documents produce a PREFILL, never a finished record — the
    * same rule the template system follows. An invoice conjured behind the operator skips
    * numbering, buyer-risk and myDATA classification.
+   *
+   * `planned_payments` is deliberately NOT on this list, and the distinction is not a technicality:
+   * a planned payment moves no money. It is an entry in the cash-flow forecast, and
+   * `paid_payment_id` is what links it to the real payment if one ever happens. Nothing is
+   * numbered, nothing reaches AADE, and deleting one costs nothing. Recorded here so the next
+   * person can see it was decided rather than missed.
    */
   const FORBIDDEN_CREATES = ['invoices', 'orders', 'payments', 'supplier_bills', 'credit_notes'];
 
@@ -123,6 +129,20 @@ describe('an action that CREATES a record is held to the prefill rule', () => {
       offenders.join('\n') + '\nA flow must not conjure a fiscal document behind the operator: '
         + 'it skips numbering, buyer-risk and myDATA classification. Produce a prefill instead.',
     ).toEqual([]);
+  });
+
+  it('a scheduled payment verifies its settlement target belongs to the workspace', () => {
+    const i = ENGINE.indexOf("case 'create_planned_payment':");
+    expect(i, 'create_planned_payment should exist').toBeGreaterThan(-1);
+    const rest = ENGINE.slice(i);
+    const end = rest.indexOf("\n    case '", 1);
+    const body = end > 0 ? rest.slice(0, end) : rest;
+    // A flow may name an invoice or a bill to settle. flow-engine holds the service role, so
+    // nothing else checks that the document is this tenant's.
+    expect(body).toMatch(/eq\('workspace_id', scope\.workspaceId\)/);
+    // And it must refuse to invent a date: the DB session runs in UTC, so a derived "today" files
+    // a Greek workspace's payment to yesterday.
+    expect(body, 'scheduled_for must be required, never defaulted').toMatch(/scheduled_for must be/);
   });
 
   it('create_task scopes its write to the flow workspace before inserting', () => {

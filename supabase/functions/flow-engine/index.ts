@@ -1377,6 +1377,64 @@ async function executeAction(
       return { output: { moved: !!data, deal_id: dealId, from, to: stage } };
     }
 
+    /**
+     * Schedule money that is expected to move (#378 Phase 4).
+     *
+     * Allowed under the prefill rule where create_expense and raise_purchase_order are not, and the
+     * distinction is not a technicality: a planned payment MOVES NO MONEY. It is an entry in the
+     * cash-flow forecast, and `planned_payments.paid_payment_id` is what links it to the real
+     * payment if and when one happens. Nothing is numbered, nothing is transmitted to AADE, and
+     * deleting one costs nothing. An invoice or a supplier bill conjured behind the operator is a
+     * different animal entirely — those stay prefills.
+     *
+     * "Invoice issued -> schedule the chase" and "bill received -> schedule the payment" are the
+     * two this exists for, which is why the settlement target is accepted and verified.
+     */
+    case 'create_planned_payment': {
+      const title = String(resolved.title ?? '').trim();
+      const amount = Number(resolved.amount);
+      const direction = resolved.direction === 'out' ? 'out' : resolved.direction === 'in' ? 'in' : null;
+      const scheduledFor = typeof resolved.scheduled_for === 'string'
+        && /^\d{4}-\d{2}-\d{2}$/.test(resolved.scheduled_for)
+        ? resolved.scheduled_for : null;
+
+      if (!scope?.workspaceId) return { output: { skipped: true, reason: 'no_workspace_scope' } };
+      if (!title || title.includes('{{')) return { output: { skipped: true, reason: 'unresolved_title' } };
+      if (!Number.isFinite(amount) || amount <= 0) return { output: { skipped: true, reason: 'amount must be a positive number' } };
+      if (!direction) return { output: { skipped: true, reason: "direction must be 'in' or 'out'" } };
+      // No fallback to "today": the DB session runs in UTC, so a derived date files a Greek
+      // workspace's payment to yesterday. A schedule with no date is not a schedule.
+      if (!scheduledFor) return { output: { skipped: true, reason: 'scheduled_for must be a YYYY-MM-DD date' } };
+
+      // A settlement target is optional, but if one is named it must belong to this workspace —
+      // flow-engine holds the service role, so nothing else checks that.
+      const invoiceId = typeof resolved.invoice_id === 'string' && !resolved.invoice_id.includes('{{')
+        ? resolved.invoice_id : null;
+      const billId = typeof resolved.supplier_bill_id === 'string' && !resolved.supplier_bill_id.includes('{{')
+        ? resolved.supplier_bill_id : null;
+      for (const [table, id] of [['invoices', invoiceId], ['supplier_bills', billId]] as const) {
+        if (!id) continue;
+        const { data: found } = await supabase.from(table).select('id')
+          .eq('id', id).eq('workspace_id', scope.workspaceId).maybeSingle();
+        if (!found) return { output: { skipped: true, reason: `${table} not found in this workspace` } };
+      }
+
+      const { data, error } = await supabase.from('planned_payments').insert({
+        workspace_id: scope.workspaceId,
+        title,
+        amount,
+        direction,
+        scheduled_for: scheduledFor,
+        currency: typeof resolved.currency === 'string' && resolved.currency ? resolved.currency : 'EUR',
+        notes: typeof resolved.notes === 'string' ? resolved.notes : null,
+        invoice_id: invoiceId,
+        supplier_bill_id: billId,
+        created_by: userId ?? null,
+      }).select('id').maybeSingle();
+      if (error) throw new Error(`create_planned_payment failed: ${error.message}`);
+      return { output: { created: true, planned_payment_id: (data as { id?: string } | null)?.id ?? null, direction, amount } };
+    }
+
     default:
       return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
   }

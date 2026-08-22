@@ -629,6 +629,7 @@ export type ActionType =
   | 'update_product'
   | 'create_task'
   | 'advance_deal_stage'
+  | 'create_planned_payment'
   | 'run_edge_function'
   | 'log_event'
   | 'send_agent_message'
@@ -789,6 +790,29 @@ export interface AdvanceDealStageConfig {
   deal_id: string;
   /** A stage KEY belonging to this deal's type. The DB rejects anything else. */
   stage: string;
+}
+
+/**
+ * Schedule money that is expected to move (#378 Phase 4).
+ *
+ * Allowed where create_expense and raise_purchase_order are not, and the distinction is not a
+ * technicality: a planned payment MOVES NO MONEY. It is an entry in the cash-flow forecast, and
+ * `paid_payment_id` links it to the real payment if one happens. Nothing is numbered and nothing
+ * is transmitted to AADE. An invoice conjured behind the operator is a different animal — those
+ * stay prefills.
+ */
+export interface CreatePlannedPaymentConfig {
+  title: string;
+  amount: number;
+  /** 'in' = money we expect to receive, 'out' = money we expect to pay. */
+  direction: 'in' | 'out';
+  /** `YYYY-MM-DD`. Required — nothing derives "today" here, and a schedule with no date is not one. */
+  scheduled_for: string;
+  currency?: string;
+  notes?: string;
+  /** Optional settlement target. Verified against the flow's workspace before anything is written. */
+  invoice_id?: string;
+  supplier_bill_id?: string;
 }
 
 export interface RunEdgeFunctionConfig {
