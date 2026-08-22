@@ -1,14 +1,18 @@
 /**
- * "Who promotes my brand" — the supplier's side of an ambassadorship, and the only thing a brand
- * gets out of one. There is nothing to approve here: a professional who picked this company off
- * the platform's supplier list is already promoting it on their public profile. This says who
- * they are, what they promote it FOR, and how much reach that profile has.
+ * "Who promotes this brand" — the brand's side of an ambassadorship, and the only thing a brand
+ * gets out of one. There is nothing to approve: a professional who picked the company off the
+ * platform's supplier list is already promoting it on their public profile. This says who they
+ * are, what they promote it FOR, and how much reach that profile has.
  *
- * Read through `list_supplier_brand_ambassadors`, which checks workspace membership against the
- * JWT and only ever returns PUBLIC profiles — a private profile is not promoting anything yet.
+ * TWO PLACES, because a brand is looked at from two directions and both already existed:
+ *   - `mode="company"`  — the CRM company record's Market → Demand tab, which is where
+ *     per-supplier analytics live (#350). Anyone in the workspace looking at that supplier.
+ *   - `mode="supplier"` — the Supplier Portal, where a workspace that has CLAIMED its own
+ *     supplier identity looks at its own numbers.
+ * Same rendering, two RPCs, so the two views cannot drift into telling different stories.
  *
- * Renders inside the Supplier Portal (Profile → Supplier Portal, Finance → Payables,
- * /supplier-portal), which is where a claimed supplier already looks at its own numbers.
+ * Both RPCs check workspace membership against the JWT and only ever return PUBLIC profiles —
+ * a private profile is not promoting anything yet.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -21,21 +25,32 @@ import { UPLOAD_CATEGORIES, categoryDisplayName } from '@/lib/categoryFieldRegis
 import { initials, PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { relationshipDef } from '@/lib/ambassadorships';
 import {
-  listSupplierBrandAmbassadors, type SupplierBrandAmbassador,
+  listCompanyBrandAmbassadors, listSupplierBrandAmbassadors,
+  type SupplierBrandAmbassador,
 } from '@/services/ambassadorService';
 import { formatDate } from '@/utils/datetime';
 
-export const SupplierAmbassadorsPanel: React.FC<{ workspaceId: string | null }> = ({ workspaceId }) => {
+interface Props {
+  workspaceId: string | null;
+  /** `company` reads a CRM company record; `supplier` reads this workspace's claimed identity. */
+  mode: 'company' | 'supplier';
+  /** Required for `mode="company"`. */
+  companyId?: string;
+}
+
+export const BrandAmbassadorsPanel: React.FC<Props> = ({ workspaceId, mode, companyId }) => {
   const [rows, setRows] = useState<SupplierBrandAmbassador[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!workspaceId) { setLoading(false); return; }
+    if (!workspaceId || (mode === 'company' && !companyId)) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
-      setRows(await listSupplierBrandAmbassadors(workspaceId));
+      setRows(mode === 'company'
+        ? await listCompanyBrandAmbassadors(workspaceId, companyId as string)
+        : await listSupplierBrandAmbassadors(workspaceId));
     } catch (e) {
       // NOT swallowed into the empty state. A workspace with no claim returns zero ROWS, so an
       // error here means the read itself is broken — and "nobody promotes you" is exactly what a
@@ -46,7 +61,7 @@ export const SupplierAmbassadorsPanel: React.FC<{ workspaceId: string | null }> 
     } finally {
       setLoading(false);
     }
-  }, [workspaceId]);
+  }, [workspaceId, mode, companyId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -77,10 +92,13 @@ export const SupplierAmbassadorsPanel: React.FC<{ workspaceId: string | null }> 
     <Card className="dashboard-card border-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 font-medium">
-          <BadgeCheck className="h-4 w-4 text-primary" />Who promotes your brand
+          <BadgeCheck className="h-4 w-4 text-primary" />
+          {mode === 'company' ? 'Brand ambassadors' : 'Who promotes your brand'}
         </CardTitle>
         <p className="text-sm text-muted-foreground mt-1">
-          Professionals who list you on their public profile, and the categories they promote you in.
+          {mode === 'company'
+            ? 'Professionals who list this brand on their public profile, and the categories they promote it in. They declare it themselves — there is nothing to approve.'
+            : 'Professionals who list you on their public profile, and the categories they promote you in.'}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -88,15 +106,17 @@ export const SupplierAmbassadorsPanel: React.FC<{ workspaceId: string | null }> 
           <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
             <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium">Could not load your ambassadors.</p>
+              <p className="font-medium">Could not load the ambassadors.</p>
               <p className="text-xs text-muted-foreground">{error}</p>
             </div>
           </div>
         ) : rows.length === 0 ? (
           <HubEmptyState
             icon={Users}
-            title="Nobody lists your brand yet"
-            description="When a professional picks your company off the supplier list and adds it to their profile, they appear here — no approval needed on either side."
+            title={mode === 'company' ? 'Nobody lists this brand yet' : 'Nobody lists your brand yet'}
+            description={mode === 'company'
+              ? 'When a professional picks this company off the supplier list and adds it to their profile, they appear here.'
+              : 'When a professional picks your company off the supplier list and adds it to their profile, they appear here — no approval needed on either side.'}
           />
         ) : (
           <>
@@ -108,7 +128,7 @@ export const SupplierAmbassadorsPanel: React.FC<{ workspaceId: string | null }> 
               />
               <HubStatTile
                 label="Profile views" category="COMBINED REACH" value={reach}
-                help="Total views of the public profiles that list you. Their audience, not yours."
+                help="Total views of the public profiles that list this brand. Their audience, not the brand's."
               />
             </HubStatGrid>
 

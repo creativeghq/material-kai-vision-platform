@@ -87,13 +87,19 @@ which #350 established no account has ever held.
   returns business-identity fields only - never the VAT number or contact email. A name that is not
   on the list can still be used; it simply carries no `platform_supplier_id`, so it never reaches a
   brand.
-- **The supplier** sees who promotes it in the **Supplier Portal**
-  (`SupplierAmbassadorsPanel`), via `list_supplier_brand_ambassadors(workspace_id)` - membership
-  asserted from the JWT, rows limited to suppliers this workspace has CLAIMED
-  (`platform_suppliers.claimed_workspace_id`, claim not revoked), and to PUBLIC profiles, because a
-  private profile is not promoting anything yet. The join is
-  `platform_supplier_id = ps.id OR lower(btrim(brand_name)) = lower(btrim(ps.legal_name))`, so a
-  typed name that happens to be the company's legal name still counts.
+- **The brand** is read from two directions, by one component (`BrandAmbassadorsPanel`), because
+  both surfaces already existed:
+  - **CRM company -> Market -> Demand** (`mode="company"`), which is where per-supplier analytics
+    live (#350). `list_brand_ambassadors_for_company(workspace_id, company_id)` matches a company
+    to ambassadorships three ways, since a brand is named three different ways here: the company's
+    VAT -> `platform_suppliers` -> `platform_supplier_id`; the brand names on products already
+    stamped `brand_company_id`; and the company's own name.
+  - **Supplier Portal** (`mode="supplier"`), where a workspace that CLAIMED its own supplier
+    identity sees its own numbers. `list_supplier_brand_ambassadors(workspace_id)` is limited to
+    suppliers with `claimed_workspace_id = <this workspace>` and no revoked claim.
+
+  Both assert workspace membership from the JWT and return PUBLIC profiles only - a private
+  profile is not promoting anything yet.
 - `get_brand_category_coverage(brands[])` is SECURITY **INVOKER**, so it reports the categories a
   brand has products in *within the catalogs the caller can already read*. Advisory only.
 

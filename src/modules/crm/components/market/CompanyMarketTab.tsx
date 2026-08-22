@@ -15,6 +15,7 @@ import { financeService } from '@/modules/finance/services/financeService';
 import { findCompetitors, type CompetitorOrg } from '@/services/companyEnrichService';
 import { marketCheck, trackProduct, untrackProduct, type MarketStats } from '@/services/priceMonitoringApi';
 import { productDetailService } from '@/services/productDetailService';
+import { BrandAmbassadorsPanel } from '@/components/features/profile/BrandAmbassadorsPanel';
 
 /** The seed identity the Market tab reads off the company row. */
 export interface CompanyMarketSeed {
@@ -557,6 +558,9 @@ const DemandTab: React.FC<CompanyMarketTabProps> = ({ companyId, workspaceId, co
   return (
     <>
       <MarketPositionCard stats={stats} />
+      {/* Advocacy is demand too, and the loudest kind: a professional who has put this brand on
+          their own public profile. The same component a claimed supplier sees in its portal. */}
+      <BrandAmbassadorsPanel mode="company" workspaceId={workspaceId} companyId={companyId} />
       <AttributeExplorerCard stats={stats} companyId={companyId} workspaceId={workspaceId} company={company} />
     </>
   );

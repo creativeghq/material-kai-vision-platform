@@ -150,7 +150,7 @@ describe('the link to the supplier list', () => {
     for (const rel of [
       'components/core/Profile/AmbassadorTab.tsx',
       'components/features/profile/AmbassadorShowcase.tsx',
-      'components/features/profile/SupplierAmbassadorsPanel.tsx',
+      'components/features/profile/BrandAmbassadorsPanel.tsx',
       'lib/ambassadorships.ts',
       'services/ambassadorService.ts',
     ]) {

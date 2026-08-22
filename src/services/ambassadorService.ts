@@ -157,6 +157,27 @@ export async function listSupplierBrandAmbassadors(
   }));
 }
 
+/**
+ * The same list, asked from the other direction: a CRM company record rather than a claimed
+ * supplier identity. The CRM company's Market tab is where per-supplier analytics live (#350),
+ * and a company there is matched to ambassadorships by VAT, by the brand names on products
+ * already stamped `brand_company_id`, and by its own name.
+ */
+export async function listCompanyBrandAmbassadors(
+  workspaceId: string,
+  companyId: string,
+): Promise<SupplierBrandAmbassador[]> {
+  const { data, error } = await db().rpc('list_brand_ambassadors_for_company', {
+    p_workspace_id: workspaceId,
+    p_company_id: companyId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as SupplierBrandAmbassador[]).map((r) => ({
+    ...r,
+    ambassador_profile_views: Number(r.ambassador_profile_views ?? 0),
+  }));
+}
+
 export interface BrandCategoryCoverage {
   brand_key: string;
   category_key: string;

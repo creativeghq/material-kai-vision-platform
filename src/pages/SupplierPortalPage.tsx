@@ -10,7 +10,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supplierClaimsService, type SupplierInboundOrder } from '@/services/supplierClaimsService';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { formatDate } from '@/utils/datetime';
-import { SupplierAmbassadorsPanel } from '@/components/features/profile/SupplierAmbassadorsPanel';
+import { BrandAmbassadorsPanel } from '@/components/features/profile/BrandAmbassadorsPanel';
 
 /**
  * Supplier portal. A claimed supplier sees the purchase
@@ -162,7 +162,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
       {/* The other half of a supplier's presence here: not what was ordered, but who is out
           there recommending you. Rendered for a claimed supplier only — the RPC returns nothing
           for an unclaimed workspace, and the banner above already explains that state. */}
-      {!notClaimed && <SupplierAmbassadorsPanel workspaceId={activeWorkspaceId} />}
+      {!notClaimed && <BrandAmbassadorsPanel mode="supplier" workspaceId={activeWorkspaceId} />}
     </div>
   );
 
