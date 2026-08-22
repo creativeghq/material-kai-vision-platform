@@ -28,9 +28,13 @@
  *         sentence is wrong and it silenced a four-hour outage (see `upstream-failure.ts`).
  *       - a 4xx that is really an RLS refusal → 403, not reported (a correct authorization
  *         answer), with the policy's own text kept out of the response body.
- *       - a 4xx that is really a MISSING GRANT → 500 and reported. Nobody granted the role;
- *         no caller can fix it, and the feature behind it is dead for everyone until someone
- *         notices. `permission denied for function is_workspace_member` was in the logs.
+ *       - a 4xx that is really a MISSING GRANT → 500 and reported, but ONLY when the caller
+ *         was authenticated. Postgres writes the same "permission denied for function x"
+ *         whether we forgot a GRANT or an ANON caller reached an authenticated-only object —
+ *         and the second is a correct refusal (403), not a bug. `is_workspace_member` and
+ *         `get_related_products` are both granted correctly; every "permission denied" for
+ *         them in the logs was the integration suite probing as anon. Reporting those would
+ *         have made the new alert worthless on day one.
  *       - 5xx whose message reads like a client error (validation / auth / method /
  *         not-found) → NOT reported, even though some functions mislabel these as
  *         500 (see `isLikelyClientError`). The HTTP response is left untouched —
@@ -62,6 +66,7 @@ import {
   ACCESS_DENIED_MESSAGE, ACTION_UNAVAILABLE_MESSAGE, UPSTREAM_UNAVAILABLE_MESSAGE,
   classifyDbFailure, describeDeniedObject, summariseUpstreamFailure,
 } from './upstream-failure.ts';
+import { callerRoleFromAuthHeader } from './caller-role.ts';
 
 type Handler = (req: Request) => Promise<Response> | Response;
 
@@ -237,9 +242,17 @@ export function withApiLogging(
           statusCode = 503;
           // Kept out of CLIENT_ERROR_RE's way on purpose: this must reach Sentry.
           errorMessage = `upstream data service unavailable — ${detail}`;
+        } else if (failure === 'grant_missing' && callerRoleFromAuthHeader(authHeader) === 'anon') {
+          // An anon caller reaching an authenticated-only object. Postgres words this exactly
+          // like a forgotten GRANT, but it is the intended refusal — the integration suite
+          // produces a run of them on every deploy. A correct answer, and not a bug.
+          response = jsonError(ACCESS_DENIED_MESSAGE, 403, 'forbidden');
+          statusCode = 403;
+          errorMessage = `refused for an anonymous caller — ${describeDeniedObject(errorMessage)}`;
         } else if (failure === 'grant_missing') {
-          // Our deployment is wrong, not their request. Phrased without the words
-          // "permission denied" so CLIENT_ERROR_RE cannot suppress the report.
+          // A caller who WAS authenticated still could not use it: our deployment is wrong, not
+          // their request. Phrased without the words "permission denied" so CLIENT_ERROR_RE
+          // cannot suppress the report.
           const target = describeDeniedObject(errorMessage);
           response = jsonError(ACTION_UNAVAILABLE_MESSAGE, 500, 'grant_missing');
           statusCode = 500;

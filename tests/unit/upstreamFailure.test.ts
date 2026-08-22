@@ -5,6 +5,7 @@ import {
   ACCESS_DENIED_MESSAGE, ACTION_UNAVAILABLE_MESSAGE, UPSTREAM_UNAVAILABLE_MESSAGE,
   classifyDbFailure, describeDeniedObject, isUpstreamFailure, summariseUpstreamFailure,
 } from '../../supabase/functions/_shared/upstream-failure.ts';
+import { callerRoleFromAuthHeader } from '../../supabase/functions/_shared/caller-role.ts';
 
 /**
  * "The database is down" must not be reported as "your request was bad".
@@ -167,6 +168,34 @@ describe('"permission denied" is two different events', () => {
   });
 });
 
+describe('who was asking decides which "permission denied" it was', () => {
+  const jwt = (claims: Record<string, unknown>) =>
+    `header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
+
+  it.each([
+    ['anon key', jwt({ role: 'anon' }), 'anon'],
+    ['a signed-in user', jwt({ role: 'authenticated', sub: 'u1' }), 'authenticated'],
+    ['the service role', jwt({ role: 'service_role' }), 'service_role'],
+  ])('reads %s', (_label, token, expected) => {
+    expect(callerRoleFromAuthHeader(`Bearer ${token}`)).toBe(expected);
+    expect(callerRoleFromAuthHeader(token)).toBe(expected);
+  });
+
+  /**
+   * `unknown` must behave as "not anon", so an unreadable token downgrades to the REPORTED
+   * branch rather than silencing a genuine missing GRANT.
+   */
+  it.each([
+    ['nothing', null],
+    ['empty', ''],
+    ['not a jwt', 'Bearer abc123'],
+    ['not base64', 'Bearer a.!!!.c'],
+    ['no role claim', `Bearer ${jwt({ sub: 'u1' })}`],
+  ])('%s is unknown, never anon', (_label, header) => {
+    expect(callerRoleFromAuthHeader(header)).toBe('unknown');
+  });
+});
+
 describe('the wrapper still applies it', () => {
   const src = readFileSync(API_LOGGER, 'utf8');
 
@@ -180,6 +209,16 @@ describe('the wrapper still applies it', () => {
     expect(src).toMatch(/failure === 'upstream'[\s\S]{0,400}statusCode = 503/);
     expect(src).toMatch(/failure === 'grant_missing'[\s\S]{0,500}statusCode = 500/);
     expect(src).toMatch(/failure === 'rls_denied'[\s\S]{0,500}statusCode = 403/);
+  });
+
+  /**
+   * The integration suite probes as anon on every deploy and Postgres words those refusals
+   * exactly like a forgotten GRANT. Without this branch the new alert would fire a run of
+   * false 500s on its first day and be ignored by its second.
+   */
+  it('an anonymous caller refused by a GRANT is 403, not a reported bug', () => {
+    expect(src).toMatch(/grant_missing'\s*&&\s*callerRoleFromAuthHeader\(authHeader\) === 'anon'/);
+    expect(src).toMatch(/grant_missing'\s*&&[\s\S]{0,800}statusCode = 403/);
   });
 
   /**
