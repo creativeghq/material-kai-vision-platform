@@ -22,6 +22,10 @@
  *       - handler throws (unhandled) → captureException(realError) — stack-grouped
  *       - handler returns/throws 5xx  → captureMessage(error level), function + status
  *       - 4xx                          → never reported (client errors, not bugs)
+ *       - a 4xx whose failure is the DATABASE being unavailable → rewritten to 503 and
+ *         reported. A handler saying `HttpError(400, dbError.message)` is describing the
+ *         caller's input; when the thing it is describing is a Cloudflare 522 page, that
+ *         sentence is wrong and it silenced a four-hour outage (see `upstream-failure.ts`).
  *       - 5xx whose message reads like a client error (validation / auth / method /
  *         not-found) → NOT reported, even though some functions mislabel these as
  *         500 (see `isLikelyClientError`). The HTTP response is left untouched —
@@ -49,6 +53,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from './cors.ts';
 import { captureException, captureMessage } from './sentry.ts';
+import {
+  UPSTREAM_UNAVAILABLE_MESSAGE, isUpstreamFailure, summariseUpstreamFailure,
+} from './upstream-failure.ts';
 
 type Handler = (req: Request) => Promise<Response> | Response;
 
@@ -60,10 +67,18 @@ type Handler = (req: Request) => Promise<Response> | Response;
  */
 export class HttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /**
+   * The failure being reported, when there is one — a PostgrestError, a fetch rejection.
+   * Optional, because 207 existing call sites pass only `error.message`; the wrapper falls
+   * back to reading that text. Pass it in new code: a structured `code` classifies exactly,
+   * where a message can only be pattern-matched.
+   */
+  upstream?: unknown;
+  constructor(status: number, message: string, upstream?: unknown) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
+    this.upstream = upstream;
   }
 }
 
@@ -175,7 +190,7 @@ export function withApiLogging(
     }
 
     const durationMs = Date.now() - start;
-    const statusCode = response.status;
+    let statusCode = response.status;
 
     if (statusCode >= 400) {
       // The table has no error column — surface the error to the function log
@@ -188,6 +203,26 @@ export function withApiLogging(
       } catch {
         // Body not JSON or already consumed — skip
       }
+
+      // A 4xx that is really the data service being down. Both shapes reach here: a thrown
+      // HttpError(400, …) and a handler that caught the error and returned its own 4xx.
+      // The structured error wins when we have it; otherwise the message is all there is.
+      if (statusCode < 500 && isUpstreamFailure(
+        (thrownError as HttpError | null)?.upstream ?? thrownError ?? errorMessage,
+      )) {
+        const detail = summariseUpstreamFailure(errorMessage);
+        response = new Response(
+          JSON.stringify({ error: UPSTREAM_UNAVAILABLE_MESSAGE, code: 'upstream_unavailable' }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '5' },
+          },
+        );
+        statusCode = 503;
+        // Kept out of CLIENT_ERROR_RE's way on purpose: this must reach Sentry.
+        errorMessage = `upstream data service unavailable — ${detail}`;
+      }
+
       if (errorMessage) {
         console.error(`[api-logger] ${functionName} ${statusCode}: ${errorMessage}`);
       }
@@ -253,5 +288,5 @@ async function logToDb(
     is_internal_request: isInternal,
     created_at: new Date().toISOString(),
   });
-  if (error) console.error('[api-logger] insert failed:', error.message);
+  if (error) console.error('[api-logger] insert failed:', summariseUpstreamFailure(error.message));
 }
