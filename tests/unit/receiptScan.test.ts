@@ -87,6 +87,21 @@ describe('the paid call is paid for first', () => {
     expect(src).toMatch(/if\s*\(!debit\.success\)/);
     expect(src, 'a refusal must answer 402, not 200 with an error body').toMatch(/402/);
   });
+
+  /**
+   * …and is billed EXACTLY once.
+   *
+   * The per-unit debit writes an `ai_usage_logs` row carrying the credits and the billed USD.
+   * `callClaudeMessages` writes its own token-priced row unless told not to, so without this flag
+   * one scan appears in the ledger twice under two different prices — two derivations of one money
+   * quantity. Found by scanning a real receipt and reading the ledger afterwards, not by reading
+   * the code: the second row was absent only because the fire-and-forget log lost a race with the
+   * isolate shutting down, which is luck, not a design.
+   */
+  it('books the call once, not twice', () => {
+    expect(src, 'the model call must declare that its cost is already booked')
+      .toMatch(/costLoggedByCaller:\s*true/);
+  });
 });
 
 describe('the prompt comes from the database', () => {
