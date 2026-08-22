@@ -1340,6 +1340,43 @@ async function executeAction(
       return { output: { created: true, task_id: (data as { id?: string } | null)?.id ?? null, project_id: projectId } };
     }
 
+    /**
+     * Move a deal along the pipeline (#378 Phase 4).
+     *
+     * "Quote accepted -> Won", "invoice paid -> Closed" — the moves a salesperson makes by hand
+     * after something that already fired an event. No money, fully reversible, and the DB refuses
+     * an illegal destination on its own: stages are per deal TYPE, enforced by a composite FK on
+     * (deal_type_id, stage), so a construction deal physically cannot be moved into
+     * "Conveyancing". That rule lives in the schema rather than in this caller's good intentions.
+     *
+     * Scoped to the flow's workspace before the write, for the same reason create_task is:
+     * flow-engine holds the service role, so RLS is not the boundary here.
+     */
+    case 'advance_deal_stage': {
+      const dealId = String(resolved.deal_id ?? '');
+      const stage = String(resolved.stage ?? '').trim();
+      if (!dealId || dealId.includes('{{')) return { output: { skipped: true, reason: 'unresolved_deal_id' } };
+      if (!stage || stage.includes('{{')) return { output: { skipped: true, reason: 'unresolved_stage' } };
+
+      let sel = supabase.from('crm_deals').select('id, stage, deal_type_id').eq('id', dealId);
+      if (scope?.workspaceId) sel = sel.eq('workspace_id', scope.workspaceId);
+      const { data: deal } = await sel.maybeSingle();
+      if (!deal) return { output: { skipped: true, reason: 'deal not found in this workspace' } };
+
+      const from = (deal as { stage?: string }).stage ?? null;
+      // Already there: report it rather than writing, so a flow that fires twice does not look
+      // like it moved the deal twice in the run log.
+      if (from === stage) return { output: { skipped: true, reason: 'already_in_stage', stage } };
+
+      let u = supabase.from('crm_deals').update({ stage }).eq('id', dealId);
+      if (scope?.workspaceId) u = u.eq('workspace_id', scope.workspaceId);
+      const { data, error } = await u.select('id').maybeSingle();
+      // The composite FK refuses a stage that does not belong to this deal's type. Surfaced, not
+      // swallowed: a flow silently failing to move a deal is worse than one that reports why.
+      if (error) throw new Error(`advance_deal_stage failed: ${error.message}`);
+      return { output: { moved: !!data, deal_id: dealId, from, to: stage } };
+    }
+
     default:
       return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
   }

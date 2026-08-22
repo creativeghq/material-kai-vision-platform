@@ -29,6 +29,7 @@ import type {
   UpdateContactConfig,
   UpdateProductConfig,
   CreateTaskConfig,
+  AdvanceDealStageConfig,
   RunEdgeFunctionConfig,
   LogEventConfig,
   SendAgentMessageConfig,
@@ -603,6 +604,34 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             onChange={(fields) => onChange({ ...cfg, fields })}
             hint="Allowlisted contact fields only (name, email, phone, status, lead_status…). Values may use {{trigger.data.x}}."
           />
+        </div>
+      );
+    }
+
+    case 'advance_deal_stage': {
+      const cfg = config as AdvanceDealStageConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Deal</Label>
+            <Input
+              value={cfg.deal_id || ''}
+              onChange={(e) => onChange({ ...cfg, deal_id: e.target.value })}
+              placeholder="Deal id, or {{trigger.data.deal_id}}"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Move to stage</Label>
+            <Input
+              value={cfg.stage || ''}
+              onChange={(e) => onChange({ ...cfg, stage: e.target.value })}
+              placeholder="Stage key, e.g. won"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Stages belong to the deal&apos;s TYPE. A stage from another pipeline is refused by the
+              database, so the run log will say so rather than moving it somewhere impossible.
+            </p>
+          </div>
         </div>
       );
     }

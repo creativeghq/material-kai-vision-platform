@@ -539,6 +539,10 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Update Contact', description: 'Edit contact fields', icon: 'UserPen', color: 'blue',
     defaultData: { label: 'Update Contact', category: 'action', actionType: 'update_contact', config: { contact_id: '', fields: {} } } as ActionNodeData },
 
+  { type: 'actionNode', category: 'action', subType: 'advance_deal_stage', group: 'CRM',
+    label: 'Move Deal Stage', description: 'Advance a deal along its pipeline', icon: 'Kanban', color: 'blue',
+    defaultData: { label: 'Move Deal Stage', category: 'action', actionType: 'advance_deal_stage', config: { deal_id: '', stage: '' } } as ActionNodeData },
+
   // ── Data ──
   { type: 'actionNode', category: 'action', subType: 'update_product', group: 'Data',
     label: 'Update Product', description: 'Edit product fields', icon: 'PackageCheck', color: 'blue',

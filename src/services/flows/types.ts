@@ -636,6 +636,7 @@ export type ActionType =
   | 'update_contact'
   | 'update_product'
   | 'create_task'
+  | 'advance_deal_stage'
   | 'run_edge_function'
   | 'log_event'
   | 'send_agent_message'
@@ -783,6 +784,19 @@ export interface CreateTaskConfig {
   /** Default 'internal'. A flow that silently starts showing work to the client is the wrong
    *  direction to be wrong in. */
   visibility?: 'internal' | 'client_visible';
+}
+
+/**
+ * Move a deal along the pipeline (#378 Phase 4).
+ *
+ * Stages are per deal TYPE — a composite FK on (deal_type_id, stage) means a construction deal
+ * physically cannot be moved into "Conveyancing". The database refuses an illegal destination, so
+ * this config does not need to police it and must not pretend to.
+ */
+export interface AdvanceDealStageConfig {
+  deal_id: string;
+  /** A stage KEY belonging to this deal's type. The DB rejects anything else. */
+  stage: string;
 }
 
 export interface RunEdgeFunctionConfig {
