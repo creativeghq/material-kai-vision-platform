@@ -17,7 +17,7 @@
     "test": "vitest run tests/unit tests/security",
     "test:watch": "vitest tests/unit",
     "test:integration": "vitest run tests/integration",
-    "types:generate": "node scripts/gen-types.mjs --project-id bgbavxtjlbvgplozizxu",
+    "types:generate": "node scripts/gen-types.mjs",
     "types:generate:db": "node scripts/gen-types.mjs --db-url",
     "types:generate:local": "node scripts/gen-types.mjs --local",
     "db:migrate": "node scripts/database/apply-migrations.js",

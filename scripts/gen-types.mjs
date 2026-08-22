@@ -40,12 +40,47 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const TARGET = 'src/integrations/supabase/types.ts';
-const args = process.argv.slice(2);
+const PROJECT_REF = 'bgbavxtjlbvgplozizxu';
 
-if (args.length === 0 || args.includes('--help')) {
-  console.error('usage: node scripts/gen-types.mjs (--db-url <url> | --project-id <ref> | --local)');
+/**
+ * Pick the auth path when the caller gave none.
+ *
+ * `--db-url` is documented above as the path to prefer precisely because it needs no personal
+ * access token — but the npm script hardcoded `--project-id`, so on any machine without
+ * SUPABASE_ACCESS_TOKEN `npm run types:generate` simply failed. The consequence was not a broken
+ * script, it was HAND-EDITED types.ts: adding an enum value meant transcribing it into both the
+ * Enums union and the Constants array by hand, and `Constants` is what
+ * tests/unit/sheetTypeCoverage.test.ts reads as the database's own answer. A generated mirror
+ * maintained by hand is one bad afternoon from lying.
+ *
+ * So: use the connection string when there is one, fall back to the Management API when there is a
+ * token, and otherwise say plainly which of the two is missing rather than failing deep inside the
+ * CLI with LegacyPlatformAuthRequiredError.
+ */
+function defaultArgs() {
+  const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+  if (dbUrl) return ['--db-url', dbUrl];
+  if (process.env.SUPABASE_ACCESS_TOKEN) return ['--project-id', PROJECT_REF];
+  console.error('✖ No way to reach the database.');
+  console.error('  Set ONE of these and re-run:');
+  console.error('    SUPABASE_DB_URL   a Postgres connection string (Dashboard → Connect → ORMs).');
+  console.error('                      Preferred: no personal token involved.');
+  console.error('    SUPABASE_ACCESS_TOKEN  a personal access token, for the Management API.');
+  console.error('  Or pass the path explicitly:');
+  console.error('    node scripts/gen-types.mjs --db-url "postgresql://…"');
+  console.error('    node scripts/gen-types.mjs --local');
   process.exit(2);
 }
+
+const passed = process.argv.slice(2);
+
+if (passed.includes('--help')) {
+  console.error('usage: node scripts/gen-types.mjs [--db-url <url> | --project-id <ref> | --local]');
+  console.error('  With no arguments: uses SUPABASE_DB_URL if set, else SUPABASE_ACCESS_TOKEN.');
+  process.exit(2);
+}
+
+const args = passed.length > 0 ? passed : defaultArgs();
 
 const tmp = join(tmpdir(), `supabase-types-${process.pid}.ts`);
 let out;
