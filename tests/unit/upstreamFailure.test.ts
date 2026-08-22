@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  UPSTREAM_UNAVAILABLE_MESSAGE, isUpstreamFailure, summariseUpstreamFailure,
+  ACCESS_DENIED_MESSAGE, ACTION_UNAVAILABLE_MESSAGE, UPSTREAM_UNAVAILABLE_MESSAGE,
+  classifyDbFailure, describeDeniedObject, isUpstreamFailure, summariseUpstreamFailure,
 } from '../../supabase/functions/_shared/upstream-failure.ts';
 
 /**
@@ -78,7 +79,8 @@ describe('an outage is recognised as an outage', () => {
 describe('a client error stays a client error', () => {
   it.each([
     ['unique violation', { code: '23505', message: 'duplicate key value violates unique constraint "profile_ambassadorships_user_brand_key"' }],
-    ['RLS / permission', { code: '42501', message: 'permission denied for table products' }],
+    // Not an OUTAGE — it is a missing GRANT, which the classifier below routes separately.
+    ['missing grant', { code: '42501', message: 'permission denied for table products' }],
     ['no rows', { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' }],
     ['bad uuid', { code: '22P02', message: 'invalid input syntax for type uuid: "null"' }],
     ['business rule', { code: 'P0001', message: 'quote 841c21cc is accepted — issue a revision instead of editing it' }],
@@ -122,6 +124,49 @@ describe('what the client and the log are told', () => {
   });
 });
 
+describe('"permission denied" is two different events', () => {
+  /**
+   * Both of these are SQLSTATE 42501 and both were returning 400. One is the caller asking for
+   * something that is not theirs; the other is a feature that is dead for everybody because
+   * nobody ran a GRANT. `permission denied for function is_workspace_member` appeared in the
+   * logs during the outage window, indistinguishable from a typo in a request body.
+   */
+  it('a policy refusing the write is the caller\'s own doing', () => {
+    expect(classifyDbFailure({
+      code: '42501',
+      message: 'new row violates row-level security policy for table "orders"',
+    })).toBe('rls_denied');
+  });
+
+  it.each([
+    ['function', 'permission denied for function is_workspace_member', 'function is_workspace_member'],
+    ['table', 'permission denied for table products', 'table products'],
+    ['schema', 'permission denied for schema vecs', 'schema vecs'],
+    ['quoted view', 'permission denied for view "finance.order_payment_status_drift"', 'view finance.order_payment_status_drift'],
+  ])('a missing GRANT on a %s is ours, and names the object', (_label, message, target) => {
+    expect(classifyDbFailure({ code: '42501', message })).toBe('grant_missing');
+    expect(describeDeniedObject(message)).toBe(target);
+  });
+
+  it('leaves every ordinary failure exactly as the handler said', () => {
+    expect(classifyDbFailure('blueprint_id required')).toBe('client');
+    expect(classifyDbFailure({ code: '23505', message: 'duplicate key value violates unique constraint' })).toBe('client');
+    expect(classifyDbFailure({ code: 'P0001', message: 'not authorized for workspace 37ca563f' })).toBe('client');
+  });
+
+  it('an outage still outranks both', () => {
+    expect(classifyDbFailure(CLOUDFLARE_522)).toBe('upstream');
+  });
+
+  it('neither response body repeats what the database said', () => {
+    // The raw texts name a table, a function, a policy. The caller needs none of that.
+    for (const msg of [ACCESS_DENIED_MESSAGE, ACTION_UNAVAILABLE_MESSAGE]) {
+      expect(msg).not.toMatch(/permission|policy|table|function|schema|grant/i);
+      expect(msg.length).toBeLessThan(120);
+    }
+  });
+});
+
 describe('the wrapper still applies it', () => {
   const src = readFileSync(API_LOGGER, 'utf8');
 
@@ -129,11 +174,12 @@ describe('the wrapper still applies it', () => {
    * The classifier is worthless unless the one place that uses it keeps using it. This is the
    * whole fix: 207 call sites are left saying 400, and the wrapper corrects them.
    */
-  it('api-logger upgrades a 4xx upstream failure to 503', () => {
-    expect(src).toMatch(/isUpstreamFailure\(/);
-    expect(src).toMatch(/statusCode\s*<\s*500\s*&&\s*isUpstreamFailure/);
-    expect(src).toMatch(/statusCode = 503/);
-    expect(src).toMatch(/UPSTREAM_UNAVAILABLE_MESSAGE/);
+  it('api-logger routes each kind to the status it deserves', () => {
+    expect(src).toMatch(/classifyDbFailure\(/);
+    expect(src).toMatch(/statusCode\s*<\s*500/);
+    expect(src).toMatch(/failure === 'upstream'[\s\S]{0,400}statusCode = 503/);
+    expect(src).toMatch(/failure === 'grant_missing'[\s\S]{0,500}statusCode = 500/);
+    expect(src).toMatch(/failure === 'rls_denied'[\s\S]{0,500}statusCode = 403/);
   });
 
   /**
@@ -146,7 +192,15 @@ describe('the wrapper still applies it', () => {
     expect(literal, 'CLIENT_ERROR_RE not found in api-logger.ts').toBeTruthy();
     const clientErrorRe = new RegExp(literal![1], literal![2]);
 
-    const rewritten = `upstream data service unavailable — ${summariseUpstreamFailure(CLOUDFLARE_522)}`;
-    expect(clientErrorRe.test(rewritten), `"${rewritten}" would be kept out of Sentry`).toBe(false);
+    // Both of the messages the wrapper writes for a REPORTED failure. The GRANT one is the
+    // delicate case: CLIENT_ERROR_RE contains "permission denied", which is exactly the phrase
+    // Postgres used, so the wrapper must not repeat it.
+    const reported = [
+      `upstream data service unavailable — ${summariseUpstreamFailure(CLOUDFLARE_522)}`,
+      `database GRANT missing — the calling role cannot use ${describeDeniedObject('permission denied for function is_workspace_member')}`,
+    ];
+    for (const message of reported) {
+      expect(clientErrorRe.test(message), `"${message}" would be kept out of Sentry`).toBe(false);
+    }
   });
 });

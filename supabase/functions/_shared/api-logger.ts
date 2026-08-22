@@ -26,6 +26,11 @@
  *         reported. A handler saying `HttpError(400, dbError.message)` is describing the
  *         caller's input; when the thing it is describing is a Cloudflare 522 page, that
  *         sentence is wrong and it silenced a four-hour outage (see `upstream-failure.ts`).
+ *       - a 4xx that is really an RLS refusal → 403, not reported (a correct authorization
+ *         answer), with the policy's own text kept out of the response body.
+ *       - a 4xx that is really a MISSING GRANT → 500 and reported. Nobody granted the role;
+ *         no caller can fix it, and the feature behind it is dead for everyone until someone
+ *         notices. `permission denied for function is_workspace_member` was in the logs.
  *       - 5xx whose message reads like a client error (validation / auth / method /
  *         not-found) → NOT reported, even though some functions mislabel these as
  *         500 (see `isLikelyClientError`). The HTTP response is left untouched —
@@ -54,7 +59,8 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from './cors.ts';
 import { captureException, captureMessage } from './sentry.ts';
 import {
-  UPSTREAM_UNAVAILABLE_MESSAGE, isUpstreamFailure, summariseUpstreamFailure,
+  ACCESS_DENIED_MESSAGE, ACTION_UNAVAILABLE_MESSAGE, UPSTREAM_UNAVAILABLE_MESSAGE,
+  classifyDbFailure, describeDeniedObject, summariseUpstreamFailure,
 } from './upstream-failure.ts';
 
 type Handler = (req: Request) => Promise<Response> | Response;
@@ -80,6 +86,19 @@ export class HttpError extends Error {
     this.status = status;
     this.upstream = upstream;
   }
+}
+
+/** One shape for every error body the wrapper writes itself. */
+function jsonError(
+  message: string,
+  status: number,
+  code: string,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return new Response(
+    JSON.stringify({ error: message, code }),
+    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders } },
+  );
 }
 
 function getErrorStatus(err: unknown): number | undefined {
@@ -204,23 +223,35 @@ export function withApiLogging(
         // Body not JSON or already consumed — skip
       }
 
-      // A 4xx that is really the data service being down. Both shapes reach here: a thrown
+      // A 4xx that is not actually the caller's fault. Both shapes reach here: a thrown
       // HttpError(400, …) and a handler that caught the error and returned its own 4xx.
       // The structured error wins when we have it; otherwise the message is all there is.
-      if (statusCode < 500 && isUpstreamFailure(
-        (thrownError as HttpError | null)?.upstream ?? thrownError ?? errorMessage,
-      )) {
-        const detail = summariseUpstreamFailure(errorMessage);
-        response = new Response(
-          JSON.stringify({ error: UPSTREAM_UNAVAILABLE_MESSAGE, code: 'upstream_unavailable' }),
-          {
-            status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '5' },
-          },
+      if (statusCode < 500) {
+        const failure = classifyDbFailure(
+          (thrownError as HttpError | null)?.upstream ?? thrownError ?? errorMessage,
         );
-        statusCode = 503;
-        // Kept out of CLIENT_ERROR_RE's way on purpose: this must reach Sentry.
-        errorMessage = `upstream data service unavailable — ${detail}`;
+
+        if (failure === 'upstream') {
+          const detail = summariseUpstreamFailure(errorMessage);
+          response = jsonError(UPSTREAM_UNAVAILABLE_MESSAGE, 503, 'upstream_unavailable', { 'Retry-After': '5' });
+          statusCode = 503;
+          // Kept out of CLIENT_ERROR_RE's way on purpose: this must reach Sentry.
+          errorMessage = `upstream data service unavailable — ${detail}`;
+        } else if (failure === 'grant_missing') {
+          // Our deployment is wrong, not their request. Phrased without the words
+          // "permission denied" so CLIENT_ERROR_RE cannot suppress the report.
+          const target = describeDeniedObject(errorMessage);
+          response = jsonError(ACTION_UNAVAILABLE_MESSAGE, 500, 'grant_missing');
+          statusCode = 500;
+          errorMessage = `database GRANT missing — the calling role cannot use ${target}`;
+        } else if (failure === 'rls_denied') {
+          // A correct authorization answer. 403 says so; the policy's own text, which names
+          // the table, stays in the log rather than the response body.
+          const detail = summariseUpstreamFailure(errorMessage);
+          response = jsonError(ACCESS_DENIED_MESSAGE, 403, 'forbidden');
+          statusCode = 403;
+          errorMessage = `row-level security refused it — ${detail}`;
+        }
       }
 
       if (errorMessage) {

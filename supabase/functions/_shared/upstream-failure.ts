@@ -22,6 +22,19 @@
  * and a Sentry event. Misreading an outage as a client error is what happened above. The
  * signals below are deliberately literal — transport verbs, gateway codes, Postgres
  * unavailability SQLSTATEs — rather than anything that tries to be clever about wording.
+ *
+ * THE SECOND QUESTION: "permission denied" is TWO different events wearing one SQLSTATE (42501),
+ * and the same 400 was hiding both.
+ *
+ *   - `new row violates row-level security policy` — the caller asked for something that is not
+ *     theirs. Correct, expected, and the caller's own doing: **403**, never reported.
+ *   - `permission denied for function is_workspace_member` — nobody GRANTed the role that needs
+ *     it. No client action can fix that, and the feature behind it is dead for EVERYONE until
+ *     somebody notices: **500, reported**. Both of those appeared in the logs during the outage
+ *     window, indistinguishable from a typo in a request body.
+ *
+ * Postgres names the object when a GRANT is missing and says "row-level security policy" when a
+ * policy refused, so its own wording separates them exactly. Anything else stays untouched.
  */
 
 /** SQLSTATE classes that mean the server could not serve, not that the request was bad. */
@@ -110,9 +123,55 @@ export function isUpstreamFailure(input: unknown): boolean {
   return !!message && UPSTREAM_MESSAGE_RE.test(message);
 }
 
+/**
+ * A policy refused, versus nobody granted. Only these two literals — Postgres writes both.
+ */
+const RLS_POLICY_RE = /violates row-level security policy/i;
+const MISSING_GRANT_RE =
+  /permission denied for (table|view|relation|materialized view|function|procedure|routine|schema|sequence|column|type|database|large object)\s*"?([\w.$]+)"?/i;
+
+export type DbFailureKind = 'upstream' | 'rls_denied' | 'grant_missing' | 'client';
+
+/**
+ * What KIND of failure this is, so the wrapper can give it the status it deserves.
+ *
+ * `client` means "leave it exactly as the handler said" — that is the answer for every ordinary
+ * validation error, constraint violation and business rule, which is most of them.
+ */
+export function classifyDbFailure(input: unknown): DbFailureKind {
+  if (isUpstreamFailure(input)) return 'upstream';
+
+  const { message } = shapeOf(input);
+  if (!message) return 'client';
+
+  // A policy refusing is checked first: "new row violates row-level security policy for table x"
+  // also contains the word permission in some client wrappers.
+  if (RLS_POLICY_RE.test(message)) return 'rls_denied';
+  if (MISSING_GRANT_RE.test(message)) return 'grant_missing';
+
+  return 'client';
+}
+
+/** "function is_workspace_member" — what the log and Sentry need to name the missing GRANT. */
+export function describeDeniedObject(message: string | null | undefined): string {
+  const m = message?.match(MISSING_GRANT_RE);
+  return m ? `${m[1].toLowerCase()} ${m[2]}` : 'an unnamed database object';
+}
+
 /** What the client is told. Never the upstream's own body — that leaked a whole HTML page. */
 export const UPSTREAM_UNAVAILABLE_MESSAGE =
   'The data service is temporarily unavailable. Please retry in a moment.';
+
+/** A real authorization answer. The raw text names the table, which the caller need not know. */
+export const ACCESS_DENIED_MESSAGE =
+  'You do not have access to that.';
+
+/**
+ * Deliberately says nothing about GRANTs. The caller cannot act on it, and the object name is
+ * ours — it belongs in Sentry, not in a response body.
+ */
+export const ACTION_UNAVAILABLE_MESSAGE =
+  'This action is unavailable right now. It has been reported.';
 
 /**
  * A bounded, single-line summary for the console and Sentry. An HTML error page is 3KB of
