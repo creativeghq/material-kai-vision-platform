@@ -12,6 +12,7 @@ export type SheetType =
   | 'elevation_render_pair'
   | 'ffe_schedule'
   | 'area_breakdown'
+  | 'scope_of_works'
   | 'full_deck';
 
 export type SheetStatus = 'draft' | 'generating' | 'ready' | 'failed';
@@ -68,6 +69,7 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   elevation_render_pair: 'Elevation + Render Pair',
   ffe_schedule: 'FF&E Schedule',
   area_breakdown: 'Area Breakdown',
+  scope_of_works: 'Scope of Works',
   full_deck: 'Full Presentation Deck',
 };
 
@@ -96,6 +98,9 @@ export const SHEET_TYPE_CREDITS: Record<SheetType, number> = {
   annotated_render: 4,
   elevation_render_pair: 3,
   area_breakdown: 2,
+  // Same as ffe_schedule: both read a table the platform already holds and render it. No
+  // image generation, no model call — the cost is the render itself.
+  scope_of_works: 1,
   full_deck: 5,
 };
 

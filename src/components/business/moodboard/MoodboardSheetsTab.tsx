@@ -42,6 +42,7 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   annotated_render: 'Render with AI-detected callouts',
   elevation_render_pair: 'Uploaded elevation with dimensions + render',
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
+  scope_of_works: 'What will happen — phases and works, from the client-visible tasks on the project',
   area_breakdown: 'Composited design board: hero render + plan + elevation + finishes',
   full_deck: 'Multi-page presentation deck assembling outputs from other tools',
 };
@@ -51,7 +52,8 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
   { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
   { label: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'electrical_plan', 'annotated_render', 'elevation_render_pair'] },
-  { label: 'Schedules', types: ['ffe_schedule'] },
+  // A scope sheet answers what will HAPPEN, where the FF&E schedule answers what is supplied.
+  { label: 'Schedules', types: ['ffe_schedule', 'scope_of_works'] },
   { label: 'Decks', types: ['full_deck'] },
 ];
 

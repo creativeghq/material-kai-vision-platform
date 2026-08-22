@@ -49,6 +49,7 @@ const SHEET_TYPES = [
   'elevation_render_pair',
   'ffe_schedule',
   'area_breakdown',
+  'scope_of_works',
   'full_deck',
 ] as const;
 
@@ -200,7 +201,10 @@ export const createPresentationSheetTool = (
         'ffe_schedule (FF&E table from quote, 1), ' +
         'area_breakdown (single composited board: hero render + dimensioned plan + elevation + ' +
         'finishes + fitting columns + palette, 2), full_deck (multi-page deck with cover + reorder canvas, 5). ' +
-        'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown) ' +
+        'scope_of_works (what will HAPPEN: phases and the works inside them, derived from the '+
+        'CLIENT-VISIBLE tasks on the project. Pass project_id and it builds itself. No prices — '+
+        'money lives on the FF&E schedule and the quote). '+
+        'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown, scope_of_works) ' +
         'generate the PDF immediately. Interactive types (lighting_plan, plumbing_plan, electrical_plan, annotated_render, ' +
         'elevation_render_pair, full_deck) open a canvas widget for user input first. ALWAYS pass a sensible ' +
         'initial_data payload — see the schema for each sheet_type.',
@@ -319,6 +323,10 @@ export const createPresentationSheetTool = (
             price: z.number().nullable().optional(),
           })).optional().describe('ffe_schedule: explicit items if no quote_id'),
           // area_breakdown — single composited design board
+          // scope_of_works — derives from the project's client-visible tasks
+          project_id: z.string().optional().describe('scope_of_works: the project whose CLIENT-VISIBLE tasks become the scope. Internal tasks are never printed.'),
+          intro: z.string().optional().describe('scope_of_works: one or two sentences above the phases'),
+          show_owners: z.boolean().optional().describe('scope_of_works: print who is doing each item. Off by default — a client document should not disclose your subcontractors unless you decide it should.'),
           subtitle: z.string().optional().describe('area_breakdown: e.g. "Modern Bathroom Design"'),
           hero_image_url: z.string().optional().describe('area_breakdown: main room render'),
           plan_image_url: z.string().optional().describe('area_breakdown: dimensioned plan / layout image'),

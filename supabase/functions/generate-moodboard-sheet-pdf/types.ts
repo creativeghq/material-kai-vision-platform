@@ -9,6 +9,7 @@ export type SheetType =
   | 'elevation_render_pair'
   | 'ffe_schedule'
   | 'area_breakdown'
+  | 'scope_of_works'
   | 'full_deck';
 
 export interface SheetRow {
@@ -110,6 +111,33 @@ export interface FixtureRunData {
   vertices?: Array<{ x: number; y: number }>;
   label?: string;
   props?: { current_a?: number; csa_mm2?: number; phases?: 1 | 3 };
+}
+
+/**
+ * One line of work on a scope sheet — a task the client is being told will happen.
+ *
+ * There is no price here and that is deliberate: money lives on the FF&E schedule and the quote.
+ * A second surface that totals money is a second derivation of it, which this platform treats as a
+ * defect rather than a convenience.
+ */
+export interface ScopeTask {
+  title: string;
+  start_date: string | null;
+  end_date: string | null;
+  /** Resolved NAME, never an id — and omitted entirely unless the sheet asks for owners. */
+  owner: string | null;
+  is_milestone: boolean;
+}
+
+/**
+ * A phase of work. A parent task is the phase; its subtasks are the works inside it — the same
+ * structure the project's task list already renders, rather than a second grouping vocabulary.
+ */
+export interface ScopePhase {
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  tasks: ScopeTask[];
 }
 
 export interface FfeItem {

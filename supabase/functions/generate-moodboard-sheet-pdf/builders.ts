@@ -34,6 +34,7 @@ import type {
   FixtureSymbolData,
   FixtureRunData,
   ProductChip,
+  ScopePhase,
   SheetRow,
   SwatchData,
 } from './types.ts';
@@ -49,6 +50,7 @@ const SHEET_LABELS: Record<string, string> = {
   elevation_render_pair: 'ELEVATION + RENDER',
   ffe_schedule: 'FF&E SCHEDULE',
   area_breakdown: 'AREA BREAKDOWN',
+  scope_of_works: 'SCOPE OF WORKS',
   full_deck: 'PRESENTATION DECK',
 };
 
@@ -1032,6 +1034,118 @@ async function drawAnnotatedImageBlock(
   }
 }
 
+// ============================================================
+// 12. SCOPE OF WORKS — the phases and the works inside them.
+//
+// The one sheet that says what will HAPPEN rather than what will be supplied. Deliberately
+// money-free: the FF&E schedule and the quote carry price, and a second surface that totals money
+// is a second derivation of it.
+// ============================================================
+export function buildScopeOfWorks(
+  pdfDoc: PDFDocument,
+  fonts: SheetFonts,
+  td: TitleBlockData,
+  phases: ScopePhase[],
+  opts?: { intro?: string | null },
+): void {
+  const page = newSheetPage(pdfDoc);
+  const cy = drawSheetHeader(page, fonts, td.sheet_title, 'Scope of Works');
+
+  let y = cy - 16;
+
+  if (opts?.intro) {
+    for (const line of wrapText(opts.intro, fonts.regular, 9.5, CONTENT_W).slice(0, 3)) {
+      page.drawText(line, { x: MARGIN, y, size: 9.5, font: fonts.regular, color: COLOR_GRAY });
+      y -= 13;
+    }
+    y -= 6;
+  }
+
+  if (phases.length === 0) {
+    // Says WHY it is empty. A blank scope on a document already sent to a client is the failure
+    // this sheet exists to prevent, and "no tasks" would send the designer looking in the wrong place.
+    page.drawText('No client-visible works yet.', {
+      x: MARGIN, y: y - 14, size: 11, font: fonts.bold, color: COLOR_DARK,
+    });
+    for (const line of wrapText(
+      'Tasks are internal until they are marked client-visible on the project. '
+      + 'Mark the ones this proposal covers and re-render.',
+      fonts.regular, 9.5, CONTENT_W,
+    )) {
+      y -= 26;
+      page.drawText(line, { x: MARGIN, y: y, size: 9.5, font: fonts.regular, color: COLOR_GRAY });
+    }
+    drawTitleBlock(page, fonts, td);
+    return;
+  }
+
+  const dateRange = (a: string | null, b: string | null): string => {
+    if (a && b && a !== b) return `${a} – ${b}`;
+    return a || b || '';
+  };
+
+  const bottom = MARGIN + 90;
+  let truncatedAt = -1;
+
+  for (let pi = 0; pi < phases.length; pi++) {
+    const ph = phases[pi];
+    // A phase header plus at least one line, or the header dangles at the page foot.
+    if (y - 40 < bottom) { truncatedAt = pi; break; }
+
+    page.drawRectangle({
+      x: MARGIN, y: y - 6, width: CONTENT_W, height: 20, color: rgb(0.92, 0.92, 0.94),
+    });
+    page.drawText(`${pi + 1}. ${ph.name.toUpperCase()}`, {
+      x: MARGIN + 4, y, size: 9.5, font: fonts.bold, color: COLOR_DARK, maxWidth: CONTENT_W - 160,
+    });
+    const range = dateRange(ph.start_date, ph.end_date);
+    if (range) {
+      page.drawText(range, {
+        x: MARGIN + CONTENT_W - 150, y, size: 8.5, font: fonts.regular, color: COLOR_DARK,
+      });
+    }
+    y -= 24;
+
+    for (const t of ph.tasks) {
+      if (y < bottom) { truncatedAt = pi; break; }
+      // A milestone is a dated marker, not a line of work — shown as one so a client reading the
+      // programme can see the commitments rather than hunting for them among the tasks.
+      const bullet = t.is_milestone ? '◆' : '•';
+      page.drawText(bullet, {
+        x: MARGIN + 6, y, size: 8, font: fonts.regular,
+        color: t.is_milestone ? COLOR_RED : COLOR_GRAY,
+      });
+      page.drawText(truncate(t.title, 90), {
+        x: MARGIN + 18, y, size: 9, font: t.is_milestone ? fonts.bold : fonts.regular,
+        color: COLOR_DARK, maxWidth: CONTENT_W - 230,
+      });
+      const tRange = dateRange(t.start_date, t.end_date);
+      if (tRange) {
+        page.drawText(tRange, {
+          x: MARGIN + CONTENT_W - 200, y, size: 8, font: fonts.regular, color: COLOR_GRAY,
+        });
+      }
+      if (t.owner) {
+        page.drawText(truncate(t.owner, 22), {
+          x: MARGIN + CONTENT_W - 96, y, size: 8, font: fonts.regular, color: COLOR_GRAY,
+        });
+      }
+      y -= 15;
+    }
+    y -= 8;
+    if (truncatedAt >= 0) break;
+  }
+
+  if (truncatedAt >= 0) {
+    const left = phases.length - truncatedAt;
+    page.drawText(`+ ${left} further phase${left === 1 ? '' : 's'} continued on the next sheet`, {
+      x: MARGIN, y: MARGIN + 80, size: 9, font: fonts.regular, color: COLOR_GRAY,
+    });
+  }
+
+  drawTitleBlock(page, fonts, td);
+}
+
 function drawTick(page: PDFPage, x: number, y: number) {
   page.drawLine({
     start: { x: x - 3, y: y - 3 }, end: { x: x + 3, y: y + 3 },
@@ -1410,6 +1524,9 @@ export async function buildSheetForDeck(
   total: number,
   resolveChips: (productIds: string[]) => Promise<ProductChip[]>,
   resolveFfe: (quoteId: string) => Promise<FfeItem[]>,
+  /** Optional so an older caller still compiles; a scope sheet without it renders its own
+   *  "no client-visible works" state rather than a blank page. */
+  resolveScope?: (projectId: string, showOwners: boolean) => Promise<ScopePhase[]>,
 ): Promise<void> {
   const td: TitleBlockData = {
     ...parentTd,
@@ -1498,6 +1615,15 @@ export async function buildSheetForDeck(
     case 'area_breakdown':
       await buildAreaBreakdown(pdfDoc, fonts, td, sheet.data as AreaBreakdownData);
       break;
+    case 'scope_of_works': {
+      let phases: ScopePhase[] = sheet.data.phases || [];
+      const projectId = sheet.data.project_id || sheet.project_id;
+      if (projectId && phases.length === 0 && resolveScope) {
+        phases = await resolveScope(projectId, !!sheet.data.show_owners);
+      }
+      buildScopeOfWorks(pdfDoc, fonts, td, phases, { intro: sheet.data.intro ?? null });
+      break;
+    }
     default:
       // Unknown sub-sheet type — emit a placeholder page
       const page = newSheetPage(pdfDoc);

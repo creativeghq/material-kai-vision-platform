@@ -43,6 +43,7 @@ import {
   fetchSheetParent,
   fetchOwnerBranding,
   fetchProductChips,
+  fetchProjectScopePhases,
   fetchQuoteFfeItems,
   fetchSheet,
   fetchSheets,
@@ -53,6 +54,7 @@ import {
   buildAnnotatedRender,
   buildAreaBreakdown,
   buildColorPalette,
+  buildScopeOfWorks,
   buildConceptBoard,
   buildElevationRenderPair,
   buildFfeSchedule,
@@ -343,6 +345,18 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       case 'area_breakdown':
         await buildAreaBreakdown(pdfDoc, fonts, td, sheet.data || {});
         break;
+      case 'scope_of_works': {
+        let phases = sheet.data.phases || [];
+        // The sheet may be owned by the project directly, or name one in its data.
+        const scopeProjectId = sheet.data.project_id || sheet.project_id;
+        if (scopeProjectId && phases.length === 0) {
+          phases = await fetchProjectScopePhases(
+            supabase, scopeProjectId, quoteScope, { showOwners: !!sheet.data.show_owners },
+          );
+        }
+        buildScopeOfWorks(pdfDoc, fonts, td, phases, { intro: sheet.data.intro ?? null });
+        break;
+      }
       case 'full_deck': {
         const includedIds: string[] = sheet.data.included_sheet_ids || [];
         const subSheets = await fetchSheets(supabase, includedIds, scopeUserId);
@@ -365,6 +379,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
             subSheets.length + 1,
             (ids) => fetchProductChips(supabase, ids, scopeWorkspaceIds),
             (qid) => fetchQuoteFfeItems(supabase, qid, quoteScope),
+            (pid, showOwners) => fetchProjectScopePhases(supabase, pid, quoteScope, { showOwners }),
           );
         }
         pageCount = subSheets.length + 1;
@@ -596,6 +611,7 @@ async function buildClientViewPdf(
         sheets[i], i + 2, sheets.length + 1,
         (ids) => fetchProductChips(supabase, ids, ownerWorkspaceIds),
         (qid) => fetchQuoteFfeItems(supabase, qid, deckQuoteScope),
+        (pid, showOwners) => fetchProjectScopePhases(supabase, pid, deckQuoteScope, { showOwners }),
       );
     }
     const pageCount = sheets.length + 1;
@@ -710,6 +726,14 @@ function validatePdfContent(sheet_type: string, data: Record<string, any> | unde
       const hasQuote = typeof d.quote_id === 'string' && d.quote_id.length > 0;
       const hasItems = Array.isArray(d.items) && d.items.length > 0;
       if (!hasQuote && !hasItems) return 'Missing quote_id or items[] for ffe_schedule.';
+      return null;
+    }
+    case 'scope_of_works': {
+      // Mirrors ffe_schedule: derive from the record, or accept explicit phases. A sheet with
+      // neither has nothing to render and would print an empty page nobody could explain.
+      const hasProject = typeof d.project_id === 'string' && d.project_id.length > 0;
+      const hasPhases = Array.isArray(d.phases) && d.phases.length > 0;
+      if (!hasProject && !hasPhases) return 'Missing project_id or phases[] for scope_of_works.';
       return null;
     }
     case 'area_breakdown':

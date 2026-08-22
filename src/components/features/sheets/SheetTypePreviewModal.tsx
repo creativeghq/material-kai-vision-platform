@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
-import { Sparkles, FileImage, Layers, Lightbulb, Droplets, Zap, Ruler, ListTree, FileText, Album, LayoutGrid } from 'lucide-react';
+import { Sparkles, FileImage, Layers, Lightbulb, Droplets, Zap, Ruler, ListTree, FileText, Album, LayoutGrid, ListChecks } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   SHEET_TYPE_LABELS,
@@ -109,6 +109,17 @@ const SHEET_TYPE_META: Record<SheetType, SheetTypeMeta> = {
     produces: 'A 1-page A3 PDF: big hero render top-left, plan + elevation stacked top-right, then finishes + fitting columns + notes below, with a palette strip along the bottom.',
     inputs: ['A hero render image', 'Optional plan + elevation images', 'Finishes (label + spec + swatch)', 'Fitting/accessory columns', 'Color palette + notes'],
     bestFor: 'A complete single-board summary of one room or area you can hand a client or contractor.',
+  },
+  scope_of_works: {
+    icon: ListChecks,
+    what: 'What will HAPPEN, rather than what will be supplied — the phases of work and the items inside them. Every other sheet describes a thing; this one describes the doing, which is the part a client actually signs off on.',
+    produces: 'A 1-page A3 PDF: numbered phases with their date ranges, the works inside each, and milestones marked. No prices — money stays on the FF&E schedule and the quote, so there is only ever one place it is totalled.',
+    inputs: [
+      'The project — its phases and works are derived from the task list, so changing the schedule and re-rendering keeps the proposal correct',
+      'Optional: a short intro paragraph',
+      'Optional: show who is doing each item (off by default — a client document should not disclose your subcontractors unless you decide it should)',
+    ],
+    bestFor: 'The scope section of a proposal, and the programme a client refers back to once work starts.',
   },
   full_deck: {
     icon: FileText,

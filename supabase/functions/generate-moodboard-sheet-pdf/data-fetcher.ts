@@ -1,6 +1,6 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ProductChip, FfeItem, MoodboardRow, SheetRow } from './types.ts';
+import type { ProductChip, FfeItem, MoodboardRow, SheetRow, ScopePhase, ScopeTask } from './types.ts';
 
 export async function fetchSheet(
   supabase: DbClient,
@@ -291,6 +291,113 @@ export async function fetchQuoteFfeItems(
     price: row.unit_price ?? null,
     currency: (quoteRow as { currency?: string | null } | null)?.currency ?? null,
   }));
+}
+
+/**
+ * Pull the scope of works off a PROJECT, as phases.
+ *
+ * Two rules make this safe to hand to a client, and both are load-bearing:
+ *
+ *   1. **Only `client_visible` tasks.** `project_tasks.visibility` already separates what the team
+ *      tracks from what the client is shown, and the tasks tab has the toggle. Without this filter
+ *      a proposal would print "chase the supplier" and "check the margin" to the customer. An empty
+ *      sheet is the correct outcome when nothing has been marked visible — and the builder says so
+ *      in those words rather than printing a blank page.
+ *   2. **Ownership is proven before reading.** Same reason `fetchQuoteFfeItems` does it: an
+ *      embedded foreign `project_id` would otherwise leak another tenant's programme.
+ *
+ * A parent task is a phase and its subtasks are the works within it — the structure the project's
+ * task list already uses. A parent with no visible children still prints as a one-line phase, so a
+ * flat task list is not silently dropped.
+ */
+export async function fetchProjectScopePhases(
+  supabase: DbClient,
+  projectId: string,
+  scope?: { userId: string; workspaceIds: string[] } | null,
+  opts?: { showOwners?: boolean },
+): Promise<ScopePhase[]> {
+  const { data: projectRow } = await supabase
+    .from('projects')
+    .select('user_id, workspace_id')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (scope) {
+    const p = projectRow as { user_id?: string; workspace_id?: string } | null;
+    const owns = !!p && (
+      p.user_id === scope.userId ||
+      (scope.workspaceIds.length > 0 && !!p.workspace_id && scope.workspaceIds.includes(p.workspace_id))
+    );
+    if (!owns) return [];
+  }
+
+  const { data, error } = await supabase
+    .from('project_tasks')
+    .select('id, parent_task_id, title, start_date, end_date, due_date, is_milestone, sort_order, visibility, assignee_id, assignee_employee_id')
+    .eq('project_id', projectId)
+    .eq('visibility', 'client_visible')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    // Loud, for the same reason the FF&E fetcher is: an empty scope on a document already sent to
+    // a client is worse than no document, and a console.warn is how that ships unnoticed.
+    console.error('fetchProjectScopePhases failed — scope sheet will print empty:', error.message);
+    return [];
+  }
+
+  const rows = (data || []) as Array<Record<string, any>>;
+  if (rows.length === 0) return [];
+
+  // Owners are resolved to NAMES and only when asked for. A client document should not disclose
+  // which subcontractor is doing what unless the operator decides it should.
+  let nameById = new Map<string, string>();
+  if (opts?.showOwners) {
+    const employeeIds = [...new Set(rows.map((r) => r.assignee_employee_id).filter(Boolean))] as string[];
+    if (employeeIds.length) {
+      const { data: emps } = await supabase
+        .from('hr_employees')
+        .select('id, crm_contacts(name)')
+        .in('id', employeeIds);
+      for (const e of (emps || []) as Array<Record<string, any>>) {
+        const n = e.crm_contacts?.name;
+        if (n) nameById.set(e.id, n);
+      }
+    }
+  }
+
+  const toTask = (r: Record<string, any>): ScopeTask => ({
+    title: r.title || 'Untitled',
+    start_date: r.start_date ?? null,
+    end_date: r.end_date ?? r.due_date ?? null,
+    owner: opts?.showOwners ? (nameById.get(r.assignee_employee_id) ?? null) : null,
+    is_milestone: !!r.is_milestone,
+  });
+
+  const parents = rows.filter((r) => !r.parent_task_id);
+  const childrenOf = (id: string) => rows.filter((r) => r.parent_task_id === id);
+
+  // A visible subtask whose parent is internal would otherwise vanish. It is still work the client
+  // was told about, so it is collected under a plain heading rather than dropped.
+  const parentIds = new Set(parents.map((p) => p.id));
+  const orphans = rows.filter((r) => r.parent_task_id && !parentIds.has(r.parent_task_id));
+
+  const phases: ScopePhase[] = parents.map((p) => {
+    const kids = childrenOf(p.id);
+    const tasks = kids.length > 0 ? kids.map(toTask) : [toTask(p)];
+    const starts = tasks.map((t) => t.start_date).filter(Boolean) as string[];
+    const ends = tasks.map((t) => t.end_date).filter(Boolean) as string[];
+    return {
+      name: p.title || 'Works',
+      start_date: p.start_date ?? (starts.length ? starts.sort()[0] : null),
+      end_date: p.end_date ?? p.due_date ?? (ends.length ? ends.sort().slice(-1)[0] : null),
+      tasks,
+    };
+  });
+
+  if (orphans.length > 0) {
+    phases.push({ name: 'Additional works', start_date: null, end_date: null, tasks: orphans.map(toTask) });
+  }
+  return phases;
 }
 
 /** Fetch sub-sheets to assemble the full deck. */

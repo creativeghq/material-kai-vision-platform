@@ -26,6 +26,7 @@ export type SheetType =
   | 'elevation_render_pair'
   | 'ffe_schedule'
   | 'area_breakdown'
+  | 'scope_of_works'
   | 'full_deck';
 
 type SupabaseClient = DbClient;
@@ -42,6 +43,8 @@ export const SHEET_CREDITS: Record<SheetType, number> = {
   annotated_render: 4,
   elevation_render_pair: 3,
   area_breakdown: 2,
+  // Same as ffe_schedule: reads a table the platform already holds and renders it.
+  scope_of_works: 1,
   full_deck: 5,
 };
 
@@ -452,6 +455,12 @@ function validateInitialData(sheet_type: SheetType, data: Record<string, any> | 
     case 'elevation_render_pair':
       if (!d.elevation_image_url) return 'elevation_render_pair needs an elevation image.';
       return null;
+    case 'scope_of_works': {
+      const hasProject = typeof d.project_id === 'string' && d.project_id.length > 0;
+      const hasPhases = Array.isArray(d.phases) && d.phases.length > 0;
+      if (!hasProject && !hasPhases) return 'scope_of_works needs a project or at least one phase.';
+      return null;
+    }
     case 'ffe_schedule':
       if (!d.quote_id && (!Array.isArray(d.items) || d.items.length === 0)) {
         return 'ffe_schedule needs a quote or at least one item.';
