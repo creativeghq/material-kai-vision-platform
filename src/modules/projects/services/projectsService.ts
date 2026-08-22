@@ -101,7 +101,13 @@ export interface ProjectTask {
   title: string;
   description: string | null;
   status: TaskStatus;
+  /** A platform USER — they get "my tasks" and notifications. */
   assignee_id: string | null;
+  /**
+   * A person on the HR roster (#378 N2). Mutually exclusive with `assignee_id` — an employee may
+   * have no login at all, which is exactly who a site task is usually for.
+   */
+  assignee_employee_id: string | null;
   due_date: string | null;
   visibility: TaskVisibility;
   sort_order: number;
@@ -393,6 +399,8 @@ export interface CreateTaskInput {
   description?: string | null;
   status?: TaskStatus;
   assignee_id?: string | null;
+  /** The HR-roster person instead. Exactly one of the two; the DB CHECK refuses both. */
+  assignee_employee_id?: string | null;
   due_date?: string | null;
   visibility?: TaskVisibility;
   sort_order?: number;
@@ -407,6 +415,8 @@ export interface UpdateTaskInput {
   description?: string | null;
   status?: TaskStatus;
   assignee_id?: string | null;
+  /** The HR-roster person instead. Exactly one of the two; the DB CHECK refuses both. */
+  assignee_employee_id?: string | null;
   due_date?: string | null;
   visibility?: TaskVisibility;
   room_id?: string | null;
@@ -785,6 +795,22 @@ class ProjectsService {
   }
 
   // ---------- TASKS ----------
+
+  /**
+   * Who a task can be given to: platform members AND the HR roster, as one deduped list (#378 N2).
+   *
+   * Derived by `list_project_task_assignees` rather than assembled here — `user_profiles` RLS is
+   * `is_public OR own row` with no teammate branch, so a plain client read returns a picker full
+   * of people called "Member".
+   */
+  async listTaskAssignees(workspaceId: string): Promise<Array<{
+    kind: 'employee' | 'member'; id: string; name: string; email: string | null;
+  }>> {
+    const { data, error } = await (supabase as any)
+      .rpc('list_project_task_assignees', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []) as any[];
+  }
 
   async listTasks(projectId: string): Promise<ProjectTaskWithSubtasks[]> {
     const { data, error } = await (supabase as any)

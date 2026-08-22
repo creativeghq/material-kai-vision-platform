@@ -13,10 +13,12 @@ import {
   Eye,
   EyeOff,
   Home,
+  User as UserIcon,
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -60,6 +62,9 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 
 const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
 
+/** Radix Select has no empty-string value, so "nobody" needs a sentinel of its own. */
+const NO_ASSIGNEE = '__unassigned__';
+
 const daysUntil = (date: string | null) => {
   if (!date) return null;
   const target = new Date(date);
@@ -69,8 +74,26 @@ const daysUntil = (date: string | null) => {
 };
 
 export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true }) => {
+  const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
   const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
+  /**
+   * Who work can be given to (#378 N2). Platform members AND the HR roster in one deduped list —
+   * a fitter or a subcontractor with no login is exactly who a site task is usually for, and until
+   * now the column pointed at auth.users and the UI rendered no assignee at all.
+   */
+  const [assignees, setAssignees] = useState<Array<{ kind: 'employee' | 'member'; id: string; name: string }>>([]);
+
+  // Loaded once per workspace. Failure leaves the list empty and the control still renders
+  // "Unassigned" — a task is not blocked on knowing who could do it.
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    projectsService.listTaskAssignees(activeWorkspaceId)
+      .then((rows) => { if (!cancelled) setAssignees(rows); })
+      .catch(() => { if (!cancelled) setAssignees([]); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -158,6 +181,23 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
       await load();
     } catch (_err) {
       toast({ title: 'Failed to update visibility', variant: 'destructive' });
+    }
+  };
+
+  /**
+   * Give the task to somebody, or to nobody. The two columns are mutually exclusive — the DB CHECK
+   * refuses both at once — so the one not chosen is explicitly cleared rather than left behind.
+   */
+  const handleAssign = async (taskId: string, value: string) => {
+    const [kind, id] = value === NO_ASSIGNEE ? [null, null] : value.split(':');
+    try {
+      await projectsService.updateTask(taskId, {
+        assignee_id: kind === 'member' ? id : null,
+        assignee_employee_id: kind === 'employee' ? id : null,
+      });
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Failed to assign the task', description: err?.message, variant: 'destructive' });
     }
   };
 
@@ -249,6 +289,8 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
                   onVisibilityToggle={() => handleVisibilityToggle(parent)}
                   onDelete={() => handleDelete(parent.id, parent.subtasks.length > 0)}
                   roomName={roomName(parent.room_id)}
+                  assignees={assignees}
+                  onAssign={(v) => handleAssign(parent.id, v)}
                   onAddSubtask={(title) => handleAddSubtask(parent.id, title)}
                   onSubtaskStatusChange={(id, s) => handleStatusChange(id, s)}
                   onSubtaskVisibilityToggle={(t) => handleVisibilityToggle(t)}
@@ -276,6 +318,8 @@ interface TaskRowProps {
   onVisibilityToggle: () => void;
   onDelete: () => void;
   roomName: string | null;
+  assignees: Array<{ kind: 'employee' | 'member'; id: string; name: string }>;
+  onAssign: (value: string) => void;
   onAddSubtask: (title: string) => void;
   onSubtaskStatusChange: (id: string, s: TaskStatus) => void;
   onSubtaskVisibilityToggle: (t: ProjectTask) => void;
@@ -292,6 +336,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
   onVisibilityToggle,
   onDelete,
   roomName,
+  assignees,
+  onAssign,
   onAddSubtask,
   onSubtaskStatusChange,
   onSubtaskVisibilityToggle,
@@ -301,6 +347,12 @@ const TaskRow: React.FC<TaskRowProps> = ({
   const [subtaskInput, setSubtaskInput] = useState('');
   const hasSubtasks = task.subtasks.length > 0;
   const days = daysUntil(task.due_date);
+  // The stored pair as one Select value. Employee wins if both are somehow set — the CHECK makes
+  // that impossible, but reading it the same way the writer writes it costs nothing.
+  const assigneeValue = task.assignee_employee_id
+    ? `employee:${task.assignee_employee_id}`
+    : task.assignee_id ? `member:${task.assignee_id}` : NO_ASSIGNEE;
+  const assigneeName = assignees.find((a) => `${a.kind}:${a.id}` === assigneeValue)?.name ?? null;
 
   return (
     <li>
@@ -357,6 +409,32 @@ const TaskRow: React.FC<TaskRowProps> = ({
                   <Eye className="h-3 w-3" />
                   Client visible
                 </span>
+              )}
+              {/* Who is doing this (#378 N2). The column and the service field existed; nothing
+                  rendered them, so the schedule could not answer "who" and crew planning happened
+                  off-platform. Read-only for collaborators. */}
+              {readOnly ? (
+                assigneeName && (
+                  <span className="flex items-center gap-1">
+                    <UserIcon className="h-3 w-3" />
+                    {assigneeName}
+                  </span>
+                )
+              ) : (
+                <Select value={assigneeValue} onValueChange={onAssign}>
+                  <SelectTrigger className="h-6 w-auto gap-1 border-none bg-transparent px-1 text-xs hover:bg-muted/60">
+                    <UserIcon className="h-3 w-3" />
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_ASSIGNEE}>Unassigned</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={`${a.kind}:${a.id}`} value={`${a.kind}:${a.id}`}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>
