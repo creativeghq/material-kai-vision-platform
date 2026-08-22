@@ -3268,6 +3268,13 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'sub-agents': ['marketing', 'product-business'], 'admin-misc': ['marketing', 'product-business'],
 };
 
+/**
+ * The hidden generalist. It owns every toolkit, which is why it is listed FIRST by
+ * `getToolkitOwnerAgents` — and why `owners[0]` must never be read as "the agent to
+ * run this". Use `resolveToolkitAgent` for that.
+ */
+export const GENERALIST_AGENT_ID = 'kai';
+
 export function getToolkitOwnerAgents(toolkit: ToolkitDefinition): string[] {
   // kai (the generalist) owns every toolkit; specialists own the clusters in TOOLKIT_AGENTS.
   if (TOOLKIT_AGENTS[toolkit.id]) return ['kai', ...TOOLKIT_AGENTS[toolkit.id]];
@@ -3279,4 +3286,29 @@ export function getToolkitOwnerAgents(toolkit: ToolkitDefinition): string[] {
   }
   owners.add('kai');
   return [...owners];
+}
+
+/**
+ * Which agent should run a toolkit's quick-start, given who is selected right now.
+ *
+ * `getToolkitOwnerAgents` puts the GENERALIST first because kai owns every toolkit,
+ * so `owners[0]` is always 'kai'. Reading that as the target moved every quick-start
+ * click OFF the specialist the user had picked and ONTO the hidden generalist — which
+ * is not a cosmetic difference: kai's system prompt carries none of the specialist's
+ * doctrine, it is not exempt from the Haiku cost-router, and `forceToolCall` is keyed
+ * to the specialist id. On 2026-08-21 "Design a room" was launched from Vision, ran as
+ * kai on Haiku, and called `generate_gemini` alone — one image where the interior
+ * prompt's rule ("call generate_3d AND generate_gemini for pure text-to-image") would
+ * have produced the model grid. Nothing failed; the user just got the cheaper tool.
+ *
+ * Order of preference:
+ *   1. the current agent, when it already owns the toolkit — a deliberate pick wins
+ *   2. the first SPECIALIST owner — so JARVIS/orchestrator lands on the specialist
+ *      that has the doctrine, not on the generalist
+ *   3. the generalist, for toolkits no specialist owns
+ */
+export function resolveToolkitAgent(toolkit: ToolkitDefinition, currentAgentId: string): string {
+  const owners = getToolkitOwnerAgents(toolkit);
+  if (owners.includes(currentAgentId)) return currentAgentId;
+  return owners.find((a) => a !== GENERALIST_AGENT_ID) ?? owners[0] ?? currentAgentId;
 }

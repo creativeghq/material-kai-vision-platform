@@ -88,7 +88,7 @@ import { InspirationUrlModal } from './InspirationUrlModal';
 import { ToolkitPickerModal } from './ToolkitPickerModal';
 import { ActionConfirmationCard } from './ActionConfirmationCard';
 import {
-  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, buildToolInput, renderPromptTemplate,
+  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, resolveToolkitAgent, buildToolInput, renderPromptTemplate,
   type ToolkitDefinition, type ToolkitQuickStart,
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
@@ -994,9 +994,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * the toolkit disabled gave the dreaded "I don't have those tools" reply.
    */
   const ensureAgentAndToolkit = useCallback((toolkit: ToolkitDefinition) => {
-    const owners = getToolkitOwnerAgents(toolkit);
-    if (!owners.includes(selectedAgent)) {
-      setSelectedAgent(owners[0]);
+    // resolveToolkitAgent keeps the agent the user picked when it owns the toolkit,
+    // and prefers the SPECIALIST over the generalist otherwise. Reading `owners[0]`
+    // here instead always selected kai, because kai owns every toolkit.
+    const target = resolveToolkitAgent(toolkit, selectedAgent);
+    if (target !== selectedAgent) {
+      setSelectedAgent(target);
     }
     // Force-include this toolkit in the next send regardless of whether the
     // activeToolkits state update below has committed by send time.
@@ -1129,7 +1132,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    *                       when a modal can't open yet, e.g. no image attached)
    */
   const handleQuickStart = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string) => {
-    const target = agentId || (getToolkitOwnerAgents(tk)[0] ?? selectedAgent);
+    // `getToolkitOwnerAgents(tk)[0]` is ALWAYS the generalist (kai owns every toolkit),
+    // so this used to move every quick-start click off the specialist the user had
+    // selected — Vision → kai on "Design a room", losing the interior prompt, the Opus
+    // pin and forceToolCall with it. resolveToolkitAgent keeps a valid current pick.
+    const target = agentId || resolveToolkitAgent(tk, selectedAgent);
     if (target && target !== selectedAgent) setSelectedAgent(target);
 
     // Guarantee the toolkit is bound on the seeded send (switch agent + queue

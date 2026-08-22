@@ -52,7 +52,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { TOOLKITS, renderPromptTemplate } from '@/components/features/ai/agentToolsCatalog';
+import {
+  TOOLKITS, renderPromptTemplate, TOOLKIT_AGENTS, GENERALIST_AGENT_ID,
+  getToolkitOwnerAgents, resolveToolkitAgent,
+} from '@/components/features/ai/agentToolsCatalog';
 import { CAPABILITIES } from '@/config/capabilities';
 import { deriveAutoFields } from '@/components/features/ai/toolAutoFields';
 import { TOOL_MANIFEST } from '@/components/features/ai/toolManifest.generated';
@@ -502,6 +505,68 @@ describe('toolkit options coverage', () => {
       stale,
       `Prune from OPTIONS_EXEMPT (now surfaced, has no enum params, or removed): ${stale.join(', ')}`,
     ).toEqual([]);
+  });
+});
+
+describe('quick-start agent resolution', () => {
+  // A quick-start click resolves WHICH agent runs the turn. `getToolkitOwnerAgents`
+  // lists the generalist FIRST (kai owns every toolkit), so reading `owners[0]` as the
+  // target moved every click off the specialist the user had selected. That is not
+  // cosmetic: the specialist's system prompt carries the tool doctrine, `forceToolCall`
+  // is keyed to its id, and the Haiku cost-router exempts it. On 2026-08-21 "Design a
+  // room" was launched from Vision, ran as kai on Haiku, and called `generate_gemini`
+  // alone — one image where the interior prompt's rule would have produced the grid.
+  // Nothing failed. The user just silently got the cheaper tool.
+  const AgentHubSrc = readFileSync(
+    join(process.cwd(), 'src/components/features/ai/AgentHub.tsx'),
+    'utf8',
+  );
+
+  it('keeps the agent the user picked when it already owns the toolkit', () => {
+    const offenders: string[] = [];
+    for (const tk of TOOLKITS) {
+      for (const owner of getToolkitOwnerAgents(tk)) {
+        const resolved = resolveToolkitAgent(tk, owner);
+        if (resolved !== owner) offenders.push(`${tk.id}: ${owner} → ${resolved}`);
+      }
+    }
+    expect(
+      offenders,
+      `A quick-start moved the user off an agent that already owns the toolkit:\n  ${offenders.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('prefers the SPECIALIST over the generalist when the agent must change', () => {
+    const offenders: string[] = [];
+    for (const tk of TOOLKITS) {
+      const specialists = TOOLKIT_AGENTS[tk.id];
+      if (!specialists?.length) continue;
+      // 'orchestrator' owns nothing — it is the router, so it always forces a switch.
+      const resolved = resolveToolkitAgent(tk, 'orchestrator');
+      if (resolved === GENERALIST_AGENT_ID) {
+        offenders.push(`${tk.id}: fell to '${GENERALIST_AGENT_ID}' with specialists [${specialists.join(', ')}]`);
+      }
+    }
+    expect(
+      offenders,
+      `A quick-start landed on the generalist while a specialist owns the toolkit:\n  ${offenders.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('AgentHub resolves the target through resolveToolkitAgent, not owners[0]', () => {
+    // The regression shape verbatim. `getToolkitOwnerAgents(...)[0]` is ALWAYS the
+    // generalist, so indexing it anywhere in the switch path reintroduces the bug.
+    // blankComments keeps line numbering while removing comment bodies — the
+    // comments here NAME the bad pattern in order to warn about it.
+    const offenders = sharedBlankComments(AgentHubSrc).split('\n')
+      .map((line, i) => ({ line, n: i + 1 }))
+      .filter(({ line }) => /getToolkitOwnerAgents\([^)]*\)\s*\[0\]|owners\[0\]/.test(line))
+      .map(({ line, n }) => `AgentHub.tsx:${n}: ${line.trim()}`);
+    expect(
+      offenders,
+      `Read the first owner as "the agent to run this" — it is always the generalist. Use resolveToolkitAgent():\n  ${offenders.join('\n  ')}`,
+    ).toEqual([]);
+    expect(AgentHubSrc).toContain('resolveToolkitAgent(tk, selectedAgent)');
   });
 });
 
