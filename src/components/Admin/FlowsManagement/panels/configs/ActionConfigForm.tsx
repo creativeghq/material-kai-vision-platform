@@ -31,6 +31,7 @@ import type {
   CreateTaskConfig,
   AdvanceDealStageConfig,
   CreatePlannedPaymentConfig,
+  LinkDocumentConfig,
   RunEdgeFunctionConfig,
   LogEventConfig,
   SendAgentMessageConfig,
@@ -605,6 +606,64 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             onChange={(fields) => onChange({ ...cfg, fields })}
             hint="Allowlisted contact fields only (name, email, phone, status, lead_status…). Values may use {{trigger.data.x}}."
           />
+        </div>
+      );
+    }
+
+    case 'link_document': {
+      const cfg = config as LinkDocumentConfig;
+      return (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Document</Label>
+              <Select
+                value={cfg.document_kind || 'invoice'}
+                onValueChange={(v) => onChange({ ...cfg, document_kind: v as LinkDocumentConfig['document_kind'] })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                  <SelectItem value="order">Order</SelectItem>
+                  <SelectItem value="quote">Quote</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Attach to</Label>
+              <Select
+                value={cfg.target_kind || 'deal'}
+                onValueChange={(v) => onChange({ ...cfg, target_kind: v as LinkDocumentConfig['target_kind'] })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deal">A deal</SelectItem>
+                  <SelectItem value="project">A project</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Document id</Label>
+            <Input
+              value={cfg.document_id || ''}
+              onChange={(e) => onChange({ ...cfg, document_id: e.target.value })}
+              placeholder="{{trigger.data.invoice_id}}"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Target id</Label>
+            <Input
+              value={cfg.target_id || ''}
+              onChange={(e) => onChange({ ...cfg, target_id: e.target.value })}
+              placeholder="{{trigger.data.deal_id}} — leave blank to detach"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Attaching to a PROJECT is usually unnecessary: the document chain already carries the
+              job down from its parent. This is mainly for the deal, which nothing derives.
+            </p>
+          </div>
         </div>
       );
     }

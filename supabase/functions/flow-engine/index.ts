@@ -1435,6 +1435,66 @@ async function executeAction(
       return { output: { created: true, planned_payment_id: (data as { id?: string } | null)?.id ?? null, direction, amount } };
     }
 
+    /**
+     * Attach a document to the job or the deal it belongs to (#378 Phase 4).
+     *
+     * Creates nothing and moves nothing: it writes one foreign key that already exists on the
+     * document. The partner to the link work in #378 — "quote accepted -> attach it to the deal",
+     * "invoice issued -> file it under the job".
+     *
+     * The project half is usually unnecessary, and that is deliberate: since Phase 1 the SQL chain
+     * functions carry `project_id` down from the parent themselves, so a flow should not be
+     * re-doing what `generate_invoice_from_order` already did. This exists for the links nothing
+     * derives — chiefly the DEAL, which no chain function knows about.
+     *
+     * BOTH ends are checked against the flow's workspace. flow-engine holds the service role, so a
+     * config naming another tenant's deal would otherwise attach this document to it.
+     */
+    case 'link_document': {
+      const docKind = String(resolved.document_kind ?? '');
+      const docId = String(resolved.document_id ?? '');
+      const targetKind = String(resolved.target_kind ?? '');
+      const targetId = String(resolved.target_id ?? '');
+
+      if (!scope?.workspaceId) return { output: { skipped: true, reason: 'no_workspace_scope' } };
+      if (!docId || docId.includes('{{')) return { output: { skipped: true, reason: 'unresolved_document_id' } };
+
+      const DOC_TABLES: Record<string, string> = {
+        invoice: 'invoices', order: 'orders', quote: 'quotes', expense: 'supplier_bills',
+      };
+      const docTable = DOC_TABLES[docKind];
+      if (!docTable) return { output: { skipped: true, reason: `link_document does not support document_kind '${docKind}'` } };
+
+      // Which column the target writes, and which table proves it exists. `supplier_bills` has no
+      // deal_id — a supplier's bill is a cost, not something a pipeline deal was won on — so that
+      // combination is refused by name rather than silently writing nothing.
+      const TARGETS: Record<string, { column: string; table: string }> = {
+        project: { column: 'project_id', table: 'projects' },
+        deal: { column: 'deal_id', table: 'crm_deals' },
+      };
+      const target = TARGETS[targetKind];
+      if (!target) return { output: { skipped: true, reason: `link_document does not support target_kind '${targetKind}'` } };
+      if (target.column === 'deal_id' && docTable === 'supplier_bills') {
+        return { output: { skipped: true, reason: 'a supplier bill has no deal — it is a cost, not something a deal was won on' } };
+      }
+
+      // Clearing is legitimate: "deal lost -> detach the quote".
+      const clearing = !targetId || targetId.includes('{{');
+      if (!clearing) {
+        const { data: found } = await supabase.from(target.table).select('id')
+          .eq('id', targetId).eq('workspace_id', scope.workspaceId).maybeSingle();
+        if (!found) return { output: { skipped: true, reason: `${targetKind} not found in this workspace` } };
+      }
+
+      const { data, error } = await supabase.from(docTable)
+        .update({ [target.column]: clearing ? null : targetId })
+        .eq('id', docId).eq('workspace_id', scope.workspaceId)
+        .select('id').maybeSingle();
+      if (error) throw new Error(`link_document failed: ${error.message}`);
+      if (!data) return { output: { skipped: true, reason: `${docKind} not found in this workspace` } };
+      return { output: { linked: !clearing, document_kind: docKind, target_kind: targetKind } };
+    }
+
     default:
       return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
   }

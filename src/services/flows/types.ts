@@ -630,6 +630,7 @@ export type ActionType =
   | 'create_task'
   | 'advance_deal_stage'
   | 'create_planned_payment'
+  | 'link_document'
   | 'run_edge_function'
   | 'log_event'
   | 'send_agent_message'
@@ -813,6 +814,21 @@ export interface CreatePlannedPaymentConfig {
   /** Optional settlement target. Verified against the flow's workspace before anything is written. */
   invoice_id?: string;
   supplier_bill_id?: string;
+}
+
+/**
+ * Attach a document to the job or the deal it belongs to (#378 Phase 4).
+ *
+ * Creates nothing and moves nothing — it writes one foreign key the document already has. Mostly
+ * for the DEAL: since #378 Phase 1 the SQL chain functions carry `project_id` down from the parent
+ * themselves, so a flow re-doing that is redundant, while nothing derives the deal link at all.
+ */
+export interface LinkDocumentConfig {
+  document_kind: 'invoice' | 'order' | 'quote' | 'expense';
+  document_id: string;
+  target_kind: 'project' | 'deal';
+  /** Blank detaches — "deal lost, detach the quote" is as real as attaching it. */
+  target_id?: string;
 }
 
 export interface RunEdgeFunctionConfig {

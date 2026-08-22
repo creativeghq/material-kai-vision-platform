@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   MessageSquare, Mail, PlusCircle, Globe, Bell, Zap,
   Smartphone, Send, CheckCircle2, UserCog, Tag, StickyNote,
-  UserPen, PackageCheck, ScrollText, CheckSquare, Kanban, CalendarClock,
+  UserPen, PackageCheck, ScrollText, CheckSquare, Kanban, CalendarClock, Link2,
   BotMessageSquare, LayoutGrid, ImagePlus,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
   MessageCircle, Megaphone, TrendingDown,
@@ -36,6 +36,7 @@ const actionIcons: Record<ActionType, React.ElementType> = {
   create_task: CheckSquare,
   advance_deal_stage: Kanban,
   create_planned_payment: CalendarClock,
+  link_document: Link2,
   log_event: ScrollText,
   http_request: Globe,
   run_edge_function: Zap,

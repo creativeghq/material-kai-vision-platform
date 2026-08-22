@@ -541,6 +541,10 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Schedule Payment', description: 'Add money expected in or out to the cash-flow forecast', icon: 'CalendarClock', color: 'blue',
     defaultData: { label: 'Schedule Payment', category: 'action', actionType: 'create_planned_payment', config: { title: '', amount: 0, direction: 'out', scheduled_for: '' } } as ActionNodeData },
 
+  { type: 'actionNode', category: 'action', subType: 'link_document', group: 'Data',
+    label: 'Link Document', description: 'Attach an invoice, order or quote to a job or a deal', icon: 'Link2', color: 'blue',
+    defaultData: { label: 'Link Document', category: 'action', actionType: 'link_document', config: { document_kind: 'invoice', document_id: '', target_kind: 'deal', target_id: '' } } as ActionNodeData },
+
   // ── Data ──
   { type: 'actionNode', category: 'action', subType: 'update_product', group: 'Data',
     label: 'Update Product', description: 'Edit product fields', icon: 'PackageCheck', color: 'blue',
