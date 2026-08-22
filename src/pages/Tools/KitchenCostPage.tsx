@@ -480,7 +480,10 @@ export default function KitchenCostPage() {
                   id="kc-budget"
                   className="w-32"
                   inputMode="decimal"
-                  defaultValue={String(dims[budgetDim.key] ?? budgetDim.default ?? '')}
+                  // "Not decided" is one of the answers a kitchen checklist offers, so an unset
+                  // budget shows as empty. A prefilled 0 would read as a budget of nothing.
+                  placeholder="Not decided"
+                  defaultValue={dims[budgetDim.key] ? String(dims[budgetDim.key]) : ''}
                   onBlur={(e) => setDimension(budgetDim.key, parseDecimalOr(e.target.value, 0))}
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                 />

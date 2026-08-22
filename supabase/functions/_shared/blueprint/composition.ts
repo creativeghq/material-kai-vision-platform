@@ -179,7 +179,13 @@ export interface AppliancePlacementDef {
 export interface ApplianceTypeDef {
   key: string;
   label: string;
-  /** Flat price when WE supply it. Ignored for one the customer already owns. */
+  /**
+   * Flat price when WE supply it. Ignored for one the customer already owns.
+   *
+   * Absent is NOT zero: an explicit 0 means "included", and absent means nobody has priced it yet.
+   * Undertaking to supply an appliance nobody has priced raises an issue rather than billing it at
+   * nothing, which is the same rule `material_cost` NULL follows on a schedule line.
+   */
   unit_price?: number;
   /** …or a model list to pick from, ABSORBED exactly like a zone global's price list. */
   option_group?: string;
@@ -891,6 +897,9 @@ export function deriveComposition(
           modelLabel = model?.label ?? null;
           if (def.option_group && !model) {
             issues.push(`${zone.label}: no model chosen for ${def.label} — it prices at 0.`);
+          }
+          if (!def.option_group && def.unit_price == null) {
+            issues.push(`${def.label}: we are supplying it and it has no price — it counts as 0.`);
           }
           const price = model ? model.unit_price : num(def.unit_price);
           if (price > 0) {

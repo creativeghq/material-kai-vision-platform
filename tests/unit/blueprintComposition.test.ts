@@ -701,6 +701,26 @@ describe('an appliance is priced by who supplies it and by nothing else', () => 
     expect(posh.appliances[0].total).toBe(900);
   });
 
+  it('refuses to bill an unpriced appliance at nothing', () => {
+    // Absent is not zero. `worktop_appliance` carries no price and no model list, so undertaking
+    // to supply one has to say so — silently charging 0 for a machine we have promised to buy is
+    // the same wrong-number-that-looks-right the schedule's NULL rate exists to avoid.
+    const unpriced = deriveComposition(kitchen, kcfg([appliance({ type: 'small', supply: 'ours' })]), applianceItems);
+    expect(unpriced.issues.some((i) => i.includes('Worktop appliance') && i.includes('no price'))).toBe(true);
+    // …and the same row costed to the customer says nothing, because nobody is buying it.
+    const owned = deriveComposition(kitchen, kcfg([appliance({ type: 'small', supply: 'existing' })]), applianceItems);
+    expect(owned.issues.some((i) => i.includes('no price'))).toBe(false);
+  });
+
+  it('treats an explicit zero as included, not as unpriced', () => {
+    const free: ZoneDef[] = kitchen.map((z) => (z.key !== 'appliances' ? z : {
+      ...z,
+      appliances: (z.appliances ?? []).map((a) => (a.key === 'small' ? { ...a, unit_price: 0 } : a)),
+    }));
+    const d = deriveComposition(free, kcfg([appliance({ type: 'small', supply: 'ours' })]), applianceItems);
+    expect(d.issues.some((i) => i.includes('no price'))).toBe(false);
+  });
+
   it('never prices an appliance model list twice', () => {
     // Same absorption trap as a zone's door-model list: the oven's money arrives through the
     // appliance line, so the list must stop being a pick-one choice in the flat scope.
