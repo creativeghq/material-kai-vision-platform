@@ -21,14 +21,14 @@
  * Amounts and supplier identity are deliberately NOT here — payments allocate against them,
  * and net/VAT feed the P&L. Correcting a wrong amount is a credit note, not an edit.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Paperclip, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,6 +38,7 @@ import {
   EMPTY_LINK, linkKey, linkSubject, linkToColumns, type BillLinkColumns,
 } from '@/modules/finance/utils/billLink';
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
+import { receiptScanService, RECEIPT_ACCEPT } from '@/services/receiptScanService';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
 const NO_CATEGORY = '__none__';
@@ -115,6 +116,14 @@ export const EditSupplierBillDialog: React.FC<{
   const [categoryId, setCategoryId] = useState<string>(NO_CATEGORY);
   const [notes, setNotes] = useState('');
   const [link, setLink] = useState<OrderLinkTarget>({ kind: 'none' });
+  /**
+   * The receipt image (#379). Read back here because this is the one surface that opens a bill by
+   * id — without it `supplier_bills.receipt_path` would be written by the scanner and read by
+   * nothing, which is the write-only-column shape the link work exists to remove.
+   */
+  const [receiptName, setReceiptName] = useState<string | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const receiptInput = useRef<HTMLInputElement | null>(null);
   /** What the row said on open, so an untouched field is never written back. */
   const [initialLinkKey, setInitialLinkKey] = useState('none');
 
@@ -126,7 +135,7 @@ export const EditSupplierBillDialog: React.FC<{
       // The five link columns are not on PayableExpense (the AP list has no use for them), so
       // they are read here rather than widening a type every payables row pays for.
       supabase.from('supplier_bills')
-        .select('project_id, order_id, covers_order_id, trip_report_id, property_id')
+        .select('project_id, order_id, covers_order_id, trip_report_id, property_id, receipt_path, receipt_name')
         .eq('id', billId).maybeSingle(),
     ])
       .then(async ([rows, linkRow]) => {
@@ -137,6 +146,8 @@ export const EditSupplierBillDialog: React.FC<{
         setDueAt(b?.due_at?.slice(0, 10) ?? '');
         setCategoryId(b?.category_id ?? NO_CATEGORY);
         setNotes(b?.notes ?? '');
+        const rec = (linkRow.data ?? {}) as { receipt_path?: string | null; receipt_name?: string | null };
+        setReceiptName(rec.receipt_path ? (rec.receipt_name || 'Receipt') : null);
         const cols = { ...EMPTY_LINK, ...((linkRow.data ?? {}) as Partial<BillLinkColumns>) };
         const resolved = await resolveLink(cols);
         setLink(resolved);
@@ -248,6 +259,46 @@ export const EditSupplierBillDialog: React.FC<{
             <div className="space-y-1.5">
               <Label>Notes</Label>
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            </div>
+            {/* The receipt. Attaching one here is also how a cost booked before the paper arrived
+                gets its evidence — the bucket is private, so the link is signed on each open and
+                never stored. */}
+            <div className="space-y-1.5">
+              <Label>Receipt</Label>
+              <input
+                ref={receiptInput}
+                type="file" accept={RECEIPT_ACCEPT} className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]; e.currentTarget.value = '';
+                  if (!f || !billId) return;
+                  setReceiptBusy(true);
+                  try { await receiptScanService.attachToBill(billId, f); setReceiptName(f.name); toast({ title: 'Receipt attached' }); }
+                  catch (err) { toast({ title: 'Could not attach the receipt', description: (err as Error).message, variant: 'destructive' }); }
+                  finally { setReceiptBusy(false); }
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                {receiptName && (
+                  <Button type="button" size="sm" variant="outline" disabled={receiptBusy}
+                    onClick={async () => {
+                      if (!billId) return;
+                      setReceiptBusy(true);
+                      try {
+                        const url = await receiptScanService.signBillReceipt(billId);
+                        if (url) window.open(url, '_blank', 'noopener');
+                        else toast({ title: 'That receipt is no longer available', variant: 'destructive' });
+                      } catch (err) { toast({ title: 'Could not open the receipt', description: (err as Error).message, variant: 'destructive' }); }
+                      finally { setReceiptBusy(false); }
+                    }}>
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> {receiptName}
+                  </Button>
+                )}
+                <Button type="button" size="sm" variant={receiptName ? 'ghost' : 'outline'} disabled={receiptBusy}
+                  onClick={() => receiptInput.current?.click()}>
+                  {receiptBusy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Paperclip className="h-3.5 w-3.5 mr-1" />}
+                  {receiptName ? 'Replace' : 'Attach a receipt'}
+                </Button>
+              </div>
             </div>
           </div>
         )}

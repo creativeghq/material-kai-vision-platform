@@ -3,8 +3,8 @@
 // is optional. The "Paid now" toggle flips it between an open payable and a settled cost:
 //   OFF → open payable (shows in AP with a due date)
 //   ON  → also books the outgoing payment now (settled, drops out of AP, hits cash-out)
-import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, Plus, ScanLine, Paperclip, X } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
@@ -29,6 +29,7 @@ import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service'
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { receiptScanService, splitForForm, RECEIPT_ACCEPT, ReceiptTooLargeError } from '@/services/receiptScanService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { todayLocalISO } from '@/utils/datetime';
 
@@ -74,6 +75,15 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // module has no properties, so the group renders nothing either way.
   const { isModuleAvailable } = useEntitlements();
   const realEstate = isModuleAvailable('real-estate');
+  /**
+   * The scanned receipt (#379). Held until the bill exists, then attached to it — a receipt has
+   * nowhere to live before there is a bill to hang it on, and uploading it to a bill that the
+   * operator then abandons would leave an orphan the reaper has to clean up.
+   */
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const receiptInput = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -496,6 +506,20 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           linkNote,
         ].filter(Boolean).join(' '),
       });
+      // The receipt goes on the bill that now exists. Best-effort and reported: the expense is
+      // COMMITTED by this point, so a storage failure must not make the dialog look like nothing
+      // happened — that shape is what turned one failed recurring setup into a duplicated cost.
+      if (receipt) {
+        try {
+          await receiptScanService.attachToBill(created.billId, receipt);
+        } catch (err: any) {
+          toast({
+            title: 'Expense saved, receipt not attached',
+            description: `${err?.message ?? 'Upload failed'} — open the expense and attach it again. Do NOT re-save this form.`,
+            variant: 'destructive',
+          });
+        }
+      }
       clearDraft();
       // Cash actually moved only when a payment was booked — `paidNow` alone is the intent, not
       // the outcome (a zero-total bill books no payment).
@@ -504,6 +528,70 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * Read a receipt into this form (#379).
+   *
+   * Prefills, never decides. Every field it touches stays editable and the operator is the one who
+   * presses Save — a confident wrong reading is the failure mode of extraction, and the only thing
+   * that catches it is a person looking at the paper.
+   *
+   * Two details that would otherwise be silent bugs:
+   *   • The form's fields are NET and VAT; a receipt prints the GROSS. `splitForForm` derives the
+   *     pair once, in one place — dropping a gross into "Subtotal (net)" books a VAT-bearing cost
+   *     with its tax folded into the net, overstating the P&L cost and losing the recoverable VAT.
+   *   • The date defaults HERE with `todayLocalISO()` when the receipt's own date was unreadable.
+   *     The scanner deliberately returns null rather than a server "today", which is UTC and is
+   *     yesterday for a Greek operator working before 03:00.
+   */
+  const scanReceipt = async (file: File) => {
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const res = await receiptScanService.scan(workspaceId, file);
+      const f = res.fields;
+      setReceipt(file);
+      if (res.status === 'failed') {
+        setScanNote('That image could not be read — it is attached, but fill the figures in by hand.');
+        return;
+      }
+      const { net, vat } = splitForForm(f);
+      setSubtotalNet(String(net));
+      setVatAmount(String(vat));
+      if (f.currency) setCurrency(f.currency);
+      setIssuedAt(f.doc_date ?? todayLocalISO());
+      if (f.document_number) setReference(f.document_number);
+      if (f.vendor) {
+        // A one-off payee, not a CRM company: creating a supplier record from a petrol-station
+        // receipt would fill the CRM with businesses nobody has a relationship with. The operator
+        // can still search for a real supplier and replace it.
+        setParty({ type: 'adhoc', id: null, label: f.vendor });
+        setDescription((d) => d || f.vendor!);
+      }
+      // The category is a HINT and only applied when it names a category that already exists.
+      // Inventing one from a receipt is how a chart of accounts fills up with "fuel", "Fuel" and
+      // "petrol" as three separate lines in the P&L.
+      if (f.category_hint) {
+        const hit = expenseCats.find((c) => c.name.toLowerCase() === f.category_hint!.toLowerCase());
+        if (hit) setCategoryId(hit.id);
+      }
+      const notes: string[] = [];
+      if (!f.total_gross) notes.push('no total found');
+      if (f.vat_amount === null) notes.push('no VAT line on the receipt — entered as 0');
+      if (!f.doc_date) notes.push('date unreadable, defaulted to today');
+      if (f.foots === false) notes.push('the printed net + VAT do not add up to the printed total');
+      if (f.confidence < 0.6) notes.push('the image was hard to read');
+      setScanNote(notes.length ? `Check these: ${notes.join('; ')}.` : null);
+    } catch (err: any) {
+      toast({
+        title: 'Could not read that receipt',
+        description: err instanceof ReceiptTooLargeError ? err.message : (err?.message ?? 'Try a clearer photo.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -523,6 +611,38 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Read the receipt first, correct it second. Placed above the form rather than beside a
+              field because it fills several of them at once, and because on the paper-in-hand path
+              it is the first thing the operator wants — typing is the fallback. */}
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-surface-sunken px-3 py-2">
+            <input
+              ref={receiptInput}
+              type="file" accept={RECEIPT_ACCEPT} className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void scanReceipt(f); e.currentTarget.value = ''; }}
+            />
+            <Button type="button" size="sm" variant="secondary" disabled={busy || scanning}
+              onClick={() => receiptInput.current?.click()}>
+              {scanning
+                ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Reading…</>
+                : <><ScanLine className="h-3.5 w-3.5 mr-1" /> Scan a receipt</>}
+            </Button>
+            {receipt ? (
+              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <Paperclip className="h-3 w-3 shrink-0" />
+                <span className="truncate">{receipt.name}</span>
+                <Button type="button" size="sm" variant="ghost" className="h-5 w-5 p-0"
+                  title="Remove the receipt" onClick={() => { setReceipt(null); setScanNote(null); }}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Photo or PDF — the figures below get filled in for you to check.</span>
+            )}
+            {/* What the reader could NOT do is worth more than what it could. A silent partial
+                prefill is how a missing VAT line becomes a cost booked gross. */}
+            {scanNote && <span className="w-full text-[11px] text-amber-600 dark:text-amber-400">{scanNote}</span>}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Category *</Label>

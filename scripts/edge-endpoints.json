@@ -11122,5 +11122,84 @@
     "actions": [],
     "request": [],
     "response": "{ success, scanned_due, scanned_warranties, serviceDue, serviceOverdue, warrantyExpiring, failed }"
+  },
+  {
+    "name": "scan-receipt",
+    "tag": "Finance",
+    "summary": "Read a photographed receipt into expense fields, and keep the image on the bill",
+    "description": "Turns a photo or PDF of a receipt into the fields an expense needs (#379). The reader is a forced Anthropic tool call over the image; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. It deliberately writes nothing: the caller creates the trip line or the supplier bill and confirms the figures, because a confident wrong reading is the failure mode of extraction. An unreadable date comes back null rather than defaulted — this function runs in UTC and the caller fills the operator's local day. `attach_bill` / `sign_bill` put the image on a supplier bill in the private bucket and mint a short-lived URL for it.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "scan",
+        "summary": "Extract vendor, date, currency and amounts from a receipt image or PDF",
+        "params": [
+          {
+            "name": "workspace_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Checked against the caller's membership; never trusted from the body alone"
+          },
+          {
+            "name": "content_type",
+            "type": "string",
+            "required": true,
+            "desc": "image/jpeg|png|webp|heic|heif or application/pdf"
+          },
+          {
+            "name": "data_base64",
+            "type": "string",
+            "required": true,
+            "desc": "Base64 receipt bytes, up to ~4 MB"
+          }
+        ],
+        "response": "{success, status: 'extracted'|'failed', unreadable, fields:{vendor, doc_date, currency, total_gross, vat_amount, net, document_number, category_hint, confidence, foots}}"
+      },
+      {
+        "name": "attach_bill",
+        "summary": "Store a receipt against a supplier bill (Finance expense)",
+        "params": [
+          {
+            "name": "bill_id",
+            "type": "string (uuid)",
+            "required": true
+          },
+          {
+            "name": "filename",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "content_type",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "data_base64",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{success, receipt_path, signed_url}"
+      },
+      {
+        "name": "sign_bill",
+        "summary": "Mint a fresh signed URL for a receipt already on a bill",
+        "params": [
+          {
+            "name": "bill_id",
+            "type": "string (uuid)",
+            "required": true
+          }
+        ],
+        "response": "{success, signed_url}"
+      }
+    ]
   }
 ]

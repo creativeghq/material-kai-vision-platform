@@ -101,6 +101,12 @@ export interface TripExpenseItem {
   review_notes: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  /** How this line came to exist. NULL = typed by hand; see CreateItemInput for the rest. */
+  extraction_status: 'pending' | 'extracted' | 'failed' | null;
+  /** The raw reader output, kept so a wrong prefill can be traced to what was actually read. */
+  extracted: Record<string, unknown> | null;
+  /** A scanned line the rep has not confirmed yet. */
+  needs_review: boolean;
   /** Set once the billable line has been on-charged to a customer as a draft invoice. */
   billed_invoice_id: string | null;
   billed_at: string | null;
@@ -152,6 +158,16 @@ export interface CreateItemInput {
   billable?: boolean;
   project_id?: string | null;
   sort_order?: number;
+  /**
+   * Set only by the receipt scanner (#379). `extraction_status` is an EXPLICIT marker: NULL means
+   * a human typed this line, 'extracted' means a scan produced it, 'failed' means a scan ran and
+   * could not read the paper — and only the last of those is worth retrying with a better photo.
+   * `needs_review` is what keeps this prefill-then-confirm rather than an automation that books
+   * money off a model's reading; it is cleared by the person, never by a confidence score.
+   */
+  extraction_status?: 'pending' | 'extracted' | 'failed' | null;
+  extracted?: Record<string, unknown> | null;
+  needs_review?: boolean;
 }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -251,6 +267,17 @@ export const tripExpenseService = {
 
   // -------- Items --------
 
+  /**
+   * The human half of prefill-then-confirm. Clearing `needs_review` is a deliberate act by the rep
+   * who is looking at both the photo and the numbers — never something a confidence threshold does
+   * on their behalf, because a confident wrong reading is the failure mode of this whole feature.
+   */
+  async confirmScanned(itemId: string): Promise<void> {
+    const { error } = await supabase.from('trip_expense_items')
+      .update({ needs_review: false } as never).eq('id', itemId);
+    if (error) throw error;
+  },
+
   async addItem(input: CreateItemInput): Promise<TripExpenseItem> {
     const { data, error } = await supabase
       .from('trip_expense_items')
@@ -267,6 +294,9 @@ export const tripExpenseService = {
         billable: input.billable ?? false,
         project_id: input.project_id ?? null,
         sort_order: input.sort_order ?? 0,
+        extraction_status: input.extraction_status ?? null,
+        extracted: input.extracted ?? null,
+        needs_review: input.needs_review ?? false,
       })
       .select('*')
       .single();

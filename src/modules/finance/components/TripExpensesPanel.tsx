@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
-  ShoppingCart, Receipt,
+  ShoppingCart, Receipt, ScanLine, BadgeCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
@@ -26,6 +26,7 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
+import { receiptScanService, splitForForm, RECEIPT_ACCEPT, ReceiptTooLargeError } from '@/services/receiptScanService';
 interface Props {
   workspaceId: string;
   /** Finance reviewers see every card and can approve/reject lines. Reps see only their own. */
@@ -196,6 +197,9 @@ const TripCardDetail: React.FC<{
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
   /** What has been FILED against this card — see `tripExpenseService.cardLinks`. */
   const [links, setLinks] = useState<TripCardLinks | null>(null);
+  /** Progress while a batch of photographed receipts is being read (#379). */
+  const [scanning, setScanning] = useState<{ done: number; total: number } | null>(null);
+  const scanInput = useRef<HTMLInputElement | null>(null);
 
   const isOwner = !!report && report.user_id === uid;
   const isDraft = report?.status === 'draft';
@@ -248,6 +252,78 @@ const TripCardDetail: React.FC<{
   const removeItem = async (id: string) => {
     try { await tripExpenseService.removeItem(id); await refreshAll(); }
     catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  /**
+   * Photograph N receipts, get N draft lines (#379).
+   *
+   * The order matters and it is not the obvious one. Each file is SCANNED first, then the line is
+   * created from what came back, then the image is attached to that line. Creating the line first
+   * would mean a failed scan leaves an empty row the rep has to find and delete; scanning first
+   * means a failure costs nothing but the credit that was already spent reading it.
+   *
+   * One file at a time, deliberately. A phone camera roll of twelve receipts fired at the model in
+   * parallel is twelve concurrent vision calls against a per-workspace credit balance, and a
+   * mid-batch refusal would leave an arbitrary subset created. Sequential also lets the button
+   * report "4 of 12" rather than freezing.
+   *
+   * Every line lands with `needs_review`, whatever the confidence. The rep confirms.
+   */
+  const scanReceipts = async (files: FileList) => {
+    if (!report) return;
+    const list = Array.from(files);
+    setScanning({ done: 0, total: list.length });
+    let created = 0;
+    const failures: string[] = [];
+    try {
+      for (const file of list) {
+        try {
+          const res = await receiptScanService.scan(report.workspace_id, file);
+          const f = res.fields;
+          if (res.status === 'failed') { failures.push(`${file.name}: could not be read`); continue; }
+          const { net, vat } = splitForForm(f);
+          const item = await tripExpenseService.addItem({
+            report_id: reportId,
+            // The reader returns null when the printed date was unreadable or ambiguous. Today is
+            // filled in HERE, in the operator's timezone — the edge function runs in UTC, and a
+            // UTC "today" before 03:00 local is yesterday on a record numbered by date.
+            expense_date: f.doc_date ?? todayLocalISO(),
+            category: f.category_hint && (TRIP_EXPENSE_CATEGORIES as readonly string[]).includes(f.category_hint.toLowerCase())
+              ? f.category_hint.toLowerCase()
+              : 'other',
+            description: [f.vendor, f.document_number].filter(Boolean).join(' · ') || file.name,
+            vendor: f.vendor,
+            // The line's `amount` is the gross the rep actually paid; net/VAT ride alongside.
+            amount: f.total_gross ?? net + vat,
+            currency: f.currency || report.currency,
+            vat_amount: f.vat_amount,
+            payment_method: 'personal',
+            extraction_status: 'extracted',
+            extracted: f as unknown as Record<string, unknown>,
+            needs_review: true,
+          });
+          created += 1;
+          // Best-effort: the line and its figures are the point, and a storage hiccup must not
+          // discard a reading the rep already paid for. They can attach it by hand afterwards.
+          await tripExpenseService.uploadReceipt(item.id, file).catch(() => null);
+        } catch (err: any) {
+          failures.push(`${file.name}: ${err instanceof ReceiptTooLargeError ? err.message : (err?.message || 'failed')}`);
+        } finally {
+          setScanning((p) => (p ? { ...p, done: p.done + 1 } : p));
+        }
+      }
+      await refreshAll();
+      toast({
+        title: created > 0 ? `${created} expense${created === 1 ? '' : 's'} read from ${created === 1 ? 'a receipt' : 'receipts'}` : 'Nothing could be read',
+        description: [
+          created > 0 ? 'Check each one before submitting — they are marked for review.' : '',
+          failures.length ? failures.join('; ') : '',
+        ].filter(Boolean).join(' '),
+        variant: created === 0 ? 'destructive' : undefined,
+      });
+    } finally {
+      setScanning(null);
+    }
   };
 
   // Approved, billable, not-yet-billed lines that can be on-charged to a client.
@@ -351,6 +427,25 @@ const TripCardDetail: React.FC<{
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {/* Photograph the receipts and let the card fill itself in. First on the row because
+                on a trip it is the normal way in — typing an expense is the fallback, not the
+                other way round. `capture` is deliberately absent: on a phone the picker still
+                offers the camera, and without it the rep can also select the twelve photos they
+                already took over three days. */}
+            {canEditItems && (
+              <>
+                <input
+                  ref={scanInput}
+                  type="file" multiple accept={RECEIPT_ACCEPT} className="hidden"
+                  onChange={(e) => { const fs = e.target.files; if (fs?.length) void scanReceipts(fs); e.currentTarget.value = ''; }}
+                />
+                <Button size="sm" variant="secondary" disabled={busy || !!scanning} onClick={() => scanInput.current?.click()}>
+                  {scanning
+                    ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Reading {scanning.done}/{scanning.total}</>
+                    : <><ScanLine className="h-3.5 w-3.5 mr-1" /> Scan receipts</>}
+                </Button>
+              </>
+            )}
             {canEditItems && <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Expense</Button>}
             {canReview && billableEligible.length > 0 && (
               <Button size="sm" variant="outline" disabled={busy} onClick={billToClient} title="Create a draft customer invoice from the approved billable expenses">
@@ -389,9 +484,14 @@ const TripCardDetail: React.FC<{
           <HubEmptyState
             icon={FileText}
             title="No expenses yet"
-            description="Every line on this trip — travel, meals, accommodation. Approved billable lines can then be pushed into a draft customer invoice."
+            description="Photograph the receipts and each one becomes a line you check, or add them by hand. Approved billable lines can then be pushed into a draft customer invoice."
             action={canEditItems ? (
-              <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add expense</Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" disabled={!!scanning} onClick={() => scanInput.current?.click()}>
+                  <ScanLine className="h-3.5 w-3.5 mr-1" /> Scan receipts
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add by hand</Button>
+              </div>
             ) : undefined}
           />
         ) : (
@@ -413,7 +513,15 @@ const TripCardDetail: React.FC<{
                   <td className="px-3 py-2 whitespace-nowrap">{it.expense_date}</td>
                   <td className="px-3 py-2 capitalize">{it.category}</td>
                   <td className="px-3 py-2">
-                    <div className="truncate max-w-[220px]">{it.description || '—'}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate max-w-[200px]">{it.description || '—'}</span>
+                      {/* A line the reader produced and nobody has looked at yet. Shown on the row
+                          rather than only in a summary, because the thing being checked is THIS
+                          line's numbers against THIS line's photo. */}
+                      {it.needs_review && (
+                        <Badge variant="warning" className="shrink-0 text-[9px]">Check</Badge>
+                      )}
+                    </div>
                     {it.vendor && <div className="text-[10px] text-muted-foreground">{it.vendor}</div>}
                     {it.review_notes && it.approval_status === 'rejected' && <div className="text-[10px] text-destructive">Rejected: {it.review_notes}</div>}
                   </td>
@@ -442,7 +550,20 @@ const TripCardDetail: React.FC<{
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" disabled={busy || it.approval_status === 'rejected'} onClick={() => review(it.id, 'rejected')} title="Reject"><X className="h-3.5 w-3.5" /></Button>
                       </div>
                     ) : canEditItems ? (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => removeItem(it.id)} title="Delete line"><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <div className="flex justify-end gap-1">
+                        {/* Confirming is a deliberate act by the person holding the receipt. No
+                            confidence score does it for them — a confident wrong reading is the
+                            failure mode this whole flow is shaped around. */}
+                        {it.needs_review && (
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-500" disabled={busy}
+                            title="These figures match the receipt"
+                            onClick={async () => {
+                              try { await tripExpenseService.confirmScanned(it.id); await refreshAll(); }
+                              catch (err: any) { toast({ title: 'Could not confirm', description: err?.message, variant: 'destructive' }); }
+                            }}><BadgeCheck className="h-3.5 w-3.5" /></Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => removeItem(it.id)} title="Delete line"><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
                     ) : null}
                   </td>
                 </tr>
