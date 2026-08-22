@@ -728,13 +728,51 @@ function shouldRouteToHaiku(
   return true;
 }
 
+/**
+ * Models an INTERNAL caller may pin for a turn, for measurement.
+ *
+ * The router below decides a model tier from message length, and the only way to find out
+ * whether that decision is any good is to run the same prompts on each tier and compare — the
+ * method issue #370 used. Without a pin there is no way to hold the prompt constant and vary
+ * the model, so the routing rule could never be tested, only argued about.
+ *
+ * Allowlisted rather than free-form: a typo would fall through to `log_agent_usage`'s unpriced
+ * branch, which records the turn and charges nothing, so a mistyped model reads as a working
+ * model that happens to be free. Gated to secret/admin auth — a tenant picking their own model
+ * is a cost decision that is not theirs to make.
+ */
+const MODEL_OVERRIDE_ALLOWED = new Set([
+  'claude-haiku-4-5',
+  'claude-opus-4-8',
+  'claude-opus-5',
+  'claude-sonnet-4-7',
+]);
+
+const _modelByName = new Map<string, ChatAnthropicModel>();
+function getModelByName(name: string): ChatAnthropicModel {
+  let m = _modelByName.get(name);
+  if (!m) {
+    m = new ChatAnthropic({
+      model: name,
+      // Matches the Opus tier's settings so an A/B compares MODELS, not sampling parameters.
+      temperature: 1,
+      maxTokens: 4096,
+      apiKey: ANTHROPIC_API_KEY,
+    });
+    _modelByName.set(name, m);
+  }
+  return m;
+}
+
 // Model selection — agent type + per-turn complexity heuristic
 function getModelForAgent(
   agentId: string,
   messages: any[] = [],
   images: string[] = [],
   hasDocuments: boolean = false,
+  modelOverride?: string | null,
 ): ChatAnthropicModel {
+  if (modelOverride) return getModelByName(modelOverride);
   return shouldRouteToHaiku(agentId, messages, images, hasDocuments) ? modelHaiku : modelOpus;
 }
 
@@ -744,7 +782,12 @@ function getModelNameForAgent(
   messages: any[] = [],
   images: string[] = [],
   hasDocuments: boolean = false,
+  modelOverride?: string | null,
 ): string {
+  // Must stay in sync with getModelForAgent, INCLUDING the override — a pinned turn that
+  // logs the router's model would price the run against the wrong rate and make the
+  // comparison the pin exists to enable meaningless.
+  if (modelOverride) return modelOverride;
   return shouldRouteToHaiku(agentId, messages, images, hasDocuments)
     ? 'claude-haiku-4-5'
     : 'claude-opus-4-8';
@@ -1156,6 +1199,7 @@ async function executeAgent(
   directTool?: { name: string; input: Record<string, any> } | null, // Deterministic single-tool run — skips the LLM entirely
   userJwt?: string, // Caller's Supabase user JWT — threaded to user-scoped MIVAA/edge tools (mentions, job-research, seo-article) so they authenticate AS the user, not the opaque service key
   documents: string[] = [], // User-attached PDFs as data URLs (data:application/pdf;base64,...) — read natively by Opus so the agent can quote/summarize/extract from them
+  modelOverride?: string | null, // Internal/eval only: pin the model for this turn instead of letting the router pick
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -2593,8 +2637,8 @@ async function executeAgent(
 
   // Select model based on agent + per-turn complexity heuristic
   const hasDocuments = Array.isArray(documents) && documents.length > 0;
-  const selectedModel = getModelForAgent(agentId, messages, images, hasDocuments);
-  const modelName = getModelNameForAgent(agentId, messages, images, hasDocuments);
+  const selectedModel = getModelForAgent(agentId, messages, images, hasDocuments, modelOverride);
+  const modelName = getModelNameForAgent(agentId, messages, images, hasDocuments, modelOverride);
 
   // 🔷 LangGraph StateGraph-based execution
 
@@ -3067,7 +3111,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -3138,6 +3182,19 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // branch below can reassign it from body.user_id — same pattern used by
     // generate-interior-gemini / generate-region-edit / generate-vr-world.
     let userId = auth.userId;
+
+    // Model pin, for measurement only. Honoured for the service-role/admin-secret path and
+    // for platform admins; ignored (silently, so a probing tenant learns nothing) for
+    // everyone else, including partner keys — which model a turn runs on is a cost decision
+    // the operator owns. An unrecognised value falls back to the router rather than erroring,
+    // so a stale eval script degrades to normal behaviour instead of failing the turn.
+    const modelOverride =
+      (auth.level === 'secret' || isAdminAccess(auth)) &&
+      typeof bodyModelOverride === 'string' &&
+      MODEL_OVERRIDE_ALLOWED.has(bodyModelOverride)
+        ? bodyModelOverride
+        : null;
+    if (modelOverride) console.log(`[agent-chat] model pinned to ${modelOverride} by an internal caller`);
 
     // ── Partner kai_* API key path ────────────────────────────────────────
     // Locked role = 'member' so admin-only tools (B2B, SEO article pipeline,
@@ -3468,6 +3525,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               isDirectTool ? { name: direct_tool.name, input: direct_tool.input } : null, // Deterministic single-tool run
               auth.level === 'user' ? (req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '').trim() || undefined) : undefined, // user JWT for user-scoped tools
               Array.isArray(documents) ? documents : [], // User-attached PDFs as data URLs — read natively by Opus
+              modelOverride, // Internal/eval pin; null for every ordinary caller
             );
             if (finalResult) {
             }
