@@ -456,6 +456,29 @@ question can be re-answered.
 - **Proven to fire:** 2026-08-21 — `linkToColumns` broken for `trip`; two behavioural tests failed naming the exact column. The same break against the pre-existing *text* guard passed, which is the row added to the table at the top of this file.
 - **Blind spot:** a future mount that hand-rolls its own kind→column mapping instead of importing `billLink.ts` is covered only by the weaker text rule.
 
+### 14. "No caller" measured with a tool that cannot see the callers
+
+`generate_order_from_quote` was reported as dead — a complete, idempotent RPC with no reference
+anywhere in `src/` or `supabase/functions/`. It is not dead. `quote_accepted_create_order`, an
+`AFTER UPDATE OF status` trigger on `quotes`, calls it every time a quote is accepted, and the
+whole chain (confirmed sales order → draft pre-invoice → 30-day pay token → the public page's "Pay
+now") runs on it. **A repo-file scan cannot see a `pg_proc` caller**, and this platform keeps a
+large amount of behaviour in `pg_proc`.
+
+- **Rule:** before calling any SQL function unused, query `pg_proc` for callers *and* `pg_trigger` for triggers — `where pg_get_functiondef(oid) ilike '%fn_name%'`. The same applies in reverse to guard tests: `moneyDerivation.test.ts` and friends read TypeScript, so "no offender found" means "none in TypeScript".
+- **Already recorded as a trap** in the audit playbook (#314) and in the variants work, where repo-file guards were noted as blind to `pg_proc`. It cost a wrong finding again anyway, which is why it is a numbered shape now rather than a footnote.
+
+**The second lesson, which cost more:** adding the missing ownership check to that function
+*broke quote acceptance*, and only a probe caught it. The trigger does not wrap the call in an
+exception handler, so `assert_workspace_member` raising inside it fails the entire `UPDATE` — and
+a customer accepting from the public quote page has no JWT at all. Fixed by the core/wrapper split
+(`_generate_order_from_quote_core` for the trigger, a guarded entry point for PostgREST), the same
+shape `inbound_doc_to_supplier_bill` already uses.
+
+- **Rule:** a SECURITY DEFINER function reached BOTH by a trigger and by PostgREST cannot carry one gate. The trigger's caller has already passed RLS on the row; the API's caller has not. Split it.
+- **Proven to fire:** 2026-08-22 — accept-with-no-JWT reproduced the break before the split and passes after it; a stranger calling the RPC is refused; a member calling twice gets the same order.
+- Two live BOLA holes were found this way and fixed: `generate_order_from_quote` (minted an order, burned an invoice number and issued a **live pay token** in any workspace) and `generate_supplier_bill_from_order` (booked a **payable** in any workspace). Both were `authenticated`-executable with a caller-supplied id and no check at all. A sweep for the same shape leaves ~10 more candidates, listed in #378 — mostly job/telemetry writers, one (`append_project_event`) able to forge an audit entry with an arbitrary `actor_id` and prune a project's history.
+
 ---
 
 ## Mechanism inventory
