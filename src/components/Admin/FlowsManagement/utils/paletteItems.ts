@@ -543,6 +543,14 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'actionNode', category: 'action', subType: 'update_product', group: 'Data',
     label: 'Update Product', description: 'Edit product fields', icon: 'PackageCheck', color: 'blue',
     defaultData: { label: 'Update Product', category: 'action', actionType: 'update_product', config: { product_id: '', fields: {} } } as ActionNodeData },
+  // ── Work ──
+  // The first action that CREATES a business record outside quotes and moodboards (#378 Phase 4).
+  // A task, deliberately, and not an invoice: money-moving and legally-numbered documents produce
+  // a prefill, never a finished record.
+  { type: 'actionNode', category: 'action', subType: 'create_task', group: 'Projects',
+    label: 'Create Task', description: 'Put work on a project task list', icon: 'CheckSquare', color: 'blue',
+    defaultData: { label: 'Create Task', category: 'action', actionType: 'create_task', config: { project_id: '', title: '' } } as ActionNodeData },
+
   { type: 'actionNode', category: 'action', subType: 'log_event', group: 'Data',
     label: 'Log Event', description: 'Write an audit / dedup-marker row', icon: 'ScrollText', color: 'blue',
     defaultData: { label: 'Log Event', category: 'action', actionType: 'log_event', config: { table: '', row: '{}' } } as ActionNodeData },

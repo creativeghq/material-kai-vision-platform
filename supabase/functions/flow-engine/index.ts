@@ -1280,6 +1280,66 @@ async function executeAction(
       return { output: { updated: !!data, fields: Object.keys(patch) } };
     }
 
+    /**
+     * Put work on somebody's list (#378 Phase 4).
+     *
+     * The first action that creates a business record outside quotes and moodboards. Until this
+     * existed the action vocabulary was communication and enrichment only, so every automation —
+     * however good its trigger — ended the same way: a human is told, and the human does the work.
+     * `run_edge_function` and `http_request` were the escape hatches, which meant the automation
+     * that DID exist was code, and invisible to the admin who is supposed to own it in Flows.
+     *
+     * A task deliberately, and not an invoice. Money-moving and legally-numbered documents produce
+     * a PREFILL and never a finished record — an invoice conjured behind the operator skips
+     * numbering, buyer-risk and myDATA classification. A task is the safe end of that spectrum:
+     * reversible, owned by a person, and worthless to forge.
+     *
+     * The project is looked up scoped to the flow's workspace BEFORE the insert. flow-engine runs
+     * with the service role, so RLS is not the boundary here — this check is (invariant 1). A flow
+     * whose config names a project in another tenant writes nothing and says why.
+     */
+    case 'create_task': {
+      const projectId = String(resolved.project_id ?? '');
+      const title = String(resolved.title ?? '').trim();
+      if (!projectId || projectId.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_project_id' } };
+      }
+      if (!title || title.includes('{{')) {
+        return { output: { skipped: true, reason: 'unresolved_title' } };
+      }
+
+      let sel = supabase.from('projects').select('id, workspace_id').eq('id', projectId);
+      if (scope?.workspaceId) sel = sel.eq('workspace_id', scope.workspaceId);
+      const { data: proj } = await sel.maybeSingle();
+      if (!proj) return { output: { skipped: true, reason: 'project not found in this workspace' } };
+
+      // `client_visible` puts the task on the customer's view of the job. Default internal: a flow
+      // that silently starts showing work to the client is the wrong direction to be wrong in.
+      const visibility = resolved.visibility === 'client_visible' ? 'client_visible' : 'internal';
+      // Only ever a plain date the operator (or the trigger payload) supplied. Nothing here
+      // derives "today" — the DB session runs in UTC and would file it to yesterday for a Greek
+      // workspace between local midnight and 02:00-03:00.
+      const dueDate = typeof resolved.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(resolved.due_date)
+        ? resolved.due_date
+        : null;
+      const assignee = typeof resolved.assignee_id === 'string' && !resolved.assignee_id.includes('{{')
+        ? resolved.assignee_id
+        : null;
+
+      const { data, error } = await supabase.from('project_tasks').insert({
+        project_id: projectId,
+        title,
+        description: typeof resolved.description === 'string' ? resolved.description : null,
+        status: 'todo',
+        visibility,
+        due_date: dueDate,
+        assignee_id: assignee,
+        created_by: userId ?? null,
+      }).select('id').maybeSingle();
+      if (error) throw new Error(`create_task failed: ${error.message}`);
+      return { output: { created: true, task_id: (data as { id?: string } | null)?.id ?? null, project_id: projectId } };
+    }
+
     default:
       return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
   }

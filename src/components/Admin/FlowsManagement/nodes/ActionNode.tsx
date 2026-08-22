@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   MessageSquare, Mail, PlusCircle, Globe, Bell, Zap,
   Smartphone, Send, CheckCircle2, UserCog, Tag, StickyNote,
-  UserPen, PackageCheck, ScrollText,
+  UserPen, PackageCheck, ScrollText, CheckSquare,
   BotMessageSquare, LayoutGrid, ImagePlus,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
   MessageCircle, Megaphone, TrendingDown,
@@ -33,6 +33,7 @@ const actionIcons: Record<ActionType, React.ElementType> = {
   add_note: StickyNote,
   update_contact: UserPen,
   update_product: PackageCheck,
+  create_task: CheckSquare,
   log_event: ScrollText,
   http_request: Globe,
   run_edge_function: Zap,

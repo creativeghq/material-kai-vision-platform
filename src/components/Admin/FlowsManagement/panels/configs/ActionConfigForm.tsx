@@ -28,6 +28,7 @@ import type {
   AddNoteConfig,
   UpdateContactConfig,
   UpdateProductConfig,
+  CreateTaskConfig,
   RunEdgeFunctionConfig,
   LogEventConfig,
   SendAgentMessageConfig,
@@ -602,6 +603,66 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             onChange={(fields) => onChange({ ...cfg, fields })}
             hint="Allowlisted contact fields only (name, email, phone, status, lead_status…). Values may use {{trigger.data.x}}."
           />
+        </div>
+      );
+    }
+
+    case 'create_task': {
+      const cfg = config as CreateTaskConfig;
+      return (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Project</Label>
+            <Input
+              value={cfg.project_id || ''}
+              onChange={(e) => onChange({ ...cfg, project_id: e.target.value })}
+              placeholder="Project id, or {{trigger.data.project_id}}"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Checked against this workspace before anything is written — a flow naming another
+              tenant&apos;s project creates nothing and says so in the run log.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Title</Label>
+            <Input
+              value={cfg.title || ''}
+              onChange={(e) => onChange({ ...cfg, title: e.target.value })}
+              placeholder="What needs doing. May use {{trigger.data.x}}."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Description</Label>
+            <Input
+              value={cfg.description || ''}
+              onChange={(e) => onChange({ ...cfg, description: e.target.value })}
+              placeholder="Optional"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Due date</Label>
+              <Input
+                type="date"
+                value={cfg.due_date || ''}
+                onChange={(e) => onChange({ ...cfg, due_date: e.target.value })}
+              />
+              <p className="text-[11px] text-muted-foreground">Left blank = no due date.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Visible to</Label>
+              <Select
+                value={cfg.visibility || 'internal'}
+                onValueChange={(v) => onChange({ ...cfg, visibility: v as 'internal' | 'client_visible' })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="internal">The team only</SelectItem>
+                  <SelectItem value="client_visible">The client too</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       );
     }

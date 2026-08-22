@@ -635,6 +635,7 @@ export type ActionType =
   | 'add_note'
   | 'update_contact'
   | 'update_product'
+  | 'create_task'
   | 'run_edge_function'
   | 'log_event'
   | 'send_agent_message'
@@ -758,6 +759,30 @@ export interface UpdateContactConfig {
 export interface UpdateProductConfig {
   product_id: string;
   fields: Record<string, string>;
+}
+
+/**
+ * Put work on somebody's list (#378 Phase 4).
+ *
+ * The first action that CREATES a business record outside quotes and moodboards. The action
+ * vocabulary was otherwise communication and enrichment, so every automation — however good its
+ * trigger — ended with a human being told and the human doing the work.
+ *
+ * A task deliberately, and not an invoice: money-moving and legally-numbered documents produce a
+ * PREFILL, never a finished record. A task is the safe end of that spectrum — reversible, owned by
+ * a person, and worthless to forge.
+ */
+export interface CreateTaskConfig {
+  /** The job the task belongs to. Verified against the flow's workspace before anything is written. */
+  project_id: string;
+  title: string;
+  description?: string;
+  /** `YYYY-MM-DD`. Nothing derives "today" here — a UTC date files a Greek job's task to yesterday. */
+  due_date?: string;
+  assignee_id?: string;
+  /** Default 'internal'. A flow that silently starts showing work to the client is the wrong
+   *  direction to be wrong in. */
+  visibility?: 'internal' | 'client_visible';
 }
 
 export interface RunEdgeFunctionConfig {
