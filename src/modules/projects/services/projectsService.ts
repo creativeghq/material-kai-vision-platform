@@ -38,6 +38,12 @@ export interface Project {
   client_contact_id: string | null;
   /** Chosen sub-unit (branch) address of the client; null = main address. */
   client_address_unit_id: string | null;
+  /**
+   * The building this job is at (#378 N4). Optional and independent of the client: a landlord's
+   * refurb and an owner-occupier's fit-out are both jobs at an address, and plenty of jobs have
+   * no building on file at all.
+   */
+  property_id: string | null;
   deadline: string | null;
   budget_amount: number | null;
   budget_currency: string;
@@ -344,6 +350,8 @@ export interface UpdateProjectInput {
   budget_amount?: number | null;
   budget_currency?: string;
   cover_image_url?: string | null;
+  /** The building this job is at (#378 N4). `null` detaches it. */
+  property_id?: string | null;
 }
 
 export interface CreateRoomInput {

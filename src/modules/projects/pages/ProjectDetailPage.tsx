@@ -23,6 +23,7 @@ import {
   ClipboardList,
   Hammer,
   FileSignature,
+  ShieldCheck,
   FileStack,
   MessageSquare,
   Layers,
@@ -59,6 +60,7 @@ import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
+import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { ProductsTab } from '../components/tabs/ProductsTab';
 import { FinanceTab } from '../components/tabs/FinanceTab';
 import { PlanTab } from '../components/tabs/PlanTab';
@@ -90,7 +92,7 @@ export const ProjectDetailPage: React.FC = () => {
   const { can, persona } = usePermissions();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'purchases' | 'plan' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'contracts' | 'tasks' | 'timeline'>('overview');
+  const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'purchases' | 'plan' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'contracts' | 'handover' | 'tasks' | 'timeline'>('overview');
   const [showInvite, setShowInvite] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
 
@@ -297,6 +299,18 @@ export const ProjectDetailPage: React.FC = () => {
                 <FileSignature className="h-4 w-4" /> Contracts
               </TabsTrigger>
             )}
+            {/* What was INSTALLED here, and what it is still covered by (#378 C5).
+                customer_assets.project_id and register_customer_asset have carried a project since
+                the installed base shipped, and this panel has always taken a projectId -- its own
+                prop comment says "used from the project workbench". It was mounted on the CRM
+                company and contact only, so the place equipment is actually fitted had no way to
+                record it, and asset.service_due / warranty_expiring fired on assets nobody
+                registered. */}
+            {isOwner && (
+              <TabsTrigger value="handover" className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" /> Handover
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <CheckSquare className="h-3.5 w-3.5" />
               Tasks
@@ -336,6 +350,15 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
           {isOwner && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>}
+          {isOwner && (
+            <TabsContent value="handover">
+              <WarrantiesTab
+                companyId={project.client_company_id ?? undefined}
+                contactId={project.client_company_id ? undefined : (project.client_contact_id ?? undefined)}
+                projectId={project.id}
+              />
+            </TabsContent>
+          )}
           <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isOwner} /></TabsContent>

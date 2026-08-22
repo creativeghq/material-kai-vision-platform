@@ -31,6 +31,9 @@ interface OverviewTabProps {
 }
 
 import { formatMoney } from '@/utils/decimal';
+import { useToast } from '@/hooks/use-toast';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { PropertyLinkField } from '@/modules/finance/components/PropertyLinkField';
 
 /** Callers branch on `null`, so this keeps the null return rather than the canonical dash. */
 const formatDate = (d: string | null) => (d ? formatDateValue(d) : null);
@@ -44,6 +47,12 @@ const daysUntil = (date: string | null) => {
 };
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true }) => {
+  const { toast } = useToast();
+  // Buildings are only a sensible answer where the workspace actually has them. A permanently
+  // empty picker reads as a broken control rather than a neutral one.
+  const { isModuleAvailable } = useEntitlements();
+  const realEstate = isModuleAvailable('real-estate');
+  const [savingProperty, setSavingProperty] = useState(false);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>([]);
   const [roomBudgetFailed, setRoomBudgetFailed] = useState(false);
@@ -90,6 +99,32 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* The building this job is at (#378 N4). A deal could point at a property OR a project;
+          the property and the project could not point at each other, so a renovation, a
+          development or a fit-out -- the actual work these customers do -- could not be attached
+          to the building it happens in. Owner-only and self-hiding without the module: a
+          permanently empty control reads as broken, not as neutral. */}
+      {isOwner && realEstate && project.workspace_id && (
+        <Card className="dashboard-card lg:col-span-3">
+          <CardContent className="p-4">
+            <PropertyLinkField
+              workspaceId={project.workspace_id}
+              propertyId={project.property_id ?? null}
+              disabled={savingProperty}
+              onChange={async (propertyId) => {
+                setSavingProperty(true);
+                try {
+                  await projectsService.updateProject(project.id, { property_id: propertyId });
+                  toast({ title: propertyId ? 'Project attached to the property' : 'Project detached from its property' });
+                } catch (e) {
+                  toast({ title: 'Failed to update the property', description: (e as Error).message, variant: 'destructive' });
+                } finally { setSavingProperty(false); }
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Client */}
       <Card className="dashboard-card lg:col-span-1">
         <CardHeader>
