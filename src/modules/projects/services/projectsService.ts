@@ -6,6 +6,8 @@ import { escapeHtml } from '@/utils/escapeHtml';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { assertSameWorkspace } from '@/utils/workspaceScope';
 import { parsePlanGeometry, type PlanGeometry } from '@/utils/planGeometry';
+import { planPurchaseOrders, purchaseItemSpecSummary } from '@/modules/projects/utils/purchaseOrders';
+import { ordersService } from '@/modules/finance/services/ordersService';
 
 /**
  * Room floor-plan backdrops live alongside the other user-uploaded imagery.
@@ -312,8 +314,23 @@ export interface ProjectPurchaseItem {
   notes: string | null;
   sort_order: number;
   quote_id: string | null;
+  /** The purchase order raised for this item (#378 C2). NULL = not ordered yet. */
+  order_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// The decisions live in utils/purchaseOrders.ts, with no Supabase client, so they can be tested
+// by being called. Re-exported here so existing importers do not churn.
+export { planPurchaseOrders, purchaseItemSpecSummary } from '@/modules/projects/utils/purchaseOrders';
+export type { PurchaseOrderGroup } from '@/modules/projects/utils/purchaseOrders';
+
+/** Outcome of raising purchase orders — what was created, and what deliberately was not. */
+export interface RaisePurchaseOrdersResult {
+  orders: Array<{ orderId: string; supplierCompanyId: string; itemCount: number }>;
+  /** Items left alone, each with the reason. NEVER silently dropped: a missing line on a PO is
+   *  discovered on fitting day. */
+  skipped: Array<{ id: string; name: string; reason: string }>;
 }
 
 export interface InvitationPreview {
@@ -1640,6 +1657,83 @@ class ProjectsService {
       .single();
     if (error) throw error;
     return data as ProjectPurchaseItem;
+  }
+
+  /**
+   * Turn made-to-order items into real PURCHASE ORDERS (#378 C2).
+   *
+   * One order per supplier, because that is what a supplier can acknowledge, deliver against and
+   * bill. Each order is stamped with the project, so its total lands as the job's COMMITTED cost
+   * immediately — and when the supplier's bill is later raised from that order,
+   * `generate_supplier_bill_from_order` carries the job onto it (#378 Phase 1), so committed
+   * becomes actual instead of quietly disappearing.
+   *
+   * The PDF spec sheet is unchanged and is still the detailed document. This adds the thing the
+   * PDF could never be: a row the platform can count, receive against, three-way match, and hand
+   * to the supplier portal.
+   *
+   * NOTHING IS SKIPPED SILENTLY. An item with no supplier cannot be grouped onto an order, and an
+   * item with no unit cost would land on a supplier's order at zero — both are returned with a
+   * reason for the caller to show. A missing line on a purchase order is discovered on fitting
+   * day, which is the most expensive day to discover it.
+   */
+  async raisePurchaseOrders(
+    projectId: string,
+    itemIds: string[],
+  ): Promise<RaisePurchaseOrdersResult> {
+    const result: RaisePurchaseOrdersResult = { orders: [], skipped: [] };
+    if (itemIds.length === 0) return result;
+
+    const { data, error } = await (supabase as any)
+      .from('project_purchase_items')
+      .select('*')
+      .eq('project_id', projectId)
+      .in('id', itemIds);
+    if (error) throw error;
+    const items = (data ?? []) as ProjectPurchaseItem[];
+
+    const plan = planPurchaseOrders(items);
+    result.skipped = plan.skipped;
+    if (plan.groups.length === 0) return result;
+
+    for (const { supplierCompanyId, currency, items: group } of plan.groups) {
+      const orderId = await ordersService.create({
+        workspaceId: group[0].workspace_id,
+        orderType: 'purchase',
+        status: 'draft',
+        supplierCompanyId,
+        projectId,
+        currency,
+        notes: 'Made-to-order items from this project. The spec sheet for each item is the detailed document.',
+        items: group.map((it) => {
+          const spec = purchaseItemSpecSummary(it);
+          return {
+            description: spec ? `${it.name} — ${spec}` : it.name,
+            quantity: Number(it.quantity) || 1,
+            // What we PAY the supplier. A purchase order settles on money OUT.
+            unit_price: Number(it.unit_cost) || 0,
+            supplier_company_id: supplierCompanyId,
+          };
+        }),
+      });
+
+      const { error: stampErr } = await (supabase as any)
+        .from('project_purchase_items')
+        .update({ order_id: orderId, status: 'ordered' })
+        .in('id', group.map((it) => it.id));
+      // The order EXISTS at this point. Failing to stamp it back would let the same items be
+      // ordered twice, so it is reported rather than swallowed.
+      if (stampErr) {
+        throw new Error(
+          `Purchase order created, but the items could not be marked as ordered (${stampErr.message}). `
+          + 'Check the project purchases tab before raising it again.',
+        );
+      }
+
+      result.orders.push({ orderId, supplierCompanyId, itemCount: group.length });
+    }
+
+    return result;
   }
 
   async deletePurchaseItem(id: string): Promise<void> {

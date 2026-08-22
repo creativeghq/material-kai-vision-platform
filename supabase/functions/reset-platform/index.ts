@@ -277,7 +277,6 @@ const TABLES_TO_CLEAR = [
   'chunk_quality_flags',           // Chunk quality flags
   'document_layout_analysis',      // PaddleOCR structural-pass layout cache
   'ocr_results',                   // OCR results
-  'spatial_analysis',              // Spatial analysis results
   'pdf_processing_results',        // PDF processing results
   // review_summaries (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'document_images',               // Extracted images from PDFs

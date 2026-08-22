@@ -23,26 +23,31 @@
 const PORT = 8799;
 let captured: Record<string, unknown> | null = null;
 
+/** Anthropic's SSE wire format, so the stub exercises the streaming path the agent uses. */
+const sse = (events: unknown[]) =>
+  events
+    .map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`)
+    .join('');
+
 const server = Deno.serve({ port: PORT, onListen: () => {} }, async (req) => {
   captured = await req.json();
   return new Response(
-    JSON.stringify({
-      id: 'msg_smoke',
-      type: 'message',
-      role: 'assistant',
-      model: 'claude-opus-4-8',
-      content: [{ type: 'text', text: 'pong' }],
-      stop_reason: 'end_turn',
-      usage: {
-        input_tokens: 11,
-        output_tokens: 2,
-        cache_read_input_tokens: 5,
-        cache_creation_input_tokens: 6,
-      },
-    }),
-    { headers: { 'content-type': 'application/json' } },
+    sse([
+      { type: 'message_start', message: {
+        id: 'msg_smoke', type: 'message', role: 'assistant', model: 'claude-opus-4-8', content: [],
+        usage: { input_tokens: 11, output_tokens: 1, cache_read_input_tokens: 5, cache_creation_input_tokens: 6 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'po' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ng' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+      { type: 'message_stop' },
+    ]),
+    { headers: { 'content-type': 'text/event-stream' } },
   );
 });
+
+const deltas: string[] = [];
 
 function fail(message: string): never {
   console.error(`✗ ${message}`);
@@ -93,7 +98,21 @@ try {
       const systemMessage = new SystemMessage({
         content: [{ type: 'text', text: 'You are a smoke test.', cache_control: { type: 'ephemeral' } }],
       });
-      const res = await model.bindTools([ping]).invoke([systemMessage, ...state.messages]);
+      // Streamed, exactly as agentNode does it: deltas out as they arrive, chunks concatenated
+      // back into one message because tool_calls only exist on the aggregate.
+      const stream = await model.bindTools([ping]).stream([systemMessage, ...state.messages]);
+      let res: any = null;
+      for await (const part of stream) {
+        res = res === null ? part : res.concat(part);
+        // With tools bound, chunk content is an ARRAY of blocks rather than a string — the
+        // same reason agentNode runs it through extractTextContent instead of reading it raw.
+        const t = typeof part.content === 'string'
+          ? part.content
+          : Array.isArray(part.content)
+            ? part.content.map((b: any) => (b?.type === 'text' ? b.text : '')).join('')
+            : '';
+        if (t) deltas.push(t);
+      }
       return { messages: [res] };
     }, { timeout: 30_000 })
     .addEdge(START, 'agent')
@@ -114,10 +133,18 @@ try {
   }
   const tools = (captured as { tools?: { name?: string }[] }).tools;
   if (!tools?.some((t) => t.name === 'ping')) fail('the zod tool was not bound into the request');
+  if ((captured as { stream?: boolean }).stream !== true) {
+    fail('the request did not ask for a stream — agentNode must call .stream(), not .invoke(), ' +
+         'or the user waits for the whole completion before seeing anything');
+  }
+  if (deltas.length < 2) {
+    fail(`expected incremental text deltas, got ${JSON.stringify(deltas)}`);
+  }
 
   console.log('✓ agent-chat runtime smoke passed');
   console.log(`  langgraph + zod resolve together (zod ${z.string().constructor ? 'loaded' : '?'})`);
   console.log('  system prompt present as a cached content block; zod tool bound');
+  console.log(`  streamed in ${deltas.length} deltas: ${JSON.stringify(deltas.join(''))}`);
 } catch (err) {
   fail(`agent-chat's dependency set does not load or run: ${err instanceof Error ? err.stack : err}`);
 } finally {

@@ -93,4 +93,35 @@ describe('generation routing', () => {
       }
     }
   });
+
+  it('routes text-to-image to Grok when Grok is asked for', () => {
+    // The regression that shipped with the interior grid: text-to-image was the last
+    // generative mode with no `useGrok` branch, so the Grok tile would have billed
+    // grok-aurora and rendered a second Gemini Flash image.
+    const r = resolveGenerationRouting('text-to-image', 'grok');
+    expect(r.provider).toBe('grok');
+    expect(r.modelLabel).toBe('grok-aurora');
+    expect(r.credits).toBe(15);
+  });
+
+  it('does NOT bill Grok for the diagram/board modes it cannot serve', () => {
+    // Every branch for these calls Gemini unconditionally. Charging the Grok rate for
+    // a Gemini render is a valid number, so nothing else can catch it.
+    for (const mode of ['floor-plan-render', 'floor-plan-text', 'materials-selection-board']) {
+      const r = resolveGenerationRouting(mode, 'grok');
+      expect(r.provider, mode).toBe('gemini');
+      expect(r.modelLabel.startsWith('gemini-'), `${mode} → ${r.modelLabel}`).toBe(true);
+      expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS[r.modelLabel]);
+    }
+  });
+
+  it('falls back to Gemini when the prompt carries multiple reference images', () => {
+    // Grok's image API takes ONE image. A multi-reference brief is Gemini's work, so
+    // it has to be Gemini's price too — decided here, not re-decided at the call site.
+    const r = resolveGenerationRouting('text-to-image', 'grok', { multiReference: true });
+    expect(r.provider).toBe('gemini');
+    expect(r.credits).toBe(GENERATION_CREDIT_COSTS[r.modelLabel]);
+    // A single-reference edit still gets Grok.
+    expect(resolveGenerationRouting('image-edit', 'grok', { multiReference: false }).provider).toBe('grok');
+  });
 });

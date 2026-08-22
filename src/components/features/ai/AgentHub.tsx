@@ -1465,6 +1465,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     timestamp: number;
     tool?: string;
   }[]>([]);
+  // Text the model is writing RIGHT NOW, appended delta by delta. The edge function streams
+  // the completion instead of resolving it in one lump, so this is what turns a 10-80s blank
+  // wait into words appearing about a second in.
+  const [streamingText, setStreamingText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCatalogPdf, setUploadingCatalogPdf] = useState(false);
@@ -1675,94 +1679,89 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * Transform raw reasoning data into Jarvis-style witty messages
    * Personality: Dry wit, subtle humor, calm, measured, professional
    */
+  /**
+   * The working-panel line for one agent event.
+   *
+   * Every line here must be TRUE. This used to pick at random from canned flavour text —
+   * "Results acquired. Rather satisfying, actually." read identically whether a search returned
+   * forty products or none, `tool_result` never looked at the result at all, and only eight of
+   * the platform's 171 tools had a line, so everything else said "Executing AI tools. One
+   * moment." A progress feed that does not track progress is decoration.
+   *
+   * The edge function now sends the shape of each result (count, zero, failed, duration) on the
+   * `tool_result` chunk, derived by the same `shapeToolResult` the tool-call log uses, so these
+   * lines and the audit log cannot disagree.
+   */
   const toJarvisStyle = (
     type: 'thinking' | 'tool_call' | 'tool_result' | 'iteration',
-    data: { tool?: string; content?: string; result?: any; iteration?: number },
+    data: {
+      tool?: string;
+      content?: string;
+      result?: any;
+      iteration?: number;
+      resultCount?: number | null;
+      zeroResult?: boolean;
+      failed?: boolean;
+      durationMs?: number;
+    },
   ): string => {
-    // Tool-specific Jarvis commentary
-    const toolMessages: Record<string, string[]> = {
-      material_search: [
-        'Scouring the material database. One moment while I work my magic.',
-        'Searching through rather a lot of materials for you.',
-        'Running analysis. The things I do for you!',
-      ],
-      vector_search: [
-        'Consulting the semantic archives. Fascinating stuff, really.',
-        'Performing vector analysis. It\'s more exciting than it sounds.',
-        'Semantic search initiated. Mathematics meets materials.',
-      ],
-      get_product_details: [
-        'Fetching product specifications. Every detail matters.',
-        'Pulling up the particulars. I do love a thorough dossier.',
-        'Gathering product intelligence. Consider it done.',
-      ],
-      analyze_image: [
-        'Examining the visual data. I see what you\'re going for.',
-        'Processing imagery. My visual acuity is rather exceptional.',
-        'Analyzing your reference. Excellent taste, if I may say.',
-      ],
-      generate_3d: [
-        'Generating 3D visualization. This is the fun part.',
-        'Rendering your vision. Stand by for something rather nice.',
-        'Creating dimensional imagery. Art and algorithms in harmony.',
-      ],
-      spatial_analysis: [
-        'Analyzing spatial configuration. Architecture is poetry, really.',
-        'Calculating dimensional relationships. Geometry at its finest.',
-        'Evaluating the spatial dynamics. Every room tells a story.',
-      ],
-      knowledge_base_search: [
-        'Executing internal search also. One moment.',
-        'Searching the knowledge base for you.',
-        'Looking through our documentation. Bear with me.',
-      ],
+    // Verbs for the tools worth naming properly. Everything else is humanised from its own
+    // name below, so a new tool reads sensibly the day it ships instead of falling into a
+    // generic bucket nobody remembers to update.
+    const toolVerbs: Record<string, string> = {
+      material_search: 'Searching materials',
+      visual_search: 'Searching by image',
+      knowledge_base_search: 'Searching the knowledge base',
+      read_document_section: 'Reading the document',
+      find_records: 'Searching your records',
+      load_toolkit: 'Loading more tools',
+      b2b_manufacturer_search: 'Researching manufacturers',
+      company_enrichment: 'Enriching the company',
+      company_website_scrape: 'Reading their website',
+      contact_discovery: 'Finding contacts',
+      generate_3d: 'Rendering in 3D',
+      generate_gemini: 'Generating the image',
+      price_lookup: 'Checking prices',
+      create_quote: 'Drafting the quote',
+      list_my_quotes: 'Fetching quotes',
+      manage_finance: 'Working through the finances',
+      request_input: 'Putting a form on screen',
     };
 
-    // Generic thinking messages
-    const thinkingMessages = [
-      'Running calculations. The elegant kind.',
-      'Thinking this through. Properly, of course.',
-      'Considering the possibilities. There are several good ones.',
-      'Processing your request. This shouldn\'t take long.',
-      'Analyzing the parameters. Bear with me.',
-    ];
+    /** `manage_stock` → "Manage stock". Covers every tool without a hand-written entry. */
+    const humanise = (name: string) => {
+      const words = name.replace(/[_-]+/g, ' ').trim();
+      return words.charAt(0).toUpperCase() + words.slice(1);
+    };
 
-    // Iteration messages
-    const iterationMessages = [
-      'Making progress. Steady as it goes.',
-      'Refining the approach. Precision matters.',
-      'Working through the details. Almost there.',
-      'Iterating thoughtfully. Quality takes time.',
-    ];
-
-    // Tool result messages
-    const resultMessages = [
-      'Results acquired. Rather satisfying, actually.',
-      'Data retrieved successfully. As expected.',
-      'Information secured. Shall we proceed?',
-      'Analysis complete. The numbers look promising.',
-    ];
-
-    const pickRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+    const secs = (ms?: number) =>
+      typeof ms === 'number' && ms >= 1000 ? ` · ${(ms / 1000).toFixed(1)}s` : '';
 
     switch (type) {
-      case 'tool_call':
-        if (data.tool && toolMessages[data.tool]) {
-          return pickRandom(toolMessages[data.tool]);
-        }
-        return 'Executing AI tools. One moment.';
+      case 'tool_call': {
+        const label = data.tool ? (toolVerbs[data.tool] ?? humanise(data.tool)) : 'Working';
+        return `${label}…`;
+      }
 
-      case 'tool_result':
-        return pickRandom(resultMessages);
+      case 'tool_result': {
+        const label = data.tool ? (toolVerbs[data.tool] ?? humanise(data.tool)) : 'Done';
+        const t = secs(data.durationMs);
+        if (data.failed) return `${label} — no result, adapting${t}`;
+        if (data.zeroResult) return `${label} — nothing matched${t}`;
+        if (typeof data.resultCount === 'number') {
+          return `${label} — ${data.resultCount} ${data.resultCount === 1 ? 'result' : 'results'}${t}`;
+        }
+        return `${label} — done${t}`;
+      }
 
       case 'iteration':
-        return pickRandom(iterationMessages);
+        return data.iteration ? `Step ${data.iteration}` : 'Working';
 
       case 'thinking':
       default:
         // Guard: content must be a string (edge function could send a raw Claude content block)
-        if (typeof data.content === 'string' && data.content) return data.content;
-        return pickRandom(thinkingMessages);
+        if (typeof data.content === 'string' && data.content.trim()) return data.content.trim();
+        return 'Thinking…';
     }
   };
 
@@ -2191,6 +2190,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // Per TURN, not per conversation: a card rendered last turn must not silence this turn's reply.
     renderedResultCardRef.current = false;
     setReasoningSteps([]); // Clear reasoning steps for new message
+    setStreamingText('');
 
     try {
       // Get current user session
@@ -2437,15 +2437,35 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     timestamp: Date.now(),
                   },
                 ]);
+              } else if (chunk.type === 'text_delta') {
+                // The model is writing. Append as it arrives — no reasoning step, this IS the
+                // output and it renders live at the bottom of the working panel.
+                setStreamingText((prev) => prev + String(chunk.delta ?? ''));
               } else if (chunk.type === 'assistant_thinking') {
-                setReasoningSteps((prev) => [
-                  ...prev,
-                  {
-                    type: 'thinking',
-                    message: toJarvisStyle('thinking', { content: chunk.content }),
-                    timestamp: Date.now(),
-                  },
-                ]);
+                // Streamed text has already been shown character by character. When the turn
+                // continues into tools, fold what was written into the step list and clear the
+                // buffer so the NEXT iteration streams into an empty line rather than appending
+                // to the last one. When it does not, leave it on screen — it is the answer, and
+                // final_result is about to replace it with the same text.
+                if (chunk.streamed && chunk.hasToolCalls) {
+                  const written = typeof chunk.content === 'string' ? chunk.content.trim() : '';
+                  if (written) {
+                    setReasoningSteps((prev) => [
+                      ...prev,
+                      { type: 'thinking', message: written, timestamp: Date.now() },
+                    ]);
+                  }
+                  setStreamingText('');
+                } else if (!chunk.streamed) {
+                  setReasoningSteps((prev) => [
+                    ...prev,
+                    {
+                      type: 'thinking',
+                      message: toJarvisStyle('thinking', { content: chunk.content }),
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }
               } else if (chunk.type === 'tool_call') {
                 setReasoningSteps((prev) => [
                   ...prev,
@@ -2461,7 +2481,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   ...prev,
                   {
                     type: 'tool_result',
-                    message: toJarvisStyle('tool_result', { tool: chunk.tool, result: chunk.result }),
+                    message: toJarvisStyle('tool_result', {
+                      tool: chunk.tool,
+                      result: chunk.result,
+                      resultCount: chunk.resultCount,
+                      zeroResult: chunk.zeroResult,
+                      failed: chunk.failed,
+                      durationMs: chunk.durationMs,
+                    }),
                     timestamp: Date.now(),
                     tool: chunk.tool,
                   },
@@ -3700,6 +3727,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      // The finished message renders from `messages`; leaving the buffer set would flash the
+      // previous answer under the next turn's working panel.
+      setStreamingText('');
     }
   }, [input, selectedAgent, selectedModel, attachedImages, attachedCatalogPdfs, userId, currentConversationId, messages]);
 
@@ -6000,6 +6030,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           ))
                         )}
                       </ul>
+
+                      {/* The answer as it is being written. Appears about a second into the
+                          turn instead of after the whole completion lands, which is the
+                          difference between a blank wait and watching it work. */}
+                      {streamingText && (
+                        <div className="text-sm whitespace-pre-wrap break-words border-t border-primary/15 pt-3">
+                          {streamingText}
+                          <span className="inline-block w-1.5 h-4 -mb-0.5 ml-0.5 bg-primary/70 animate-pulse" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

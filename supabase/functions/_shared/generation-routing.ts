@@ -55,8 +55,40 @@ function usesFlux(mode: string, useGrok: boolean): boolean {
   return mode === 'redesign' || (mode === 'copy-style' && !useGrok);
 }
 
-export function resolveGenerationRouting(mode: string, tier?: GenerationTier): GenerationRouting {
-  const useGrok = tier === 'grok';
+/**
+ * Modes Grok Aurora does not serve. These are precision diagram / board renders
+ * built against Gemini's prompt behaviour, and every branch for them in
+ * generate-interior-gemini calls Gemini unconditionally — so asking for the Grok
+ * tier here billed grok-aurora and ran Gemini, the same wrong-but-valid number
+ * that `product-shot` already had to be fixed for.
+ *
+ * Declaring the gap HERE rather than at each call site is the point of this
+ * module: a mode Grok cannot serve resolves to Gemini's provider, label AND
+ * credits together, so the three cannot disagree.
+ */
+const GROK_UNSUPPORTED_MODES = new Set([
+  'floor-plan-render',
+  'floor-plan-text',
+  'materials-selection-board',
+]);
+
+export interface GenerationRoutingOptions {
+  /**
+   * The prompt carries MORE THAN ONE image the model must incorporate — pinned
+   * catalog materials on a text-to-image brief. Grok's image API takes a single
+   * image, so a multi-reference request is Gemini's work whatever tier was asked
+   * for, and must be priced as Gemini's.
+   */
+  multiReference?: boolean;
+}
+
+export function resolveGenerationRouting(
+  mode: string,
+  tier?: GenerationTier,
+  opts: GenerationRoutingOptions = {},
+): GenerationRouting {
+  const grokCanServe = !GROK_UNSUPPORTED_MODES.has(mode) && !opts.multiReference;
+  const useGrok = tier === 'grok' && grokCanServe;
   const geminiModel: GeminiImageModelId =
     tier === 'pro' ? 'gemini-3-pro-image' : 'gemini-3.1-flash-image';
 

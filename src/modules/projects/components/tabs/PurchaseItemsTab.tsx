@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import {
-  Hammer, Loader2, Plus, Trash2, Pencil, Sparkles, FileDown, Search, X, DoorOpen, Square, Package,
+  Hammer, Loader2, Plus, Trash2, Pencil, Sparkles, FileDown, Search, X, DoorOpen, Square, Package, ShoppingCart,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import {
   projectsService,
+  purchaseItemSpecSummary,
   PURCHASE_ITEM_TYPES,
   type PurchaseItemType,
   type PurchaseItemDetails,
@@ -34,6 +35,9 @@ import {
   type ProjectRoom,
 } from '../../services/projectsService';
 import { HubEmptyState } from '@/components/core/hub';
+import { Checkbox } from '@/components/core/ui/checkbox';
+import { Link } from 'react-router-dom';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 
 const TYPE_LABELS: Record<string, string> = { door: 'Door', window: 'Window', other: 'Other' };
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -42,22 +46,10 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 
 const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
-// Compact spec summary shown on the row (the most identifying keys per type).
-function specSummary(it: ProjectPurchaseItem): string {
-  const d = it.details || {};
-  const parts: string[] = [];
-  if (d.width_mm || d.height_mm) parts.push(`${d.width_mm ?? '?'}×${d.height_mm ?? '?'} mm`);
-  if (it.item_type === 'door') {
-    if (d.finish) parts.push(String(d.finish));
-    if (d.opening) parts.push(`opens ${d.opening}`);
-    if (d.handing) parts.push(`${d.handing}-hand`);
-  } else if (it.item_type === 'window') {
-    if (d.opening_type) parts.push(String(d.opening_type));
-    if (d.glazing) parts.push(String(d.glazing));
-    if (d.finish) parts.push(String(d.finish));
-  } else if (d.finish) parts.push(String(d.finish));
-  return parts.join(' · ');
-}
+// The spec summary now lives in the service: the purchase ORDER line needs the same string, and
+// a supplier reading "Front door" with no size cannot make anything. Two versions of "how do we
+// describe this item" is how the row and the PO come to disagree about what was ordered.
+const specSummary = purchaseItemSpecSummary;
 
 export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: string | null; projectName: string }> = ({
   projectId, workspaceId, projectName,
@@ -68,6 +60,46 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [raising, setRaising] = useState(false);
+
+  /**
+   * Raise one purchase order per supplier from the selected items.
+   *
+   * The result is REPORTED in full, including what was not raised. An item with no supplier or no
+   * unit cost is left alone deliberately — reporting "3 ordered" while silently dropping the
+   * fourth is how a missing line reaches fitting day.
+   */
+  const raiseOrders = async () => {
+    if (selected.size === 0) return;
+    setRaising(true);
+    try {
+      const res = await projectsService.raisePurchaseOrders(projectId, [...selected]);
+      setSelected(new Set());
+      await load();
+      const made = res.orders.length;
+      const lines = res.orders.reduce((n, o) => n + o.itemCount, 0);
+      if (made === 0) {
+        toast({
+          title: 'Nothing could be ordered',
+          description: res.skipped.map((k) => `${k.name}: ${k.reason}`).join(' · '),
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: `${made} purchase order${made === 1 ? '' : 's'} raised`,
+          description: [
+            `${lines} item${lines === 1 ? '' : 's'} ordered.`,
+            res.skipped.length
+              ? `Not ordered — ${res.skipped.map((k) => `${k.name} (${k.reason})`).join('; ')}`
+              : null,
+          ].filter(Boolean).join(' '),
+        });
+      }
+    } catch (err: any) {
+      toast({ title: 'Failed to raise the purchase order', description: err?.message, variant: 'destructive' });
+    } finally { setRaising(false); }
+  };
   const [dialogItem, setDialogItem] = useState<ProjectPurchaseItem | 'new' | null>(null);
   const [sheetMode, setSheetMode] = useState<'both' | 'schedule' | 'per_item' | 'order'>('both');
   const [generatingSheet, setGeneratingSheet] = useState(false);
@@ -146,6 +178,12 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
             {generatingSheet ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FileDown className="h-3.5 w-3.5 mr-1" />}
             Generate sheet
           </Button>
+          {/* The thing the PDF could never be: a row the platform can count as committed cost,
+              receive against, three-way match, and hand to the supplier portal (#378 C2). */}
+          <Button size="sm" variant="outline" onClick={raiseOrders} disabled={raising || selected.size === 0}>
+            {raising ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5 mr-1" />}
+            Raise PO{selected.size > 0 ? ` (${selected.size})` : ''}
+          </Button>
           <Button size="sm" onClick={() => setDialogItem('new')}>
             <Plus /> Add item
           </Button>
@@ -167,6 +205,19 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
             const TypeIcon = TYPE_ICONS[it.item_type] || Package;
             return (
               <div key={it.id} className="p-4 flex items-center gap-3 flex-wrap">
+                {/* Only an unordered item can be selected — an item already on a PO would be
+                    ordered twice, and the service refuses it anyway. */}
+                <Checkbox
+                  className="shrink-0"
+                  checked={selected.has(it.id)}
+                  disabled={!!it.order_id}
+                  aria-label={`Select ${it.name}`}
+                  onCheckedChange={(v) => setSelected((prev) => {
+                    const next = new Set(prev);
+                    if (v === true) next.add(it.id); else next.delete(it.id);
+                    return next;
+                  })}
+                />
                 <div className="h-14 w-14 rounded-md overflow-hidden bg-muted/40 border border-white/10 flex items-center justify-center shrink-0">
                   {it.design_image_url
                     ? <img src={it.design_image_url} alt={it.name} className="h-full w-full object-cover" />
@@ -178,6 +229,11 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
                     <span className="text-[10px] text-muted-foreground capitalize">{TYPE_LABELS[it.item_type] || it.item_type}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">{specSummary(it) || 'No spec yet'}</p>
+                  {it.order_id && (
+                    <Link to={`${FINANCE_BASE}/orders/${it.order_id}`} className="text-[11px] text-primary hover:underline">
+                      On a purchase order →
+                    </Link>
+                  )}
                 </div>
 
                 <div className="text-right w-[120px]">

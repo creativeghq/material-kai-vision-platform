@@ -27579,60 +27579,6 @@ export type Database = {
           },
         ]
       }
-      spatial_analysis: {
-        Row: {
-          accessibility_analysis: Json | null
-          analysis_type: string
-          confidence_score: number | null
-          created_at: string | null
-          flow_optimization: Json | null
-          id: string
-          layout_suggestions: Json | null
-          material_placements: Json | null
-          processing_time_ms: number | null
-          reasoning_explanation: string | null
-          room_type: string
-          spatial_features: Json | null
-          updated_at: string | null
-          user_id: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          accessibility_analysis?: Json | null
-          analysis_type: string
-          confidence_score?: number | null
-          created_at?: string | null
-          flow_optimization?: Json | null
-          id?: string
-          layout_suggestions?: Json | null
-          material_placements?: Json | null
-          processing_time_ms?: number | null
-          reasoning_explanation?: string | null
-          room_type: string
-          spatial_features?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          accessibility_analysis?: Json | null
-          analysis_type?: string
-          confidence_score?: number | null
-          created_at?: string | null
-          flow_optimization?: Json | null
-          id?: string
-          layout_suggestions?: Json | null
-          material_placements?: Json | null
-          processing_time_ms?: number | null
-          reasoning_explanation?: string | null
-          room_type?: string
-          spatial_features?: Json | null
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: []
-      }
       status_tags: {
         Row: {
           color: string

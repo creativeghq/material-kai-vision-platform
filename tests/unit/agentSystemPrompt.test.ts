@@ -46,14 +46,18 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * Arguments of every `.invoke(...)` call in `text`, split at top level.
+ * Arguments of every `.invoke(...)` / `.stream(...)` call in `text`, split at top level.
+ *
+ * Both, because the two agent loops differ: agent-chat streams (so text reaches the client as
+ * it is written) while the background-agent runner invokes (nothing is watching it). The
+ * contract under test is the same either way — the SystemMessage leads the message array.
  *
  * Hand-scanned rather than regexed because the interesting case is precisely a nested object
  * literal in argument two, and a regex either stops at the first `}` or swallows the file.
  */
 function invokeArgLists(text: string): { args: string[]; index: number }[] {
   const calls: { args: string[]; index: number }[] = [];
-  const CALL = /\.invoke\(/g;
+  const CALL = /\.(?:invoke|stream)\(/g;
   for (const m of text.matchAll(CALL)) {
     const start = m.index! + m[0].length;
     let depth = 1;
@@ -86,17 +90,18 @@ function invokeArgLists(text: string): { args: string[]; index: number }[] {
 }
 
 describe('the agent system prompt travels as a message', () => {
-  it('the scanner finds invoke() calls at all', () => {
+  it('the scanner finds model calls at all', () => {
     const total = sourceFiles(FN_DIR).reduce(
       (n, f) => n + invokeArgLists(readFileSync(f, 'utf8')).length, 0);
-    expect(total, 'no .invoke() calls found — the scan is broken, not the code').toBeGreaterThan(20);
+    expect(total, 'no .invoke()/.stream() calls found — the scan is broken, not the code')
+      .toBeGreaterThan(20);
   });
 
-  it('no invoke() passes system or cache_control as a call option', () => {
+  it('no model call passes system or cache_control as a call option', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(FN_DIR)) {
       const text = readFileSync(file, 'utf8');
-      if (!text.includes('.invoke(')) continue;
+      if (!text.includes('.invoke(') && !text.includes('.stream(')) continue;
       for (const call of invokeArgLists(text)) {
         // Argument 1 is the message list; the options object is argument 2 onward.
         for (const arg of call.args.slice(1)) {
@@ -132,10 +137,38 @@ describe('the agent system prompt travels as a message', () => {
         (call) => /^\s*\[\s*systemMessage\s*,/.test(call.args[0] ?? ''));
       expect(
         leadsWithSystem,
-        `${rel} builds a SystemMessage but no model invoke passes it as the first message. ` +
+        `${rel} builds a SystemMessage but no model call passes it as the first message. ` +
         'Anthropic reads messages[0] and nowhere else.',
       ).toBe(true);
     }
+  });
+
+  /**
+   * The model call STREAMS. `invoke()` resolves only when the completion is finished, so the
+   * user watches nothing happen for the length of the generation — once per iteration of the
+   * tool loop, on turns measured up to 181 seconds. Streaming does not shorten a turn; it puts
+   * the first words on screen about a second in, which is the part anyone actually experiences.
+   *
+   * Guarded because reverting it is a one-word edit that breaks nothing and shows up in no test:
+   * the answer is identical, it just arrives all at once, at the end.
+   */
+  it('agent-chat streams the model call rather than invoking it', () => {
+    const text = readFileSync(join(ROOT, 'supabase/functions/agent-chat/index.ts'), 'utf8');
+
+    expect(
+      text,
+      'agentNode must call model.stream() so text can be forwarded as text_delta chunks',
+    ).toMatch(/await modelWithTools\.stream\(\[systemMessage, \.\.\.state\.messages\]\)/);
+
+    expect(
+      text.includes('modelWithTools.invoke('),
+      'the model call reverted to invoke() — the whole completion would arrive at once',
+    ).toBe(false);
+
+    expect(
+      text,
+      "streamed text must be forwarded to the client as `text_delta`, or streaming buys nothing",
+    ).toMatch(/type:\s*'text_delta'/);
   });
 
   it('the cache breakpoint sits on the system content block', () => {

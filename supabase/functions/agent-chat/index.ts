@@ -290,27 +290,57 @@ function createAgentGraph(
         { type: 'text', text: state.systemPrompt, cache_control: { type: 'ephemeral' } },
       ],
     });
-    const response = await modelWithTools.invoke([systemMessage, ...state.messages]);
+    // STREAMED, not invoked. `invoke()` resolves only when the whole completion is finished,
+    // so the user saw nothing at all while the model wrote — on a multi-iteration turn that is
+    // one silent gap per iteration, and turn latency here runs to a measured 181s. Streaming
+    // does not make the turn shorter; it makes the first token arrive in about a second, which
+    // is the part people actually experience.
+    //
+    // Chunks are concatenated back into one AIMessage because the tool loop downstream needs
+    // the aggregate: `tool_calls` are assembled from `input_json_delta` fragments and only
+    // exist on the concatenated message.
+    const stream = await modelWithTools.stream([systemMessage, ...state.messages]);
+    let response: any = null;
+    for await (const part of stream) {
+      response = response === null ? part : response.concat(part);
+      const delta = extractTextContent(part.content);
+      if (delta) {
+        try {
+          onChunk?.({ type: 'text_delta', delta, iteration });
+        } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
+      }
+    }
+    if (response === null) throw new Error('Model stream produced no chunks');
 
     const invokeElapsed = Date.now() - invokeStartTime;
 
-    // Track token usage (use ?? not || so a legitimate 0 isn't treated as missing)
+    // Token accounting differs between the streamed and non-streamed shapes, and getting it
+    // wrong is a billing bug rather than a crash. On the STREAM, `usage_metadata.input_tokens`
+    // is the TOTAL and already INCLUDES the cached prefix, while the non-streamed
+    // `response_metadata.usage.input_tokens` EXCLUDES it. `log_agent_usage` prices the cache
+    // terms separately, so the uncached remainder is what belongs in input_tokens — adding the
+    // cache on top of a total that already contains it would bill the prefix twice.
+    const um = response.usage_metadata;
     const usage = response.response_metadata?.usage;
-    const inputTokens = usage?.input_tokens ?? 0;
-    const outputTokens = usage?.output_tokens ?? 0;
-    // Cached prefix tokens are billed differently (writes at 1.25×, reads at 0.1×) and are
-    // reported SEPARATELY from input_tokens — they are not a subset of it. Carried through
-    // state so `log_agent_usage` can record them: without a stored number the cache hit rate
-    // is unobservable, which is exactly how the previous no-op survived.
-    const cacheReadTokens = usage?.cache_read_input_tokens ?? 0;
-    const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
-
-    // Send thinking status
+    const cacheReadTokens = um?.input_token_details?.cache_read
+      ?? usage?.cache_read_input_tokens ?? 0;
+    const cacheWriteTokens = um?.input_token_details?.cache_creation
+      ?? usage?.cache_creation_input_tokens ?? 0;
+    // (use ?? not || so a legitimate 0 isn't treated as missing)
+    const inputTokens = um?.input_tokens != null
+      ? Math.max(0, um.input_tokens - cacheReadTokens - cacheWriteTokens)
+      : (usage?.input_tokens ?? 0);
+    const outputTokens = um?.output_tokens ?? usage?.output_tokens ?? 0;
+    // The text has already gone out as `text_delta`s. This still fires because it is what
+    // closes the streaming bubble on the client and tells it whether the turn continues into
+    // tools — `hasToolCalls:false` means the text just streamed IS the answer.
     try {
       onChunk?.({
         type: 'assistant_thinking',
         content: extractTextContent(response.content),
-        hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
+        hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0),
+        streamed: true,
+        iteration,
       });
     } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
@@ -382,13 +412,22 @@ function createAgentGraph(
         ]);
         toolTimings[toolCall.id || toolCall.name] = Date.now() - _t_start;
 
-        // Send tool result
+        // Send tool result. The shape summary rides along so the progress feed can say what
+        // actually happened — "Found 12 materials" / "No matches" — instead of a random line
+        // of flavour text that reads identically whether the tool returned 40 rows or none.
+        // Derived by the SAME `shapeToolResult` the tool-call log and the memory gate use, so
+        // the three cannot disagree about whether a call produced anything.
         try {
+          const shape = shapeToolResult(toolResult);
           onChunk?.({
             type: 'tool_result',
             tool: toolCall.name,
             result: toolResult,
-            message: `${toolCall.name} completed`
+            resultCount: shape.resultCount,
+            zeroResult: shape.zeroResult,
+            failed: !shape.ok,
+            durationMs: toolTimings[toolCall.id || toolCall.name],
+            message: `${toolCall.name} completed`,
           });
         } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 

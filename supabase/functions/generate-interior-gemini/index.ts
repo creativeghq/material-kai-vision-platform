@@ -552,7 +552,11 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   }
   // Single source for provider + price (see _shared/generation-routing.ts): credits
   // are keyed off the label of the model that actually runs, so the two can't drift.
-  const routing = resolveGenerationRouting(mode, body.model_tier);
+  // Pinned catalog materials make this a multi-image prompt, which only Gemini takes —
+  // the routing collapses the tier to Gemini so the price collapses with it.
+  const routing = resolveGenerationRouting(mode, body.model_tier, {
+    multiReference: (body.material_images?.length ?? 0) > 0,
+  });
   const useGrok = routing.provider === 'grok';
   const isFluxMode = routing.provider === 'flux';
   const model: GeminiImageModel = routing.geminiModel;
@@ -593,7 +597,14 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         prompt = { text: narrative, images: materialBuffers };
       }
 
-      const result = await generateImageWithGemini(prompt, { model, aspectRatio });
+      // Honour model_tier here too — this was the LAST generative mode still ignoring
+      // it, so `model_tier: 'grok'` billed grok-aurora and ran Gemini Flash. It is also
+      // now the hot path: the interior grid renders one tile per tier, so a silently
+      // Gemini-serving Grok tile would be a duplicate image at the Grok price.
+      // `useGrok` is already false when material_images made this multi-reference.
+      const result = useGrok
+        ? await generateImageWithGrok(narrative)
+        : await generateImageWithGemini(prompt, { model, aspectRatio });
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
