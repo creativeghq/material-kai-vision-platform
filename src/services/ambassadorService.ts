@@ -1,11 +1,13 @@
 /**
  * Data access for brand ambassadorships (`profile_ambassadorships`).
  *
- * Reads go straight at the table: its RLS is the boundary and says exactly what the product
- * means — your own rows, rows naming you as the brand, and rows on a PUBLIC profile that the
- * brand has not declined. The two writes that a person must not be able to make for themselves
- * — "the brand confirmed me", "I confirm this ambassador" — are RPCs, because the table's guard
- * trigger pins those columns shut for everyone else, service role included.
+ * Reads and writes go straight at the table: its RLS is the boundary and says exactly what the
+ * product means — your own rows, and rows on a PUBLIC profile. Nobody approves an ambassadorship;
+ * being on the platform's supplier list is the whole condition.
+ *
+ * Two things need an RPC and get one: the brand list itself (an operator-owned registry, so only
+ * its business-identity fields are exposed) and the brand's own "who promotes me" view (which
+ * has to read `user_profiles` past an RLS policy that would blank every name).
  *
  * The table post-dates the last `types.ts` regeneration (which cannot run locally — no access
  * token), hence the casts. They are confined to this file.
@@ -17,9 +19,9 @@ import type { Ambassadorship, AmbassadorshipDraft } from '@/lib/ambassadorships'
 const db = () => supabase as any;
 
 const COLUMNS =
-  'id, user_id, brand_name, brand_source, brand_country, brand_url, category_keys, relationship, '
-  + 'headline, since_year, showcase_moodboard_id, is_featured, sort_order, verification_status, '
-  + 'brand_user_id, verification_requested_at, verified_at, decision_note, created_at, updated_at';
+  'id, user_id, brand_name, brand_source, platform_supplier_id, brand_country, brand_url, '
+  + 'category_keys, relationship, headline, since_year, showcase_moodboard_id, is_featured, '
+  + 'sort_order, created_at, updated_at';
 
 /**
  * Every ambassadorship on a profile that the caller may see. Same query for your own profile and
@@ -42,6 +44,7 @@ function payloadFrom(draft: AmbassadorshipDraft) {
   return {
     brand_name: draft.brand_name.trim(),
     brand_source: draft.brand_source,
+    platform_supplier_id: draft.platform_supplier_id,
     brand_country: draft.brand_country?.trim() || null,
     brand_url: draft.brand_url?.trim() || null,
     category_keys: draft.category_keys,
@@ -93,72 +96,65 @@ export async function reorderAmbassadorship(id: string, sortOrder: number): Prom
   if (error) throw error;
 }
 
-export type VerificationRequestResult =
-  | { status: 'pending'; brand_name: string; brand_user_id: string }
-  | { status: 'verified'; brand_name: string; brand_user_id: string | null }
-  | { status: 'no_brand_account'; brand_name: string };
+export interface PlatformBrand {
+  supplier_id: string | null;
+  name: string;
+  country_code: string | null;
+  website: string | null;
+  source: 'supplier' | 'catalog';
+}
 
 /**
- * Ask the brand to confirm. `no_brand_account` is a normal answer, not a failure: most brands
- * have no verified account here yet, and the claim stays visible either way — just without a
- * confirmation next to it.
+ * The platform's factory/supplier list, searchable. `supplier` rows are companies on the list;
+ * `catalog` rows are brand names the product catalog knows that are not (yet) on it.
  */
-export async function requestVerification(id: string): Promise<VerificationRequestResult> {
-  const { data, error } = await db().rpc('request_ambassadorship_verification', { p_id: id });
-  if (error) throw error;
-  return data as VerificationRequestResult;
-}
-
-export interface DecisionResult {
-  status: 'verified' | 'declined';
-  ambassador_user_id: string;
-  brand_name: string;
-  ambassadorship_id: string;
-}
-
-/** The brand's side. Refused unless the caller's own profile is the verified supplier for it. */
-export async function decideAmbassadorship(
-  id: string,
-  approve: boolean,
-  note?: string | null,
-): Promise<DecisionResult> {
-  const { data, error } = await db().rpc('decide_ambassadorship', {
-    p_id: id,
-    p_approve: approve,
-    p_note: note ?? null,
+export async function searchPlatformBrands(query: string, limit = 30): Promise<PlatformBrand[]> {
+  const { data, error } = await db().rpc('search_platform_brands', {
+    p_query: query.trim() || null,
+    p_limit: limit,
   });
   if (error) throw error;
-  return data as DecisionResult;
+  return (data ?? []) as PlatformBrand[];
 }
 
-export interface BrandAmbassadorRequest {
+export interface SupplierBrandAmbassador {
   id: string;
+  supplier_id: string;
+  supplier_name: string;
+  brand_name: string;
   ambassador_user_id: string;
   ambassador_name: string | null;
   ambassador_company: string | null;
   ambassador_avatar_url: string | null;
-  ambassador_is_public: boolean;
-  brand_name: string;
+  ambassador_location: string | null;
+  ambassador_professional_type: string | null;
+  ambassador_profile_views: number;
   category_keys: string[];
   relationship: string;
   headline: string | null;
   since_year: number | null;
-  verification_status: string;
-  verification_requested_at: string | null;
-  verified_at: string | null;
-  decision_note: string | null;
+  brand_url: string | null;
+  is_featured: boolean;
   created_at: string;
 }
 
 /**
- * "Who is promoting my brand" — an RPC rather than a join, because `user_profiles`' RLS is
- * "public profile or your own row", so a plain select returns the row with the person's name
- * and avatar blank for exactly the people the brand needs to identify.
+ * The other side, and the only thing the brand gets: visibility. Every public profile promoting
+ * a supplier identity this workspace has claimed. Returns nothing — not an error — for a
+ * workspace with no claim, because "you have not claimed a supplier identity" is a state the
+ * portal already explains.
  */
-export async function listBrandAmbassadorRequests(): Promise<BrandAmbassadorRequest[]> {
-  const { data, error } = await db().rpc('list_brand_ambassador_requests');
+export async function listSupplierBrandAmbassadors(
+  workspaceId: string,
+): Promise<SupplierBrandAmbassador[]> {
+  const { data, error } = await db().rpc('list_supplier_brand_ambassadors', {
+    p_workspace_id: workspaceId,
+  });
   if (error) throw error;
-  return (data ?? []) as BrandAmbassadorRequest[];
+  return ((data ?? []) as SupplierBrandAmbassador[]).map((r) => ({
+    ...r,
+    ambassador_profile_views: Number(r.ambassador_profile_views ?? 0),
+  }));
 }
 
 export interface BrandCategoryCoverage {

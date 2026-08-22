@@ -252,8 +252,6 @@ emits an enriched payload (`user_id`/recipient, `title`, `body`, `action_url`,
 | `profile_followed` | `FollowButton.tsx` | Create Notification |
 | `material_reviewed` | `MaterialReviews.tsx` | Create Notification (owner) |
 | `preferred_factory_added` | `AmbassadorTab.tsx` | Create Notification (brand) |
-| `ambassadorship_verification_requested` | `AmbassadorTab.tsx` | Create Notification (brand) |
-| `ambassadorship_decided` | `AmbassadorTab.tsx` | Create Notification (ambassador) |
 | `vr_world_created` / `vr_world_failed` | `generate-vr-world` | Create Notification |
 | `virtual_staging_completed` | `generate-virtual-staging` | Create Notification |
 | `video_generation_completed` / `_failed` | `generate-interior-video-v2` | Create Notification |

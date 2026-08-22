@@ -10,10 +10,10 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BadgeCheck, ExternalLink, Layers, ShieldCheck, Star } from 'lucide-react';
+import { BadgeCheck, ExternalLink, Layers, Star } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import {
-  groupByCategory, isPubliclyVisible, relationshipDef, sortForDisplay,
+  groupByCategory, relationshipDef, sortForDisplay,
   type Ambassadorship,
 } from '@/lib/ambassadorships';
 
@@ -33,11 +33,6 @@ function BrandLine({ a, publicMoodboardIds }: { a: Ambassadorship; publicMoodboa
     <div className="rounded-lg border border-hairline bg-card p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-sm">{a.brand_name}</span>
-        {a.verification_status === 'verified' && (
-          <Badge variant="success" className="text-[11px] gap-1">
-            <ShieldCheck className="h-3 w-3" />Confirmed by brand
-          </Badge>
-        )}
         {a.is_featured && (
           <Badge variant="info" className="text-[11px] gap-1"><Star className="h-3 w-3" />Featured</Badge>
         )}
@@ -70,14 +65,10 @@ function BrandLine({ a, publicMoodboardIds }: { a: Ambassadorship; publicMoodboa
 }
 
 export const AmbassadorShowcase: React.FC<Props> = ({ ambassadorships, publicMoodboardIds, className }) => {
-  // A claim the brand declined never appears here. RLS already hides it from everyone else; this
-  // is what stops the OWNER's own view of their public profile from showing something a visitor
-  // cannot see.
-  const visible = ambassadorships.filter(isPubliclyVisible);
-  if (visible.length === 0) return null;
+  if (ambassadorships.length === 0) return null;
 
-  const featured = sortForDisplay(visible.filter((a) => a.is_featured));
-  const groups = groupByCategory(visible);
+  const featured = sortForDisplay(ambassadorships.filter((a) => a.is_featured));
+  const groups = groupByCategory(ambassadorships);
 
   return (
     <div className={className}>

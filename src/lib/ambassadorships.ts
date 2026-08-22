@@ -25,9 +25,9 @@ export const RELATIONSHIP_KEYS = [
 ] as const;
 export type AmbassadorRelationship = typeof RELATIONSHIP_KEYS[number];
 
-/** MIRRORS `profile_ambassadorships_verification_status_check`. */
-export const VERIFICATION_KEYS = ['self_declared', 'pending', 'verified', 'declined'] as const;
-export type AmbassadorVerification = typeof VERIFICATION_KEYS[number];
+/** MIRRORS `profile_ambassadorships_brand_source_check` — WHICH list the name came from. */
+export const BRAND_SOURCES = ['supplier', 'catalog', 'manual'] as const;
+export type BrandSource = typeof BRAND_SOURCES[number];
 
 export interface RelationshipDef {
   key: AmbassadorRelationship;
@@ -76,7 +76,9 @@ export interface Ambassadorship {
   id: string;
   user_id: string;
   brand_name: string;
-  brand_source: 'catalog' | 'manual';
+  brand_source: BrandSource;
+  /** The `platform_suppliers` row this brand IS, when it was picked off the list. */
+  platform_supplier_id: string | null;
   brand_country: string | null;
   brand_url: string | null;
   category_keys: string[];
@@ -86,11 +88,6 @@ export interface Ambassadorship {
   showcase_moodboard_id: string | null;
   is_featured: boolean;
   sort_order: number;
-  verification_status: AmbassadorVerification;
-  brand_user_id: string | null;
-  verification_requested_at: string | null;
-  verified_at: string | null;
-  decision_note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -99,7 +96,8 @@ export interface Ambassadorship {
 export interface AmbassadorshipDraft {
   id?: string;
   brand_name: string;
-  brand_source: 'catalog' | 'manual';
+  brand_source: BrandSource;
+  platform_supplier_id: string | null;
   brand_country: string | null;
   brand_url: string | null;
   category_keys: string[];
@@ -116,6 +114,7 @@ export function emptyDraft(): AmbassadorshipDraft {
   return {
     brand_name: '',
     brand_source: 'manual',
+    platform_supplier_id: null,
     brand_country: null,
     brand_url: null,
     category_keys: [],
@@ -172,11 +171,6 @@ export function validateDraft(
   }
 
   return problems;
-}
-
-/** A declined claim is the brand's answer, and it never appears on the public profile. */
-export function isPubliclyVisible(a: Pick<Ambassadorship, 'verification_status'>): boolean {
-  return a.verification_status !== 'declined';
 }
 
 /** Featured first, then the person's own order, then alphabetical. */

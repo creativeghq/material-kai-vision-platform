@@ -123,18 +123,6 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'factory_user_id', label: 'Brand user ID', note: 'The verified brand user (recipient).' },
     { key: 'factory_name', label: 'Brand name', note: 'The added brand name.' },
   ]),
-  ambassadorship_verification_requested: withStandard([
-    { key: 'ambassador_user_id', label: 'Ambassador user ID', note: 'The professional making the claim.' },
-    { key: 'ambassadorship_id', label: 'Ambassadorship ID', note: 'The row awaiting a decision.' },
-    { key: 'brand_name', label: 'Brand name', note: 'The brand being asked to confirm.' },
-    { key: 'category_keys', label: 'Categories', note: 'The material categories they promote it in.' },
-    { key: 'relationship', label: 'Relationship', note: 'Ambassador, dealer, installer or specifier.', example: 'ambassador' },
-  ]),
-  ambassadorship_decided: withStandard([
-    { key: 'ambassadorship_id', label: 'Ambassadorship ID', note: 'The row that was decided.' },
-    { key: 'brand_name', label: 'Brand name', note: 'The brand that decided.' },
-    { key: 'status', label: 'Decision', note: 'verified or declined.', example: 'verified' },
-  ]),
   vr_world_created: withStandard([
     { key: 'world_id', label: 'World ID', note: 'The generated VR world.' },
     { key: 'quality_tier', label: 'Quality tier', note: 'The model/quality used.' },
@@ -404,8 +392,6 @@ export const TRIGGER_TITLES: Record<string, string> = {
   material_reviewed: 'Material reviewed',
   review_submitted: 'Profile review received',
   preferred_factory_added: 'Preferred brand added',
-  ambassadorship_verification_requested: 'Ambassador confirmation requested',
-  ambassadorship_decided: 'Ambassadorship decided',
   vr_world_created: 'VR world ready',
   vr_world_failed: 'VR world failed',
   virtual_staging_completed: 'Virtual staging ready',

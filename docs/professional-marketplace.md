@@ -58,42 +58,44 @@ brand | supplier | sourcing_agent | consultant | other
 
 ## Brand Ambassadorships
 
-Table: **`profile_ambassadorships`** (Profile → **Ambassador** tab). One row per (person, brand),
+Table: **`profile_ambassadorships`** (Profile -> **Ambassador** tab). One row per (person, brand),
 unique on `(user_id, lower(btrim(brand_name)))`.
 
-A professional does not merely "prefer" a brand — they represent it, and they represent it *for
+A professional does not merely "prefer" a brand - they represent it, and they represent it *for
 something*. The category is what a visitor is actually asking about ("who do you use for
 sanitary?"), so it is part of the relationship rather than a tag on the person.
 
+**Nobody approves an ambassadorship.** Being on the platform's supplier list is the whole
+condition: pick a brand, choose the categories, and it is live on the public profile. A short-lived
+confirm/decline design was removed on 2026-08-22 - it hung off `user_profiles.factory_verified`,
+which #350 established no account has ever held.
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `brand_name` / `brand_source` | text | The brand; `catalog` (from `get_distinct_factory_names()`) or `manual` |
-| `category_keys` | text[] | `material_categories.category_key` values — validated and re-ordered into registry order by a trigger |
+| `brand_name` / `brand_source` | text | The brand; `supplier` (from `platform_suppliers`), `catalog` (a name the product catalog knows) or `manual` (typed) |
+| `platform_supplier_id` | uuid | The `platform_suppliers` row this brand IS, when picked off the list. This is what makes the supplier's own view an id join rather than a name comparison |
+| `category_keys` | text[] | `material_categories.category_key` values - validated and re-ordered into registry order by a trigger |
 | `relationship` | text | `ambassador` \| `authorized_dealer` \| `certified_installer` \| `specifier` |
-| `headline`, `since_year`, `brand_url`, `brand_country` | — | What the public profile shows. `brand_url` is https-only (CHECK) |
+| `headline`, `since_year`, `brand_url`, `brand_country` | - | What the public profile shows. `brand_url` is https-only (CHECK) |
 | `showcase_moodboard_id` | uuid | The person's own work with the brand; the link renders only if that moodboard is public |
-| `is_featured`, `sort_order` | — | Lead brands and ordering on the public profile |
-| `verification_status` | text | `self_declared` \| `pending` \| `verified` \| `declined` |
-| `brand_user_id`, `verified_at`, `decided_by`, `decision_note` | — | Who decided, and what they said |
+| `is_featured`, `sort_order` | - | Lead brands and ordering on the public profile |
 
-**Verification is the brand's to give.** `tg_profile_ambassadorship_verification_guard()` pins every
-verification column shut for ordinary writes — service role included — so the only way to set them
-is through the two SECURITY DEFINER RPCs, which announce themselves with a transaction-local flag:
+### The two sides
 
-- `request_ambassadorship_verification(id)` — the ambassador asks. Resolves the brand's verified
-  supplier profile (`user_profiles.factory_verified` + `factory_claimed_name`). Answering
-  `no_brand_account` is normal: most brands have no account here, and the claim stays visible
-  without a confirmation.
-- `decide_ambassadorship(id, approve, note)` — the brand answers. Re-checks the caller's supplier
-  verification every time, so a withdrawn verification stops carrying the power.
-- `list_brand_ambassador_requests()` — the brand's queue. An RPC and not a join, because
-  `user_profiles` RLS is "public profile or your own row" and would blank the name of exactly the
-  people the brand needs to identify.
-- `get_brand_category_coverage(brands[])` — SECURITY **INVOKER**, so it reports the categories a
+- **The professional** manages entries in Profile -> Ambassador. `search_platform_brands(q, limit)`
+  serves the list; it is SECURITY DEFINER over `platform_suppliers` (an operator-owned registry) and
+  returns business-identity fields only - never the VAT number or contact email. A name that is not
+  on the list can still be used; it simply carries no `platform_supplier_id`, so it never reaches a
+  brand.
+- **The supplier** sees who promotes it in the **Supplier Portal**
+  (`SupplierAmbassadorsPanel`), via `list_supplier_brand_ambassadors(workspace_id)` - membership
+  asserted from the JWT, rows limited to suppliers this workspace has CLAIMED
+  (`platform_suppliers.claimed_workspace_id`, claim not revoked), and to PUBLIC profiles, because a
+  private profile is not promoting anything yet. The join is
+  `platform_supplier_id = ps.id OR lower(btrim(brand_name)) = lower(btrim(ps.legal_name))`, so a
+  typed name that happens to be the company's legal name still counts.
+- `get_brand_category_coverage(brands[])` is SECURITY **INVOKER**, so it reports the categories a
   brand has products in *within the catalogs the caller can already read*. Advisory only.
-
-A `declined` row is never public: RLS excludes it for visitors, and `AmbassadorShowcase` filters it
-again because the owner *can* read their own declined rows.
 
 Guarded by [tests/unit/ambassadorships.test.ts](../tests/unit/ambassadorships.test.ts).
 
@@ -210,8 +212,6 @@ Full profile view for a single user.
 | `profile_followed` | A user follows a public profile |
 | `profile_published` | User makes their profile public |
 | `preferred_factory_added` | User adds a brand to their profile (Ambassador tab) |
-| `ambassadorship_verification_requested` | A professional asks a brand to confirm they represent it |
-| `ambassadorship_decided` | The brand confirmed or declined an ambassadorship |
 
 These can be used in the Flow Builder to trigger automated actions (emails, notifications, etc.).
 

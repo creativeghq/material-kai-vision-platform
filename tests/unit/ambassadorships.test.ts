@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  RELATIONSHIPS, RELATIONSHIP_KEYS, VERIFICATION_KEYS, brandKey, categoriesCovered, emptyDraft,
-  groupByCategory, isPubliclyVisible, relationshipDef, sortForDisplay, validateDraft,
+  BRAND_SOURCES, RELATIONSHIPS, RELATIONSHIP_KEYS, brandKey, categoriesCovered, emptyDraft,
+  groupByCategory, relationshipDef, sortForDisplay, validateDraft,
   type Ambassadorship,
 } from '../../src/lib/ambassadorships';
 import { UPLOAD_CATEGORIES } from '../../src/lib/categoryFieldRegistry';
@@ -11,15 +11,15 @@ import { UPLOAD_CATEGORIES } from '../../src/lib/categoryFieldRegistry';
 /**
  * Brand ambassadorships (Profile → Ambassador).
  *
- * Three things here can break without anything failing at build time, which is why they are
- * tested rather than trusted:
+ * Nobody approves an ambassadorship: being on the platform's supplier list is the whole
+ * condition. What is left to get wrong is silent, which is why it is tested rather than trusted:
  *
- *  1. The relationship and verification vocabularies exist TWICE — as a TypeScript union and as
+ *  1. The relationship and brand-source vocabularies exist TWICE — as a TypeScript union and as
  *     a Postgres CHECK constraint. A value added on one side only is either an insert that
  *     always fails or a state the UI cannot name.
- *  2. A DECLINED claim must never reach a public profile. RLS hides it from visitors, but the
- *     profile OWNER can read their own declined rows, so the public component has to filter as
- *     well — and dropping that filter looks like a harmless simplification.
+ *  2. The supplier LINK is what carries the brand's own view of who promotes it
+ *     (`list_supplier_brand_ambassadors` joins on it). A form that stops sending
+ *     `platform_supplier_id` breaks that view while every profile still renders perfectly.
  *  3. Category keys and labels must come from the registry projection. The #368 defect was
  *     exactly this: a hand-written category map that disagreed with the database.
  */
@@ -32,6 +32,7 @@ function row(over: Partial<Ambassadorship> = {}): Ambassadorship {
     user_id: 'u1',
     brand_name: 'Harmony',
     brand_source: 'catalog',
+    platform_supplier_id: null,
     brand_country: null,
     brand_url: null,
     category_keys: [],
@@ -41,11 +42,6 @@ function row(over: Partial<Ambassadorship> = {}): Ambassadorship {
     showcase_moodboard_id: null,
     is_featured: false,
     sort_order: 0,
-    verification_status: 'self_declared',
-    brand_user_id: null,
-    verification_requested_at: null,
-    verified_at: null,
-    decision_note: null,
     created_at: '2026-08-22T00:00:00Z',
     updated_at: '2026-08-22T00:00:00Z',
     ...over,
@@ -55,17 +51,15 @@ function row(over: Partial<Ambassadorship> = {}): Ambassadorship {
 describe('ambassadorship vocabulary', () => {
   // These literals ARE the CHECK constraints, transcribed. Changing one side without the other
   // is the failure this pins: `profile_ambassadorships_relationship_check` and
-  // `profile_ambassadorships_verification_status_check`.
+  // `profile_ambassadorships_brand_source_check`.
   it('mirrors the relationship CHECK constraint exactly', () => {
     expect([...RELATIONSHIP_KEYS]).toEqual([
       'ambassador', 'authorized_dealer', 'certified_installer', 'specifier',
     ]);
   });
 
-  it('mirrors the verification-status CHECK constraint exactly', () => {
-    expect([...VERIFICATION_KEYS]).toEqual([
-      'self_declared', 'pending', 'verified', 'declined',
-    ]);
+  it('mirrors the brand-source CHECK constraint exactly', () => {
+    expect([...BRAND_SOURCES]).toEqual(['supplier', 'catalog', 'manual']);
   });
 
   it('describes every relationship the DB accepts', () => {
@@ -125,22 +119,48 @@ describe('validateDraft', () => {
   });
 });
 
-describe('public visibility', () => {
-  it('hides a declined claim and nothing else', () => {
-    expect(isPubliclyVisible(row({ verification_status: 'declined' }))).toBe(false);
-    for (const status of VERIFICATION_KEYS.filter((s) => s !== 'declined')) {
-      expect(isPubliclyVisible(row({ verification_status: status })), status).toBe(true);
-    }
+describe('the link to the supplier list', () => {
+  /**
+   * `platform_supplier_id` is how a supplier sees who promotes it: the analytics RPC joins on it
+   * first and only falls back to comparing names. A form that stops sending it leaves every
+   * profile looking right and the brand's own view silently empty — the shape this repo keeps
+   * finding, so it is pinned here rather than assumed.
+   */
+  it('the editor sends the supplier id it picked, and the service writes it', () => {
+    const tab = readFileSync(join(SRC, 'components/core/Profile/AmbassadorTab.tsx'), 'utf8');
+    expect(tab, 'the picker must carry the supplier id into the draft')
+      .toMatch(/platform_supplier_id:\s*b\.supplierId/);
+
+    const service = readFileSync(join(SRC, 'services/ambassadorService.ts'), 'utf8');
+    expect(service, 'the write payload must include the supplier link')
+      .toMatch(/platform_supplier_id:\s*draft\.platform_supplier_id/);
+    expect(service, 'reads must select it back').toMatch(/platform_supplier_id/);
+  });
+
+  it('a new draft starts unlinked rather than pretending to be on the list', () => {
+    expect(emptyDraft().platform_supplier_id).toBeNull();
+    expect(emptyDraft().brand_source).toBe('manual');
   });
 
   /**
-   * The owner CAN read their own declined rows (RLS grants "your own rows"), so the public
-   * component is the only thing standing between a rejected claim and the owner's public
-   * profile. A test that only checked the helper would not notice the caller dropping it.
+   * Nothing waits on anybody. The words are the feature: if an approval concept comes back into
+   * these surfaces, it should be a deliberate decision and not a drift.
    */
-  it('the public showcase filters declined claims out', () => {
-    const src = readFileSync(join(SRC, 'components/features/profile/AmbassadorShowcase.tsx'), 'utf8');
-    expect(src).toMatch(/\.filter\(isPubliclyVisible\)/);
+  it('no ambassador surface asks anyone to approve anything', () => {
+    for (const rel of [
+      'components/core/Profile/AmbassadorTab.tsx',
+      'components/features/profile/AmbassadorShowcase.tsx',
+      'components/features/profile/SupplierAmbassadorsPanel.tsx',
+      'lib/ambassadorships.ts',
+      'services/ambassadorService.ts',
+    ]) {
+      const src = readFileSync(join(SRC, rel), 'utf8')
+        .split('\n')
+        .filter((l) => !l.trim().startsWith('*') && !l.trim().startsWith('//'))
+        .join('\n');
+      expect(src, `${rel} reintroduces a verification state`)
+        .not.toMatch(/verification_status|verified_at|decide_ambassadorship|request_ambassadorship/);
+    }
   });
 });
 

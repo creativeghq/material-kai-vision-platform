@@ -40,8 +40,6 @@ export type TriggerType =
   | 'material_reviewed'
   | 'review_submitted'
   | 'preferred_factory_added'
-  | 'ambassadorship_verification_requested'
-  | 'ambassadorship_decided'
   // ── Event vocabulary for notification→flow migration ──
   | 'quote_pdf_generated'
   | 'factory_approved'
@@ -385,10 +383,6 @@ export interface MaterialReviewedTriggerConfig {
 }
 
 export interface PreferredFactoryAddedTriggerConfig {}
-/** A professional asked a brand to confirm they represent it. Recipient: the brand. */
-export interface AmbassadorshipVerificationRequestedTriggerConfig {}
-/** The brand confirmed or declined it. Recipient: the professional. */
-export interface AmbassadorshipDecidedTriggerConfig {}
 
 // ── Notification→flow migration events. These carry their
 // full notification payload in trigger.data, so no filter config is needed. ──
@@ -445,8 +439,6 @@ export type TriggerConfigMap = {
   material_reviewed: MaterialReviewedTriggerConfig;
   review_submitted: ReviewSubmittedTriggerConfig;
   preferred_factory_added: PreferredFactoryAddedTriggerConfig;
-  ambassadorship_verification_requested: AmbassadorshipVerificationRequestedTriggerConfig;
-  ambassadorship_decided: AmbassadorshipDecidedTriggerConfig;
   quote_pdf_generated: QuotePdfGeneratedTriggerConfig;
   factory_approved: FactoryApprovedTriggerConfig;
   factory_rejected: FactoryRejectedTriggerConfig;

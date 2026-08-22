@@ -19,7 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
-  Wrench, AlarmClock, ShieldCheck, Coins, MessagesSquare, PhoneOff, Link2, Unlink, BadgeCheck,
+  Wrench, AlarmClock, ShieldCheck, Coins, MessagesSquare, PhoneOff, Link2, Unlink,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -54,8 +54,6 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   material_reviewed: CheckCircle2,
   review_submitted: CheckCircle2,
   preferred_factory_added: Package,
-  ambassadorship_verification_requested: BadgeCheck,
-  ambassadorship_decided: BadgeCheck,
   quote_pdf_generated: FileCheck,
   factory_approved: CheckCircle2,
   factory_rejected: XCircle,
