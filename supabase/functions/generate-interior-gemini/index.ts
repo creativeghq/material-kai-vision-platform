@@ -34,7 +34,8 @@ import {
   buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt, loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
-import { resolveGenerationRouting } from '../_shared/generation-routing.ts';
+import { resolveGenerationRouting, PRICING_KEY_BY_LABEL } from '../_shared/generation-routing.ts';
+import { checkGenerationModelHealth, unavailableMessage } from '../_shared/generation-health.ts';
 import {
   buildProductShotPrompt,
   buildProductLifestylePrompt,
@@ -562,6 +563,23 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const model: GeminiImageModel = routing.geminiModel;
   const credits = routing.credits;
   const modelLabel = routing.modelLabel;
+
+  // Ask the registry whether this model can run BEFORE taking any money. Without this a
+  // `redesign` on the unfunded/uncredentialled Flux path debited 20 credits, failed, and
+  // refunded 20 — a ledger that nets to zero and a user who waited for nothing and was told
+  // nothing useful. Fails open, so an unreadable registry cannot block generation.
+  // `PRICING_KEY_BY_LABEL` maps the response-payload label to the registry id for the one
+  // case where they differ (`grok-aurora` → `xai-aurora`).
+  const health = await checkGenerationModelHealth(
+    supabase,
+    PRICING_KEY_BY_LABEL[modelLabel] ?? modelLabel,
+  );
+  if (!health.runnable) {
+    return jsonResponse(
+      { success: false, error: unavailableMessage(modelLabel, health.reason), model: modelLabel },
+      503,
+    );
+  }
 
   let debited = false;
   try {
