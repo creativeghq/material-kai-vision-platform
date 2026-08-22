@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Globe,
@@ -38,6 +38,9 @@ import { MoodboardComments } from '@/components/features/social/MoodboardComment
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
+import type { Ambassadorship } from '@/lib/ambassadorships';
+import { listAmbassadorships } from '@/services/ambassadorService';
+import { AmbassadorShowcase } from '@/components/features/profile/AmbassadorShowcase';
 
 import { onEnterOrSpace } from '@/utils/a11y';
 import { formatNumber } from '@/utils/decimal';
@@ -52,7 +55,6 @@ interface PublicProfile {
   website_url: string;
   services: string[];
   services_detail: ServiceItem[];
-  preferred_factories: { name: string; country?: string }[];
   skill_tags: string[];
   featured_moodboard_id: string | null;
   profile_views: number;
@@ -191,6 +193,7 @@ export const PublicProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [moodboards, setMoodboards] = useState<PublicMoodboard[]>([]);
+  const [ambassadorships, setAmbassadorships] = useState<Ambassadorship[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
@@ -199,6 +202,9 @@ export const PublicProfilePage: React.FC = () => {
   const [hireMeOpen, setHireMeOpen] = useState(false);
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | undefined>();
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
+  // A showcase link is only rendered when the moodboard behind it is actually public — a link
+  // to a private board is a 'this moodboard is private' page with the visitor's name on it.
+  const publicMoodboardIds = useMemo(() => new Set(moodboards.map((m) => m.id)), [moodboards]);
   const loadIdRef = useRef(0);
   const trackedMoodboardsRef = useRef<Set<string>>(new Set());
 
@@ -220,7 +226,7 @@ export const PublicProfilePage: React.FC = () => {
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select(
-          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public, show_listings',
+          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public, show_listings',
         )
         .eq('user_id', userId)
         .eq('is_public', true)
@@ -237,12 +243,16 @@ export const PublicProfilePage: React.FC = () => {
         ...profileData,
         services: profileData.services ?? [],
         services_detail: (profileData.services_detail as ServiceItem[]) ?? [],
-        preferred_factories: (profileData.preferred_factories as { name: string; country?: string }[]) ?? [],
         skill_tags: profileData.skill_tags ?? [],
         featured_moodboard_id: profileData.featured_moodboard_id ?? null,
         profile_views: profileData.profile_views ?? 0,
         professional_type: profileData.professional_type ?? null,
       });
+
+      // Ambassadorships: RLS returns the ones this profile shows publicly.
+      listAmbassadorships(userId!)
+        .then((list) => { if (loadId === loadIdRef.current) setAmbassadorships(list); })
+        .catch(() => setAmbassadorships([]));
 
       // Fire-and-forget analytics
       supabase.rpc('increment_profile_views', { p_user_id: userId! }).then(() => {});
@@ -572,25 +582,16 @@ export const PublicProfilePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Preferred Factories */}
-              {profile.preferred_factories.length > 0 && (
-                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
-                    <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-primary">
-                      <Building2 className="h-4 w-4" /> Preferred Brands
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {profile.preferred_factories.map((f, i) => (
-                        <div key={i} className="rounded-xl bg-muted/40 p-3">
-                          <p className="font-medium text-sm">{f.name}</p>
-                          {f.country && <p className="text-xs text-muted-foreground mt-0.5">{f.country}</p>}
-                        </div>
-                      ))}
-                    </div>
-                </div>
+              {ambassadorships.length > 0 && (
+                <AmbassadorShowcase
+                  ambassadorships={ambassadorships}
+                  publicMoodboardIds={publicMoodboardIds}
+                  className="dashboard-card rounded-2xl border-0 shadow-sm p-5"
+                />
               )}
 
               {/* Empty about */}
-              {!profile.bio && !profile.website_url && !profile.location && !reviewStats?.summary && profile.preferred_factories.length === 0 && (
+              {!profile.bio && !profile.website_url && !profile.location && !reviewStats?.summary && ambassadorships.length === 0 && (
                 <div className="py-12 text-center text-muted-foreground">
                   <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   {isOwnProfile ? (

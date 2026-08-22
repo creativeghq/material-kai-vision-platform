@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles, FileText, Building2,
   Globe, Video, Layers, Cpu, Download, CreditCard, XCircle, UserPlus, CheckCircle,
-  Megaphone,
+  Megaphone, BadgeCheck,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +32,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   material_alert:         <Sparkles className="h-4 w-4 text-primary" />,
   quote_updated:          <FileText className="h-4 w-4 text-violet-500" />,
   preferred_factory:      <Building2 className="h-4 w-4 text-blue-500" />,
+  ambassadorship:         <BadgeCheck className="h-4 w-4 text-blue-500" />,
   vr_world_ready:         <Globe className="h-4 w-4 text-emerald-500" />,
   vr_world_failed:        <Globe className="h-4 w-4 text-destructive" />,
   video_ready:            <Video className="h-4 w-4 text-emerald-500" />,

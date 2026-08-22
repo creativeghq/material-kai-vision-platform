@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook, BadgeCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
+import { AmbassadorTab } from '@/components/core/Profile/AmbassadorTab';
 import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
 import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
@@ -71,6 +72,10 @@ export const UserProfilePage: React.FC = () => {
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Profile
+          </TabsTrigger>
+          <TabsTrigger value="ambassador" className="flex items-center gap-2">
+            <BadgeCheck className="h-4 w-4" />
+            Ambassador
           </TabsTrigger>
           <TabsTrigger value="inbox" className="flex items-center gap-2">
             <Inbox className="h-4 w-4" />
@@ -144,6 +149,10 @@ export const UserProfilePage: React.FC = () => {
           <ProfileTab />
           {/* Renders nothing unless the user has a workspace; shows a status card once disabled. */}
           <AccountStatusCard />
+        </TabsContent>
+
+        <TabsContent value="ambassador" className="space-y-6">
+          <AmbassadorTab />
         </TabsContent>
 
         <TabsContent value="inbox" className="space-y-6">

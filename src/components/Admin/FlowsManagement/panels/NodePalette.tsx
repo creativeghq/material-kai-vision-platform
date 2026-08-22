@@ -18,7 +18,7 @@ import {
   MailX, MailWarning, MailOpen, MousePointerClick, AtSign, Briefcase,
   Ship, Truck, Home,
   Landmark, CreditCard, ShieldAlert, BatteryLow, UserMinus,
-  Wrench, AlarmClock, ShieldCheck,
+  Wrench, AlarmClock, ShieldCheck, BadgeCheck,
 } from 'lucide-react';
 import {
   Accordion,
@@ -51,7 +51,7 @@ const iconMap: Record<string, React.ElementType> = {
   // here, so those two rendered the `Globe` fallback instead of their own icon.
   Landmark, CreditCard, ShieldAlert, BatteryLow,
   UserMinus,
-  Wrench, AlarmClock, ShieldCheck,
+  Wrench, AlarmClock, ShieldCheck, BadgeCheck,
 };
 
 const categoryColors: Record<string, string> = {

@@ -41,9 +41,11 @@ Stored in `user_profiles` table:
 | `services` | text[] | Legacy simple service name list |
 | `services_detail` | jsonb | Rich service objects (preferred, see below) |
 | `skill_tags` | text[] | Free-form skill/expertise tags |
-| `preferred_factories` | jsonb | Array of `{ name, country? }` factory references |
 | `featured_moodboard_id` | uuid | FK to `moodboards` — pinned to profile top |
 | `profile_views` | integer | Incremented on each public profile view via `increment_profile_views()` RPC |
+
+> `preferred_factories` (jsonb `[{name, country?}]`) was **dropped** on 2026-08-22. Brand
+> relationships live in `profile_ambassadorships` — see **Brand Ambassadorships** below.
 
 ### Professional Types (enum)
 
@@ -51,6 +53,49 @@ Stored in `user_profiles` table:
 designer | interior_designer | architect | manufacturer |
 brand | supplier | sourcing_agent | consultant | other
 ```
+
+---
+
+## Brand Ambassadorships
+
+Table: **`profile_ambassadorships`** (Profile → **Ambassador** tab). One row per (person, brand),
+unique on `(user_id, lower(btrim(brand_name)))`.
+
+A professional does not merely "prefer" a brand — they represent it, and they represent it *for
+something*. The category is what a visitor is actually asking about ("who do you use for
+sanitary?"), so it is part of the relationship rather than a tag on the person.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `brand_name` / `brand_source` | text | The brand; `catalog` (from `get_distinct_factory_names()`) or `manual` |
+| `category_keys` | text[] | `material_categories.category_key` values — validated and re-ordered into registry order by a trigger |
+| `relationship` | text | `ambassador` \| `authorized_dealer` \| `certified_installer` \| `specifier` |
+| `headline`, `since_year`, `brand_url`, `brand_country` | — | What the public profile shows. `brand_url` is https-only (CHECK) |
+| `showcase_moodboard_id` | uuid | The person's own work with the brand; the link renders only if that moodboard is public |
+| `is_featured`, `sort_order` | — | Lead brands and ordering on the public profile |
+| `verification_status` | text | `self_declared` \| `pending` \| `verified` \| `declined` |
+| `brand_user_id`, `verified_at`, `decided_by`, `decision_note` | — | Who decided, and what they said |
+
+**Verification is the brand's to give.** `tg_profile_ambassadorship_verification_guard()` pins every
+verification column shut for ordinary writes — service role included — so the only way to set them
+is through the two SECURITY DEFINER RPCs, which announce themselves with a transaction-local flag:
+
+- `request_ambassadorship_verification(id)` — the ambassador asks. Resolves the brand's verified
+  supplier profile (`user_profiles.factory_verified` + `factory_claimed_name`). Answering
+  `no_brand_account` is normal: most brands have no account here, and the claim stays visible
+  without a confirmation.
+- `decide_ambassadorship(id, approve, note)` — the brand answers. Re-checks the caller's supplier
+  verification every time, so a withdrawn verification stops carrying the power.
+- `list_brand_ambassador_requests()` — the brand's queue. An RPC and not a join, because
+  `user_profiles` RLS is "public profile or your own row" and would blank the name of exactly the
+  people the brand needs to identify.
+- `get_brand_category_coverage(brands[])` — SECURITY **INVOKER**, so it reports the categories a
+  brand has products in *within the catalogs the caller can already read*. Advisory only.
+
+A `declined` row is never public: RLS excludes it for visitors, and `AmbassadorShowcase` filters it
+again because the owner *can* read their own declined rows.
+
+Guarded by [tests/unit/ambassadorships.test.ts](../tests/unit/ambassadorships.test.ts).
 
 ---
 
@@ -164,7 +209,9 @@ Full profile view for a single user.
 | `hire_me_received` | Hire Me form submitted |
 | `profile_followed` | A user follows a public profile |
 | `profile_published` | User makes their profile public |
-| `preferred_factory_added` | User adds a preferred factory |
+| `preferred_factory_added` | User adds a brand to their profile (Ambassador tab) |
+| `ambassadorship_verification_requested` | A professional asks a brand to confirm they represent it |
+| `ambassadorship_decided` | The brand confirmed or declined an ambassadorship |
 
 These can be used in the Flow Builder to trigger automated actions (emails, notifications, etc.).
 

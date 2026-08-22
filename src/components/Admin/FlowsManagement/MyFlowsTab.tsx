@@ -67,7 +67,7 @@ import {
   Wrench,
   AlarmClock,
   ShieldCheck,
-  Coins, MessagesSquare, PhoneOff, Link2, Unlink,
+  Coins, MessagesSquare, PhoneOff, Link2, Unlink, BadgeCheck,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -131,6 +131,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   material_reviewed: CheckCircle2,
   review_submitted: CheckCircle2,
   preferred_factory_added: Package,
+  ambassadorship_verification_requested: BadgeCheck,
+  ambassadorship_decided: BadgeCheck,
   quote_pdf_generated: FileCheck,
   factory_approved: CheckCircle2,
   factory_rejected: XCircle,
@@ -264,6 +266,8 @@ const triggerLabels: Record<TriggerType, string> = {
   material_reviewed: 'Material Reviewed',
   review_submitted: 'Profile Review Received',
   preferred_factory_added: 'Preferred Brand Added',
+  ambassadorship_verification_requested: 'Ambassador Confirmation Requested',
+  ambassadorship_decided: 'Ambassadorship Decided',
   quote_pdf_generated: 'Quote PDF Ready',
   factory_approved: 'Brand Approved',
   factory_rejected: 'Brand Rejected',

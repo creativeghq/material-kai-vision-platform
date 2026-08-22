@@ -108,6 +108,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'preferred_factory_added', group: 'Profiles',
     label: 'Brand Added to Profile', description: 'User adds a preferred brand to their profile', icon: 'Building2', color: 'emerald',
     defaultData: { label: 'Brand Added to Profile', category: 'trigger', triggerType: 'preferred_factory_added', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'ambassadorship_verification_requested', group: 'Profiles',
+    label: 'Ambassador Confirmation Requested', description: 'A professional asks a brand to confirm they represent it', icon: 'BadgeCheck', color: 'emerald',
+    defaultData: { label: 'Ambassador Confirmation Requested', category: 'trigger', triggerType: 'ambassadorship_verification_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'ambassadorship_decided', group: 'Profiles',
+    label: 'Ambassadorship Decided', description: 'A brand confirmed or declined an ambassadorship', icon: 'BadgeCheck', color: 'emerald',
+    defaultData: { label: 'Ambassadorship Decided', category: 'trigger', triggerType: 'ambassadorship_decided', config: {} } as TriggerNodeData },
 
   // ── Quotes (PDF) ──
   { type: 'triggerNode', category: 'trigger', subType: 'quote_pdf_generated', group: 'Quotes',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2, Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, CalendarDays, BarChart2, Users, Calendar, Grid3x3, Mail, MessageCircle, FileText, Sparkles, Layers, Wrench } from 'lucide-react';
+import { User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2, Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, CalendarDays, BarChart2, Users, Calendar, Grid3x3, Mail, MessageCircle, FileText, Sparkles, Layers, Wrench, BadgeCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -505,7 +505,6 @@ export const ProfileTab: React.FC = () => {
   const [showListings, setShowListings] = useState(true); // Show property listings on public profile
   const { enabled: realEstateEnabled } = useModule('real-estate');
   const [services, setServices] = useState<ServiceItem[]>([]);
-  const [factories, setFactories] = useState<{ name: string; country?: string }[]>([]);
   const [skillTags, setSkillTags] = useState<string[]>([]);
   const [featuredMoodboardId, setFeaturedMoodboardId] = useState<string | null>(null);
   const [profileViews, setProfileViews] = useState(0);
@@ -533,12 +532,10 @@ export const ProfileTab: React.FC = () => {
 
   const [addingService, setAddingService] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
-  const [addingFactory, setAddingFactory] = useState(false);
   const [addingSkill, setAddingSkill] = useState(false);
   const [editingFeatured, setEditingFeatured] = useState(false);
 
   const [newSkill, setNewSkill] = useState('');
-  const [selectedFactoryName, setSelectedFactoryName] = useState('');
 
   const [moodboards, setMoodboards] = useState<{ id: string; title: string }[]>([]);
   const [factoryOptions, setFactoryOptions] = useState<FactoryOption[]>([]);
@@ -566,7 +563,7 @@ export const ProfileTab: React.FC = () => {
       .from('user_profiles')
       .select(
         'full_name, company, phone, address, bio, avatar_url, location, website_url, professional_type,' +
-        'is_public, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views,' +
+        'is_public, services, services_detail, skill_tags, featured_moodboard_id, profile_views,' +
         'factory_verified, factory_claimed_name',
       )
       .eq('user_id', user.id)
@@ -584,7 +581,6 @@ export const ProfileTab: React.FC = () => {
     setIsPublic(data.is_public ?? false);
     setShowListings((data as any).show_listings ?? true);
     setServices((data.services_detail as ServiceItem[]) ?? []);
-    setFactories((data.preferred_factories as { name: string; country?: string }[]) ?? []);
     setSkillTags(data.skill_tags ?? []);
     setFeaturedMoodboardId(data.featured_moodboard_id ?? null);
     setProfileViews(data.profile_views ?? 0);
@@ -796,47 +792,6 @@ export const ProfileTab: React.FC = () => {
     }
   };
 
-  // ── Factories ─────────────────────────────────────────────────
-  const addFactory = async () => {
-    if (!selectedFactoryName || factories.some((f) => f.name === selectedFactoryName)) return;
-    const next = [...factories, { name: selectedFactoryName }];
-    const factoryToAdd = selectedFactoryName;
-    setFactories(next); setSelectedFactoryName(''); setAddingFactory(false);
-    const ok = await patch({ preferred_factories: next });
-    if (ok && user) {
-      // Look up the verified factory user first so the event carries the
-      // notification recipient (factory_user_id). The "Preferred Factory Added"
-      // flow delivers the notification; an admin can pause/edit it in Flows.
-      supabase
-        .from('user_profiles')
-        .select('user_id, full_name')
-        .eq('factory_claimed_name', factoryToAdd)
-        .eq('factory_verified', true)
-        .maybeSingle()
-        .then(({ data: factoryProfile }) => {
-          flowEventService.emit('preferred_factory_added', {
-            user_id: user.id, // the user who added the factory (documented semantics)
-            factory_user_id: factoryProfile?.user_id ?? null, // recipient
-            factory_name: factoryToAdd,
-            added_at: new Date().toISOString(),
-            type: 'preferred_factory',
-            title: 'A user added your brand as a preferred brand',
-            body: '',
-            // Was /factory-analytics, which no longer exists (#350). The recipient here is a
-            // platform supplier account, so the destination has to be a page THEY can open —
-            // /market-trends is workspace-admin gated and the CRM company Market tab lives in the
-            // buyer's workspace. Their own catalog in Discovery is the one surface that qualifies.
-            action_url: `/discover?tab=products&factory=${encodeURIComponent(factoryToAdd)}`,
-          });
-        });
-    }
-  };
-
-  const removeFactory = async (i: number) => {
-    const next = factories.filter((_, idx) => idx !== i);
-    setFactories(next); await patch({ preferred_factories: next });
-  };
-
   const saveFeatured = async (id: string | null) => {
     setFeaturedMoodboardId(id); setEditingFeatured(false);
     await patch({ featured_moodboard_id: id });
@@ -875,10 +830,6 @@ export const ProfileTab: React.FC = () => {
 
   const initials = (personal.full_name || user?.email || '?')
     .split(/[\s@]/).filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
-
-  const factoryComboOptions = factoryOptions
-    .filter((f) => !factories.some((ex) => ex.name === f.name))
-    .map((f) => ({ value: f.name, label: f.name, sub: f.source === 'import' ? 'Import' : 'Product catalog' }));
 
   const moodboardOptions = [
     { value: '', label: 'None' },
@@ -1127,62 +1078,31 @@ export const ProfileTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Preferred Factories */}
+      {/* Brand ambassadorships moved to their OWN tab (Profile → Ambassador). What lived here
+          was a list of brand names with nowhere to say what the person promotes each brand FOR,
+          which is the only part a visitor is looking for. The pointer stays because this is the
+          card people knew it by. */}
       <Card className="rounded-2xl">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Preferred Brands</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setAddingFactory((v) => !v)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />Add brand
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" />Brands you represent
+            </CardTitle>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/profile?tab=ambassador">
+                <BadgeCheck className="h-3.5 w-3.5 mr-1.5" />Open Ambassador
+              </Link>
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {factories.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {factories.map((f, i) => (
-                <div key={i} className="flex items-start justify-between p-3 rounded-xl border bg-muted/30">
-                  <div>
-                    <p className="font-medium text-sm">{f.name}</p>
-                    {f.country && <p className="text-xs text-muted-foreground">{f.country}</p>}
-                  </div>
-                  <button onClick={() => removeFactory(i)} className="text-muted-foreground hover:text-destructive transition-colors ml-2 shrink-0 mt-0.5">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {factories.length === 0 && !addingFactory && (
-            <p className="text-sm text-muted-foreground">No preferred brands added yet.</p>
-          )}
-          {addingFactory && (
-            <div className="rounded-xl border p-4 space-y-3 bg-muted/20">
-              {factoryComboOptions.length > 0 ? (
-                <div className="space-y-1.5">
-                  <label htmlFor="profile-factory-from-catalog" className="text-xs text-muted-foreground">From your product catalog</label>
-                  <SearchCombobox
-                    id="profile-factory-from-catalog"
-                    options={factoryComboOptions}
-                    value={selectedFactoryName}
-                    onSelect={setSelectedFactoryName}
-                    placeholder="Search brands…"
-                    emptyText="No brands found."
-                  />
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">
-                  No brand data in catalog yet. Import products to populate this list.
-                </p>
-              )}
-              <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="ghost" onClick={() => { setAddingFactory(false); setSelectedFactoryName(''); }}>Cancel</Button>
-                <Button size="sm" onClick={addFactory} disabled={!selectedFactoryName}>Add brand</Button>
-              </div>
-            </div>
-          )}
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Brand ambassadorships — which brands you represent, in which categories, and whether the
+            brand has confirmed it — are managed on the Ambassador tab.
+          </p>
         </CardContent>
       </Card>
+
 
       {/* Supplier Verification — gated on professional_type='supplier'. The
           underlying column is factory_verified for historical reasons; the

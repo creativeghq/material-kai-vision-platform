@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Globe, MapPin, Briefcase, Building2, ExternalLink, Mail, Star, Tag,
+  Globe, MapPin, Briefcase, ExternalLink, Mail, Star, Tag,
   DollarSign, Link as LinkIcon, Pencil, Sparkles, ChevronDown, ChevronUp,
   MessageCircle, Grid3x3, UserCircle, X,
 } from 'lucide-react';
@@ -20,6 +20,9 @@ import { MoodboardComments } from '@/components/features/social/MoodboardComment
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
+import type { Ambassadorship } from '@/lib/ambassadorships';
+import { listAmbassadorships } from '@/services/ambassadorService';
+import { AmbassadorShowcase } from '@/components/features/profile/AmbassadorShowcase';
 import { formatNumber } from '@/utils/decimal';
 
 const CARD_COLORS = [
@@ -123,7 +126,6 @@ interface PublicProfile {
   website_url: string;
   services: string[];
   services_detail: ServiceItem[];
-  preferred_factories: { name: string; country?: string }[];
   skill_tags: string[];
   profile_views: number;
   professional_type: string | null;
@@ -156,6 +158,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [moodboards, setMoodboards] = useState<PublicMoodboard[]>([]);
+  const [ambassadorships, setAmbassadorships] = useState<Ambassadorship[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
@@ -179,22 +182,24 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
     setProfile(null);
     setMoodboards([]);
     setReviewStats(null);
+    setAmbassadorships([]);
 
     try {
       const { data: profileData } = await supabase
         .from('user_profiles')
-        .select('user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, preferred_factories, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public')
+        .select('user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public')
         .eq('user_id', uid)
         .eq('is_public', true)
         .maybeSingle();
 
       if (!profileData) { setLoading(false); return; }
 
+      listAmbassadorships(uid).then(setAmbassadorships).catch(() => setAmbassadorships([]));
+
       setProfile({
         ...profileData,
         services: profileData.services ?? [],
         services_detail: (profileData.services_detail as ServiceItem[]) ?? [],
-        preferred_factories: (profileData.preferred_factories as { name: string; country?: string }[]) ?? [],
         skill_tags: profileData.skill_tags ?? [],
         profile_views: profileData.profile_views ?? 0,
         professional_type: profileData.professional_type ?? null,
@@ -480,22 +485,14 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                               )}
                           </div>
                         )}
-                        {profile.preferred_factories.length > 0 && (
-                          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
-                              <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-primary">
-                                <Building2 className="h-4 w-4" /> Preferred Brands
-                              </h3>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {profile.preferred_factories.map((f, i) => (
-                                  <div key={i} className="rounded-xl bg-muted/40 p-3">
-                                    <p className="font-medium text-sm">{f.name}</p>
-                                    {f.country && <p className="text-xs text-muted-foreground mt-0.5">{f.country}</p>}
-                                  </div>
-                                ))}
-                              </div>
-                          </div>
+                        {ambassadorships.length > 0 && (
+                          <AmbassadorShowcase
+                            ambassadorships={ambassadorships}
+                            publicMoodboardIds={new Set(moodboards.map((m) => m.id))}
+                            className="dashboard-card rounded-2xl border-0 shadow-sm p-5"
+                          />
                         )}
-                        {!profile.bio && !profile.website_url && !profile.location && !reviewStats?.summary && profile.preferred_factories.length === 0 && (
+                        {!profile.bio && !profile.website_url && !profile.location && !reviewStats?.summary && ambassadorships.length === 0 && (
                           <div className="py-12 text-center text-muted-foreground">
                             <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-30" />
                             {isOwnProfile ? (
