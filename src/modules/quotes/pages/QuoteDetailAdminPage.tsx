@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, FileText, Package, User, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Timer, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature } from 'lucide-react';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 
@@ -16,6 +16,7 @@ import { quotesService, QuoteWithItems, Upsell, QuoteUpsell, TimelineStep, Quote
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
+import { FINANCE_BASE } from '@/modules/finance/routes';
 import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
@@ -62,6 +63,11 @@ export const QuoteDetailPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
+  /** The order + pre-invoice the accept trigger produced (#378 C1). Read-only. */
+  const [quoteDocs, setQuoteDocs] = useState<{
+    order: { id: string; order_number: string | null; status: string } | null;
+    preInvoice: { id: string; internal_number: string | null; status: string } | null;
+  }>({ order: null, preInvoice: null });
   const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [loadingUpsells, setLoadingUpsells] = useState(false);
@@ -151,6 +157,11 @@ export const QuoteDetailPage: React.FC = () => {
       // asks without it (#368 follow-up).
       const data = await quotesService.getQuote(id, { includeCost: true });
       setQuote(data);
+      // Best-effort: the quote renders with or without them, so a failure here must not blank
+      // the page. Absent simply means the accept trigger has not run for this quote.
+      void quotesService.getQuoteDocuments(id)
+        .then((d) => setQuoteDocs(d as any))
+        .catch(() => setQuoteDocs({ order: null, preInvoice: null }));
       // Initialize pricing state from loaded data
       if (data?.items) {
         const prices: Record<string, string> = {};
@@ -818,6 +829,36 @@ export const QuoteDetailPage: React.FC = () => {
           contactId={quote.customer_contact_id ?? null}
           onSaved={loadQuoteDetails}
         />
+
+        {/* What accepting this quote PRODUCED (#378 C1). The accept trigger raises a confirmed
+            sales order from these lines and a draft pre-invoice with a pay token — correctly, and
+            until now invisibly: the operator marked a quote accepted and the fulfilment chain
+            started somewhere they had no link to. Read-only; nothing here creates anything. */}
+        {(quoteDocs.order || quoteDocs.preInvoice) && (
+          <div className="dashboard-card flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
+            <span className="text-xs font-medium text-muted-foreground">Accepting this quote created</span>
+            {quoteDocs.order && (
+              <Link
+                to={`${FINANCE_BASE}/orders/${quoteDocs.order.id}`}
+                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <Package className="h-3.5 w-3.5" />
+                Order {quoteDocs.order.order_number ?? quoteDocs.order.id.slice(0, 8)}
+                <span className="text-xs text-muted-foreground">· {quoteDocs.order.status}</span>
+              </Link>
+            )}
+            {quoteDocs.preInvoice && (
+              <Link
+                to={`${FINANCE_BASE}/invoices/${quoteDocs.preInvoice.id}`}
+                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {quoteDocs.preInvoice.internal_number ?? 'Pre-invoice'}
+                <span className="text-xs text-muted-foreground">· {quoteDocs.preInvoice.status}</span>
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Which job this quote belongs to (#378 L3). It could previously be answered only in the
             create modal, so a quote raised before its project existed — the normal order of

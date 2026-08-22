@@ -522,6 +522,37 @@ export class QuotesService {
    * Returns null when the derivation could not be read. A caller must render that as "unknown",
    * never as zero.
    */
+  /**
+   * What accepting this quote PRODUCED (#378 C1).
+   *
+   * Accepting a quote is not just a status change: the `quote_accepted_create_order` trigger on
+   * `quotes` raises a confirmed sales order from its lines and a draft pre-invoice carrying a
+   * 30-day pay token, so the public quote page can offer "Pay now" immediately. All of it is
+   * correct, and none of it was visible from the quote — the operator marked a quote accepted and
+   * the fulfilment chain started somewhere they had no link to.
+   *
+   * Read, never derived: this reports the documents the trigger made. It does not create them,
+   * and an absent order means the trigger did not run (a quote accepted before that trigger
+   * existed), not that one should be minted here.
+   */
+  async getQuoteDocuments(quoteId: string): Promise<{
+    order: { id: string; order_number: string | null; status: string; total: number | null; currency: string | null } | null;
+    preInvoice: { id: string; internal_number: string | null; status: string; total: number | null; currency: string | null } | null;
+  }> {
+    const [orderRes, invRes] = await Promise.all([
+      supabase.from('orders')
+        .select('id, order_number, status, total, currency')
+        .eq('source_quote_id', quoteId).maybeSingle(),
+      supabase.from('invoices')
+        .select('id, internal_number, status, total, currency')
+        .eq('quote_id', quoteId).order('created_at', { ascending: true }).limit(1).maybeSingle(),
+    ]);
+    return {
+      order: (orderRes.data as any) ?? null,
+      preInvoice: (invRes.data as any) ?? null,
+    };
+  }
+
   async getQuoteTotals(quoteId: string): Promise<QuoteTotals | null> {
     const { data, error } = await (supabase as any).rpc('get_quote_totals', { p_quote_ids: [quoteId] });
     if (error) {
