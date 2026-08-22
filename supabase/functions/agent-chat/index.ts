@@ -136,8 +136,12 @@ async function initRuntime() {
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
   });
+  // Opus 5, not 4.8. Same rate in ai_model_pricing ($5/$25 in, out), measurably better
+  // judgement — see the A/B recorded on shouldRouteToHaiku below. It only became reachable
+  // through ChatAnthropic when the LangChain pin moved off 1.3.10 (support landed in
+  // @langchain/anthropic 1.5.2), and until then nothing in the platform called it.
   modelOpus = new ChatAnthropic({
-    model: 'claude-opus-4-8',
+    model: MAIN_MODEL,
     temperature: 1,
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
@@ -701,31 +705,33 @@ let modelOpus: any;
 //   - history < 4 turns (early-conversation triage)
 //   - agent isn't `interior-designer` (always needs Opus for design tasks)
 //   - agent isn't admin-tier (B2B / SEO sub-agents need Opus)
-function shouldRouteToHaiku(
-  agentId: string,
-  messages: any[],
-  images: string[],
-  hasDocuments: boolean = false,
-): boolean {
+function shouldRouteToHaiku(agentId: string): boolean {
+  // Only the sandbox agent. Everything a real user asks runs on the main model.
+  //
+  // This used to tier by the LENGTH of the last user message: over 80 characters went to
+  // Opus, under it went to Haiku, with side conditions on '@', a quote character and turn
+  // count. Length is not complexity. "who are our top suppliers?" is 25 characters and needs
+  // several tool calls; "what's our stock?" went to Opus only because it contains an
+  // apostrophe. Measured over 31 turns (6 judgement cases x 3 models x 2 reps, 2026-08-22):
+  //
+  //   model            punted to a form   substantive answer   tool calls/run
+  //   haiku-4-5             6 of 12            5 of 12              1.7
+  //   opus-4-8              4 of 11            7 of 11              1.7
+  //   opus-5                1 of 8             7 of 8               3.8
+  //
+  // Haiku's failure mode is the exact one the operating doctrine exists to prevent: half its
+  // turns ended with "I need a couple of details - the form is on screen" instead of an
+  // answer, once without calling a single tool. On the same prompt Opus 5 ran three search
+  // phrasings and then distinguished an empty catalog from a broken index - "I would not
+  // conclude you have no porcelain products".
+  //
+  // The saving this bought was not worth it. At the platform's measured volume (24-57 turns
+  // a day) the whole tier is worth roughly a dollar a day, against an agent that stalls on
+  // half its questions. Haiku is still used where it is genuinely right and unchanged:
+  // specialist routing, conversation compaction, and the memory gate - short classification
+  // jobs with no tool loop.
   if (agentId === 'demo') return true;
-  if (agentId === 'interior-designer') return false;
-
-  if (images && images.length > 0) return false;
-  // A PDF/document attachment needs a document-capable model (Opus reads PDFs natively).
-  if (hasDocuments) return false;
-
-  const lastUserMsg = [...messages]
-    .reverse()
-    .find((m: any) => m.role === 'user');
-  const text: string = (typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '') || '';
-
-  if (text.length > 80) return false;
-  if (text.includes('@') || text.includes('"') || text.includes("'")) return false;
-
-  const turnCount = messages.filter((m: any) => m.role === 'user').length;
-  if (turnCount >= 4) return false;
-
-  return true;
+  return false;
 }
 
 /**
@@ -741,6 +747,9 @@ function shouldRouteToHaiku(
  * model that happens to be free. Gated to secret/admin auth — a tenant picking their own model
  * is a cost decision that is not theirs to make.
  */
+/** The model every substantive turn runs on. */
+const MAIN_MODEL = 'claude-opus-5';
+
 const MODEL_OVERRIDE_ALLOWED = new Set([
   'claude-haiku-4-5',
   'claude-opus-4-8',
@@ -764,33 +773,22 @@ function getModelByName(name: string): ChatAnthropicModel {
   return m;
 }
 
-// Model selection — agent type + per-turn complexity heuristic
-function getModelForAgent(
-  agentId: string,
-  messages: any[] = [],
-  images: string[] = [],
-  hasDocuments: boolean = false,
-  modelOverride?: string | null,
-): ChatAnthropicModel {
+// Model selection. The per-turn complexity heuristic is gone — see shouldRouteToHaiku for the
+// measurements that removed it. Images and documents no longer need a separate branch either:
+// the main model reads both natively, which is what the old `hasDocuments` check was steering
+// around.
+function getModelForAgent(agentId: string, modelOverride?: string | null): ChatAnthropicModel {
   if (modelOverride) return getModelByName(modelOverride);
-  return shouldRouteToHaiku(agentId, messages, images, hasDocuments) ? modelHaiku : modelOpus;
+  return shouldRouteToHaiku(agentId) ? modelHaiku : modelOpus;
 }
 
 // Get model name for logging/tracking — must stay in sync with router above
-function getModelNameForAgent(
-  agentId: string,
-  messages: any[] = [],
-  images: string[] = [],
-  hasDocuments: boolean = false,
-  modelOverride?: string | null,
-): string {
+function getModelNameForAgent(agentId: string, modelOverride?: string | null): string {
   // Must stay in sync with getModelForAgent, INCLUDING the override — a pinned turn that
   // logs the router's model would price the run against the wrong rate and make the
   // comparison the pin exists to enable meaningless.
   if (modelOverride) return modelOverride;
-  return shouldRouteToHaiku(agentId, messages, images, hasDocuments)
-    ? 'claude-haiku-4-5'
-    : 'claude-opus-4-8';
+  return shouldRouteToHaiku(agentId) ? 'claude-haiku-4-5' : MAIN_MODEL;
 }
 
 // ── Orchestrator routing (Agent Fabric) ──────────────────────────────
@@ -2637,8 +2635,8 @@ async function executeAgent(
 
   // Select model based on agent + per-turn complexity heuristic
   const hasDocuments = Array.isArray(documents) && documents.length > 0;
-  const selectedModel = getModelForAgent(agentId, messages, images, hasDocuments, modelOverride);
-  const modelName = getModelNameForAgent(agentId, messages, images, hasDocuments, modelOverride);
+  const selectedModel = getModelForAgent(agentId, modelOverride);
+  const modelName = getModelNameForAgent(agentId, modelOverride);
 
   // 🔷 LangGraph StateGraph-based execution
 
