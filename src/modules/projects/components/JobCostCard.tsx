@@ -8,6 +8,8 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
+import { Button } from '@/components/core/ui/button';
+import { LogTimeDialog } from './LogTimeDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/utils/decimal';
@@ -28,7 +30,13 @@ const Stat: React.FC<{ label: string; value: string; hint?: string; tone?: strin
   </div>
 );
 
-export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> = ({ projectId, reloadToken }) => {
+export const JobCostCard: React.FC<{
+  projectId: string;
+  reloadToken?: number;
+  /** Enables the "Log time" action. Omitted on surfaces that only report. */
+  workspaceId?: string | null;
+}> = ({ projectId, reloadToken, workspaceId }) => {
+  const [logOpen, setLogOpen] = useState(false);
   const { toast } = useToast();
   const [pnl, setPnl] = useState<ProjectPnl | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,13 +81,23 @@ export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> 
 
   return (
     <Card className="dashboard-card">
-      <CardHeader className="border-b border-hairline px-5 py-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <TrendingUp className="h-4 w-4 text-primary" /> Job cost
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Margin on billed work, and the forecast against what the client has agreed to.
-        </p>
+      <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-start justify-between space-y-0 gap-3">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <TrendingUp className="h-4 w-4 text-primary" /> Job cost
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Margin on billed work, and the forecast against what the client has agreed to.
+          </p>
+        </div>
+        {/* Labour was enterable only in Finance -> Time & Billing, and the person who knows the
+            hours is on the job, not in the finance hub (#378 C6). Placed here, beside the Labor
+            figure it moves, rather than in a menu somewhere else. */}
+        {workspaceId && (
+          <Button size="sm" variant="outline" onClick={() => setLogOpen(true)}>
+            <Clock className="h-3.5 w-3.5 mr-1" /> Log time
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-5 space-y-5">
         {mixed && (
@@ -151,6 +169,18 @@ export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> 
           </div>
         )}
       </CardContent>
+
+      {workspaceId && (
+        <LogTimeDialog
+          open={logOpen}
+          onOpenChange={setLogOpen}
+          workspaceId={workspaceId}
+          projectId={projectId}
+          // Re-derive: the hours just logged are labour cost, and this card is the thing that
+          // reports it. Leaving it stale shows the operator their entry did nothing.
+          onLogged={load}
+        />
+      )}
     </Card>
   );
 };

@@ -132,7 +132,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
   return (
     <div className="space-y-4">
       {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
-      <JobCostCard projectId={projectId} reloadToken={costToken} />
+      <JobCostCard projectId={projectId} reloadToken={costToken} workspaceId={activeWorkspaceId} />
 
       {/* Costs booked straight onto the job, plus linking imported card spend to it. */}
       <ProjectExpensesCard
