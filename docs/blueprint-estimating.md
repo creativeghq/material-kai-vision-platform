@@ -128,6 +128,20 @@ splits them, because a workshop reads one half of the schedule and an electricia
 Both halves are subject to the same completeness rule: a quantity derived and consumed by no
 schedule line raises an issue rather than sitting at zero unnoticed.
 
+### What a plan says about it
+
+`_shared/blueprint/plan-rows.ts` materializes a derived composition into `project_plan_items` —
+one section per enabled zone, its priced lines beneath it, all carrying `source='composition'` and
+regenerated wholesale on every reprice. That is what makes quotes, material lists, versions and
+change orders work through the single path they already use.
+
+An appliance the customer already owns produces **no priced line and still gets a row**: a
+`is_schedule` scope line at €0, `"Fridge-freezer — in a tall unit (supplied by the client)"`. It is
+what tells the fitter to leave the aperture and the electrician to leave the socket. Dropping it
+because it costs nothing is the same €0 blind spot that once hid these appliances from the enquiry
+email, and it produces a quote nobody can fit a kitchen from. The fitting of that same appliance is
+a separate, priced row — we hang the door whoever bought the machine.
+
 Guarded by [`tests/unit/blueprintComposition.test.ts`](../tests/unit/blueprintComposition.test.ts).
 
 ---

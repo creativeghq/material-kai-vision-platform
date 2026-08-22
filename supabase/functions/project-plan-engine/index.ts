@@ -26,6 +26,7 @@ import {
   snapshotRateTables,
 } from '../_shared/blueprint/composition.ts';
 import type { Composition, DerivedComposition, PlanComposition, ZoneDef } from '../_shared/blueprint/composition.ts';
+import { compositionRows } from '../_shared/blueprint/plan-rows.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface ItemRow {
@@ -191,49 +192,6 @@ function stripAbsorbed(items: ItemRow[], schema: ZoneDef[]): ItemRow[] {
   return items.filter((it) => !(it.option_group && absorbed.has(it.option_group)));
 }
 
-/**
- * Derived zone lines → real plan rows, one section per enabled zone.
- *
- * They are MATERIALIZED rather than computed on read so that quotes, material lists, versions and
- * change orders keep working through the single path they already use. They carry
- * `source='composition'` and are regenerated wholesale on every reprice — a hand edit to one is
- * expected to be overwritten, and the marker is how a reader can tell.
- *
- * The rate is written into `material_cost` with `margin_pct: 0` because deriveComposition already
- * put it through `computeLinePricing` with the module's margin. Re-applying it here would charge
- * the margin twice; resolveItem re-derives these rows to exactly the numbers derived here.
- */
-function compositionRows(derived: DerivedComposition, startOrder: number): ItemRow[] {
-  const rows: ItemRow[] = [];
-  let order = startOrder;
-  for (const zone of derived.zones) {
-    const zoneLines = derived.lines.filter((l) => l.zone_key === zone.key);
-    if (!zone.enabled || zoneLines.length === 0) continue;
-    const sectionId = crypto.randomUUID();
-    rows.push({
-      id: sectionId, parent_id: null, sort_order: order++, kind: 'section', label: zone.label,
-      notes: null, unit: null, quantity_formula: null, line_kind: 'materials',
-      service_id: null, product_id: null, material_cost: null, labor_rate: null, margin_pct: 0,
-      option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
-      is_schedule: false, option_key: null, suggests_quantity: null,
-      source: 'composition',
-    });
-    let childOrder = 0;
-    for (const line of zoneLines) {
-      rows.push({
-        id: crypto.randomUUID(), parent_id: sectionId, sort_order: childOrder++, kind: 'task',
-        label: line.label, notes: null, unit: line.unit, quantity_formula: null,
-        default_quantity: line.quantity, quantity: line.quantity,
-        line_kind: line.line_kind, service_id: null, product_id: null,
-        material_cost: line.unit_price, labor_rate: null, margin_pct: 0,
-        option_group: null, tier: null, is_selected: true, is_allowance: false, allowance_amount: null,
-        is_schedule: false, option_key: null, suggests_quantity: null,
-        source: 'composition',
-      });
-    }
-  }
-  return rows;
-}
 
 // Persist resolved items for a plan (replace-all) and return the stored rows + subtotal.
 // `comp` — when the plan is zone-driven, its derived lines are materialized alongside the tree and

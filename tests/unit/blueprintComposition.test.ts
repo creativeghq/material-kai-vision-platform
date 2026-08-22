@@ -44,6 +44,7 @@ import {
 } from '../../supabase/functions/_shared/blueprint/composition';
 import type { Composition, ZoneDef } from '../../supabase/functions/_shared/blueprint/composition';
 import { computeBlueprint } from '../../supabase/functions/_shared/blueprint/compute';
+import { compositionRows } from '../../supabase/functions/_shared/blueprint/plan-rows';
 import { expectedMirror, SOURCE, TARGET } from '../../scripts/gen-blueprint-mirror.mjs';
 
 // A miniature kitchen carrying every shape that matters: a per-metre rate table two zones share,
@@ -907,6 +908,63 @@ describe('defaults — the appliances a kitchen usually has', () => {
       applianceItems,
     );
     expect(withOven.appliances.appliances![0].model).toBe('oven-basic');
+  });
+});
+
+describe('what a PLAN says about the configuration', () => {
+  // WHY: the plan rows are what a quote, a material list, a version and a change order are all
+  // built from. A configuration detail that does not become a row here exists nowhere the fitter
+  // will ever look — and the details most likely to be dropped are the ones worth nothing.
+  let n = 0;
+  const rowsFor = (cfg: Composition) => {
+    n = 0;
+    return compositionRows(deriveComposition(kitchen, cfg, applianceItems), 0, () => `id-${n++}`);
+  };
+
+  it('gives each priced zone a section and its lines', () => {
+    const rows = rowsFor(kcfg([]));
+    const sections = rows.filter((r) => r.kind === 'section').map((r) => r.label);
+    expect(sections).toContain('Bottom units');
+    expect(rows.every((r) => r.source === 'composition')).toBe(true);
+  });
+
+  it('carries an appliance the customer owns into the plan, priced at nothing', () => {
+    // The €0 blind spot in its last hiding place: this row has no money in it, so every filter
+    // that keeps a quote tidy drops it — taking with it the fact that a 60cm aperture and a socket
+    // have to be left for a machine we are not selling.
+    const rows = rowsFor(kcfg([appliance({ type: 'fridge', supply: 'existing', placement: 'tall' })]));
+    const scope = rows.find((r) => r.label.includes('supplied by the client'));
+    expect(scope).toBeTruthy();
+    expect(scope!.label).toContain('Fridge-freezer');
+    expect(scope!.label).toContain('in a tall unit');
+    expect(scope!.quantity).toBe(1);
+    // The fitting is a SEPARATE, priced row: we hang the door and cut the aperture whoever bought
+    // the machine, so the two must not collapse into one line.
+    const fitting = rows.find((r) => r.label === 'Fridge-freezer — In a tall unit');
+    expect(fitting?.material_cost).toBe(120);
+  });
+
+  it('marks it a schedule row, so it can never move the money', () => {
+    const scope = rowsFor(kcfg([appliance({ type: 'fridge', supply: 'existing', placement: 'tall' })]))
+      .find((r) => r.label.includes('supplied by the client'))!;
+    expect(scope.is_schedule).toBe(true);
+    // 0 because somebody else is buying it, NOT null — a null rate prints "needs a price"
+    // downstream, and nobody needs to price the customer's own fridge.
+    expect(scope.material_cost).toBe(0);
+  });
+
+  it('still opens the appliance section when every appliance is the customer’s own', () => {
+    // The zone prices nothing at all in this case, and the old rule skipped a zone with no lines.
+    const rows = rowsFor(kcfg([appliance({ type: 'fridge', supply: 'existing', placement: 'standalone' })]));
+    expect(rows.some((r) => r.kind === 'section' && r.label === 'Appliances')).toBe(true);
+  });
+
+  it('says nothing about a zone that is off', () => {
+    const off: ZoneDef[] = kitchen.map((z) => (z.key === 'appliances' ? { ...z, optional: true } : z));
+    const derived = deriveComposition(off, kcfg([appliance({ type: 'fridge', supply: 'existing' })], {
+      appliances: { enabled: false, globals: {}, appliances: [appliance({ type: 'fridge', supply: 'existing' })] as never },
+    }), applianceItems);
+    expect(compositionRows(derived, 0, () => 'x').some((r) => r.label === 'Appliances')).toBe(false);
   });
 });
 
