@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { CrmRecordActivity } from '@/components/business/crm/CrmRecordActivity';
 import { DealTeamCard } from '@/components/business/crm/DealTeamCard';
+import { DealDocumentsCard } from '@/modules/crm/components/DealDocumentsCard';
 import {
   dealsService, getDeal, type Deal, type DealStage, type DealType,
 } from '@/services/dealsService';
@@ -167,6 +168,15 @@ export const DealDetailPage: React.FC = () => {
               <Row icon={CalendarClock} label="Expected close" value={deal.expected_close_date ? formatDate(deal.expected_close_date) : '—'} />
             </CardContent>
           </Card>
+
+          {/* What the deal actually turned into (#378 C3) — so the pipeline's forecast and the
+              invoiced revenue stop being two unrelated numbers. */}
+          <DealDocumentsCard
+            dealId={deal.id}
+            workspaceId={activeWorkspaceId}
+            companyId={deal.company_id ?? null}
+            contactId={deal.contact_id ?? null}
+          />
 
           <DealTeamCard dealId={deal.id} workspaceId={activeWorkspaceId} />
 

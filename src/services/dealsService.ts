@@ -170,6 +170,39 @@ async function emitDealEvent(
 
 export const dealsService = {
   /** Platform defaults + this workspace's own types, in display order. */
+  /**
+   * What this deal actually turned into (#378 C3) — quotes, orders and invoices, derived in SQL by
+   * `get_deal_documents` so a fourth document type is added in one place rather than in N
+   * components, and so the client cannot assemble a different answer from three queries.
+   */
+  async documents(dealId: string): Promise<Array<{
+    kind: 'quote' | 'order' | 'invoice';
+    id: string;
+    number: string | null;
+    status: string | null;
+    total: number | null;
+    currency: string | null;
+    occurred_at: string;
+  }>> {
+    const { data, error } = await (supabase as any).rpc('get_deal_documents', { p_deal_id: dealId });
+    if (error) throw error;
+    return (data ?? []) as any[];
+  },
+
+  /**
+   * Attach or detach a document. `deal_id` lives on the DOCUMENT, not on the deal, because one
+   * deal legitimately produces several quotes (a revision, an option A/B), can be served by more
+   * than one order and is billed by more than one invoice — a single `crm_deals.quote_id` would
+   * have to pick one and be wrong about the rest.
+   *
+   * `dealId: null` detaches. The document itself is never touched otherwise.
+   */
+  async setDocumentDeal(kind: 'quote' | 'order' | 'invoice', documentId: string, dealId: string | null): Promise<void> {
+    const table = kind === 'quote' ? 'quotes' : kind === 'order' ? 'orders' : 'invoices';
+    const { error } = await (supabase as any).from(table).update({ deal_id: dealId }).eq('id', documentId);
+    if (error) throw error;
+  },
+
   async listTypes(workspaceId: string): Promise<DealType[]> {
     const { data, error } = await supabase
       .from('crm_deal_types')
