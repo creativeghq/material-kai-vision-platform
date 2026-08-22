@@ -28,6 +28,7 @@ import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { formatDate } from '@/utils/datetime';
+import { propertyName } from '@/utils/propertyLabel';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
@@ -327,7 +328,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
       {rows.map((r) => (
         <button key={r.id} onClick={() => navigate(`/properties/${r.id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2"><span className="truncate font-medium">{r.title || 'Untitled listing'}</span>{r.reference_code && <span className="shrink-0 text-xs text-muted-foreground">#{r.reference_code}</span>}</div>
+            <div className="flex items-center gap-2"><span className="truncate font-medium">{propertyName(r)}</span>{r.reference_code && <span className="shrink-0 text-xs text-muted-foreground">#{r.reference_code}</span>}</div>
             <div className="mt-0.5 truncate text-xs text-muted-foreground">{[r.property_type, r.transaction_type.replace('_', ' '), [r.town, r.region].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</div>
           </div>
           <div className="hidden shrink-0 text-sm font-medium sm:block">{money(r.price, r.currency)}</div>
@@ -435,7 +436,7 @@ const PropertySelect: React.FC<{ ws: string | null; value: string; onChange: (id
   return (
     <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">Select a property…</option>
-      {opts.map((p) => <option key={p.id} value={p.id}>{p.title || 'Untitled'}{p.reference_code ? ` · #${p.reference_code}` : ''}</option>)}
+      {opts.map((p) => <option key={p.id} value={p.id}>{propertyName(p)}{p.reference_code ? ` · #${p.reference_code}` : ''}</option>)}
     </select>
   );
 };

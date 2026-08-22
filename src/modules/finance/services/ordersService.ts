@@ -323,17 +323,15 @@ export interface LinkPropertySummary {
 }
 
 /**
- * What we call a building in a link field. The RPC already coalesced title -> address ->
- * reference code, so this is the last-resort guard.
+ * Re-exported, not defined here. Finance is not where the platform decides what a building is
+ * called — the workbench, the portfolio and the CRM pipeline all need the same answer, and none of
+ * them should import an orders service to get it. The canonical home is `@/utils/propertyLabel`
+ * (which also carries `propertyName`, for surfaces that print the reference code separately).
  *
- * It lives beside the type rather than inside the picker because two surfaces need the SAME
- * string: the dropdown that offers a property, and any field rendering the property a record is
- * ALREADY linked to. A second copy is how a field comes to read `Untitled property` immediately
- * after the operator picked one by name.
+ * Kept exported from here so the finance link surfaces that already import it do not churn — the
+ * same arrangement `src/modules/finance/utils/statusTone.ts` uses for the same reason.
  */
-export function propertyLabel(p: Pick<LinkPropertySummary, 'title' | 'address' | 'reference_code'>): string {
-  return p.title?.trim() || p.address?.trim() || p.reference_code?.trim() || 'Untitled property';
-}
+export { propertyLabel } from '@/utils/propertyLabel';
 
 /**
  * What a cost is FOR. One field in the UI, five resolutions — every one of which writes a column

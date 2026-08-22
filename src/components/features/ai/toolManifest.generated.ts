@@ -1329,6 +1329,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'currency', type: 'string', optional: true, description: 'ISO currency (default EUR)' },
       { name: 'expense_date', type: 'string', optional: true, description: 'YYYY-MM-DD (defaults to today)' },
       { name: 'paid', type: 'boolean', optional: true, description: 'true = also record the payment now (settled); false/omitted = leave as an open payable' },
+      { name: 'trip', type: 'string', optional: true, description: 'File it against an existing trip / monthly expense card, by name. Must already exist — never created.' },
+      { name: 'property', type: 'string', optional: true, description: 'The building this cost is for, by name or address. Must already exist — never created.' },
     ],
   },
   {

@@ -66,6 +66,7 @@ import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDr
 import { DealDrawer } from '@/components/business/crm/DealDrawer';
 import { dealsService, getDealForecast, getDealStageTotals, type Deal, type DealForecastRow, type DealStage, type DealStageTotalRow, type DealTask, type DealType } from '@/services/dealsService';
 import { DealTypeManager } from '@/components/business/crm/DealTypeManager';
+import { propertyLabel } from '@/utils/propertyLabel';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: '' });
 
@@ -674,8 +675,15 @@ const DealDialog: React.FC<{
       const rows = (data ?? []) as any[];
       setSubjectError(null);
       setSubjectsTruncated(rows.length > SUBJECT_LIMIT);
+      // The label follows the KIND. One coalesce chain covering both was how a property came to be
+      // called "Untitled" here and "Untitled property" in the order that bought something for it —
+      // and it never fell back to the address, which is what a person actually recognises a
+      // building by. A project genuinely has only a name.
       setSubjects(rows.slice(0, SUBJECT_LIMIT).map((r) => ({
-        id: r.id, label: r.title || r.name || r.reference_code || 'Untitled',
+        id: r.id,
+        label: subjectKind === 'property'
+          ? propertyLabel(r as { title?: string | null; reference_code?: string | null })
+          : (r.name?.trim() || 'Untitled project'),
       })));
     });
     return () => { cancelled = true; };

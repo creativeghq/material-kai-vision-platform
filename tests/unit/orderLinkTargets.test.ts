@@ -348,47 +348,142 @@ describe('order line totals are derived in SQL', () => {
 });
 
 /**
- * One name for a building, in the link surfaces.
+ * One name for a building, platform-wide.
  *
- * `propertyLabel` was hoisted out of the picker precisely because two surfaces need the SAME
- * string — the dropdown that OFFERS a property, and the field showing the one a record is ALREADY
- * linked to. It drifted immediately anyway: the order detail grew its own copy ending
- * `|| 'Property'` where the shared one ends `|| 'Untitled property'`, so an untitled building was
- * called one thing when you picked it and another when you reopened the order. Same control, same
- * building, two names, depending only on how recently you had chosen it.
+ * There were FOUR answers, and the differences were not stylistic: `'Untitled property'` in the
+ * finance link surfaces, `'Untitled listing'` on the workbench header and the portfolio row,
+ * `'Untitled'` in the portfolio's own property select, and a `title || name || reference_code`
+ * chain in the CRM pipeline subject picker that covered properties and projects with one
+ * expression. So one untitled building was called three different things depending on which
+ * screen you were standing on, and only one of the four ever fell back to the ADDRESS — the thing
+ * a person actually recognises a building by.
  *
- * Scoped to the link surfaces on purpose. The real-estate module has its own long-standing
- * variants ('Untitled listing' in the workbench and the portfolio, a `title || name ||
- * reference_code` chain in the pipeline board); unifying those is a separate change, and pretending
- * this rule already covers them would make the test a claim it does not honour.
+ * `@/utils/propertyLabel` is now the only source, in two documented shapes:
+ *   • `propertyLabel` — a self-contained string (dropdown row, link field, board card); falls
+ *     through to the reference code, because a bare code beats "Untitled property".
+ *   • `propertyName`  — for a surface that ALREADY prints the reference beside it; stops before
+ *     the code so the same string is not rendered twice in one control.
+ *
+ * DISCOVERED, not listed. A hand-kept file list is a list of the files somebody already looked at.
  */
-describe('a property has one name in the link surfaces', () => {
-  const LINK_SURFACES = [
-    'src/modules/finance/components/OrdersPanel.tsx',
-    'src/modules/finance/components/OrderLinkPicker.tsx',
-    'src/modules/finance/components/EditSupplierBillDialog.tsx',
-    'src/modules/finance/components/NewExpenseDialog.tsx',
-  ];
+describe('a property has one name', () => {
+  const NAMING_SITES = (() => {
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) { walk(full); continue; }
+        if (!/\.tsx?$/.test(e.name)) continue;
+        const rel = relative(ROOT, full).replace(/\\/g, '/');
+        if (rel === 'src/utils/propertyLabel.ts') continue;             // the source itself
+        if (rel === 'src/integrations/supabase/types.ts') continue;     // generated
+        found.push(rel);
+      }
+    };
+    walk(join(ROOT, 'src'));
+    return found;
+  })();
 
-  it('nobody re-rolls the title -> address -> reference_code fallback', () => {
+  it('finds files at all — an empty sweep would vacuously pass', () => {
+    expect(NAMING_SITES.length).toBeGreaterThan(100);
+  });
+
+  it('nobody re-rolls the fallback chain', () => {
     const offenders: string[] = [];
-    for (const rel of LINK_SURFACES) {
+    for (const rel of NAMING_SITES) {
       const src = read(join(ROOT, rel));
-      // The shape of the hand-rolled copy: a coalesce chain ending at reference_code. The shared
-      // helper is a call, so a caller of it cannot match this.
-      if (/address[^\n]*\|\|[^\n]*reference_code/.test(src)) {
-        offenders.push(`${rel}: hand-rolls the property-name fallback — call propertyLabel() instead`);
+      // The two shapes a hand-rolled copy takes. A caller of the helper is a call expression and
+      // cannot match either.
+      if (/\baddress\b[^\n]*\|\|[^\n]*\breference_code\b/.test(src)) {
+        offenders.push(`${rel}: hand-rolls title -> address -> reference_code — call propertyLabel()`);
+      }
+      // The invented fallback words. `dealLabel` legitimately reads `d.property?.title` on its way
+      // to a company/contact fallback and is NOT a property name, so only the terminal string is
+      // forbidden — that is the part that has to agree across screens.
+      if (/\|\|\s*'Untitled listing'/.test(src)) {
+        offenders.push(`${rel}: says 'Untitled listing' — the platform word is 'Untitled property'`);
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
 
   it('the surfaces that resolve a stored property use the shared helper', () => {
+    const LINK_SURFACES = [
+      'src/modules/finance/components/OrdersPanel.tsx',
+      'src/modules/finance/components/OrderLinkPicker.tsx',
+      'src/modules/finance/components/EditSupplierBillDialog.tsx',
+      'src/modules/finance/components/NewExpenseDialog.tsx',
+    ];
     for (const rel of LINK_SURFACES) {
       const src = read(join(ROOT, rel));
       if (!/kind: 'property'/.test(src)) continue;   // this surface never labels one
       expect(src, `${rel} builds a property link value without propertyLabel()`)
         .toContain('propertyLabel(');
     }
+  });
+
+  it('finance re-exports the helper rather than owning a second definition of it', () => {
+    const svc = read(ORDERS_SERVICE);
+    expect(svc, 'ordersService should re-export propertyLabel, not define it')
+      .toMatch(/export \{ propertyLabel \} from '@\/utils\/propertyLabel'/);
+    expect(svc, 'ordersService still contains its own propertyLabel body')
+      .not.toMatch(/export function propertyLabel/);
+  });
+});
+
+/**
+ * The agent can file an expense the same way the form can — and, crucially, cannot INVENT the
+ * thing it files against.
+ *
+ * `resolveCategory` and `resolvePayee` in the same file are find-or-create, and rightly so: those
+ * are labels, and a new one costs nothing. A trip card and a property are RECORDS. An agent that
+ * conjured "the Athens trip" because the expense mentioned Athens would fabricate a claim nobody
+ * filed, and every later expense would file against the fake one — while every message the
+ * operator saw said it had worked.
+ */
+describe('the agent files expenses, and never invents what it files against', () => {
+  const TOOLS = join(ROOT, 'supabase/functions/_shared/tools/expense-tools.ts');
+
+  /** The resolver body, up to the next top-level declaration. */
+  function resolverBody(src: string): string {
+    const start = src.indexOf('async function resolveFilingTarget');
+    expect(start, 'resolveFilingTarget should exist').toBeGreaterThan(-1);
+    const rest = src.slice(start);
+    const end = rest.search(/\n(?:export |\/\/ ─|async function |function )/);
+    return end > 0 ? rest.slice(0, end) : rest;
+  }
+
+  it('record_expense offers both filing links', () => {
+    const src = read(TOOLS);
+    expect(src).toMatch(/trip:\s*z\.string\(\)\.optional\(\)/);
+    expect(src).toMatch(/property:\s*z\.string\(\)\.optional\(\)/);
+  });
+
+  it('and writes them to the columns the reverse views read', () => {
+    const src = read(TOOLS);
+    expect(src).toContain('trip_report_id: tripRef?.id ?? null');
+    expect(src).toContain('property_id: propRef?.id ?? null');
+  });
+
+  it('the filing resolver never creates a row', () => {
+    const body = resolverBody(read(TOOLS));
+    expect(body, 'resolveFilingTarget must look a target up, never create one')
+      .not.toMatch(/\.insert\(/);
+    expect(body, 'an unmatched target must be reported, not invented').toMatch(/rows\.length === 0/);
+    expect(body, 'an ambiguous target must be reported, not guessed').toMatch(/rows\.length > 1/);
+  });
+
+  /**
+   * Resolution happens BEFORE the insert. The other order books a real payable and then fails to
+   * file it — leaving a bill whose entire purpose was to sit on a trip card, and an agent
+   * reporting a partial success it has no way to undo.
+   */
+  it('resolves the targets before the bill is inserted', () => {
+    const src = read(TOOLS);
+    const resolveAt = src.indexOf('resolveFilingTarget(workspaceId');
+    const insertAt = src.indexOf("from('supplier_bills').insert(");
+    expect(resolveAt, 'the resolver is never called from record_expense').toBeGreaterThan(-1);
+    expect(insertAt).toBeGreaterThan(-1);
+    expect(resolveAt, 'the bill is inserted before its filing target is resolved').toBeLessThan(insertAt);
   });
 });

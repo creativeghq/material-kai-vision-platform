@@ -73,11 +73,48 @@ async function resolvePayee(workspaceId: string, name: string): Promise<{ id: st
   return { id: ins.data.id, name: ins.data.name };
 }
 
+/**
+ * Resolve a FILING target by name — an expense card or a building.
+ *
+ * Deliberately NOT find-or-create, unlike the category and payee above. Those are labels: a new
+ * one costs nothing and inventing it is the helpful answer. A trip card and a property are
+ * RECORDS. Conjuring "the Athens trip" because the operator's expense mentioned Athens would
+ * fabricate a claim nobody filed and a building nobody owns, and every later expense would file
+ * against the fake one.
+ *
+ * Ambiguity is reported, never guessed. Two cards called "June expenses" belong to two different
+ * people, and picking the first is how one rep's hotel bill lands on another's claim.
+ */
+async function resolveFilingTarget(
+  workspaceId: string,
+  table: 'trip_expense_reports' | 'properties',
+  nameColumn: 'title',
+  value: string,
+): Promise<{ ok: true; id: string; name: string } | { ok: false; error: string }> {
+  const what = table === 'properties' ? 'property' : 'expense card';
+  const q = value.trim();
+  const sb = svc();
+  const res = await sb.from(table)
+    .select(`id, ${nameColumn}`).eq('workspace_id', workspaceId)
+    .ilike(nameColumn, `%${q}%`).limit(5);
+  if (res.error) return { ok: false, error: res.error.message };
+  const rows = (res.data ?? []) as Array<Record<string, string>>;
+  if (rows.length === 0) {
+    return { ok: false, error: `No ${what} matching "${q}". It has to exist first — I will not create one to file an expense against.` };
+  }
+  if (rows.length > 1) {
+    const names = rows.map((r) => r[nameColumn]).filter(Boolean).join(', ');
+    return { ok: false, error: `More than one ${what} matches "${q}": ${names}. Which one?` };
+  }
+  return { ok: true, id: rows[0].id, name: rows[0][nameColumn] };
+}
+
 // ───────────────────────────── record_expense ─────────────────────────────
 export const createRecordExpenseTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
-  tool(async ({ amount, category, payee, description, vat_amount, currency, expense_date, paid }: {
+  tool(async ({ amount, category, payee, description, vat_amount, currency, expense_date, paid, trip, property }: {
     amount: number; category: string; payee: string; description?: string;
     vat_amount?: number; currency?: string; expense_date?: string; paid?: boolean;
+    trip?: string; property?: string;
   }) => {
     try {
       // Validation + net/VAT/total split — pure, shared with tests/unit/expenseMath.test.ts.
@@ -88,6 +125,22 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
 
       const cat = await resolveCategory(workspaceId, category);
       const pay = await resolvePayee(workspaceId, payee);
+
+      // Filing links, resolved BEFORE the insert so an unresolvable one costs nothing. Booking the
+      // bill first and failing to file it afterwards would leave a real payable whose whole point
+      // was to sit on a trip card, and the agent reporting a partial success it cannot undo.
+      let tripRef: { id: string; name: string } | null = null;
+      let propRef: { id: string; name: string } | null = null;
+      if (trip?.trim()) {
+        const r = await resolveFilingTarget(workspaceId, 'trip_expense_reports', 'title', trip);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        tripRef = { id: r.id, name: r.name };
+      }
+      if (property?.trim()) {
+        const r = await resolveFilingTarget(workspaceId, 'properties', 'title', property);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        propRef = { id: r.id, name: r.name };
+      }
 
       const sb = svc();
       const billIns = await sb.from('supplier_bills').insert({
@@ -102,6 +155,8 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
         notes: description ?? null,
         category_id: cat.id,
         created_by: userId,
+        trip_report_id: tripRef?.id ?? null,
+        property_id: propRef?.id ?? null,
       }).select('id').single();
       if (billIns.error) throw billIns.error;
       const billId = billIns.data.id;
@@ -124,21 +179,27 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
         paymentId = rp.data as string;
       }
 
-      onChunk?.({ type: 'expense_recorded', data: { bill_id: billId, category: cat.name, payee: pay.name, total, currency: cur, paid: Boolean(paid) } });
+      // The filing is part of what happened, so it travels in the chunk the card renders as well
+      // as in the sentence. A tool that files an expense somewhere and does not say where has told
+      // the operator less than the form would have.
+      onChunk?.({ type: 'expense_recorded', data: { bill_id: billId, category: cat.name, payee: pay.name, total, currency: cur, paid: Boolean(paid), trip: tripRef?.name ?? null, property: propRef?.name ?? null } });
       return JSON.stringify({
         success: true, bill_id: billId, payment_id: paymentId,
         category: cat.name, payee: pay.name, total, vat, net, currency: cur,
+        trip: tripRef?.name ?? null, property: propRef?.name ?? null,
         status: paid ? 'paid' : 'payable',
-        message: paid
+        message: (paid
           ? `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) and marked it paid.`
-          : `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable in AP.`,
+          : `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable in AP.`)
+          + (tripRef ? ` Filed against ${tripRef.name}.` : '')
+          + (propRef ? ` For ${propRef.name}.` : ''),
       });
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not record expense' });
     }
   }, {
     name: 'record_expense',
-    description: 'Record a business operating expense (rent, utilities, fees…) as a categorized supplier bill. Creates the category and payee by name if they do not exist. Leave it as an open payable (default) or mark it paid. Use when the user says e.g. "record 500 euro rent to Acme for June" or "log the electricity bill, paid".',
+    description: 'Record a business operating expense (rent, utilities, fees…) as a categorized supplier bill. Creates the category and payee by name if they do not exist. Leave it as an open payable (default) or mark it paid. Optionally file it against an existing trip/monthly expense card or a building — those are looked up, never created. Use when the user says e.g. "record 500 euro rent to Acme for June", "log the electricity bill, paid", or "put the Athens hotel on my June expense card".',
     schema: z.object({
       amount: z.number().describe('Total amount including VAT'),
       category: z.string().describe('Expense category, e.g. Rent, Utilities, Insurance (created if new)'),
@@ -148,6 +209,8 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
       currency: z.string().optional().describe('ISO currency (default EUR)'),
       expense_date: z.string().optional().describe('YYYY-MM-DD (defaults to today)'),
       paid: z.boolean().optional().describe('true = also record the payment now (settled); false/omitted = leave as an open payable'),
+      trip: z.string().optional().describe('File it against an existing trip / monthly expense card, by name. Must already exist — never created.'),
+      property: z.string().optional().describe('The building this cost is for, by name or address. Must already exist — never created.'),
     }),
   });
 

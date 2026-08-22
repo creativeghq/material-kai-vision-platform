@@ -41,6 +41,7 @@ import { PropertyCommercialCard } from '../components/PropertyCommercialCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
+import { propertyName } from '@/utils/propertyLabel';
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
@@ -321,7 +322,7 @@ export default function PropertyWorkbench() {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Building2} title={property.title || 'Untitled listing'} subtitle={property.reference_code ? `#${property.reference_code}` : 'Listing workbench'}
+      <PageHeader icon={Building2} title={propertyName({ title: property.title, address: property.address })} subtitle={property.reference_code ? `#${property.reference_code}` : 'Listing workbench'}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}><ArrowLeft className="mr-1 h-4 w-4" /> Portfolio</Button>
