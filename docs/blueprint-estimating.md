@@ -77,6 +77,25 @@ The frontend must show the same number the engine will persist, but Vite can't i
 
 ---
 
+## The platform starters
+
+Four, one per job: **New Kitchen** (`kitchen_cabinets`), **Bathroom Renovation**, **Full Repaint**,
+**Full Home Renovation**. Only the kitchen is zone-driven; the other three are flat scopes.
+
+There used to be a fifth — `kitchen_refit` — which priced the WORKS of a kitchen job (strip-out,
+first-fix electrics and plumbing, tiling, painting, debris) while `kitchen_cabinets` priced the
+GOODS. Nothing referenced it, and three lines were priced differently in each, so an operator had
+to know which of two blueprints to open and got a different number depending on the answer. It was
+merged into New Kitchen as the **Preparatory work & connections** section and deleted. Two of its
+lines got better in the move: the electrical and plumbing point counts were typed dimensions and
+are now derived from the appliances that need them —
+`= total_socket + total_socket_dedicated` and `= total_water_in`.
+
+Its flat *"Appliances allowance — €1,200"* was deliberately **not** carried over: the appliances
+zone derives that now, and a flat allowance sitting beside it is the same money arriving twice.
+
+---
+
 ## Composition — zones, appliances and the survey
 
 A blueprint whose `composition_schema` is non-empty is driven by **zones** rather than by typed

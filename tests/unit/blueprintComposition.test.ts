@@ -38,6 +38,7 @@ import {
   rateChoices,
   rateItemsFromTables,
   snapshotRateTables,
+  declaredYieldKeys,
   SERVICE_YIELD_KEYS,
   yieldMeta,
   zoneEnabled,
@@ -751,8 +752,11 @@ describe('an appliance choice costs money only when it is ours, and counts alway
   it('swaps the consequence with the choice', () => {
     const recirc = hood('ours', 'recirc');
     expect(recirc.vars.total_carbon_filter).toBe(1);
-    expect(recirc.vars.total_duct_run).toBeUndefined();
+    // An explicit 0, not a missing variable: a `= total_duct_run` line has to read "no duct" here
+    // rather than fail closed and fall back to its stored default.
+    expect(recirc.vars.total_duct_run).toBe(0);
     expect(recirc.appliances[0].total).toBe(250);
+    expect(recirc.schedule.some((r) => r.key === 'duct_run')).toBe(false);
   });
 });
 
@@ -862,6 +866,31 @@ describe('the services schedule', () => {
     expect(byKey.socket).toMatchObject({ quantity: 1, label: 'Power sockets', unit: 'pcs' });
     expect(byKey.water_in.quantity).toBe(1);
     expect(byKey.waste_out.quantity).toBe(1);
+  });
+
+  it('publishes a zero for a key the schema can produce but this kitchen does not', () => {
+    // The trap: `addYields` skips zeros, so `total_gas_point` would be UNDEFINED on an all-electric
+    // kitchen — and a `= total_gas_point` line does not evaluate to 0 when its variable is missing,
+    // it fails closed and falls back to whatever default quantity is stored on it. A wrong number
+    // wearing the face of a right one, on a line nobody is looking at.
+    const d = deriveComposition(kitchen, kcfg([appliance({ type: 'fridge', supply: 'existing', placement: 'standalone' })]), applianceItems);
+    expect(d.vars.total_gas_point).toBe(0);
+    expect(d.vars.total_carbon_filter).toBe(0);
+    expect(d.vars.total_socket).toBe(1);
+    // …and a zero stays OUT of the rendered schedule, which reports what to order.
+    expect(d.schedule.some((r) => r.key === 'gas_point')).toBe(false);
+  });
+
+  it('knows every key the schema declares', () => {
+    const keys = declaredYieldKeys(kitchen);
+    expect(keys).toContain('socket');
+    expect(keys).toContain('gas_point');
+    expect(keys).toContain('duct_run');
+    expect(keys).toContain('carbon_filter');
+    // …including one no module or appliance ever writes down: hinges follow from the DOOR count,
+    // so a schema with doors in it can produce them even though nothing declares them.
+    expect(declaredYieldKeys(schema)).toContain('hinges');
+    expect(keys).not.toContain('hinges');   // this fixture's modules carry no doors
   });
 
   it('gives every service key a real name, so the two lists cannot drift apart', () => {

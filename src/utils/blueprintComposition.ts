@@ -602,6 +602,46 @@ function addYields(into: Record<string, number>, src: Yields | undefined, times:
   }
 }
 
+/**
+ * Every schedule key this SCHEMA can produce, whether or not the current configuration does.
+ *
+ * A formula reading `total_socket` on a kitchen that happens to have no sockets is the trap this
+ * closes. `addYields` skips zeros, so the key never reaches the totals, so the variable is
+ * undefined, so `evaluateFormula` fails closed and the line silently falls back to its stored
+ * default quantity — a wrong number wearing the face of a right one. It is the same reason a
+ * switched-off zone publishes an explicit 0 rather than nothing.
+ *
+ * `hinges` is included wherever doors are, because the zone synthesises it rather than declaring it.
+ */
+export function declaredYieldKeys(schema: ZoneDef[]): string[] {
+  const keys = new Set<string>();
+  const add = (y: Yields | undefined) => {
+    for (const [key, value] of Object.entries(y ?? {})) if (value != null) keys.add(key);
+  };
+  const addOptions = (options: ModuleOptionDef[] | undefined) => {
+    for (const opt of asArray<ModuleOptionDef>(options)) {
+      for (const choice of asArray<ModuleOptionChoice>(opt.choices)) add(choice.yields);
+    }
+  };
+  for (const zone of asArray<ZoneDef>(schema)) {
+    add(zone.run_yields);
+    for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
+      for (const c of asArray<GlobalChoiceDef>(g.choices)) add(c.yields);
+    }
+    for (const m of asArray<ModuleTypeDef>(zone.modules)) {
+      add(m.yields);
+      addOptions(m.options);
+      if (num(m.yields?.doors) > 0) keys.add('hinges');
+    }
+    for (const a of asArray<ApplianceTypeDef>(zone.appliances)) {
+      add(a.requires);
+      addOptions(a.options);
+      for (const p of asArray<AppliancePlacementDef>(a.placements)) add(p.yields);
+    }
+  }
+  return Array.from(keys);
+}
+
 /** A zone is on unless it is optional and switched off. */
 export function zoneEnabled(zone: ZoneDef, cfg: ZoneConfig | undefined): boolean {
   if (!zone.optional) return true;
@@ -1064,6 +1104,10 @@ export function deriveComposition(
   // Totals are published BOTH as formula variables (`total_hinges`, so a schedule line can be an
   // ordinary blueprint task with a formula) and as a rendered schedule.
   const schedule: ScheduleRow[] = [];
+  // Publish a zero for every key the schema COULD produce before the live ones overwrite them, so
+  // a `= total_socket` line resolves to 0 on a kitchen with no sockets instead of failing closed
+  // and falling back to whatever default quantity happens to be stored on it.
+  for (const key of declaredYieldKeys(zones)) vars[`total_${key}`] = 0;
   for (const [key, quantity] of Object.entries(scheduleTotals)) {
     vars[`total_${key}`] = round2(quantity);
     if (quantity === 0) continue;
