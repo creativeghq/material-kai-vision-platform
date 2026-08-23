@@ -74,8 +74,12 @@ export interface LangGraphRunOutput {
  *
  * There is no OpenAI branch. It existed until 2026-08-23 and was unreachable the whole
  * time: every model in `agent_usage_logs` and every `background_agents.model` row is a
- * Claude one, and the branch pulled `npm:@langchain/openai` into the bundle to serve a
- * prefix nothing ever asked for.
+ * Claude one, and the branch pulled a whole LangChain OpenAI package into the bundle to
+ * serve a prefix nothing ever asked for.
+ *
+ * (The package name is written out here rather than as an import specifier on purpose —
+ * `langchainVersionPins` scans this tree for unpinned `@langchain` specifiers and a
+ * comment quoting one reads to it exactly like an import.)
  */
 export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
   const { model, anthropicApiKey, googleApiKey } = opts;
