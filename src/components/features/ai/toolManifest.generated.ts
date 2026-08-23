@@ -263,8 +263,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'product_id', type: 'string', optional: true, description: 'Product UUID, for a product enrolment.' },
       { name: 'subject', type: 'string', optional: true, description: 'A tracked brand or keyword — its name, or its tracked-subject UUID. Use this for anything that is not a catalog product.' },
-      { name: 'models', type: 'array', optional: true, description: 'Subset of: claude-haiku-4-5, gpt-4o-mini, gemini-2.0-flash, sonar' },
-      { name: 'force_run', type: 'boolean', optional: true, description: 'If true, fires a new probe run instead of reading the latest snapshot.' },
+      { name: 'models', type: 'array', optional: true, description: 'Subset of the subject' },
     ],
   },
   {

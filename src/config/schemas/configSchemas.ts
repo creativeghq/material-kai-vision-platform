@@ -153,7 +153,6 @@ export const EnvVarsSchema = z.object({
   DEBUG: z.string().default('false'),
 
   // API Configuration
-  OPENAI_API_KEY: z.string().optional(),
   HUGGINGFACE_API_KEY: z.string().optional(),
 
   // Database Configuration

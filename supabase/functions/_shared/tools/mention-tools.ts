@@ -471,7 +471,7 @@ export const createCheckLlmVisibilityTool = (
       schema: z.object({
         product_id: z.string().optional().describe('Product UUID, for a product enrolment.'),
         subject: z.string().optional().describe('A tracked brand or keyword — its name, or its tracked-subject UUID. Use this for anything that is not a catalog product.'),
-        models: z.array(z.string()).optional().describe('Subset of: claude-haiku-4-5, gpt-4o-mini, gemini-2.0-flash, sonar'),
+        models: z.array(z.string()).optional().describe('Subset of the subject's tier. Cheap: claude-haiku-4-5, gemini-2.0-flash, sonar. Frontier: claude-opus-5, gemini-3.1-pro, sonar-pro.'),
         force_run: z.boolean().default(false).describe('If true, fires a new probe run instead of reading the latest snapshot.'),
       }),
     },
