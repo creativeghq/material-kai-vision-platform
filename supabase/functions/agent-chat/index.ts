@@ -827,7 +827,14 @@ function getModelNameForAgent(agentId: string, modelOverride?: string | null): s
 const ORCHESTRATOR_IDS = new Set(['orchestrator', 'jarvis', 'auto']);
 const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
-  { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research' },
+  // The knowledge-base clause is not padding — it is the largest corpus in the platform and it
+  // had no owner in this menu. Measured 2026-08-23: 674 of the 677 published kb_docs sit in the
+  // "Product Management" category (discovery, roadmaps, JTBD, opportunity solution trees), and
+  // every blurb here described product-as-GOODS — catalogs, manufacturers, SKUs. So "what is
+  // product discovery?" matched no specialist, fell to the generalist, and the generalist
+  // answered from its own knowledge without searching. Asked directly, Pepper searched the KB
+  // and quoted the workspace's own Product Bible on the first turn. The routing was the defect.
+  { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research; ALSO any question answerable from the workspace knowledge base — product-management practice, product discovery, roadmaps, frameworks, internal playbooks and "what do our docs say about X"' },
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
   { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
   { slug: 'social-media', name: 'Hermes', blurb: 'publishing or scheduling social-media posts, social analytics, best time to post' },
