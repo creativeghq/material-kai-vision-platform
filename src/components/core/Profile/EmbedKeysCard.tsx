@@ -8,6 +8,7 @@
  * wildcard is spelled out as a warning rather than offered as a checkbox with a neutral label.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Code2, Copy, Loader2, Plus, Trash2, Globe, AlertTriangle, Sparkles, KeyRound } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +29,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import {
   embedKeysService, normalizeOriginList, isWildcardOriginList,
-  listScopeCategories, searchScopeProducts,
+  listScopeCategories, searchScopeProducts, listScopeBlueprints,
   MAX_RATE_LIMIT_PER_MINUTE, DEFAULT_GENERATION_DAILY_CAP, MAX_GENERATION_DAILY_CAP,
   type EmbedKey, type EmbedScopeType, type EmbedScopeOption,
   type EmbedAnalyticsSummary,
@@ -60,6 +61,7 @@ function scopeLabel(key: EmbedKey): string {
   const n = key.scope_values?.length ?? 0;
   if (key.scope_type === 'categories') return `${n} ${n === 1 ? 'category' : 'categories'}`;
   if (key.scope_type === 'products') return `${n} ${n === 1 ? 'product' : 'products'}`;
+  if (key.scope_type === 'blueprints') return `${n} ${n === 1 ? 'configurator' : 'configurators'}`;
   return 'Everything published';
 }
 
@@ -113,6 +115,9 @@ export const EmbedKeysCard: React.FC = () => {
   // Scope pickers. Categories are a short fixed list (a global taxonomy, ~a dozen entries), so they
   // load once as checkboxes; products are unbounded per workspace, so they type-ahead.
   const [categories, setCategories] = useState<EmbedScopeOption[]>([]);
+  // Blueprints are workspace-owned and few (a workspace has a handful, not a catalogue), so they
+  // load once as checkboxes like categories rather than type-ahead like products.
+  const [blueprints, setBlueprints] = useState<EmbedScopeOption[]>([]);
   const [productTerm, setProductTerm] = useState('');
   const [productHits, setProductHits] = useState<EmbedScopeOption[]>([]);
   // Labels for already-chosen products, so a selection stays readable after the search box clears.
@@ -122,6 +127,11 @@ export const EmbedKeysCard: React.FC = () => {
     if (!creating || form.scopeType !== 'categories' || categories.length) return;
     listScopeCategories().then(setCategories).catch(() => setCategories([]));
   }, [creating, form.scopeType, categories.length]);
+
+  useEffect(() => {
+    if (!creating || form.scopeType !== 'blueprints' || !activeWorkspaceId || blueprints.length) return;
+    listScopeBlueprints(activeWorkspaceId).then(setBlueprints).catch(() => setBlueprints([]));
+  }, [creating, form.scopeType, activeWorkspaceId, blueprints.length]);
 
   useEffect(() => {
     if (!creating || form.scopeType !== 'products' || !activeWorkspaceId) return;
@@ -197,7 +207,9 @@ export const EmbedKeysCard: React.FC = () => {
     // constraint error.
     if (form.scopeType !== 'all' && form.scopeValues.length === 0) {
       toast({
-        title: form.scopeType === 'categories' ? 'Pick at least one category' : 'Pick at least one product',
+        title: form.scopeType === 'categories'
+          ? 'Pick at least one category'
+          : form.scopeType === 'blueprints' ? 'Pick at least one configurator' : 'Pick at least one product',
         description: 'A limited key with nothing selected would return an empty catalog.',
         variant: 'destructive',
       });
@@ -539,9 +551,10 @@ export const EmbedKeysCard: React.FC = () => {
                 onValueChange={(v) => setForm((f) => ({ ...f, scopeType: v as EmbedScopeType, scopeValues: [] }))}
               >
                 {([
-                  ['all', 'Everything published', 'All products you have published to your online store.'],
+                  ['all', 'Everything published', 'Every product published to your online store, and every configurator you have published.'],
                   ['categories', 'Only certain categories', 'Good for a partner who should see one range.'],
                   ['products', 'Only specific products', 'The tightest option — an exact list.'],
+                  ['blueprints', 'Only configurators', 'A key for your kitchen or project configurator. Serves no products at all.'],
                 ] as [EmbedScopeType, string, string][]).map(([value, label, hint]) => (
                   <label
                     key={value}
@@ -602,6 +615,33 @@ export const EmbedKeysCard: React.FC = () => {
                       Selected: {form.scopeValues.map((id) => chosenProducts[id] ?? id).join(', ')}
                     </p>
                   )}
+                </div>
+              )}
+
+              {form.scopeType === 'blueprints' && (
+                <div className="space-y-2 rounded-md border border-border/60 p-3">
+                  {blueprints.length === 0 ? (
+                    // Not a loading state and not an error — most workspaces genuinely have none
+                    // yet. The way out is on another screen, so it is a LINK rather than a
+                    // sentence describing where to go: telling someone with nothing to select to
+                    // navigate somewhere by name is the actionless empty state this platform
+                    // ratchets down, and it is worst exactly here, on day one of a workspace.
+                    <p className="text-xs text-muted-foreground">
+                      No configurators yet.{' '}
+                      <Link to="/blueprints" className="text-primary underline underline-offset-2">
+                        Build one
+                      </Link>
+                      , then publish it for the web.
+                    </p>
+                  ) : blueprints.map((b) => (
+                    <label key={b.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={form.scopeValues.includes(b.id)}
+                        onCheckedChange={() => toggleScopeValue(b)}
+                      />
+                      <span className="truncate">{b.label}</span>
+                    </label>
+                  ))}
                 </div>
               )}
             </div>

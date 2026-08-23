@@ -47,6 +47,7 @@ import type { Composition, ZoneDef } from '../../supabase/functions/_shared/blue
 import { computeBlueprint } from '../../supabase/functions/_shared/blueprint/compute';
 import { compositionRows } from '../../supabase/functions/_shared/blueprint/plan-rows';
 import { expectedMirror, SOURCE, TARGET } from '../../scripts/gen-blueprint-mirror.mjs';
+import { ANON_BLUEPRINT_ITEM_COLUMNS } from '../../supabase/functions/_shared/blueprint/anon-pricing.ts';
 
 // A miniature kitchen carrying every shape that matters: a per-metre rate table two zones share,
 // a per-piece module, a module option, an optional zone, and a surface that follows another zone.
@@ -470,20 +471,17 @@ describe('the anonymous starters payload carries every column the client reads',
   // existing. The required set is DERIVED from the client rather than restated here, so this
   // cannot pass by being updated in lockstep with the bug.
   const CLIENT = readFileSync('src/utils/blueprintCompute.ts', 'utf8');
-  const FN = readFileSync('supabase/functions/public-project-plan/index.ts', 'utf8');
 
   const columnsClientReads = Array.from(new Set(
     Array.from(CLIENT.matchAll(/\bbi\.([a-z_]+)/g)).map((m) => m[1]),
   )).sort();
 
-  const startersSelect = (() => {
-    const idx = FN.indexOf(".from('blueprint_items')");
-    expect(idx).toBeGreaterThan(-1);
-    const after = FN.slice(idx, idx + 1200);
-    const m = after.match(/\.select\('([^']+)'\)/);
-    expect(m).toBeTruthy();
-    return m![1].split(',').map((c) => c.trim());
-  })();
+  // The list is no longer scraped out of the endpoint. Since #382 there are TWO anonymous
+  // surfaces serving blueprint items — `public-project-plan` (our starters page) and
+  // `products-3d-api → blueprint` (a tenant's own configurator on their own site) — and they
+  // share one constant precisely so a column cannot reach one and miss the other. Guarding the
+  // constant guards both; guarding one endpoint's source would have left the newer one uncovered.
+  const startersSelect = ANON_BLUEPRINT_ITEM_COLUMNS.split(',').map((c) => c.trim());
 
   it('reads at least one column, or the derivation below is vacuous', () => {
     expect(columnsClientReads.length).toBeGreaterThan(10);

@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
@@ -28,6 +29,7 @@ export const BlueprintEditorPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [bp, setBp] = useState<Blueprint | null>(null);
   const [title, setTitle] = useState('');
+  const [embedPublished, setEmbedPublished] = useState(false);
   const [description, setDescription] = useState('');
   const [schema, setSchema] = useState<DimensionDef[]>([]);
   const [zones, setZones] = useState<ZoneDef[]>([]);
@@ -47,6 +49,7 @@ export const BlueprintEditorPage: React.FC = () => {
       const [b, its] = await Promise.all([blueprintsService.get(id), blueprintsService.listItems(id)]);
       if (!b) { toast({ title: 'Blueprint not found', variant: 'destructive' }); navigate('/blueprints'); return; }
       setBp(b); setTitle(b.title); setDescription(b.description ?? ''); setSchema(b.dimensions_schema ?? []);
+      setEmbedPublished(!!b.is_embed_published);
       setZones(b.composition_schema ?? []);
       setItems(its as EditItem[]);
     } catch (e) {
@@ -70,7 +73,7 @@ export const BlueprintEditorPage: React.FC = () => {
     if (!bp) return;
     setSaving(true);
     try {
-      await blueprintsService.update(bp.id, { title: title.trim() || bp.title, description: description.trim() || null, dimensions_schema: schema, composition_schema: zones });
+      await blueprintsService.update(bp.id, { title: title.trim() || bp.title, description: description.trim() || null, dimensions_schema: schema, composition_schema: zones, is_embed_published: embedPublished });
       await blueprintsService.replaceItems(bp.id, items.map((it, idx) => ({ ...it, sort_order: it.sort_order ?? idx })));
       toast({ title: 'Blueprint saved' });
       navigate('/blueprints');
@@ -127,6 +130,25 @@ export const BlueprintEditorPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Description</Label><Input value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+        </div>
+        {/*
+          Publishing to the web (#382 Phase 1). Two switches have to be on before a stranger sees
+          anything — this one, and an embed key whose scope covers this blueprint — so the copy
+          says that rather than implying the toggle alone puts it live.
+        */}
+        <div className="flex items-start justify-between gap-4 border-t border-hairline pt-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="bp-embed-published" className="text-sm">Publish to the web</Label>
+            <p className="text-xs text-muted-foreground">
+              Lets visitors configure and price this on your own website. You also need an embed key
+              that covers it — Profile → Keys → Website Embed.
+            </p>
+          </div>
+          <Switch
+            id="bp-embed-published"
+            checked={embedPublished}
+            onCheckedChange={setEmbedPublished}
+          />
         </div>
       </CardContent></Card>
 

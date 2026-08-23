@@ -43,6 +43,17 @@ export interface Blueprint {
    */
   composition_schema: ZoneDef[];
   is_platform_starter: boolean;
+  /**
+   * Serve this blueprint through the embed SDK, to anonymous visitors on the tenant's own site
+   * (#382 Phase 1).
+   *
+   * Deliberately not `status` (lifecycle) and not `is_platform_starter` (ours, not theirs) —
+   * publication is a third, orthogonal fact. Publishing alone exposes nothing: an admin must also
+   * create an embed key whose scope covers it, exactly as a storefront-published product does.
+   * A platform starter can never be published this way; the DB refuses it, because a starter
+   * carries our default rates and would quote a visitor prices the tenant never set.
+   */
+  is_embed_published: boolean;
   version: number;
   status: 'active' | 'archived';
   created_at: string;
@@ -157,7 +168,7 @@ class BlueprintsService {
     return data as Blueprint;
   }
 
-  async update(id: string, patch: Partial<Pick<Blueprint, 'title' | 'description' | 'project_type' | 'source_currency' | 'dimensions_schema' | 'composition_schema' | 'status'>>): Promise<Blueprint> {
+  async update(id: string, patch: Partial<Pick<Blueprint, 'title' | 'description' | 'project_type' | 'source_currency' | 'dimensions_schema' | 'composition_schema' | 'status' | 'is_embed_published'>>): Promise<Blueprint> {
     const { data, error } = await supabase.from('blueprints').update(patch).eq('id', id).select('*').single();
     if (error) throw error;
     return data as Blueprint;

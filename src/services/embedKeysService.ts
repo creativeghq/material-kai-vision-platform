@@ -28,7 +28,7 @@ export type EmbedKey = Tables<'material_kai_keys'>;
  * Mirrors the `material_kai_keys_scope_type_check` CHECK — a value this union allows but the
  * constraint rejects fails at insert time, so the two must stay in step.
  */
-export type EmbedScopeType = 'all' | 'categories' | 'products';
+export type EmbedScopeType = 'all' | 'categories' | 'products' | 'blueprints';
 
 export interface EmbedKeyInput {
   key_name: string;
@@ -37,7 +37,7 @@ export interface EmbedKeyInput {
   allowed_origins: string[];
   rate_limit_per_minute: number;
   scope_type: EmbedScopeType;
-  /** Category ids or product ids per `scope_type`. Must be empty iff scope_type is 'all'. */
+  /** Category, product or blueprint ids per `scope_type`. Must be empty iff scope_type is 'all'. */
   scope_values: string[];
   /**
    * May this key spend credits on an AI impression when the catalog cannot satisfy a spec?
@@ -89,6 +89,35 @@ export async function searchScopeProducts(workspaceId: string, term: string): Pr
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((p) => ({ id: p.id, label: p.name ?? '(unnamed)' }));
+}
+
+/**
+ * The workspace's own configurators, for a blueprint-scoped key (#382 Phase 1).
+ *
+ * Only rows this workspace OWNS. Platform starters are deliberately absent: they carry
+ * `workspace_id IS NULL` and our default rates, so serving one through a tenant's key would quote
+ * a visitor prices that tenant never set. The DB refuses it too
+ * (`blueprints_embed_publish_requires_workspace`) — this is the same rule read from the UI side so
+ * the picker cannot offer what the constraint would reject.
+ *
+ * Unpublished blueprints ARE offered. Scoping a key to one is how a merchant sets up before
+ * flipping it live, and the endpoint checks publication independently on every request.
+ */
+export async function listScopeBlueprints(workspaceId: string): Promise<EmbedScopeOption[]> {
+  const { data, error } = await supabase
+    .from('blueprints')
+    .select('id, title, is_embed_published')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .order('title', { ascending: true })
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    // The published state is part of the label, because a key scoped to an unpublished blueprint
+    // serves nothing and looks identical to one that works.
+    label: b.is_embed_published ? b.title : `${b.title} (not published)`,
+  }));
 }
 
 /** Sensible ceiling for a per-key quota — high enough for a busy shop, low enough to be a cap. */
