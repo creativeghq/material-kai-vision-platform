@@ -99,6 +99,8 @@ export async function logAgentAiUsage(
       credits_debited:  0,
       metadata: {
         ...(args.metadata ?? {}),
+        // // Reaching this line means the provider returned — these rows are written after a completed call. Declared rather than implied: `ops.silent_zero_provider` skips any row without `success`, so silence here reads as 'no evidence', not as 'fine'.
+        success:      true,
         feature:      'background_agent',
         agent_id:     args.agentId,
         agent_type:   args.agentType,

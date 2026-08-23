@@ -135,6 +135,19 @@ async function _logTrackedCall(opts: {
       markup_multiplier: markup,
       input_cost_usd: price ? (opts.inputTokens / 1_000_000) * price.input * markup : null,
       output_cost_usd: price ? (opts.outputTokens / 1_000_000) * price.output * markup : null,
+      // DECLARE THE OUTCOME. `ops.silent_zero_provider` judges a provider only on rows
+      // carrying `success`, and skips any row without it — correctly, since a row that
+      // never claimed to succeed is not evidence that it failed. This chokepoint set it
+      // nowhere, so every model call it logged was invisible to the one probe that exists
+      // to notice a provider refusing all of them.
+      //
+      // Derived from `errorMessage`, which the row above already uses to choose its
+      // action, rather than accepted as a separate argument that could contradict it.
+      metadata: {
+        success: !opts.errorMessage,
+        error: opts.errorMessage ?? null,
+        latency_ms: opts.latencyMs,
+      },
     });
   } catch (e) {
     console.warn('[ai-client] _logTrackedCall failed (non-fatal):', e);
@@ -197,6 +210,11 @@ async function _logUnitCall(opts: {
         billing_type: 'per_unit',
         units: billableUnits,
         unit_label: price?.unitLabel ?? null,
+        // Same key, same reason as the token path above. `error_message` was already
+        // here conditionally; `success` is what the probe reads and must be present
+        // either way — a key that only appears on failure is a key that never appears
+        // when the provider is healthy, which is indistinguishable from silence.
+        success: !opts.errorMessage,
         ...(opts.errorMessage ? { error_message: opts.errorMessage } : {}),
       },
     });

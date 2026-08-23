@@ -299,6 +299,9 @@ async function enrichViaWebSearch(
       credits_debited: p?.credits ?? 0,
       module_slug: 'crm',
       metadata: {
+        // Post-call row. `success` is the key ops.silent_zero_provider reads;
+        // without it this provider's calls are invisible to that probe.
+        success: true,
         feature: 'company_enrich', sub_feature: 'web_search', provider: 'anthropic', name,
         // Explicit marker, not an absence: a NULL cost must be readable as "we could not
         // price this", never as "it was free".

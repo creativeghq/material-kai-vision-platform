@@ -120,7 +120,8 @@ export async function draftListingCopy(
       operation_type: 'real_estate_listing_copy', model_name: model,
       input_tokens: inTok, output_tokens: outTok,
       raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER, billed_cost_usd: billedUsd,
-      credits_debited: credits, metadata: { property_id: property.id },
+      credits_debited: credits,
+      metadata: { success: true, property_id: property.id },
     });
   } catch (e) { console.warn('[re-ai] usage log failed (non-fatal):', e); }
   const delta = DRAFT_CEILING - credits;
@@ -209,7 +210,8 @@ export async function analyzePropertyPhotos(
       user_id: userId, workspace_id: workspaceId, module_slug: 'real-estate',
       operation_type: 'real_estate_photo_analysis', model_name: model,
       input_tokens: inTok, output_tokens: outTok, raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER,
-      billed_cost_usd: billedUsd, credits_debited: credits, metadata: { photo_count: picked.length },
+      billed_cost_usd: billedUsd, credits_debited: credits,
+      metadata: { success: true, photo_count: picked.length },
     });
   } catch (e) { console.warn('[re-ai] photo usage log failed (non-fatal):', e); }
   const delta = PHOTO_CEILING - credits;

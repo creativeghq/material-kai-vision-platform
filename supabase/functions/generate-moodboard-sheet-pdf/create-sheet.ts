@@ -196,7 +196,8 @@ export async function createSheet(
       input_tokens: 0, output_tokens: 0, input_cost_usd: 0, output_cost_usd: 0,
       raw_cost_usd: creditCost / 100, markup_multiplier: 1, billed_cost_usd: creditCost / 100,
       credits_debited: creditCost,
-      metadata: { feature: 'presentation_sheet', sheet_type, moodboard_id, title },
+      // Post-call row; `success` is the key ops.silent_zero_provider reads.
+      metadata: { success: true, feature: 'presentation_sheet', sheet_type, moodboard_id, title },
       created_at: new Date().toISOString(),
     });
   }
@@ -389,7 +390,7 @@ async function autoDetectCallouts(
       markup_multiplier: price?.markup ?? null,
       billed_cost_usd: rawCost === null ? null : rawCost * (price!.markup),
       credits_debited: 0,
-      metadata: { feature: 'presentation_sheet', event: 'auto_detect_callouts', moodboard_id: moodboardId },
+      metadata: { success: true, feature: 'presentation_sheet', event: 'auto_detect_callouts', moodboard_id: moodboardId },
       created_at: new Date().toISOString(),
     }).then?.(({ error }: any) => { if (error) console.warn('[autoDetectCallouts] cost log failed:', error); });
   } catch (e) {

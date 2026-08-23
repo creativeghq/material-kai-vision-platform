@@ -144,7 +144,9 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId, workspace_id: workspaceId, module_slug: 'crm', operation_type: 'crm_lead_score', model_name: model,
       input_tokens: inTok, output_tokens: outTok, raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER,
-      billed_cost_usd: billedUsd, credits_debited: credits, metadata: { crm_contact_id: contactId },
+      billed_cost_usd: billedUsd, credits_debited: credits,
+      // `success` is what ops.silent_zero_provider reads; this row is post-call.
+      metadata: { success: true, crm_contact_id: contactId },
     });
   } catch (e) { console.warn('[crm-lead-score] usage log failed:', e); }
   if (CEILING - credits > 0) await refund(supabase, userId, workspaceId, CEILING - credits, { settle: true });

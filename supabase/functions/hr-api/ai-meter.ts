@@ -111,7 +111,9 @@ export async function meterHrAi(supabase: any, opts: {
       input_tokens: inTok, output_tokens: outTok,
       input_cost_usd: rawInput * MARKUP_MULTIPLIER, output_cost_usd: rawOutput * MARKUP_MULTIPLIER,
       raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER, billed_cost_usd: billedUsd,
-      credits_debited: credits, metadata: opts.metadata ?? {},
+      credits_debited: credits,
+      // Written after a completed Claude call — see ai-client.ts for why the key matters.
+      metadata: { success: true, ...(opts.metadata ?? {}) },
     });
   } catch (e) { console.warn('[hr-ai-meter] ai_usage_logs insert failed (non-fatal):', e); }
 
