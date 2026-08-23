@@ -3,7 +3,7 @@
 // GET — proxies to oauth handler (used by the account-listing flow).
 // Analytics:  get_best_time, get_post_analytics, get_account_insights, import_external_posts,
 //             get_daily_metrics, get_content_decay, get_posting_frequency, get_follower_stats,
-//             get_post_timeline
+//             get_post_timeline, get_linkedin_aggregate
 // OAuth:      connect, callback, list_accounts (via GET), disconnect, config_status
 // Publish:    schedule, publish_now
 // zernio-webhook-handler stays separate (Zernio's outbound webhook URL).
@@ -19,6 +19,9 @@ const ANALYTICS_ACTIONS = new Set([
   // Derived reads Zernio already computes — pass-through, never stored (see analytics.ts).
   'get_daily_metrics', 'get_content_decay', 'get_posting_frequency', 'get_follower_stats',
   'get_post_timeline',
+  // Per-ACCOUNT, and the only analytics a LinkedIn personal profile has — every other read here
+  // is per-post and needs a post list LinkedIn does not publish for a member.
+  'get_linkedin_aggregate',
 ]);
 const OAUTH_ACTIONS = new Set(['connect', 'callback', 'disconnect', 'config_status']);
 const PUBLISH_ACTIONS = new Set(['schedule', 'publish_now']);

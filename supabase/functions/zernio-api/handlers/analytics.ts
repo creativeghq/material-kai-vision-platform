@@ -112,6 +112,81 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     }
   }
 
+  // ── LINKEDIN PERSONAL AGGREGATE ────────────────────────────────────────────
+  //
+  // The ONLY analytics endpoint that answers for a personal LinkedIn profile, and a different
+  // one from every other read here: `/analytics/*` and `/v1/analytics` are per-POST and need a
+  // post list, which LinkedIn does not publish for a member. This one is per-ACCOUNT — LinkedIn
+  // aggregates it server-side and hands back totals, so it needs no post list at all.
+  //
+  // It is also the only place the SCOPE question gets an answer. `r_member_postAnalytics` is
+  // granted at connect time; without it LinkedIn returns nothing and every downstream number is
+  // a legitimate-looking zero. Zernio reports that as a 403 `missing_scope` with
+  // `action: 'reconnect'`, which is surfaced verbatim rather than folded into a generic failure:
+  // "reconnect the account" and "you have no engagement" are opposite instructions.
+  //
+  // Its coverage is narrower than it sounds and the UI must not overstate it: LinkedIn only
+  // aggregates posts published THROUGH Zernio. Posts written in the LinkedIn app are outside it.
+  if (action === 'get_linkedin_aggregate') {
+    if (!social_account_id) return jsonResponse({ success: false, error: 'social_account_id required' }, 400);
+
+    const { data: acct } = await supabase
+      .from('social_accounts')
+      .select('id, workspace_id, zernio_account_id, platform, metadata')
+      .eq('id', social_account_id)
+      .maybeSingle();
+
+    // 404 on a foreign account, never 403 — the two answers must be indistinguishable.
+    if (!acct || (!isSecretCaller && !callerWorkspaceIds.includes(acct.workspace_id))) {
+      return jsonResponse({ success: false, error: 'No such account' }, 404);
+    }
+    if (acct.platform !== 'linkedin') {
+      return jsonResponse({ success: false, error: 'This endpoint is LinkedIn-only' }, 400);
+    }
+    // Zernio answers 400 `personal_account_not_supported` the other way round; keep the two
+    // account types on their own endpoints rather than discovering it from an upstream error.
+    if ((acct.metadata as { accountType?: string } | null)?.accountType !== 'personal') {
+      return jsonResponse({
+        success: false,
+        code: 'organization_account',
+        error: 'This is an organization page — its analytics come from the per-post endpoints, which do work for pages.',
+      }, 400);
+    }
+
+    const qs = new URLSearchParams({ aggregation: body.aggregation === 'DAILY' ? 'DAILY' : 'TOTAL' });
+    if (body.from_date) qs.set('startDate', body.from_date);
+    if (body.to_date) qs.set('endDate', body.to_date);
+
+    try {
+      const data = await zernioApi(
+        'GET',
+        `/accounts/${encodeURIComponent(acct.zernio_account_id)}/linkedin-aggregate-analytics?${qs.toString()}`,
+      );
+      return jsonResponse({ success: true, ...data });
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      const bodyText = (err as { bodyText?: string })?.bodyText ?? '';
+      if (status === 403 && bodyText.includes('missing_scope')) {
+        return jsonResponse({
+          success: false,
+          code: 'missing_scope',
+          required_scope: 'r_member_postAnalytics',
+          error: 'This LinkedIn connection was authorised without permission to read post analytics. '
+            + 'Disconnect and reconnect the account, accepting the analytics permission, and the '
+            + 'figures start arriving — nothing can read them until then.',
+        }, 403);
+      }
+      if (status === 402) {
+        return jsonResponse({
+          success: false,
+          code: 'analytics_addon_required',
+          error: 'This needs the Zernio Analytics add-on, which the platform account does not currently have.',
+        }, 402);
+      }
+      throw err;
+    }
+  }
+
   // One post's day-by-day accumulation. The post id comes from the CLIENT, so it is checked
   // against the caller's workspaces first — otherwise any tenant could read the engagement
   // history of any post on the shared operator account by passing its id.

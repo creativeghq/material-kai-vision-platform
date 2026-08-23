@@ -159,14 +159,30 @@ describe('we only call Zernio endpoints that exist', () => {
   // Checked against the published OpenAPI spec (https://docs.zernio.com/api/openapi, v1.0.4,
   // 566 operations). Our ZERNIO_BASE_URL ends in /v1, so a call to `/accounts` is the spec's
   // `/v1/accounts`.
+  // The BARE path is the one with no GET. Sub-resources under it are a different matter: the
+  // spec exposes 20+ `GET /v1/accounts/{accountId}/<sub>` operations (health, bluesky-settings,
+  // slack-settings, linkedin-organizations, linkedin-post-analytics, linkedin-aggregate-
+  // analytics…), and they are real. An earlier version of this pattern stopped at
+  // `/accounts/${` and so forbade the whole family, which would have blocked the only analytics
+  // endpoint a LinkedIn personal profile has. Anchored on what follows the interpolation: a `/`
+  // means sub-resource and is fine, anything else is the bare read.
+  const BARE_ACCOUNT_GET = /zernioApi\(\s*['"]GET['"]\s*,\s*[`'"]\/accounts\/\$\{[^}]*\}(?!\/)/;
+
+  it('the bare-account-read pattern still catches the shape it was written for', () => {
+    // Guards the guard. Loosening the regex above must not quietly turn it into a no-op, and
+    // the only way to know is to hand it the offending code and the permitted code directly.
+    expect(BARE_ACCOUNT_GET.test('zernioApi(\'GET\', `/accounts/${accountId}`)')).toBe(true);
+    expect(BARE_ACCOUNT_GET.test('zernioApi(\'GET\', `/accounts/${encodeURIComponent(id)}?x=1`)')).toBe(true);
+    expect(BARE_ACCOUNT_GET.test('zernioApi(\'GET\', `/accounts/${id}/linkedin-aggregate-analytics`)')).toBe(false);
+    expect(BARE_ACCOUNT_GET.test('zernioApi(\'GET\', `/accounts/${id}/health`)')).toBe(false);
+  });
+
   it('never reads a single account by id — that path has no GET', () => {
     // `/v1/accounts/{accountId}` exposes PUT, PATCH and DELETE only. Both OAuth callbacks
     // called GET on it, so the LAST step of every connect — social and WhatsApp — would have
     // 404'd. Nothing caught it because ZERNIO_API_KEY has never had a value, so every request
     // failed earlier at the 503. Use fetchZernioAccount(), which reads the list endpoint.
-    const offenders = SOURCES.filter((f) =>
-      /zernioApi\(\s*['"]GET['"]\s*,\s*[`'"]\/accounts\/\$\{/.test(f.code),
-    ).map((f) => f.rel);
+    const offenders = SOURCES.filter((f) => BARE_ACCOUNT_GET.test(f.code)).map((f) => f.rel);
 
     expect(
       offenders,

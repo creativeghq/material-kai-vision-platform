@@ -94,6 +94,22 @@ interface AccountRow {
 const needsUrlImport = (a: AccountRow) =>
   a.platform === 'linkedin' && a.metadata?.accountType === 'personal';
 
+/**
+ * Lifetime totals LinkedIn aggregates itself for a member account. `saves` and `sends` exist
+ * ONLY here — an organization page returns 0 for both, because LinkedIn does not expose them on
+ * the org endpoint. So this is not a poorer version of the page numbers, it is a different set.
+ */
+interface LinkedInTotals {
+  impressions: number | null;
+  reach: number | null;
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  sends: number | null;
+  engagementRate: number | null;
+}
+
 const statusVariant = (s: string) =>
   s === 'published' ? 'success' : s === 'failed' ? 'error' : s === 'scheduled' ? 'info' : 'neutral';
 
@@ -119,6 +135,10 @@ export const SocialAnalyticsPanel: React.FC = () => {
   const [addonMissing, setAddonMissing] = useState(false);
   const [syncNotes, setSyncNotes] = useState<SyncNote[]>([]);
   const [importUrl, setImportUrl] = useState('');
+  // LinkedIn aggregates a personal profile's totals server-side, so this needs no post list —
+  // which is the whole reason it is the only analytics such an account has.
+  const [liTotals, setLiTotals] = useState<Record<string, LinkedInTotals>>({});
+  const [liScopeMissing, setLiScopeMissing] = useState(false);
 
   /** POST one zernio-api action for this workspace. Throws with the server's own message. */
   const callAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
@@ -192,6 +212,29 @@ export const SocialAnalyticsPanel: React.FC = () => {
     setPlatformTotals(dm.status === 'fulfilled' ? (dm.value.platformBreakdown ?? []) : []);
     setDecay(cd.status === 'fulfilled' ? (cd.value.buckets ?? []) : []);
     setFrequency(pf.status === 'fulfilled' ? (pf.value.frequency ?? []) : []);
+
+    // Per-account, and only for the account type that has no other source. Settled, not all:
+    // one profile's missing scope must not blank the rest of the screen.
+    const personal = ((a.data ?? []) as AccountRow[]).filter(needsUrlImport);
+    if (personal.length) {
+      const results = await Promise.allSettled(
+        personal.map(acct => callAction('get_linkedin_aggregate', { social_account_id: acct.id })),
+      );
+      const totals: Record<string, LinkedInTotals> = {};
+      let scopeMissing = false;
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          if (r.value?.analytics) totals[personal[idx].id] = r.value.analytics as LinkedInTotals;
+        } else if ((r.reason as Error & { code?: string })?.code === 'missing_scope') {
+          scopeMissing = true;
+        }
+      });
+      setLiTotals(totals);
+      setLiScopeMissing(scopeMissing);
+    } else {
+      setLiTotals({});
+      setLiScopeMissing(false);
+    }
 
     setLoading(false);
   }, [activeWorkspaceId, callAction]);
@@ -363,6 +406,79 @@ export const SocialAnalyticsPanel: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* The only analytics a personal LinkedIn profile has. Rendered whenever one is connected,
+          including at zero — a connected account showing nothing at all is the state that sent
+          somebody looking for a bug last time. */}
+      {urlImportAccounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PlatformIcon platform="linkedin" className="h-4 w-4" /> LinkedIn lifetime totals
+            </CardTitle>
+            <CardDescription>
+              LinkedIn adds these up itself for a personal profile, so they need no post list —
+              which is why they work where the posts table cannot. Covers posts published{' '}
+              <strong>through this app</strong> only; anything written in the LinkedIn app is
+              outside what LinkedIn will report here. Saves and sends are personal-profile
+              figures — a company page returns 0 for both.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {liScopeMissing ? (
+              <div className="flex items-start gap-3 text-sm">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
+                <div>
+                  <p className="font-medium">This connection cannot read post analytics</p>
+                  <p className="text-muted-foreground mt-1">
+                    It was authorised without the <code>r_member_postAnalytics</code> permission.
+                    Disconnect and reconnect the account, accepting the analytics permission —
+                    until then every figure here reads zero whether or not anyone engaged.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account</TableHead>
+                      <TableHead className="text-right">Impressions</TableHead>
+                      <TableHead className="text-right">Reach</TableHead>
+                      <TableHead className="text-right">Reactions</TableHead>
+                      <TableHead className="text-right">Comments</TableHead>
+                      <TableHead className="text-right">Reshares</TableHead>
+                      <TableHead className="text-right">Saves</TableHead>
+                      <TableHead className="text-right">Sends</TableHead>
+                      <TableHead className="text-right">Engagement</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {urlImportAccounts.map(acct => {
+                      const t = liTotals[acct.id];
+                      return (
+                        <TableRow key={acct.id}>
+                          <TableCell className="text-sm">{acct.handle ?? platformLabel(acct.platform)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.impressions)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.reach)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.reactions)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.comments)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.shares)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.saves)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(t?.sends)}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {t?.engagementRate == null ? '—' : `${t.engagementRate.toFixed(2)}%`}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <DailyReachChart daily={daily} platforms={platformTotals} />
       <ContentDecayChart buckets={decay} />
