@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { blankComments } from '../helpers/stripComments';
-import { PUBLIC_TOOLS, toolsForKey } from '../../supabase/functions/_shared/embed-agent-tools.ts';
+import { PUBLIC_TOOLS, toolsForKey, fieldsFromSchema } from '../../supabase/functions/_shared/embed-agent-tools.ts';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -109,5 +109,54 @@ describe('attribution is two records, and they stay two', () => {
     for (const f of ['src/embed/materialkai-assistant.ts', 'src/embed/materialkai-product.ts']) {
       expect(read(f)).toContain("from './appOrigin'");
     }
+  });
+});
+
+describe('the form is built from the schema, never from a list beside it', () => {
+  it('reads enum values off the tool, so they cannot be invented', () => {
+    // THE BUG THIS EXISTS FOR. The widget's first version hand-wrote
+    // `insulation_level: 'average'` and `emitter: 'radiators'` against a schema that says
+    // `none|medium|modern|passive` and `underfloor|fan_coil|…`. Every heat-pump call failed at the
+    // tool boundary, where a visitor sees only a widget that does not work — the exact outcome
+    // CLAUDE.md's "never hand-mirror a tool's enum" rule was written from.
+    const schema = {
+      shape: {
+        floor_area_m2: { _def: { typeName: 'ZodNumber' }, description: 'Heated floor area in m².' },
+        insulation_level: { _def: { typeName: 'ZodEnum', values: ['none', 'medium', 'modern', 'passive'] } },
+        ceiling_height_m: { _def: { typeName: 'ZodOptional', innerType: { _def: { typeName: 'ZodNumber' } } } },
+        include_dhw: { _def: { typeName: 'ZodBoolean' } },
+      },
+    };
+    const fields = fieldsFromSchema(schema);
+    const by = (n: string) => fields.find((f) => f.name === n)!;
+
+    expect(by('insulation_level').type).toBe('enum');
+    expect(by('insulation_level').options).toEqual(['none', 'medium', 'modern', 'passive']);
+    expect(by('insulation_level').options).not.toContain('average');
+    expect(by('floor_area_m2').type).toBe('number');
+    expect(by('floor_area_m2').required).toBe(true);
+    expect(by('include_dhw').type).toBe('boolean');
+  });
+
+  it('unwraps optional so a defaulted input is not demanded of a visitor', () => {
+    const fields = fieldsFromSchema({
+      shape: { ceiling_height_m: { _def: { typeName: 'ZodOptional', innerType: { _def: { typeName: 'ZodNumber' } } } } },
+    });
+    expect(fields[0].required).toBe(false);
+    expect(fields[0].type).toBe('number');
+  });
+
+  it('survives a schema shape it does not understand', () => {
+    // A tool whose schema cannot be read must render no fields rather than throw into the page.
+    expect(fieldsFromSchema(undefined)).toEqual([]);
+    expect(fieldsFromSchema({})).toEqual([]);
+  });
+
+  it('the widget renders those fields and hand-writes no enum of its own', () => {
+    const widget = blankComments(read('src/embed/materialkai-assistant.ts'));
+    expect(widget).toContain('tool?.fields');
+    // The values that broke it must not reappear anywhere in the widget.
+    expect(widget).not.toContain("'average'");
+    expect(widget).not.toContain("'radiators'");
   });
 });

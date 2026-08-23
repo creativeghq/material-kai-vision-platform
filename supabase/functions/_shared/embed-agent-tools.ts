@@ -160,11 +160,67 @@ export const PUBLIC_TOOL_NAMES: ReadonlySet<string> = new Set(PUBLIC_TOOLS.map((
  * person by the CRM contact it finds or creates from their email, exactly as the widget's own
  * `request_quote` action does.
  */
+/** One input a public tool takes, projected from its own zod schema. */
+export interface PublicToolField {
+  name: string;
+  type: 'number' | 'boolean' | 'enum' | 'text';
+  required: boolean;
+  /** Present for `enum`. THE tool's values, never a list written next to it. */
+  options?: string[];
+  description?: string;
+}
+
+/**
+ * Project a tool's zod schema into the fields a form can render.
+ *
+ * NEVER HAND-MIRROR A TOOL'S ENUM. That rule exists in CLAUDE.md because hand-written option lists
+ * drift into values no enum accepts, and it is written from experience — this function exists
+ * because the widget's first version passed `insulation_level: 'average'` and `emitter: 'radiators'`
+ * to a tool whose schema says `none|medium|modern|passive` and `underfloor|fan_coil|…`. Every call
+ * failed, and it failed at the tool boundary where the visitor just sees a widget that does not
+ * work. Reading the schema is the only version of this that cannot be wrong.
+ */
+// deno-lint-ignore no-explicit-any
+export function fieldsFromSchema(schema: any): PublicToolField[] {
+  const shape = schema?.shape ?? schema?._def?.shape?.();
+  if (!shape || typeof shape !== 'object') return [];
+
+  return Object.entries(shape).map(([name, raw]) => {
+    // Unwrap optional/default/nullable wrappers to reach the type that carries the values.
+    let node = raw as any;
+    let required = true;
+    const description: string | undefined = node?.description;
+    for (let i = 0; i < 5; i++) {
+      const kind = node?._def?.typeName;
+      if (kind === 'ZodOptional' || kind === 'ZodNullable' || kind === 'ZodDefault') {
+        required = false;
+        node = node._def.innerType;
+      } else break;
+    }
+    const kind = node?._def?.typeName;
+    const options: string[] | undefined = kind === 'ZodEnum' ? node._def.values : undefined;
+    const type: PublicToolField['type'] = options
+      ? 'enum'
+      : kind === 'ZodNumber' ? 'number'
+        : kind === 'ZodBoolean' ? 'boolean'
+          : 'text';
+    return {
+      name,
+      type,
+      required,
+      ...(options ? { options } : {}),
+      ...(description || node?.description ? { description: description ?? node.description } : {}),
+    };
+  });
+}
+
 export async function buildPublicTools(
   ctx: EmbedKeyContext,
   onChunk?: (chunk: unknown) => void,
-): Promise<Map<string, { invoke: (input: unknown) => Promise<unknown> }>> {
-  const out = new Map<string, { invoke: (input: unknown) => Promise<unknown> }>();
+// deno-lint-ignore no-explicit-any
+): Promise<Map<string, { invoke: (input: unknown) => Promise<unknown>; schema?: any }>> {
+  // deno-lint-ignore no-explicit-any
+  const out = new Map<string, { invoke: (input: unknown) => Promise<unknown>; schema?: any }>();
   const { workspaceId } = ctx;
 
   const [searchMod, graphMod, calcMod, quoteMod] = await Promise.all([

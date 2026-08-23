@@ -23,7 +23,15 @@ import { referralLink } from './appOrigin';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
-interface PublicToolInfo { name: string; label: string; writes: boolean }
+/** One input, projected from the TOOL'S OWN zod schema by the server. */
+interface PublicToolField {
+  name: string;
+  type: 'number' | 'boolean' | 'enum' | 'text';
+  required: boolean;
+  options?: string[];
+  description?: string;
+}
+interface PublicToolInfo { name: string; label: string; writes: boolean; fields?: PublicToolField[] }
 
 /** What the assistant said about the last result, if the key may spend on that. */
 interface AskState { asking: boolean; answer: string | null; pending: boolean }
@@ -500,64 +508,74 @@ export class MaterialKaiAssistant extends HTMLElement {
     }
   }
 
-  /** The inputs one quick-start needs, kept minimal — a visitor answers one question, not a form. */
+  /**
+   * The inputs a quick-start needs, rendered from the TOOL'S OWN SCHEMA.
+   *
+   * Nothing here is hand-written. The first version guessed the argument names and the enum values
+   * — `insulation_level: 'average'` against an enum of `none|medium|modern|passive` — so every heat
+   * pump call failed at the tool boundary, where a visitor sees only a widget that does not work.
+   * CLAUDE.md has a rule against hand-mirroring a tool's enum for exactly this reason; the server
+   * projects the schema and this renders what it says.
+   *
+   * Only REQUIRED fields are asked. A public widget that opened with eleven optional inputs would
+   * not be used at all, and every one of these tools defaults the rest sensibly.
+   */
   private renderInput(host: HTMLElement) {
     if (!this.active) return;
+    const tool = this.tools.find((t) => t.name === this.active);
+    const fields = (tool?.fields ?? []).filter((f) => f.required);
+
     const form = document.createElement('div');
     form.className = 'form';
-    const fields: Array<{ key: string; label: string; type: string; placeholder?: string }> =
-      this.active === 'calculate_heat_pump_sizing'
-        ? [{ key: 'floor_area_m2', label: 'Floor area (m²)', type: 'number', placeholder: '120' }]
-        : this.active === 'calculate_heating_cost_comparison'
-          ? [{ key: 'floor_area_m2', label: 'Floor area (m²)', type: 'number', placeholder: '120' }]
-          : this.active === 'calculate_kitchen_cost'
-        ? [{ key: 'run_length_m', label: 'How many metres of base units?', type: 'number', placeholder: '4' }]
-        : [{ key: 'q', label: this.active === 'material_search' ? 'What are you looking for?' : 'Describe what you want', type: 'text', placeholder: 'oak kitchen worktop' }];
-
     const values: Record<string, string> = {};
+
     for (const f of fields) {
       const l = document.createElement('label');
       l.className = 'f';
       const span = document.createElement('span');
-      span.textContent = f.label;
-      const input = document.createElement('input');
-      input.type = f.type;
-      if (f.placeholder) input.placeholder = f.placeholder;
-      input.addEventListener('input', () => { values[f.key] = input.value; });
+      // The schema's own description, trimmed to something a label can hold.
+      span.textContent = f.description ? f.description.split(/[.;]/)[0].slice(0, 90) : f.name.replace(/_/g, ' ');
+
+      let input: HTMLInputElement | HTMLSelectElement;
+      if (f.type === 'enum' && f.options?.length) {
+        const sel = document.createElement('select');
+        for (const opt of f.options) {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt.replace(/_/g, ' ');
+          sel.appendChild(o);
+        }
+        // Pre-seed: a select shows its first option, so the value must match from the start or a
+        // visitor who does not touch it submits nothing.
+        values[f.name] = f.options[0];
+        sel.addEventListener('change', () => { values[f.name] = sel.value; });
+        input = sel;
+      } else {
+        const i = document.createElement('input');
+        i.type = f.type === 'number' ? 'number' : 'text';
+        i.addEventListener('input', () => { values[f.name] = i.value; });
+        input = i;
+      }
       l.append(span, input);
       form.appendChild(l);
     }
 
     const go = document.createElement('button');
     go.className = 'go';
+    go.type = 'button';
     go.textContent = this.busy ? 'Working…' : 'Go';
     go.disabled = this.busy;
     go.addEventListener('click', () => {
       const active = this.active!;
-      if (active === 'calculate_heat_pump_sizing') {
-        // Defaults for everything the visitor was not asked: one question is the most a widget on
-        // somebody else's page can ask for before it stops being used at all. The tool states its
-        // assumptions back, and `renderHeatPumpResult` shows them.
-        void this.run(active, {
-          floor_area_m2: Number(values.floor_area_m2) || 0,
-          insulation_level: 'average',
-          emitter: 'radiators',
-          include_dhw: true,
-        });
-      } else if (active === 'calculate_heating_cost_comparison') {
-        void this.run(active, {
-          floor_area_m2: Number(values.floor_area_m2) || 0,
-          insulation_level: 'average',
-        });
-      } else if (active === 'calculate_kitchen_cost') {
-        void this.run(active, { run_length_m: Number(values.run_length_m) || 0 });
-      } else if (active === 'material_search') {
-        void this.run(active, { query: values.q ?? '' });
-      } else {
-        // price_my_spec takes the NOUN plus adjectives; a single free-text box gives us the noun,
-        // which is the minimum the RPC needs and enough to come back with the real vocabulary.
-        void this.run(active, { product_type: values.q ?? '' });
+      // Coerced by the field's declared type, so a number field does not arrive as a string and
+      // fail the schema for a second, sillier reason.
+      const args: Record<string, unknown> = {};
+      for (const f of fields) {
+        const raw = values[f.name];
+        if (raw === undefined || raw === '') continue;
+        args[f.name] = f.type === 'number' ? Number(raw) : raw;
       }
+      void this.run(active, args);
     });
     form.appendChild(go);
     host.appendChild(form);

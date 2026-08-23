@@ -34,7 +34,7 @@ import { captureException } from '../_shared/sentry.ts';
 import { authenticateEmbedKey, embedJson } from '../_shared/embed-key.ts';
 import { embedCorsHeaders } from '../_shared/cors.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
-import { buildPublicTools, toolsForKey } from '../_shared/embed-agent-tools.ts';
+import { buildPublicTools, toolsForKey, fieldsFromSchema } from '../_shared/embed-agent-tools.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 // ONE model turn goes through the shared client (CLAUDE.md: which client makes the model call) —
 // it constructs the provider lazily so bootstrapped secrets are seen, and books the tokens.
@@ -143,12 +143,20 @@ Deno.serve(withApiLogging((req) => {
       .eq('id', auth.ctx.workspaceId)
       .maybeSingle();
 
+    // THE FIELDS COME FROM EACH TOOL'S OWN SCHEMA, never from a list written beside it. Building
+    // the tools here costs one construction pass and removes an entire bug class: the widget's
+    // first version guessed `insulation_level: 'average'` against an enum of
+    // `none|medium|modern|passive`, and every call failed at the tool boundary where a visitor
+    // just sees a widget that does not work.
+    const built = await buildPublicTools(auth.ctx).catch(() => null);
+
     return embedJson({
       ok: true,
       tools: toolsForKey(keyRow ?? {}).map((t) => ({
         name: t.name,
         label: t.label,
         writes: t.writes,
+        fields: built ? fieldsFromSchema(built.get(t.name)?.schema) : [],
       })),
       turnstile_site_key: siteKey,
       referral_code: ws?.referral_enabled ? (ws.referral_code ?? null) : null,
