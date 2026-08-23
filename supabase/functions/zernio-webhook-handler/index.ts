@@ -88,6 +88,20 @@ function firstPlatformError(post: any): string | undefined {
 
 const accountIdOf = (account: any): string | undefined => account?.accountId || account?.id || account?._id;
 
+/**
+ * Display name for a network, for notification copy only. Zernio sends the slug (`linkedin`),
+ * and a notification reading "linkedin connected" is the one place a user sees a raw slug.
+ * Casing is per-brand, so there is no rule to derive it from — an unknown slug falls back to
+ * itself rather than guessing. Nothing branches on this; the slug stays the identifier.
+ */
+const PLATFORM_LABELS: Record<string, string> = {
+  instagram: 'Instagram', facebook: 'Facebook', linkedin: 'LinkedIn', tiktok: 'TikTok',
+  pinterest: 'Pinterest', youtube: 'YouTube', twitter: 'X (Twitter)', x: 'X (Twitter)',
+  threads: 'Threads', whatsapp: 'WhatsApp',
+};
+const platformLabel = (platform?: string): string =>
+  (platform ? PLATFORM_LABELS[platform] ?? platform : 'An account');
+
 /** WhatsApp contact phone in E.164 (with +). sender.phoneNumber wins; sender.id is digits-only. */
 function contactPhoneOf(sender: any): string | undefined {
   if (sender?.phoneNumber) return sender.phoneNumber;
@@ -1032,18 +1046,33 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
         workspaceId = prof?.workspace_id ?? null;
       }
 
+      // Did this delivery actually CHANGE anything? Zernio re-sends account.connected for an
+      // account that has been connected all along (observed 4× for one LinkedIn account on
+      // 2026-08-23, one of them with no user activity anywhere near it), and the handler used
+      // to notify on every delivery — so "linkedin connected" arrived again and again for a
+      // connection made once. Only a real transition is news: an account we have never seen,
+      // or one that was sitting inactive after a disconnect. A repeat delivery still refreshes
+      // the row; it just does not announce itself.
+      let isNewConnection = false;
+
       if (!zernioAccountId || !workspaceId) {
         console.warn(`[zernio-webhook] account.connected without a resolvable workspace (account=${zernioAccountId}, profile=${profileId}) — ignored`);
       } else if (platform === 'whatsapp') {
         const senderId = account?.selectedPhoneNumber || account?.username || account?.platformIdentifier;
         const { data: existing } = await supabase
-          .from('messaging_channels').select('id')
+          .from('messaging_channels').select('id, is_active')
           .eq('zernio_account_id', zernioAccountId).maybeSingle();
         if (existing) {
+          // Reconnecting a number that was switched off IS worth a notification — publishing
+          // and replies were dead until this moment.
+          isNewConnection = existing.is_active === false;
           const { error: updErr } = await supabase.from('messaging_channels')
             .update({ is_active: true, sender_id: senderId, updated_at: new Date().toISOString() })
             .eq('id', existing.id);
-          if (updErr) console.error('[zernio-webhook] account.connected channel refresh FAILED', zernioAccountId, updErr);
+          if (updErr) {
+            console.error('[zernio-webhook] account.connected channel refresh FAILED', zernioAccountId, updErr);
+            isNewConnection = false;
+          }
         } else if (senderId) {
           const { count } = await supabase
             .from('messaging_channels').select('*', { count: 'exact', head: true })
@@ -1065,11 +1094,24 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
               profile_id: profileId ?? null,
             },
           });
-          // The row is the ONLY trace that this number connected — Zernio does not resend
-          // account.connected, and supabase-js resolves on an RLS denial rather than throwing.
+          // The row is the ONLY trace that this number connected, and supabase-js resolves on
+          // an RLS denial rather than throwing — so a failed insert must not notify either,
+          // or we announce a connection nothing recorded.
           if (insErr) console.error('[zernio-webhook] account.connected channel insert FAILED', senderId, insErr);
+          else isNewConnection = true;
         }
       } else {
+        // Read before the upsert: afterwards every row looks identical whether it was created
+        // now or months ago. Matched on the account id within the workspace rather than the
+        // full unique key, because `platform` can be absent from the payload.
+        const { data: existingSocial } = await supabase
+          .from('social_accounts').select('id, is_active')
+          .eq('workspace_id', workspaceId)
+          .eq('zernio_account_id', zernioAccountId)
+          .limit(1);
+        const priorSocial = existingSocial?.[0];
+        isNewConnection = !priorSocial || priorSocial.is_active === false;
+
         const { error: upErr } = await supabase.from('social_accounts').upsert({
           workspace_id: workspaceId,
           platform,
@@ -1081,14 +1123,17 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
           is_active: true,
           last_synced_at: new Date().toISOString(),
         }, { onConflict: 'workspace_id,platform,zernio_account_id' });
-        if (upErr) console.error('[zernio-webhook] account.connected social upsert FAILED', zernioAccountId, upErr);
+        if (upErr) {
+          console.error('[zernio-webhook] account.connected social upsert FAILED', zernioAccountId, upErr);
+          isNewConnection = false;
+        }
       }
 
-      if (workspaceId && zernioAccountId) {
+      if (workspaceId && zernioAccountId && isNewConnection) {
         await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'social_account_connected', (uid: string) => ({
           user_id: uid,
           type: 'social_account_connected',
-          title: `${platform ?? 'An account'} connected`,
+          title: `${platformLabel(platform)} connected`,
           body: account?.username ?? account?.displayName ?? zernioAccountId,
           action_url: platform === 'whatsapp' ? '/messaging' : '/profile?tab=social-accounts',
           workspace_id: workspaceId,
@@ -1103,6 +1148,14 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     else if (event === 'account.disconnected') {
       const zernioAccountId = accountIdOf(account) || account?.accountId;
       if (zernioAccountId) {
+        // Read BEFORE the update, for the same reason account.connected does: afterwards the
+        // row is is_active=false whether this delivery switched it off or a delivery an hour
+        // ago did. Only the transition is news.
+        const { data: owned } = await supabase
+          .from('social_accounts').select('workspace_id, platform, handle, is_active')
+          .eq('zernio_account_id', zernioAccountId).maybeSingle();
+        const wasActive = (owned as { is_active?: boolean } | null)?.is_active === true;
+
         const { error: saErr } = await supabase
           .from('social_accounts')
           .update({ is_active: false })
@@ -1117,15 +1170,12 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
         if (mcErr) console.error('[zernio-webhook] account.disconnected channel update FAILED', zernioAccountId, mcErr);
 
         // Publishing and replies stop dead until someone reconnects. Nothing else tells them.
-        const { data: owned } = await supabase
-          .from('social_accounts').select('workspace_id, platform, handle')
-          .eq('zernio_account_id', zernioAccountId).maybeSingle();
         const wsId = (owned as { workspace_id?: string } | null)?.workspace_id;
-        if (wsId) {
+        if (wsId && wasActive) {
           await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'social_account_disconnected', (uid: string) => ({
             user_id: uid,
             type: 'social_account_disconnected',
-            title: `${(owned as { platform?: string })?.platform ?? 'An account'} disconnected`,
+            title: `${platformLabel((owned as { platform?: string })?.platform)} disconnected`,
             body: 'Publishing and replies stop until it is reconnected.',
             action_url: (owned as { platform?: string })?.platform === 'whatsapp' ? '/messaging' : '/profile?tab=social-accounts',
             workspace_id: wsId,
