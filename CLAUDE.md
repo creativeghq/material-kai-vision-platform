@@ -233,6 +233,18 @@ reviewed, the `.ts` is what ships. Run **`npm run skills:sync`** after editing a
 the `.ts`, and never use `String.raw` (it leaks the backslash of every escaped backtick into the prompt).
 Guarded by [tests/unit/skillsRegistry.test.ts](tests/unit/skillsRegistry.test.ts).
 
+**Naming a place is LINKING to it, and a button must not ask the model for something no tool can do.**
+`src/config/appDestinations.ts` is the one registry of in-app destinations; `linkifyDestinations` turns
+`Profile → Social Accounts` (or the paraphrase, "the Social Accounts tab") into a real link inside every agent
+reply, and `RESULT_SETUP_DESTINATION` makes the result card's action a LINK to the setup flow. Connecting a
+social account or a WhatsApp number is an OAuth handshake that exists only in the app UI, so the generic
+"Add {thing}" — derived from the payload's list key — sent `Add a new account.` to an agent that could only
+answer with a paragraph telling the user where to go. Add a destination there rather than hardcoding a route,
+keep the tool's own wording in the `Area → Tab` breadcrumb form so it linkifies, and put a result type in
+`UNCREATABLE_RESULT_TYPES` when nobody can add one (search hits, inbox threads, reviews about yourself).
+Guarded by [tests/unit/agentReplyDestinations.test.ts](tests/unit/agentReplyDestinations.test.ts), which also
+fails when a registered route or `?tab=` stops existing.
+
 ## Templates — one table, one registry, an allowlist per type
 "Reusable starting point for a record" is **one** system (`entity_templates`, issue #322), not a table per
 entity. Adding a type = an adapter in `src/services/templates/` + a value in the CHECK constraint
