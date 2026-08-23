@@ -63,13 +63,18 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   // ── IMPORT EXTERNAL POSTS ──────────────────────────────────────────────────
   //
   // Analytics only ever covered posts WE published: get_post_analytics reads social_posts where
-  // zernio_post_id IS NOT NULL, and a post someone wrote in LinkedIn was never in that table at
-  // all. So a freshly connected account showed an empty Posts list and a refresh that "did
-  // nothing" — correct behaviour, and a useless answer, because the account plainly has posts.
+  // zernio_post_id IS NOT NULL, and a post written in LinkedIn was never in that table. On a
+  // freshly connected account that is an empty screen with a refresh button that does nothing,
+  // next to an account that plainly has posts.
   //
-  // Zernio's `GET /v1/posts?source=external` returns the ones published outside it — roughly 12
-  // months of history per account. Importing them gives every post a zernio_post_id, after which
-  // the existing analytics sync covers native and platform-published posts identically.
+  // TWO calls, and the order is the whole point. `GET /posts?source=external` reads what Zernio
+  // has ALREADY pulled from the platform, which for a new account is nothing — listing first
+  // returns an empty array and looks exactly like "this account has no posts".
+  // `POST /posts/sync-external` is the one that reaches out to LinkedIn/Instagram and fetches.
+  // It is debounced ~15s per account by Zernio, so calling it on every refresh is safe.
+  //
+  // The sync response also carries per-post `analytics` inline, so an imported post arrives with
+  // its engagement already attached instead of waiting for a second pass.
   if (action === 'import_external_posts') {
     if (!workspace_id) return jsonResponse({ success: false, error: 'workspace_id required' }, 400);
 
@@ -84,11 +89,17 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     }
 
     let imported = 0;
+    let withMetrics = 0;
     const errors: string[] = [];
 
     for (const acct of accounts as Array<{ id: string; zernio_account_id: string; platform: string; user_id: string }>) {
       if (!acct.zernio_account_id) continue;
       try {
+        // 1. Make Zernio go and fetch. Analytics ride along on the posts it returns.
+        const fresh = await zernioApi('POST', '/posts/sync-external', { accountId: acct.zernio_account_id });
+
+        // 2. Read back everything Zernio now holds for this account, which is a superset of what
+        //    the sync just returned (it answers with recent posts; the store keeps ~12 months).
         const qs = new URLSearchParams({
           source: 'external',
           accountId: acct.zernio_account_id,
@@ -97,9 +108,20 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
           sortBy: 'created-desc',
         });
         const page = await zernioApi('GET', `/posts?${qs.toString()}`);
-        const posts = (page?.posts ?? []) as Array<Record<string, any>>;
 
-        for (const post of posts) {
+        // Merge by Zernio post id, preferring the freshly-synced copy: it is the one carrying
+        // analytics. Same id from both calls must not become two rows.
+        const merged = new Map<string, Record<string, any>>();
+        for (const post of ((page?.posts ?? []) as Array<Record<string, any>>)) {
+          const id = String(post._id ?? '');
+          if (id) merged.set(id, post);
+        }
+        for (const post of ((fresh?.posts ?? []) as Array<Record<string, any>>)) {
+          const id = String(post._id ?? '');
+          if (id) merged.set(id, { ...(merged.get(id) ?? {}), ...post });
+        }
+
+        for (const post of merged.values()) {
           const zernioPostId = String(post._id ?? '');
           if (!zernioPostId) continue;
 
@@ -109,35 +131,58 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
             (pl: Record<string, any>) => pl.accountId === acct.zernio_account_id,
           ) ?? {};
 
-          const row = {
-            workspace_id,
-            // NOT NULL, and the honest answer is whoever authorised the account: an imported post
-            // has no author on our side, and stamping the syncing admin would credit them with
-            // somebody else's posting history.
-            user_id: acct.user_id,
-            social_account_id: acct.id,
-            platform: leg.platform ?? post.platform ?? acct.platform,
-            caption: post.content ?? post.title ?? null,
-            status: 'published',
-            zernio_post_id: zernioPostId,
-            published_at: post.publishedAt ?? post.scheduledFor ?? post.createdAt ?? null,
-            metadata: {
-              source: 'external',
-              platform_post_url: post.platformPostUrl ?? leg.platformPostUrl ?? null,
-              imported_at: new Date().toISOString(),
-            },
-          };
-
-          // Upsert on (workspace_id, zernio_post_id) — the partial unique index added for exactly
-          // this. Without it a second import duplicates the whole history.
-          const { error } = await supabase
+          const { data: saved, error } = await supabase
             .from('social_posts')
-            .upsert(row, { onConflict: 'workspace_id,zernio_post_id' });
+            .upsert({
+              workspace_id,
+              // NOT NULL, and the honest answer is whoever authorised the account: an imported
+              // post has no author on our side, and stamping the syncing admin would credit them
+              // with somebody else's posting history.
+              user_id: acct.user_id,
+              social_account_id: acct.id,
+              platform: leg.platform ?? post.platform ?? acct.platform,
+              caption: post.content ?? post.title ?? null,
+              status: 'published',
+              zernio_post_id: zernioPostId,
+              published_at: post.publishedAt ?? post.scheduledFor ?? post.createdAt ?? null,
+              metadata: {
+                source: 'external',
+                platform_post_url: post.platformPostUrl ?? leg.platformPostUrl ?? null,
+                imported_at: new Date().toISOString(),
+              },
+            }, { onConflict: 'workspace_id,zernio_post_id' })
+            .select('id')
+            .single();
+
           if (error) {
             errors.push(`${acct.platform} ${zernioPostId}: ${error.message}`);
             continue;
           }
           imported++;
+
+          // Engagement, when the sync supplied it. Same upsert-on-post_id shape the normal
+          // analytics pass uses, so the two cannot produce two rows for one post.
+          const a = post.analytics as Record<string, number> | undefined;
+          if (a && saved?.id) {
+            const { error: mErr } = await supabase.from('social_post_analytics').upsert({
+              post_id: saved.id,
+              workspace_id,
+              synced_at: new Date().toISOString(),
+              impressions: a.impressions ?? 0,
+              reach: a.reach ?? 0,
+              likes: a.likes ?? 0,
+              comments: a.comments ?? 0,
+              shares: a.shares ?? 0,
+              saves: a.saves ?? 0,
+              clicks: a.clicks ?? 0,
+              engagement_rate: a.engagementRate ?? 0,
+              // `views` has no column and is not the same thing as impressions — keep it rather
+              // than folding it into a field that means something else.
+              metadata: { raw: a, source: 'external_sync' },
+            }, { onConflict: 'post_id' });
+            if (mErr) errors.push(`${acct.platform} ${zernioPostId} metrics: ${mErr.message}`);
+            else withMetrics++;
+          }
         }
       } catch (err) {
         // One account failing must not abandon the others — a LinkedIn token expiring should not
@@ -149,6 +194,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     return jsonResponse({
       success: true,
       imported,
+      with_metrics: withMetrics,
       accounts: accounts.length,
       errors: errors.length ? errors : undefined,
     });

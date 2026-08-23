@@ -151,7 +151,8 @@ export const SocialAnalyticsPanel: React.FC = () => {
       toast({
         title: 'Analytics synced',
         description: importRes?.imported
-          ? `Imported ${importRes.imported} existing post${importRes.imported === 1 ? '' : 's'} from your accounts.`
+          ? `Imported ${importRes.imported} post${importRes.imported === 1 ? '' : 's'} from your accounts`
+            + (importRes.with_metrics ? `, ${importRes.with_metrics} with engagement figures.` : '.')
           : undefined,
       });
     } catch (err) {
