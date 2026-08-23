@@ -41,6 +41,9 @@ import { formatMoney } from '@/utils/decimal';
 // success case IS the product widget — an exact match mounts one — and because splitting them
 // would give a merchant two script tags to get right for one feature.
 import './materialkai-builder';
+// And `<materialkai-configurator>` (#382). Same bundle for the same reason: a merchant learns one
+// script tag, and which element they place is a choice about their page, not an install decision.
+import './materialkai-configurator';
 
 interface EmbedModel {
   format: string;
