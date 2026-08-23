@@ -1241,10 +1241,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
                     conversationId: conv.id,
                     sentAt: m.sentAt ?? m.createdTime ?? null,
                     sender: {
+                      // `phoneNumber` is the field the handler reads FIRST. The replay set only
+                      // `phone`, which nothing looks at, and left the handler to parse a JID out
+                      // of `id` — which it could not. Send the name it actually reads, and keep
+                      // the alternates so a change on either side degrades instead of dropping.
+                      phoneNumber: conv.platform === 'whatsapp'
+                        ? (conv.participantPhone ?? conv.participantId ?? conv.contactId)
+                        : undefined,
                       id: conv.participantId,
                       name: conv.participantName,
                       username: conv.accountUsername ?? conv.participantName,
-                      phone: conv.platform === 'whatsapp' ? conv.participantId : undefined,
                     },
                   },
               });

@@ -104,8 +104,21 @@ const platformLabel = (platform?: string): string =>
 
 /** WhatsApp contact phone in E.164 (with +). sender.phoneNumber wins; sender.id is digits-only. */
 function contactPhoneOf(sender: any): string | undefined {
-  if (sender?.phoneNumber) return sender.phoneNumber;
-  if (sender?.id && /^\d{6,}$/.test(String(sender.id))) return '+' + sender.id;
+  // Every shape a WhatsApp sender arrives in, because this function decides whether the message
+  // is filed or discarded and it used to accept exactly two of them.
+  //
+  // It required `phoneNumber`, or an `id` of BARE digits. A live webhook happens to satisfy that;
+  // a back-filled conversation does not — Zernio identifies a participant by a JID
+  // (`306948408542@s.whatsapp.net`) or an E.164 string with the plus already on it, and both fail
+  // `/^\d{6,}$/`. 103 replayed messages were dropped for "no resolvable phone" and every one
+  // returned 200, so the import reported success and the inbox stayed empty.
+  const candidates = [sender?.phoneNumber, sender?.phone, sender?.wa_id, sender?.id];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    // A JID carries the number before the @; anything else is taken as written.
+    const digits = String(raw).split('@')[0].replace(/[^\d]/g, '');
+    if (digits.length >= 6) return '+' + digits;
+  }
   return undefined;
 }
 
