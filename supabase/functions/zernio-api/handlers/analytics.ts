@@ -275,7 +275,11 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
           if (id) merged.set(id, { ...(merged.get(id) ?? {}), ...post });
         }
 
-        if (!merged.size && !isPersonalLinkedIn && !notes.some((n) => n.account_id === acct.id)) {
+        // Guarded only on "this account already said why". An earlier `!isPersonalLinkedIn` here
+        // was wrong: a personal LinkedIn account given URLs takes the by-URL path like any other,
+        // and a URL that matches nothing has to say so — it went out silent, which is the exact
+        // defect this block exists to prevent.
+        if (!merged.size && !notes.some((n) => n.account_id === acct.id)) {
           notes.push({
             account_id: acct.id,
             platform: acct.platform,
