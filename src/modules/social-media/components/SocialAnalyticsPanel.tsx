@@ -340,20 +340,26 @@ export const SocialAnalyticsPanel: React.FC = () => {
    * spends three round trips to render three blank panels. It asks the member endpoint instead,
    * which is the one that can answer.
    */
-  const loadDerived = useCallback(async (accountRows: AccountRow[]) => {
+  const loadDerived = useCallback(async (accountRows: AccountRow[], forAccountId?: string) => {
     if (!activeWorkspaceId || !accountRows.length) { setDerivedLoading(false); return; }
     setDerivedLoading(true);
 
-    const members = accountRows.filter(a => capabilitiesOf(a).aggregate);
-    const anyPerPost = accountRows.some(a => capabilitiesOf(a).perPost);
+    // On a per-account tab the derived reads are narrowed to that account. Every one of these
+    // endpoints accepts an account filter; without it the tab charts the whole workspace under a
+    // heading naming one account, which is a wrong number that looks completely plausible.
+    const scoped = forAccountId ? accountRows.filter(a => a.id === forAccountId) : accountRows;
+    const scope = forAccountId ? { social_account_id: forAccountId } : {};
+
+    const members = scoped.filter(a => capabilitiesOf(a).aggregate);
+    const anyPerPost = scoped.some(a => capabilitiesOf(a).perPost);
 
     // EVERY account, every platform. Instagram, Facebook Pages and LinkedIn pages each have an
     // account-level endpoint and none of them had ever been called from here.
     const perAccount = Promise.allSettled(
-      accountRows.map(a => callAction('get_account_metrics', { social_account_id: a.id })),
+      scoped.map(a => callAction('get_account_metrics', { social_account_id: a.id })),
     ).then((results) => {
       const next: Record<string, AccountMetrics> = {};
-      accountRows.forEach((acct, idx) => {
+      scoped.forEach((acct, idx) => {
         const r = results[idx];
         if (r.status === 'fulfilled') {
           next[acct.id] = {
@@ -380,9 +386,9 @@ export const SocialAnalyticsPanel: React.FC = () => {
       anyPerPost
         // Settled, not all: the decay curve failing must not blank the daily chart beside it.
         ? Promise.allSettled([
-          callAction('get_daily_metrics'),
-          callAction('get_content_decay'),
-          callAction('get_posting_frequency'),
+          callAction('get_daily_metrics', scope),
+          callAction('get_content_decay', scope),
+          callAction('get_posting_frequency', scope),
         ])
         : Promise.resolve(null),
       members.length
@@ -454,12 +460,22 @@ export const SocialAnalyticsPanel: React.FC = () => {
     setDerivedLoading(false);
   }, [activeWorkspaceId, callAction]);
 
-  const load = useCallback(async () => {
-    const accountRows = await loadCore();
-    await loadDerived(accountRows ?? []);
-  }, [loadCore, loadDerived]);
+  /**
+   * A full refresh is the LOCAL read only. The derived reads follow from it through the effect
+   * below, because they also have to re-run when the tab changes — and doing both here as well
+   * would fire them twice per sync.
+   */
+  const load = useCallback(async () => { await loadCore(); }, [loadCore]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadCore(); }, [loadCore]);
+
+  // Whenever the account set or the selected tab changes. Deliberately NOT coupled to loadCore:
+  // re-reading the DB on every tab click would flash the whole-page skeleton over tables that
+  // already hold the right rows.
+  useEffect(() => {
+    if (!accounts.length) { setDerivedLoading(false); return; }
+    void loadDerived(accounts, activeTab === 'all' ? undefined : activeTab);
+  }, [accounts, activeTab, loadDerived]);
 
   /**
    * Pull fresh numbers from Zernio for this workspace, then re-read.

@@ -190,6 +190,77 @@ describe('we only call Zernio endpoints that exist', () => {
     ).toEqual([]);
   });
 
+  /**
+   * Every operation in Zernio's published spec, as a committed fixture.
+   *
+   * Regenerate with:
+   *   curl -s https://docs.zernio.com/llms-full.txt \
+   *     | grep -oE '^## (GET|POST|PUT|PATCH|DELETE) /v1/[^ ]*' \
+   *     | sed 's/^## //' | sort -u > tests/fixtures/zernio-operations.txt
+   *
+   * Committed rather than fetched at test time: a guard that needs the network is a guard that
+   * goes yellow on a bad DNS day and gets skipped. (`docs.zernio.com/openapi.json` serves the
+   * docs SPA's HTML, not a spec — do not try to parse it.)
+   */
+  const SPEC_OPS = new Set(
+    readFileSync(join(__dirname, '..', 'fixtures', 'zernio-operations.txt'), 'utf-8')
+      .split('\n').map(l => l.trim()).filter(Boolean)
+      // Path params are positional, so their NAMES do not matter for this comparison.
+      .map(l => l.replace(/\{[^}]*\}/g, '{}')),
+  );
+
+  /**
+   * A called path matches a spec operation when they agree segment by segment, treating a spec
+   * placeholder as a wildcard. Plain string equality is not enough in BOTH directions: we call
+   * `/connect/whatsapp` against the spec's `/connect/{platform}` (a literal filling a
+   * placeholder), and we call `/accounts/${id}/linkedin-organizations` where the placeholder is
+   * ours. Comparing the two as strings reported the first as a missing endpoint, which is the
+   * kind of false alarm that gets a guard deleted.
+   */
+  const matchesSpec = (method: string, path: string) => {
+    const want = path.split('/');
+    for (const op of SPEC_OPS) {
+      const [m, p] = op.split(' ');
+      if (m !== method) continue;
+      const got = p.split('/');
+      if (got.length !== want.length) continue;
+      if (got.every((seg, i) => seg === '{}' || want[i] === '{}' || seg === want[i])) return true;
+    }
+    return false;
+  };
+
+  it('every Zernio path we call exists in the published spec', () => {
+    // The defect this catches is silent: a wrong path 404s inside a try/catch, the handler
+    // reports a clean zero, and nothing anywhere says the endpoint was never real. That is
+    // exactly how `GET /v1/accounts/{id}` — a path with no GET at all — survived in two OAuth
+    // callbacks until it was found by hand.
+    const offenders: string[] = [];
+
+    for (const file of SOURCES) {
+      const calls = file.code.matchAll(/zernioApi\(\s*['"]([A-Z]+)['"]\s*,\s*([`'"])(.*?)\2/gs);
+      for (const [, method, , rawPath] of calls) {
+        // A path assembled from a variable cannot be resolved statically. Those are covered by
+        // the literal-fragment sweep below instead.
+        if (!rawPath.startsWith('/')) continue;
+        const path = '/v1' + rawPath.split('?')[0].replace(/\$\{[^}]*\}/g, '{}');
+        if (!matchesSpec(method, path)) offenders.push(`${method} ${path} (${file.rel})`);
+      }
+    }
+
+    // Paths built into a variable first — `const path = cond ? '/analytics/x' : '/analytics/y'`.
+    // Every /analytics/… or /accounts/… literal in a Zernio handler must be a real operation
+    // under SOME method, which is weaker than the check above but catches a typo'd path.
+    const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+    for (const file of SOURCES.filter(f => f.rel.includes('zernio-api'))) {
+      for (const [, lit] of file.code.matchAll(/['"`](\/(?:analytics|accounts|posts)\/[a-z0-9\-/]*[a-z0-9\-])['"`?]/gi)) {
+        const path = '/v1' + lit.replace(/\$\{[^}]*\}/g, '{}');
+        if (!METHODS.some(m => matchesSpec(m, path))) offenders.push(`${path} (${file.rel}, literal)`);
+      }
+    }
+
+    expect(offenders, 'Path is not in tests/fixtures/zernio-operations.txt').toEqual([]);
+  });
+
   it('sends an idempotency key when creating a post', () => {
     // POST /v1/posts dedups on x-request-id for 5 minutes. Without it a retried invocation
     // double-posts to the customer's real social account — the one Zernio failure mode that

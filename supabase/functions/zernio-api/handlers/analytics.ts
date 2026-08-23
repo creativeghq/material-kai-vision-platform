@@ -84,16 +84,43 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
 
     const profileId = await resolveWorkspaceProfile(supabase, workspace_id);
     const qs = new URLSearchParams({ profileId });
-    if (body.platform) qs.set('platform', body.platform);
-    if (body.source) qs.set('source', body.source);
-    if (body.from_date) qs.set('fromDate', body.from_date);
-    if (body.to_date) qs.set('toDate', body.to_date);
+
+    // Narrow to ONE account when the caller is asking about one. All four endpoints accept an
+    // account filter, and without it a per-account view charts the whole workspace while its
+    // heading names a single account — a wrong number that looks entirely plausible.
+    //
+    // The id comes from the CLIENT, so it is resolved through social_accounts and bound to the
+    // caller's workspaces first; passing a body-supplied Zernio id straight upstream would let
+    // any tenant read another's analytics off the shared operator account.
+    if (social_account_id) {
+      const { data: acct } = await supabase
+        .from('social_accounts')
+        .select('zernio_account_id, workspace_id')
+        .eq('id', social_account_id)
+        .maybeSingle();
+      if (!acct || (!isSecretCaller && !callerWorkspaceIds.includes(acct.workspace_id))) {
+        return jsonResponse({ success: false, error: 'No such account' }, 404);
+      }
+      // follower-stats takes a comma-separated `accountIds`; the other three take `accountId`.
+      if (action === 'get_follower_stats') qs.set('accountIds', acct.zernio_account_id);
+      else qs.set('accountId', acct.zernio_account_id);
+    }
 
     const path = action === 'get_daily_metrics' ? '/analytics/daily-metrics'
       : action === 'get_content_decay' ? '/analytics/content-decay'
         : action === 'get_posting_frequency' ? '/analytics/posting-frequency'
           : '/accounts/follower-stats';
 
+    // `platform` and `source` exist on the three /analytics/* endpoints and NOT on
+    // follower-stats, whose parameters are accountIds / profileId / fromDate / toDate /
+    // granularity. Sending them there is at best ignored and at worst a 400, and either way it
+    // is us describing a filter the endpoint never applied.
+    if (action !== 'get_follower_stats') {
+      if (body.platform) qs.set('platform', body.platform);
+      if (body.source) qs.set('source', body.source);
+    }
+    if (body.from_date) qs.set('fromDate', body.from_date);
+    if (body.to_date) qs.set('toDate', body.to_date);
     if (action === 'get_follower_stats' && body.granularity) qs.set('granularity', body.granularity);
 
     try {
