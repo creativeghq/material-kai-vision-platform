@@ -57,6 +57,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'customer-assets-api', label: 'customer-assets-api', sublabel: "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343)." },
   { id: 'dashboard-insights', label: 'dashboard-insights', sublabel: 'Generate cached AI insights for the home dashboard' },
   { id: 'data-integrity-runner', label: 'data-integrity-runner', sublabel: 'Run the platform data-integrity check battery + manage checks/findings' },
+  { id: 'embed-agent', label: 'embed-agent', sublabel: 'Public agent surface for the website embed — allowlisted tools, no model turn (embed-key authenticated)' },
   { id: 'email-api', label: 'email-api', sublabel: 'Action-discriminated email sending, domain management, logs, and analytics via Resend.' },
   { id: 'email-contacts-sync-cron', label: 'email-contacts-sync-cron', sublabel: 'Daily cron: push CRM contacts to each workspace\'s Resend audience' },
   { id: 'email-unsubscribe', label: 'email-unsubscribe', sublabel: 'Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).' },

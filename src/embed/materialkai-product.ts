@@ -44,6 +44,9 @@ import './materialkai-builder';
 // And `<materialkai-configurator>` (#382). Same bundle for the same reason: a merchant learns one
 // script tag, and which element they place is a choice about their page, not an install decision.
 import './materialkai-configurator';
+// And `<materialkai-assistant>` (#382 Phase 3) — the platform's tools as buttons. Same bundle,
+// same reason: one script tag, and which element a merchant places is a choice about their page.
+import './materialkai-assistant';
 
 interface EmbedModel {
   format: string;

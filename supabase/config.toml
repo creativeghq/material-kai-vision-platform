@@ -139,6 +139,12 @@ verify_jwt = false
 [functions.products-3d-api]
 verify_jwt = false
 
+# The public agent surface (#382). Anonymous by design — the embed key IS the auth, checked
+# inside the handler by authenticateEmbedKey, so a JWT requirement here would break the one
+# caller it has (a stranger's browser on a merchant's website).
+[functions.embed-agent]
+verify_jwt = false
+
 # #252 — HR module API (employees as CRM contacts + absence tracking). Does its own auth
 # (authenticate + userCanAccessWorkspace + assertEntitled('hr') + hr.view/hr.manage RBAC).
 [functions.hr-api]

@@ -1726,6 +1726,51 @@
     ]
   },
   {
+    "name": "embed-agent",
+    "tag": "Products",
+    "summary": "Public agent surface for the website embed SDK — allowlisted tools, no model turn",
+    "description": "Anonymous tool-running API for the <materialkai-assistant> embed (#382 Phase 2/3). Authenticated by a publishable embed key (material_kai_keys) via the x-embed-key header or ?key= query param; the key resolves the workspace and nothing here reads a workspace, user or owner from the request body. The reachable tool set is a HARDCODED allowlist in _shared/embed-agent-tools.ts — there is no dynamic binding, so a request, a prompt or a model cannot widen it. Every listed tool is deterministic: action=run invokes one tool directly with the caller's arguments and performs NO model turn, so a quick-start costs the merchant nothing. Exactly one tool writes (raise_quote_request, which mints a CRM contact and a quote request); it is gated on Cloudflare Turnstile before the tool is even constructed. The key's allowed_origins drives per-request CORS and its rate_limit_per_minute is consumed atomically per call, exactly as on products-3d-api.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "capabilities",
+        "summary": "Which quick-starts this key may run, plus the Turnstile site key for the quote form",
+        "params": []
+      },
+      {
+        "name": "run",
+        "summary": "Run one allowlisted tool deterministically and return its result",
+        "params": [
+          {
+            "name": "tool",
+            "type": "string",
+            "required": true,
+            "desc": "Tool name. Must be on the public allowlist; an unknown name and a real-but-unexposed name give the same 400 so the endpoint cannot enumerate the platform."
+          },
+          {
+            "name": "args",
+            "type": "object",
+            "required": false,
+            "desc": "Arguments passed straight to the tool. Capped at 8 kB; the tool validates its own shape."
+          },
+          {
+            "name": "turnstile_token",
+            "type": "string",
+            "required": false,
+            "desc": "Required only for the writing tool (raise_quote_request). Verified before the tool is built; fails closed."
+          }
+        ]
+      }
+    ]
+  },
+  {
     "name": "flow-engine",
     "tag": "Flows",
     "summary": "Execute, test, or event-trigger workflow automations by walking the xyflow graph.",
