@@ -26,6 +26,9 @@ import { Switch } from '@/components/core/ui/switch';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
+import {
   RefreshCw, ExternalLink, AlertCircle, Sparkles, Bell, Globe,
   TrendingUp, TrendingDown, MessageSquare, Bot, Newspaper, ThumbsDown, Ban, ThumbsUp,
   Link2, Ghost,
@@ -45,7 +48,7 @@ import {
   getSubjectMonitoring, getSubjectFeed, getSubjectLlmVisibility,
   getSubjectLlmVisibilityTrend, probeSubjectLlm, refreshSubject,
   getSubjectOpportunities, Opportunity, OpportunitiesResponse,
-  getSubjectAiOverviewHistory, AiOverviewHistory,
+  getSubjectAiOverviewHistory, AiOverviewHistory, MentionProbeTier,
   shareOfVoice, submitMentionClassifierCorrection,
   listExclusions, excludeMentionUrl, includeMentionUrl, promoteMentionUrl,
 } from '@/services/mentionMonitoringApi';
@@ -256,7 +259,13 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
     setProbing(true);
     try {
       const r = await probeSubjectLlm(subject);
-      toast({ title: 'LLM probe complete', description: `${r.probe_count} probes, $${r.total_cost_usd.toFixed(4)}` });
+      toast({
+        title: 'LLM probe complete',
+        description: `${r.probe_count} probes, $${r.total_cost_usd.toFixed(4)}`
+          // A run that silently dropped to fewer models is still billed as its tier.
+          + (r.models_unavailable?.length ? ` · no key for ${r.models_unavailable.join(', ')}` : '')
+          + (r.failed_calls ? ` · ${r.failed_calls} call(s) failed` : ''),
+      });
       const [v, tr, sv] = await Promise.all([
         getSubjectLlmVisibility(subject),
         getSubjectLlmVisibilityTrend(subject, 90),
@@ -289,6 +298,30 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
       setOppsLoading(false);
     }
   }, [subject, toast]);
+
+  /**
+   * Change which models the probe uses.
+   *
+   * Warns before switching, because the cost is not the only consequence: every run
+   * already recorded was measured with the other set, so the trend line breaks here and
+   * the platform will refuse to compare across it. That is the correct behaviour and it
+   * is also surprising, so it gets said before rather than discovered after.
+   */
+  const handleTierChange = useCallback(async (tier: MentionProbeTier) => {
+    if (!tracked?.id || tier === (tracked.probe_tier || 'cheap')) return;
+    try {
+      const updated = await updateTrackedMention(tracked.id, { probe_tier: tier });
+      if (updated) setTracked(updated);
+      toast({
+        title: tier === 'frontier' ? 'Switched to the frontier tier' : 'Switched to the cheap tier',
+        description:
+          'Runs before and after this change were measured with different models, so the '
+          + 'trend will not compare across it.',
+      });
+    } catch (e: any) {
+      toast({ title: 'Could not change tier', description: String(e?.message || e), variant: 'destructive' });
+    }
+  }, [tracked?.id, tracked?.probe_tier, toast]);
 
   const handleUpdateAlerts = useCallback(async (patch: Partial<TrackedMention>) => {
     if (!tracked) return;
@@ -700,10 +733,24 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                   </p>
                 </div>
                 {admin && (
-                  <Button size="sm" onClick={handleProbeLlm} disabled={probing}>
-                    <Bot className={`h-3 w-3 mr-1 ${probing ? 'animate-spin' : ''}`} />
-                    {probing ? 'Probing...' : 'Run probe (2 cr)'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={tracked?.probe_tier || 'cheap'}
+                      onValueChange={(v) => void handleTierChange(v as MentionProbeTier)}
+                    >
+                      <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cheap">Cheap tier · ~$0.008/run</SelectItem>
+                        <SelectItem value="frontier">Frontier tier · ~25x</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={handleProbeLlm} disabled={probing}>
+                      <Bot className={`h-3 w-3 mr-1 ${probing ? 'animate-spin' : ''}`} />
+                      {probing
+                        ? 'Probing...'
+                        : `Run probe (${tracked?.probe_tier === 'frontier' ? 60 : 15} cr)`}
+                    </Button>
+                  </div>
                 )}
               </div>
               <Card className="dashboard-card">
@@ -721,6 +768,14 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                           {sovDelta !== null && (
                             <div className={`text-[11px] tabular-nums ${sovDelta >= 0 ? 'text-success' : 'text-destructive'}`}>
                               {sovDelta >= 0 ? '+' : ''}{(sovDelta * 100).toFixed(0)} pts vs {llmTrend?.days}d ago
+                            </div>
+                          )}
+                          {sovDelta === null && llmTrend?.model_set_changed && (
+                            // The backend withheld the delta because the probe tier moved
+                            // inside the window. Saying WHY beats a bare dash, which reads
+                            // as "no data" — a different fact.
+                            <div className="text-[11px] text-muted-foreground">
+                              not comparable — probe models changed
                             </div>
                           )}
                         </div>
@@ -766,6 +821,16 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                         </div>
                       </div>
 
+                      {llmTrend?.model_set_changed && (
+                        <div className="text-[11px] text-warning flex items-start gap-1">
+                          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                          <span>
+                            The probe model set changed inside this window, so the line is two
+                            measurements rather than one trend. A different model gives a
+                            different answer — the step is the instrument, not the brand.
+                          </span>
+                        </div>
+                      )}
                       {llmTrend?.present && llmTrend.points.length > 1 && (
                         <div>
                           <div className="text-xs font-medium mb-1">

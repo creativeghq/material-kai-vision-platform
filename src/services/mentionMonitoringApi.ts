@@ -42,6 +42,15 @@ export type MentionAlertType =
   | 'mention_spike' | 'negative_sentiment' | 'new_outlet' | 'llm_visibility_change';
 export type MentionSubjectType = 'product' | 'brand' | 'keyword';
 
+/**
+ * Which models the weekly probe uses.
+ *
+ * `cheap` is Haiku / gpt-4o-mini / Gemini Flash / Sonar. `frontier` is the models a
+ * person is actually answered by, and costs roughly 25x per token — which is why the
+ * credit price differs and why a trend refuses to compare across a change.
+ */
+export type MentionProbeTier = 'cheap' | 'frontier';
+
 export interface MentionRow {
   id: string;
   tracked_mention_id: string;
@@ -92,6 +101,7 @@ export interface TrackedMention {
   recency_days: number;
   /** Brand's primary domain (no scheme) — powers `domain_snapshot` opportunity. */
   homepage_domain: HomepageDomain;
+  probe_tier: MentionProbeTier;
   sources_enabled: Record<string, boolean>;
   source_config: Record<string, unknown>;
   language_codes: string[];
@@ -208,18 +218,27 @@ export interface LlmVisibilityTrendPoint {
   sentiment_score: number | null;
   ghost_citations: number;
   brand_cited: number;
+  /** Which models measured this point — the instrument, not just the reading. */
+  models: string[];
+  /** False on the first point measured with a different model set. */
+  comparable_with_previous: boolean;
 }
 
 export interface LlmVisibilityTrend {
   present: boolean;
   days: number;
   truncated?: boolean;
+  /** The probe tier moved inside this window, so the line is not one measurement. */
+  model_set_changed?: boolean;
   points: LlmVisibilityTrendPoint[];
   change?: {
-    share_of_voice: number;
-    /** Negative = rank IMPROVED. `null` when there is nothing to compare against. */
+    /** `null` when the model set changed — the question is not answerable, not zero. */
+    share_of_voice: number | null;
+    /** Negative = rank IMPROVED. `null` when there is nothing comparable. */
     avg_position: number | null;
     runs_compared: number;
+    /** Why `change` is null, so a dash can say what kind of dash it is. */
+    not_comparable_reason?: string | null;
   };
 }
 
@@ -415,11 +434,23 @@ export async function getSubjectLlmVisibilityTrend(
   return res.data;
 }
 
+export interface ProbeRunOutcome {
+  status: string;
+  probe_run_id: string;
+  probe_count: number;
+  total_cost_usd: number;
+  tier?: MentionProbeTier;
+  /** Models the tier asked for that this deployment has no key for. */
+  models_unavailable?: string[];
+  /** Calls that errored. A tier is not what ran; it is what was asked for. */
+  failed_calls?: number;
+}
+
 export async function probeSubjectLlm(
   ref: MentionSubjectRef,
   models?: string[],
-): Promise<{ status: string; probe_run_id: string; probe_count: number; total_cost_usd: number }> {
-  const res = await api<{ success: boolean; data: { status: string; probe_run_id: string; probe_count: number; total_cost_usd: number } }>(
+): Promise<ProbeRunOutcome> {
+  const res = await api<{ success: boolean; data: ProbeRunOutcome }>(
     `${subjectBase(ref)}/probe-llm`,
     { method: 'POST', body: JSON.stringify(models ? { models } : {}) },
   );
@@ -514,6 +545,8 @@ export interface CreateTrackedMentionInput {
   refresh_interval_hours?: number;
   recency_days?: number;
   homepage_domain?: string;
+  /** Which model tier the weekly probe uses. `frontier` costs materially more. */
+  probe_tier?: MentionProbeTier;
   alert_channels?: string[];
   alert_on_spike?: boolean;
   alert_on_negative_sentiment?: boolean;
