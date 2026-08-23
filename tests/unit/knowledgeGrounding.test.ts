@@ -143,6 +143,81 @@ describe('knowledge grounding: retrieval is not the model’s decision', () => {
   });
 });
 
+/** A stub `read_document_section` returning a continuous window. */
+function readerTool(spy?: { calls: Record<string, unknown>[] }) {
+  return {
+    name: 'read_document_section',
+    invoke: (args: Record<string, unknown>) => {
+      spy?.calls.push(args);
+      const at = Number(args.chunkIndex);
+      return Promise.resolve(JSON.stringify({
+        found: true,
+        documentTitle: 'Product Bible / Product Discovery',
+        docSectionCount: 253,
+        sections: [at - 1, at, at + 1].map((i) => ({ chunkIndex: i, content: `continuous text ${i}` })),
+      }));
+    },
+  };
+}
+
+describe('knowledge grounding: the best hits arrive already read out', () => {
+  // Fragments alone left the agent one move short, so it spent a whole MODEL TURN calling
+  // read_document_section — ~350ms of tool time but a full Opus round trip, against a 38–45s turn
+  // in which retrieval is only ~2–4s. The round trip was the expensive part.
+  it('expands the top hits into continuous text before the turn', async () => {
+    const spy = { calls: [] as Record<string, unknown>[] };
+    const out = await groundTurnInWorkspaceKnowledge({
+      tools: [
+        kbTool({ found: true, articles: [article()], products: [], entities: [] }),
+        readerTool(spy),
+      ],
+      userInput: 'what is product discovery',
+    });
+    expect(spy.calls.length).toBe(1);
+    expect(spy.calls[0]).toMatchObject({ docId: 'doc-1', chunkIndex: 112, source: 'kb' });
+    expect(out.block).toContain('continuous text 112');
+    expect(out.block).toMatch(/expanded="sections 111-113 of 253"/);
+    expect(out.block).toMatch(/ALREADY been read out/i);
+  });
+
+  it('expands one hit per DOCUMENT — two hits in one chapter are one passage', async () => {
+    // Overlapping windows would pay a second round trip to re-fetch text the first returned.
+    const spy = { calls: [] as Record<string, unknown>[] };
+    await groundTurnInWorkspaceKnowledge({
+      tools: [
+        kbTool({
+          found: true,
+          products: [], entities: [],
+          articles: [article({ chunkIndex: 112 }), article({ chunkIndex: 116 }), article({ docId: 'doc-2', chunkIndex: 4 })],
+        }),
+        readerTool(spy),
+      ],
+      userInput: 'x',
+    });
+    expect(spy.calls.map((c) => c.docId)).toEqual(['doc-1', 'doc-2']);
+  });
+
+  it('keeps the fragment when expansion fails', async () => {
+    const failing = { name: 'read_document_section', invoke: () => Promise.reject(new Error('504')) };
+    const out = await groundTurnInWorkspaceKnowledge({
+      tools: [kbTool({ found: true, articles: [article()], products: [], entities: [] }), failing],
+      userInput: 'x',
+    });
+    expect(out.sections).toBe(1);
+    expect(out.block).toContain('complements and precedes'); // the original fragment
+    expect(out.block).toContain('expanded="no"');
+  });
+
+  it('still works when the reader tool is not bound at all', async () => {
+    const out = await groundTurnInWorkspaceKnowledge({
+      tools: [kbTool({ found: true, articles: [article()], products: [], entities: [] })],
+      userInput: 'x',
+    });
+    expect(out.sections).toBe(1);
+    expect(out.block).toContain('expanded="no"');
+  });
+});
+
 describe('knowledge grounding: the skip list is facts, never a judgement about the message', () => {
   it('skips only on structural conditions', async () => {
     const spy = { calls: [] as unknown[] };
