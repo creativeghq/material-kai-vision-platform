@@ -37,6 +37,10 @@ import {
   applyMaterialOverrides, cloneSceneWithOwnMaterials, type MaterialOverride,
 } from '@/components/features/ar/materialOverrides';
 import { formatMoney } from '@/utils/decimal';
+// The tenant's lighting rigs. Plain import-free constants, so a React-free bundle takes them as-is
+// — and importing them is what stops the widget growing a second opinion about what
+// "natural daylight" means.
+import { LIGHTING_PRESETS } from '@/components/features/lighting/lightingPresets';
 // Registers `<materialkai-builder>` in the same bundle. They ship together because the builder's
 // success case IS the product widget — an exact match mounts one — and because splitting them
 // would give a merchant two script tags to get right for one feature.
@@ -75,6 +79,14 @@ interface EmbedOptionGroup {
   values: EmbedOptionValue[];
 }
 
+/** The tenant's lighting choice, as `resolve_scene_settings` returns it (#335 / #382). */
+interface EmbedScene {
+  preset: string;
+  exposure: number;
+  camera_zoom: number | null;
+  show_background: boolean;
+}
+
 interface EmbedProduct {
   product_id: string;
   name: string;
@@ -84,6 +96,7 @@ interface EmbedProduct {
   images: string[];
   models: EmbedModel[];
   options?: EmbedOptionGroup[];
+  scene?: EmbedScene | null;
 }
 
 /** Where the API lives. Overridable per-element so a staging page can point elsewhere. */
@@ -658,16 +671,41 @@ export class MaterialKaiProduct extends HTMLElement {
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environmentIntensity = 1;
 
-    scene.add(new AmbientLight(0xffffff, 0.4));
-    const key = new DirectionalLight(0xffffff, 1.0);
-    key.position.set(5, 8, 5);
-    scene.add(key);
-    const fill = new DirectionalLight(0xffffff, 0.4);
+    // THE TENANT'S RIG, not a hardcoded one. `resolve_scene_settings` already answered
+    // embed key → product → workspace default; this is the first surface to honour it.
+    //
+    // The preset's `hdri` name is deliberately NOT used: fetching an environment map would depend
+    // on the merchant's CSP allowing our origin for assets, and a lit product must not depend on
+    // that. The generated RoomEnvironment stays; what the preset drives is the sun and the ambient,
+    // which is the part a tenant is actually choosing between.
+    const presets = LIGHTING_PRESETS as Record<string, {
+      sunEnabled: boolean; sunIntensity: number; sunColor: string; sunAltitude: number; ambientIntensity: number;
+    }>;
+    const rig = presets[this.product?.scene?.preset ?? ''] ?? presets.natural_daylight;
+
+    scene.add(new AmbientLight(0xffffff, rig.ambientIntensity));
+    if (rig.sunEnabled) {
+      const key = new DirectionalLight(rig.sunColor, rig.sunIntensity);
+      // Altitude is degrees above the horizon; the azimuth stays where the widget always had it so
+      // a product does not swing round when a tenant only changed the time of day.
+      const alt = (rig.sunAltitude * Math.PI) / 180;
+      const radius = 9;
+      key.position.set(Math.cos(alt) * 5, Math.sin(alt) * radius, Math.cos(alt) * 5);
+      scene.add(key);
+    }
+    const fill = new DirectionalLight(0xffffff, Math.max(0.15, rig.ambientIntensity));
     fill.position.set(-3, 4, -2);
     scene.add(fill);
 
+    // Exposure and background are the two settings that are not part of a preset.
+    renderer.toneMappingExposure = Number(this.product?.scene?.exposure ?? 1) || 1;
+    if (this.product?.scene?.show_background) scene.background = scene.environment;
+
     const camera = new PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.set(0, TARGET_SIZE * 0.8, TARGET_SIZE * 1.8);
+    // `camera_zoom` is a multiple of the model's size; null means auto-fit, which is the behaviour
+    // every widget had before the setting existed.
+    const zoom = Number(this.product?.scene?.camera_zoom ?? 0) || 1.8;
+    camera.position.set(0, TARGET_SIZE * (zoom * 0.45), TARGET_SIZE * zoom);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     this.controls = controls;

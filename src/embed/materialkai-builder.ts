@@ -42,6 +42,11 @@ const STYLE = `
    model they cannot configure or buy, which is the one thing an exact match is FOR. */
 .viewport[data-mode="product"] { aspect-ratio:auto; overflow:visible; background:transparent; }
 .viewport materialkai-product { display:block; width:100%; }
+.viewport[data-mode="shelf"] { background:transparent; aspect-ratio:auto; overflow:visible; }
+.shelf { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; }
+.shelfItem { font:inherit; display:grid; gap:5px; padding:6px; border:1px solid #e3ddd2; border-radius:9px;
+             background:#fff; color:inherit; cursor:pointer; text-align:left; font-size:12px; }
+.shelfItem img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:6px; display:block; }
 .genTag { position:absolute; left:8px; bottom:8px; font-size:11px; padding:3px 8px; border-radius:999px;
           background:rgba(28,26,30,.72); color:#fff; }
 .vEmpty { position:absolute; inset:0; display:grid; place-items:center; font-size:13px; color:#8b857f; }
@@ -83,6 +88,7 @@ textarea { min-height:70px; resize:vertical; }
   :host { color:#f2eef2; }
   .dot { background:#2c2833; color:#a9a2ad; } .dot[data-on="1"] { background:#f2eef2; color:#221f26; }
   .viewport { background:#252030; } .vEmpty { color:#8b8394; }
+  .shelfItem { background:#2c2833; border-color:#3d3745; }
   .rule, .card, .near .n { border-color:#3d3745; } .card, .opt, input, textarea, button.ghost { background:#2c2833; }
   .opt, button.ghost, input, textarea { border-color:#3d3745; color:#f2eef2; }
   .opt[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
@@ -95,6 +101,15 @@ textarea { min-height:70px; resize:vertical; }
 export class MaterialKaiBuilder extends HTMLElement {
   private root: ShadowRoot;
   private facets: SpecFacet[] = [];
+  /**
+   * The merchant's actual shelf, shown while the visitor has chosen nothing (#382).
+   *
+   * The widget used to open on a grey square reading "Your selection appears here" — an empty box
+   * on a stranger's website, on a page that already had a catalogue API it never called. Real
+   * products are a better first impression than a prompt, and picking one deep-links straight into
+   * the product widget, which is the fastest path to the thing most visitors actually came for.
+   */
+  private shelf: Array<{ product_id: string; name: string; image: string | null }> = [];
   private spec: Record<string, string> = {};
   private stage: 1 | 2 | 3 = 1;
   private result: ResolveResult | null = null;
@@ -138,6 +153,9 @@ export class MaterialKaiBuilder extends HTMLElement {
     }
     this.render();
     void this.loadFacets();
+    // Not awaited and not blocking: the wizard is usable the moment its vocabulary lands, and a
+    // slow catalogue must not hold up the questions.
+    void this.loadShelf();
   }
 
   private get apiBase(): string {
@@ -148,8 +166,18 @@ export class MaterialKaiBuilder extends HTMLElement {
     return this.getAttribute('api-key') || '';
   }
 
-  private url(action: string): string {
-    return `${this.apiBase}/functions/v1/products-3d-api?action=${action}&key=${encodeURIComponent(this.apiKey)}`;
+  /**
+   * Every request this widget makes, built in one place.
+   *
+   * `extra` exists so a caller with query params still goes through here rather than concatenating
+   * onto the result — a fetch built any other way is one refactor away from omitting the key and
+   * hitting an unauthenticated endpoint, which is what the contract test guards.
+   */
+  private url(action: string, extra: Record<string, string | number> = {}): string {
+    const params = Object.entries(extra)
+      .map(([k, v]) => `&${k}=${encodeURIComponent(String(v))}`)
+      .join('');
+    return `${this.apiBase}/functions/v1/products-3d-api?action=${action}&key=${encodeURIComponent(this.apiKey)}${params}`;
   }
 
   private async loadFacets() {
@@ -168,6 +196,26 @@ export class MaterialKaiBuilder extends HTMLElement {
     this.render();
   }
 
+  /** The merchant's published products, for the opening frame. */
+  private async loadShelf() {
+    try {
+      const res = await fetch(this.url('list', { limit: 12 }));
+      const body = await res.json();
+      const rows = Array.isArray(body?.products) ? body.products : [];
+      this.shelf = rows
+        .map((p: Record<string, unknown>) => ({
+          product_id: String(p.product_id ?? ''),
+          name: String(p.name ?? 'Product'),
+          image: Array.isArray(p.images) && p.images.length ? String(p.images[0]) : null,
+        }))
+        .filter((p: { product_id: string }) => p.product_id);
+    } catch {
+      // A shelf that will not load is not an error the visitor needs — the wizard still works.
+      this.shelf = [];
+    }
+    this.render();
+  }
+
   private choose(key: string, value: string) {
     // Clicking the selected value clears it: every question is optional, because a spec is what the
     // visitor cares about, not a form they must complete.
@@ -177,6 +225,28 @@ export class MaterialKaiBuilder extends HTMLElement {
     this.matchedProductId = null;
     this.generatedUrl = null;
     this.render();
+  }
+
+  /**
+   * What "Price it" collapses to when the catalogue has no vocabulary to offer.
+   *
+   * Going straight to the quote form is the honest move: `resolve` on an empty spec cannot match
+   * anything, so routing through it would spend a round trip to tell the visitor what we already
+   * know.
+   */
+  private quoteOnlyRow(): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const go = document.createElement('button');
+    go.className = 'go';
+    go.textContent = 'Request a quote';
+    go.addEventListener('click', () => {
+      this.result = { match_kind: 'none', spec_facets: 0, product: null, near_matches: [] };
+      this.stage = 2;
+      this.render();
+    });
+    row.appendChild(go);
+    return row;
   }
 
   private async priceIt() {
@@ -325,6 +395,38 @@ export class MaterialKaiBuilder extends HTMLElement {
       return frame;
     }
 
+    // THE SHELF, rather than an empty box (#382). A widget that opens on "Your selection appears
+    // here" is the emptiness this whole surface was criticised for, and the catalogue API was
+    // sitting right there unused. Picking one is the deep-link path, so a visitor who recognises
+    // what they want skips the wizard entirely.
+    if (!this.generating && this.shelf.length > 0) {
+      frame.dataset.mode = 'shelf';
+      const grid = document.createElement('div');
+      grid.className = 'shelf';
+      for (const p of this.shelf.slice(0, 8)) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'shelfItem';
+        if (p.image) {
+          const img = document.createElement('img');
+          img.src = p.image;
+          img.alt = '';
+          img.loading = 'lazy';
+          b.appendChild(img);
+        }
+        const cap = document.createElement('span');
+        cap.textContent = p.name;
+        b.appendChild(cap);
+        b.addEventListener('click', () => {
+          this.matchedProductId = p.product_id;
+          this.render();
+        });
+        grid.appendChild(b);
+      }
+      frame.appendChild(grid);
+      return frame;
+    }
+
     const empty = document.createElement('div');
     empty.className = 'vEmpty';
     empty.textContent = this.generating
@@ -454,10 +556,19 @@ export class MaterialKaiBuilder extends HTMLElement {
     h.textContent = 'What are you looking for?';
     const p = document.createElement('p');
     p.className = 'hint';
+    // NO QUESTIONS MEANS NO WIZARD (#382). `get_embed_spec_options` builds the vocabulary from
+    // product ATTRIBUTES, so a workspace that has not filled any in rendered a heading, a hint and
+    // nothing at all — a form with no fields, on a stranger's website, on day one of a catalogue,
+    // which is exactly the audience least able to forgive it. Say what actually happens next
+    // instead, and let the shelf above and the quote button below carry the visit.
     p.textContent = this.facets.length
       ? 'Pick anything that matters to you — every question is optional.'
-      : 'Tell us what you need and we will come back with a quote.';
+      : 'Tell us what you are after and we will come back with a quote.';
     host.append(h, p);
+    if (this.facets.length === 0) {
+      host.appendChild(this.quoteOnlyRow());
+      return;
+    }
 
     for (const f of this.facets) {
       const wrap = document.createElement('div');

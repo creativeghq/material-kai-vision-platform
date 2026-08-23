@@ -75,8 +75,12 @@ export default function EmbedPlannerPage() {
             .map((p: Record<string, unknown>) => ({
               product_id: String(p.product_id ?? p.id ?? ''),
               name: String(p.name ?? 'Product'),
-              image: (p.image as string) ?? null,
-              // The embed API returns the model's measured dimensions when a model exists.
+              // `images` (plural) is what the listing returns — this read `p.image` and got
+              // undefined for every product, so the thumbnail map was always empty.
+              image: (Array.isArray(p.images) ? (p.images[0] as string) : null) ?? null,
+              // The embed API returns the model's measured dimensions when a model exists. It did
+              // NOT return them on `action=list` until #382, so every product placed at the 0.6 m
+              // placeholder however carefully its GLB had been measured.
               width_m: (p.width_m as number) ?? null,
               depth_m: (p.depth_m as number) ?? null,
             }))

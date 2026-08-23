@@ -409,19 +409,37 @@ Deno.serve(withApiLogging((req) => {
     const priced = (rows ?? []).filter((r: any) => r.product);
     const ids = priced.map((r: any) => r.product_id);
 
-    // Which of these have a ready model, in one query rather than N.
+    // Which of these have a ready model, in one query rather than N — AND how big it is.
+    //
+    // The DIMENSIONS ship with the listing because the room planner reads them off this action and
+    // there is nowhere else for it to get them: `action=product` carries them, but the planner
+    // loads a whole catalogue, and one request per product to learn a width is not a listing.
+    // Without them every product was placed at the 0.6 m placeholder with
+    // `footprint_source: 'default'`, even when its GLB had been measured on upload — a plausible
+    // number, nothing raised, and the one question the planner exists to answer ("does it fit")
+    // answered wrongly for every item.
     const formatsByProduct = new Map<string, string[]>();
+    const sizeByProduct = new Map<string, { width_m: number | null; height_m: number | null; depth_m: number | null }>();
     if (ids.length) {
       const { data: models } = await supabase
         .from('product_3d_models')
-        .select('product_id, format')
+        .select('product_id, format, width_m, height_m, depth_m')
         .eq('workspace_id', workspaceId)
         .eq('status', 'ready')
         .in('product_id', ids);
       for (const m of models ?? []) {
-        const list = formatsByProduct.get((m as any).product_id) ?? [];
-        list.push((m as any).format);
-        formatsByProduct.set((m as any).product_id, list);
+        const row = m as any;
+        const list = formatsByProduct.get(row.product_id) ?? [];
+        list.push(row.format);
+        formatsByProduct.set(row.product_id, list);
+        // usdz is a zip container measured from its glb sibling, so a format may carry nulls. Keep
+        // the first row that actually has a measurement rather than whichever arrived last.
+        const known = sizeByProduct.get(row.product_id);
+        if (!known?.width_m && (row.width_m != null || row.depth_m != null || row.height_m != null)) {
+          sizeByProduct.set(row.product_id, {
+            width_m: row.width_m ?? null, height_m: row.height_m ?? null, depth_m: row.depth_m ?? null,
+          });
+        }
       }
     }
 
@@ -437,6 +455,11 @@ Deno.serve(withApiLogging((req) => {
       currency: r.currency ?? 'EUR',
       images: imagesFromMetadata(r.product.metadata),
       model_formats: formatsByProduct.get(r.product_id) ?? [],
+      // Null means UNKNOWN, never a guessed size — a consumer that wants to place this at real
+      // scale has to say out loud that it is assuming.
+      width_m: sizeByProduct.get(r.product_id)?.width_m ?? null,
+      height_m: sizeByProduct.get(r.product_id)?.height_m ?? null,
+      depth_m: sizeByProduct.get(r.product_id)?.depth_m ?? null,
     }));
 
     return embedJson({ ok: true, products }, 200, cors);
@@ -471,6 +494,22 @@ Deno.serve(withApiLogging((req) => {
     // on a configurable item, and revealing them late reads as a broken page.
     const options = await loadOptions(supabase, workspaceId, productId, vatRate);
 
+    // HOW THIS TENANT WANTS THEIR PRODUCTS LIT (#335, wired to the embed in #382).
+    //
+    // `resolve_scene_settings` has answered `embed key → product → workspace default` since it
+    // shipped, and `scene_settings` has carried an `embed_key_id` column for exactly this — and
+    // nothing on this surface ever called it. So a merchant who set a product's lighting in-app
+    // saw it in the in-app viewer and the AR modal, and not on their own website, which is the one
+    // place their customers look. The key is passed, so a per-key override finally means something.
+    //
+    // Fails soft: an error here returns nothing and the widget keeps its built-in rig. Lighting is
+    // not worth failing a product render over.
+    const { data: scene } = await supabase.rpc('resolve_scene_settings', {
+      p_workspace_id: workspaceId,
+      p_product_id: productId,
+      p_embed_key_id: auth.ctx.keyId,
+    });
+
     const product = (row as any).product;
     return embedJson({
       ok: true,
@@ -485,6 +524,7 @@ Deno.serve(withApiLogging((req) => {
         images: imagesFromMetadata(product.metadata),
         models: serializeModels(supabaseUrl, (models ?? []) as ModelRow[]),
         options,
+        scene: scene ?? null,
       },
     }, 200, cors);
   }
