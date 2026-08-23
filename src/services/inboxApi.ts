@@ -490,15 +490,27 @@ export const inboxApi = {
  * editor. `key` is what's stored in `inbox_labels.color`; `chip` is the Tailwind class set for a
  * pill (works in both themes); `dot` tints the small swatch in the picker.
  */
+/**
+ * The label palette. Each chip is a light/dark PAIR and both halves are mandatory.
+ *
+ * These were `bg-x-500/15 text-x-300 border-x-500/30` — one set of classes, picked against the
+ * dark theme. A `-300` shade is pale by design: it reads on plum-black and it disappears on the
+ * light themes' cream and white, where a label chip rendered at roughly 1.6:1. Nothing raised,
+ * because a wrong colour is a valid class. Same fix as the source tags in
+ * `src/pages/Inbox/inboxSource.ts`, and the same house pattern as `src/utils/statusTone.ts`.
+ *
+ * Written out rather than assembled: Tailwind's scanner reads source text, so a class built
+ * from a template literal produces no CSS rule at all.
+ */
 export const LABEL_COLORS: Array<{ key: string; label: string; chip: string; dot: string }> = [
-  { key: 'slate',   label: 'Slate',   chip: 'bg-slate-500/15 text-slate-300 border-slate-500/30',       dot: 'bg-slate-400' },
-  { key: 'rose',    label: 'Rose',    chip: 'bg-rose-500/15 text-rose-300 border-rose-500/30',          dot: 'bg-rose-400' },
-  { key: 'amber',   label: 'Amber',   chip: 'bg-amber-500/15 text-amber-300 border-amber-500/30',       dot: 'bg-amber-400' },
-  { key: 'emerald', label: 'Emerald', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-400' },
-  { key: 'sky',     label: 'Sky',     chip: 'bg-sky-500/15 text-sky-300 border-sky-500/30',             dot: 'bg-sky-400' },
-  { key: 'violet',  label: 'Violet',  chip: 'bg-violet-500/15 text-violet-300 border-violet-500/30',    dot: 'bg-violet-400' },
-  { key: 'cyan',    label: 'Cyan',    chip: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',          dot: 'bg-cyan-400' },
-  { key: 'teal',    label: 'Teal',    chip: 'bg-teal-500/15 text-teal-300 border-teal-500/30',          dot: 'bg-teal-400' },
+  { key: 'slate',   label: 'Slate',   chip: 'bg-slate-500/10 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/25 dark:border-slate-500/30',             dot: 'bg-slate-500 dark:bg-slate-400' },
+  { key: 'rose',    label: 'Rose',    chip: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/25 dark:border-rose-500/30',                   dot: 'bg-rose-500 dark:bg-rose-400' },
+  { key: 'amber',   label: 'Amber',   chip: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30',             dot: 'bg-amber-500 dark:bg-amber-400' },
+  { key: 'emerald', label: 'Emerald', chip: 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 dark:border-emerald-500/30', dot: 'bg-emerald-500 dark:bg-emerald-400' },
+  { key: 'sky',     label: 'Sky',     chip: 'bg-sky-500/10 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25 dark:border-sky-500/30',                         dot: 'bg-sky-500 dark:bg-sky-400' },
+  { key: 'violet',  label: 'Violet',  chip: 'bg-violet-500/10 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25 dark:border-violet-500/30',       dot: 'bg-violet-500 dark:bg-violet-400' },
+  { key: 'cyan',    label: 'Cyan',    chip: 'bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/25 dark:border-cyan-500/30',                   dot: 'bg-cyan-500 dark:bg-cyan-400' },
+  { key: 'teal',    label: 'Teal',    chip: 'bg-teal-500/10 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/25 dark:border-teal-500/30',                   dot: 'bg-teal-500 dark:bg-teal-400' },
 ];
 
 export function labelChipClass(color: string | null | undefined): string {

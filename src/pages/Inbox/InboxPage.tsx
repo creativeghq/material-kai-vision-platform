@@ -34,7 +34,10 @@ import { Label } from '@/components/core/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
-import { channelForSource, inboxRequestedServices, inboxThreadSource } from './inboxSource';
+import {
+  channelForSource, inboxRequestedServices, inboxSourceKey, inboxSourceMeta, inboxThreadSource,
+  SOURCE_FILTER_ORDER, type InboxSource, type InboxSourceKey,
+} from './inboxSource';
 import { formatDate } from '@/utils/datetime';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -52,7 +55,6 @@ interface WorkspaceMemberOption { user_id: string; label: string; }
 /** {label, kind, userId} keyed by participant id — drives sender names + bubble alignment. */
 interface ParticipantLabel { label: string; kind: 'member' | 'customer' | 'agent'; userId: string | null; }
 
-const ACTIVE_TAB = 'data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
 
 function timeAgo(iso: string): string {
   const d = new Date(iso).getTime();
@@ -72,11 +74,18 @@ function initials(name: string | null | undefined): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** Stable subtle avatar tint derived from the name. */
+/**
+ * Stable subtle avatar tint derived from the name. Each entry is a light/dark PAIR — a `-300`
+ * shade alone is pale by design and left initials invisible on the light themes' cream card.
+ */
 function avatarTint(name: string | null | undefined): string {
   const palette = [
-    'bg-rose-500/20 text-rose-300', 'bg-sky-500/20 text-sky-300', 'bg-emerald-500/20 text-emerald-300',
-    'bg-amber-500/20 text-amber-300', 'bg-violet-500/20 text-violet-300', 'bg-cyan-500/20 text-cyan-300',
+    'bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300',
+    'bg-sky-500/15 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300',
+    'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    'bg-amber-500/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300',
+    'bg-violet-500/15 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300',
+    'bg-cyan-500/15 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300',
   ];
   const s = name || '?';
   let h = 0;
@@ -88,20 +97,109 @@ function money(amount: number | null | undefined, currency: string | null | unde
   return formatMoney(amount, currency || 'EUR');
 }
 
-/** Colored label pills for a thread. */
+/** Coloured label tags for a thread. Squared (`rounded-xs`) — a pill is a button silhouette. */
 const LabelChips: React.FC<{ labels?: InboxLabel[]; className?: string }> = ({ labels, className }) => {
   if (!labels || labels.length === 0) return null;
   return (
     <div className={`flex flex-wrap items-center gap-1 ${className || ''}`}>
       {labels.map((l) => (
-        <span key={l.id} className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full border ${labelChipClass(l.color)}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} />
+        <span key={l.id} className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-xs border ${labelChipClass(l.color)}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${labelDot(l.color)}`} />
           {l.name}
         </span>
       ))}
     </div>
   );
 };
+
+/** The solid dot for a label colour — the one lookup, so the fallback lives in one place. */
+function labelDot(color: string | null | undefined): string {
+  return (LABEL_COLORS.find((c) => c.key === color) || LABEL_COLORS[0]).dot;
+}
+
+/**
+ * The source, rendered for a DENSE LIST ROW: a solid dot plus a plain coloured word.
+ *
+ * It used to be a tinted pill here. Two problems, and the redesign fixes both at once — the
+ * tint that keeps a pill quiet is exactly the thing that makes its text hard to read, and at
+ * twenty rows a tag per row gives every row the visual weight of a button (the same reason
+ * `statusTone` exists and `docs/design-system.md` bans pill backgrounds inside table rows).
+ */
+const SourceWord: React.FC<{ source: InboxSource; className?: string }> = ({ source, className }) => (
+  <span className={`inline-flex items-center gap-1.5 text-[11px] leading-none ${source.tone.text} ${className || ''}`}>
+    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${source.tone.dot}`} />
+    {source.label}
+  </span>
+);
+
+/**
+ * One row of the mailbox sidebar — a view, a source or a label. All three are the same object:
+ * somewhere you GO, with an optional count of what is waiting there.
+ *
+ * `count` is a string, not a number, so a caller can hand it `200+` — the server pages at 200
+ * and printing the ceiling as if it were a total is the quiet kind of wrong. `null` withholds
+ * the count entirely, which is what a caller does when it genuinely does not know.
+ */
+const NavRow: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  count?: string | null;
+  /** Sources and labels sit a step quieter than the three top-level views. */
+  dense?: boolean;
+  /** Unread earns a solid count; everything else is a muted number. */
+  emphasiseCount?: boolean;
+}> = ({ icon, label, active, onClick, count, dense, emphasiseCount }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-current={active ? 'true' : undefined}
+    className={`w-full flex items-center gap-2.5 rounded-sm text-sm transition-colors ${
+      dense ? 'px-2.5 py-1.5' : 'px-2.5 py-2'
+    } ${active
+      ? 'bg-surface-sunken text-foreground font-medium'
+      : 'text-foreground/80 hover:bg-surface-hover'}`}
+  >
+    {icon}
+    <span className="flex-1 text-left truncate">{label}</span>
+    {count != null && (
+      emphasiseCount
+        ? <span className="text-[11px] rounded-xs bg-primary text-primary-foreground px-1.5 tabular-nums shrink-0">{count}</span>
+        : <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{count}</span>
+    )}
+  </button>
+);
+
+/** The mobile stand-in for one sidebar row. Squared, never a pill — see the call site. */
+const MobileChip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`shrink-0 inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-xs border transition-colors ${
+      active ? 'bg-primary text-primary-foreground border-transparent' : 'border-hairline text-muted-foreground hover:bg-surface-hover'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+/** Section heading in the sidebar, with an optional action pinned to its right. */
+const SidebarHeading: React.FC<{ children: React.ReactNode; action?: React.ReactNode }> = ({ children, action }) => (
+  <div className="px-3 pt-3 pb-1.5 flex items-center justify-between gap-2">
+    <span className="text-[11px] tracking-wide text-muted-foreground font-semibold">{children}</span>
+    {action}
+  </div>
+);
+
+/** The source where it stands ALONE and must name itself — header, rail. Squared tinted tag. */
+const SourceTag: React.FC<{ source: InboxSource; className?: string }> = ({ source, className }) => (
+  <span className={`inline-flex items-center gap-1 text-[11px] leading-none px-1.5 py-1 rounded-xs border font-medium ${source.tone.tag} ${className || ''}`}>
+    <source.Icon className="w-3 h-3 shrink-0" />
+    {source.label}
+  </span>
+);
 
 /** Bucket threads into Today / Yesterday / Earlier for the email-client day headers. */
 function dayBucket(iso: string): string {
@@ -154,6 +252,15 @@ const InboxPage: React.FC = () => {
   );
   const setLabelFilter = useCallback(
     (id: string | null) => setFilterValues({ ...filterValues, label: id ?? undefined }),
+    [filterValues, setFilterValues],
+  );
+  // The sidebar's Sources list and the modal's Source select are the same constraint, the same
+  // way Unread already is. The sidebar is where you MOVE around a mailbox; the modal is where
+  // you stack conditions on it — but there is only one filter, so picking a source in either
+  // place puts it in `?f=` and the mailbox is a link either way.
+  const sourceFilter = (filterValues.source as string) || null;
+  const setSourceFilter = useCallback(
+    (key: string | null) => setFilterValues({ ...filterValues, source: key ?? undefined }),
     [filterValues, setFilterValues],
   );
 
@@ -446,6 +553,32 @@ const InboxPage: React.FC = () => {
     [threads, showArchived],
   );
 
+  /**
+   * How many conversations each source is carrying — the number that makes the Sources nav
+   * worth having rather than a second copy of the filter modal.
+   *
+   * It counts the LOADED page, and that page is not always the whole mailbox: `list_threads`
+   * caps at 200, and picking a source pushes that source's channel into the request (which is
+   * the point — trimming 200 rows client-side is wrong past 200 rows). So while a source is
+   * pinned the server has already thrown the others away, and counting them here would print a
+   * confident `0` next to WhatsApp for someone with a hundred WhatsApp threads.
+   *
+   * A count that is only sometimes true is worse than no count, so it is withheld instead:
+   * `null` renders nothing. Same reason `threadTotal` says `200+` at the cap rather than `200`.
+   */
+  const sourceCounts = useMemo(() => {
+    if (sourceFilter) return null;
+    const counts = new Map<InboxSourceKey, number>();
+    for (const t of threads) {
+      const k = inboxSourceKey(t);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    return counts;
+  }, [threads, sourceFilter]);
+
+  /** `200` is the server's page cap, not an answer — say so rather than reporting the ceiling. */
+  const threadTotal = threads.length >= 200 ? '200+' : String(threads.length);
+
   const isCommentThread = activeThread?.channel === 'social'
     && (activeThread.metadata as Record<string, unknown> | null)?.social_kind === 'comments';
 
@@ -561,7 +694,7 @@ const InboxPage: React.FC = () => {
         </Button>
       )}
       <select
-        className="bg-transparent border border-white/10 rounded-full px-3 py-1.5 text-xs capitalize focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="bg-card border border-hairline rounded-sm px-3 py-1.5 text-xs capitalize focus:outline-none focus:ring-2 focus:ring-ring"
         value={activeThread.status}
         onChange={async (e) => {
           const status = e.target.value as InboxThread['status'];
@@ -599,11 +732,12 @@ const InboxPage: React.FC = () => {
       {/* Desktop: 3-pane grid. Mobile: single-pane drill-in (list ↔ conversation),
           with the details rail moved into a slide-up sheet. */}
       <div className="flex flex-col md:grid md:grid-cols-12 gap-4 flex-1 min-h-0 px-4 sm:px-6 py-4">
-        {/* ── Column 0 · Mailbox sidebar (Compose · folders · labels) ── */}
-        <aside className="dashboard-card rounded-2xl border-0 md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0">
-          {/* Workspace header */}
-          <div className="px-3 pt-3 pb-2.5 flex items-center gap-2 border-b border-white/5">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-xs font-display shrink-0" style={{ fontWeight: 700 }}>
+        {/* ── Column 0 · Mailbox sidebar (Compose · views · sources · labels) ── */}
+        <aside className="dashboard-card md:col-span-3 lg:col-span-2 hidden md:flex flex-col overflow-hidden p-0">
+          {/* Workspace header. Flat: the ladder is bg-background → bg-card → bg-surface-sunken,
+              and a gradient block here would be the only thing on the page that is not on it. */}
+          <div className="px-3 py-2.5 flex items-center gap-2 border-b border-hairline bg-surface-sunken shrink-0">
+            <div className="h-8 w-8 rounded-sm bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold shrink-0">
               {initials(activeWorkspace?.name || 'Inbox')}
             </div>
             <div className="min-w-0">
@@ -611,111 +745,153 @@ const InboxPage: React.FC = () => {
               <div className="text-[11px] text-muted-foreground leading-tight">Inbox</div>
             </div>
           </div>
-          {isMember && (
-            <div className="p-3">
-              <Button className="w-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
-                <Plus className="w-4 h-4 mr-1.5" /> Compose
-              </Button>
-            </div>
-          )}
-          <nav className="px-2 space-y-0.5">
-            <button
-              onClick={() => { setShowArchived(false); setUnreadOnly(false); }}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${!showArchived && !unreadOnly ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
-            >
-              <InboxIcon className="w-4 h-4 shrink-0" />
-              <span className="flex-1 text-left">All Inboxes</span>
-              {!showArchived && <span className="text-[11px] text-muted-foreground">{threads.length}</span>}
-            </button>
-            <button
-              onClick={() => { setShowArchived(false); setUnreadOnly(true); }}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${unreadOnly && !showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
-            >
-              <Mail className="w-4 h-4 shrink-0" />
-              <span className="flex-1 text-left">Unread</span>
-              {inboxUnread > 0 && (
-                <span className="text-[11px] rounded-full bg-primary text-primary-foreground px-1.5 min-w-5 text-center">{inboxUnread}</span>
-              )}
-            </button>
-            <button
-              onClick={() => { setShowArchived(true); setUnreadOnly(false); }}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors ${showArchived ? 'bg-primary/15 text-primary font-medium' : 'text-foreground/80 hover:bg-accent'}`}
-            >
-              <Trash2 className="w-4 h-4 shrink-0" />
-              <span className="flex-1 text-left">Archived</span>
-            </button>
-          </nav>
 
-          <div className="px-3 pt-4 pb-1.5 flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium">Labels</span>
-            {canManageLabels && activeWorkspaceId && (
-              <LabelManagerPopover
-                workspaceId={activeWorkspaceId}
-                labels={wsLabels}
-                onChanged={() => { loadLabels(); loadThreads(); }}
-              />
-            )}
-          </div>
-          <div className="px-2 pb-3 space-y-0.5 overflow-y-auto flex-1">
-            <button
-              onClick={() => setLabelFilter(null)}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${!labelFilter ? 'bg-accent text-foreground' : 'text-foreground/70 hover:bg-accent'}`}
-            >
-              <Tag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-              <span className="flex-1 text-left">All labels</span>
-            </button>
-            {wsLabels.map((l) => {
-              const on = labelFilter === l.id;
-              const dot = (LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot;
-              return (
-                <button
-                  key={l.id}
-                  onClick={() => setLabelFilter(on ? null : l.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${on ? 'bg-accent text-foreground font-medium' : 'text-foreground/70 hover:bg-accent'}`}
-                >
-                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
-                  <span className="flex-1 text-left truncate">{l.name}</span>
-                </button>
-              );
-            })}
-            {wsLabels.length === 0 && (
-              <div className="text-[11px] text-muted-foreground px-2.5 py-2">
-                {canManageLabels ? 'Create labels with the + above.' : 'No labels yet.'}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {isMember && (
+              <div className="p-3">
+                <Button className="w-full" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId}>
+                  <Plus className="w-4 h-4 mr-1.5" /> Compose
+                </Button>
               </div>
             )}
+
+            <nav className="px-2 pb-1 space-y-0.5">
+              <NavRow
+                icon={<InboxIcon className="w-4 h-4 shrink-0" />}
+                label="All conversations"
+                active={!showArchived && !unreadOnly}
+                count={showArchived ? null : threadTotal}
+                onClick={() => { setShowArchived(false); setUnreadOnly(false); }}
+              />
+              <NavRow
+                icon={<Mail className="w-4 h-4 shrink-0" />}
+                label="Unread"
+                active={unreadOnly && !showArchived}
+                count={inboxUnread > 0 ? String(inboxUnread) : null}
+                emphasiseCount
+                onClick={() => { setShowArchived(false); setUnreadOnly(true); }}
+              />
+              <NavRow
+                icon={<Archive className="w-4 h-4 shrink-0" />}
+                label="Archived"
+                active={showArchived}
+                onClick={() => { setShowArchived(true); setUnreadOnly(false); }}
+              />
+            </nav>
+
+            {/*
+              Sources — the door each conversation came through, which is the axis this inbox is
+              actually organised on since the profile-enquiry merge. It was reachable only from
+              inside the filter modal, so the one thing that distinguishes a "Hire me" enquiry
+              from cold mail took two clicks and a read to find.
+            */}
+            <SidebarHeading>Sources</SidebarHeading>
+            <nav className="px-2 pb-1 space-y-0.5">
+              <NavRow
+                icon={<MessagesSquare className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                label="Every source"
+                dense
+                active={!sourceFilter}
+                onClick={() => setSourceFilter(null)}
+              />
+              {SOURCE_FILTER_ORDER.map((key) => {
+                const meta = inboxSourceMeta(key);
+                const n = sourceCounts?.get(key) ?? null;
+                // A source with nothing in it is not a place to go. It stays visible only while
+                // it is the one you picked, so the row you are standing on never vanishes.
+                if (sourceCounts && !n && sourceFilter !== key) return null;
+                return (
+                  <NavRow
+                    key={key}
+                    icon={<span className={`w-2 h-2 rounded-full shrink-0 ${meta.tone.dot}`} />}
+                    label={meta.label}
+                    dense
+                    active={sourceFilter === key}
+                    count={n != null ? String(n) : null}
+                    onClick={() => setSourceFilter(sourceFilter === key ? null : key)}
+                  />
+                );
+              })}
+            </nav>
+
+            <SidebarHeading
+              action={canManageLabels && activeWorkspaceId ? (
+                <LabelManagerPopover
+                  workspaceId={activeWorkspaceId}
+                  labels={wsLabels}
+                  onChanged={() => { loadLabels(); loadThreads(); }}
+                />
+              ) : undefined}
+            >
+              Labels
+            </SidebarHeading>
+            <nav className="px-2 pb-3 space-y-0.5">
+              <NavRow
+                icon={<Tag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                label="All labels"
+                dense
+                active={!labelFilter}
+                onClick={() => setLabelFilter(null)}
+              />
+              {wsLabels.map((l) => (
+                <NavRow
+                  key={l.id}
+                  icon={<span className={`w-2 h-2 rounded-full shrink-0 ${labelDot(l.color)}`} />}
+                  label={l.name}
+                  dense
+                  active={labelFilter === l.id}
+                  onClick={() => setLabelFilter(labelFilter === l.id ? null : l.id)}
+                />
+              ))}
+              {wsLabels.length === 0 && (
+                <div className="text-[11px] text-muted-foreground px-2.5 py-2">
+                  {canManageLabels ? 'Create labels with the + above.' : 'No labels yet.'}
+                </div>
+              )}
+            </nav>
           </div>
         </aside>
 
         {/* ── Column 1 · Message list ── */}
-        <div className={`dashboard-card rounded-2xl border-0 md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-3 border-b border-white/10 space-y-3">
+        <div className={`dashboard-card md:col-span-4 lg:col-span-3 2xl:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-3 border-b border-hairline bg-surface-sunken space-y-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input
                   value={query} onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search mail"
-                  className="pl-9 h-10 rounded-lg"
+                  placeholder="Search conversations"
+                  className="pl-9 h-9"
                 />
               </div>
               {/* Mobile compose — the sidebar (with its Compose) is desktop-only */}
               {isMember && (
-                <Button size="icon" className="h-10 w-10 shrink-0 md:hidden" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} title="Compose">
+                <Button size="icon" className="h-9 w-9 shrink-0 md:hidden" onClick={() => setShowNew(true)} disabled={!activeWorkspaceId} title="Compose">
                   <Plus className="w-4 h-4" />
                 </Button>
               )}
             </div>
-            {/* Mobile folder + label filters (they live in the sidebar on desktop) */}
+            {/* Mobile views + sources (they live in the sidebar on desktop). Squared, not pills:
+                a pill is the silhouette of a primary button, so "where I am" and "what to press"
+                would be the same object on the one breakpoint with no room to tell them apart. */}
             <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-0.5">
-              <button onClick={() => { setShowArchived(false); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${!showArchived && !unreadOnly ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><InboxIcon className="w-3 h-3" />All</button>
-              <button onClick={() => { setShowArchived(false); setUnreadOnly(true); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${unreadOnly && !showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Mail className="w-3 h-3" />Unread</button>
-              <button onClick={() => { setShowArchived(true); setUnreadOnly(false); }} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${showArchived ? 'bg-primary text-primary-foreground border-transparent' : 'border-white/10 text-muted-foreground'}`}><Archive className="w-3 h-3" />Archived</button>
-              {wsLabels.map((l) => {
-                const on = labelFilter === l.id;
+              <MobileChip active={!showArchived && !unreadOnly} onClick={() => { setShowArchived(false); setUnreadOnly(false); }}>
+                <InboxIcon className="w-3 h-3" />All
+              </MobileChip>
+              <MobileChip active={unreadOnly && !showArchived} onClick={() => { setShowArchived(false); setUnreadOnly(true); }}>
+                <Mail className="w-3 h-3" />Unread
+              </MobileChip>
+              <MobileChip active={showArchived} onClick={() => { setShowArchived(true); setUnreadOnly(false); }}>
+                <Archive className="w-3 h-3" />Archived
+              </MobileChip>
+              {SOURCE_FILTER_ORDER.map((key) => {
+                const meta = inboxSourceMeta(key);
+                const n = sourceCounts?.get(key) ?? null;
+                if (sourceCounts && !n && sourceFilter !== key) return null;
                 return (
-                  <button key={l.id} onClick={() => setLabelFilter(on ? null : l.id)} className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 border ${labelChipClass(l.color)} ${on ? 'ring-1 ring-inset ring-current' : 'opacity-70'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} />{l.name}
-                  </button>
+                  <MobileChip key={key} active={sourceFilter === key} onClick={() => setSourceFilter(sourceFilter === key ? null : key)}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${meta.tone.dot}`} />{meta.label}
+                  </MobileChip>
                 );
               })}
             </div>
@@ -725,10 +901,12 @@ const InboxPage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-2">
               {!showArchived && !unreadOnly ? (
                 <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
-                  <TabsList className="h-auto gap-1.5 bg-transparent p-0">
-                    <TabsTrigger value="open" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Open</TabsTrigger>
-                    <TabsTrigger value="snoozed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Follow-Up</TabsTrigger>
-                    <TabsTrigger value="closed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Done</TabsTrigger>
+                  {/* No active-state override: the underline treatment is global, on
+                      [role="tab"] in index.css. A filled pill here would read as a button. */}
+                  <TabsList className="h-auto gap-3 bg-transparent p-0">
+                    <TabsTrigger value="open" className="text-xs px-0 py-1">Open</TabsTrigger>
+                    <TabsTrigger value="snoozed" className="text-xs px-0 py-1">Follow-up</TabsTrigger>
+                    <TabsTrigger value="closed" className="text-xs px-0 py-1">Done</TabsTrigger>
                   </TabsList>
                 </Tabs>
               ) : <span />}
@@ -776,44 +954,59 @@ const InboxPage: React.FC = () => {
                 {items.map((t) => {
                   const name = threadDisplayName(t);
                   const active = activeId === t.id;
-                  const { Icon: SrcIcon, label: srcLabel, className: srcClass } = inboxThreadSource(t);
+                  const source = inboxThreadSource(t);
+                  // Who is on it, printed after the source — the pairing an operator triages by
+                  // ("Email · Cody Wilson"). Unassigned is STATED, not left blank: a thread
+                  // nobody has picked up and one whose assignee simply did not render look
+                  // identical when the answer is an empty string.
+                  const assignee = (t.assignees ?? [])[0]?.name ?? null;
+                  const orderPending = (t.metadata as { order_intake?: { status?: string } } | null)
+                    ?.order_intake?.status === 'pending_review';
                   return (
                     <button
                       key={t.id}
                       onClick={() => openThread(t.id)}
-                      className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 border-b border-white/5 transition-colors ${active ? 'bg-accent border-l-primary' : 'border-l-transparent hover:bg-accent'}`}
+                      className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
                     >
                       <div className="relative shrink-0 mt-0.5">
                         <Avatar className="h-9 w-9">
                           <AvatarFallback className={`text-xs ${avatarTint(name)}`}>{initials(name)}</AvatarFallback>
                         </Avatar>
-                        <span className={`absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center ${srcClass}`}>
-                          <SrcIcon className="w-2 h-2" />
+                        {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
+                            and the glyph inside it needs a ground to sit on. */}
+                        <span
+                          className={`absolute -right-0.5 -bottom-0.5 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center text-white ${source.tone.dot}`}
+                          title={source.label}
+                        >
+                          <source.Icon className="w-2 h-2" />
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           {t.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                           <span className={`flex-1 truncate text-sm ${t.unread ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>{name}</span>
-                          <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(t.last_message_at)}</span>
+                          <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{timeAgo(t.last_message_at)}</span>
                         </div>
                         {t.last_message_preview && (
                           <div className={`text-xs truncate mt-0.5 ${t.unread ? 'text-foreground/70' : 'text-muted-foreground'}`}>{t.last_message_preview}</div>
                         )}
-                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                          <span className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full border ${srcClass}`}>
-                            <SrcIcon className="w-2.5 h-2.5" /> {srcLabel}
+                        <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap">
+                          <SourceWord source={source} />
+                          <span className="text-[11px] text-muted-foreground truncate max-w-[9rem]">
+                            {assignee ?? 'Unassigned'}
                           </span>
-                          {t.status !== 'open' && !t.archived_at && <span className={`text-[10px] capitalize ${statusTone(t.status)}`}>{t.status}</span>}
+                          {t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status}</span>}
                           {t.agent_state === 'active' && (
-                            <Badge variant="outline" className="text-[10px] border-primary/40 text-primary"><Bot className="w-2.5 h-2.5 mr-0.5" />AI</Badge>
+                            <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>
                           )}
                           {/* #342: an order waiting for approval is the one thing worth seeing
                               from the list — otherwise it is only discoverable by opening the
-                              thread, which is how an order sits unactioned for a week. */}
-                          {(t.metadata as { order_intake?: { status?: string } } | null)?.order_intake?.status === 'pending_review' && (
-                            <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
-                              <ShoppingCart className="w-2.5 h-2.5 mr-0.5" />Order
+                              thread, which is how an order sits unactioned for a week. It keeps
+                              a tag where the rest of the row went to plain words, because it is
+                              the one item in the row that is a JOB rather than a description. */}
+                          {orderPending && (
+                            <Badge variant="warning" className="text-[10px] py-0">
+                              <ShoppingCart className="w-2.5 h-2.5" />Order
                             </Badge>
                           )}
                           <LabelChips labels={t.labels} />
@@ -828,7 +1021,9 @@ const InboxPage: React.FC = () => {
         </div>
 
         {/* ── Column 2 · Conversation ── */}
-        <div className={`dashboard-card rounded-2xl border-0 md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${
+          activeThread ? '2xl:col-span-4' : '2xl:col-span-7'
+        } ${activeId ? 'flex' : 'hidden md:flex'}`}>
           {!activeThread ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
               <MessageSquare className="w-10 h-10 opacity-30" />
@@ -836,13 +1031,13 @@ const InboxPage: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="px-3 sm:px-4 py-3 border-b border-white/10 flex items-center gap-2 sm:gap-3">
+              <div className="px-3 sm:px-4 py-3 border-b border-hairline bg-surface-sunken flex items-center gap-2 sm:gap-3 shrink-0">
                 {/* Mobile: back to the conversation list */}
                 <button
                   type="button"
                   onClick={backToList}
                   aria-label="Back to conversations"
-                  className="md:hidden shrink-0 h-9 w-9 -ml-1 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                  className="md:hidden shrink-0 h-9 w-9 -ml-1 flex items-center justify-center rounded-sm text-muted-foreground hover:bg-surface-hover"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -853,17 +1048,21 @@ const InboxPage: React.FC = () => {
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <div className="truncate text-[15px] font-display" style={{ fontWeight: 600 }}>{threadDisplayName(activeThread)}</div>
+                    <div className="truncate text-[15px] font-semibold">{threadDisplayName(activeThread)}</div>
                     {activeThread.archived_at && (
-                      <Badge variant="outline" className="text-[10px] shrink-0"><Archive className="w-2.5 h-2.5 mr-0.5" />Archived</Badge>
+                      <Badge variant="neutral" className="text-[10px] shrink-0"><Archive className="w-2.5 h-2.5" />Archived</Badge>
                     )}
                   </div>
-                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <span>{inboxThreadSource(activeThread).label}</span>
-                    <span className="opacity-50">·</span>
-                    <span>{activeCount} participant{activeCount === 1 ? '' : 's'}</span>
+                  {/* Here the source DOES get a tag: it stands alone with room around it, and
+                      this is the one place that has to answer "what am I about to reply on"
+                      before the operator starts typing. */}
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    <SourceTag source={inboxThreadSource(activeThread)} />
+                    <span className="text-xs text-muted-foreground">
+                      {activeCount} participant{activeCount === 1 ? '' : 's'}
+                    </span>
+                    <LabelChips labels={activeThreadLabels} />
                   </div>
-                  <LabelChips labels={activeThreadLabels} className="mt-1" />
                 </div>
                 {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
                 {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
@@ -872,7 +1071,7 @@ const InboxPage: React.FC = () => {
                   variant="outline" size="sm"
                   onClick={() => setShowDetails(true)}
                   title="Customer profile — contact, quotes, invoices & projects"
-                  className="shrink-0 gap-1.5"
+                  className="shrink-0 gap-1.5 2xl:hidden"
                 >
                   <UserIcon className="w-4 h-4" /> <span className="hidden sm:inline">Profile</span>
                 </Button>
@@ -895,14 +1094,14 @@ const InboxPage: React.FC = () => {
               </div>
 
               {/* Composer */}
-              <div className="border-t border-white/10 p-3 space-y-2">
+              <div className="border-t border-hairline bg-surface-sunken p-3 space-y-2 shrink-0">
                 {/* A comment reply is PUBLIC. Nothing else about the composer says so, and the
                     same box is used for private DMs one filter click away — an operator who
                     assumes private has already published the mistake by the time they find out. */}
                 {activeThread.channel === 'social'
                   && (activeThread.metadata as Record<string, unknown> | null)?.social_kind === 'comments'
                   && !isNote && (
-                  <div className="text-xs bg-pink-500/10 border border-pink-500/30 text-pink-300 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                  <div className="text-xs bg-pink-500/10 dark:bg-pink-500/15 border border-pink-500/25 dark:border-pink-500/30 text-pink-700 dark:text-pink-300 rounded-sm px-3 py-2 flex items-start gap-1.5">
                     <MessagesSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                     <span>
                       This posts publicly as a reply under your {String((activeThread.metadata as Record<string, unknown> | null)?.platform ?? 'social')} post,
@@ -912,39 +1111,49 @@ const InboxPage: React.FC = () => {
                 )}
 
                 {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
-                  <div className="text-xs bg-amber-bg/60 border border-amber/30 text-amber-foreground rounded-lg px-3 py-2">
+                  <div className="text-xs bg-[hsl(var(--warning-bg))] border border-warning/25 text-warning rounded-sm px-3 py-2">
                     WhatsApp 24-hour reply window has closed. Freeform replies are blocked by Meta — an approved
                     template is required to re-open the conversation. (Internal notes are still allowed.)
                   </div>
                 )}
                 {isMember && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setIsNote(false)}
-                      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 transition-colors ${!isNote ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
-                    >
-                      <Send className="w-3 h-3" /> Reply
-                    </button>
-                    <button
-                      onClick={() => setIsNote(true)}
-                      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 transition-colors ${isNote ? 'bg-amber text-black' : 'text-muted-foreground hover:bg-accent'}`}
-                    >
-                      <StickyNote className="w-3 h-3" /> Private note
-                    </button>
-                    {!isNote && (
+                  <div className="flex items-center gap-2">
+                    {/* Reply / Private note is a MODE, not an action, so it is a segmented
+                        control rather than two filled buttons — the composer already has one
+                        solid button and it is Send. Getting this wrong publishes an internal
+                        note to a customer, so the selected mode is stated in words and the
+                        note mode carries its colour through to the textarea below. */}
+                    <div className="inline-flex rounded-sm border border-hairline overflow-hidden bg-card">
                       <button
+                        onClick={() => setIsNote(false)}
+                        aria-pressed={!isNote}
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 transition-colors ${!isNote ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-hover'}`}
+                      >
+                        <Send className="w-3 h-3" /> Reply
+                      </button>
+                      <button
+                        onClick={() => setIsNote(true)}
+                        aria-pressed={isNote}
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 border-l border-hairline transition-colors ${isNote ? 'bg-[hsl(var(--warning-bg))] text-warning' : 'text-muted-foreground hover:bg-surface-hover'}`}
+                      >
+                        <StickyNote className="w-3 h-3" /> Private note
+                      </button>
+                    </div>
+                    {!isNote && (
+                      <Button
+                        variant="secondary" size="sm"
                         onClick={aiSuggest}
                         disabled={aiDrafting || waBlocked}
                         title="Let the assistant draft a reply you can edit before sending (1 credit)"
-                        className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
+                        className="ml-auto h-8"
                       >
-                        {aiDrafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Draft with AI
-                      </button>
+                        {aiDrafting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1.5" />} Draft with AI
+                      </Button>
                     )}
                   </div>
                 )}
                 {aiDraftShown && !isNote && (
-                  <div className="flex items-center justify-between gap-2 text-xs bg-primary/10 border border-primary/25 text-primary rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 text-xs bg-primary/10 border border-primary/25 text-primary rounded-sm px-3 py-2">
                     <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.</span>
                     <button onClick={() => { setDraft(''); setAiDraftShown(false); }} className="inline-flex items-center gap-1 hover:underline shrink-0">
                       <X className="w-3 h-3" /> Reject
@@ -958,7 +1167,7 @@ const InboxPage: React.FC = () => {
                   </div>
                 )}
                 <div className="flex items-end gap-2">
-                  <label className="cursor-pointer p-2.5 rounded-full hover:bg-accent shrink-0">
+                  <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">
                     <Paperclip className="w-4 h-4 text-muted-foreground" />
                     <input type="file" className="hidden" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} />
                   </label>
@@ -967,10 +1176,10 @@ const InboxPage: React.FC = () => {
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked) send(); } }}
                     placeholder={isNote ? 'Write a private note (only your team sees this)…' : waBlocked ? 'Reply window closed — template required' : 'Type a message…'}
-                    className={`flex-1 min-h-[44px] max-h-32 resize-none rounded-xl ${isNote ? 'border-amber/40 focus-visible:ring-amber/30' : ''}`}
+                    className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
                     disabled={waBlocked}
                   />
-                  <Button className="h-11 w-11 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment)}>
+                  <Button className="h-10 w-10 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment)}>
                     {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -978,6 +1187,30 @@ const InboxPage: React.FC = () => {
             </>
           )}
         </div>
+
+        {/*
+          ── Column 3 · Customer profile ──
+          Standing, not slid over, from 2xl (1536px) up. Both reference layouts keep the
+          contact permanently beside the conversation, and the reason is not decoration: who
+          this person is, what they owe and what is open for them is context you read WHILE
+          composing a reply. Behind a drawer it costs a click and covers the message you were
+          answering, so in practice it goes unread.
+
+          Below 2xl there is no room for a fourth column and it stays the Sheet it was — which
+          is why the Profile button in the header is `2xl:hidden` rather than removed.
+        */}
+        {activeThread && (
+          <aside className="dashboard-card hidden 2xl:flex 2xl:col-span-3 min-h-0 flex-col overflow-hidden p-0">
+            <DetailsRail
+              thread={activeThread}
+              context={context}
+              participants={participants}
+              labels={labels}
+              isMember={isMember}
+              onIntakeChanged={() => { void openThread(activeThread.id); }}
+            />
+          </aside>
+        )}
       </div>
 
       {showNew && activeWorkspaceId && (
@@ -1008,7 +1241,7 @@ const InboxPage: React.FC = () => {
                 logs a warning and a screen reader announces it with no name at all. */}
             <SheetTitle className="sr-only">Conversation details</SheetTitle>
             {memberControls && (
-              <div className="md:hidden flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-white/10 shrink-0">
+              <div className="md:hidden flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-hairline shrink-0">
                 {memberControls}
               </div>
             )}
@@ -1072,7 +1305,7 @@ const MessageBubble: React.FC<{
   if (isSystem) {
     return (
       <div className="flex justify-center my-1.5">
-        <span className="text-[11px] text-muted-foreground bg-muted rounded-full px-3 py-1">{m.body}</span>
+        <span className="text-[11px] text-muted-foreground bg-surface-sunken border border-hairline rounded-xs px-2.5 py-1">{m.body}</span>
       </div>
     );
   }
@@ -1105,7 +1338,7 @@ const MessageBubble: React.FC<{
             <span>{displayLabel}</span>
             {meta.social_kind === 'comment' && <span className="opacity-70">· public comment</span>}
             {meta.hidden_on_platform === true && (
-              <span className="text-amber-400 inline-flex items-center gap-0.5">
+              <span className="text-amber-600 dark:text-amber-400 inline-flex items-center gap-0.5">
                 <EyeOff className="w-2.5 h-2.5" /> hidden
               </span>
             )}
@@ -1172,7 +1405,9 @@ const Row: React.FC<{ icon: React.ReactNode; children: React.ReactNode }> = ({ i
 );
 
 const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode; count?: number }> = ({ icon, children, count }) => (
-  <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-3">
+  // Not accent-coloured: eight accent headings down one narrow column make the labels louder
+  // than the values under them, which is backwards for a panel you read to find a fact.
+  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
     <span className="shrink-0">{icon}</span>
     <span>{children}</span>
     {count != null && <span className="text-xs text-muted-foreground font-normal">({count})</span>}
@@ -1238,11 +1473,11 @@ const KitchenEstimatePanel: React.FC<{ thread: InboxThread }> = ({ thread }) => 
   };
 
   return (
-    <div className="p-5 border-b border-white/10">
+    <div className="p-5 border-b border-hairline">
       <SectionTitle icon={<CookingPot className="h-4 w-4" />}>Kitchen estimate</SectionTitle>
-      <div className="rounded-xl bg-white/5 border border-white/10 p-3 space-y-2.5">
+      <div className="rounded-sm bg-surface-sunken border border-hairline p-3 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-lg font-display" style={{ fontWeight: 700 }}>
+          <span className="text-lg font-semibold tabular-nums">
             {formatMoney(est.subtotal ?? 0, currency)}
           </span>
           {est.reference && <Badge variant="outline" className="text-[10px]">{est.reference}</Badge>}
@@ -1350,7 +1585,7 @@ const IntakeProductPicker: React.FC<{
             key={h.product_id}
             type="button"
             onClick={() => onPick(h)}
-            className="w-full text-left text-sm px-2 py-1.5 rounded-sm hover:bg-accent transition-colors"
+            className="w-full text-left text-sm px-2 py-1.5 rounded-sm hover:bg-surface-hover transition-colors"
           >
             <span className="block truncate">{h.name}</span>
           </button>
@@ -1483,7 +1718,7 @@ const IntakeLineEditor: React.FC<{
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="flex-1 min-w-0 text-left text-sm h-8 px-2 rounded-sm border border-hairline hover:bg-accent transition-colors"
+                    className="flex-1 min-w-0 text-left text-sm h-8 px-2 rounded-sm border border-hairline hover:bg-surface-hover transition-colors"
                   >
                     <span className="block truncate">
                       {r.description || <span className="text-muted-foreground">Pick a product…</span>}
@@ -1662,7 +1897,7 @@ const OrderIntakePanel: React.FC<{
   };
 
   return (
-    <div className="p-5 border-b border-white/10">
+    <div className="p-5 border-b border-hairline">
       <SectionTitle icon={<ShoppingCart className="h-4 w-4" />} count={intake.items.length}>
         {intake.status === 'approved' ? 'Order created' : intake.status === 'rejected' ? 'Order dismissed' : 'Order to approve'}
       </SectionTitle>
@@ -1701,7 +1936,7 @@ const OrderIntakePanel: React.FC<{
         <>
           <div className="space-y-1.5 mb-3">
             {intake.items.map((it: IntakeItem) => (
-              <div key={it.line_no} className="flex items-start gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
+              <div key={it.line_no} className="flex items-start gap-2 text-sm py-1.5 px-2 -mx-2 rounded-sm hover:bg-surface-hover transition-colors">
                 <span className="text-muted-foreground shrink-0 tabular-nums">{it.quantity}×</span>
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{it.description}</div>
@@ -1805,40 +2040,58 @@ const DetailsRail: React.FC<{
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-        <span className="text-sm font-semibold text-primary">Customer Profile</span>
+      <div className="px-4 py-2.5 border-b border-hairline bg-surface-sunken flex items-center justify-between sticky top-0 z-10">
+        <span className="text-sm font-semibold">Customer profile</span>
       </div>
-      {/* Cover banner + overlapping avatar */}
-      <div className="border-b border-white/10">
-        <div className="h-20 bg-gradient-to-br from-primary/40 via-primary/20 to-accent/40" />
-        <div className="px-5 pb-4 -mt-8 flex flex-col items-center text-center">
-          <div
-            className="h-16 w-16 rounded-2xl flex items-center justify-center text-lg font-display text-white bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/25 ring-4 ring-card"
-            style={{ fontWeight: 700 }}
-          >
-            {initials(displayName)}
-          </div>
-          <div className="text-base font-display mt-2" style={{ fontWeight: 600 }}>{displayName}</div>
-          {contact?.position && <div className="text-xs text-muted-foreground mt-0.5">{contact.position}</div>}
+      {/*
+        Identity block. It used to open with a gradient cover banner and a gradient avatar
+        floating on a coloured shadow — the marketing language, on the panel whose job is
+        showing someone's phone number and what they owe. Flat, left-aligned and readable:
+        the reader is scanning for a fact, not admiring a header.
+      */}
+      <div className="border-b border-hairline px-4 py-4 flex items-start gap-3">
+        <Avatar className="h-12 w-12 shrink-0 rounded-sm">
+          <AvatarFallback className={`text-sm rounded-sm ${avatarTint(displayName)}`}>{initials(displayName)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold truncate">{displayName}</div>
+          {contact?.position && <div className="text-xs text-muted-foreground truncate">{contact.position}</div>}
           {company?.name && (
-            <div className="mt-2">
-              <Badge variant="outline" className="text-[11px]"><Building2 className="w-3 h-3 mr-1" />{company.name}</Badge>
+            <div className="inline-flex items-center gap-1 mt-1 text-xs text-muted-foreground min-w-0">
+              <Building2 className="w-3 h-3 shrink-0" /><span className="truncate">{company.name}</span>
             </div>
           )}
           {(contact?.city || contact?.country) && (
-            <div className="inline-flex items-center gap-1 mt-2.5 text-[11px] text-muted-foreground">
-              <MapPin className="w-3 h-3" />{[contact?.city, contact?.country].filter(Boolean).join(', ')}
+            <div className="inline-flex items-center gap-1 mt-0.5 text-[11px] text-muted-foreground">
+              <MapPin className="w-3 h-3 shrink-0" />{[contact?.city, contact?.country].filter(Boolean).join(', ')}
             </div>
           )}
-          <div className="flex flex-wrap gap-1.5 justify-center mt-2.5">
-            {contact?.is_client && <Badge variant="outline" className="text-[10px]"><BadgeCheck className="w-3 h-3 mr-0.5" />Client</Badge>}
-            {contact?.lead_status && <Badge variant="secondary" className="text-[10px] capitalize">{contact.lead_status}</Badge>}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {contact?.is_client && <Badge variant="success" className="text-[10px]"><BadgeCheck className="w-3 h-3" />Client</Badge>}
+            {contact?.lead_status && <Badge variant="neutral" className="text-[10px] capitalize">{contact.lead_status}</Badge>}
           </div>
+          {/* The two things you actually do from a contact card, per the reference layouts.
+              Rendered only when there is something to act on — a dead mailto: button is
+              worse than no button. */}
+          {(contact?.email || contact?.phone || contact?.mobile) && (
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              {contact?.email && (
+                <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                  <a href={`mailto:${contact.email}`}><Mail className="w-3 h-3 mr-1" />Email</a>
+                </Button>
+              )}
+              {(contact?.phone || contact?.mobile) && (
+                <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                  <a href={`tel:${contact.phone || contact.mobile}`}><Phone className="w-3 h-3 mr-1" />Call</a>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Information — status + who's handling it */}
-      <div className="p-5 border-b border-white/10 space-y-2.5">
+      <div className="p-5 border-b border-hairline space-y-2.5">
         <SectionTitle icon={<Hash className="h-4 w-4" />}>Information</SectionTitle>
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Status</span>
@@ -1866,17 +2119,19 @@ const DetailsRail: React.FC<{
           (via inbox-api). Falls back to quoted-total + project-count on older API
           responses / internal threads where finance metrics aren't returned. */}
       {(metrics || quotes.length > 0 || projects.length > 0) && (
-        <div className="p-5 border-b border-white/10">
+        <div className="p-5 border-b border-hairline">
           <SectionTitle icon={<Wallet className="h-4 w-4" />}>Customer value</SectionTitle>
           <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-              <div className="text-lg font-display" style={{ fontWeight: 700 }}>
+            {/* tabular-nums, not the display serif: these are money, and two figures side by
+                side have to line up on the decimal to be comparable at a glance. */}
+            <div className="rounded-sm bg-surface-sunken border border-hairline p-3">
+              <div className="text-lg font-semibold tabular-nums">
                 {money(metrics ? metrics.lifetime_value : quotedTotal, metrics?.currency || quotes[0]?.currency)}
               </div>
               <div className="text-[11px] text-muted-foreground mt-0.5">{metrics ? 'Lifetime' : `Quoted · ${quotes.length}`}</div>
             </div>
-            <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-              <div className={`text-lg font-display ${metrics && metrics.open_balance > 0 ? 'text-warning' : ''}`} style={{ fontWeight: 700 }}>
+            <div className="rounded-sm bg-surface-sunken border border-hairline p-3">
+              <div className={`text-lg font-semibold tabular-nums ${metrics && metrics.open_balance > 0 ? 'text-warning' : ''}`}>
                 {metrics ? money(metrics.open_balance, metrics.currency) : projects.length}
               </div>
               <div className="text-[11px] text-muted-foreground mt-0.5">{metrics ? 'Open balance' : `Project${projects.length === 1 ? '' : 's'}`}</div>
@@ -1887,11 +2142,11 @@ const DetailsRail: React.FC<{
 
       {/* Open invoices — the customer's unpaid invoices, soonest-due first. */}
       {invoices.length > 0 && (
-        <div className="p-5 border-b border-white/10">
+        <div className="p-5 border-b border-hairline">
           <SectionTitle icon={<FileText className="h-4 w-4" />} count={metrics?.open_count}>Open invoices</SectionTitle>
           <div className="space-y-0.5">
             {invoices.map((inv) => (
-              <div key={inv.id} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
+              <div key={inv.id} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-sm hover:bg-surface-hover transition-colors">
                 <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{inv.number || 'Invoice'}</div>
@@ -1907,7 +2162,7 @@ const DetailsRail: React.FC<{
       {contact ? (
         <>
           {/* Contact details */}
-          <div className="p-5 space-y-2.5 border-b border-white/10">
+          <div className="p-5 space-y-2.5 border-b border-hairline">
             <SectionTitle icon={<UserIcon className="h-4 w-4" />}>Contact</SectionTitle>
             {contact.email && <Row icon={<Mail className="w-3.5 h-3.5" />}><a href={`mailto:${contact.email}`} className="hover:underline">{contact.email}</a></Row>}
             {(contact.phone || contact.mobile) && <Row icon={<Phone className="w-3.5 h-3.5" />}>{contact.phone || contact.mobile}</Row>}
@@ -1923,7 +2178,7 @@ const DetailsRail: React.FC<{
 
           {/* Company */}
           {company && (
-            <div className="p-5 space-y-2.5 border-b border-white/10">
+            <div className="p-5 space-y-2.5 border-b border-hairline">
               <SectionTitle icon={<Building2 className="h-4 w-4" />}>Company</SectionTitle>
               <Row icon={<Building2 className="w-3.5 h-3.5" />}><span className="font-medium">{company.name}</span></Row>
               {company.industry && <Row icon={<Tag className="w-3.5 h-3.5" />}>{company.industry}</Row>}
@@ -1933,14 +2188,14 @@ const DetailsRail: React.FC<{
           )}
 
           {/* Quotes */}
-          <div className="p-5 border-b border-white/10">
+          <div className="p-5 border-b border-hairline">
             <SectionTitle icon={<FileText className="h-4 w-4" />} count={quotes.length}>Quotes</SectionTitle>
             {quotes.length === 0 ? (
               <div className="text-xs text-muted-foreground">No quotes for this contact yet.</div>
             ) : (
               <div className="space-y-0.5">
                 {quotes.map((q) => (
-                  <a key={q.id} href={`/quotes/${q.id}`} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
+                  <a key={q.id} href={`/quotes/${q.id}`} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-sm hover:bg-surface-hover transition-colors">
                     <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{q.quote_number || q.name || 'Quote'}</span>
                     <span className="text-xs text-muted-foreground shrink-0">{money(q.grand_total, q.currency)}</span>
@@ -1959,7 +2214,7 @@ const DetailsRail: React.FC<{
             ) : (
               <div className="space-y-0.5">
                 {projects.map((p) => (
-                  <a key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
+                  <a key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-sm hover:bg-surface-hover transition-colors">
                     <FolderKanban className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{p.name || 'Project'}</span>
                     {p.status && <span className={`text-[10px] capitalize shrink-0 ${statusTone(p.status)}`}>{p.status}</span>}
@@ -1972,7 +2227,7 @@ const DetailsRail: React.FC<{
         </>
       ) : (
         /* Internal thread (or no linked contact): show participants + thread meta. */
-        <div className="p-5 border-b border-white/10">
+        <div className="p-5 border-b border-hairline">
           <SectionTitle icon={<Users className="h-4 w-4" />} count={participants.filter((p) => p.status === 'active').length}>Participants</SectionTitle>
           <div className="space-y-1.5">
             {participants.filter((p) => p.status === 'active').map((p) => {
@@ -1998,14 +2253,19 @@ const DetailsRail: React.FC<{
       )}
 
       {/* Conversation meta — always shown at the bottom */}
-      <Separator className="bg-white/10" />
+      <Separator className="bg-hairline" />
       <div className="p-5 space-y-2.5">
         <SectionTitle icon={<MessageSquare className="h-4 w-4" />}>Conversation</SectionTitle>
-        <Row icon={<MessagesSquare className="w-3.5 h-3.5" />}>
-          <span>{inboxThreadSource(thread).label}</span>
-          <span className="opacity-50"> · </span>
-          <span className="capitalize">{thread.channel}</span>
-        </Row>
+        {/* SOURCE is the door it came through; CHANNEL is the transport a reply goes out on.
+            Both are printed because they are different questions and a public-profile enquiry
+            answers them differently — it arrived from a profile page and replies by email. */}
+        <div className="flex items-start gap-2.5 text-sm">
+          <span className="text-muted-foreground mt-0.5 shrink-0"><MessagesSquare className="w-3.5 h-3.5" /></span>
+          <span className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <SourceTag source={inboxThreadSource(thread)} />
+            <span className="text-xs text-muted-foreground">replies by <span className="capitalize">{thread.channel}</span></span>
+          </span>
+        </div>
         <Row icon={<Hash className="w-3.5 h-3.5" />}><span className="capitalize">{thread.status}</span></Row>
         {/* The one thing a public-profile enquiry carries that no channel does: which services
             the visitor ticked. It used to be the only reason the separate profile inbox existed. */}
@@ -2113,7 +2373,7 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
               )}
             </>
           )}
-          <Separator className="bg-white/10" />
+          <Separator className="bg-hairline" />
           <MyEmailAddressSection workspaceId={workspaceId} />
         </div>
       </PopoverContent>
@@ -2255,7 +2515,7 @@ const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <button
             type="button"
             onClick={copy}
-            className="w-full flex items-center gap-2 text-xs rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 hover:bg-accent transition-colors"
+            className="w-full flex items-center gap-2 text-xs rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2 hover:bg-surface-hover transition-colors"
             title="Copy to clipboard"
           >
             <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -2331,7 +2591,7 @@ const LabelManagerPopover: React.FC<{
           {labels.length === 0 ? (
             <div className="text-xs text-muted-foreground px-2 py-2">No labels yet.</div>
           ) : labels.map((l) => (
-            <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent group">
+            <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-surface-hover group">
               <Popover>
                 <PopoverTrigger asChild>
                   <button className={`w-3 h-3 rounded-full shrink-0 ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} title="Change color" aria-label="Change label colour" />
@@ -2433,7 +2693,7 @@ const LabelAssignButton: React.FC<{
             const on = assignedIds.has(l.id);
             const dot = (LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot;
             return (
-              <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent group">
+              <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-surface-hover group">
                 <button onClick={() => toggle(l.id)} disabled={busy} className="flex items-center gap-2 flex-1 min-w-0 text-left">
                   <span className={`w-4 h-4 rounded flex items-center justify-center border ${on ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/40'}`}>
                     {on && <Check className="w-3 h-3" />}
@@ -2623,9 +2883,9 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground mb-1.5">Who's in this conversation?</div>
-                  <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/10 p-1.5">
+                  <div className="max-h-48 overflow-y-auto space-y-1 rounded-sm border border-hairline p-1.5">
                     {members.map((m) => (
-                      <label key={m.user_id} className="flex items-center gap-2.5 text-sm px-2 py-1.5 rounded-lg hover:bg-accent cursor-pointer transition-colors">
+                      <label key={m.user_id} className="flex items-center gap-2.5 text-sm px-2 py-1.5 rounded-sm hover:bg-surface-hover cursor-pointer transition-colors">
                         <Checkbox checked={selected.includes(m.user_id)}
                           onCheckedChange={(v) => setSelected((prev) => v === true ? [...prev, m.user_id] : prev.filter((x) => x !== m.user_id))} />
                         <Avatar className="h-7 w-7"><AvatarFallback className={`text-[10px] ${avatarTint(m.label)}`}>{initials(m.label)}</AvatarFallback></Avatar>
@@ -2651,12 +2911,12 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <Input id="inboxpage-customer" placeholder="Search contacts by name or email" value={contactQuery} onChange={(e) => { setContactQuery(e.target.value); setContactId(null); }} className="pl-9" />
                   </div>
-                  <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-xl border border-white/10 p-1.5">
+                  <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-sm border border-hairline p-1.5">
                     {contacts.map((ct) => (
                       <button
                         key={ct.id}
                         onClick={() => setContactId(ct.id)}
-                        className={`w-full flex items-center gap-2.5 text-sm px-2 py-1.5 rounded-lg transition-colors text-left ${contactId === ct.id ? 'bg-primary/15 text-primary' : 'hover:bg-accent'}`}
+                        className={`w-full flex items-center gap-2.5 text-sm px-2 py-1.5 rounded-lg transition-colors text-left ${contactId === ct.id ? 'bg-primary/15 text-primary' : 'hover:bg-surface-hover'}`}
                       >
                         <Avatar className="h-7 w-7"><AvatarFallback className={`text-[10px] ${avatarTint(ct.label)}`}>{initials(ct.label)}</AvatarFallback></Avatar>
                         <span className="flex-1 min-w-0">
@@ -2735,7 +2995,7 @@ const AddParticipantDialog: React.FC<{ thread: InboxThread; onClose: () => void;
         <div className="max-h-64 overflow-y-auto space-y-1">
           {members.map((m) => (
             <button key={m.user_id} onClick={() => add(m.user_id)} disabled={!!busy}
-              className="w-full flex items-center gap-2.5 text-sm px-2 py-2 rounded-lg hover:bg-accent transition-colors">
+              className="w-full flex items-center gap-2.5 text-sm px-2 py-2 rounded-sm hover:bg-surface-hover transition-colors">
               <Avatar className="h-7 w-7"><AvatarFallback className={`text-[10px] ${avatarTint(m.label)}`}>{initials(m.label)}</AvatarFallback></Avatar>
               <span className="flex-1 text-left">{m.label}</span>
               {busy === m.user_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

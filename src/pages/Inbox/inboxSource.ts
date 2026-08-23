@@ -33,13 +33,40 @@ export type InboxSourceKey =
   | 'customer'
   | 'dealer';
 
+/**
+ * How a source is PAINTED, in the two forms the Inbox needs it — and each class is a
+ * light/dark PAIR, which is the whole point of this type existing.
+ *
+ * The source tags were written once, against the dark theme, in raw palette shades
+ * (`bg-amber-500/15 text-amber-300`). The platform has FOUR themes — dark/light x
+ * green/blue — and a `-300` shade is a pale, high-lightness colour: it reads on
+ * plum-black and it is invisible on cream. So in both light themes the "Email" tag was
+ * pale yellow on near-white, at roughly 1.6:1. Nothing raised: a wrong colour is a valid
+ * class. `src/utils/statusTone.ts` had already solved this shape for status words
+ * (`text-emerald-600 dark:text-emerald-400`); this is the same pairing for sources.
+ */
+export interface SourceTone {
+  /**
+   * Squared tinted tag — for where the source stands ALONE and has to name itself: the
+   * conversation header, the details rail. Tinted, never a saturated fill (design system).
+   */
+  tag: string;
+  /**
+   * Plain coloured word — for a dense list row. House style (statusTone) is no pill
+   * backgrounds inside a row: at twenty rows a tag per row reads as twenty buttons, and
+   * the tint that makes a pill quiet is exactly what makes its text hard to read.
+   */
+  text: string;
+  /** Solid dot. No text sits on it, so it needs no light/dark pairing to stay legible. */
+  dot: string;
+}
+
 export interface InboxSource {
   key: InboxSourceKey;
   /** What the chip says. Social sources fold the network in ("Instagram DM"). */
   label: string;
   Icon: LucideIcon;
-  /** Tailwind chip classes — tinted tag, never a saturated fill (design system). */
-  className: string;
+  tone: SourceTone;
 }
 
 /**
@@ -58,16 +85,80 @@ const SOURCE_CHANNEL: Record<InboxSourceKey, InboxChannel | null> = {
   dealer: 'internal',
 };
 
-/** Static chip presentation. Social labels are overridden per-thread with the network name. */
-const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; className: string }> = {
-  public_profile: { label: 'Public profile', Icon: UserRound, className: 'bg-teal-500/15 text-teal-300 border-teal-500/30' },
-  whatsapp: { label: 'WhatsApp', Icon: MessageCircle, className: 'bg-green-500/15 text-green-400 border-green-500/30' },
-  email: { label: 'Email', Icon: Mail, className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  social_dm: { label: 'Social DM', Icon: Share2, className: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30' },
-  social_comments: { label: 'Social comments', Icon: MessagesSquare, className: 'bg-pink-500/15 text-pink-300 border-pink-500/30' },
-  team: { label: 'Team', Icon: Users, className: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-  customer: { label: 'Customer', Icon: MessageSquare, className: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
-  dealer: { label: 'Dealer', Icon: MessageSquare, className: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
+/**
+ * One tint per source, written OUT — Tailwind's scanner reads source text, not runtime values,
+ * so a class assembled from a template literal (`text-${c}-${shade}`) ends up in no stylesheet
+ * at all. That is the same failure as an off-scale opacity step: the class looks right in the
+ * source and no rule is ever emitted. Verbose here is the point.
+ *
+ * `-700` on a 10% wash carries ~6:1 on cream; `-300` on a 15% wash carries the dark themes.
+ * A new source needs BOTH halves, or it is unreadable in two of the four themes, silently.
+ */
+const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; tone: SourceTone }> = {
+  public_profile: {
+    label: 'Public profile', Icon: UserRound,
+    tone: {
+      tag: 'bg-teal-500/10 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/25 dark:border-teal-500/30',
+      text: 'text-teal-700 dark:text-teal-300',
+      dot: 'bg-teal-500 dark:bg-teal-400',
+    },
+  },
+  whatsapp: {
+    label: 'WhatsApp', Icon: MessageCircle,
+    tone: {
+      tag: 'bg-green-500/10 dark:bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/25 dark:border-green-500/30',
+      text: 'text-green-700 dark:text-green-300',
+      dot: 'bg-green-500 dark:bg-green-400',
+    },
+  },
+  email: {
+    label: 'Email', Icon: Mail,
+    tone: {
+      tag: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30',
+      text: 'text-amber-700 dark:text-amber-300',
+      dot: 'bg-amber-500 dark:bg-amber-400',
+    },
+  },
+  social_dm: {
+    label: 'Social DM', Icon: Share2,
+    tone: {
+      tag: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-500/25 dark:border-fuchsia-500/30',
+      text: 'text-fuchsia-700 dark:text-fuchsia-300',
+      dot: 'bg-fuchsia-500 dark:bg-fuchsia-400',
+    },
+  },
+  social_comments: {
+    label: 'Social comments', Icon: MessagesSquare,
+    tone: {
+      tag: 'bg-pink-500/10 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/25 dark:border-pink-500/30',
+      text: 'text-pink-700 dark:text-pink-300',
+      dot: 'bg-pink-500 dark:bg-pink-400',
+    },
+  },
+  team: {
+    label: 'Team', Icon: Users,
+    tone: {
+      tag: 'bg-sky-500/10 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25 dark:border-sky-500/30',
+      text: 'text-sky-700 dark:text-sky-300',
+      dot: 'bg-sky-500 dark:bg-sky-400',
+    },
+  },
+  customer: {
+    label: 'Customer', Icon: MessageSquare,
+    tone: {
+      tag: 'bg-violet-500/10 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25 dark:border-violet-500/30',
+      text: 'text-violet-700 dark:text-violet-300',
+      dot: 'bg-violet-500 dark:bg-violet-400',
+    },
+  },
+  dealer: {
+    label: 'Dealer', Icon: MessageSquare,
+    tone: {
+      tag: 'bg-violet-500/10 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25 dark:border-violet-500/30',
+      text: 'text-violet-700 dark:text-violet-300',
+      dot: 'bg-violet-500 dark:bg-violet-400',
+    },
+  },
 };
 
 /**
@@ -117,6 +208,16 @@ export function inboxThreadSource(t: Pick<InboxThread, 'channel' | 'thread_type'
   if (!platform) return { key, ...base };
   const pretty = platform.charAt(0).toUpperCase() + platform.slice(1);
   return { key, ...base, label: key === 'social_comments' ? `${pretty} comments` : `${pretty} DM` };
+}
+
+/**
+ * Presentation for a bare source KEY — the sidebar lists sources it has counted, so it holds a
+ * key with no thread in hand. Social folds in the network name per thread and cannot here, so
+ * this returns the generic label; that is correct for a nav row that has to cover every
+ * Instagram and Facebook DM at once.
+ */
+export function inboxSourceMeta(key: InboxSourceKey): { label: string; Icon: LucideIcon; tone: SourceTone } {
+  return SOURCE_META[key];
 }
 
 /** The `channel` request parameter a source filter implies, or null when it pins none. */
