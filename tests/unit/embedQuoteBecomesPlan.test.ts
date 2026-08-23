@@ -91,7 +91,7 @@ describe('an anonymous composition cannot name its own tenant or blueprint', () 
     expect(principal).toContain("pick('admin')");
     expect(principal).toContain('created_by');
     // Stable ordering: without it the same workspace could attribute two plans to two people.
-    expect(principal).toContain("order('created_at'");
+    expect(principal).toContain("order('joined_at'");
   });
 
   it('caps the composition, which is anonymous input becoming a jsonb column', () => {

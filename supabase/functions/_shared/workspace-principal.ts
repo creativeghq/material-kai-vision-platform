@@ -36,13 +36,20 @@ export async function resolveWorkspacePrincipal(
   const pick = async (role: 'owner' | 'admin'): Promise<string | null> => {
     const { data } = await supabase
       .from('workspace_members')
-      .select('user_id, created_at')
+      .select('user_id, joined_at')
       .eq('workspace_id', workspaceId)
       .eq('role', role)
       .eq('status', 'active')
       // Stable across calls: without an order, "the admin" is whichever row the planner returned
       // first, and the same workspace could attribute two plans to two different people.
-      .order('created_at', { ascending: true })
+      //
+      // `joined_at`, NOT `created_at` — this table has no `created_at`, and the first version of
+      // this file said otherwise. PostgREST rejects the whole query on an unknown column, so both
+      // ladder rungs would have returned null and every workspace would have silently fallen
+      // through to `created_by`. Caught by the `db.schema-writers` production smoke check, which
+      // lints the checkout against the live column registry — nothing local sees it, because
+      // `npm run typecheck` cannot know what columns exist.
+      .order('joined_at', { ascending: true })
       .limit(1)
       .maybeSingle();
     return (data?.user_id as string | undefined) ?? null;
