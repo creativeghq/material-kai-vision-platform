@@ -22,6 +22,9 @@ const ANALYTICS_ACTIONS = new Set([
   // Per-ACCOUNT, and the only analytics a LinkedIn personal profile has — every other read here
   // is per-post and needs a post list LinkedIn does not publish for a member.
   'get_linkedin_aggregate',
+  // The company pages an existing member connection already administers — they do NOT each need
+  // connecting separately, and they are invisible until something asks.
+  'get_linkedin_organizations',
 ]);
 const OAUTH_ACTIONS = new Set(['connect', 'callback', 'disconnect', 'config_status']);
 const PUBLISH_ACTIONS = new Set(['schedule', 'publish_now']);

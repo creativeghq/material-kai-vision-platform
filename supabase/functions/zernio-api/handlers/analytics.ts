@@ -187,6 +187,39 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     }
   }
 
+  // ── LINKEDIN COMPANY PAGES ON AN EXISTING CONNECTION ───────────────────────
+  //
+  // "Can we manage more than one account?" has a LinkedIn-specific answer that is easy to get
+  // wrong in both directions. A member connection ALREADY carries every company page that member
+  // administers — `organizationUrn` on publish picks between them — so the pages do not each
+  // need connecting, and telling someone to connect one per page is wrong. But the pages are
+  // invisible until something asks, so assuming there are none is equally wrong.
+  //
+  // Read-only and cheap. Answers [] for a member who administers nothing, which is a fact worth
+  // rendering rather than an error.
+  if (action === 'get_linkedin_organizations') {
+    if (!social_account_id) return jsonResponse({ success: false, error: 'social_account_id required' }, 400);
+
+    const { data: acct } = await supabase
+      .from('social_accounts')
+      .select('id, workspace_id, zernio_account_id, platform')
+      .eq('id', social_account_id)
+      .maybeSingle();
+
+    if (!acct || (!isSecretCaller && !callerWorkspaceIds.includes(acct.workspace_id))) {
+      return jsonResponse({ success: false, error: 'No such account' }, 404);
+    }
+    if (acct.platform !== 'linkedin') {
+      return jsonResponse({ success: false, error: 'This endpoint is LinkedIn-only' }, 400);
+    }
+
+    const data = await zernioApi(
+      'GET',
+      `/accounts/${encodeURIComponent(acct.zernio_account_id)}/linkedin-organizations`,
+    );
+    return jsonResponse({ success: true, organizations: data?.organizations ?? [] });
+  }
+
   // One post's day-by-day accumulation. The post id comes from the CLIENT, so it is checked
   // against the caller's workspaces first — otherwise any tenant could read the engagement
   // history of any post on the shared operator account by passing its id.

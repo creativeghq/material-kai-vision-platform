@@ -25,7 +25,7 @@ import { supabaseConfig } from '@/config/apis/supabaseConfig';
 import { formatDate, todayLocalISO, localISODateOffset } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import {
-  DailyReachChart, ContentDecayChart, PostingFrequencyTable,
+  DailyReachChart, ContentDecayChart, PostingFrequencyTable, Loadable,
   type DailyPoint, type PlatformTotals, type DecayBucket, type FrequencyRow,
 } from './SocialInsightsCharts';
 import { PlatformIcon, platformLabel } from '@/components/core/icons/PlatformIcon';
@@ -87,12 +87,38 @@ interface AccountRow {
 }
 
 /**
- * LinkedIn exposes no listing API for a PERSONAL profile — only for organization pages — so
- * nothing can sweep one. Zernio imports such a post by URL instead, at any age and with full
- * engagement. The distinction decides what this screen may honestly offer.
+ * What a connected account can actually answer, which is NOT the same question for a member
+ * profile and a business page.
+ *
+ * Nearly everything on this screen is derived from a POST LIST — per-post engagement, the decay
+ * curve, cadence-vs-engagement, the daily rollup. LinkedIn publishes no listing API for a
+ * personal profile, so for a member account every one of those is empty by construction, and
+ * rendering them anyway produces a screen of blank panels that reads as breakage. It also costs
+ * three Zernio round trips per load to fetch nothing.
+ *
+ * What a member account HAS instead is the aggregate LinkedIn computes server-side, which needs
+ * no post list at all — and which includes saves and sends, two figures a business page can
+ * never return. So this is a fork in the road, not a ladder.
  */
-const needsUrlImport = (a: AccountRow) =>
+interface AccountCapabilities {
+  /** The platform will enumerate this account's posts, so post-derived views have input. */
+  perPost: boolean;
+  /** LinkedIn member aggregate — the account-level totals endpoint. */
+  aggregate: boolean;
+  /** Cannot be swept; past posts arrive one URL at a time. */
+  urlImport: boolean;
+}
+
+const isLinkedInMember = (a: AccountRow) =>
   a.platform === 'linkedin' && a.metadata?.accountType === 'personal';
+
+const capabilitiesOf = (a: AccountRow): AccountCapabilities =>
+  isLinkedInMember(a)
+    ? { perPost: false, aggregate: true, urlImport: true }
+    : { perPost: true, aggregate: false, urlImport: false };
+
+/** Kept as a named concept: several surfaces below turn on exactly this. */
+const needsUrlImport = (a: AccountRow) => capabilitiesOf(a).urlImport;
 
 /**
  * Lifetime totals LinkedIn aggregates itself for a member account. `saves` and `sends` exist
@@ -166,6 +192,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
   // which is the whole reason it is the only analytics such an account has.
   const [liTotals, setLiTotals] = useState<Record<string, LinkedInTotals>>({});
   const [liScopeMissing, setLiScopeMissing] = useState(false);
+  const [liOrgs, setLiOrgs] = useState<Array<{ id: string; name: string; vanityName?: string }>>([]);
+  /**
+   * Separate from `loading` on purpose. The DB reads finish in milliseconds; the Zernio
+   * pass-throughs are four sequential network hops to a third party and took the whole tab
+   * hostage behind one spinner. Now the tables render as soon as they can and only the panels
+   * still waiting say so.
+   */
+  const [derivedLoading, setDerivedLoading] = useState(true);
 
   /** POST one zernio-api action for this workspace. Throws with the server's own message. */
   const callAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
@@ -185,8 +219,9 @@ export const SocialAnalyticsPanel: React.FC = () => {
     return json;
   }, [activeWorkspaceId]);
 
-  const load = useCallback(async () => {
-    if (!activeWorkspaceId) { setLoading(false); return; }
+  /** The local reads. Fast, and everything the tables need — nothing here waits on Zernio. */
+  const loadCore = useCallback(async (): Promise<AccountRow[]> => {
+    if (!activeWorkspaceId) { setLoading(false); setDerivedLoading(false); return []; }
     setLoading(true);
     const [p, m, i, a] = await Promise.all([
       supabase.from('social_posts')
@@ -221,45 +256,82 @@ export const SocialAnalyticsPanel: React.FC = () => {
       seen.add(r.social_account_id);
       return true;
     }));
-    setAccounts((a.data ?? []) as AccountRow[]);
+    const accountRows = (a.data ?? []) as AccountRow[];
+    setAccounts(accountRows);
+    // Everything above is a local read. Release the screen HERE — the third-party calls below
+    // are the slow part, and holding four tables hostage to them is what made this tab feel
+    // broken on open.
+    setLoading(false);
+    return accountRows;
+  }, [activeWorkspaceId]);
 
-    // The derived views are read live from Zernio, never stored — it already computes them, and
-    // a cached rollup would be a second derivation of the same number. Settled, not all: the
-    // decay curve failing must not blank the daily chart beside it.
-    const [dm, cd, pf] = await Promise.allSettled([
-      callAction('get_daily_metrics'),
-      callAction('get_content_decay'),
-      callAction('get_posting_frequency'),
+  /**
+   * The derived views, read live from Zernio and never stored — it already computes them, and a
+   * cached rollup would be a second derivation of the same number.
+   *
+   * Asked for STRICTLY by capability. A workspace whose only account is a LinkedIn member
+   * profile has no post list, so daily/decay/cadence are empty by construction: asking for them
+   * spends three round trips to render three blank panels. It asks the member endpoint instead,
+   * which is the one that can answer.
+   */
+  const loadDerived = useCallback(async (accountRows: AccountRow[]) => {
+    if (!activeWorkspaceId || !accountRows.length) { setDerivedLoading(false); return; }
+    setDerivedLoading(true);
+
+    const members = accountRows.filter(a => capabilitiesOf(a).aggregate);
+    const anyPerPost = accountRows.some(a => capabilitiesOf(a).perPost);
+
+    const [postDerived, memberDerived] = await Promise.all([
+      anyPerPost
+        // Settled, not all: the decay curve failing must not blank the daily chart beside it.
+        ? Promise.allSettled([
+          callAction('get_daily_metrics'),
+          callAction('get_content_decay'),
+          callAction('get_posting_frequency'),
+        ])
+        : Promise.resolve(null),
+      members.length
+        ? Promise.allSettled([
+          ...members.map(acct => callAction('get_linkedin_aggregate', { social_account_id: acct.id })),
+          // DAILY for the reach chart. `get_daily_metrics` derives from a post list, so it is
+          // empty for a member account no matter how much reach the profile actually has —
+          // which is how a profile with 28k impressions rendered an empty chart.
+          callAction('get_linkedin_aggregate', {
+            social_account_id: members[0].id,
+            aggregation: 'DAILY',
+            from_date: localISODateOffset(-29),
+            to_date: todayLocalISO(),
+          }),
+          // Which company pages this same connection already administers.
+          callAction('get_linkedin_organizations', { social_account_id: members[0].id }),
+        ])
+        : Promise.resolve(null),
     ]);
-    const addonGated = [dm, cd, pf].some(
-      (r) => r.status === 'rejected' && (r.reason as Error & { code?: string })?.code === 'analytics_addon_required',
-    );
-    setAddonMissing(addonGated);
-    setDaily(dm.status === 'fulfilled' ? (dm.value.dailyData ?? []) : []);
-    setPlatformTotals(dm.status === 'fulfilled' ? (dm.value.platformBreakdown ?? []) : []);
-    setDecay(cd.status === 'fulfilled' ? (cd.value.buckets ?? []) : []);
-    setFrequency(pf.status === 'fulfilled' ? (pf.value.frequency ?? []) : []);
 
-    // Per-account, and only for the account type that has no other source. Settled, not all:
-    // one profile's missing scope must not blank the rest of the screen.
-    const personal = ((a.data ?? []) as AccountRow[]).filter(needsUrlImport);
-    if (personal.length) {
-      const results = await Promise.allSettled([
-        ...personal.map(acct => callAction('get_linkedin_aggregate', { social_account_id: acct.id })),
-        // DAILY for the reach chart above. `get_daily_metrics` is derived from a post list, so
-        // it is empty for a member account no matter how much reach the profile actually has —
-        // which is how a profile with 28k impressions rendered an empty chart.
-        callAction('get_linkedin_aggregate', {
-          social_account_id: personal[0].id,
-          aggregation: 'DAILY',
-          from_date: localISODateOffset(-29),
-          to_date: todayLocalISO(),
-        }),
-      ]);
+    let dailyPoints: DailyPoint[] = [];
+    if (postDerived) {
+      const [dm, cd, pf] = postDerived;
+      // Only meaningful about endpoints we actually called — a workspace that asked for none of
+      // them has learned nothing about the add-on and must not claim it is missing.
+      setAddonMissing([dm, cd, pf].some(
+        (r) => r.status === 'rejected' && (r.reason as Error & { code?: string })?.code === 'analytics_addon_required',
+      ));
+      dailyPoints = dm.status === 'fulfilled' ? (dm.value.dailyData ?? []) : [];
+      setPlatformTotals(dm.status === 'fulfilled' ? (dm.value.platformBreakdown ?? []) : []);
+      setDecay(cd.status === 'fulfilled' ? (cd.value.buckets ?? []) : []);
+      setFrequency(pf.status === 'fulfilled' ? (pf.value.frequency ?? []) : []);
+    } else {
+      setAddonMissing(false);
+      setPlatformTotals([]);
+      setDecay([]);
+      setFrequency([]);
+    }
+
+    if (memberDerived) {
       const totals: Record<string, LinkedInTotals> = {};
       let scopeMissing = false;
-      personal.forEach((acct, idx) => {
-        const r = results[idx];
+      members.forEach((acct, idx) => {
+        const r = memberDerived[idx];
         if (r.status === 'fulfilled') {
           if (r.value?.analytics) totals[acct.id] = r.value.analytics as LinkedInTotals;
         } else if ((r.reason as Error & { code?: string })?.code === 'missing_scope') {
@@ -269,19 +341,29 @@ export const SocialAnalyticsPanel: React.FC = () => {
       setLiTotals(totals);
       setLiScopeMissing(scopeMissing);
 
-      const dailyRes = results[results.length - 1];
-      if (dm.status === 'rejected' || !(dm.value?.dailyData ?? []).length) {
-        if (dailyRes.status === 'fulfilled') {
-          setDaily(linkedInDailyToPoints(dailyRes.value?.analytics ?? {}));
-        }
+      const orgRes = memberDerived[memberDerived.length - 1];
+      setLiOrgs(orgRes.status === 'fulfilled' ? (orgRes.value?.organizations ?? []) : []);
+
+      // Substitute only where the post-derived source came back with nothing to plot, so a
+      // workspace that has both an org page and a member profile keeps the richer series.
+      const memberDaily = memberDerived[memberDerived.length - 2];
+      if (!dailyPoints.length && memberDaily.status === 'fulfilled') {
+        dailyPoints = linkedInDailyToPoints(memberDaily.value?.analytics ?? {});
       }
     } else {
       setLiTotals({});
       setLiScopeMissing(false);
+      setLiOrgs([]);
     }
 
-    setLoading(false);
+    setDaily(dailyPoints);
+    setDerivedLoading(false);
   }, [activeWorkspaceId, callAction]);
+
+  const load = useCallback(async () => {
+    const accountRows = await loadCore();
+    await loadDerived(accountRows ?? []);
+  }, [loadCore, loadDerived]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -350,6 +432,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
   };
 
   const urlImportAccounts = useMemo(() => accounts.filter(needsUrlImport), [accounts]);
+  /**
+   * What this workspace's mix of accounts can actually answer. Every conditional panel below
+   * reads one of these rather than re-deriving "is it LinkedIn and personal" in place — that
+   * test is already wrong for the next platform that draws the same distinction (Instagram
+   * personal vs business, Facebook profile vs page).
+   */
+  const anyPerPost = useMemo(() => accounts.some(a => capabilitiesOf(a).perPost), [accounts]);
+  const anyAggregate = useMemo(() => accounts.some(a => capabilitiesOf(a).aggregate), [accounts]);
 
   const accountLabel = useMemo(() => {
     const m: Record<string, { platform: string; text: string }> = {};
@@ -454,7 +544,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
       {/* The only analytics a personal LinkedIn profile has. Rendered whenever one is connected,
           including at zero — a connected account showing nothing at all is the state that sent
           somebody looking for a bug last time. */}
-      {urlImportAccounts.length > 0 && (
+      {anyAggregate && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -469,6 +559,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <Loadable loading={derivedLoading}>
             {liScopeMissing ? (
               <div className="flex items-start gap-3 text-sm">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
@@ -520,13 +611,40 @@ export const SocialAnalyticsPanel: React.FC = () => {
                 </Table>
               </div>
             )}
+
+            {/* "Can we manage more than one?" — for LinkedIn the answer is already yes, and
+                already connected. A member connection carries every company page that member
+                administers; publishing picks between them. Nobody connects those separately, so
+                the only thing missing was anyone asking what they are. */}
+            {liOrgs.length > 0 && (
+              <p className="mt-4 border-t border-hairline pt-3 text-sm text-muted-foreground">
+                This connection also administers{' '}
+                <strong className="text-foreground">{liOrgs.map(o => o.name).join(', ')}</strong>
+                {liOrgs.length === 1 ? ' — a company page' : ' — company pages'}. Posting can target{' '}
+                {liOrgs.length === 1 ? 'it' : 'them'} without connecting anything else, and page posts
+                get per-post analytics and comments, which a personal profile does not.
+              </p>
+            )}
+            </Loadable>
           </CardContent>
         </Card>
       )}
 
-      <DailyReachChart daily={daily} platforms={platformTotals} />
-      <ContentDecayChart buckets={decay} />
-      <PostingFrequencyTable rows={frequency} />
+      {/* Shown when EITHER source can fill it: post-derived for a business page, the member
+          aggregate for a personal profile. */}
+      {(anyPerPost || anyAggregate) && (
+        <DailyReachChart daily={daily} platforms={platformTotals} loading={derivedLoading} />
+      )}
+
+      {/* Both derive from a post list and have no member-account substitute, so for a workspace
+          with only personal profiles they are not "empty" — they are inapplicable, and an empty
+          state that invites you to wait for data that can never arrive is worse than absence. */}
+      {anyPerPost && (
+        <>
+          <ContentDecayChart buckets={decay} loading={derivedLoading} />
+          <PostingFrequencyTable rows={frequency} loading={derivedLoading} />
+        </>
+      )}
 
       <Card>
         <CardHeader>
@@ -534,9 +652,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
             <BarChart3 className="h-4 w-4" /> Posts
           </CardTitle>
           <CardDescription>
-            Everything this workspace has drafted, scheduled or published, plus up to a year of
-            posts published natively on each connected account — Sync now imports those. Newest
-            first, with the engagement Zernio reports for each.
+            {anyPerPost
+              ? <>Everything this workspace has drafted, scheduled or published, plus up to a year
+                  of posts published natively on each connected account — Sync now imports those.
+                  Newest first, with the engagement reported for each.</>
+              : <>Everything this workspace has drafted, scheduled or published. Posts written
+                  directly on a personal profile are not listed here — LinkedIn will not enumerate
+                  them for anyone — so they arrive one URL at a time. Their engagement is still
+                  counted in the lifetime totals above.</>}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

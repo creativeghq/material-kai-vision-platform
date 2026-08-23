@@ -21,7 +21,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
-import { Activity, TrendingDown, CalendarClock } from 'lucide-react';
+import { Activity, TrendingDown, CalendarClock, Loader2 } from 'lucide-react';
 import { formatNumber } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 
@@ -70,7 +70,41 @@ const tooltipStyle = {
 
 const num = (v: number | null | undefined) => (v == null ? '—' : formatNumber(v));
 
-export const DailyReachChart: React.FC<{ daily: DailyPoint[]; platforms: PlatformTotals[] }> = ({ daily, platforms }) => {
+/**
+ * A panel still waiting on Zernio.
+ *
+ * These three read a third party over four sequential hops, while the tables above them come
+ * from a local query that finishes in milliseconds. Holding the whole tab behind one spinner
+ * made a fast screen feel like a broken one, and swapping the spinner for an empty state the
+ * moment it clears is worse — "still loading" and "there is nothing here" are opposite facts and
+ * were rendering identically.
+ *
+ * An OVERLAY rather than a replacement, so the panel keeps its height and the page does not
+ * jump as each one lands. `aria-busy` is on the region for the same reason it is visible: a
+ * screen reader gets told to wait rather than told the panel is empty.
+ */
+const LoadingOverlay: React.FC = () => (
+  <div
+    className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-card/80 backdrop-blur-[1px]"
+    role="status"
+  >
+    <span className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+    </span>
+  </div>
+);
+
+/** Wraps a panel body so the overlay has something to sit on. Exported so every panel on the
+ *  analytics screen waits the same way — a second hand-rolled spinner is how two panels start
+ *  disagreeing about what "loading" looks like. */
+export const Loadable: React.FC<{ loading?: boolean; children: React.ReactNode }> = ({ loading, children }) => (
+  <div className="relative min-h-[8rem]" aria-busy={loading ? true : undefined}>
+    {children}
+    {loading && <LoadingOverlay />}
+  </div>
+);
+
+export const DailyReachChart: React.FC<{ daily: DailyPoint[]; platforms: PlatformTotals[]; loading?: boolean }> = ({ daily, platforms, loading }) => {
   // Two series only, and they share a scale — impressions and reach are both "how many saw it",
   // so one axis is honest. Engagement counts are orders of magnitude smaller and live in the
   // table rather than on a second y-axis, which would be the dual-axis mistake.
@@ -93,77 +127,79 @@ export const DailyReachChart: React.FC<{ daily: DailyPoint[]; platforms: Platfor
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
-          <HubEmptyState
-            variant="empty"
-            icon={Activity}
-            title="No daily data yet"
-            description="Zernio builds this from published posts. Sync your accounts, then give it a day."
-          />
-        ) : (
-          <>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="date" {...axis} tickFormatter={(d: string) => formatDate(d)} minTickGap={24} />
-                  <YAxis {...axis} width={52} tickFormatter={(v: number) => formatNumber(v)} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    labelFormatter={(d: string) => formatDate(d)}
-                    formatter={(v: number, name: string) => [formatNumber(v), name]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="impressions" name="Impressions" stroke={SERIES_1} strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="reach" name="Reach" stroke={SERIES_2} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {platforms.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Platform</TableHead>
-                      <TableHead className="text-right">Posts</TableHead>
-                      <TableHead className="text-right">Impressions</TableHead>
-                      <TableHead className="text-right">Reach</TableHead>
-                      <TableHead className="text-right">Likes</TableHead>
-                      <TableHead className="text-right">Comments</TableHead>
-                      <TableHead className="text-right">Shares</TableHead>
-                      <TableHead className="text-right">Saves</TableHead>
-                      <TableHead className="text-right">Clicks</TableHead>
-                      <TableHead className="text-right">Views</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {platforms.map(p => (
-                      <TableRow key={p.platform}>
-                        <TableCell className="capitalize">{p.platform}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.postCount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.impressions)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.reach)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.likes)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.comments)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.shares)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.saves)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.clicks)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.views)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+        <Loadable loading={loading}>
+          {data.length === 0 ? (
+            <HubEmptyState
+              variant="empty"
+              icon={Activity}
+              title="No daily data yet"
+              description="Zernio builds this from published posts. Sync your accounts, then give it a day."
+            />
+          ) : (
+            <>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="date" {...axis} tickFormatter={(d: string) => formatDate(d)} minTickGap={24} />
+                    <YAxis {...axis} width={52} tickFormatter={(v: number) => formatNumber(v)} />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      labelFormatter={(d: string) => formatDate(d)}
+                      formatter={(v: number, name: string) => [formatNumber(v), name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Line type="monotone" dataKey="impressions" name="Impressions" stroke={SERIES_1} strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="reach" name="Reach" stroke={SERIES_2} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            )}
-          </>
-        )}
+
+              {platforms.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Platform</TableHead>
+                        <TableHead className="text-right">Posts</TableHead>
+                        <TableHead className="text-right">Impressions</TableHead>
+                        <TableHead className="text-right">Reach</TableHead>
+                        <TableHead className="text-right">Likes</TableHead>
+                        <TableHead className="text-right">Comments</TableHead>
+                        <TableHead className="text-right">Shares</TableHead>
+                        <TableHead className="text-right">Saves</TableHead>
+                        <TableHead className="text-right">Clicks</TableHead>
+                        <TableHead className="text-right">Views</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {platforms.map(p => (
+                        <TableRow key={p.platform}>
+                          <TableCell className="capitalize">{p.platform}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.postCount)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.impressions)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.reach)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.likes)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.comments)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.shares)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.saves)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.clicks)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.views)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </>
+          )}
+        </Loadable>
       </CardContent>
     </Card>
   );
 };
 
-export const ContentDecayChart: React.FC<{ buckets: DecayBucket[] }> = ({ buckets }) => {
+export const ContentDecayChart: React.FC<{ buckets: DecayBucket[]; loading?: boolean }> = ({ buckets, loading }) => {
   const data = [...buckets].sort((a, b) => a.bucket_order - b.bucket_order);
   return (
     <Card>
@@ -177,58 +213,60 @@ export const ContentDecayChart: React.FC<{ buckets: DecayBucket[] }> = ({ bucket
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
-          <HubEmptyState
-            variant="empty"
-            icon={TrendingDown}
-            title="Not enough history"
-            description="Zernio needs several published posts with a settled engagement curve before it can measure decay."
-          />
-        ) : (
-          <>
-            {/* One series — no legend: the title names it. */}
-            <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="bucket_label" {...axis} />
-                  <YAxis {...axis} width={44} unit="%" domain={[0, 100]} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(v: number) => [`${v.toFixed(1)}%`, 'of final engagement']}
-                  />
-                  <Bar dataKey="avg_pct_of_final" fill={SERIES_2} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-3 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Age</TableHead>
-                    <TableHead className="text-right">% of final engagement</TableHead>
-                    <TableHead className="text-right">Posts measured</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.map(b => (
-                    <TableRow key={b.bucket_label}>
-                      <TableCell>{b.bucket_label}</TableCell>
-                      <TableCell className="text-right tabular-nums">{b.avg_pct_of_final.toFixed(1)}%</TableCell>
-                      <TableCell className="text-right tabular-nums">{num(b.post_count)}</TableCell>
+        <Loadable loading={loading}>
+          {data.length === 0 ? (
+            <HubEmptyState
+              variant="empty"
+              icon={TrendingDown}
+              title="Not enough history"
+              description="Zernio needs several published posts with a settled engagement curve before it can measure decay."
+            />
+          ) : (
+            <>
+              {/* One series — no legend: the title names it. */}
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="bucket_label" {...axis} />
+                    <YAxis {...axis} width={44} unit="%" domain={[0, 100]} />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(v: number) => [`${v.toFixed(1)}%`, 'of final engagement']}
+                    />
+                    <Bar dataKey="avg_pct_of_final" fill={SERIES_2} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Age</TableHead>
+                      <TableHead className="text-right">% of final engagement</TableHead>
+                      <TableHead className="text-right">Posts measured</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        )}
+                  </TableHeader>
+                  <TableBody>
+                    {data.map(b => (
+                      <TableRow key={b.bucket_label}>
+                        <TableCell>{b.bucket_label}</TableCell>
+                        <TableCell className="text-right tabular-nums">{b.avg_pct_of_final.toFixed(1)}%</TableCell>
+                        <TableCell className="text-right tabular-nums">{num(b.post_count)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </Loadable>
       </CardContent>
     </Card>
   );
 };
 
-export const PostingFrequencyTable: React.FC<{ rows: FrequencyRow[] }> = ({ rows }) => {
+export const PostingFrequencyTable: React.FC<{ rows: FrequencyRow[]; loading?: boolean }> = ({ rows, loading }) => {
   // A table, not a chart. This is a correlation across two dimensions (platform × cadence) with a
   // sample size per row, and `weeks_count` is the number that decides whether to believe any of
   // it — a bar chart would hide exactly that.
@@ -247,41 +285,43 @@ export const PostingFrequencyTable: React.FC<{ rows: FrequencyRow[] }> = ({ rows
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        {sorted.length === 0 ? (
-          <div className="p-4">
-            <HubEmptyState
-              variant="empty"
-              icon={CalendarClock}
-              title="Not enough weeks yet"
-              description="This compares posting rates against each other, so it needs several weeks of history per platform."
-            />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Platform</TableHead>
-                  <TableHead className="text-right">Posts / week</TableHead>
-                  <TableHead className="text-right">Avg engagement rate</TableHead>
-                  <TableHead className="text-right">Avg engagement</TableHead>
-                  <TableHead className="text-right">Weeks observed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sorted.map(r => (
-                  <TableRow key={`${r.platform}-${r.posts_per_week}`}>
-                    <TableCell className="capitalize">{r.platform}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.posts_per_week}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.avg_engagement_rate.toFixed(2)}%</TableCell>
-                    <TableCell className="text-right tabular-nums">{num(r.avg_engagement)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.weeks_count}</TableCell>
+        <Loadable loading={loading}>
+          {sorted.length === 0 ? (
+            <div className="p-4">
+              <HubEmptyState
+                variant="empty"
+                icon={CalendarClock}
+                title="Not enough weeks yet"
+                description="This compares posting rates against each other, so it needs several weeks of history per platform."
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Platform</TableHead>
+                    <TableHead className="text-right">Posts / week</TableHead>
+                    <TableHead className="text-right">Avg engagement rate</TableHead>
+                    <TableHead className="text-right">Avg engagement</TableHead>
+                    <TableHead className="text-right">Weeks observed</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {sorted.map(r => (
+                    <TableRow key={`${r.platform}-${r.posts_per_week}`}>
+                      <TableCell className="capitalize">{r.platform}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.posts_per_week}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.avg_engagement_rate.toFixed(2)}%</TableCell>
+                      <TableCell className="text-right tabular-nums">{num(r.avg_engagement)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.weeks_count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </Loadable>
       </CardContent>
     </Card>
   );
