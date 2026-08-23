@@ -112,6 +112,58 @@ async function describeEmptyResult(
   };
 }
 
+/**
+ * Which corpora in this workspace actually contain anything.
+ *
+ * MIVAA's knowledge-base endpoint runs one branch per requested `search_type`, and each branch
+ * costs a vector search whether or not the table behind it holds a single row. Measured against
+ * the live workspace on 2026-08-23, same query, same 6 results returned either way:
+ *
+ *   search_types=["kb_docs"]                      →  4.1s
+ *   search_types=["kb_docs","chunks","products"]  → 17.2s
+ *
+ * Thirteen seconds to search `document_chunks` and `products`, both of which are at 0 rows. That
+ * was two thirds of every knowledge lookup on the platform, and it is pure waste — not a
+ * trade-off, not a quality/latency balance. Nothing is lost by not searching an empty table.
+ *
+ * (This is where the time went. The re-ranker was the obvious suspect and was innocent: it is one
+ * Haiku reorder that never drops a result. Worth measuring before optimising.)
+ *
+ * Probes with `limit(1)` rather than a count — the question is "is there anything", and an exact
+ * count over a large catalogue is the expensive way to ask it. Cached briefly per isolate: the
+ * answer changes only when a workspace first ingests, and a short TTL keeps that window small
+ * rather than pinning "empty" for the rest of the isolate's life.
+ */
+const CORPUS_TABLE: Record<string, string> = {
+  kb_docs: 'kb_docs',
+  chunks: 'document_chunks',
+  products: 'products',
+  entities: 'document_entities',
+};
+const CORPUS_TTL_MS = 60_000;
+const corpusCache = new Map<string, { at: number; nonEmpty: Set<string> }>();
+
+async function nonEmptyCorpora(workspaceId: string, requested: string[]): Promise<Set<string>> {
+  const cached = corpusCache.get(workspaceId);
+  if (cached && Date.now() - cached.at < CORPUS_TTL_MS) {
+    return new Set(requested.filter((t) => cached.nonEmpty.has(t)));
+  }
+  const nonEmpty = new Set<string>();
+  await Promise.all(
+    Object.entries(CORPUS_TABLE).map(async ([type, table]) => {
+      try {
+        const { data, error } = await supabase.from(table).select('id').eq('workspace_id', workspaceId).limit(1);
+        // On error, ASSUME NON-EMPTY. A failed probe must never silently narrow the search —
+        // that would turn a transient DB hiccup into "we have no documents", which is the
+        // silent-zero shape wearing a performance optimisation.
+        if (error || (data && data.length > 0)) nonEmpty.add(type);
+      } catch { nonEmpty.add(type); }
+    }),
+  );
+  corpusCache.set(workspaceId, { at: Date.now(), nonEmpty });
+  return new Set(requested.filter((t) => nonEmpty.has(t)));
+}
+
 async function rerankMivaaPayload(
   // deno-lint-ignore no-explicit-any
   data: any,
@@ -505,10 +557,25 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
         const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
         try {
+          // Ask only for corpora that hold something. See nonEmptyCorpora: searching the two
+          // empty ones cost 13 of every 15 seconds and returned nothing, by construction.
+          const liveTypes = [...(await nonEmptyCorpora(workspaceId, searchTypes))];
+          if (liveTypes.length === 0) {
+            // Every requested corpus is empty — there is no query to run. Answer from the same
+            // derivation the zero-result path uses, so the agent gets one consistent story.
+            return JSON.stringify({
+              found: false, totalResults: 0, articles: [], products: [], entities: [],
+              ...(await describeEmptyResult(searchTypes.includes('products') && !searchTypes.includes('kb_docs') ? 'products' : 'kb_docs', workspaceId)),
+            });
+          }
+          if (liveTypes.length < searchTypes.length) {
+            console.log(`🗂️ KB search: ${searchTypes.length - liveTypes.length} empty corpus/corpora skipped (${searchTypes.filter((t: string) => !liveTypes.includes(t)).join(', ')})`);
+          }
+
           const body: Record<string, any> = {
             query,
             workspace_id: workspaceId,
-            search_types: searchTypes,
+            search_types: liveTypes,
             top_k: topK,
             similarity_threshold: 0.6, // Lower threshold to catch more relevant articles
             caller: isAdmin ? 'admin' : 'agent',
