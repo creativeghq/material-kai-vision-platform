@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, RefreshCw, Users } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
@@ -50,23 +51,22 @@ function timeAgo(iso: string | null): string {
 
 export const SocialAccountsTab: React.FC = () => {
   const { user } = useAuth();
+  // The account connects into the workspace the user is CURRENTLY looking at. This used to
+  // read `workspace_members` directly with `.maybeSingle()` and no `.limit(1)`: for anyone in
+  // two workspaces PostgREST returns an error rather than a row, so `workspaceId` stayed null
+  // and Connect silently did nothing — the multi-workspace case, i.e. the whole point.
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => setWorkspaceId(data?.workspace_id ?? null));
     loadAccounts();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, workspaceId]);
 
   // Zernio redirects the OAuth tab back here with ?connected=<platform>&accountId=<id>.
   // This tab shares the user's Supabase session, so we persist the account via the
@@ -120,12 +120,16 @@ export const SocialAccountsTab: React.FC = () => {
 
   const loadAccounts = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    // Scoped to the ACTIVE workspace, not just the user: an account belongs to the workspace it
+    // was connected into, and listing every workspace's accounts here would offer a Disconnect
+    // for a tenant the user is not currently in.
+    let q = supabase
       .from('social_accounts')
       .select('*')
       .eq('user_id', user!.id)
-      .eq('is_active', true)
-      .order('connected_at', { ascending: false });
+      .eq('is_active', true);
+    if (workspaceId) q = q.eq('workspace_id', workspaceId);
+    const { data, error } = await q.order('connected_at', { ascending: false });
 
     if (error) {
       toast({ title: 'Failed to load accounts', description: error.message, variant: 'destructive' });

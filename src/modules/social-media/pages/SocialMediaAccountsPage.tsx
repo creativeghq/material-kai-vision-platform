@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { formatDate } from '@/utils/datetime';
 
@@ -51,6 +52,10 @@ function timeAgo(iso: string | null): string {
 
 export const SocialMediaAccountsPage: React.FC = () => {
   const { user } = useAuth();
+  // The ACTIVE workspace, not "whichever membership row came back first" — the previous
+  // `.limit(1).maybeSingle()` showed a member of two workspaces an arbitrary one of them,
+  // with nothing on screen saying which.
+  const { activeWorkspaceId } = useWorkspace();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -58,25 +63,18 @@ export const SocialMediaAccountsPage: React.FC = () => {
 
   useEffect(() => {
     loadAccounts();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeWorkspaceId]);
 
   const loadAccounts = async () => {
     if (!user) return;
+    if (!activeWorkspaceId) { setLoading(false); return; }
     setLoading(true);
-
-    const { data: membership } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (!membership) { setLoading(false); return; }
 
     const { data, error } = await supabase
       .from('social_accounts')
       .select('*')
-      .eq('workspace_id', membership.workspace_id)
+      .eq('workspace_id', activeWorkspaceId)
       .order('connected_at', { ascending: false });
 
     if (error) {

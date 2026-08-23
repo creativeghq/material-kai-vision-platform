@@ -57,7 +57,7 @@ Resolution is **env-first, then `platform_secrets` (DB)** — set via edge-funct
 | Secret Name | Where to get it |
 |-------------|----------------|
 | `ZERNIO_API_KEY` *(fallback: `LATE_API_KEY`)* | [Zernio Dashboard](https://zernio.com) → API Keys. The old Late key will **not** authenticate against Zernio — a real Zernio key is required. |
-| `ZERNIO_WEBHOOK_SECRET` *(fallback: `LATE_WEBHOOK_SECRET`)* | Zernio Dashboard → Webhooks → copy the signing secret |
+| `ZERNIO_WEBHOOK_SECRET` *(fallback: `LATE_WEBHOOK_SECRET`)* | **You invent this one** — there is nothing to copy from Zernio. Generate a random string (`openssl rand -hex 32`), save it here, then register the webhook (below): `ensureZernioWebhook` **sends** this secret to Zernio as the signing key. |
 | `XAI_API_KEY` | [x.ai console](https://console.x.ai) |
 | `GOOGLE_AI_API_KEY` | Google AI Studio or Google Cloud → Gemini API |
 | `REPLICATE_API_TOKEN` | [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens) |
@@ -70,7 +70,12 @@ Resolution is **env-first, then `platform_secrets` (DB)** — set via edge-funct
 
 1. **Plan**: a Zernio plan with API access + multi-account + the analytics add-on (analytics endpoints — follower-stats, post analytics — require it; see [zernio.com](https://zernio.com) for current pricing/tiers).
 2. **OAuth redirect**: `redirect_url` is passed **per connect call** (the frontend sends its own profile-page URL, e.g. `https://app.example.com/profile`). Zernio returns the browser there with `?connected&accountId`. Whitelist your **app origin** as an allowed redirect domain in the Zernio dashboard if it asks — there is no static edge-function callback URL to register.
-3. **Webhook URL** to register in Zernio:
+3. **Webhook**: do NOT hand-create it in the Zernio dashboard — register it from the app, at
+   **/messaging → Register webhook** (`messaging-api` `action: register-webhook`). It pushes the URL,
+   the full `ZERNIO_WEBHOOK_EVENTS` list and `ZERNIO_WEBHOOK_SECRET` to Zernio in one call, and repairs a
+   hook Zernio auto-disabled after 10 failed deliveries. It refuses if the secret is unset, because the
+   handler verifies signatures and fails closed — registering first would just get the hook switched off.
+   The URL it registers:
    ```
    https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/zernio-webhook-handler
    ```
@@ -171,7 +176,7 @@ The `SocialAccountsTab` component (`src/modules/social-media/components/SocialAc
 ## Deployment Checklist
 
 - [ ] Add secrets: `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET`, `XAI_API_KEY`, `GOOGLE_AI_API_KEY`, `REPLICATE_API_TOKEN`
-- [ ] Register webhook URL in Zernio dashboard
+- [ ] Register the webhook from /messaging → Register webhook (AFTER setting `ZERNIO_WEBHOOK_SECRET`)
 - [ ] Register OAuth redirect URL in Zernio dashboard
 - [ ] Deploy edge functions (all 8 new functions are in `config.toml`)
 - [ ] Verify `social_accounts`, `social_posts`, `social_post_analytics`, `social_account_insights` tables exist
