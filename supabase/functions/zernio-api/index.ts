@@ -25,6 +25,9 @@ const ANALYTICS_ACTIONS = new Set([
   // The company pages an existing member connection already administers — they do NOT each need
   // connecting separately, and they are invisible until something asks.
   'get_linkedin_organizations',
+  // Account-level metrics for ANY platform — Instagram, Facebook Pages, LinkedIn pages and
+  // members — normalised onto one shape, with unavailable metrics named rather than zeroed.
+  'get_account_metrics',
 ]);
 const OAUTH_ACTIONS = new Set(['connect', 'callback', 'disconnect', 'config_status']);
 const PUBLISH_ACTIONS = new Set(['schedule', 'publish_now']);

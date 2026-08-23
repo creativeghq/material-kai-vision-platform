@@ -18,6 +18,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubTabNav } from '@/components/core/hub/HubTabNav';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +41,7 @@ interface PostRow {
   scheduled_at: string | null;
   published_at: string | null;
   zernio_post_id: string | null;
+  social_account_id: string | null;
   metadata: { platform_post_url?: string | null } | null;
 }
 
@@ -121,22 +123,6 @@ const capabilitiesOf = (a: AccountRow): AccountCapabilities =>
 const needsUrlImport = (a: AccountRow) => capabilitiesOf(a).urlImport;
 
 /**
- * Lifetime totals LinkedIn aggregates itself for a member account. `saves` and `sends` exist
- * ONLY here — an organization page returns 0 for both, because LinkedIn does not expose them on
- * the org endpoint. So this is not a poorer version of the page numbers, it is a different set.
- */
-interface LinkedInTotals {
-  impressions: number | null;
-  reach: number | null;
-  reactions: number | null;
-  comments: number | null;
-  shares: number | null;
-  saves: number | null;
-  sends: number | null;
-  engagementRate: number | null;
-}
-
-/**
  * A company page the connected member administers.
  *
  * LinkedIn does not always return the name: for several pages it answers with the id alone, and
@@ -154,6 +140,57 @@ interface LinkedInOrg {
 
 const isNamedOrg = (o: LinkedInOrg) =>
   Boolean(o.vanityName) && !/^Organization \d+$/.test(o.name);
+
+/**
+ * One account's account-level figures, normalised across platforms by the edge handler.
+ *
+ * `unavailable` is not decoration. Instagram, Facebook and LinkedIn all answer with a metric
+ * OMITTED and named here when the platform could not serve it, precisely so it is never confused
+ * with a real zero — a Facebook Page that earned nothing and a Page not enrolled in monetisation
+ * both report 0, and only this list separates "we did not get an answer" from either.
+ */
+interface AccountMetrics {
+  platform: string;
+  metrics: Record<string, { total: number; unit?: string; currency?: string | null }>;
+  unavailable: string[];
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Platform metric keys are the platform's own vocabulary and read like it — `page_media_view`,
+ * `accounts_engaged`, `organic_followers_gained`. Anything not named here falls back to its key
+ * de-snaked, which is why an unknown metric still renders rather than being dropped: a new
+ * metric appearing upstream should show up as an ugly label, never vanish.
+ */
+const METRIC_LABELS: Record<string, string> = {
+  // LinkedIn member
+  impressions: 'Impressions', reach: 'Reach', reactions: 'Reactions', comments: 'Comments',
+  shares: 'Reshares', saves: 'Saves', sends: 'Sends', engagementRate: 'Engagement rate',
+  // LinkedIn organisation
+  unique_impressions: 'Unique impressions', clicks: 'Clicks', likes: 'Likes',
+  engagement_rate: 'Engagement rate', organic_followers_gained: 'Organic followers gained',
+  followers_gained: 'Followers gained', followers_lost: 'Followers lost',
+  // Instagram
+  views: 'Views', accounts_engaged: 'Accounts engaged', total_interactions: 'Interactions',
+  replies: 'Replies', reposts: 'Reposts', follows_and_unfollows: 'Follows & unfollows',
+  profile_links_taps: 'Profile link taps',
+  // Facebook Page
+  page_media_view: 'Media views', page_views_total: 'Page views',
+  page_post_engagements: 'Post engagements', page_video_views: 'Video views',
+  page_video_view_time: 'Video view time', page_follows: 'Follows',
+};
+
+const metricLabel = (key: string) =>
+  METRIC_LABELS[key] ?? key.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+
+/** Rates arrive as a percentage from LinkedIn members and as 0..1 from LinkedIn orgs. */
+const formatMetric = (key: string, m: { total: number; unit?: string; currency?: string | null }) => {
+  if (key === 'engagementRate') return `${m.total.toFixed(2)}%`;
+  if (key === 'engagement_rate') return `${(m.total * 100).toFixed(2)}%`;
+  if (m.unit === 'micro_amount') return `${(m.total / 1_000_000).toFixed(2)} ${m.currency ?? ''}`.trim();
+  return formatNumber(m.total);
+};
 
 const statusVariant = (s: string) =>
   s === 'published' ? 'success' : s === 'failed' ? 'error' : s === 'scheduled' ? 'info' : 'neutral';
@@ -209,7 +246,6 @@ export const SocialAnalyticsPanel: React.FC = () => {
   const [importUrl, setImportUrl] = useState('');
   // LinkedIn aggregates a personal profile's totals server-side, so this needs no post list —
   // which is the whole reason it is the only analytics such an account has.
-  const [liTotals, setLiTotals] = useState<Record<string, LinkedInTotals>>({});
   const [liScopeMissing, setLiScopeMissing] = useState(false);
   const [liOrgs, setLiOrgs] = useState<LinkedInOrg[]>([]);
   /**
@@ -219,6 +255,17 @@ export const SocialAnalyticsPanel: React.FC = () => {
    * still waiting say so.
    */
   const [derivedLoading, setDerivedLoading] = useState(true);
+  /**
+   * Account-level metrics per connected account, whatever the platform. Normalised server-side
+   * onto one shape so this does not need four renderers — and carrying `unavailable` separately,
+   * because a metric the platform declined to serve is NOT a zero and must not render as one.
+   */
+  const [accountMetrics, setAccountMetrics] = useState<Record<string, AccountMetrics>>({});
+  /**
+   * `all`, or a connected account's id. Stacking every account's panels down one page was
+   * readable with one account and stops being so at three.
+   */
+  const [activeTab, setActiveTab] = useState<string>('all');
 
   /** POST one zernio-api action for this workspace. Throws with the server's own message. */
   const callAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
@@ -244,7 +291,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
     setLoading(true);
     const [p, m, i, a] = await Promise.all([
       supabase.from('social_posts')
-        .select('id, platform, caption, status, scheduled_at, published_at, zernio_post_id, metadata')
+        .select('id, platform, caption, status, scheduled_at, published_at, zernio_post_id, social_account_id, metadata')
         .eq('workspace_id', activeWorkspaceId)
         .order('published_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
@@ -300,6 +347,35 @@ export const SocialAnalyticsPanel: React.FC = () => {
     const members = accountRows.filter(a => capabilitiesOf(a).aggregate);
     const anyPerPost = accountRows.some(a => capabilitiesOf(a).perPost);
 
+    // EVERY account, every platform. Instagram, Facebook Pages and LinkedIn pages each have an
+    // account-level endpoint and none of them had ever been called from here.
+    const perAccount = Promise.allSettled(
+      accountRows.map(a => callAction('get_account_metrics', { social_account_id: a.id })),
+    ).then((results) => {
+      const next: Record<string, AccountMetrics> = {};
+      accountRows.forEach((acct, idx) => {
+        const r = results[idx];
+        if (r.status === 'fulfilled') {
+          next[acct.id] = {
+            platform: acct.platform,
+            metrics: r.value?.metrics ?? {},
+            unavailable: r.value?.unavailable ?? [],
+            code: r.value?.code,
+            message: r.value?.message,
+          };
+        } else {
+          // A refusal is a fact about the account, and belongs on that account's tab rather
+          // than disappearing into a console line.
+          const err = r.reason as Error & { code?: string };
+          next[acct.id] = {
+            platform: acct.platform, metrics: {}, unavailable: [],
+            code: err?.code ?? 'error', message: err?.message,
+          };
+        }
+      });
+      setAccountMetrics(next);
+    });
+
     const [postDerived, memberDerived] = await Promise.all([
       anyPerPost
         // Settled, not all: the decay curve failing must not blank the daily chart beside it.
@@ -347,18 +423,15 @@ export const SocialAnalyticsPanel: React.FC = () => {
     }
 
     if (memberDerived) {
-      const totals: Record<string, LinkedInTotals> = {};
-      let scopeMissing = false;
-      members.forEach((acct, idx) => {
+      // The member TOTALS are no longer read here — `get_account_metrics` serves them for every
+      // platform on one shape, and keeping a second copy of the same numbers is how two panels
+      // start disagreeing. What is still only knowable here is whether the connection was
+      // authorised without permission to read analytics.
+      setLiScopeMissing(members.some((_, idx) => {
         const r = memberDerived[idx];
-        if (r.status === 'fulfilled') {
-          if (r.value?.analytics) totals[acct.id] = r.value.analytics as LinkedInTotals;
-        } else if ((r.reason as Error & { code?: string })?.code === 'missing_scope') {
-          scopeMissing = true;
-        }
-      });
-      setLiTotals(totals);
-      setLiScopeMissing(scopeMissing);
+        return r.status === 'rejected'
+          && (r.reason as Error & { code?: string })?.code === 'missing_scope';
+      }));
 
       const orgRes = memberDerived[memberDerived.length - 1];
       setLiOrgs(orgRes.status === 'fulfilled' ? (orgRes.value?.organizations ?? []) : []);
@@ -370,12 +443,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
         dailyPoints = linkedInDailyToPoints(memberDaily.value?.analytics ?? {});
       }
     } else {
-      setLiTotals({});
       setLiScopeMissing(false);
       setLiOrgs([]);
     }
 
     setDaily(dailyPoints);
+    // The per-account sweep runs alongside the two above; the panel is not "loaded" until it
+    // lands too, or its cards would flash an empty state on the way in.
+    await perAccount;
     setDerivedLoading(false);
   }, [activeWorkspaceId, callAction]);
 
@@ -460,6 +535,52 @@ export const SocialAnalyticsPanel: React.FC = () => {
   const anyPerPost = useMemo(() => accounts.some(a => capabilitiesOf(a).perPost), [accounts]);
   const anyAggregate = useMemo(() => accounts.some(a => capabilitiesOf(a).aggregate), [accounts]);
 
+  /** The account this tab is about, or null on the cross-account view. */
+  const tabAccount = useMemo(
+    () => accounts.find(a => a.id === activeTab) ?? null,
+    [accounts, activeTab],
+  );
+
+  // A tab whose account was just disconnected must not strand the screen on an empty view.
+  useEffect(() => {
+    if (activeTab !== 'all' && !accounts.some(a => a.id === activeTab)) setActiveTab('all');
+  }, [accounts, activeTab]);
+
+  /**
+   * One tab per account, plus the cross-account view — offered only from TWO accounts up. With
+   * one connected account a tab strip is pure chrome: it names the thing you are already looking
+   * at and offers nowhere else to go.
+   */
+  const tabItems = useMemo(() => (
+    accounts.length < 2 ? [] : [
+      { id: 'all', label: 'All accounts', count: accounts.length },
+      ...accounts.map(a => ({
+        id: a.id,
+        label: a.handle ?? platformLabel(a.platform),
+        count: posts.filter(p => p.social_account_id === a.id).length,
+      })),
+    ]
+  ), [accounts, posts]);
+
+  /** Posts belonging to the active tab. The cross-account view shows everything. */
+  const visiblePosts = useMemo(
+    () => (tabAccount ? posts.filter(p => p.social_account_id === tabAccount.id) : posts),
+    [posts, tabAccount],
+  );
+
+  /** Insight snapshots for the active tab, same rule. */
+  const visibleInsights = useMemo(
+    () => (tabAccount ? insights.filter(r => r.social_account_id === tabAccount.id) : insights),
+    [insights, tabAccount],
+  );
+
+  // Which panels this tab may show. On a single account it is that account's answer; across all
+  // of them it is the union, because a page and a profile can be connected side by side.
+  const tabPerPost = tabAccount ? capabilitiesOf(tabAccount).perPost : anyPerPost;
+  const tabAggregate = tabAccount ? capabilitiesOf(tabAccount).aggregate : anyAggregate;
+  const tabUrlImport = tabAccount ? capabilitiesOf(tabAccount).urlImport : urlImportAccounts.length > 0;
+  const metricAccounts = tabAccount ? [tabAccount] : accounts;
+
   const accountLabel = useMemo(() => {
     const m: Record<string, { platform: string; text: string }> = {};
     for (const a of accounts) m[a.id] = { platform: a.platform, text: a.handle ?? platformLabel(a.platform) };
@@ -478,6 +599,15 @@ export const SocialAnalyticsPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {tabItems.length > 0 && (
+        <HubTabNav
+          items={tabItems}
+          activeId={activeTab}
+          onSelect={setActiveTab}
+          aria-label="Connected accounts"
+        />
+      )}
+
       {addonMissing && (
         <div className="dashboard-card flex items-start gap-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
@@ -509,7 +639,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          {insights.length === 0 ? (
+          {visibleInsights.length === 0 ? (
             <HubEmptyState
               variant="empty"
               icon={Users}
@@ -533,7 +663,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {insights.map(row => (
+                  {visibleInsights.map(row => (
                     <TableRow key={row.social_account_id}>
                       <TableCell>
                         {accountLabel[row.social_account_id] ? (
@@ -563,126 +693,138 @@ export const SocialAnalyticsPanel: React.FC = () => {
       {/* The only analytics a personal LinkedIn profile has. Rendered whenever one is connected,
           including at zero — a connected account showing nothing at all is the state that sent
           somebody looking for a bug last time. */}
-      {anyAggregate && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PlatformIcon platform="linkedin" className="h-4 w-4" /> LinkedIn lifetime totals
-            </CardTitle>
-            <CardDescription>
-              Lifetime totals across your profile’s posts. LinkedIn adds these up itself, so they
-              need no post list — which is why they work where the posts table cannot, and why
-              they cannot be broken down per post. Saves and sends are personal-profile figures;
-              a company page returns 0 for both, so these are not a lesser version of page
-              analytics but a different set.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Loadable loading={derivedLoading}>
-            {liScopeMissing ? (
-              <div className="flex items-start gap-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
-                <div>
-                  <p className="font-medium">This connection cannot read post analytics</p>
-                  <p className="text-muted-foreground mt-1">
-                    It was authorised without the <code>r_member_postAnalytics</code> permission.
-                    Disconnect and reconnect the account, accepting the analytics permission —
-                    until then every figure here reads zero whether or not anyone engaged.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account</TableHead>
-                      <TableHead className="text-right">Impressions</TableHead>
-                      <TableHead className="text-right">Reach</TableHead>
-                      <TableHead className="text-right">Reactions</TableHead>
-                      <TableHead className="text-right">Comments</TableHead>
-                      <TableHead className="text-right">Reshares</TableHead>
-                      <TableHead className="text-right">Saves</TableHead>
-                      <TableHead className="text-right">Sends</TableHead>
-                      <TableHead className="text-right">Engagement</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {urlImportAccounts.map(acct => {
-                      const t = liTotals[acct.id];
-                      return (
-                        <TableRow key={acct.id}>
-                          <TableCell className="text-sm">{acct.handle ?? platformLabel(acct.platform)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.impressions)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.reach)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.reactions)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.comments)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.shares)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.saves)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(t?.sends)}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {t?.engagementRate == null ? '—' : `${t.engagementRate.toFixed(2)}%`}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+      {/* Account-level metrics, one card per account on this tab. Every platform has such an
+          endpoint — Instagram, Facebook Pages, LinkedIn pages and members — and until now only
+          LinkedIn members were being asked. The shape is normalised server-side, so this is one
+          renderer rather than four. */}
+      {metricAccounts.map(acct => {
+        const am = accountMetrics[acct.id];
+        const entries = Object.entries(am?.metrics ?? {});
+        const caps = capabilitiesOf(acct);
+        return (
+          <Card key={acct.id}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlatformIcon platform={acct.platform} className="h-4 w-4" />
+                {acct.handle ?? platformLabel(acct.platform)}
+              </CardTitle>
+              <CardDescription>
+                {caps.aggregate
+                  ? <>Lifetime totals across this profile’s posts. LinkedIn adds these up itself, so
+                      they need no post list — which is why they work where the posts table cannot,
+                      and why they cannot be broken down per post. Saves and sends are
+                      personal-profile figures; a company page returns 0 for both, so these are not
+                      a lesser version of page analytics but a different set.</>
+                  : <>Account-level figures {platformLabel(acct.platform)} reports for the last 30
+                      days. These cover the whole account across every surface, which is a different
+                      question from what any single post did.</>}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Loadable loading={derivedLoading}>
+                {liScopeMissing && caps.aggregate ? (
+                  <div className="flex items-start gap-3 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
+                    <div>
+                      <p className="font-medium">This connection cannot read post analytics</p>
+                      <p className="text-muted-foreground mt-1">
+                        It was authorised without the <code>r_member_postAnalytics</code> permission.
+                        Disconnect and reconnect the account, accepting the analytics permission —
+                        until then every figure here reads zero whether or not anyone engaged.
+                      </p>
+                    </div>
+                  </div>
+                ) : am?.code && !entries.length ? (
+                  <div className="flex items-start gap-3 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
+                    <p className="text-muted-foreground">
+                      {am.message ?? 'These figures could not be read for this account.'}
+                    </p>
+                  </div>
+                ) : entries.length === 0 ? (
+                  <HubEmptyState
+                    variant="empty"
+                    icon={BarChart3}
+                    title="No account figures yet"
+                    description={`${platformLabel(acct.platform)} has not reported account-level numbers for this account yet.`}
+                  />
+                ) : (
+                  <>
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+                      {entries.map(([key, m]) => (
+                        <div key={key}>
+                          <dt className="text-xs text-muted-foreground">{metricLabel(key)}</dt>
+                          <dd className="mt-0.5 text-lg font-semibold tabular-nums">{formatMetric(key, m)}</dd>
+                        </div>
+                      ))}
+                    </dl>
 
-            {/* "Can we manage more than one?" — for LinkedIn the answer is already yes, and
-                already connected. A member connection carries every company page that member
-                administers; publishing picks between them. Nobody connects those separately, so
-                the only thing missing was anyone asking what they are. */}
-            {liOrgs.length > 0 && (
-              <div className="mt-4 border-t border-hairline pt-3">
-                <p className="text-sm font-medium">
-                  This connection already administers {liOrgs.length} company{' '}
-                  {liOrgs.length === 1 ? 'page' : 'pages'}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {liOrgs.filter(isNamedOrg).map(org => (
-                    <span
-                      key={org.id}
-                      className="inline-flex items-center gap-2 rounded-sm border border-hairline bg-surface-sunken px-2 py-1 text-xs"
-                    >
-                      {org.logoUrl
-                        ? <img src={org.logoUrl} alt="" className="h-4 w-4 rounded-sm object-cover" />
-                        : <PlatformIcon platform="linkedin" className="h-3.5 w-3.5" />}
-                      {org.name}
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {liOrgs.filter(o => !isNamedOrg(o)).length > 0 && (
-                    <>
-                      {liOrgs.filter(o => !isNamedOrg(o)).length} more that LinkedIn returned by id
-                      only — usually a page the member is listed on without full admin rights.{' '}
-                    </>
-                  )}
-                  Publishing can target any of these <strong className="text-foreground">without
-                  connecting anything else</strong>. Connecting one as its own account additionally
-                  gives per-post analytics and the comments inbox — the two things a personal
-                  profile cannot have, and the only real reason to add a page here.
-                </p>
-              </div>
-            )}
-            </Loadable>
-          </CardContent>
-        </Card>
-      )}
+                    {/* Named, never zeroed. The platform declined to serve these, which is a
+                        different fact from "nobody engaged" — and the two look identical the
+                        moment an unavailable metric is rendered as 0. */}
+                    {am!.unavailable.length > 0 && (
+                      <p className="mt-4 border-t border-hairline pt-3 text-xs text-muted-foreground">
+                        Not available from {platformLabel(acct.platform)} for this period:{' '}
+                        {am!.unavailable.map(metricLabel).join(', ')}. These are withheld rather than
+                        counted as zero.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {/* "Can we manage more than one?" — for LinkedIn the answer is already yes, and
+                    already connected. A member connection carries every company page that member
+                    administers; publishing picks between them. Nobody connects those separately,
+                    so the only thing missing was anyone asking what they are. */}
+                {caps.aggregate && liOrgs.length > 0 && (
+                  <div className="mt-4 border-t border-hairline pt-3">
+                    <p className="text-sm font-medium">
+                      This connection already administers {liOrgs.length} company{' '}
+                      {liOrgs.length === 1 ? 'page' : 'pages'}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {liOrgs.filter(isNamedOrg).map(org => (
+                        <span
+                          key={org.id}
+                          className="inline-flex items-center gap-2 rounded-sm border border-hairline bg-surface-sunken px-2 py-1 text-xs"
+                        >
+                          {org.logoUrl
+                            ? <img src={org.logoUrl} alt="" className="h-4 w-4 rounded-sm object-cover" />
+                            : <PlatformIcon platform="linkedin" className="h-3.5 w-3.5" />}
+                          {org.name}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {liOrgs.filter(o => !isNamedOrg(o)).length > 0 && (
+                        <>
+                          {liOrgs.filter(o => !isNamedOrg(o)).length} more that LinkedIn returned by
+                          id only — usually a page the member is listed on without full admin rights.{' '}
+                        </>
+                      )}
+                      Publishing can target any of these <strong className="text-foreground">without
+                      connecting anything else</strong>. Connecting one as its own account
+                      additionally gives per-post analytics and the comments inbox — the two things a
+                      personal profile cannot have, and the only real reason to add a page here.
+                    </p>
+                  </div>
+                )}
+              </Loadable>
+            </CardContent>
+          </Card>
+        );
+      })}
 
       {/* Shown when EITHER source can fill it: post-derived for a business page, the member
           aggregate for a personal profile. */}
-      {(anyPerPost || anyAggregate) && (
+      {(tabPerPost || tabAggregate) && (
         <DailyReachChart daily={daily} platforms={platformTotals} loading={derivedLoading} />
       )}
 
       {/* Both derive from a post list and have no member-account substitute, so for a workspace
           with only personal profiles they are not "empty" — they are inapplicable, and an empty
           state that invites you to wait for data that can never arrive is worse than absence. */}
-      {anyPerPost && (
+      {tabPerPost && (
         <>
           <ContentDecayChart buckets={decay} loading={derivedLoading} />
           <PostingFrequencyTable rows={frequency} loading={derivedLoading} />
@@ -695,7 +837,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
             <BarChart3 className="h-4 w-4" /> Posts
           </CardTitle>
           <CardDescription>
-            {anyPerPost
+            {tabPerPost
               ? <>Everything this workspace has drafted, scheduled or published, plus up to a year
                   of posts published natively on each connected account — Sync now imports those.
                   Newest first, with the engagement reported for each.</>
@@ -724,11 +866,11 @@ export const SocialAnalyticsPanel: React.FC = () => {
 
           {/* The only import a personal LinkedIn profile has. Offered whenever one is connected,
               not hidden behind the failure — the sweep can never succeed for it. */}
-          {urlImportAccounts.length > 0 && (
+          {tabUrlImport && (
             <div className="rounded-sm border border-hairline p-3">
               <p className="text-sm font-medium">Import a published post by URL</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                For {urlImportAccounts.map(a => a.handle ?? platformLabel(a.platform)).join(', ')} —
+                For {(tabAccount ? [tabAccount] : urlImportAccounts).map(a => a.handle ?? platformLabel(a.platform)).join(', ')} —
                 LinkedIn keeps personal profiles off its listing API, so posts are imported one link
                 at a time. Any age, including before you connected, with full engagement figures.
               </p>
@@ -748,7 +890,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
             </div>
           )}
 
-          {posts.length === 0 ? (
+          {visiblePosts.length === 0 ? (
             <HubEmptyState
               variant="empty"
               icon={BarChart3}
@@ -773,7 +915,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {posts.map(post => {
+                  {visiblePosts.map(post => {
                     const m = metrics[post.id];
                     return (
                       <TableRow key={post.id}>

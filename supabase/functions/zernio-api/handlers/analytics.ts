@@ -187,6 +187,134 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     }
   }
 
+  // ── ACCOUNT-LEVEL METRICS, ANY PLATFORM ────────────────────────────────────
+  //
+  // Every platform here has an account-level analytics endpoint and we were calling exactly one
+  // of them (LinkedIn personal). Instagram, Facebook Pages and LinkedIn organization pages each
+  // have their own, and none of them was reachable from this app.
+  //
+  // They can share ONE implementation because Zernio deliberately gave three of them the same
+  // response shape — `metrics` keyed by name, each `{ total, values[] }`, plus an
+  // `unavailableMetrics` list. That list is the important part and the reason this is worth
+  // normalising rather than passing through: **a metric the platform could not serve is OMITTED
+  // from `metrics` and named in `unavailableMetrics`, never returned as 0.** Flattening the two
+  // together would manufacture exactly the confident zero this codebase keeps being bitten by.
+  //
+  // LinkedIn PERSONAL is the odd one out — flat numbers under `analytics`, no unavailable list —
+  // so it is mapped into the same shape here. One normalisation server-side beats four shapes
+  // the client has to know apart.
+  if (action === 'get_account_metrics') {
+    if (!social_account_id) return jsonResponse({ success: false, error: 'social_account_id required' }, 400);
+
+    const { data: acct } = await supabase
+      .from('social_accounts')
+      .select('id, workspace_id, zernio_account_id, platform, metadata')
+      .eq('id', social_account_id)
+      .maybeSingle();
+
+    if (!acct || (!isSecretCaller && !callerWorkspaceIds.includes(acct.workspace_id))) {
+      return jsonResponse({ success: false, error: 'No such account' }, 404);
+    }
+
+    const accountType = (acct.metadata as { accountType?: string } | null)?.accountType ?? null;
+    const zid = encodeURIComponent(acct.zernio_account_id);
+    // A window is passed ONLY when the caller supplied one. Defaulting it here would mean
+    // stamping a date in the edge runtime, whose clock is UTC — the operator's calendar day is
+    // 2-3 hours ahead, so "today" is yesterday for part of every evening. Zernio's own default
+    // (last 30 days) is both correct and the platform's stated behaviour.
+    const win = [
+      body.from_date ? `&since=${encodeURIComponent(body.from_date)}` : '',
+      body.to_date ? `&until=${encodeURIComponent(body.to_date)}` : '',
+    ].join('');
+
+    // Which endpoint answers for this account. `null` means the platform has no account-level
+    // endpoint — a fact to report, not an error to throw.
+    let path: string | null = null;
+    if (acct.platform === 'instagram') {
+      path = `/analytics/instagram/account-insights?accountId=${zid}${win}`;
+    } else if (acct.platform === 'facebook') {
+      path = `/analytics/facebook/page-insights?accountId=${zid}${win}`;
+    } else if (acct.platform === 'linkedin' && accountType !== 'personal') {
+      path = `/analytics/linkedin/org-aggregate-analytics?accountId=${zid}${win}`;
+    } else if (acct.platform === 'linkedin') {
+      path = `/accounts/${zid}/linkedin-aggregate-analytics?aggregation=TOTAL`;
+    }
+
+    if (!path) {
+      return jsonResponse({
+        success: true,
+        platform: acct.platform,
+        account_type: accountType,
+        metrics: {},
+        unavailable: [],
+        code: 'no_account_endpoint',
+        message: `${acct.platform} publishes no account-level analytics endpoint — its figures come from individual posts.`,
+      });
+    }
+
+    try {
+      const data = await zernioApi('GET', path);
+
+      // LinkedIn personal: flat `analytics`. Everything else: `metrics` + `unavailableMetrics`.
+      if (acct.platform === 'linkedin' && accountType === 'personal') {
+        const a = (data?.analytics ?? {}) as Record<string, number>;
+        const metrics: Record<string, { total: number }> = {};
+        for (const [k, v] of Object.entries(a)) {
+          if (typeof v === 'number') metrics[k] = { total: v };
+        }
+        return jsonResponse({
+          success: true, platform: acct.platform, account_type: accountType,
+          metrics, unavailable: [], last_updated: data?.lastUpdated ?? null,
+        });
+      }
+
+      const raw = (data?.metrics ?? {}) as Record<string, Record<string, unknown>>;
+      const metrics: Record<string, { total: number; unit?: string; currency?: string | null }> = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof v?.total === 'number') {
+          metrics[k] = {
+            total: v.total as number,
+            ...(v.unit ? { unit: v.unit as string } : {}),
+            ...(v.currency !== undefined ? { currency: v.currency as string | null } : {}),
+          };
+        }
+      }
+      return jsonResponse({
+        success: true,
+        platform: acct.platform,
+        account_type: accountType,
+        metrics,
+        // Carried through by NAME. The client renders these as "not available", which is a
+        // different row from a zero and must never collapse into one.
+        unavailable: ((data?.unavailableMetrics ?? []) as Array<Record<string, unknown>>)
+          .map((u) => String(u?.metric ?? u?.name ?? '')).filter(Boolean),
+        date_range: data?.dateRange ?? null,
+      });
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      const bodyText = (err as { bodyText?: string })?.bodyText ?? '';
+      // 412 is the org endpoint's "connected before these scopes existed" reauth hint; 403
+      // missing_scope is the member endpoint's. Both mean reconnect, neither means zero.
+      if (status === 412 || (status === 403 && bodyText.includes('missing_scope'))) {
+        return jsonResponse({
+          success: false,
+          code: 'missing_scope',
+          error: 'This connection was authorised before it could read analytics. Disconnect and '
+            + 'reconnect the account, accepting the analytics permissions — nothing can read the '
+            + 'figures until then.',
+        }, 403);
+      }
+      if (status === 402) {
+        return jsonResponse({
+          success: false,
+          code: 'analytics_addon_required',
+          error: 'This needs the Zernio Analytics add-on, which the platform account does not currently have.',
+        }, 402);
+      }
+      throw err;
+    }
+  }
+
   // ── LINKEDIN COMPANY PAGES ON AN EXISTING CONNECTION ───────────────────────
   //
   // "Can we manage more than one account?" has a LinkedIn-specific answer that is easy to get
