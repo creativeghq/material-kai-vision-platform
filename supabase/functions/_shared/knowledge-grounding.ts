@@ -35,10 +35,21 @@
  * So: ground UNCONDITIONALLY, and skip only on facts — never on a guess about intent. The
  * relevance floor decides what is worth injecting, which is a measurement, not an opinion.
  *
- * ON LATENCY. This is not a new cost, it is a cheaper version of an existing one. When the agent
- * behaves correctly today it calls the tool itself and pays 12–16s. Grounding pays ~6s, once,
- * before the turn starts, and tells the agent the results are already in hand so it does not call
- * the tool again. On the turns that matter this is FASTER than the behaviour it replaces.
+ * ON LATENCY — measured, not estimated, and it is not free.
+ *
+ * An earlier draft of this comment claimed ~6s. That was the raw MIVAA round trip; the bound tool
+ * also re-ranks, and the real figure is the same as the tool call it replaces. Measured live
+ * 2026-08-23: model-initiated `knowledge_base_search` 12.5s / 13.4s / 16.7s, grounding 15.5s.
+ *
+ * So the honest account is: on a turn that NEEDS the knowledge base this costs nothing extra — it
+ * moves a call that was going to happen anyway to before the turn, and tells the agent not to
+ * repeat it (verified: the model now calls `read_document_section` and never re-searches). On a
+ * turn that does not need it, it is ~15s spent for nothing.
+ *
+ * That trade is deliberate while the alternative is a gate that can say no. The way to improve it
+ * is to make the LOOKUP cheaper — the re-ranker is an extra model call inside the tool, and this
+ * path applies its own relevance floor and cap, so it does not need one — not to reintroduce a
+ * guess about whether to look.
  *
  * ON SECURITY. Retrieved KB text is ingested content — authored by users, and now travelling into
  * a privileged position in the system prompt. It is fenced as DATA (security invariant 9), the

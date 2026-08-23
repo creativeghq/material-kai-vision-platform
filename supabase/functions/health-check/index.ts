@@ -554,7 +554,6 @@ serve(withApiLogging('health-check', async (req) => {
     ...externalResults
   ] = await Promise.all([
     checkClaude(),
-    checkOpenAI(),
     checkSlig(),
     checkPaddleOcr(),
     checkVoyageAI(),

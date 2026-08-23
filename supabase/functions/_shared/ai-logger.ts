@@ -460,41 +460,6 @@ export class AICallLogger {
   }
 
   /**
-   * Log OpenAI API call
-   */
-  async logOpenAICall(
-    task: string,
-    model: string,
-    response: any,
-    latencyMs: number,
-    confidenceScore?: number,
-    confidenceBreakdown?: ConfidenceBreakdown,
-    action?: 'use_ai_result' | 'fallback_to_rules',
-    jobId?: string,
-    fallbackReason?: string,
-    attribution?: AICallAttribution,
-  ): Promise<void> {
-    const inputTokens = response.usage?.prompt_tokens || 0;
-    const outputTokens = response.usage?.completion_tokens || 0;
-
-    await this.logAICall({
-      job_id: jobId,
-      task,
-      model,
-      user_id: attribution?.userId,
-      workspace_id: attribution?.workspaceId,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      latency_ms: latencyMs,
-      confidence_score: confidenceScore,
-      confidence_breakdown: confidenceBreakdown,
-      action,
-      fallback_reason: fallbackReason,
-      response_data: { choices: response.choices },
-    });
-  }
-
-  /**
    * Log embedding generation call
    */
   async logEmbeddingCall(

@@ -145,7 +145,6 @@ export class KaiTaskAgent implements AgentRunner {
     ].join('\n');
 
     // ── Run LangGraph loop ─────────────────────────────────────────────────────
-    const openaiApiKey  = Deno.env.get('OPENAI_API_KEY')  ?? '';
     const googleApiKey  = Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') ?? '';
 
     // Heartbeat every ~10 iterations via onLog callback
@@ -182,7 +181,6 @@ export class KaiTaskAgent implements AgentRunner {
     try {
       result = await runLangGraphAgent({
         anthropicApiKey,
-        openaiApiKey,
         googleApiKey,
         model,
         systemPrompt,

@@ -47,8 +47,6 @@ export function extractTextContent(content: unknown): string {
 export interface LangGraphRunOptions {
   /** Anthropic API key (required for claude-* models) */
   anthropicApiKey:  string;
-  /** OpenAI API key (required for gpt-* models) */
-  openaiApiKey?:    string;
   /** Google AI key (required for gemini-* models) */
   googleApiKey?:    string;
   model:            string;
@@ -72,23 +70,21 @@ export interface LangGraphRunOutput {
 /**
  * Build an LLM instance based on the model name prefix.
  *  claude-*  → ChatAnthropic
- *  gpt-* / o1* / o3* → ChatOpenAI
  *  gemini-*  → ChatGoogleGenerativeAI
+ *
+ * There is no OpenAI branch. It existed until 2026-08-23 and was unreachable the whole
+ * time: every model in `agent_usage_logs` and every `background_agents.model` row is a
+ * Claude one, and the branch pulled `npm:@langchain/openai` into the bundle to serve a
+ * prefix nothing ever asked for.
  */
 export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
-  const { model, anthropicApiKey, openaiApiKey, googleApiKey } = opts;
+  const { model, anthropicApiKey, googleApiKey } = opts;
 
   // Merge into the existing process.env shim rather than replacing it wholesale.
   // Replacing the entire object would wipe keys set by other concurrent agents.
   const procEnv: Record<string, string> = (globalThis as any).process?.env ?? {};
   if (!(globalThis as any).process) {
     (globalThis as any).process = { env: procEnv };
-  }
-
-  if (model.startsWith('gpt-') || model.startsWith('o1') || model.startsWith('o3')) {
-    const { ChatOpenAI } = await import('npm:@langchain/openai@1.5.8');
-    procEnv.OPENAI_API_KEY = openaiApiKey ?? '';
-    return new ChatOpenAI({ model, openAIApiKey: openaiApiKey, maxTokens: 4096 });
   }
 
   if (model.startsWith('gemini-')) {

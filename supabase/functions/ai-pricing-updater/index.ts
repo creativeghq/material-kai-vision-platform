@@ -33,14 +33,11 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
       'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
     },
   },
-  openai: {
-    // OpenAI embeddings only — chat models removed (platform uses Claude exclusively)
-    // https://openai.com/api/pricing/
-    fallback_prices: {
-      'text-embedding-3-small': { input: 0.02, output: 0.00 },
-      'text-embedding-3-large': { input: 0.13, output: 0.00 },
-    },
-  },
+  // OpenAI is deliberately absent (2026-08-23). The provider was removed from the
+  // platform, and its two `ai_model_pricing` rows were deactivated rather than deleted so
+  // the historical `ai_usage_logs` rows naming them still resolve. Leaving a fallback here
+  // would have this cron write them back and flip them active again on its next run —
+  // a removal undone by a scheduled job is a removal that does not stay done.
   voyage: {
     // Voyage AI pricing
     // https://docs.voyageai.com/docs/pricing

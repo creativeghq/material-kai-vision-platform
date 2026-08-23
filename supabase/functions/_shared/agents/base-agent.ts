@@ -57,8 +57,6 @@ const MODEL_USD_PER_M_TOKENS: Record<string, { input: number; output: number }> 
   'claude-haiku-4-5':         { input: 1.0,  output: 5.0  },
   'claude-sonnet-4-6':        { input: 3.0,  output: 15.0 },
   'claude-opus-4-8':          { input: 15.0, output: 75.0 },
-  'gpt-4o-mini':              { input: 0.15, output: 0.6  },
-  'gpt-4o':                   { input: 2.5,  output: 10.0 },
   'gemini-2.0-flash':         { input: 0.075, output: 0.3 },
 };
 
@@ -83,7 +81,6 @@ export async function logAgentAiUsage(
     const outputCost = (args.outputTokens / 1_000_000) * pricing.output;
     const rawCost    = inputCost + outputCost;
     const provider   = args.model.startsWith('claude-') ? 'anthropic'
-      : args.model.startsWith('gpt-') || args.model.startsWith('o1') || args.model.startsWith('o3') ? 'openai'
       : args.model.startsWith('gemini-') ? 'google'
       : 'unknown';
 
