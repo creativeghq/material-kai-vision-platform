@@ -97,6 +97,18 @@ describe('the destination registry points at real places', () => {
     }
   });
 
+  it('every ?section= names a section that rail still offers', () => {
+    // A stale section id does not 404 — it silently lands on the rail's default, which is the
+    // same "valid URL, wrong pane" failure a wrong ?tab= produces.
+    const RAIL = 'src/modules/social-media/components/SocialHubPanel.tsx';
+    for (const d of APP_DESTINATIONS) {
+      const section = new URLSearchParams(d.route.split('?')[1] ?? '').get('section');
+      if (!section) continue;
+      expect(read(RAIL), `${d.id} → no section "${section}" on the channels rail`)
+        .toContain(`id: '${section}'`);
+    }
+  });
+
   it('every breadcrumb names at least two segments', () => {
     // A one-word destination ("Inbox") cannot be linkified without swallowing the word wherever
     // it appears in ordinary prose.
@@ -269,7 +281,8 @@ describe('a list fed by a setup flow links to that flow', () => {
   it('covers the other connection-shaped lists too', () => {
     const wa = render({ channels: [] }, 'messaging_channels_list', 'WhatsApp channels');
     expect(wa).toContain('Connect a channel');
-    expect(wa).toContain('/messaging');
+    // The channels rail on the profile, not the workspace-admin-gated /messaging page.
+    expect(wa).toContain('/profile?tab=social-accounts&amp;section=whatsapp');
   });
 });
 

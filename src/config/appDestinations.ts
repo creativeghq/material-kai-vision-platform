@@ -60,7 +60,19 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   { id: 'profile-reviews', breadcrumb: 'Profile → Reviews', route: '/profile?tab=reviews' },
 
   // ── Module pages ──
-  { id: 'messaging-channels', breadcrumb: 'Messaging → Channels', route: '/messaging' },
+  // WhatsApp connect lives on the profile's channels rail, beside the social accounts — same
+  // Zernio account, same mental model. `?section=whatsapp` is that rail's declared external
+  // contract (SocialHubPanel), not one of its internal section names. `/messaging` still exists
+  // but is workspace-admin-gated, so it is the wrong place to send the person connecting.
+  {
+    id: 'messaging-channels',
+    // The breadcrumb has to NAME where the link goes — a card that says "Messaging → Channels"
+    // and lands on the profile is the same mismatch this file exists to remove. The old name
+    // stays as an alias so prose still carrying it links to the surface that replaced it.
+    breadcrumb: 'Profile → Social Accounts → WhatsApp',
+    route: '/profile?tab=social-accounts&section=whatsapp',
+    aliases: ['Messaging → Channels'],
+  },
   {
     id: 'quote-requests',
     breadcrumb: 'Quotes → Requests',
