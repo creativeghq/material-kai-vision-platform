@@ -24,6 +24,9 @@ const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
 interface PublicToolInfo { name: string; label: string; writes: boolean }
 
+/** What the assistant said about the last result, if the key may spend on that. */
+interface AskState { asking: boolean; answer: string | null; pending: boolean }
+
 const STYLE = `
 :host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
 .card { border:1px solid #e3ddd2; border-radius:12px; padding:16px; background:#fff; display:grid; gap:14px; }
@@ -70,6 +73,7 @@ export class MaterialKaiAssistant extends HTMLElement {
   private active: string | null = null;
   private result: Record<string, unknown> | null = null;
   private busy = false;
+  private ask: AskState = { asking: false, answer: null, pending: false };
   private failure = '';
   private started = false;
   private disposed = false;
@@ -143,6 +147,8 @@ export class MaterialKaiAssistant extends HTMLElement {
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error ?? 'failed');
       this.result = (body?.result ?? null) as Record<string, unknown> | null;
+      // A new result invalidates the previous explanation — it described the old one.
+      this.ask = { asking: false, answer: null, pending: false };
     } catch {
       this.failure = 'That did not work. Please try again.';
       this.result = null;
@@ -306,6 +312,80 @@ export class MaterialKaiAssistant extends HTMLElement {
     return box;
   }
 
+  /**
+   * "Ask about this" — the one place the visitor can type.
+   *
+   * Deliberately AFTER a result, never before. A blank box asking an open question is what this
+   * surface was built to avoid; a box asking about something already on screen is a follow-up,
+   * which is a question people know how to write.
+   */
+  private renderAsk(host: HTMLElement) {
+    if (!this.result) return;
+
+    if (this.ask.answer) {
+      const p = document.createElement('p');
+      p.className = 'sub';
+      p.textContent = this.ask.answer;
+      host.appendChild(p);
+      return;
+    }
+
+    if (!this.ask.asking) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'act';
+      b.textContent = 'Ask about this';
+      b.addEventListener('click', () => { this.ask.asking = true; this.render(); });
+      host.appendChild(b);
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'form';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'e.g. would this suit a small bathroom?';
+    input.maxLength = 500;
+    const go = document.createElement('button');
+    go.className = 'go';
+    go.type = 'button';
+    go.textContent = this.ask.pending ? 'Thinking…' : 'Ask';
+    go.disabled = this.ask.pending;
+    const submit = () => {
+      const q = input.value.trim();
+      if (q) void this.submitAsk(q);
+    };
+    go.addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') submit(); });
+    wrap.append(input, go);
+    host.appendChild(wrap);
+  }
+
+  private async submitAsk(question: string) {
+    this.ask.pending = true;
+    this.render();
+    try {
+      const res = await fetch(this.url('ask'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // The RESULT travels with the question — the model has no tools and cannot look anything
+        // up, so what it is given is the whole of what it can say.
+        body: JSON.stringify({ question, result: this.result }),
+      });
+      const body = await res.json();
+      // `available: false` is the merchant's billing, not the visitor's business: the box simply
+      // stops being offered rather than showing an error about somebody else's cap.
+      this.ask.answer = body?.available && typeof body.answer === 'string' ? body.answer : null;
+      this.ask.asking = false;
+    } catch {
+      this.ask.answer = null;
+      this.ask.asking = false;
+    } finally {
+      this.ask.pending = false;
+      this.render();
+    }
+  }
+
   private renderResult(): HTMLElement | null {
     if (!this.result) return null;
     if (this.result.error) {
@@ -416,6 +496,7 @@ export class MaterialKaiAssistant extends HTMLElement {
 
     const result = this.renderResult();
     if (result) card.appendChild(result);
+    if (result) this.renderAsk(card);
 
     this.root.replaceChildren(style, card);
   }

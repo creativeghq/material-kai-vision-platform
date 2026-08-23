@@ -127,3 +127,56 @@ describe('the widget renders what it runs', () => {
     expect(widget).not.toMatch(/console\.debug/);
   });
 });
+
+describe('the one model turn is capped in money and cannot reach anything', () => {
+  const fn = read('supabase/functions/embed-agent/index.ts');
+  const code = blankComments(fn);
+
+  it('checks the dollar ceiling BEFORE the model call, and fails closed', () => {
+    const ask = code.slice(code.indexOf("if (action === 'ask')"));
+    const capAt = ask.indexOf('embed_chat_has_headroom');
+    const callAt = ask.indexOf('generateWithClaude');
+    expect(capAt).toBeGreaterThan(-1);
+    expect(callAt).toBeGreaterThan(-1);
+    // Invariant 10: the budget is checked before the upstream call, never after.
+    expect(capAt).toBeLessThan(callAt);
+    expect(ask.slice(0, 2500)).toMatch(/capErr \|\| headroom !== true/);
+  });
+
+  it('is opt-in per key, like every other thing that spends', () => {
+    expect(code).toContain('chat_enabled');
+    const ask = code.slice(code.indexOf("if (action === 'ask')"));
+    expect(ask.slice(0, 1200)).toMatch(/!keyRow\?\.chat_enabled/);
+  });
+
+  it('passes NO tools to the model', () => {
+    // The whole safety argument for a public text box: there is nothing behind the model to reach,
+    // so a crafted question yields prose and never an action.
+    expect(code).toContain('generateWithClaude(');
+    expect(code).not.toContain('generateWithClaudeTools');
+    const ask = code.slice(code.indexOf("if (action === 'ask')"));
+    expect(ask).not.toMatch(/tools:\s*/);
+  });
+
+  it('loads its prompt from the database with no fallback', () => {
+    expect(code).toContain("loadPrompt(supabase, 'embed', 'embed_assistant_answer')");
+    // A hardcoded prompt would make an admin's edit save and change nothing, forever.
+    expect(code).not.toMatch(/systemPrompt = `|systemPrompt = '/);
+  });
+
+  it('fences the visitor text as DATA', () => {
+    // Invariant 9: untrusted content fed to a model is delimited, never concatenated as if it
+    // were instruction.
+    expect(code).toContain('<QUESTION>');
+    expect(code).toContain('</QUESTION>');
+  });
+
+  it('prices the turn from the ONE usd source, and treats an unknown price as the cap', () => {
+    expect(code).toContain('resolveTokenPrice');
+    // A null price means the cost is UNKNOWN, not zero — charging it at the cap stops an unpriced
+    // model becoming a free-spending hole.
+    const ask = code.slice(code.indexOf("if (action === 'ask')"));
+    expect(ask).toMatch(/:\s*Number\(keyRow\.chat_daily_usd_cap/);
+    expect(ask).toContain('embed_chat_record_spend');
+  });
+});
