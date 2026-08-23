@@ -202,6 +202,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     // Reasons an account contributed nothing. A zero with no explanation is the defect this
     // whole block exists to remove, so "nothing came back" always arrives with a why.
     const notes: Array<{ account_id: string; platform: string; handle: string | null; code: string; message: string }> = [];
+    const allProbes: Array<Record<string, unknown>> = [];
 
     for (const acct of accounts as Array<{
       id: string; zernio_account_id: string; platform: string; user_id: string;
@@ -217,16 +218,39 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
         // A locator makes this a single-post import; without one it is a listing sweep. Only the
         // sweep is unavailable on a personal LinkedIn profile, so URLs are honoured either way.
         const freshPosts: Array<Record<string, any>> = [];
+        // What Zernio actually said, per URL. An import that finds nothing is the expected
+        // outcome often enough (wrong account, someone else's post) that "nothing happened" has
+        // to carry the upstream's own answer — otherwise the only way to tell a rejected URL
+        // from a broken integration is to redeploy with a console.log, which is how this whole
+        // surface was debugged the first time.
+        const probes: Array<Record<string, unknown>> = [];
         if (postUrls.length) {
           for (const url of postUrls) {
-            const one = await zernioApi('POST', '/posts/sync-external', {
+            const raw = await zernioApi('POST', '/posts/sync-external', {
               accountId: acct.zernio_account_id,
               url,
             });
-            // `found: false` is a 200. It means this URL is not a post of THIS account — the
-            // common case when several accounts are connected and each is offered every URL.
-            if (one?.found && one.post) freshPosts.push(one.post as Record<string, any>);
-            else if (one?.post) freshPosts.push(one.post as Record<string, any>);
+            // Zernio is inconsistent about wrapping: the inbox and media endpoints answer under
+            // `data`, the documented shape for this one is top-level. Accept both rather than
+            // discard a real post because it arrived one level down.
+            const one = (raw?.data ?? raw) as Record<string, any> | undefined;
+            const post = (one?.post ?? one?.externalPost ?? null) as Record<string, any> | null;
+            const probe = {
+              url,
+              response_keys: Object.keys(one ?? {}),
+              found: one?.found ?? null,
+              has_post: Boolean(post),
+              posts_found: one?.synced?.postsFound ?? null,
+              posts_synced: one?.synced?.postsSynced ?? null,
+              // True when Zernio did NOT go to the platform: already stored, or inside its ~15s
+              // per-account debounce. Retrying immediately then cannot change the answer.
+              skipped: one?.synced?.skipped ?? null,
+              post_key: post ? String(post._id ?? post.platformPostId ?? post.platformPostUrl ?? '') : null,
+            };
+            probes.push(probe);
+            allProbes.push({ account_id: acct.id, ...probe });
+            console.log('[zernio-import] sync-external', JSON.stringify({ account: acct.id, ...probe }));
+            if (post) freshPosts.push(post);
           }
         } else if (isPersonalLinkedIn) {
           notes.push({
@@ -252,7 +276,14 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
           limit: '100',
           sortBy: 'created-desc',
         });
-        const page = await zernioApi('GET', `/posts?${qs.toString()}`);
+        const pageRaw = await zernioApi('GET', `/posts?${qs.toString()}`);
+        const page = (pageRaw?.data ?? pageRaw) as Record<string, any> | undefined;
+        console.log('[zernio-import] list', JSON.stringify({
+          account: acct.id,
+          platform: acct.platform,
+          stored_external_posts: (page?.posts ?? []).length,
+          fresh_from_sync: freshPosts.length,
+        }));
 
         // Merge, preferring the freshly-synced copy: it is the one carrying analytics.
         //
@@ -280,14 +311,22 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
         // and a URL that matches nothing has to say so — it went out silent, which is the exact
         // defect this block exists to prevent.
         if (!merged.size && !notes.some((n) => n.account_id === acct.id)) {
+          // A URL Zernio answered without going to the platform is a different problem from one
+          // it looked up and rejected, and only the first is worth retrying differently.
+          const debounced = probes.some((p) => p.skipped === true);
           notes.push({
             account_id: acct.id,
             platform: acct.platform,
             handle: acct.handle,
             code: 'no_external_posts',
-            message: postUrls.length
-              ? 'None of the URLs you gave belong to this account.'
-              : 'The platform reported no posts published outside this app for this account.',
+            message: !postUrls.length
+              ? 'The platform reported no posts published outside this app for this account.'
+              : debounced
+                ? 'Zernio answered from its cache without asking the platform (it only checks each '
+                  + 'account once every ~15 seconds). Wait a moment and try that URL again.'
+                : 'LinkedIn did not return that post for this account. It has to be a post you '
+                  + 'authored on the connected profile — a reshare of someone else’s post, or a '
+                  + 'post from a company page, is not one LinkedIn will hand back here.',
           });
         }
 
@@ -370,6 +409,9 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
       // Always present when an account contributed nothing. The caller RENDERS this: an import
       // that returns 0 and says nothing is indistinguishable from one that worked.
       notes: notes.length ? notes : undefined,
+      // What each submitted URL got back, shape only — no secrets, no post bodies. Returned so a
+      // failing import can be diagnosed from its own response instead of a redeploy.
+      probes: allProbes.length ? allProbes : undefined,
     });
   }
 
