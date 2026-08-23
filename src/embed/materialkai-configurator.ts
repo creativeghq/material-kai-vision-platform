@@ -25,10 +25,10 @@
  * nothing loads until the widget is near the viewport.
  */
 import type { Composition, RateItemLike, ZoneDef, ZoneConfig, ZoneGlobalDef } from '@/utils/blueprintComposition';
-import {
-  absorbedGroups, defaultComposition, hasComposition, rateChoices,
-} from '@/utils/blueprintComposition';
-import { composeEstimate, seedPlanItems } from '@/utils/blueprintCompute';
+import { defaultComposition, hasComposition, rateChoices } from '@/utils/blueprintComposition';
+// The pricing SEQUENCE lives in its own module — it is order-sensitive in a way that is invisible
+// at the call site, and it is guarded by tests/unit/configuratorPricing.test.ts.
+import { computeConfiguratorEstimate } from './configuratorPricing';
 import { formatMoney } from '@/utils/decimal';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
@@ -196,15 +196,13 @@ export class MaterialKaiConfigurator extends HTMLElement {
    *
    * Deliberately not incremental. A zone's length feeds another zone's, which feeds the formula
    * variables every line prices against, so a partial update is a wrong total — and a wrong total
-   * is a valid number that nothing downstream can catch.
+   * is a valid number that nothing downstream can catch. The ORDER the pieces run in matters just
+   * as much; see `configuratorPricing.ts`.
    */
   private compute() {
-    const items = this.bp?.items ?? [];
-    const absorbed = new Set(absorbedGroups(this.schema));
-    const base = this.baseDims();
-    // Seed once against the base dims, then let composeEstimate reprice with the derived vars.
-    const flat = seedPlanItems(items, base, absorbed);
-    return composeEstimate(this.schema, this.config, items, base, flat);
+    return computeConfiguratorEstimate(
+      this.schema, this.config, this.bp?.items ?? [], this.baseDims(),
+    );
   }
 
   private zoneCfg(key: string): ZoneConfig {
