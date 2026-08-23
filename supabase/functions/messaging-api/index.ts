@@ -1214,9 +1214,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             scanned++;
             let messages: Array<Record<string, any>> = [];
             try {
+              // accountId is REQUIRED on this endpoint — Zernio answers 400
+              // `missing_required_field` without it. Omitting it meant the back-fill found
+              // conversations, failed to read a single message from any of them, and still
+              // returned success: five conversations scanned, five 400s, an empty inbox and a
+              // green toast. The conversation id alone is not enough to identify a conversation
+              // on a key that spans every tenant.
               const md = await zernioApi(
                 'GET',
-                `/inbox/conversations/${encodeURIComponent(String(conv.id))}/messages?limit=50`,
+                `/inbox/conversations/${encodeURIComponent(String(conv.id))}/messages`
+                + `?accountId=${encodeURIComponent(accountId)}&limit=50`,
               );
               messages = (md.data ?? md.messages ?? []) as Array<Record<string, any>>;
             } catch (err) {
