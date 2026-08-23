@@ -2326,6 +2326,22 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'I\'ve worked out when your audience is most active.',
         run: { tool: 'manage_social', fixedArgs: { action: 'best_time' } },
       },
+      // The tool has answered both of these since it shipped and the toolkit offered neither, so
+      // the only way to reach the analytics this workspace pays Zernio for was to guess the
+      // sentence. Both emit chunks AgentHub already titles (social_post_analytics,
+      // social_insights), which is what makes a direct `run` render instead of going quiet.
+      {
+        label: 'Post analytics', description: 'Engagement on everything you published', icon: 'BarChart3',
+        prompt: 'Show me the analytics for my social posts.',
+        done: 'I have pulled the engagement figures for your posts.',
+        run: { tool: 'manage_social', fixedArgs: { action: 'post_analytics' } },
+      },
+      {
+        label: 'Audience insights', description: 'Followers and reach per account', icon: 'Users',
+        prompt: 'How is my social audience doing?',
+        done: 'I have pulled your follower and reach figures.',
+        run: { tool: 'manage_social', fixedArgs: { action: 'account_insights' } },
+      },
     ],
   },
   {
