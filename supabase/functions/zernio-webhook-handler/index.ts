@@ -205,9 +205,28 @@ async function matchOrCreateContact(
  * user_id NULL — never converts to an app account). Assign-on-first-reply adds the campaign /
  * workspace owner as the `owner` member participant. STOP/START opt-out handling preserved.
  */
-async function handleInboundMessage(supabase: any, payload: any): Promise<void> {
+/**
+ * What happened to one inbound message.
+ *
+ * Every drop below used to be a bare `return`, and the handler answered 200 either way — correct
+ * as a webhook (Zernio must not retry a message we will never want) and useless to anything
+ * asking whether the message landed. The back-fill counted those 200s as imports and reported a
+ * full inbox while nothing had been filed.
+ *
+ * The reason travels with the outcome because the reasons need different fixes: an unresolvable
+ * workspace is a wiring problem, a missing phone is a payload-shape problem, and an outbound echo
+ * is correct behaviour that should never be reported as a failure.
+ */
+export interface InboundOutcome {
+  outcome: 'filed' | 'dropped';
+  reason?: string;
+}
+
+async function handleInboundMessage(supabase: any, payload: any): Promise<InboundOutcome> {
   const msg = payload.message || {};
-  if (msg.direction && msg.direction !== 'incoming') return;
+  if (msg.direction && msg.direction !== 'incoming') {
+    return { outcome: 'dropped', reason: 'not an incoming message' };
+  }
 
   // Zernio's inbox covers Instagram, Facebook, X, Bluesky, Reddit and Telegram DMs as well as
   // WhatsApp. Everything that was not WhatsApp used to hit `return` on the line below and be
@@ -217,12 +236,15 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   // phone, so it cannot reuse any of that.
   if (msg.platform && msg.platform !== 'whatsapp') {
     await handleSocialDirectMessage(supabase, payload);
-    return;
+    return { outcome: 'filed', reason: 'routed to the social DM path' };
   }
 
   const accountId = accountIdOf(payload.account);
   const phone = contactPhoneOf(msg.sender);
-  if (!phone) { console.warn('[zernio-webhook] inbound message without resolvable phone'); return; }
+  if (!phone) {
+    console.warn('[zernio-webhook] inbound message without resolvable phone');
+    return { outcome: 'dropped', reason: 'no resolvable phone on the sender' };
+  }
 
   // STOP / START keyword compliance (independent of thread resolution).
   const text = String(msg.text || '').trim();
@@ -241,7 +263,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   const { workspaceId, channelId } = await resolveAccountWorkspace(supabase, accountId);
   if (!workspaceId) {
     console.warn(`[zernio-webhook] no workspace for Zernio account ${accountId} — inbound dropped`);
-    return;
+    return { outcome: 'dropped', reason: `no workspace bound to Zernio account ${accountId}` };
   }
 
   const owner = (await resolveCampaignOwner(supabase, phone)) || (await resolveWorkspaceOwner(supabase, workspaceId));
@@ -379,6 +401,10 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
     headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'internal_agent_reply', thread_id: threadId }),
   }).catch(() => {});
+
+  // Reached only after the message is in a thread. Everything above returns 'dropped' with the
+  // reason, so 'filed' means filed.
+  return { outcome: 'filed' };
 }
 
 
@@ -909,8 +935,11 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
   try {
     // ── WhatsApp messaging events (Zernio inbox) ────────────────────
     if (event === 'message.received') {
-      await handleInboundMessage(supabase, payload);
-      return jsonResponse({ received: true, event });
+      // The outcome rides back in the response. Still a 200 either way — Zernio must not retry a
+      // message we have deliberately declined — but a caller replaying history can now tell an
+      // import from a discard, which is the difference between a full inbox and an empty one.
+      const result = await handleInboundMessage(supabase, payload);
+      return jsonResponse({ received: true, event, ...result });
     }
     if (event === 'message.delivered' || event === 'message.read' || event === 'message.failed') {
       await handleDeliveryStatus(supabase, event, payload);

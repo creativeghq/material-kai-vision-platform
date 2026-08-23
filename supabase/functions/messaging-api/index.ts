@@ -26,6 +26,7 @@ import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { checkChannelSeat } from '../_shared/channel-seats.ts';
 import { reconcileWaba } from '../_shared/whatsapp-cost-reconcile.ts';
+import { billChannelsForMonth } from '../_shared/channel-recurring-billing.ts';
 import {
   zernioApi,
   zernioKey,
@@ -300,6 +301,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'purchase-phone-number', 'release-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
+      'bill-channels-monthly', 'set-channel-seats',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -789,6 +791,61 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Charge the month's recurring channel lines.
+      //
+      // Seats and rented numbers were metered and never billed: a workspace could hold four
+      // connected accounts and a Greek number, cost the platform $15/month, and pay nothing.
+      // Idempotent on (workspace, type, month) — running this twice bills nobody twice.
+      // ─────────────────────────────────────────────────────────────
+      case 'bill-channels-monthly': {
+        const { month, lines } = await billChannelsForMonth(supabaseClient, new Date());
+        const charged = lines.filter((l) => l.status === 'charged');
+        const failed = lines.filter((l) => l.status === 'failed');
+        return jsonResponse({
+          // False when anything failed: a partial billing run reported as success is a month of
+          // revenue nobody goes looking for.
+          success: failed.length === 0,
+          month,
+          charged: charged.length,
+          credits_charged: Math.round(charged.reduce((n, l) => n + l.credits, 0) * 100) / 100,
+          failed: failed.length,
+          skipped: lines.filter((l) => l.status === 'skipped').length,
+          lines,
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Grant paid channel seats to a workspace.
+      //
+      // Self-serve seat purchase needs a Stripe price that does not exist yet. This is the half
+      // that works today: an operator records the seats a workspace has agreed to pay for, the
+      // connect gate starts enforcing against the new allowance, and the monthly billing charges
+      // for what is actually connected. Replaced, not duplicated, when checkout arrives.
+      // ─────────────────────────────────────────────────────────────
+      case 'set-channel-seats': {
+        const targetWs = String(requestBody.workspaceId || '').trim();
+        const seats = Number(requestBody.seats);
+        if (!targetWs) throw new HttpError(400, 'workspaceId is required');
+        if (!Number.isInteger(seats) || seats < 0 || seats > 500) {
+          throw new HttpError(400, 'seats must be a whole number between 0 and 500');
+        }
+
+        const { error } = await supabaseClient.from('workspace_module_subscriptions').upsert({
+          workspace_id: targetWs,
+          module_slug: 'messaging',
+          // Seats granted by an operator are active by definition — there is no Stripe
+          // subscription behind them to take a status from.
+          status: 'active',
+          quantity: seats,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id,module_slug' });
+        if (error) throw new HttpError(500, `Could not set seats: ${error.message}`);
+
+        const { data: usage } = await supabaseClient.rpc('workspace_channel_usage', { p_workspace_id: targetWs });
+        return jsonResponse({ success: true, workspace_id: targetWs, seats, usage: Array.isArray(usage) ? usage[0] : usage });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Record a template rate read off an invoice.
       //
       // Automatic reconciliation only works where WE own the WhatsApp Business Account. Connect a
@@ -1137,6 +1194,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         let accepted = 0;
         let scanned = 0;
         const errors: string[] = [];
+        // Why the handler declined, tallied. "Nothing arrived" is not a diagnosis; "47 messages
+        // had no workspace bound to Zernio account X" is one, and it names the fix.
+        const dropReasons: Record<string, number> = {};
 
         for (const accountId of accountIds) {
           let convs: Array<Record<string, any>> = [];
@@ -1200,8 +1260,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
                 },
                 body: replayBody,
               });
-              if (res.ok) accepted++;
-              else errors.push(`replay ${m.id}: ${res.status}`);
+              if (res.ok) {
+                accepted++;
+                const body = await res.json().catch(() => ({}));
+                if (body?.outcome === 'dropped') {
+                  const why = String(body.reason ?? 'unspecified');
+                  dropReasons[why] = (dropReasons[why] ?? 0) + 1;
+                }
+              } else {
+                errors.push(`replay ${m.id}: ${res.status}`);
+              }
             }
           }
         }
@@ -1221,11 +1289,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // resolution problem, not a transport one — and that is invisible if only one is shown.
           accepted,
           dropped_silently: Math.max(accepted - imported, 0),
+          // The handler's own words, counted. No log-diving to find out why an inbox is empty.
+          drop_reasons: Object.keys(dropReasons).length ? dropReasons : undefined,
           message: accepted > 0 && imported === 0
-            ? 'Every message was accepted and none was filed. The handler could not resolve them '
-              + 'to a workspace or treated them as echoes of our own replies — check the '
-              + 'zernio-webhook-handler logs for "dropped".'
-            : undefined,
+            ? 'Every message was accepted and none was filed — see drop_reasons for why.'
+            : scanned === 0
+              ? 'Zernio returned no conversations for these accounts. A number connected in '
+                + 'coexistence mode keeps its existing chats on the phone; only messages that '
+                + 'flow through Zernio after connecting are its to hand back.'
+              : undefined,
           // Never a silent partial: a truncated backfill that reports plain success is
           // indistinguishable from one that found nothing.
           errors: errors.slice(0, 20),
