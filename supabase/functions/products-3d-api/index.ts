@@ -19,8 +19,10 @@
  * and unpublishing works everywhere at once.
  *
  * Actions (GET query params or a POST JSON body):
- *   • list    → published products, with which 3D formats each has
- *   • product → one published product: media, gross price, and its glb/gltf/usdz models
+ *   • list       → published products, with which 3D formats each has
+ *   • product    → one published product: media, gross price, and its glb/gltf/usdz models
+ *   • blueprints → the workspace's embed-published configurators (metadata only)
+ *   • blueprint  → one configurator: composition schema + items, cost basis folded
  */
 import { serviceClient } from '../_shared/supabase-client.ts';
 import { captureException } from '../_shared/sentry.ts';
@@ -33,6 +35,8 @@ import { imagesFromMetadata } from '../_shared/product-media.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { grossFromNet } from '../_shared/money.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
+// Shared with public-project-plan so both anonymous surfaces answer identically (#382 Phase 1).
+import { ANON_BLUEPRINT_ITEM_COLUMNS, foldItemPricingForAnon } from '../_shared/blueprint/anon-pricing.ts';
 
 /** Page size ceiling — an embed grid is a shelf, not a catalog dump. */
 const MAX_LIMIT = 60;
@@ -137,6 +141,11 @@ async function scopeRestriction(
   if (ctx.scopeType === 'all') return null;
   if (ctx.scopeValues.length === 0) return [];       // scoped to nothing — serve nothing
   if (ctx.scopeType === 'products') return ctx.scopeValues;
+  // A BLUEPRINT-scoped key serves no products at all (#382). Spelled out rather than left to the
+  // category branch below, which would happen to return nothing by querying `products.category_id`
+  // against a list of blueprint ids — the right answer for the wrong reason, and one index change
+  // away from becoming the wrong answer silently.
+  if (ctx.scopeType === 'blueprints') return [];
 
   // categories → resolve to product ids. The workspace filter is applied here as well as on the
   // main query: `material_categories` is a GLOBAL taxonomy, so a category id alone says nothing
@@ -181,6 +190,32 @@ async function isProductInScope(
   });
   if (error) {
     console.error('embed_scope_covers_product failed:', error.message);
+    return false;
+  }
+  return data === true;
+}
+
+/**
+ * Is ONE blueprint inside the key's scope AND published? (#382 Phase 1)
+ *
+ * The twin of `isProductInScope`, and deliberately the same shape: the rule is one SQL function,
+ * the caller passes the scope it already holds, and an RPC error answers "no". Publication is
+ * folded INTO the SQL rather than checked separately here, so there is no ordering in which a
+ * caller can ask about scope and forget to ask about publication — the two are one question.
+ */
+async function isBlueprintInScope(
+  supabase: ReturnType<typeof serviceClient>,
+  ctx: EmbedKeyContext,
+  blueprintId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('embed_scope_covers_blueprint', {
+    p_workspace_id: ctx.workspaceId,
+    p_scope_type: ctx.scopeType,
+    p_scope_values: ctx.scopeValues,
+    p_blueprint_id: blueprintId,
+  });
+  if (error) {
+    console.error('embed_scope_covers_blueprint failed:', error.message);
     return false;
   }
   return data === true;
@@ -496,6 +531,77 @@ Deno.serve(withApiLogging((req) => {
       // quote the merchant's customer ends up signing.
       violations: p?.violations ?? [],
       is_valid: p?.is_valid ?? true,
+    }, 200, cors);
+  }
+
+  // ── #382 Phase 1: the tenant's own configurator ──────────────────────────────────────────────
+  //
+  // The blueprint engine models the domain the facet wizard only gestures at — zones, module
+  // types, widths and counts, appliances, hardware yields, service connections. Until now the only
+  // anonymous path to it was `public-project-plan`, which serves OUR platform starters on OUR
+  // marketing page, so a merchant could not put their own configurator on their own site.
+  //
+  // Both actions answer with the SAME payload shape `public-project-plan` uses, from the shared
+  // column list and cost-basis fold in `_shared/blueprint/anon-pricing.ts` — the visitor prices
+  // interactively in the browser through `blueprintComposition`, and the operator's material cost,
+  // labour rate and margin never leave the server.
+  if (action === 'blueprints') {
+    // The shelf. Metadata only: enough to choose one, not enough to price anything — a listing
+    // that shipped every item of every blueprint would hand the whole rate card to a page load.
+    let query = supabase
+      .from('blueprints')
+      .select('id, title, description, project_type, source_currency')
+      .eq('workspace_id', workspaceId)
+      .eq('is_embed_published', true)
+      .eq('status', 'active')
+      .order('title', { ascending: true });
+    // Scope narrows the shelf. `all` does not restrict; a blueprint-scoped key sees only its own
+    // list; a product/category-scoped key sees NONE, because it is a key about products.
+    if (auth.ctx.scopeType === 'blueprints') {
+      if (auth.ctx.scopeValues.length === 0) return embedJson({ ok: true, blueprints: [] }, 200, cors);
+      query = query.in('id', auth.ctx.scopeValues);
+    } else if (auth.ctx.scopeType !== 'all') {
+      return embedJson({ ok: true, blueprints: [] }, 200, cors);
+    }
+    const { data, error } = await query.limit(MAX_LIMIT);
+    if (error) return embedJson({ error: 'Could not load configurators' }, 500, cors);
+    return embedJson({ ok: true, blueprints: data ?? [] }, 200, cors);
+  }
+
+  if (action === 'blueprint') {
+    const blueprintId = String(params.blueprint_id ?? '').trim();
+    if (!blueprintId) return embedJson({ error: 'blueprint_id is required' }, 400, cors);
+
+    // Scope AND publication in one question, before anything is read. Same 404 as a blueprint that
+    // does not exist — an unpublished id and another tenant's id must stay indistinguishable, or
+    // the endpoint becomes an id oracle (invariant 1).
+    if (!(await isBlueprintInScope(supabase, auth.ctx, blueprintId))) {
+      return embedJson({ error: 'Configurator not found' }, 404, cors);
+    }
+
+    const { data: bp } = await supabase
+      .from('blueprints')
+      .select('id, title, description, project_type, source_currency, dimensions_schema, composition_schema')
+      .eq('id', blueprintId)
+      .eq('workspace_id', workspaceId)
+      .eq('is_embed_published', true)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!bp) return embedJson({ error: 'Configurator not found' }, 404, cors);
+
+    const { data: items, error: itemsErr } = await supabase
+      .from('blueprint_items')
+      .select(ANON_BLUEPRINT_ITEM_COLUMNS)
+      .eq('blueprint_id', blueprintId)
+      .order('sort_order', { ascending: true });
+    if (itemsErr) return embedJson({ error: 'Could not load this configurator' }, 500, cors);
+
+    return embedJson({
+      ok: true,
+      blueprint: {
+        ...bp,
+        items: (items ?? []).map((it) => foldItemPricingForAnon(it as Record<string, unknown>)),
+      },
     }, 200, cors);
   }
 

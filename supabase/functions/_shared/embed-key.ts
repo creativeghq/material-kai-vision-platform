@@ -20,7 +20,7 @@
 import type { DbClient } from './supabase-client.ts';
 import { embedCorsHeaders } from './cors.ts';
 
-export type EmbedScopeType = 'all' | 'categories' | 'products';
+export type EmbedScopeType = 'all' | 'categories' | 'products' | 'blueprints';
 
 export interface EmbedKeyContext {
   keyId: string;
@@ -172,7 +172,7 @@ export async function authenticateEmbedKey(
       workspaceId: row.workspace_id as string,
       // Default to the most restrictive reading of a missing value. A row that somehow carries no
       // scope_type is a bug, and an unrecognised one must not fall through to "serve everything".
-      scopeType: (['all', 'categories', 'products'] as const).includes(row.scope_type as EmbedScopeType)
+      scopeType: (['all', 'categories', 'products', 'blueprints'] as const).includes(row.scope_type as EmbedScopeType)
         ? (row.scope_type as EmbedScopeType)
         : 'products',
       scopeValues: (row.scope_values as string[] | null) ?? [],
