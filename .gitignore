@@ -71,3 +71,8 @@ supabase/functions/*/deno.lock
 # artifact drifts from its source the first time someone forgets to rebuild).
 public/embed/
 edge-prompt-inventory.json
+
+# TypeScript incremental build caches. `tsconfig.app.tsbuildinfo` was committed at 460 KB
+# and churned on every build — a compiler cache is a local artifact, never a repo fact.
+*.tsbuildinfo
+tsc.log
