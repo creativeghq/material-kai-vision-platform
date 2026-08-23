@@ -11,10 +11,11 @@
  * not likes+comments over reach computed a second time in TypeScript.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, RefreshCw, Loader2, Users, Eye, Heart, MessageCircle, Share2, AlertTriangle } from 'lucide-react';
+import { BarChart3, RefreshCw, Loader2, Users, Eye, Heart, MessageCircle, Share2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +40,20 @@ interface PostRow {
   scheduled_at: string | null;
   published_at: string | null;
   zernio_post_id: string | null;
+  metadata: { platform_post_url?: string | null } | null;
+}
+
+/**
+ * Why an account contributed nothing to an import. Rendered, never swallowed: an import that
+ * returns 0 and says nothing looks exactly like one that worked, which is how the first version
+ * of this screen reported "Analytics synced" over an empty table for a whole afternoon.
+ */
+interface SyncNote {
+  account_id: string;
+  platform: string;
+  handle: string | null;
+  code: string;
+  message: string;
 }
 
 interface MetricRow {
@@ -64,7 +79,20 @@ interface InsightRow {
   impressions_7d: number | null;
 }
 
-interface AccountRow { id: string; platform: string; handle: string | null }
+interface AccountRow {
+  id: string;
+  platform: string;
+  handle: string | null;
+  metadata: { accountType?: string } | null;
+}
+
+/**
+ * LinkedIn exposes no listing API for a PERSONAL profile — only for organization pages — so
+ * nothing can sweep one. Zernio imports such a post by URL instead, at any age and with full
+ * engagement. The distinction decides what this screen may honestly offer.
+ */
+const needsUrlImport = (a: AccountRow) =>
+  a.platform === 'linkedin' && a.metadata?.accountType === 'personal';
 
 const statusVariant = (s: string) =>
   s === 'published' ? 'success' : s === 'failed' ? 'error' : s === 'scheduled' ? 'info' : 'neutral';
@@ -89,6 +117,8 @@ export const SocialAnalyticsPanel: React.FC = () => {
   // and an empty chart because the plan lacks it needs a different answer from an empty chart
   // because nobody has posted.
   const [addonMissing, setAddonMissing] = useState(false);
+  const [syncNotes, setSyncNotes] = useState<SyncNote[]>([]);
+  const [importUrl, setImportUrl] = useState('');
 
   /** POST one zernio-api action for this workspace. Throws with the server's own message. */
   const callAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
@@ -113,7 +143,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
     setLoading(true);
     const [p, m, i, a] = await Promise.all([
       supabase.from('social_posts')
-        .select('id, platform, caption, status, scheduled_at, published_at, zernio_post_id')
+        .select('id, platform, caption, status, scheduled_at, published_at, zernio_post_id, metadata')
         .eq('workspace_id', activeWorkspaceId)
         .order('published_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
@@ -126,7 +156,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
         .eq('workspace_id', activeWorkspaceId)
         .order('snapshot_date', { ascending: false }),
       supabase.from('social_accounts')
-        .select('id, platform, handle')
+        .select('id, platform, handle, metadata')
         .eq('workspace_id', activeWorkspaceId).eq('is_active', true),
     ]);
     setPosts((p.data ?? []) as PostRow[]);
@@ -168,8 +198,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  /** Pull fresh numbers from Zernio for this workspace, then re-read. */
-  const sync = async () => {
+  /**
+   * Pull fresh numbers from Zernio for this workspace, then re-read.
+   *
+   * `postUrls` turns this into a by-URL import, which is the ONLY import a LinkedIn personal
+   * profile has: LinkedIn publishes no listing API for one, so the sweep every other platform
+   * uses returns nothing and cannot be made to return anything.
+   */
+  const sync = async (postUrls?: string[]) => {
     if (!activeWorkspaceId) return;
     setSyncing(true);
     try {
@@ -178,20 +214,35 @@ export const SocialAnalyticsPanel: React.FC = () => {
       // Import FIRST. Analytics only covers posts carrying a zernio_post_id, and a post written
       // natively in LinkedIn has none until it is imported — which is why a freshly connected
       // account used to show an empty list and a refresh that appeared to do nothing.
-      const importRes = await call('import_external_posts');
+      const importRes = await call('import_external_posts', postUrls?.length ? { post_urls: postUrls } : {});
       // Post metrics for the workspace, then one insights call per connected account.
       await call('get_post_analytics');
       for (const acct of accounts) {
         await call('get_account_insights', { social_account_id: acct.id });
       }
       await load();
-      toast({
-        title: 'Analytics synced',
-        description: importRes?.imported
-          ? `Imported ${importRes.imported} post${importRes.imported === 1 ? '' : 's'} from your accounts`
-            + (importRes.with_metrics ? `, ${importRes.with_metrics} with engagement figures.` : '.')
-          : undefined,
-      });
+
+      // The server explains every account that contributed nothing. Keep those on the screen
+      // rather than in a toast that vanishes: "why is this still empty" is asked minutes later.
+      const notes = (importRes?.notes ?? []) as SyncNote[];
+      const failures = (importRes?.errors ?? []) as string[];
+      setSyncNotes(notes);
+
+      if (importRes?.imported) {
+        toast({
+          title: 'Analytics synced',
+          description: `Imported ${importRes.imported} post${importRes.imported === 1 ? '' : 's'}`
+            + (importRes.with_metrics ? `, ${importRes.with_metrics} with engagement figures.` : '.'),
+        });
+      } else if (failures.length) {
+        // A 100%-failed import used to render as "Analytics synced" with an empty body.
+        toast({ title: 'Nothing could be imported', description: failures[0], variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Synced — no new posts',
+          description: notes[0]?.message ?? 'Follower and engagement figures are up to date.',
+        });
+      }
     } catch (err) {
       toast({
         title: 'Sync failed',
@@ -202,6 +253,16 @@ export const SocialAnalyticsPanel: React.FC = () => {
       setSyncing(false);
     }
   };
+
+  /** Import one already-published post by its URL, for accounts that cannot be swept. */
+  const importByUrl = async () => {
+    const url = importUrl.trim();
+    if (!url) return;
+    await sync([url]);
+    setImportUrl('');
+  };
+
+  const urlImportAccounts = useMemo(() => accounts.filter(needsUrlImport), [accounts]);
 
   const accountLabel = useMemo(() => {
     const m: Record<string, { platform: string; text: string }> = {};
@@ -318,13 +379,57 @@ export const SocialAnalyticsPanel: React.FC = () => {
             first, with the engagement Zernio reports for each.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* What the last sync could NOT do, per account. On screen rather than in a toast:
+              an empty table with no explanation is the thing this panel kept producing. */}
+          {syncNotes.length > 0 && (
+            <div className="space-y-2">
+              {syncNotes.map(note => (
+                <div key={note.account_id} className="flex items-start gap-3 rounded-sm border border-hairline bg-surface-sunken p-3 text-sm">
+                  <PlatformIcon platform={note.platform} className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">{note.handle ?? platformLabel(note.platform)}</p>
+                    <p className="text-muted-foreground mt-0.5">{note.message}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* The only import a personal LinkedIn profile has. Offered whenever one is connected,
+              not hidden behind the failure — the sweep can never succeed for it. */}
+          {urlImportAccounts.length > 0 && (
+            <div className="rounded-sm border border-hairline p-3">
+              <p className="text-sm font-medium">Import a published post by URL</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                For {urlImportAccounts.map(a => a.handle ?? platformLabel(a.platform)).join(', ')} —
+                LinkedIn keeps personal profiles off its listing API, so posts are imported one link
+                at a time. Any age, including before you connected, with full engagement figures.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={importUrl}
+                  onChange={e => setImportUrl(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void importByUrl(); }}
+                  placeholder="https://www.linkedin.com/posts/…"
+                  disabled={syncing}
+                  aria-label="Post URL to import"
+                />
+                <Button variant="secondary" onClick={() => void importByUrl()} disabled={syncing || !importUrl.trim()}>
+                  {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Import'}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {posts.length === 0 ? (
             <HubEmptyState
               variant="empty"
               icon={BarChart3}
               title="No posts yet"
-              description="Sync now to pull up to a year of posts already published on your connected accounts, or write a new one from My accounts."
+              description={urlImportAccounts.length === accounts.length && accounts.length > 0
+                ? 'Paste a post URL above to import one, or write a new post from My accounts.'
+                : 'Sync now to pull up to a year of posts already published on your connected accounts, or write a new one from My accounts.'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -349,7 +454,23 @@ export const SocialAnalyticsPanel: React.FC = () => {
                         <TableCell className="max-w-xs">
                           <div className="flex items-start gap-2">
                             <PlatformIcon platform={post.platform} className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span className="truncate text-sm">{post.caption || <span className="text-muted-foreground">(no caption)</span>}</span>
+                            {/* A LinkedIn personal profile exposes engagement but NOT the text or
+                                media, so an imported row legitimately has no caption. The
+                                permalink is then the only thing that identifies it. */}
+                            {post.caption
+                              ? <span className="truncate text-sm">{post.caption}</span>
+                              : post.metadata?.platform_post_url
+                                ? (
+                                  <a
+                                    href={post.metadata.platform_post_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 truncate text-sm text-primary hover:underline"
+                                  >
+                                    View on {platformLabel(post.platform)} <ExternalLink className="h-3 w-3 shrink-0" />
+                                  </a>
+                                )
+                                : <span className="truncate text-sm text-muted-foreground">(no caption)</span>}
                           </div>
                         </TableCell>
                         <TableCell>

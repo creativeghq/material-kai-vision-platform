@@ -159,17 +159,36 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   // TWO calls, and the order is the whole point. `GET /posts?source=external` reads what Zernio
   // has ALREADY pulled from the platform, which for a new account is nothing — listing first
   // returns an empty array and looks exactly like "this account has no posts".
-  // `POST /posts/sync-external` is the one that reaches out to LinkedIn/Instagram and fetches.
+  // `POST /posts/sync-external` is the one that reaches out to the platform and fetches.
   // It is debounced ~15s per account by Zernio, so calling it on every refresh is safe.
   //
   // The sync response also carries per-post `analytics` inline, so an imported post arrives with
   // its engagement already attached instead of waiting for a second pass.
+  //
+  // BUT A BULK SYNC IS NOT AVAILABLE FOR EVERY ACCOUNT, and the account that cannot do it is the
+  // one most likely to be connected first. `POST /posts/sync-external { accountId }` works by
+  // reading the platform's LISTING API; LinkedIn does not expose one for PERSONAL profiles, only
+  // for organization pages. So on a personal LinkedIn account the call succeeds, reports zero
+  // posts found, and there is no error anywhere — the first version of this shipped against
+  // exactly such an account and imported nothing while reporting success.
+  //
+  // Zernio's answer for that case is a per-URL import: `{ accountId, url }` fetches that single
+  // post, at any age, published long before the account was connected, WITH full analytics. So a
+  // personal LinkedIn account is not "unsupported" — it is a different import, and saying so is
+  // the whole difference between a button that does nothing and one that asks for a link.
+  //
+  // `post_urls` therefore drives the by-URL path for any account, and a listable account keeps
+  // the bulk sweep. What an account cannot do is reported in `notes`, never swallowed.
   if (action === 'import_external_posts') {
     if (!workspace_id) return jsonResponse({ success: false, error: 'workspace_id required' }, 400);
 
+    const postUrls: string[] = Array.isArray(body.post_urls)
+      ? body.post_urls.map((u: unknown) => String(u ?? '').trim()).filter(Boolean).slice(0, 25)
+      : [];
+
     const { data: accounts } = await supabase
       .from('social_accounts')
-      .select('id, zernio_account_id, platform, user_id')
+      .select('id, zernio_account_id, platform, user_id, handle, metadata')
       .eq('workspace_id', workspace_id)
       .eq('is_active', true);
 
@@ -180,12 +199,49 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     let imported = 0;
     let withMetrics = 0;
     const errors: string[] = [];
+    // Reasons an account contributed nothing. A zero with no explanation is the defect this
+    // whole block exists to remove, so "nothing came back" always arrives with a why.
+    const notes: Array<{ account_id: string; platform: string; handle: string | null; code: string; message: string }> = [];
 
-    for (const acct of accounts as Array<{ id: string; zernio_account_id: string; platform: string; user_id: string }>) {
+    for (const acct of accounts as Array<{
+      id: string; zernio_account_id: string; platform: string; user_id: string;
+      handle: string | null; metadata: Record<string, unknown> | null;
+    }>) {
       if (!acct.zernio_account_id) continue;
+      // The connect flow records this; Zernio uses the same word.
+      const isPersonalLinkedIn = acct.platform === 'linkedin'
+        && (acct.metadata as { accountType?: string } | null)?.accountType === 'personal';
       try {
         // 1. Make Zernio go and fetch. Analytics ride along on the posts it returns.
-        const fresh = await zernioApi('POST', '/posts/sync-external', { accountId: acct.zernio_account_id });
+        //
+        // A locator makes this a single-post import; without one it is a listing sweep. Only the
+        // sweep is unavailable on a personal LinkedIn profile, so URLs are honoured either way.
+        const freshPosts: Array<Record<string, any>> = [];
+        if (postUrls.length) {
+          for (const url of postUrls) {
+            const one = await zernioApi('POST', '/posts/sync-external', {
+              accountId: acct.zernio_account_id,
+              url,
+            });
+            // `found: false` is a 200. It means this URL is not a post of THIS account — the
+            // common case when several accounts are connected and each is offered every URL.
+            if (one?.found && one.post) freshPosts.push(one.post as Record<string, any>);
+            else if (one?.post) freshPosts.push(one.post as Record<string, any>);
+          }
+        } else if (isPersonalLinkedIn) {
+          notes.push({
+            account_id: acct.id,
+            platform: acct.platform,
+            handle: acct.handle,
+            code: 'linkedin_personal_needs_url',
+            message: 'LinkedIn does not let anyone list a personal profile’s posts, so there is '
+              + 'nothing to sweep. Paste a post’s URL to import it — any age, including posts '
+              + 'published before this account was connected, with their full engagement figures.',
+          });
+        } else {
+          const sweep = await zernioApi('POST', '/posts/sync-external', { accountId: acct.zernio_account_id });
+          for (const p of ((sweep?.posts ?? []) as Array<Record<string, any>>)) freshPosts.push(p);
+        }
 
         // 2. Read back everything Zernio now holds for this account, which is a superset of what
         //    the sync just returned (it answers with recent posts; the store keeps ~12 months).
@@ -198,20 +254,41 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
         });
         const page = await zernioApi('GET', `/posts?${qs.toString()}`);
 
-        // Merge by Zernio post id, preferring the freshly-synced copy: it is the one carrying
-        // analytics. Same id from both calls must not become two rows.
+        // Merge, preferring the freshly-synced copy: it is the one carrying analytics.
+        //
+        // THE TWO CALLS DO NOT AGREE ON THE ID FIELD. `GET /posts` returns Zernio `Post` objects,
+        // keyed `_id`. `POST /posts/sync-external` returns `ExternalPostSummary`, which has no
+        // `_id` at all — it identifies a post by `platformPostId` plus `platformPostUrl`. Reading
+        // only `_id` therefore dropped every freshly-synced post on the floor, silently and on
+        // every platform, so even an Instagram account that CAN be swept would have imported the
+        // stored history and none of the engagement that was the point of syncing.
+        const postKey = (p: Record<string, any>) =>
+          String(p?._id ?? p?.platformPostId ?? p?.platformPostUrl ?? '');
+
         const merged = new Map<string, Record<string, any>>();
         for (const post of ((page?.posts ?? []) as Array<Record<string, any>>)) {
-          const id = String(post._id ?? '');
+          const id = postKey(post);
           if (id) merged.set(id, post);
         }
-        for (const post of ((fresh?.posts ?? []) as Array<Record<string, any>>)) {
-          const id = String(post._id ?? '');
+        for (const post of freshPosts) {
+          const id = postKey(post);
           if (id) merged.set(id, { ...(merged.get(id) ?? {}), ...post });
         }
 
+        if (!merged.size && !isPersonalLinkedIn && !notes.some((n) => n.account_id === acct.id)) {
+          notes.push({
+            account_id: acct.id,
+            platform: acct.platform,
+            handle: acct.handle,
+            code: 'no_external_posts',
+            message: postUrls.length
+              ? 'None of the URLs you gave belong to this account.'
+              : 'The platform reported no posts published outside this app for this account.',
+          });
+        }
+
         for (const post of merged.values()) {
-          const zernioPostId = String(post._id ?? '');
+          const zernioPostId = postKey(post);
           if (!zernioPostId) continue;
 
           // `platforms[]` carries the per-network result; take the entry for THIS account so a
@@ -286,6 +363,9 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
       with_metrics: withMetrics,
       accounts: accounts.length,
       errors: errors.length ? errors : undefined,
+      // Always present when an account contributed nothing. The caller RENDERS this: an import
+      // that returns 0 and says nothing is indistinguishable from one that worked.
+      notes: notes.length ? notes : undefined,
     });
   }
 
