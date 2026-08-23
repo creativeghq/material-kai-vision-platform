@@ -299,7 +299,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // actions. Searching availability and listing what a workspace already has are reads.
       'purchase-phone-number', 'release-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
-      'reconcile-phone-numbers', 'reconcile-whatsapp-costs',
+      'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -789,6 +789,53 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Record a template rate read off an invoice.
+      //
+      // Automatic reconciliation only works where WE own the WhatsApp Business Account. Connect a
+      // number through a BSP's embedded signup and the WABA lives in THEIR Business Manager, so
+      // Meta returns nothing for it — no token, however well-scoped, can read a WABA the operator
+      // does not own.
+      //
+      // In that case the real figure exists on the partner's invoice and nowhere else, and a human
+      // has to carry it across. That is not a lesser answer than the API one: both end with a rate
+      // stamped `last_verified_at`, which is what the unverified-rates probe actually asks for. A
+      // probe nothing can satisfy fires forever and teaches everyone to ignore it.
+      // ─────────────────────────────────────────────────────────────
+      case 'set-whatsapp-rate': {
+        const country = String(requestBody.country || '').trim().toUpperCase();
+        const category = String(requestBody.category || '').trim().toLowerCase();
+        const cost = Number(requestBody.cost_per_message_usd);
+        const note = String(requestBody.source_note || '').trim();
+
+        if (!country) throw new HttpError(400, 'country is required (ISO alpha-2, or * for the wildcard)');
+        if (!['marketing', 'utility', 'authentication', 'service'].includes(category)) {
+          throw new HttpError(400, "category must be marketing, utility, authentication or service");
+        }
+        if (!Number.isFinite(cost) || cost < 0) throw new HttpError(400, 'cost_per_message_usd must be a number >= 0');
+
+        const { data, error } = await supabaseClient
+          .from('whatsapp_template_rates')
+          .upsert({
+            country_code: country,
+            category,
+            cost_per_message_usd: cost,
+            // Where the number came from is part of the number. A rate with no provenance is the
+            // seeded guess again, just with a fresher timestamp on it.
+            source_note: note || 'Entered by the operator from a provider invoice.',
+            last_verified_at: new Date().toISOString(),
+            // Distinguishes an invoice-derived figure from one Meta reported directly.
+            derived_from_actuals: false,
+            active: true,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'country_code,category' })
+          .select('country_code, category, cost_per_message_usd, last_verified_at')
+          .single();
+
+        if (error) throw new HttpError(500, `Could not save the rate: ${error.message}`);
+        return jsonResponse({ success: true, rate: data });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Reconcile what Meta actually charged.
       //
       // The one cost this platform genuinely could not see — template messages are billed by Meta
@@ -813,9 +860,24 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         }
 
         if (seen.size === 0) {
+          // Two very different situations reach here and only one is a defect, so say which.
+          const { count: waChannels } = await supabaseClient
+            .from('messaging_channels')
+            .select('*', { count: 'exact', head: true })
+            .eq('channel_type', 'whatsapp');
+
           return jsonResponse({
-            success: true, wabas: 0, results: [],
-            message: 'No WhatsApp channel carries a WABA id yet, so there is nothing of Meta\'s to read.',
+            success: true,
+            wabas: 0,
+            results: [],
+            whatsapp_channels: waChannels ?? 0,
+            message: (waChannels ?? 0) === 0
+              ? 'No WhatsApp channel is connected, so there is nothing to reconcile yet.'
+              : 'WhatsApp is connected but no channel carries a WABA id. That normally means the '
+                + 'number was onboarded through the provider\'s own Meta app, so the WhatsApp '
+                + 'Business Account sits in THEIR Business Manager and Meta will not report its '
+                + 'cost to us at all. Take the figures from the provider invoice and record them '
+                + 'with set-whatsapp-rate — no Meta token can read a WABA you do not own.',
           });
         }
 
