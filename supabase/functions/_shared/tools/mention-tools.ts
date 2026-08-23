@@ -186,6 +186,81 @@ async function getTrackedForProduct(productId: string) {
   return data;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Turn whatever the agent was given into the MIVAA path prefix for that subject.
+ *
+ * `tracked_mentions` holds two kinds of row and MIVAA serves both — `/products/{id}/…`
+ * for a product enrolment, `/track/{id}/…` for a free brand/keyword subject. Every tool
+ * in this file spoke only the first, so on a platform where all 17 tracked rows are the
+ * second kind, "how visible is Flobali in AI answers?" could not be answered by the agent
+ * at all. It did not error; there was simply no id to give it.
+ *
+ * Resolution order, most specific first:
+ *   product_id           → the product's enrolment
+ *   subject as a UUID    → that tracked row
+ *   subject as a label   → exact match first, then a single prefix match
+ *
+ * A label matching several subjects returns them rather than guessing: picking one and
+ * reporting its numbers under the other's name is worse than asking.
+ */
+async function resolveSubjectBase(
+  args: { product_id?: string; subject?: string },
+  userId: string,
+): Promise<{ base: string; label: string; trackedMentionId?: string } | { error: string; candidates?: string[] }> {
+  if (args.product_id) {
+    return { base: `/api/v1/mention-monitoring/products/${args.product_id}`, label: args.product_id };
+  }
+  const subject = (args.subject || '').trim();
+  if (!subject) return { error: 'Give either a product_id or a subject (brand / keyword name).' };
+
+  const sb = svcClient();
+  if (UUID_RE.test(subject)) {
+    const { data } = await sb
+      .from('tracked_mentions')
+      .select('id, subject_label')
+      .eq('id', subject)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!data) return { error: `No tracked subject ${subject} belongs to you.` };
+    return {
+      base: `/api/v1/mention-monitoring/track/${data.id}`,
+      label: data.subject_label as string,
+      trackedMentionId: data.id as string,
+    };
+  }
+
+  // Scoped to the caller: the service-role client bypasses RLS, so ownership is checked
+  // here or not at all (invariant 1).
+  const { data: rows } = await sb
+    .from('tracked_mentions')
+    .select('id, subject_label')
+    .eq('user_id', userId)
+    .is('api_key_id', null)
+    .ilike('subject_label', `${subject}%`)
+    .limit(10);
+  const matches = rows || [];
+  const exact = matches.filter(
+    (r: { subject_label: string }) => r.subject_label.toLowerCase() === subject.toLowerCase(),
+  );
+  const picked = exact.length === 1 ? exact[0] : matches.length === 1 ? matches[0] : null;
+  if (!picked) {
+    if (matches.length > 1) {
+      return {
+        error: `"${subject}" matches ${matches.length} tracked subjects — name one exactly.`,
+        candidates: matches.map((r: { subject_label: string }) => r.subject_label),
+      };
+    }
+    return { error: `Nothing tracked matches "${subject}". Track it first, or check the spelling.` };
+  }
+  return {
+    base: `/api/v1/mention-monitoring/track/${picked.id}`,
+    label: picked.subject_label as string,
+    trackedMentionId: picked.id as string,
+  };
+}
+
 async function callMivaa(
   path: string,
   init: RequestInit & { jwt?: string } = {},
@@ -295,13 +370,16 @@ export const createGetMentionSummaryTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_id, days = 30 }) => {
+    async ({ product_id, subject, days = 30 }) => {
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
       }
+      const resolved = await resolveSubjectBase({ product_id, subject }, userId);
+      if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
+      const { base, label } = resolved;
       onChunk?.({ type: 'tool_progress', status: `Loading ${days}d mention summary...`, timestamp: Date.now() });
       const r = await callMivaa(
-        `/api/v1/mention-monitoring/products/${product_id}/summary?days=${days}`,
+        `${base}/summary?days=${days}`,
         { method: 'GET', jwt },
       );
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
@@ -310,6 +388,7 @@ export const createGetMentionSummaryTool = (
       onChunk?.({
         type: 'mention_summary',
         product_id,
+        subject_label: label,
         days,
         summary,
         timestamp: Date.now(),
@@ -318,9 +397,10 @@ export const createGetMentionSummaryTool = (
     },
     {
       name: 'get_mention_summary',
-      description: 'Fetch the rolling mention summary for a product: total count, sentiment breakdown, top outlets. 0 credits.',
+      description: 'Fetch the rolling mention summary for a product, brand or keyword: total count, sentiment breakdown, top outlets. Give EITHER product_id OR subject. 0 credits.',
       schema: z.object({
-        product_id: z.string(),
+        product_id: z.string().optional().describe('Product UUID, for a product enrolment.'),
+        subject: z.string().optional().describe('A tracked brand or keyword — its name, or its tracked-subject UUID.'),
         days: z.number().int().min(1).max(180).default(30),
       }),
     },
@@ -339,10 +419,13 @@ export const createCheckLlmVisibilityTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_id, models, force_run }) => {
+    async ({ product_id, subject, models, force_run }) => {
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
       }
+      const resolved = await resolveSubjectBase({ product_id, subject }, userId);
+      if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
+      const { base, label } = resolved;
       // If force_run, debit + run probe; otherwise return latest cached snapshot
       if (force_run) {
         const ok = await debit(userId, workspaceId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
@@ -350,10 +433,7 @@ export const createCheckLlmVisibilityTool = (
         onChunk?.({ type: 'tool_progress', status: 'Running LLM visibility probe across models...', timestamp: Date.now() });
         let r: { ok: boolean; status: number; data?: any; error?: string };
         try {
-          r = await callMivaa(
-            `/api/v1/mention-monitoring/products/${product_id}/probe-llm`,
-            { method: 'POST', body: JSON.stringify({ models }), jwt },
-          );
+          r = await callMivaa(`${base}/probe-llm`, { method: 'POST', body: JSON.stringify({ models }), jwt });
         } catch (probeErr) {
           // Network or unexpected error — refund and surface
           await refund(userId, workspaceId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
@@ -365,27 +445,32 @@ export const createCheckLlmVisibilityTool = (
         }
       }
       // Read latest snapshot
-      const sn = await callMivaa(
-        `/api/v1/mention-monitoring/products/${product_id}/llm-visibility`,
-        { method: 'GET', jwt },
-      );
+      const sn = await callMivaa(`${base}/llm-visibility`, { method: 'GET', jwt });
       if (!sn.ok) return JSON.stringify({ success: false, error: sn.error || `backend ${sn.status}` });
       const snapshot = sn.data?.data;
+      // The trend is the answer to "is that better or worse than last month", which is the
+      // question anybody asking about visibility is actually asking. Free — it reads the
+      // same rows the snapshot came from.
+      const tr = await callMivaa(`${base}/llm-visibility-trend?days=90`, { method: 'GET', jwt });
+      const trend = tr.ok ? tr.data?.data : null;
       onChunk?.({
         type: 'llm_visibility_result',
         product_id,
+        subject_label: label,
         snapshot,
+        trend,
         forced: !!force_run,
         credits_used: force_run ? LLM_PROBE_CREDITS : 0,
         timestamp: Date.now(),
       });
-      return JSON.stringify({ success: true, snapshot, credits_used: force_run ? LLM_PROBE_CREDITS : 0 });
+      return JSON.stringify({ success: true, subject: label, snapshot, trend, credits_used: force_run ? LLM_PROBE_CREDITS : 0 });
     },
     {
       name: 'check_llm_visibility',
-      description: 'Inspect how a product/brand appears in LLM responses (Haiku, GPT-4o-mini, Gemini Flash, Sonar). Returns share-of-voice, average rank, top competitors. Set force_run:true to fire a fresh probe (2 credits); otherwise reads the most recent snapshot (0 credits).',
+      description: 'Inspect how a product, brand or keyword appears in AI answers (Haiku, GPT-4o-mini, Gemini Flash, Sonar). Returns share-of-voice, average rank, sentiment per model, which sources the answers cited, ghost citations (our page used as a source without naming us), competitors, and the 90-day trend. Give EITHER product_id OR subject (the tracked brand/keyword name). Set force_run:true to fire a fresh probe (2 credits); otherwise reads the most recent snapshot (0 credits).',
       schema: z.object({
-        product_id: z.string(),
+        product_id: z.string().optional().describe('Product UUID, for a product enrolment.'),
+        subject: z.string().optional().describe('A tracked brand or keyword — its name, or its tracked-subject UUID. Use this for anything that is not a catalog product.'),
         models: z.array(z.string()).optional().describe('Subset of: claude-haiku-4-5, gpt-4o-mini, gemini-2.0-flash, sonar'),
         force_run: z.boolean().default(false).describe('If true, fires a new probe run instead of reading the latest snapshot.'),
       }),
@@ -403,13 +488,16 @@ export const createFindNegativeMentionsTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_id, days = 30, limit = 25 }) => {
+    async ({ product_id, subject, days = 30, limit = 25 }) => {
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
       }
+      const resolved = await resolveSubjectBase({ product_id, subject }, userId);
+      if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
+      const { base, label } = resolved;
       onChunk?.({ type: 'tool_progress', status: 'Loading negative-sentiment mentions...', timestamp: Date.now() });
       const r = await callMivaa(
-        `/api/v1/mention-monitoring/products/${product_id}/history?days=${days}&sentiment=negative&limit=${limit}`,
+        `${base}/history?days=${days}&sentiment=negative&limit=${limit}`,
         { method: 'GET', jwt },
       );
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
@@ -417,6 +505,7 @@ export const createFindNegativeMentionsTool = (
       onChunk?.({
         type: 'mention_feed',
         product_id,
+        subject_label: label,
         days,
         sentiment_filter: 'negative',
         rows,
@@ -431,9 +520,10 @@ export const createFindNegativeMentionsTool = (
     },
     {
       name: 'find_negative_mentions',
-      description: 'List recent negative-sentiment mentions for a product. Useful for reputation triage.',
+      description: 'List recent negative-sentiment mentions for a product, brand or keyword. Useful for reputation triage. Give EITHER product_id OR subject.',
       schema: z.object({
-        product_id: z.string(),
+        product_id: z.string().optional().describe('Product UUID, for a product enrolment.'),
+        subject: z.string().optional().describe('A tracked brand or keyword — its name, or its tracked-subject UUID.'),
         days: z.number().int().min(1).max(180).default(30),
         limit: z.number().int().min(1).max(100).default(25),
       }),

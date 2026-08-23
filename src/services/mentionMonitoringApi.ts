@@ -302,7 +302,99 @@ export interface OpportunitiesResponse {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Product-scoped helpers
+// Which subject are we looking at?
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * A tracked subject, addressed either way the backend addresses one.
+ *
+ * `tracked_mentions` has always held two kinds of row: a PRODUCT enrolment
+ * (`product_id` set, reached at `/products/{id}/…`) and a free SUBJECT — a brand or
+ * keyword with no product behind it, reached at `/track/{id}/…`. MIVAA has served both
+ * families since the feature shipped.
+ *
+ * The client only ever spoke the first one. Every reader below existed exactly once, in
+ * its product form, so the subject half of the product was reachable by curl and by
+ * nothing else — and on this platform **all 17 tracked subjects are the subject kind**,
+ * so in practice the screens could not open a single real row. A typed wrapper is not a
+ * surface; neither is a route.
+ *
+ * One ref, one set of functions, so a reader cannot exist for one kind and not the other.
+ */
+export type MentionSubjectRef =
+  | { kind: 'product'; productId: string }
+  | { kind: 'subject'; trackedMentionId: string };
+
+const subjectBase = (ref: MentionSubjectRef): string =>
+  ref.kind === 'product'
+    ? `/api/v1/mention-monitoring/products/${ref.productId}`
+    : `/api/v1/mention-monitoring/track/${ref.trackedMentionId}`;
+
+/** The tracked row itself, or null when a product is not enrolled. */
+export async function getSubjectMonitoring(
+  ref: MentionSubjectRef,
+): Promise<TrackedMention | null> {
+  const res = await api<{ success: boolean; data: TrackedMention | null }>(
+    subjectBase(ref), { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function getSubjectFeed(
+  ref: MentionSubjectRef,
+  params?: { limit?: number },
+): Promise<MentionRow[]> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const res = await api<{ success: boolean; data: MentionRow[] }>(
+    `${subjectBase(ref)}/feed?${qs.toString()}`, { method: 'GET' },
+  );
+  return res.data || [];
+}
+
+export async function getSubjectLlmVisibility(
+  ref: MentionSubjectRef,
+): Promise<LlmVisibilitySnapshot> {
+  const res = await api<{ success: boolean; data: LlmVisibilitySnapshot }>(
+    `${subjectBase(ref)}/llm-visibility`, { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function getSubjectLlmVisibilityTrend(
+  ref: MentionSubjectRef,
+  days: number = 90,
+): Promise<LlmVisibilityTrend> {
+  const res = await api<{ success: boolean; data: LlmVisibilityTrend }>(
+    `${subjectBase(ref)}/llm-visibility-trend?days=${days}`, { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function probeSubjectLlm(
+  ref: MentionSubjectRef,
+  models?: string[],
+): Promise<{ status: string; probe_run_id: string; probe_count: number; total_cost_usd: number }> {
+  const res = await api<{ success: boolean; data: { status: string; probe_run_id: string; probe_count: number; total_cost_usd: number } }>(
+    `${subjectBase(ref)}/probe-llm`,
+    { method: 'POST', body: JSON.stringify(models ? { models } : {}) },
+  );
+  return res.data;
+}
+
+export async function refreshSubject(
+  ref: MentionSubjectRef,
+  options?: { force?: boolean },
+): Promise<RefreshOutcome> {
+  const res = await api<{ success: boolean; data: RefreshOutcome }>(
+    `${subjectBase(ref)}/refresh`,
+    { method: 'POST', body: JSON.stringify({ force: !!options?.force }) },
+  );
+  return res.data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Product ENROLMENT — genuinely product-only, so it keeps its own pair
 // ─────────────────────────────────────────────────────────────────────────
 
 export async function trackProduct(
@@ -333,109 +425,19 @@ export async function untrackProduct(productId: string): Promise<void> {
   await api(`/api/v1/mention-monitoring/products/${productId}/track`, { method: 'DELETE' });
 }
 
-export async function getProductMonitoring(productId: string): Promise<TrackedMention | null> {
-  const res = await api<{ success: boolean; data: TrackedMention | null }>(
-    `/api/v1/mention-monitoring/products/${productId}`, { method: 'GET' },
-  );
-  return res.data;
-}
-
-export async function refreshProduct(
-  productId: string,
-  options?: { force?: boolean },
-): Promise<RefreshOutcome> {
-  const res = await api<{ success: boolean; data: RefreshOutcome }>(
-    `/api/v1/mention-monitoring/products/${productId}/refresh`,
-    { method: 'POST', body: JSON.stringify({ force: !!options?.force }) },
-  );
-  return res.data;
-}
-
-export async function getProductFeed(
-  productId: string,
-  params?: { limit?: number },
-): Promise<MentionRow[]> {
-  const qs = new URLSearchParams();
-  if (params?.limit) qs.set('limit', String(params.limit));
-  const res = await api<{ success: boolean; data: MentionRow[] }>(
-    `/api/v1/mention-monitoring/products/${productId}/feed?${qs.toString()}`,
-    { method: 'GET' },
-  );
-  return res.data || [];
-}
-
-export async function getProductHistory(
-  productId: string,
-  params?: { days?: number; sentiment?: string; outlet_type?: string; limit?: number },
-): Promise<MentionRow[]> {
-  const qs = new URLSearchParams();
-  if (params?.days) qs.set('days', String(params.days));
-  if (params?.sentiment) qs.set('sentiment', params.sentiment);
-  if (params?.outlet_type) qs.set('outlet_type', params.outlet_type);
-  if (params?.limit) qs.set('limit', String(params.limit));
-  const res = await api<{ success: boolean; data: MentionRow[] }>(
-    `/api/v1/mention-monitoring/products/${productId}/history?${qs.toString()}`,
-    { method: 'GET' },
-  );
-  return res.data || [];
-}
-
-export async function getProductSummary(
-  productId: string,
-  days: number = 30,
-): Promise<MentionSummary | null> {
-  const res = await api<{ success: boolean; data: MentionSummary | null }>(
-    `/api/v1/mention-monitoring/products/${productId}/summary?days=${days}`,
-    { method: 'GET' },
-  );
-  return res.data;
-}
-
-export async function getProductLlmVisibility(
-  productId: string,
-): Promise<LlmVisibilitySnapshot> {
-  const res = await api<{ success: boolean; data: LlmVisibilitySnapshot }>(
-    `/api/v1/mention-monitoring/products/${productId}/llm-visibility`,
-    { method: 'GET' },
-  );
-  return res.data;
-}
-
-export async function getProductLlmVisibilityTrend(
-  productId: string,
-  days: number = 90,
-): Promise<LlmVisibilityTrend> {
-  const res = await api<{ success: boolean; data: LlmVisibilityTrend }>(
-    `/api/v1/mention-monitoring/products/${productId}/llm-visibility-trend?days=${days}`,
-    { method: 'GET' },
-  );
-  return res.data;
-}
-
-export async function getTrackedLlmVisibilityTrend(
-  trackedMentionId: string,
-  days: number = 90,
-): Promise<LlmVisibilityTrend> {
-  const res = await api<{ success: boolean; data: LlmVisibilityTrend }>(
-    `/api/v1/mention-monitoring/track/${trackedMentionId}/llm-visibility-trend?days=${days}`,
-    { method: 'GET' },
-  );
-  return res.data;
-}
-
-export async function probeProductLlm(
-  productId: string,
-  models?: string[],
-): Promise<{ status: string; probe_run_id: string; probe_count: number; total_cost_usd: number }> {
-  const res = await api<{ success: boolean; data: any }>(
-    `/api/v1/mention-monitoring/products/${productId}/probe-llm`,
-    { method: 'POST', body: JSON.stringify(models ? { models } : {}) },
-  );
-  return res.data;
-}
-
-export async function getProductOpportunities(
-  productId: string,
+/**
+ * Content + outreach opportunities for one subject.
+ *
+ * Both arms existed and neither had a caller. This is the read side of a ~2,000-line
+ * service that scores AI Overview presence, People-Also-Ask gaps, featured snippets,
+ * competitor rankings, video/news carousels, knowledge panels and outlet pitches — the
+ * entire "how do we get cited more" half of the product, reachable by curl only.
+ *
+ * `use_llm_summary` costs credits (it polishes each rationale through Haiku); everything
+ * else is one SERP call the subject has already paid for.
+ */
+export async function getSubjectOpportunities(
+  ref: MentionSubjectRef,
   options?: {
     types?: OpportunityType[];
     days?: number;
@@ -444,23 +446,7 @@ export async function getProductOpportunities(
   },
 ): Promise<OpportunitiesResponse> {
   const res = await api<{ success: boolean; data: OpportunitiesResponse }>(
-    `/api/v1/mention-monitoring/products/${productId}/opportunities`,
-    { method: 'POST', body: JSON.stringify(options || {}) },
-  );
-  return res.data;
-}
-
-export async function getTrackedOpportunities(
-  trackedMentionId: string,
-  options?: {
-    types?: OpportunityType[];
-    days?: number;
-    limit_per_type?: number;
-    use_llm_summary?: boolean;
-  },
-): Promise<OpportunitiesResponse> {
-  const res = await api<{ success: boolean; data: OpportunitiesResponse }>(
-    `/api/v1/mention-monitoring/track/${trackedMentionId}/opportunities`,
+    `${subjectBase(ref)}/opportunities`,
     { method: 'POST', body: JSON.stringify(options || {}) },
   );
   return res.data;
@@ -503,13 +489,6 @@ export async function createTrackedMention(
   return res.data;
 }
 
-export async function getTrackedMention(id: string): Promise<TrackedMention> {
-  const res = await api<{ success: boolean; data: TrackedMention }>(
-    `/api/v1/mention-monitoring/track/${id}`, { method: 'GET' },
-  );
-  return res.data;
-}
-
 export async function updateTrackedMention(
   id: string,
   patch: Partial<CreateTrackedMentionInput & { is_active: boolean }>,
@@ -517,21 +496,6 @@ export async function updateTrackedMention(
   const res = await api<{ success: boolean; data: TrackedMention | null }>(
     `/api/v1/mention-monitoring/track/${id}`,
     { method: 'PUT', body: JSON.stringify(patch) },
-  );
-  return res.data;
-}
-
-export async function deactivateTrackedMention(id: string): Promise<void> {
-  await api(`/api/v1/mention-monitoring/track/${id}`, { method: 'DELETE' });
-}
-
-export async function refreshTracked(
-  id: string,
-  options?: { force?: boolean },
-): Promise<RefreshOutcome> {
-  const res = await api<{ success: boolean; data: RefreshOutcome }>(
-    `/api/v1/mention-monitoring/track/${id}/refresh`,
-    { method: 'POST', body: JSON.stringify({ force: !!options?.force }) },
   );
   return res.data;
 }

@@ -32,6 +32,28 @@ each of which returned a plausible number rather than failing:
 - **Sentiment, aggregated and split per model.** It was persisted and then only ever shown inside four capped samples. Computed over the probes where the subject was **actually mentioned** — rolling in the extractor's `neutral` default for answers that never named it drags the score toward neutral in proportion to how invisible the brand is, which inverts the signal. `score: null` means never mentioned, which is not the same fact as a neutral verdict.
 - **`/share-of-voice` had two defects.** It counted competitors and never the subject, so the one brand the page belongs to had no share of its own voice; and its `days` parameter was declared, `ge=1, le=180`-validated and then never applied to the query, which filtered on the subject and took the newest 500 rows whatever window you asked for. Now bucketed per run, subject included, window honoured.
 
+**Where the SCREENS are (2026-08-23).** A subject is addressed two ways and, until this
+pass, the client spoke only one of them.
+
+`tracked_mentions` holds a PRODUCT enrolment (`product_id` set, served at
+`/products/{id}/…`) and a free brand/keyword SUBJECT (served at `/track/{id}/…`). MIVAA
+has served both since the feature shipped. Every client reader existed once, in its
+product form — and **all 17 tracked rows on this platform are the subject kind**, so the
+admin list rendered its `Open` link `if (r.product_id)` for none of them. 636 probe rows
+across 50 runs had no screen at all, `shareOfVoice()` had zero callers, so did
+`createTrackedMention`, and so did both opportunity readers.
+
+- **`MentionSubjectRef`** is the fix: `{kind:'product',productId}` | `{kind:'subject',trackedMentionId}`. One set of readers takes it, so a reader cannot exist for one kind and not the other. `getSubject{Monitoring,Feed,LlmVisibility,LlmVisibilityTrend,Opportunities}`, `probeSubjectLlm`, `refreshSubject`.
+- **`MentionMonitorTab` takes the ref**, so the admin list opens any row in a sheet. Product enrolment still lives on the product page.
+- **`TrackSubjectDialog`** is the create surface. It asks for `homepage_domain`, which nothing did before — zero of the 17 subjects carry one, and without it `brand_cited` is NULL forever, so ghost citations stay permanently *undecidable* rather than zero.
+- **An Opportunities tab** makes `mention_opportunity_service` reachable. It is fetched on demand, never with the tab: the call is a live metered SERP round-trip.
+- **The agent tools take a subject too.** `check_llm_visibility`, `get_mention_summary` and `find_negative_mentions` accept `product_id` OR `subject` (name or uuid), resolved through one `resolveSubjectBase()` scoped to the caller. Before this the agent could not answer a question about any real subject either. `check_llm_visibility` now returns the 90-day trend alongside the snapshot — same rows, no extra cost — and the chat card renders sentiment, cited sources and ghost citations.
+
+Guarded by [tests/unit/mentionApiReachability.test.ts](../tests/unit/mentionApiReachability.test.ts):
+every exported reader must have a real caller, both addressing modes must be built into a
+URL, the tab must take a ref, and the list must be able to open a subject. Watched to fire
+2026-08-23 — restoring the product-only shape failed 3 of 8.
+
 **Where the arithmetic lives.** All of it in
 [llm_visibility_math.py](../mivaa-pdf-extractor/app/services/integrations/llm_visibility_math.py) —
 stdlib-only, no DB client. The service fetches rows and hands them over. That split is not

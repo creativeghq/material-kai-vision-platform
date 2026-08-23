@@ -646,11 +646,35 @@ interface Message {
   agentResultData?: { title: string; data: Record<string, any>; resultType?: string };
   llmVisibilityData?: {
     product_id: string;
+    /** Brand / keyword name when the tool was given a subject rather than a product. */
+    subject_label?: string;
+    /**
+     * 90-day movement, returned alongside the snapshot. "Where do we stand" without
+     * "and is that better than last month" is half an answer, and the tool already has
+     * both — they come off the same rows.
+     */
+    trend?: {
+      present: boolean;
+      days: number;
+      points: Array<{ run_at: string; share_of_voice: number; avg_position: number | null }>;
+      change?: { share_of_voice: number; avg_position: number | null; runs_compared: number };
+    } | null;
     snapshot: {
       present: boolean;
       total_probes?: number;
       share_of_voice?: number;
       avg_position?: number | null;
+      sentiment?: {
+        positive: number; neutral: number; negative: number;
+        basis_probes: number; score: number | null;
+      };
+      citations?: {
+        probes_with_citations: number;
+        brand_cited: number;
+        ghost_citations: number;
+        undecidable_no_homepage_domain: number;
+        top_cited_domains: Array<[string, number]>;
+      };
       per_model?: Record<string, {
         probes: number;
         mentioned: number;
@@ -3158,6 +3182,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentId: selectedAgent,
                   model: selectedModel,
                   llmVisibilityData: {
+                    subject_label: chunk.subject_label,
+                    trend: chunk.trend,
                     product_id: chunk.product_id,
                     snapshot: chunk.snapshot,
                     forced: chunk.forced,
@@ -4547,7 +4573,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.llmVisibilityData) {
       return (
         <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
-          <div className="text-xs text-muted-foreground mb-0.5">LLM visibility{message.llmVisibilityData.forced ? ' · fresh probe' : ''}</div>
+          <div className="text-xs text-muted-foreground mb-0.5">
+            LLM visibility{message.llmVisibilityData.subject_label ? ` · ${message.llmVisibilityData.subject_label}` : ''}
+            {message.llmVisibilityData.forced ? ' · fresh probe' : ''}
+          </div>
           <p className="text-[11px] text-muted-foreground mb-2">How AI assistants (ChatGPT, Gemini, Claude and others) talk about this subject when asked — how often it comes up, and where it ranks.</p>
           {!message.llmVisibilityData.snapshot?.present ? (
             <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">No AI-assistant probes have run yet — once they do, you'll see how often each model mentions this and who it names alongside.</div>
@@ -4610,6 +4639,55 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     </details>
                   ))}
+                </div>
+              )}
+              {message.llmVisibilityData.trend?.change?.avg_position != null && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  {/* A smaller rank number is better, so a negative delta is good news. */}
+                  Over {message.llmVisibilityData.trend.days} days ·{' '}
+                  {message.llmVisibilityData.trend.change.avg_position < 0
+                    ? `improved ${Math.abs(message.llmVisibilityData.trend.change.avg_position).toFixed(1)} ranks`
+                    : `slipped ${message.llmVisibilityData.trend.change.avg_position.toFixed(1)} ranks`}
+                  {' · '}
+                  {(message.llmVisibilityData.trend.change.share_of_voice >= 0 ? '+' : '')}
+                  {Math.round(message.llmVisibilityData.trend.change.share_of_voice * 100)} pts share of voice
+                  {' · '}{message.llmVisibilityData.trend.change.runs_compared} runs
+                </div>
+              )}
+              {message.llmVisibilityData.snapshot.sentiment?.score != null && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  How they talk about it: <strong className="text-foreground">
+                    {message.llmVisibilityData.snapshot.sentiment.score > 0 ? '+' : ''}
+                    {message.llmVisibilityData.snapshot.sentiment.score.toFixed(2)}
+                  </strong>{' '}
+                  ({message.llmVisibilityData.snapshot.sentiment.positive} positive ·{' '}
+                  {message.llmVisibilityData.snapshot.sentiment.neutral} neutral ·{' '}
+                  {message.llmVisibilityData.snapshot.sentiment.negative} negative, over the answers
+                  that actually named it)
+                </div>
+              )}
+              {!!message.llmVisibilityData.snapshot.citations?.probes_with_citations && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {!!message.llmVisibilityData.snapshot.citations.ghost_citations && (
+                    <div className="text-foreground">
+                      {message.llmVisibilityData.snapshot.citations.ghost_citations} answer(s) cited
+                      one of your pages as a source <em>without naming you</em>.
+                    </div>
+                  )}
+                  {!!message.llmVisibilityData.snapshot.citations.undecidable_no_homepage_domain && (
+                    // Undecidable is not zero, and saying "zero" here would be a lie the
+                    // operator has no way to check.
+                    <div>
+                      Citations can't be matched to you until this subject has a homepage domain set.
+                    </div>
+                  )}
+                  {message.llmVisibilityData.snapshot.citations.top_cited_domains?.length > 0 && (
+                    <div className="mt-1">
+                      Sources the answers cited:{' '}
+                      {message.llmVisibilityData.snapshot.citations.top_cited_domains
+                        .slice(0, 5).map(([d, c]: any) => `${d} (${c})`).join(', ')}
+                    </div>
+                  )}
                 </div>
               )}
               {message.llmVisibilityData.snapshot.top_competitors && message.llmVisibilityData.snapshot.top_competitors.length > 0 && (

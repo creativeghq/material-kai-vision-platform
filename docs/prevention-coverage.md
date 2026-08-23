@@ -498,6 +498,26 @@ here because the "fix" you reach for is to work harder on visibility.
 - **Proven to fire:** 2026-08-23, twice. (a) `Perplexity-User` moved back to the training block → the "may read the public surface" case failed, naming it. (b) The allow group's Disallow list deleted, leaving `Allow: /` — the exact "named group with no Disallow lines is an unrestricted crawl" trap — → **18 of 54** failed, every share-URL and app-surface case. Restored byte-identically both times; 54/54 green after.
 - **Blind spot:** llms.txt is prose. The test can stop it disagreeing with robots.txt on the agent list; it cannot check that the surfaces it advertises still exist.
 
+### 16. One addressing mode has a screen and the other does not
+
+Shape 3's bigger brother. `tracked_mentions` is reached two ways — `/products/{id}/…` for a
+product enrolment, `/track/{id}/…` for a free brand/keyword subject — and MIVAA has served
+both since the feature shipped. The client implemented every reader once, in its product
+form. Because **all 17 tracked rows on this platform are the subject kind**, the effect was
+total: the admin list rendered its `Open` link `if (r.product_id)`, which was true for none
+of them; 636 probe rows across 50 runs had nowhere to be displayed; `shareOfVoice()` had
+zero callers on the day it was fixed; so did `createTrackedMention` and both opportunity
+readers, the latter being the read side of a ~2,000-line scoring service.
+
+Nothing failed. Every wrapper typechecked, every route routed, the suite was green, and the
+admin page rendered a list of seventeen rows that looked completely healthy.
+
+- **Why it is worse than a dead action.** `inboxApiReachability` catches a single unreachable action. Here the unreachable thing was a *category of row*, and the guard you would naturally write — "does this reader have a caller?" — passes as soon as any one screen calls it with the kind it does support.
+- **The tell:** a reader whose only parameter is one kind's id. `getProductLlmVisibility(productId)` cannot serve a subject however many callers it has.
+- **Guarded by:** [tests/unit/mentionApiReachability.test.ts](../tests/unit/mentionApiReachability.test.ts) — every exported reader has a real caller (comments stripped); no reader is named `get*Product*`; `MentionSubjectRef` covers both modes AND both are built into a URL; the tab takes the ref; the admin list constructs a `{kind:'subject'}` ref; the create dialog collects `homepage_domain`.
+- **Proven to fire:** 2026-08-23 — the pre-fix shape restored across three files (dashboard linking a product, tab taking a bare `productId`, one reader renamed back to `getProduct…`); 3 of 8 failed, naming each. Restored byte-identically; 8/8 green after.
+- **Blind spot:** it knows about this one API. The same shape is available to any service with two id families — and `priceMonitoringApi` has exactly that structure.
+
 ---
 
 ## Mechanism inventory
@@ -517,6 +537,7 @@ here because the "fix" you reach for is to work harder on visibility.
 | `ops.silent_zero` | nightly | shape 4 | no |
 | [tests/unit/inboxApiReachability.test.ts](../tests/unit/inboxApiReachability.test.ts) | `npm test`, blocking | shape 3 — an `inbox-api` action no screen can reach, and an intake price echoed back as the member's own | **yes** — mutation-tested by renaming both call sites and dropping the price guard; 3 of 5 assertions failed, naming the actions (2026-08-20) |
 | `ops.silent_zero_probe_missing` | nightly | shape 4g — a probe silently dropped from the detector by a full `CREATE OR REPLACE` | **yes** — watched to go 0 → 15 → 0 with the detector stubbed inside an aborted subtransaction (2026-08-20); re-watched 2026-08-23 for the `seo #349` roster entry specifically |
+| [tests/unit/mentionApiReachability.test.ts](../tests/unit/mentionApiReachability.test.ts) | `npm test`, blocking | shape 16 — a reader, or a whole addressing mode, with no screen | **yes** — pre-fix shape restored across three files; 3 of 8 assertions failed, naming each (2026-08-23) |
 | [tests/unit/crawlPolicy.test.ts](../tests/unit/crawlPolicy.test.ts) | `npm test`, blocking | shape 15 — robots.txt and llms.txt expressing two different crawl policies, and retrieval agents blocked as if they were training crawlers | **yes** — two mutations, 1 and 18 assertions failed as intended (2026-08-23) |
 | [test_llm_visibility_is_a_measurement.py](../mivaa-pdf-extractor/tests/unit/test_llm_visibility_is_a_measurement.py) | MIVAA CI, blocking | shape 3 + shape 4 on the LLM-probe pipeline — a `days` param never applied, a sentiment score diluted by the probes that never mentioned the subject, a ghost citation nothing could see, a substring domain match | **yes** — three mutations restoring the original defects; 3, 3 and 1 assertions failed as intended (2026-08-23) |
 | `ops.silent_zero` probe `seo_article_refresh_due_never_emitted` | nightly | shape 4 — generated articles aging past their refresh cadence while the weekly sweep tells nobody | **yes** — 4 overdue fixtures inside a rolled-back transaction produced the finding; the same fixtures with `refresh_notified_at` set produced none (2026-08-23) |

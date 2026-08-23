@@ -2917,8 +2917,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <ModuleTabGate moduleSlug="mention-monitoring" moduleName="Mention Monitoring"
                 blurb="Track where this product is mentioned across news, blogs and AI assistants.">
                 <MentionMonitorTab
-                  productId={product.id}
-                  productName={product.name}
+                  subject={{ kind: 'product', productId: product.id }}
+                  subjectName={product.name}
                   manufacturer={(product as any).manufacturer}
                 />
               </ModuleTabGate>

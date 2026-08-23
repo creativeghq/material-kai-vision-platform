@@ -1,5 +1,15 @@
 /**
- * MentionMonitorTab — per-product mention monitoring view.
+ * MentionMonitorTab — one tracked subject's mention monitoring view.
+ *
+ * Takes a `MentionSubjectRef`, not a product id. `tracked_mentions` holds two kinds of
+ * row — a product enrolment and a free brand/keyword subject — and this screen only ever
+ * spoke the first, while every real row on this platform is the second. So the component
+ * rendered nothing openable: the admin list showed 17 subjects and could open none of
+ * them, and 636 probe rows across 50 runs had no screen at all.
+ *
+ * Everything below the `tracked` lookup was already ref-agnostic (it works off
+ * `tracked.id`); only the six readers were product-shaped, and they are now one set that
+ * takes the ref.
  *
  * Layout (top → bottom):
  *   1. Header with Enable toggle + Admin "Refresh now" + alert prefs
@@ -30,17 +40,47 @@ import {
 } from 'recharts';
 import {
   TrackedMention, MentionRow, LlmVisibilitySnapshot, LlmVisibilityTrend, MentionExclusion,
-  trackProduct, untrackProduct, getProductMonitoring, refreshProduct,
-  getProductFeed, getProductLlmVisibility, getProductLlmVisibilityTrend, probeProductLlm,
-  updateTrackedMention, submitMentionClassifierCorrection,
+  MentionSubjectRef, ShareOfVoice,
+  trackProduct, untrackProduct, updateTrackedMention,
+  getSubjectMonitoring, getSubjectFeed, getSubjectLlmVisibility,
+  getSubjectLlmVisibilityTrend, probeSubjectLlm, refreshSubject,
+  getSubjectOpportunities, Opportunity, OpportunitiesResponse,
+  shareOfVoice, submitMentionClassifierCorrection,
   listExclusions, excludeMentionUrl, includeMentionUrl, promoteMentionUrl,
 } from '@/services/mentionMonitoringApi';
 
 interface Props {
-  productId: string;
-  productName: string;
+  /** Which tracked row this is. A product enrolment or a free brand/keyword subject. */
+  subject: MentionSubjectRef;
+  /** What to call it on screen — product name, brand, or the subject label. */
+  subjectName: string;
   manufacturer?: string | null;
 }
+
+/**
+ * Human wording per opportunity type. A map, not a `.replace('_', ' ')`, because the
+ * backend keys are internal (`pao_question`, `paid_competitor`) and reading one raw tells
+ * an operator nothing about what they are being asked to do.
+ */
+const OPPORTUNITY_LABELS: Record<string, string> = {
+  keyword_opportunity: 'Keyword gap',
+  pao_question: 'People also ask',
+  ai_overview: 'AI Overview',
+  featured_snippet: 'Featured snippet',
+  related_search: 'Related search',
+  competitor_ranking: 'Competitor ranks here',
+  video_carousel: 'Video carousel',
+  news_carousel: 'News carousel',
+  knowledge_graph: 'Knowledge panel',
+  paid_competitor: 'Competitor is paying',
+  shopping_listing: 'Shopping listing',
+  llm_visibility: 'LLM visibility',
+  domain_snapshot: 'Domain snapshot',
+  trending_topic: 'Trending topic',
+  outlet_pitch: 'Outlet to pitch',
+  author_relationship: 'Author to know',
+  sentiment_response: 'Needs a response',
+};
 
 const SENTIMENT_BADGE: Record<string, string> = {
   positive: 'bg-green-500/20 text-green-300 border-green-500/40',
@@ -59,7 +99,7 @@ const OUTLET_ICON: Record<string, React.ReactNode> = {
   aggregator: <Globe className="h-3 w-3" />,
 };
 
-export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) => {
+export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => {
   const { toast } = useToast();
   // admin-only diagnostic actions (force-refresh, classifier correction, promote) are
   // operator-level platform controls. Resolved from the unified capability layer.
@@ -76,6 +116,9 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const [busyUrl, setBusyUrl] = useState<string | null>(null);
   const [llm, setLlm] = useState<LlmVisibilitySnapshot | null>(null);
   const [llmTrend, setLlmTrend] = useState<LlmVisibilityTrend | null>(null);
+  const [sov, setSov] = useState<ShareOfVoice | null>(null);
+  const [opps, setOpps] = useState<OpportunitiesResponse | null>(null);
+  const [oppsLoading, setOppsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [probing, setProbing] = useState(false);
@@ -93,6 +136,28 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
     [llmTrend],
   );
 
+  /**
+   * The subject and its competitors on one scale, biggest first.
+   *
+   * Derived from `totals`, which MIVAA computes over the same probe rows the trend line
+   * is drawn from — never re-counted here from `llm.top_competitors`, which is a second
+   * tally over a different window and would disagree the moment the two windows differ.
+   */
+  const sovRows = useMemo(() => {
+    const totals = sov?.totals;
+    if (!totals) return [];
+    const rows = [
+      { name: sov?.subject_label || subjectName, count: totals.subject_mentions, isSubject: true },
+      ...totals.competitor_mentions.map((c) => ({ name: c.name, count: c.count, isSubject: false })),
+    ];
+    const named = rows.reduce((sum, r) => sum + r.count, 0);
+    if (!named) return [];
+    return rows
+      .map((r) => ({ ...r, share: r.count / named }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [sov, subjectName]);
+
   const feedFilterGroups = useMemo(() => buildMentionFeedFilters(feed), [feed]);
   const {
     values: feedFilterValues, setValues: setFeedFilterValues,
@@ -103,54 +168,72 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const t = await getProductMonitoring(productId);
+      const t = await getSubjectMonitoring(subject);
       setTracked(t);
       if (t?.id) {
-        // getProductSummary was fetched on every tab open and its result never read — the KPI
-        // strip renders from `tracked.current_*`. A paid round-trip per open, discarded.
-        const [f, v, tr] = await Promise.all([
-          getProductFeed(productId, { limit: 100 }),
-          getProductLlmVisibility(productId),
-          getProductLlmVisibilityTrend(productId, 90),
+        // getSubjectSummary is deliberately NOT fetched: it was called on every tab open and
+        // its result never read — the KPI strip renders from `tracked.current_*`. A paid
+        // round-trip per open, discarded.
+        const [f, v, tr, sv] = await Promise.all([
+          getSubjectFeed(subject, { limit: 100 }),
+          getSubjectLlmVisibility(subject),
+          getSubjectLlmVisibilityTrend(subject, 90),
+          // Share of voice is subject-addressed on the backend, so a product enrolment
+          // reaches it through its own tracked id once we have the row.
+          shareOfVoice(t.id, 90).catch(() => null),
         ]);
         setFeed(f);
         setLlm(v);
         setLlmTrend(tr);
+        setSov(sv);
       } else {
         setFeed([]);
         setLlm(null);
         setLlmTrend(null);
+        setSov(null);
       }
     } catch (e: any) {
       toast({ title: 'Load failed', description: String(e?.message || e), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [productId, toast]);
+  }, [subject, toast]);
 
   useEffect(() => { void load(); }, [load]);
 
   const handleToggle = useCallback(async (enabled: boolean) => {
     try {
-      if (enabled) {
-        const t = await trackProduct(productId, { run_first_refresh: true });
-        setTracked(t);
-        toast({ title: 'Mention monitoring enabled', description: 'First refresh in progress...' });
-      } else {
-        await untrackProduct(productId);
-        setTracked(null);
-        setFeed([]);
-        setLlm(null);
+      if (subject.kind === 'product') {
+        // A product is ENROLLED or not — there is no row until you turn it on.
+        if (enabled) {
+          const t = await trackProduct(subject.productId, { run_first_refresh: true });
+          setTracked(t);
+          toast({ title: 'Mention monitoring enabled', description: 'First refresh in progress...' });
+        } else {
+          await untrackProduct(subject.productId);
+          setTracked(null);
+          setFeed([]);
+          setLlm(null);
+          setLlmTrend(null);
+          setSov(null);
+        }
+        return;
       }
+      // A brand/keyword subject already EXISTS — the toggle pauses it rather than
+      // deleting it, so its probe history (and everything derived from it) survives.
+      if (!tracked?.id) return;
+      const updated = await updateTrackedMention(tracked.id, { is_active: enabled });
+      if (updated) setTracked(updated);
+      toast({ title: enabled ? 'Subject resumed' : 'Subject paused' });
     } catch (e: any) {
       toast({ title: 'Toggle failed', description: String(e?.message || e), variant: 'destructive' });
     }
-  }, [productId, toast]);
+  }, [subject, tracked?.id, toast]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const o = await refreshProduct(productId, { force: admin });
+      const o = await refreshSubject(subject, { force: admin });
       toast({
         title: o.status === 'refreshed' ? `Refresh complete: ${o.hits_count || 0} mentions` : `Refresh ${o.status}`,
         description: o.errors && Object.keys(o.errors).length ? `Errors: ${Object.keys(o.errors).join(', ')}` : undefined,
@@ -161,25 +244,45 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
     } finally {
       setRefreshing(false);
     }
-  }, [productId, admin, toast, load]);
+  }, [subject, admin, toast, load]);
 
   const handleProbeLlm = useCallback(async () => {
     setProbing(true);
     try {
-      const r = await probeProductLlm(productId);
+      const r = await probeSubjectLlm(subject);
       toast({ title: 'LLM probe complete', description: `${r.probe_count} probes, $${r.total_cost_usd.toFixed(4)}` });
-      const [v, tr] = await Promise.all([
-        getProductLlmVisibility(productId),
-        getProductLlmVisibilityTrend(productId, 90),
+      const [v, tr, sv] = await Promise.all([
+        getSubjectLlmVisibility(subject),
+        getSubjectLlmVisibilityTrend(subject, 90),
+        tracked?.id ? shareOfVoice(tracked.id, 90).catch(() => null) : Promise.resolve(null),
       ]);
       setLlm(v);
       setLlmTrend(tr);
+      setSov(sv);
     } catch (e: any) {
       toast({ title: 'Probe failed', description: String(e?.message || e), variant: 'destructive' });
     } finally {
       setProbing(false);
     }
-  }, [productId, toast]);
+  }, [subject, tracked?.id, toast]);
+
+  /**
+   * Opportunities are fetched ON DEMAND, never with the tab.
+   *
+   * The call is a live SERP round-trip against DataForSEO and it is metered. Firing it on
+   * every tab open would bill the owner for a panel they may never scroll to — the exact
+   * shape `getProductSummary` had before it was removed from `load`.
+   */
+  const loadOpportunities = useCallback(async () => {
+    setOppsLoading(true);
+    try {
+      setOpps(await getSubjectOpportunities(subject, { days: 30, limit_per_type: 5 }));
+    } catch (e: any) {
+      toast({ title: 'Could not load opportunities', description: String(e?.message || e), variant: 'destructive' });
+    } finally {
+      setOppsLoading(false);
+    }
+  }, [subject, toast]);
 
   const handleUpdateAlerts = useCallback(async (patch: Partial<TrackedMention>) => {
     if (!tracked) return;
@@ -229,7 +332,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       await excludeMentionUrl({
         trackedMentionId: tracked.id,
         ...(domain ? { domain } : { url: row.url }),
-        reason: `Excluded from ${productName} feed by an admin`,
+        reason: `Excluded from ${subjectName} feed by an admin`,
       });
       toast({
         title: domain ? `Excluded ${domain}` : 'Excluded this URL',
@@ -241,7 +344,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
     } finally {
       setBusyUrl(null);
     }
-  }, [tracked?.id, productName, toast, load, loadExclusions]);
+  }, [tracked?.id, subjectName, toast, load, loadExclusions]);
 
   /** Force a mention the classifier down-ranked back to `exact`. The counterpart to the existing
    *  "wrong match" thumbs-down: without it an operator could only ever push results DOWN. */
@@ -300,7 +403,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
               Mention Monitoring
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              News, blogs, RSS, and LLM mentions of <span className="font-medium">{productName}</span>
+              News, blogs, RSS, and LLM mentions of <span className="font-medium">{subjectName}</span>
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
@@ -390,6 +493,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
               <TabsTrigger value="feed" className="flex items-center gap-2">Feed ({filteredFeed.length})</TabsTrigger>
               <TabsTrigger value="outlets" className="flex items-center gap-2">Outlets</TabsTrigger>
               <TabsTrigger value="llm" className="flex items-center gap-2">LLM Visibility</TabsTrigger>
+              <TabsTrigger value="opportunities" className="flex items-center gap-2">Opportunities</TabsTrigger>
             </TabsList>
 
             {/* Feed */}
@@ -753,19 +857,100 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                           )}
                         </div>
                       )}
-                      {llm.top_competitors && llm.top_competitors.length > 0 && (
+                      {sovRows.length > 0 && (
                         <div>
-                          <div className="text-xs font-medium mb-1">Top co-mentioned competitors</div>
-                          <div className="flex flex-wrap gap-1">
-                            {llm.top_competitors.slice(0, 8).map(([name, count]) => (
-                              <Badge key={String(name)} variant="outline" className="text-[10px]">
-                                {String(name)} · {count}
-                              </Badge>
-                            ))}
+                          <div className="text-xs font-medium mb-1">
+                            Share of voice · last {sov?.days ?? 90} days
                           </div>
+                          {/*
+                            The subject is IN this list. It was a competitor tally before
+                            #349 A4 — the one brand the page belongs to had no share of its
+                            own voice, which is not a share of anything.
+                          */}
+                          <ul className="space-y-1">
+                            {sovRows.map((row) => (
+                              <li key={row.name} className="flex items-center gap-2 text-xs">
+                                <span className={`w-40 shrink-0 truncate ${row.isSubject ? 'font-medium' : 'text-muted-foreground'}`}>
+                                  {row.isSubject ? `${row.name} (you)` : row.name}
+                                </span>
+                                <span className="flex-1 h-1.5 rounded-sm bg-surface-sunken overflow-hidden">
+                                  <span
+                                    className={`block h-full ${row.isSubject ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+                                    style={{ width: `${Math.round(row.share * 100)}%` }}
+                                  />
+                                </span>
+                                <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">
+                                  {(row.share * 100).toFixed(0)}% · {row.count}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                          {sov?.truncated && (
+                            <div className="text-[11px] text-muted-foreground mt-1">
+                              Window capped — older runs are not counted.
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Opportunities */}
+            <TabsContent value="opportunities" className="mt-4 space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium">Where the citations are going</h4>
+                  <p className="text-xs text-muted-foreground">
+                    AI Overview presence, People-Also-Ask gaps, featured snippets and the
+                    competitors ranking on this subject's own terms.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => void loadOpportunities()} disabled={oppsLoading}>
+                  <Sparkles className={`h-3 w-3 mr-1 ${oppsLoading ? 'animate-spin' : ''}`} />
+                  {oppsLoading ? 'Scanning…' : opps ? 'Rescan' : 'Scan now'}
+                </Button>
+              </div>
+              <Card className="dashboard-card">
+                <CardContent className="p-4">
+                  {!opps ? (
+                    // Deliberately NOT auto-run: this is a live, metered SERP call. An
+                    // empty panel that costs nothing until asked is the honest default.
+                    <div className="text-sm text-muted-foreground">
+                      Not scanned yet. This runs a live search against the subject's terms and
+                      is billed per scan.
+                    </div>
+                  ) : opps.opportunities.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      Nothing surfaced for this subject in the last {opps.days} days.
+                      {Object.keys(opps.errors || {}).length > 0 && (
+                        <> Some sources failed: {Object.keys(opps.errors).join(', ')}.</>
+                      )}
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {opps.opportunities.map((o: Opportunity, i: number) => (
+                        <li key={`${o.type}-${i}`} className="border-b border-hairline pb-3 last:border-0 last:pb-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-[10px]">
+                                  {OPPORTUNITY_LABELS[o.type] || o.type}
+                                </Badge>
+                                <span className="text-sm font-medium">{o.title}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">{o.rationale}</p>
+                              <p className="text-xs mt-1"><strong>Do:</strong> {o.suggested_action}</p>
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                              {Math.round(o.priority_score)}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </CardContent>
               </Card>
