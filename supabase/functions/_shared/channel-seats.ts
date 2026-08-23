@@ -15,7 +15,7 @@
 // supabase-js returns a thenable builder from .rpc(), not a Promise, so this stays loose —
 // the same shape the other _shared helpers take.
 // deno-lint-ignore no-explicit-any
-type SupabaseLike = { rpc: (fn: string, args: Record<string, unknown>) => any };
+type SupabaseLike = { rpc: (fn: string, args: Record<string, unknown>) => any; from: (t: string) => any };
 
 export interface ChannelUsage {
   socialAccounts: number;
@@ -54,19 +54,47 @@ export interface SeatVerdict {
 }
 
 /**
+ * Can a seat actually be BOUGHT right now?
+ *
+ * A cap is only legitimate when there is a way past it. Channels is priced ($29 + $9/seat) but the
+ * Stripe product is not bound yet, so `activate-module` refuses the paid path outright — a
+ * workspace at the limit would be told to buy something that cannot be bought.
+ *
+ * Derived from the module row rather than a flag someone has to remember to flip: the day an
+ * operator binds the Stripe product, the cap starts enforcing by itself.
+ */
+async function seatsArePurchasable(supabase: SupabaseLike): Promise<boolean> {
+  const { data } = await supabase
+    .from('modules').select('addon_stripe_product_id').eq('slug', 'messaging').maybeSingle();
+  return Boolean(data?.addon_stripe_product_id);
+}
+
+/**
  * May this workspace connect ONE more channel?
  *
- * Fails OPEN when the usage read itself fails. This gate exists to protect a margin, not a
- * boundary: a DB hiccup that silently stopped every customer connecting an account would cost
- * far more than the $6 it saved, and the count is reconcilable after the fact. That is the
- * opposite of the entitlement and tenancy checks around it, which fail closed — the difference
- * is that those protect other people's data and this protects a cost line.
+ * Fails OPEN when the usage read itself fails. This gate protects a margin, not a boundary: a DB
+ * hiccup that silently stopped every customer connecting an account would cost far more than the
+ * $6 it saved, and the count is reconcilable after the fact. That is the opposite of the
+ * entitlement and tenancy checks beside it, which fail closed — those protect other people's
+ * data, this protects a cost line.
+ *
+ * It also declines to block while there is nothing to buy. Over-allowance still comes back in
+ * `usage`, so the admin cost view keeps showing exactly who is over and by how much — the
+ * measurement stays, only the wall goes away until the wall has a door.
  */
 export async function checkChannelSeat(supabase: SupabaseLike, workspaceId: string): Promise<SeatVerdict> {
   const usage = await getChannelUsage(supabase, workspaceId);
   if (!usage) return { ok: true, usage: null };
-
   if (usage.total < usage.allowance) return { ok: true, usage };
+
+  if (!(await seatsArePurchasable(supabase))) {
+    console.warn(
+      `[channel-seats] workspace ${workspaceId} is over its channel allowance `
+      + `(${usage.total}/${usage.allowance}) and seats cannot be bought yet — allowing the connect. `
+      + 'Bind the Channels Stripe product to start enforcing.',
+    );
+    return { ok: true, usage };
+  }
 
   return {
     ok: false,
