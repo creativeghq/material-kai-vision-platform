@@ -5,7 +5,6 @@
  *
  * AI providers (key validity):
  *   - Claude:      GET /v1/models          — no tokens consumed
- *   - OpenAI:      GET /v1/models          — no tokens consumed
  *   - SLIG (Modal): GET /health            — SigLIP2 visual embeddings endpoint
  *   - Voyage AI:   POST /v1/embeddings     — minimal single-word embedding
  *

@@ -46,7 +46,7 @@ export function createLogHelper(supabase: DbClient, runId: string) {
 }
 
 // ── ai_usage_logs writer ─────────────────────────────────────────────────────
-// Background agents call Anthropic / OpenAI / Gemini through runLangGraphAgent
+// Background agents call Anthropic / Gemini through runLangGraphAgent
 // but historically never wrote to ai_usage_logs, so the Operations dashboard
 // underreported background-agent spend by 100%. Helper centralizes the insert
 // and is fire-and-forget — never blocks or breaks the agent's hot path.
