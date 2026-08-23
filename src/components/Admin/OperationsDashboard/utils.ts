@@ -30,7 +30,6 @@ export const calculateCost = (model: string, inputTokens: number, outputTokens: 
 export const getProviderStyle = (provider: string) => {
   switch (provider) {
     case 'anthropic': return { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: '🧠' };
-    case 'openai': return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: '🤖' };
     case 'meta': return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', icon: '🦙' };
     case 'google': return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: '🔍' };
     default: return { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: '⚙️' };

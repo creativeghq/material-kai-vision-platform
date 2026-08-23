@@ -127,7 +127,6 @@ export type {
   BaseApiConfig,
   ReplicateApiConfig,
   SupabaseApiConfig,
-  OpenAIApiConfig,
   EnvironmentConfig,
 } from './apiConfig';
 

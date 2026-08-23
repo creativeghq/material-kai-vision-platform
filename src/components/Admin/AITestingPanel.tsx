@@ -693,7 +693,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                 <div className="space-y-2 text-sm">
                   <p>
                     • Use the <strong>Material Analysis Test</strong> to test
-                    hybrid OpenAI/Claude material recognition
+                    Claude material recognition
                   </p>
                   <p>
                     • For 3D generation testing, use the <strong>/agent-hub</strong> page

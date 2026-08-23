@@ -19,6 +19,7 @@
  * until the widget is near the viewport.
  */
 import { formatMoney } from '@/utils/decimal';
+import { referralLink } from './appOrigin';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
@@ -54,6 +55,8 @@ ul.rows .n { font-variant-numeric:tabular-nums; color:#6b6560; }
 .kv div { display:flex; justify-content:space-between; gap:10px; }
 .kv .k { color:#6b6560; }
 .err { font-size:13px; color:#a3341f; margin:0; }
+.attrib { margin:0; font-size:11px; color:#8b857f; }
+.attrib a { color:inherit; }
 .ok { font-size:13px; color:#2f7d50; margin:0; }
 @media (prefers-color-scheme: dark) {
   :host { color:#f2eef2; }
@@ -64,6 +67,7 @@ ul.rows .n { font-variant-numeric:tabular-nums; color:#6b6560; }
   button.go { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
   .result { border-color:#3d3745; }
   .err { color:#f08a72; } .ok { color:#4fbe7e; }
+  .attrib { color:#8b8394; }
 }
 `;
 
@@ -74,6 +78,14 @@ export class MaterialKaiAssistant extends HTMLElement {
   private result: Record<string, unknown> | null = null;
   private busy = false;
   private ask: AskState = { asking: false, answer: null, pending: false };
+  /**
+   * The embedder's referral code, when their workspace has one enabled.
+   *
+   * This is the half of attribution the key cannot do on its own. A visitor who requests a quote
+   * today already belongs to the embedder; this is the one who reads a calculator, leaves, and
+   * signs up later — the code makes them the embedder's CLIENT rather than an anonymous arrival.
+   */
+  private referralCode: string | null = null;
   private failure = '';
   private started = false;
   private disposed = false;
@@ -130,6 +142,7 @@ export class MaterialKaiAssistant extends HTMLElement {
       // a form, and a form the visitor did not ask for is noise on a product page — it appears
       // after a result, where asking for it makes sense.
       this.tools = (body?.tools ?? []).filter((t: PublicToolInfo) => !t.writes);
+      this.referralCode = typeof body?.referral_code === 'string' ? body.referral_code : null;
     } catch {
       this.failure = 'Could not reach the assistant.';
     }
@@ -227,6 +240,89 @@ export class MaterialKaiAssistant extends HTMLElement {
         const n = document.createElement('span');
         n.className = 'n';
         n.textContent = formatMoney(Number(sec.total ?? 0), currency);
+        li.append(l, n);
+        ul.appendChild(li);
+      }
+      box.appendChild(ul);
+    }
+    return box;
+  }
+
+  private renderHeatPumpResult(r: Record<string, unknown>): HTMLElement {
+    const box = document.createElement('div');
+    box.className = 'result';
+    const range = (r.recommendedRange ?? {}) as Record<string, unknown>;
+
+    const h = document.createElement('div');
+    h.className = 'headline';
+    // The RANGE is the answer, not the raw load: nobody buys a 7.3 kW heat pump.
+    h.textContent = range.minKW != null
+      ? `${range.minKW}–${range.maxKW} kW`
+      : `${Number(r.totalDesignKW ?? 0)} kW`;
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = `Design load ${Number(r.totalDesignKW ?? 0)} kW · flow temperature ${Number(r.flowTempC ?? 0)}°C`;
+    box.append(h, sub);
+
+    const ul = document.createElement('ul');
+    ul.className = 'rows';
+    for (const [label, value] of [
+      ['Space heating', `${Number(r.spaceHeatingKW ?? 0)} kW`],
+      ['Hot water', `${Number(r.dhwKW ?? 0)} kW`],
+      ['Specific load', `${Number(r.effectiveWattsPerM2 ?? 0)} W/m²`],
+    ] as Array<[string, string]>) {
+      const li = document.createElement('li');
+      const l = document.createElement('span');
+      l.textContent = label;
+      const n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = value;
+      li.append(l, n);
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+
+    // The caveat travels with the number. A sizing figure shown without what it assumed is the
+    // kind of confident answer that gets somebody the wrong unit.
+    if (typeof r.emitterNote === 'string' && r.emitterNote) {
+      const note = document.createElement('div');
+      note.className = 'sub';
+      note.textContent = r.emitterNote;
+      box.appendChild(note);
+    }
+    return box;
+  }
+
+  private renderHeatingCostResult(r: Record<string, unknown>): HTMLElement {
+    const box = document.createElement('div');
+    box.className = 'result';
+    const methods = (r.methods ?? []) as Array<Record<string, unknown>>;
+    const cheapest = (r.cheapest ?? {}) as Record<string, unknown>;
+
+    const h = document.createElement('div');
+    h.className = 'headline';
+    h.textContent = cheapest.annualCostEur != null
+      ? formatMoney(Number(cheapest.annualCostEur), 'EUR')
+      : '—';
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = cheapest.label
+      ? `${String(cheapest.label)} is cheapest per year`
+      : 'Annual running cost';
+    box.append(h, sub);
+
+    if (methods.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'rows';
+      // Ranked, with the gap to the cheapest — the comparison IS the tool.
+      for (const m of methods.slice(0, 6)) {
+        const li = document.createElement('li');
+        const l = document.createElement('span');
+        const pct = Number(m.pctVsCheapest ?? 0);
+        l.textContent = pct > 0 ? `${String(m.label)} (+${pct}%)` : String(m.label);
+        const n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = formatMoney(Number(m.annualCostEur ?? 0), 'EUR');
         li.append(l, n);
         ul.appendChild(li);
       }
@@ -398,6 +494,8 @@ export class MaterialKaiAssistant extends HTMLElement {
       case 'price_my_spec': return this.renderSpecResult(this.result);
       case 'calculate_kitchen_cost': return this.renderKitchenResult(this.result);
       case 'material_search': return this.renderSearchResult(this.result);
+      case 'calculate_heat_pump_sizing': return this.renderHeatPumpResult(this.result);
+      case 'calculate_heating_cost_comparison': return this.renderHeatingCostResult(this.result);
       default: return this.renderUnknown(this.result);
     }
   }
@@ -408,7 +506,11 @@ export class MaterialKaiAssistant extends HTMLElement {
     const form = document.createElement('div');
     form.className = 'form';
     const fields: Array<{ key: string; label: string; type: string; placeholder?: string }> =
-      this.active === 'calculate_kitchen_cost'
+      this.active === 'calculate_heat_pump_sizing'
+        ? [{ key: 'floor_area_m2', label: 'Floor area (m²)', type: 'number', placeholder: '120' }]
+        : this.active === 'calculate_heating_cost_comparison'
+          ? [{ key: 'floor_area_m2', label: 'Floor area (m²)', type: 'number', placeholder: '120' }]
+          : this.active === 'calculate_kitchen_cost'
         ? [{ key: 'run_length_m', label: 'How many metres of base units?', type: 'number', placeholder: '4' }]
         : [{ key: 'q', label: this.active === 'material_search' ? 'What are you looking for?' : 'Describe what you want', type: 'text', placeholder: 'oak kitchen worktop' }];
 
@@ -432,7 +534,22 @@ export class MaterialKaiAssistant extends HTMLElement {
     go.disabled = this.busy;
     go.addEventListener('click', () => {
       const active = this.active!;
-      if (active === 'calculate_kitchen_cost') {
+      if (active === 'calculate_heat_pump_sizing') {
+        // Defaults for everything the visitor was not asked: one question is the most a widget on
+        // somebody else's page can ask for before it stops being used at all. The tool states its
+        // assumptions back, and `renderHeatPumpResult` shows them.
+        void this.run(active, {
+          floor_area_m2: Number(values.floor_area_m2) || 0,
+          insulation_level: 'average',
+          emitter: 'radiators',
+          include_dhw: true,
+        });
+      } else if (active === 'calculate_heating_cost_comparison') {
+        void this.run(active, {
+          floor_area_m2: Number(values.floor_area_m2) || 0,
+          insulation_level: 'average',
+        });
+      } else if (active === 'calculate_kitchen_cost') {
         void this.run(active, { run_length_m: Number(values.run_length_m) || 0 });
       } else if (active === 'material_search') {
         void this.run(active, { query: values.q ?? '' });
@@ -498,7 +615,27 @@ export class MaterialKaiAssistant extends HTMLElement {
     if (result) card.appendChild(result);
     if (result) this.renderAsk(card);
 
+    card.appendChild(this.renderAttribution());
     this.root.replaceChildren(style, card);
+  }
+
+  /**
+   * The quid pro quo of the free tools, stated on the page.
+   *
+   * The embedder gets working tools and every lead they produce; we get an attributed way back.
+   * Rendered plainly rather than hidden — a visitor should be able to see whose calculator this is,
+   * and an embedder should be able to see what they are giving in exchange for it.
+   */
+  private renderAttribution(): HTMLElement {
+    const p = document.createElement('p');
+    p.className = 'attrib';
+    const a = document.createElement('a');
+    a.href = referralLink('/tools', this.referralCode);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'MaterialKai';
+    p.append(document.createTextNode('Powered by '), a);
+    return p;
   }
 }
 

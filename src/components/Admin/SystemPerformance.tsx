@@ -46,9 +46,7 @@ interface SystemMetrics {
   success_rate: number;
   error_rate: number;
   ai_model_performance: {
-    openai_success: number;
     claude_success: number;
-    openai_avg_time: number;
     claude_avg_time: number;
   };
 }
@@ -122,9 +120,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
     success_rate: 0,
     error_rate: 0,
     ai_model_performance: {
-      openai_success: 0,
+
       claude_success: 0,
-      openai_avg_time: 0,
+
       claude_avg_time: 0,
     },
   });
@@ -323,17 +321,12 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
         analyticsData?.filter((e: unknown) =>
           (e as any).event_type.includes('hybrid'),
         ) || [];
-      let openaiCount = 0,
-        claudeCount = 0,
-        openaiTime = 0,
+      let claudeCount = 0,
         claudeTime = 0;
 
       hybridEvents.forEach((event: any) => {
         const data = event.event_data as Record<string, unknown>;
-        if (data?.final_provider === 'openai') {
-          openaiCount++;
-          openaiTime += Number(data?.processing_time_ms) || 0;
-        } else if (data?.final_provider === 'claude') {
+        if (data?.final_provider === 'claude') {
           claudeCount++;
           claudeTime += Number(data?.processing_time_ms) || 0;
         }
@@ -346,10 +339,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
         success_rate: Math.round(Number(js.success_rate) || 0),
         error_rate: Math.round(Number(js.error_rate) || 0),
         ai_model_performance: {
-          openai_success: openaiCount,
           claude_success: claudeCount,
-          openai_avg_time:
-            openaiCount > 0 ? Math.round(openaiTime / openaiCount) : 0,
           claude_avg_time:
             claudeCount > 0 ? Math.round(claudeTime / claudeCount) : 0,
         },
@@ -868,29 +858,6 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                   <div className="space-y-4">
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">OpenAI</span>
-                        <Badge className="border border-border bg-background text-foreground">
-                          {metrics.ai_model_performance.openai_success}{' '}
-                          completions
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Avg Response Time</span>
-                        <span>
-                          {metrics.ai_model_performance.openai_avg_time}ms
-                        </span>
-                      </div>
-                      <Progress
-                        value={
-                          metrics.ai_model_performance.openai_success > 0
-                            ? 85
-                            : 0
-                        }
-                        className="h-2 mt-1"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium">Claude</span>
                         <Badge className="border border-border bg-background text-foreground">
                           {metrics.ai_model_performance.claude_success}{' '}
@@ -922,19 +889,6 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-sm">OpenAI Efficiency</span>
-                      <span className="font-mono text-sm">
-                        {metrics.ai_model_performance.openai_avg_time > 0
-                          ? Math.round(
-                              (1000 /
-                                metrics.ai_model_performance.openai_avg_time) *
-                                100,
-                            ) / 100
-                          : 0}{' '}
-                        req/s
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-sm">Claude Efficiency</span>
                       <span className="font-mono text-sm">
                         {metrics.ai_model_performance.claude_avg_time > 0
@@ -953,8 +907,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                         {/* Both sides of this ratio come from the same recent analytics-event
                             window — pairing it with an all-time total would read as ~0%. */}
                         {Math.round(
-                          ((metrics.ai_model_performance.openai_success +
-                            metrics.ai_model_performance.claude_success) /
+                          (metrics.ai_model_performance.claude_success /
                             Math.max(metrics.ai_events_sampled, 1)) *
                             100,
                         )}

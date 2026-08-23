@@ -24,7 +24,13 @@ export interface DocumentChunkingConfig {
 }
 
 export interface EmbeddingGenerationConfig {
-  provider: 'openai' | 'huggingface' | 'local';
+  /**
+   * `voyage` is the only one this platform actually uses — it is the sole embedding
+   * provider, and OpenAI was removed outright on 2026-08-23. The other two are kept
+   * because this config type also describes non-default deployments; `openai` is not,
+   * because there is no longer any code that could honour it.
+   */
+  provider: 'voyage' | 'huggingface' | 'local';
   model: string;
   dimensions: number;
   batchSize: number;

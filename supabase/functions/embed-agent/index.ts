@@ -34,7 +34,7 @@ import { captureException } from '../_shared/sentry.ts';
 import { authenticateEmbedKey, embedJson } from '../_shared/embed-key.ts';
 import { embedCorsHeaders } from '../_shared/cors.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
-import { PUBLIC_TOOLS, PUBLIC_TOOL_NAMES, buildPublicTools } from '../_shared/embed-agent-tools.ts';
+import { buildPublicTools, toolsForKey } from '../_shared/embed-agent-tools.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 // ONE model turn goes through the shared client (CLAUDE.md: which client makes the model call) —
 // it constructs the provider lazily so bootstrapped secrets are seen, and books the tokens.
@@ -122,22 +122,75 @@ Deno.serve(withApiLogging((req) => {
     // reaches the only action that writes.
     const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY')
       .catch(() => ({ value: null })))?.value ?? null;
+
+    const { data: keyRow } = await supabase
+      .from('material_kai_keys')
+      .select('key_kind, tools_enabled, paid_tools_enabled, workspace_id')
+      .eq('id', auth.ctx.keyId)
+      .maybeSingle();
+
+    // THE REFERRAL CODE, so every link this widget renders back to us carries it.
+    //
+    // Attribution here is deliberately TWO records that are not the same fact. The LEAD belongs to
+    // this key's workspace and always has — that is what `raise_quote_request` writes and it cannot
+    // be redirected. This is the other half: a visitor who follows a link from the embedder's site
+    // and later signs up becomes a workspace UNDER them, through the referral path that already
+    // exists (`/auth?mode=signup&ref=`). Null when the workspace has never minted one; the widget
+    // then links plainly rather than inventing a code.
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('referral_code, referral_enabled')
+      .eq('id', auth.ctx.workspaceId)
+      .maybeSingle();
+
     return embedJson({
       ok: true,
-      tools: PUBLIC_TOOLS.map((t) => ({ name: t.name, label: t.label, writes: t.writes })),
+      tools: toolsForKey(keyRow ?? {}).map((t) => ({
+        name: t.name,
+        label: t.label,
+        writes: t.writes,
+      })),
       turnstile_site_key: siteKey,
+      referral_code: ws?.referral_enabled ? (ws.referral_code ?? null) : null,
     }, 200, cors);
   }
 
   if (action === 'run') {
     const name = String(params.tool ?? '').trim();
-    if (!PUBLIC_TOOL_NAMES.has(name)) {
-      // The allowlist answers before anything is constructed. Naming an unknown tool and naming a
-      // real tool this surface does not expose get the SAME answer, so the endpoint cannot be used
-      // to enumerate what the platform has.
+
+    // THE SAME FILTER `capabilities` ADVERTISED, re-asked here.
+    //
+    // Offering the list is a convenience; this is the gate. Checking only on the listing would
+    // make it decorative — a caller can name any tool it likes, and the one thing standing between
+    // a free-calculator key and a paid MIVAA search is that this question is asked again about the
+    // one tool actually being run.
+    const { data: keyRow } = await supabase
+      .from('material_kai_keys')
+      .select('key_kind, tools_enabled, paid_tools_enabled, daily_usd_cap')
+      .eq('id', auth.ctx.keyId)
+      .maybeSingle();
+
+    const allowed = toolsForKey(keyRow ?? {});
+    const spec = allowed.find((t) => t.name === name);
+    if (!spec) {
+      // A tool that does not exist, a tool this surface never exposes, and a tool this KEY may not
+      // run all get the same answer. Distinguishing them would turn the endpoint into a map of
+      // both the platform and the merchant's billing settings.
       return embedJson({ error: 'Unknown tool' }, 400, cors);
     }
-    const spec = PUBLIC_TOOLS.find((t) => t.name === name)!;
+
+    // Anything that costs money checks the ONE budget before it runs (invariant 10), and fails
+    // closed. The zero-cost calculators never reach this, so a free key cannot be rate-limited by
+    // a ceiling that has nothing to do with it.
+    if (spec.upstreamCostUsd > 0) {
+      const { data: headroom, error: capErr } = await supabase.rpc('embed_spend_has_headroom', {
+        p_key_id: auth.ctx.keyId,
+        p_cap: keyRow?.daily_usd_cap ?? 1,
+      });
+      if (capErr || headroom !== true) {
+        return embedJson({ ok: true, available: false, reason: 'daily_cap' }, 200, cors);
+      }
+    }
 
     // The one write is bot-gated BEFORE the tool is built, let alone invoked — it mints a CRM
     // contact, which is exactly the shape the storefront had to protect.
@@ -181,6 +234,14 @@ Deno.serve(withApiLogging((req) => {
           parsed = { success: true, text: result };
         }
       }
+      // Charged AFTER the fact at the measured rate, against the same ceiling the ask turn draws
+      // on. One budget per key, so a merchant answers "what can this cost me in a day" once.
+      if (spec.upstreamCostUsd > 0) {
+        await supabase.rpc('embed_spend_record', {
+          p_key_id: auth.ctx.keyId,
+          p_usd: spec.upstreamCostUsd,
+        });
+      }
       return embedJson({ ok: true, tool: name, result: parsed }, 200, cors);
     } catch (e) {
       // Never leak an internal message to a stranger's page, and never swallow it either — a tool
@@ -211,7 +272,7 @@ Deno.serve(withApiLogging((req) => {
   if (action === 'ask') {
     const { data: keyRow } = await supabase
       .from('material_kai_keys')
-      .select('chat_enabled, chat_daily_usd_cap')
+      .select('chat_enabled, daily_usd_cap')
       .eq('id', auth.ctx.keyId)
       .maybeSingle();
 
@@ -228,9 +289,9 @@ Deno.serve(withApiLogging((req) => {
     // is reached", which can overshoot by at most one turn — a turn's cost is unknowable until it
     // has happened, and claiming a hard ceiling we cannot enforce would be worse than a stated
     // one-turn tolerance.
-    const { data: headroom, error: capErr } = await supabase.rpc('embed_chat_has_headroom', {
+    const { data: headroom, error: capErr } = await supabase.rpc('embed_spend_has_headroom', {
       p_key_id: auth.ctx.keyId,
-      p_cap: keyRow.chat_daily_usd_cap ?? 1,
+      p_cap: keyRow.daily_usd_cap ?? 1,
     });
     // Fail CLOSED: an errored budget check is not evidence of budget.
     if (capErr || headroom !== true) {
@@ -281,8 +342,8 @@ Deno.serve(withApiLogging((req) => {
       const usd = price
         ? (answer.usage.inputTokens / 1_000_000) * price.input
           + (answer.usage.outputTokens / 1_000_000) * price.output
-        : Number(keyRow.chat_daily_usd_cap ?? 1);
-      await supabase.rpc('embed_chat_record_spend', { p_key_id: auth.ctx.keyId, p_usd: usd });
+        : Number(keyRow.daily_usd_cap ?? 1);
+      await supabase.rpc('embed_spend_record', { p_key_id: auth.ctx.keyId, p_usd: usd });
 
       return embedJson({ ok: true, available: true, answer: answer.text }, 200, cors);
     } catch (e) {

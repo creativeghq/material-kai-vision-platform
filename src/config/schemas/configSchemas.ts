@@ -30,7 +30,7 @@ export const DocumentChunkingConfigSchema = z.object({
 });
 
 export const EmbeddingGenerationConfigSchema = z.object({
-  provider: z.enum(['openai', 'huggingface', 'local']),
+  provider: z.enum(['voyage', 'huggingface', 'local']),
   model: z.string().min(1),
   dimensions: z.number().min(1).max(4096),
   batchSize: z.number().min(1).max(100),

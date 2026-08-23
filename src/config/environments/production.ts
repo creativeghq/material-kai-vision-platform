@@ -22,9 +22,11 @@ export const productionConfig: AppConfig = {
       splitStrategy: 'sentence',
     },
     embeddingGeneration: {
-      provider: 'openai',
-      model: 'text-embedding-ada-002',
-      dimensions: 1536,
+      // Voyage, at 1024D. This said `openai` / `text-embedding-ada-002` / 1536 —
+         // config for a provider the platform removed and a dimension nothing uses.
+      provider: 'voyage',
+      model: 'voyage-4',
+      dimensions: 1024,
       batchSize: 20,
       timeout: 60000,
       retryAttempts: 5,

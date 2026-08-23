@@ -11,7 +11,6 @@ import { Singleton } from '../core/patterns/Singleton';
 
 import { replicateConfig } from './apis/replicateConfig';
 import { supabaseConfig } from './apis/supabaseConfig';
-import { openaiConfig } from './apis/openaiConfig';
 
 // Environment configuration
 export interface EnvironmentConfig {
@@ -65,24 +64,10 @@ export interface SupabaseApiConfig extends BaseApiConfig {
   };
 }
 
-// OpenAI API specific configuration
-export interface OpenAIApiConfig extends BaseApiConfig {
-  type: 'openai';
-  models: {
-    [modelId: string]: {
-      maxTokens: number;
-      inputSchema: z.ZodSchema;
-      outputSchema: z.ZodSchema;
-      costPerToken?: number;
-    };
-  };
-}
-
 // Union type for all API configurations
 export type ApiConfig =
   | ReplicateApiConfig
-  | SupabaseApiConfig
-  | OpenAIApiConfig;
+  | SupabaseApiConfig;
 
 // API Registry - centralized store for all API configurations
 export class ApiRegistry extends Singleton {
@@ -99,7 +84,6 @@ export class ApiRegistry extends Singleton {
     // Register all API configurations
     this.registerApi(replicateConfig);
     this.registerApi(supabaseConfig);
-    this.registerApi(openaiConfig);
   }
 
   protected cleanup(): void {

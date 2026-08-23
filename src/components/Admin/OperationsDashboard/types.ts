@@ -1,7 +1,7 @@
 export interface ModelConfig {
   id: string;
   name: string;
-  provider: 'anthropic' | 'openai' | 'meta' | 'google';
+  provider: 'anthropic' | 'meta' | 'google';
   model: string;
   inputCostPer1M: number;
   outputCostPer1M: number;

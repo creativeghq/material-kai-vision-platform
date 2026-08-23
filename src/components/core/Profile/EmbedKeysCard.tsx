@@ -31,7 +31,8 @@ import {
   embedKeysService, normalizeOriginList, isWildcardOriginList,
   listScopeCategories, searchScopeProducts, listScopeBlueprints,
   MAX_RATE_LIMIT_PER_MINUTE, DEFAULT_GENERATION_DAILY_CAP, MAX_GENERATION_DAILY_CAP,
-  type EmbedKey, type EmbedScopeType, type EmbedScopeOption,
+  DEFAULT_DAILY_USD_CAP, MAX_DAILY_USD_CAP,
+  type EmbedKey, type EmbedScopeType, type EmbedScopeOption, type EmbedKeyKind,
   type EmbedAnalyticsSummary,
 } from '@/services/embedKeysService';
 
@@ -110,6 +111,7 @@ export const EmbedKeysCard: React.FC = () => {
     name: '', origins: '', rate: DEFAULT_RATE, allowAny: false,
     scopeType: 'all' as EmbedScopeType, scopeValues: [] as string[],
     allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
+    kind: 'catalog' as EmbedKeyKind, paidTools: false, usdCap: DEFAULT_DAILY_USD_CAP,
   });
 
   // Scope pickers. Categories are a short fixed list (a global taxonomy, ~a dozen entries), so they
@@ -180,6 +182,7 @@ export const EmbedKeysCard: React.FC = () => {
   const resetForm = () => {
     setForm({
       name: '', origins: '', rate: DEFAULT_RATE, allowAny: false, scopeType: 'all', scopeValues: [],
+      kind: 'catalog', paidTools: false, usdCap: DEFAULT_DAILY_USD_CAP,
       allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
     });
     setProductTerm('');
@@ -205,7 +208,7 @@ export const EmbedKeysCard: React.FC = () => {
     // The CHECK rejects a scoped key with an empty list, and a key that serves nothing is a
     // support ticket rather than a configuration — catch it here with a sentence instead of a
     // constraint error.
-    if (form.scopeType !== 'all' && form.scopeValues.length === 0) {
+    if (form.kind !== 'tools' && form.scopeType !== 'all' && form.scopeValues.length === 0) {
       toast({
         title: form.scopeType === 'categories'
           ? 'Pick at least one category'
@@ -221,6 +224,10 @@ export const EmbedKeysCard: React.FC = () => {
         key_name: form.name,
         allowed_origins: origins,
         rate_limit_per_minute: form.rate,
+        key_kind: form.kind,
+        tools_enabled: form.kind === 'tools',
+        paid_tools_enabled: form.paidTools,
+        daily_usd_cap: form.usdCap,
         scope_type: form.scopeType,
         scope_values: form.scopeValues,
         allow_generation: form.allowGeneration,
@@ -543,7 +550,42 @@ export const EmbedKeysCard: React.FC = () => {
               </div>
             </div>
 
+            {/*
+              WHAT THE KEY GRANTS, asked before what it is scoped to — they are different questions
+              and the second one is meaningless for a tools key. An architect embedding a heat-pump
+              sizer has no catalogue to slice, and asking them to pick one is how a form teaches
+              somebody that a product is not for them.
+            */}
             <div className="space-y-2">
+              <Label>What this key is for</Label>
+              <RadioGroup
+                className="space-y-1.5"
+                value={form.kind}
+                onValueChange={(v) => setForm((f) => ({
+                  ...f, kind: v as EmbedKeyKind, scopeValues: [], scopeType: 'all',
+                }))}
+              >
+                {([
+                  ['catalog', 'My catalogue', 'Show your published products, 3D models or configurators on your own site.'],
+                  ['tools', 'The free tools', 'A calculator or sizer on your site. Serves none of your catalogue — and every enquiry it produces lands in this workspace.'],
+                ] as const).map(([value, title, help]) => (
+                  <label
+                    key={value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
+                      form.kind === value ? 'border-primary' : 'border-border/60'
+                    }`}
+                  >
+                    <RadioGroupItem value={value} id={`embed-kind-${value}`} className="mt-1" />
+                    <span className="space-y-0.5">
+                      <span className="block text-sm font-medium">{title}</span>
+                      <span className="block text-xs text-muted-foreground">{help}</span>
+                    </span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className={`space-y-2 ${form.kind === 'tools' ? 'hidden' : ''}`}>
               <Label>What this key can show</Label>
               <RadioGroup
                 className="space-y-1.5"
@@ -656,6 +698,45 @@ export const EmbedKeysCard: React.FC = () => {
                 value={form.rate}
                 onChange={(e) => setForm((f) => ({ ...f, rate: Number(e.target.value) }))}
               />
+            </div>
+
+            {/*
+              Tools that cost money, and the ONE budget everything spendable on this key draws on.
+              Phrased as a cost rather than a feature, and off by default: the free calculators work
+              without this, so a merchant can decline it and still have a working widget.
+            */}
+            <div className="space-y-1.5 rounded-md border border-border/60 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="embed-key-paid-tools" className="text-sm">Tools that cost money</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Catalogue search and the written answers. The calculators are free and always
+                    work; these bill per use and are triggered by your visitors, not by you.
+                  </p>
+                </div>
+                <Switch
+                  id="embed-key-paid-tools"
+                  checked={form.paidTools}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, paidTools: v }))}
+                />
+              </div>
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="embed-key-usd">Most per day (USD)</Label>
+                <Input
+                  id="embed-key-usd"
+                  type="number"
+                  min={0}
+                  step={0.25}
+                  max={MAX_DAILY_USD_CAP}
+                  value={form.usdCap}
+                  onChange={(e) => setForm((f) => ({ ...f, usdCap: Number(e.target.value) }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  One ceiling for everything this key can spend in a day. Roughly a hundred written
+                  answers at $0.50. Once it is reached the widget quietly stops offering them; the
+                  free tools keep working.
+                </p>
+              </div>
             </div>
 
             {/* The only control here that spends money. Off by default and phrased as a cost, not

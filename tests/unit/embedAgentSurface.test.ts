@@ -80,7 +80,10 @@ describe('the endpoint enforces the boundary rather than describing it', () => {
   const fn = read('supabase/functions/embed-agent/index.ts');
 
   it('checks the allowlist before building any tool', () => {
-    expect(fn).toContain('PUBLIC_TOOL_NAMES.has(name)');
+    // Since the free-tools key, the allowlist is resolved PER KEY rather than globally — a tools
+    // key may not run what a catalogue key may, and a free key may not run what costs money. The
+    // property guarded is unchanged: nothing is constructed until the name has been approved.
+    expect(fn).toContain('toolsForKey');
     // An unknown tool and a real-but-not-exposed tool must give the same answer, or the endpoint
     // enumerates the platform.
     expect(fn).toContain("'Unknown tool'");
@@ -89,7 +92,7 @@ describe('the endpoint enforces the boundary rather than describing it', () => {
   it('bot-gates the write before the tool is constructed', () => {
     const runBlock = fn.slice(fn.indexOf("if (action === 'run')"));
     const gateAt = runBlock.indexOf('verifyTurnstile');
-    const buildAt = runBlock.indexOf('buildPublicTools');
+    const buildAt = runBlock.indexOf('buildPublicTools(');
     expect(gateAt).toBeGreaterThan(-1);
     expect(buildAt).toBeGreaterThan(-1);
     expect(gateAt).toBeLessThan(buildAt);
@@ -134,7 +137,7 @@ describe('the one model turn is capped in money and cannot reach anything', () =
 
   it('checks the dollar ceiling BEFORE the model call, and fails closed', () => {
     const ask = code.slice(code.indexOf("if (action === 'ask')"));
-    const capAt = ask.indexOf('embed_chat_has_headroom');
+    const capAt = ask.indexOf('embed_spend_has_headroom');
     const callAt = ask.indexOf('generateWithClaude');
     expect(capAt).toBeGreaterThan(-1);
     expect(callAt).toBeGreaterThan(-1);
@@ -176,7 +179,8 @@ describe('the one model turn is capped in money and cannot reach anything', () =
     // A null price means the cost is UNKNOWN, not zero — charging it at the cap stops an unpriced
     // model becoming a free-spending hole.
     const ask = code.slice(code.indexOf("if (action === 'ask')"));
-    expect(ask).toMatch(/:\s*Number\(keyRow\.chat_daily_usd_cap/);
-    expect(ask).toContain('embed_chat_record_spend');
+    // Renamed to `daily_usd_cap` when the ask turn and the paid tools were put on ONE budget.
+    expect(ask).toMatch(/:\s*Number\(keyRow\.daily_usd_cap/);
+    expect(ask).toContain('embed_spend_record');
   });
 });

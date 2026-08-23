@@ -37,6 +37,8 @@ import {
   applyMaterialOverrides, cloneSceneWithOwnMaterials, type MaterialOverride,
 } from '@/components/features/ar/materialOverrides';
 import { formatMoney } from '@/utils/decimal';
+// Shared with <materialkai-assistant> (#382 follow-up) — two widgets needed the same derivation.
+import { appOrigin } from './appOrigin';
 // The tenant's lighting rigs. Plain import-free constants, so a React-free bundle takes them as-is
 // — and importing them is what stops the widget growing a second opinion about what
 // "natural daylight" means.
@@ -550,7 +552,7 @@ export class MaterialKaiProduct extends HTMLElement {
       plan.className = 'btn';
       plan.target = '_blank';
       plan.rel = 'noopener';
-      plan.href = `${this.appOrigin()}/embed/planner`
+      plan.href = `${appOrigin()}/embed/planner`
         + `?key=${encodeURIComponent(this.getAttribute('api-key') ?? '')}`
         + `&product=${encodeURIComponent(this.getAttribute('product-id') ?? '')}`;
       plan.textContent = 'Plan your room';
@@ -614,24 +616,6 @@ export class MaterialKaiProduct extends HTMLElement {
   }
 
   /** Fire-and-forget telemetry. Never blocks, never surfaces, never throws into the host page. */
-  /**
-   * Where the hosted pages live.
-   *
-   * Derived from the script tag's own src rather than hardcoded: the widget is served from the app
-   * origin, so whatever loaded this bundle is the right host for the planner too. A constant would
-   * be wrong on staging and in any self-hosted deployment.
-   */
-  private appOrigin(): string {
-    const src = (document.currentScript as HTMLScriptElement | null)?.src
-      ?? Array.from(document.querySelectorAll('script'))
-        .map((s) => s.src)
-        .find((u) => u.includes('materialkai-product'));
-    try {
-      if (src) return new URL(src).origin;
-    } catch { /* fall through to the page's own origin */ }
-    return location.origin;
-  }
-
   private track(eventType: string) {
     const productId = this.getAttribute('product-id');
     const apiKey = this.getAttribute('api-key');

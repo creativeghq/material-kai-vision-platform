@@ -11,7 +11,6 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'claude-opus-4-8':            { input: 15.00, output: 75.00 },
   'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
-  // OpenAI Embeddings (chat models removed — platform uses Claude only)
   'text-embedding-3-small': { input: 0.02, output: 0.00 },
   'text-embedding-3-large': { input: 0.13, output: 0.00 },
 
@@ -24,8 +23,6 @@ export const MODEL_CONFIGS: ModelConfig[] = [
   { id: 'claude-opus-4-8',            name: 'Claude Opus 4.8',   provider: 'anthropic', model: 'claude-opus-4-8',            inputCostPer1M: 15.00, outputCostPer1M: 75.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Agent Chat', 'High-stakes Validation', 'Consensus Extraction'], totalInputTokens: 0, totalOutputTokens: 0 },
   { id: 'claude-haiku-4-5',  name: 'Claude Haiku 4.5',  provider: 'anthropic', model: 'claude-haiku-4-5',  inputCostPer1M:  1.00, outputCostPer1M:  5.00, speed: 'fast',   usedFor: ['Background Agents', 'Query Parsing', 'Reranking'], totalInputTokens: 0, totalOutputTokens: 0 },
 
-  // OpenAI Embeddings only
-  { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
 
   // Image classification + vision analysis both run on Claude Opus 4.8
   // (already listed under Anthropic above).

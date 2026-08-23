@@ -99,7 +99,6 @@ interface HealthStatus {
     embeddings?: AIServiceHealth;
     ai_services?: AIServiceHealth;
     claude?: AIServiceHealth;
-    chatgpt?: AIServiceHealth;
     slig?: AIServiceHealth;
     paddleocr?: AIServiceHealth;
     voyage_ai?: AIServiceHealth;
@@ -242,7 +241,6 @@ export const SystemHealthMonitor: React.FC = () => {
 
       // Extract results from edge function
       const claudeResult      = edgeResults?.claude      ?? null;
-      const openaiResult      = edgeResults?.openai      ?? null;
       const hfResult          = edgeResults?.slig ?? null;
       const paddleResult      = edgeResults?.paddleocr  ?? null;
       const voyageResult      = edgeResults?.voyage_ai   ?? null;
@@ -301,7 +299,6 @@ export const SystemHealthMonitor: React.FC = () => {
 
       data.ai_services = {
         claude: fromCheck(claudeResult),
-        chatgpt: fromCheck(openaiResult),
         slig: fromCheck(hfResult),
         paddleocr: fromCheck(paddleResult),
         voyage_ai: fromCheck(voyageResult),
@@ -324,7 +321,7 @@ export const SystemHealthMonitor: React.FC = () => {
       // being refused at SMTP time with nothing in this platform to show for it.
       const cloudflareDown = cloudflareResult?.status === 'unhealthy';
       const cloudflareDegraded = cloudflareResult?.status === 'degraded';
-      const degraded = openaiResult?.status === 'unhealthy' || hfResult?.status === 'unhealthy'
+      const degraded = hfResult?.status === 'unhealthy'
         || voyageResult?.status === 'unhealthy' || providerDown || cloudflareDown || cloudflareDegraded;
       // Checks that did not run cannot vote healthy. `unknown` outranks `healthy` and yields to a
       // real failure, so a board with unmeasured subsystems never reads as all-clear.
@@ -841,31 +838,6 @@ export const SystemHealthMonitor: React.FC = () => {
                   )}
                   {health.ai_services.claude?.error && health.ai_services.claude.error !== 'API key not configured' && (
                     <span className="text-red-600 truncate" title={health.ai_services.claude.error}>{health.ai_services.claude.error}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* ChatGPT (OpenAI) — real API key check */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🤖</span>
-                    <span className="text-sm font-medium text-green-900">ChatGPT</span>
-                  </div>
-                  {health.ai_services.chatgpt?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
-                  ) : health.ai_services.chatgpt?.error === 'API key not configured' ? (
-                    <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
-                  ) : (
-                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-green-700">
-                  {health.ai_services.chatgpt?.latency_ms != null && (
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.chatgpt.latency_ms}ms</span>
-                  )}
-                  {health.ai_services.chatgpt?.error && health.ai_services.chatgpt.error !== 'API key not configured' && (
-                    <span className="text-red-600 truncate" title={health.ai_services.chatgpt.error}>{health.ai_services.chatgpt.error}</span>
                   )}
                 </div>
               </div>

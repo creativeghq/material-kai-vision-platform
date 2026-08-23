@@ -1083,7 +1083,7 @@ const OperationsDashboardInner: React.FC = () => {
           <TabsContent value="services-billing" className="space-y-4">
             <SectionHeader
               title="3rd Party Services"
-              subtitle="Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google, OpenAI) see AI Configurations → Performance."
+              subtitle="Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google) see AI Configurations → Performance."
             />
 
             {/* API Catalogue — static reference */}

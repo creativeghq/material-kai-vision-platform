@@ -30,8 +30,29 @@ export type EmbedKey = Tables<'material_kai_keys'>;
  */
 export type EmbedScopeType = 'all' | 'categories' | 'products' | 'blueprints';
 
+/**
+ * What a key GRANTS, which is a different question from what it is scoped to.
+ *
+ * `catalog` is the original: serve this workspace's published products or blueprints. `tools` is
+ * for an embedder who has no catalogue at all — an architect putting a heat-pump sizer on their
+ * blog — and serves NONE of it, ever. The lead still lands in this workspace either way, because
+ * the key is the tenancy binding.
+ */
+export type EmbedKeyKind = 'catalog' | 'tools';
+
 export interface EmbedKeyInput {
   key_name: string;
+  key_kind?: EmbedKeyKind;
+  /** May a CATALOGUE key also run the public tool surface? Meaningless for a tools key, which always can. */
+  tools_enabled?: boolean;
+  /**
+   * May this key run tools that cost the platform money per call?
+   *
+   * Default false. The zero-cost calculators are always available; anything with a real upstream
+   * bill is opt-in, for the same reason `allow_generation` is — a key handed out for a free
+   * calculator must not be able to start spending because somebody pressed a different button.
+   */
+  paid_tools_enabled?: boolean;
   description?: string | null;
   /** Browser origins allowed to use the key. `['*']` = any site. Empty = no browser may use it. */
   allowed_origins: string[];
@@ -51,6 +72,14 @@ export interface EmbedKeyInput {
   allow_generation?: boolean;
   /** Per-key ceiling on those generations per day. Meaningless while `allow_generation` is false. */
   generation_daily_cap?: number;
+  /**
+   * ONE daily ceiling in USD for everything on this key that costs money — the ask turn and every
+   * paid tool draw on the same budget.
+   *
+   * Denominated in money rather than calls on purpose: a model turn ranges three orders of
+   * magnitude, so a per-call cap is not a budget, it is a coin toss.
+   */
+  daily_usd_cap?: number;
 }
 
 export interface EmbedScopeOption {
@@ -133,6 +162,23 @@ export const MAX_RATE_LIMIT_PER_MINUTE = 600;
  * mistype a zero.
  */
 export const DEFAULT_GENERATION_DAILY_CAP = 20;
+
+/**
+ * Default and ceiling for the ONE daily money budget on a key.
+ *
+ * $0.50 buys roughly a hundred answer turns at the measured ~$0.005 each, or several hundred
+ * catalogue searches — enough that a normal day never touches it, low enough that a key left on a
+ * busy page cannot quietly run up a bill. The ceiling exists for the same reason the generation one
+ * does: a merchant who wants more should have to ask rather than mistype a zero.
+ */
+export const DEFAULT_DAILY_USD_CAP = 0.5;
+export const MAX_DAILY_USD_CAP = 25;
+
+function clampUsdCap(v: number | undefined): number {
+  const n = Number(v ?? DEFAULT_DAILY_USD_CAP);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_DAILY_USD_CAP;
+  return Math.min(n, MAX_DAILY_USD_CAP);
+}
 export const MAX_GENERATION_DAILY_CAP = 200;
 
 /**
@@ -224,8 +270,16 @@ export const embedKeysService = {
         // Normalized together: the CHECK requires values to be empty for 'all' and non-empty
         // otherwise, so sending a stale list alongside 'all' is a constraint violation rather than
         // a harmless extra field.
-        scope_type: input.scope_type,
-        scope_values: input.scope_type === 'all' ? [] : input.scope_values,
+        // A TOOLS key is scoped to nothing, and saying so explicitly beats leaving whatever the
+        // form last held: it serves no catalogue by construction, so a stale product list on the
+        // row would be a claim the endpoint then ignores — a discrepancy somebody would eventually
+        // have to reconcile.
+        scope_type: input.key_kind === 'tools' ? 'all' : input.scope_type,
+        scope_values: input.key_kind === 'tools' || input.scope_type === 'all' ? [] : input.scope_values,
+        key_kind: input.key_kind ?? 'catalog',
+        tools_enabled: input.key_kind === 'tools' ? true : (input.tools_enabled ?? false),
+        paid_tools_enabled: input.paid_tools_enabled ?? false,
+        daily_usd_cap: clampUsdCap(input.daily_usd_cap),
         allow_generation: input.allow_generation ?? false,
         generation_daily_cap: clampDailyCap(input.generation_daily_cap),
         is_active: true,

@@ -32,7 +32,6 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecrets } from '../_shared/secrets.ts';
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
-const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
 const SLIG_MODAL_URL = () => Deno.env.get('SLIG_MODAL_URL') || 'https://basilakis--slig-sligservice-web.modal.run';
 const VOYAGE_API_KEY = () => Deno.env.get('VOYAGE_API_KEY') || '';
 const MIVAA_GATEWAY_URL   = Deno.env.get('MIVAA_GATEWAY_URL')   || 'https://v1api.materialshub.gr';
@@ -135,22 +134,6 @@ async function checkClaude(): Promise<ServiceResult> {
   }
 }
 
-async function checkOpenAI(): Promise<ServiceResult> {
-  if (!OPENAI_API_KEY()) return { status: 'unhealthy', latency_ms: 0, error: 'API key not configured' };
-  const start = Date.now();
-  try {
-    const res = await fetch('https://api.openai.com/v1/models', {
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY()}` },
-      signal: AbortSignal.timeout(8000),
-    });
-    const latency_ms = Date.now() - start;
-    if (res.ok) return { status: 'healthy', latency_ms, message: 'API key valid' };
-    const body = await res.json().catch(() => ({}));
-    return { status: 'unhealthy', latency_ms, error: body?.error?.message || `HTTP ${res.status}` };
-  } catch (e) {
-    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e.message };
-  }
-}
 
 async function checkPaddleOcr(): Promise<ServiceResult> {
   // PaddleOCR-VL structural/OCR backbone on Modal (GET /health, unauth). 303 =
@@ -565,7 +548,7 @@ serve(withApiLogging('health-check', async (req) => {
   const externalChecks = activeServices.map(svc => checkExternalService(svc.url));
 
   const [
-    claude, openai, slig, paddleocr, voyage_ai,
+    claude, slig, paddleocr, voyage_ai,
     embeddings, ai_services, vercel,
     turnstile, emailRoutingMx, workers, inboundDelivery,
     ...externalResults
@@ -613,7 +596,7 @@ serve(withApiLogging('health-check', async (req) => {
   }));
 
   return new Response(JSON.stringify({
-    claude, openai, slig, paddleocr, voyage_ai,
+    claude, slig, paddleocr, voyage_ai,
     embeddings, ai_services, vercel,
     cloudflare,
     external,

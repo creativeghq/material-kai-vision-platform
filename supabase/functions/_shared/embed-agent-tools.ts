@@ -46,6 +46,15 @@ export interface PublicTool {
   upstreamCostUsd: number;
   /** True for the one tool that writes. Gated on Turnstile before it is reached. */
   writes: boolean;
+  /**
+   * Does this tool need the embedder to have a CATALOGUE?
+   *
+   * The distinction the free-tools key turns on. `price_my_spec` searches published products and
+   * is meaningless to an architect who sells none; a heat-pump sizer is arithmetic and works for
+   * anybody. A `key_kind: 'tools'` key serves no catalogue at all, so it is offered exactly the
+   * tools for which that is not a limitation.
+   */
+  needsCatalog: boolean;
 }
 
 export const PUBLIC_TOOLS: PublicTool[] = [
@@ -56,6 +65,7 @@ export const PUBLIC_TOOLS: PublicTool[] = [
     // Proxies MIVAA: query understanding + embeddings + rerank. Measured 2026-08-23.
     upstreamCostUsd: 0.0011,
     writes: false,
+    needsCatalog: true,
   },
   {
     name: 'price_my_spec',
@@ -64,6 +74,7 @@ export const PUBLIC_TOOLS: PublicTool[] = [
     // Pure SQL — `resolve_product_spec` + `get_configured_product_price`. Measured at zero.
     upstreamCostUsd: 0,
     writes: false,
+    needsCatalog: true,
   },
   {
     name: 'calculate_kitchen_cost',
@@ -72,6 +83,9 @@ export const PUBLIC_TOOLS: PublicTool[] = [
     // Pure arithmetic over the live price list. Measured at zero.
     upstreamCostUsd: 0,
     writes: false,
+    // Prices from the PLATFORM STARTER kitchen blueprint, not from the embedder's catalogue, so
+    // it works for a workspace that has never published a product.
+    needsCatalog: false,
   },
   {
     name: 'raise_quote_request',
@@ -80,8 +94,57 @@ export const PUBLIC_TOOLS: PublicTool[] = [
     // A CRM insert. No model anywhere in it.
     upstreamCostUsd: 0,
     writes: true,
+    // THE POINT OF THE WHOLE FREE-TOOLS KEY: whoever embedded the calculator gets the lead. The
+    // workspace comes from the key, so this needs no catalogue and cannot be redirected.
+    needsCatalog: false,
+  },
+  // ── The free calculators (#382 follow-up) ──────────────────────────────────────────────────
+  //
+  // Deterministic arithmetic with NO backend of any kind — the in-app tools compute these in the
+  // browser. They cost nothing however hard a stranger presses them, which is what makes them
+  // safe to hand to anybody who wants to put one on their own site.
+  {
+    name: 'calculate_heat_pump_sizing',
+    label: 'Size a heat pump',
+    deterministic: true,
+    upstreamCostUsd: 0,
+    writes: false,
+    needsCatalog: false,
+  },
+  {
+    name: 'calculate_heating_cost_comparison',
+    label: 'Compare heating costs',
+    deterministic: true,
+    upstreamCostUsd: 0,
+    writes: false,
+    needsCatalog: false,
   },
 ];
+
+/**
+ * What a given KEY may actually run.
+ *
+ * Three gates, and each exists because the alternative fails silently:
+ *   • a `tools` key gets only the tools that do not need a catalogue, because it has none — and
+ *     offering `price_my_spec` to an architect with no products returns "nothing matched" forever,
+ *     which reads as a broken widget rather than as a misconfiguration;
+ *   • anything with a non-zero upstream cost needs `paid_tools_enabled`, so a key handed out for a
+ *     free calculator cannot quietly start billing the platform;
+ *   • `tools_enabled` is the master switch for a catalogue key, which did not ask for this surface.
+ */
+export function toolsForKey(key: {
+  key_kind?: string | null;
+  tools_enabled?: boolean | null;
+  paid_tools_enabled?: boolean | null;
+}): PublicTool[] {
+  const isToolsKey = key.key_kind === 'tools';
+  if (!isToolsKey && !key.tools_enabled) return [];
+  return PUBLIC_TOOLS.filter((t) => {
+    if (isToolsKey && t.needsCatalog) return false;
+    if (t.upstreamCostUsd > 0 && !key.paid_tools_enabled) return false;
+    return true;
+  });
+}
 
 export const PUBLIC_TOOL_NAMES: ReadonlySet<string> = new Set(PUBLIC_TOOLS.map((t) => t.name));
 
@@ -115,6 +178,10 @@ export async function buildPublicTools(
   out.set('material_search', searchMod.createSearchTool(workspaceId, onChunk as never));
   out.set('price_my_spec', graphMod.createPriceMySpecTool(workspaceId, onChunk as never));
   out.set('calculate_kitchen_cost', calcMod.createKitchenCostTool(serviceClient(), onChunk as never));
+  // No workspace argument at all — these are arithmetic, which is exactly why they can be offered
+  // to a key that has no catalogue behind it.
+  out.set('calculate_heat_pump_sizing', calcMod.createHeatPumpSizingTool(onChunk as never));
+  out.set('calculate_heating_cost_comparison', calcMod.createHeatingCostComparisonTool(onChunk as never));
   out.set('raise_quote_request', quoteMod.createRaiseQuoteRequestTool('', workspaceId, onChunk as never));
 
   return out;
