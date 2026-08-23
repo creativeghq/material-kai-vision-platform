@@ -136,6 +136,25 @@ interface LinkedInTotals {
   engagementRate: number | null;
 }
 
+/**
+ * A company page the connected member administers.
+ *
+ * LinkedIn does not always return the name: for several pages it answers with the id alone, and
+ * Zernio fills `name` with a literal "Organization <id>". That placeholder must never reach the
+ * screen — it looks like a rendering bug and tells the reader nothing. `vanityName` is the
+ * reliable marker of a page LinkedIn actually described, so the named ones are listed and the
+ * rest are counted.
+ */
+interface LinkedInOrg {
+  id: string;
+  name: string;
+  vanityName?: string;
+  logoUrl?: string | null;
+}
+
+const isNamedOrg = (o: LinkedInOrg) =>
+  Boolean(o.vanityName) && !/^Organization \d+$/.test(o.name);
+
 const statusVariant = (s: string) =>
   s === 'published' ? 'success' : s === 'failed' ? 'error' : s === 'scheduled' ? 'info' : 'neutral';
 
@@ -192,7 +211,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
   // which is the whole reason it is the only analytics such an account has.
   const [liTotals, setLiTotals] = useState<Record<string, LinkedInTotals>>({});
   const [liScopeMissing, setLiScopeMissing] = useState(false);
-  const [liOrgs, setLiOrgs] = useState<Array<{ id: string; name: string; vanityName?: string }>>([]);
+  const [liOrgs, setLiOrgs] = useState<LinkedInOrg[]>([]);
   /**
    * Separate from `loading` on purpose. The DB reads finish in milliseconds; the Zernio
    * pass-throughs are four sequential network hops to a third party and took the whole tab
@@ -617,13 +636,37 @@ export const SocialAnalyticsPanel: React.FC = () => {
                 administers; publishing picks between them. Nobody connects those separately, so
                 the only thing missing was anyone asking what they are. */}
             {liOrgs.length > 0 && (
-              <p className="mt-4 border-t border-hairline pt-3 text-sm text-muted-foreground">
-                This connection also administers{' '}
-                <strong className="text-foreground">{liOrgs.map(o => o.name).join(', ')}</strong>
-                {liOrgs.length === 1 ? ' — a company page' : ' — company pages'}. Posting can target{' '}
-                {liOrgs.length === 1 ? 'it' : 'them'} without connecting anything else, and page posts
-                get per-post analytics and comments, which a personal profile does not.
-              </p>
+              <div className="mt-4 border-t border-hairline pt-3">
+                <p className="text-sm font-medium">
+                  This connection already administers {liOrgs.length} company{' '}
+                  {liOrgs.length === 1 ? 'page' : 'pages'}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {liOrgs.filter(isNamedOrg).map(org => (
+                    <span
+                      key={org.id}
+                      className="inline-flex items-center gap-2 rounded-sm border border-hairline bg-surface-sunken px-2 py-1 text-xs"
+                    >
+                      {org.logoUrl
+                        ? <img src={org.logoUrl} alt="" className="h-4 w-4 rounded-sm object-cover" />
+                        : <PlatformIcon platform="linkedin" className="h-3.5 w-3.5" />}
+                      {org.name}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {liOrgs.filter(o => !isNamedOrg(o)).length > 0 && (
+                    <>
+                      {liOrgs.filter(o => !isNamedOrg(o)).length} more that LinkedIn returned by id
+                      only — usually a page the member is listed on without full admin rights.{' '}
+                    </>
+                  )}
+                  Publishing can target any of these <strong className="text-foreground">without
+                  connecting anything else</strong>. Connecting one as its own account additionally
+                  gives per-post analytics and the comments inbox — the two things a personal
+                  profile cannot have, and the only real reason to add a page here.
+                </p>
+              </div>
             )}
             </Loadable>
           </CardContent>
