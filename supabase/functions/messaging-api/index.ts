@@ -25,6 +25,7 @@ import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { checkChannelSeat } from '../_shared/channel-seats.ts';
+import { reconcileWaba } from '../_shared/whatsapp-cost-reconcile.ts';
 import {
   zernioApi,
   zernioKey,
@@ -297,6 +298,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // platform's money and the platform's lifecycle, so they sit with the other operator
       // actions. Searching availability and listing what a workspace already has are reads.
       'purchase-phone-number', 'release-phone-number',
+      // Operator maintenance: both read or repair platform-level billing state.
+      'reconcile-phone-numbers', 'reconcile-whatsapp-costs',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -730,6 +733,107 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Repair number attribution.
+      //
+      // A number is bought on Zernio and recorded locally in two steps, and the second one can
+      // fail: the purchase returns success, the workspace_phone_numbers row does not land, and
+      // the platform now pays a monthly charge with nobody to bill. The purchase cannot be undone
+      // to make that safe, so the answer is a repair that can be run at any time — the profile
+      // map already says which workspace owns which number, so nothing has to be guessed.
+      // ─────────────────────────────────────────────────────────────
+      case 'reconcile-phone-numbers': {
+        const { data: profiles } = await supabaseClient
+          .from('social_zernio_profiles').select('workspace_id, zernio_profile_id');
+
+        let checked = 0, repaired = 0;
+        const errors: string[] = [];
+
+        for (const prof of ((profiles ?? []) as Array<{ workspace_id: string; zernio_profile_id: string }>)) {
+          try {
+            const owned = await listPhoneNumbers(supabaseClient, prof.zernio_profile_id);
+            for (const n of owned.filter((x) => !x.broughtYourOwn)) {
+              checked++;
+              // The lookup's own error matters: a failed read here would look like "no row yet"
+              // and insert a duplicate, which the unique index would then reject as a repair
+              // failure on a number that was already fine.
+              const { data: existing, error: lookupErr } = await supabaseClient
+                .from('workspace_phone_numbers').select('id').eq('zernio_number_id', n.id).maybeSingle();
+              if (lookupErr) { errors.push(`${n.phoneNumber}: ${lookupErr.message}`); continue; }
+              if (existing) continue;
+
+              const { error } = await supabaseClient.from('workspace_phone_numbers').insert({
+                workspace_id: prof.workspace_id,
+                zernio_number_id: n.id,
+                phone_number: n.phoneNumber,
+                country: n.country,
+                monthly_cents: n.monthlyCents,
+                status: n.status ?? 'active',
+              });
+              if (error) errors.push(`${n.phoneNumber}: ${error.message}`);
+              else repaired++;
+            }
+          } catch (err) {
+            errors.push(`profile ${prof.zernio_profile_id}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+
+        // `success` reports whether the REPAIR worked, not whether the handler ran. A partial
+        // sweep that left numbers unattributed is the state this action exists to remove, and
+        // reporting it as success is how it would be run once and believed.
+        return jsonResponse({
+          success: errors.length === 0,
+          checked,
+          repaired,
+          errors: errors.length ? errors : undefined,
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Reconcile what Meta actually charged.
+      //
+      // The one cost this platform genuinely could not see — template messages are billed by Meta
+      // straight to the WABA and never touch Zernio's invoice, so template pricing ran entirely on
+      // seeded guesses. Meta does expose it: pricing_analytics on the WABA returns COST and VOLUME
+      // by country and category. This reads it back, stores billed-vs-actual, and rewrites the
+      // rate table from Meta's own numbers where the sample is large enough to mean anything.
+      // ─────────────────────────────────────────────────────────────
+      case 'reconcile-whatsapp-costs': {
+        const days = Math.min(Math.max(Number(requestBody.days) || 30, 1), 90);
+        const periodEnd = new Date();
+        const periodStart = new Date(periodEnd.getTime() - days * 86400000);
+
+        // Every distinct WABA we know about, with the workspace that owns it.
+        const { data: channels } = await supabaseClient
+          .from('messaging_channels').select('workspace_id, config').eq('channel_type', 'whatsapp');
+
+        const seen = new Map<string, string | null>();
+        for (const c of ((channels ?? []) as Array<{ workspace_id: string | null; config: Record<string, unknown> | null }>)) {
+          const waba = (c.config?.waba_id as string) || null;
+          if (waba && !seen.has(waba)) seen.set(waba, c.workspace_id);
+        }
+
+        if (seen.size === 0) {
+          return jsonResponse({
+            success: true, wabas: 0, results: [],
+            message: 'No WhatsApp channel carries a WABA id yet, so there is nothing of Meta\'s to read.',
+          });
+        }
+
+        const results = [];
+        for (const [wabaId, workspaceId] of seen) {
+          results.push(await reconcileWaba(supabaseClient, { wabaId, workspaceId, periodStart, periodEnd }));
+        }
+
+        return jsonResponse({
+          success: true,
+          wabas: seen.size,
+          period: { from: periodStart.toISOString().slice(0, 10), to: periodEnd.toISOString().slice(0, 10) },
+          rates_updated: results.reduce((n, r) => n + r.ratesUpdated, 0),
+          results,
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Phone numbers: search / list / buy / release.
       //
       // The gap this closes: connecting WhatsApp assumed you already owned a number. Zernio
@@ -867,11 +971,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const released = await releasePhoneNumber(supabaseClient, phoneNumberId);
         // Stop billing for it. Marked released rather than deleted: a number charged for three
         // months and then let go is a fact the invoice still needs.
-        await supabaseClient
+        // Unchecked, this is the release mirror of the purchase bug: Zernio has let the number go
+        // and we keep billing the tenant for it every month, with a clean success on screen.
+        const { error: releaseRowErr } = await supabaseClient
           .from('workspace_phone_numbers')
           .update({ status: 'released', released_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq('zernio_number_id', phoneNumberId)
           .eq('workspace_id', wsId);
+        if (releaseRowErr) {
+          console.error('[messaging-api] release bookkeeping FAILED', phoneNumberId, releaseRowErr);
+        }
         // The channel row points at a number that no longer exists; leaving it active would keep
         // offering a sender whose every send fails.
         await supabaseClient
@@ -880,7 +989,17 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           .eq('workspace_id', wsId)
           .eq('sender_id', target.phoneNumber);
 
-        return jsonResponse({ success: true, ...released });
+        return jsonResponse({
+          success: true,
+          ...released,
+          ...(releaseRowErr
+            ? {
+                warning: 'The number was released at Zernio but the local record was not updated, '
+                  + 'so billing for it will continue. Run reconcile-phone-numbers.',
+                bookkeeping_error: releaseRowErr.message,
+              }
+            : {}),
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
