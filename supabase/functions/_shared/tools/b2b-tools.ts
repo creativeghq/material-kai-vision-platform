@@ -320,7 +320,13 @@ export const createB2BManufacturerSearchTool = (
       // three times in a row, having spent full price on each. A measured 6-company search takes
       // ~52s, so anything past ~10 cannot return. Capping here converts a guaranteed timeout into
       // a smaller result plus an explicit instruction to call again, which the agent can act on.
-      const MAX_PER_CALL = 10;
+      // 8, not 10. The clamp landed on 2026-08-18 and did NOT stop the timeouts — six more
+      // followed on 08-22. The arithmetic says why: 6 companies measured at ~52s, so 10 lands
+      // around 85s against what was then a 90s wall, i.e. inside the noise of a single slow
+      // upstream call. agent-chat now gives this tool 110s specifically (see
+      // LONG_RUNNING_TOOL_TIMEOUT_MS), and 8 keeps the expected run near 70s so the extra budget
+      // is headroom rather than the new wall.
+      const MAX_PER_CALL = 8;
       const requestedLimit = limit;
       if (limit > MAX_PER_CALL) limit = MAX_PER_CALL;
 
@@ -562,7 +568,7 @@ export const createB2BManufacturerSearchTool = (
         // guaranteed to be killed before it answered, which reads to the agent as a broken tool
         // rather than an over-large request. Ask for more than ~10 and you need the background
         // lane, not a bigger timeout.
-        limit: z.number().optional().default(8).describe('Max manufacturers per call. Default 8; more than ~10 will exceed the 90s tool timeout — run several calls or dispatch a background task instead.'),
+        limit: z.number().optional().default(8).describe('Max manufacturers per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
       }),
     }

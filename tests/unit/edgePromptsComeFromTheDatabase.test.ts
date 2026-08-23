@@ -69,15 +69,43 @@ const FILES = walk(FUNCTIONS_DIR).map((f) => ({
   src: readFileSync(f, 'utf8'),
 }));
 
-/** Files that actually call a model. */
+/**
+ * Files that actually call a model.
+ *
+ * The three shapes are here because the first one alone missed the two worst offenders. This
+ * pattern used to match only the `_shared/ai-client.ts` helpers, so `agent-chat` (LangChain
+ * `.invoke()`) and `agent-memory` (raw `fetch` to the Messages API) were outside the corpus
+ * entirely — and that is precisely where the platform's most load-bearing prompt was sitting as
+ * a string literal: `routeToSpecialist`, the classifier that decides WHICH AGENT RUNS AT ALL.
+ * A guard that cannot see the biggest caller is a guard that reports clean forever.
+ */
 const MODEL_CALLERS = FILES.filter(({ src }) =>
-  /generateStructuredWithClaude|generateWithClaude|generateWithClaudeTools|callClaudeTool\s*\(/.test(src),
+  // 1. the shared AI-SDK client
+  /generateStructuredWithClaude|generateWithClaude|generateWithClaudeTools|callClaudeTool\s*\(/.test(src)
+  // 2. LangChain — agent-chat's router, compactor and corrective pass
+  || /\b(modelHaiku|modelOpus|getModelByName\([^)]*\)|llm|model)\s*(\.bindTools\([^)]*\))?\.invoke\s*\(/.test(src)
+  // 3. a raw POST to the Messages API — agent-memory's distiller, and the 15 unmigrated fetchers
+  || /fetch\(\s*['"`]https:\/\/api\.anthropic\.com\/v1\/messages/.test(src),
 );
 
 describe('edge functions: prompts come from the database', () => {
   it('finds the model-calling functions at all (the scan itself must not silently match nothing)', () => {
     // A guard whose corpus is empty passes forever. Pin the floor.
     expect(MODEL_CALLERS.length).toBeGreaterThan(5);
+  });
+
+  it('the corpus includes the biggest model callers by name', () => {
+    // Naming them is the point. The pattern used to match only the ai-client helpers, so the
+    // two files that between them hold the router, the compactor and the memory distiller were
+    // outside the scan — the guard was green and the highest-leverage prompt in the platform
+    // was a string literal. A count floor would not have caught that; these names do.
+    const rels = new Set(MODEL_CALLERS.map((f) => f.rel));
+    for (const required of ['agent-chat/index.ts', '_shared/agent-memory.ts']) {
+      expect(
+        rels.has(required),
+        `${required} calls a model but is not in MODEL_CALLERS — the detection pattern regressed`,
+      ).toBe(true);
+    }
   });
 
   it('no prompt is loaded with a hardcoded fallback behind it', () => {

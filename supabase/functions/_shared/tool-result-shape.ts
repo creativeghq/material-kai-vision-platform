@@ -69,20 +69,35 @@ export function shapeToolResult(raw: unknown): ToolResultShape {
     shape.errorMessage = typeof parsed.error === 'string' ? parsed.error : 'tool reported success:false';
   }
 
-  // Countable shapes, in the order they were already checked by the tool-call logger.
-  if (Array.isArray(parsed?.results)) {
-    shape.resultCount = parsed.results.length;
-  } else if (Array.isArray(parsed?.data)) {
-    shape.resultCount = parsed.data.length;
-  } else if (Array.isArray(parsed?.products)) {
-    shape.resultCount = parsed.products.length;
-  } else if (Array.isArray(parsed?.matches)) {
-    // price_lookup returns { matches: [...] }
-    shape.resultCount = parsed.matches.length;
-  } else if (Array.isArray(parsed?.articles)) {
-    // knowledge_base_search returns { articles: [...] }
-    shape.resultCount = parsed.articles.length;
+  // Countable shapes. SUMMED, not first-match — and that is the whole point of this block.
+  //
+  // This used to be an `else if` ladder with `products` ahead of `articles`. Every tool with a
+  // single result array was fine; `knowledge_base_search` was not, because it returns FOUR
+  // arrays at once (`articles`, `products`, `entities`, plus `totalResults`) and always
+  // initialises `products: []` whether or not any product matched. So the `products` branch
+  // matched first, on an empty array, on every call — and the `articles` branch below it was
+  // unreachable code. A KB search returning five document sections logged `result_count: 0,
+  // zero_result: true`.
+  //
+  // Both consumers were wrong in the same direction, and the second one costs more than the
+  // reporting does: `turnProducedWork()` shares this derivation, so the memory promotion gate
+  // concluded a successful KB-grounded turn had produced nothing and declined to distil it. The
+  // agents could not form long-term memory from the one retrieval path that works.
+  //
+  // Proved against production: system_logs recorded "Knowledge base search complete: 5 results
+  // in 22.27s" for a query agent_tool_call_logs stored as 0 (2026-08-18, workspace ffafc28b).
+  //
+  // Summing is safe because no tool aliases the same list under two of these keys — verified
+  // across supabase/functions/_shared/tools/*.ts, where only the KB search returns more than
+  // one of them. `entities` is counted for the first time here: certificate/logo/spec hits from
+  // a PDF were never countable at all under the ladder.
+  const COUNTABLE_KEYS = ['results', 'data', 'products', 'matches', 'articles', 'entities'] as const;
+  let total: number | null = null;
+  for (const key of COUNTABLE_KEYS) {
+    const arr = (parsed as Record<string, unknown> | null | undefined)?.[key];
+    if (Array.isArray(arr)) total = (total ?? 0) + arr.length;
   }
+  shape.resultCount = total;
 
   shape.zeroResult = shape.resultCount === 0;
   shape.summary = {

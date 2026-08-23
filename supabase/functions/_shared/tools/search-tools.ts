@@ -55,6 +55,63 @@ const toCandidate = (r: any, i: number): RerankCandidate => ({
   understandingScore: typeof r?.understanding_score === 'number' ? r.understanding_score : undefined,
 });
 
+/**
+ * Why a search came back empty — "nothing matched" or "there is nothing to match".
+ *
+ * Those are the same empty list to the agent, and telling them apart is not optional judgement:
+ * it decides whether reformulating is smart or futile. Watched live on 2026-08-22, with
+ * `products` at 0 rows, the agent ran TEN `material_search` calls in one turn at ~13s each —
+ * broadening "porcelain" to "gres" and "stoneware", then firing a deliberate control query whose
+ * own stated intent was *"confirm whether any tile products exist in the catalog at all"*. It had
+ * correctly worked out what to ask and had no way to be told. Two minutes of the user's time, and
+ * it still could not conclude anything, because a zero result carries no information about the
+ * corpus behind it.
+ *
+ * So on a zero result — and ONLY then, this costs nothing in the common case — count the corpus
+ * and say which of the two happened. `null` means the count itself failed: unknown is not empty,
+ * and reporting "the catalogue is empty" because a count errored would be the same bug inverted.
+ */
+async function describeEmptyResult(
+  corpus: 'products' | 'kb_docs',
+  workspaceId: string,
+): Promise<Record<string, unknown>> {
+  let size: number | null = null;
+  try {
+    const q = supabase.from(corpus).select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId);
+    const { count, error } = corpus === 'kb_docs' ? await q.eq('status', 'published') : await q;
+    if (!error) size = count ?? 0;
+  } catch { /* leave null — unknown, not empty */ }
+
+  const label = corpus === 'products' ? 'product catalogue' : 'knowledge base';
+  if (size === null) {
+    return {
+      corpus_size: null,
+      guidance:
+        `No matches. The size of this workspace's ${label} could not be checked, so it is not ` +
+        `known whether this is a wording problem or an empty ${label}. Try ONE rephrasing at most.`,
+    };
+  }
+  if (size === 0) {
+    return {
+      corpus_size: 0,
+      corpus_empty: true,
+      guidance:
+        `This workspace's ${label} is EMPTY — it contains 0 items, so no query can return ` +
+        `anything. Do NOT rephrase or retry: no wording will help. Tell the user plainly that ` +
+        `nothing has been added to their ${label} yet, and answer from your own knowledge or ` +
+        `another tool if you can.`,
+    };
+  }
+  return {
+    corpus_size: size,
+    corpus_empty: false,
+    guidance:
+      `No matches, but the ${label} holds ${size} items — so this is a wording or filter ` +
+      `problem, not an empty ${label}. One broader rephrasing is worth trying; if that also ` +
+      `returns nothing, say so rather than continuing to guess synonyms.`,
+  };
+}
+
 async function rerankMivaaPayload(
   // deno-lint-ignore no-explicit-any
   data: any,
@@ -214,7 +271,16 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
           // Fuse the per-aspect candidate sets into one ordering. MIVAA returns candidates
           // scored per embedding aspect; without this the agent sees whichever aspect happened
           // to sort first, which is not a ranking.
-          return JSON.stringify(await rerankMivaaPayload(data, query, 'material_search_rerank'));
+          const ranked = await rerankMivaaPayload(data, query, 'material_search_rerank');
+          // Say WHY it is empty, so the agent stops guessing synonyms at an empty catalogue.
+          const hitCount = RERANKABLE_KEYS.reduce(
+            (n, k) => n + (Array.isArray(ranked?.[k]) ? ranked[k].length : 0),
+            0,
+          );
+          if (hitCount === 0) {
+            Object.assign(ranked ?? {}, await describeEmptyResult('products', workspaceId));
+          }
+          return JSON.stringify(ranked);
         } catch (fetchError) {
           clearTimeout(timeoutId);
 
@@ -587,6 +653,13 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
                   }
                 }, () => {});
             }
+          }
+
+          // Same reason as material_search: an empty KB and an unlucky query look identical,
+          // and only one of them is worth rewording. 677 published docs sat behind a search the
+          // agent had already given up on.
+          if (!results.found) {
+            Object.assign(results, await describeEmptyResult('kb_docs', workspaceId));
           }
 
           return JSON.stringify(results);

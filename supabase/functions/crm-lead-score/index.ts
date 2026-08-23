@@ -9,6 +9,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
+import { loadPrompt } from '../_shared/prompt-utils.ts';
 
 
 const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = [
@@ -106,7 +107,14 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
     }
   } catch (e) { console.warn('[crm-lead-score] property enrichment skipped:', e); }
 
-  const prompt = `Score this sales lead. Higher lead_score = more likely to transact soon (engagement, offers, viewings, pre-approval, recent activity push it up; cold/no-engagement/stale pushes it down).\n\nSIGNALS (JSON):\n${JSON.stringify(signals, null, 2)}`;
+  // The rubric is a DB row (`prompt_type='tool'`, `category='crm_lead_score'`) — "what makes a
+  // lead hot" is a sales policy an operator should be able to retune without a deploy. The
+  // SIGNALS block stays in code because it carries DATA, not behaviour.
+  //
+  // Loaded BEFORE reserve() on purpose: a missing prompt must not debit the caller's credits
+  // for work that cannot happen (invariant 10).
+  const rubric = await loadPrompt(supabase, 'tool', 'crm_lead_score');
+  const prompt = `${rubric}\n\nSIGNALS (JSON):\n${JSON.stringify(signals, null, 2)}`;
 
   const model = MODEL();
   await reserve(supabase, userId, workspaceId, CEILING);

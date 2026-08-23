@@ -292,6 +292,22 @@ export const AgentConfigsPage: React.FC = () => {
     return labels[type] || type;
   };
 
+  /**
+   * An agent prompt this page will happily DISPLAY and the runtime cannot LOAD.
+   *
+   * `getAgentSystemPrompt` selects `system_prompt` and nothing else, and throws when it is empty.
+   * The viewers here fall back to `prompt_text` for display, which is convenient and, for an
+   * agent row, actively misleading: `property-advisor` shipped with its whole persona in
+   * `prompt_text`, looked perfectly configured on this page, and threw on the first message of
+   * every conversation — while the orchestrator routed real-estate questions straight into it.
+   * Nobody noticed for as long as nobody opened that agent.
+   *
+   * Editing and saving fixes it: update_prompt_with_history writes `system_prompt` for
+   * prompt_type='agent'. The badge is there so somebody knows to.
+   */
+  const isUnreadableAtRuntime = (prompt: Prompt) =>
+    prompt.prompt_type === 'agent' && !prompt.system_prompt?.trim();
+
   const getPromptLength = (prompt: Prompt) => {
     const text = (prompt.prompt_type === 'agent' || prompt.prompt_type === 'tool')
       ? (prompt.system_prompt || prompt.prompt_text)
@@ -479,6 +495,19 @@ export const AgentConfigsPage: React.FC = () => {
                                   <div className="flex items-center gap-2 mt-1">
                                     <Badge variant="outline" className="text-xs">{prompt.category}</Badge>
                                     <Badge variant="outline" className="text-xs">v{prompt.version}</Badge>
+                                    {isUnreadableAtRuntime(prompt) && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="error" className="text-xs">Not live</Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs">
+                                          This agent has no <code>system_prompt</code>. The text below is its{' '}
+                                          <code>prompt_text</code>, which the runtime does not read — every
+                                          conversation with this agent fails before reaching the model. Save an
+                                          edit here to write it to the right column.
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
                                   </div>
                                 </div>
                               </div>

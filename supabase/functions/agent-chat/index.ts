@@ -101,6 +101,8 @@ async function initRuntime() {
   getToolPrompt = promptMod.getToolPrompt;
   getAgentSystemPrompt = promptMod.getAgentSystemPrompt;
   getSharedOperatingDoctrine = promptMod.getSharedOperatingDoctrine;
+  loadPrompt = promptMod.loadPrompt;
+  renderPromptTemplate = promptMod.renderPromptTemplate;
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
   isAdminAccess = authMod.isAdminAccess;
@@ -388,7 +390,27 @@ function createAgentGraph(
     let generationJob = null;
 
     // Execute all tool calls in parallel for lower latency
-    const TOOL_TIMEOUT_MS = 90_000;
+    //
+    // ── Tool timeouts ────────────────────────────────────────────────────────
+    // One flat number for 174 tools is the problem, not the value of the number. Nearly every
+    // tool here is a DB read that answers in under 200ms; a handful run a multi-step research
+    // sweep against a paid upstream and legitimately take a minute or more. Measured over the
+    // lifetime of agent_tool_call_logs (2026-08-23): `b2b_manufacturer_search` averages 68.3s
+    // when it SUCCEEDS and accounts for 13 of the 14 timeouts ever recorded — a tool running at
+    // 76% of its own ceiling has no headroom, so any upstream slowness becomes a dead 90s and a
+    // full-price charge for nothing.
+    //
+    // Raising it for everything would be wrong: a stuck DB read should fail fast, not hold the
+    // turn open. So the budget is per tool, and the ceiling stays well inside the edge function's
+    // own ~150s wall — the model still has to compose a reply after the tool returns.
+    const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
+    const LONG_RUNNING_TOOL_TIMEOUT_MS: Record<string, number> = {
+      // Multi-company web-search sweep: ~52s measured for 6 companies, 68.3s average overall.
+      b2b_manufacturer_search: 110_000,
+      // Whole-PDF translation + restructure into a catalog; timed out once at 90s.
+      translate_pdf_to_catalog: 110_000,
+    };
+    const timeoutFor = (name: string) => LONG_RUNNING_TOOL_TIMEOUT_MS[name] ?? DEFAULT_TOOL_TIMEOUT_MS;
     const toolTimings: Record<string, number> = {};
     const toolSettled = await Promise.allSettled(
       toolCalls.map(async (toolCall: any) => {
@@ -408,10 +430,11 @@ function createAgentGraph(
         }
 
         const _t_start = Date.now();
+        const timeoutMs = timeoutFor(toolCall.name);
         const toolResult = await Promise.race([
           matchedTool.invoke(toolCall.args),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Tool '${toolCall.name}' timed out after ${TOOL_TIMEOUT_MS / 1000}s`)), TOOL_TIMEOUT_MS)
+            setTimeout(() => reject(new Error(`Tool '${toolCall.name}' timed out after ${timeoutMs / 1000}s`)), timeoutMs)
           ),
         ]);
         toolTimings[toolCall.id || toolCall.name] = Date.now() - _t_start;
@@ -691,6 +714,11 @@ let getAgentSystemPrompt: (supabase: any, agentType: string) => Promise<string>;
 // The act-then-refine doctrine appended to every agent prompt (#370). Also from promptMod.
 let getSharedOperatingDoctrine: (supabase: any) => Promise<string>;
 
+// Prompts that are neither an agent persona nor a tool description — the router classifier and
+// the conversation compactor. Both used to be string literals in this file. Also from promptMod.
+let loadPrompt: (supabase: any, promptType: string, category: string, subcategory?: string) => Promise<string>;
+let renderPromptTemplate: (template: string, vars: Record<string, string | number | null | undefined>) => string;
+
 // Claude models — initialized in initRuntime()
 let modelHaiku: any;
 let modelOpus: any;
@@ -810,21 +838,45 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
  * Classify the user message → a specialist slug (or null = generalist/JARVIS).
  * Cheap Haiku call. Fully defensive: any error/timeout/ambiguity → null so the
  * turn falls back to the generalist (current behavior) and chat never breaks.
+ *
+ * THE PROMPT IS A DB ROW (`prompt_type='tool'`, `category='agent_router'`). It used to be a
+ * string literal right here, which made it the one prompt in the platform no admin could see,
+ * tune or version — and it is the highest-leverage prompt there is, because it decides which
+ * agent runs at all. Adding a specialist or fixing a misroute meant a deploy.
+ *
+ * There is NO hardcoded copy behind the load, per CLAUDE.md. If the row is missing this returns
+ * null and the turn runs on the generalist — which is this function's existing behaviour for
+ * every other failure, not a substitute prompt. The warning below is what makes that state
+ * visible instead of silent.
+ *
+ * The specialist MENU stays derived from ROUTABLE_SPECIALISTS and is interpolated into
+ * `{{menu}}`: the roster is code (it must match AGENT_CONFIGS), only the instruction is editable.
  */
-async function routeToSpecialist(userInput: string): Promise<{ slug: string; name: string } | null> {
+async function routeToSpecialist(supabase: any, userInput: string): Promise<{ slug: string; name: string } | null> {
   try {
     if (!modelHaiku || !userInput || !userInput.trim()) return null;
     const menu = ROUTABLE_SPECIALISTS.map((s) => `- ${s.slug}: ${s.blurb}`).join('\n');
+
+    let routerPrompt: string;
+    try {
+      routerPrompt = renderPromptTemplate(
+        await loadPrompt(supabase, 'tool', 'agent_router'),
+        { menu },
+      );
+    } catch (promptErr) {
+      // Missing row or unreachable store. Either way we cannot classify; say so loudly and let
+      // the generalist take the turn rather than inventing an instruction here.
+      console.error(
+        '[agent-chat] orchestrator routing DISABLED — could not load the `agent_router` prompt. ' +
+        'Every orchestrator turn will run on the generalist until it is restored ' +
+        '(/admin/ai-configs → Agent Router):',
+        promptErr,
+      );
+      return null;
+    }
+
     const resp = await modelHaiku.invoke([
-      {
-        role: 'system',
-        content:
-          `You route a message on a materials / interior-design B2B platform to the best specialist.\n` +
-          `Specialists:\n${menu}\n` +
-          `Reply with ONLY the slug of the best fit, or the word "generalist" for general questions, ` +
-          `material/knowledge-base search, greetings, follow-ups, or anything not clearly one specialist's job. ` +
-          `Output the slug (or "generalist") and nothing else.`,
-      },
+      { role: 'system', content: routerPrompt },
       { role: 'user', content: userInput.slice(0, 2000) },
     ]);
     const c = resp?.content;
@@ -1249,7 +1301,7 @@ async function executeAgent(
   // from a guess (conversation 96da9fc8).
   const requestedAgentId = agentId;
   if (ORCHESTRATOR_IDS.has(agentId)) {
-    const routed = await routeToSpecialist(userInput);
+    const routed = await routeToSpecialist(supabase, userInput);
     if (routed && AGENT_CONFIGS[routed.slug]) {
       onChunk?.({ type: 'agent_routed', to: routed.slug, name: routed.name, timestamp: Date.now() });
       console.log(`[agent-chat] routed ${requestedAgentId} → ${routed.slug} (${routed.name})`);
@@ -1310,6 +1362,42 @@ async function executeAgent(
       for (const cfg of Object.values(AGENT_CONFIGS) as any[]) for (const t of (cfg?.tools ?? [])) if (!homed.has(t)) orphans.add(t);
       if (orphans.size) console.error(`[agent-chat] ORPHANED TOOLS — declared on an agent but in NO toolkit (stripped at startup, unreachable via load_toolkit): ${[...orphans].join(', ')}`);
     } catch (e) { console.warn('[agent-chat] toolkit audit failed', e); }
+  }
+
+  // PREVENTION (Estate, 2026-08-23): every agent in the roster must have a LOADABLE prompt.
+  //
+  // `property-advisor` shipped with its persona in `prompts.prompt_text` and `system_prompt`
+  // NULL. getAgentSystemPrompt reads system_prompt and nothing else, so the agent threw on the
+  // first message of every conversation — while /admin/ai-configs displayed the text happily,
+  // because its viewer falls back to prompt_text for DISPLAY. Visible in the UI, dead at
+  // runtime, and the orchestrator routed real-estate questions straight into it.
+  //
+  // No repo test can catch this: the defect is a column value, not code. So the check runs here,
+  // once per cold start, against the same reader the turn will use. It reports; it never blocks
+  // — one misconfigured agent must not take the whole chat down.
+  if (!(globalThis as any).__agentPromptAuditLogged) {
+    (globalThis as any).__agentPromptAuditLogged = true;
+    try {
+      // Distinct real agent ids — AGENT_CONFIGS also holds legacy aliases pointing at 'kai'.
+      const agentIds = [...new Set(Object.values(AGENT_CONFIGS).map((c: any) => c?.id).filter(Boolean))];
+      const missing: string[] = [];
+      await Promise.all(agentIds.map(async (id: string) => {
+        try { await getAgentSystemPrompt(supabase, id); } catch { missing.push(id); }
+      }));
+      if (missing.length) {
+        console.error(
+          `[agent-chat] AGENTS WITH NO LOADABLE PROMPT — every turn on these throws before the ` +
+          `model is reached: ${missing.join(', ')}. Fix at /admin/ai-configs (prompt_type='agent', ` +
+          `category=<id>); note the editor SHOWS prompt_text but the runtime reads system_prompt.`,
+        );
+      }
+      // The orchestrator can only route to an agent that exists. A slug here with no
+      // AGENT_CONFIGS entry means a routed turn dies on "Unknown agent".
+      const unknown = ROUTABLE_SPECIALISTS.filter((s) => !AGENT_CONFIGS[s.slug]).map((s) => s.slug);
+      if (unknown.length) {
+        console.error(`[agent-chat] ROUTABLE SPECIALISTS WITH NO AGENT CONFIG: ${unknown.join(', ')}`);
+      }
+    } catch (e) { console.warn('[agent-chat] agent prompt audit failed', e); }
   }
 
   // Resolve toolkits → tool IDs. alwaysOn clusters (core, calculators) are always included.
@@ -2702,7 +2790,13 @@ async function executeAgent(
         .filter((line: string) => line.length > line.indexOf(': ') + 2)
         .join('\n');
 
-      const summaryPrompt = `Summarize the conversation below in <=200 tokens. Preserve: named entities (products, people, companies, materials), explicit user constraints, decisions made, and unresolved questions. Drop pleasantries and reasoning chains.\n\n---\n${transcript}\n---\nSummary:`;
+      // Instruction from the DB (`prompt_type='tool'`, `category='conversation_compaction'`);
+      // the transcript envelope stays in code because it carries DATA, not behaviour — the same
+      // split the edge prompt guard already applies to injection fences and data delimiters.
+      // No fallback: if the row is gone we keep the full history rather than compacting it with
+      // an instruction invented here. The catch below already handles that path.
+      const compactionInstruction = await loadPrompt(supabase, 'tool', 'conversation_compaction');
+      const summaryPrompt = `${compactionInstruction}\n\n---\n${transcript}\n---\nSummary:`;
 
       const summaryResp = await modelHaiku.invoke([
         new HumanMessage(summaryPrompt),

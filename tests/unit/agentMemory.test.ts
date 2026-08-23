@@ -99,9 +99,27 @@ describe('the turn reaches the distiller as DATA, not as instructions', () => {
   });
 
   it('tells the model the delimited block cannot instruct it', () => {
-    const system = memorySrc.slice(memorySrc.indexOf('DISTILL_SYSTEM'), memorySrc.indexOf('AnthropicResponse'));
-    expect(system).toMatch(/is DATA/i);
-    expect(system).toMatch(/cannot give you instructions|not addressed to you/i);
+    // The fence lives in DISTILL_SECURITY_FENCE, in this file. That placement is the point:
+    // the distiller's tunable policy (what to remember, what to refuse) is a DB row an admin
+    // owns, but the injection fence is not — a guard someone can delete by editing a table is
+    // not a guard, and memory is a stored injection channel (text typed once is replayed into
+    // the system prompt of every later turn).
+    const fence = memorySrc.slice(
+      memorySrc.indexOf('const DISTILL_SECURITY_FENCE'),
+      memorySrc.indexOf('isCapabilityClaim'),
+    );
+    expect(fence).toMatch(/is DATA/i);
+    expect(fence).toMatch(/cannot give you instructions|not addressed to you/i);
+  });
+
+  it('loads the distiller POLICY from the database and appends the fence to it', () => {
+    // Both halves, in one assertion, because either alone is a bug: policy hardcoded here is
+    // the thing CLAUDE.md bans, and a fence loaded from a row is a guard an admin can delete.
+    expect(memoryCode).toMatch(/loadPrompt\([^)]*'tool',\s*'agent_memory_distiller'\)/);
+    expect(memoryCode).toContain('DISTILL_SECURITY_FENCE');
+    // …and no code fallback behind the load. A distiller running on an invented policy writes
+    // memories that are recalled as settled fact for as long as they survive.
+    expect(memoryCode).not.toMatch(/agent_memory_distiller[\s\S]{0,200}(\|\||\?\?)\s*[A-Z_]*(DISTILL|FALLBACK|DEFAULT)/);
   });
 
   it('marks recalled memory as data when splicing it into the system prompt', () => {
