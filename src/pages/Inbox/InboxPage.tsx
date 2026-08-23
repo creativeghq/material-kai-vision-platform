@@ -5,8 +5,8 @@ import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
-  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, Share2, EyeOff, Eye, Reply,
-  Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
+  User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, EyeOff, Eye, Reply,
+  Archive, ArchiveRestore, Trash2, Sparkles, Check, Link2,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
 } from 'lucide-react';
 import { projectPlansService } from '@/services/projectPlansService';
@@ -34,19 +34,18 @@ import { Label } from '@/components/core/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
+import { channelForSource, inboxRequestedServices, inboxThreadSource } from './inboxSource';
 import { formatDate } from '@/utils/datetime';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
 import {
   inboxApi, signInboxAttachment, LABEL_COLORS, labelChipClass,
-  type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
+  type InboxThread, type InboxMessage, type InboxParticipant,
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
   type IntakeConfirmation, type IntakeMatchMethod, type UserEmailAddress,
 } from '@/services/inboxApi';
-
-type ChannelFilter = 'all' | InboxChannel;
 
 interface WorkspaceMemberOption { user_id: string; label: string; }
 
@@ -87,35 +86,6 @@ function avatarTint(name: string | null | undefined): string {
 
 function money(amount: number | null | undefined, currency: string | null | undefined): string {
   return formatMoney(amount, currency || 'EUR');
-}
-
-/** Per-source presentation for a thread's channel (the "Team / Customer / WhatsApp / Email" tag).
- *  Email became a real inbound channel in #342 (Cloudflare Email Routing → email-webhooks);
- *  `social` in the Zernio pass — Instagram/Facebook/X DMs plus comments on our own posts. */
-function channelMeta(t: InboxThread): { label: string; Icon: typeof MessageCircle; className: string } {
-  if (t.channel === 'whatsapp') {
-    return { label: 'WhatsApp', Icon: MessageCircle, className: 'bg-green-500/15 text-green-400 border-green-500/30' };
-  }
-  if (t.channel === 'email') {
-    return { label: 'Email', Icon: Mail, className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
-  }
-  if (t.channel === 'social') {
-    // A comment is PUBLIC and a DM is not, and the reply composer behaves differently for each.
-    // Labelling both "Social" would leave an operator one keystroke from answering a private
-    // question underneath a public post.
-    const meta = (t.metadata ?? {}) as Record<string, unknown>;
-    const isComments = meta.social_kind === 'comments';
-    const platform = typeof meta.platform === 'string' ? meta.platform : 'Social';
-    const pretty = platform.charAt(0).toUpperCase() + platform.slice(1);
-    return isComments
-      ? { label: `${pretty} comments`, Icon: MessagesSquare, className: 'bg-pink-500/15 text-pink-300 border-pink-500/30' }
-      : { label: `${pretty} DM`, Icon: Share2, className: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30' };
-  }
-  if (t.thread_type === 'internal') {
-    return { label: 'Team', Icon: Users, className: 'bg-sky-500/15 text-sky-300 border-sky-500/30' };
-  }
-  // customer / upstream on the internal channel = an in-app customer chat.
-  return { label: t.thread_type === 'upstream' ? 'Dealer' : 'Customer', Icon: MessageSquare, className: 'bg-violet-500/15 text-violet-300 border-violet-500/30' };
 }
 
 /** Colored label pills for a thread. */
@@ -162,13 +132,19 @@ const InboxPage: React.FC = () => {
   const [canManageLabels, setCanManageLabels] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(searchParams.get('thread'));
 
-  // One bag for every secondary dimension. `channel` and `label` are request parameters on
-  // listThreads (server-applied); the rest are matched client-side against the loaded page.
-  // Assignee options come off the loaded threads, so the group def depends on them too.
+  // One bag for every secondary dimension. `label` is a request parameter on listThreads
+  // (server-applied) and `source` is half of one — it narrows the request to that source's
+  // channel and then separates same-channel sources client-side. The rest are matched
+  // client-side against the loaded page. Assignee options come off the loaded threads, so the
+  // group def depends on them too.
+  //
+  // The bag lives in `?f=` so a filtered mailbox is a link: `/profile?tab=inbox` (a whole second
+  // inbox until this merge) is now just this list pinned to `source: public_profile`, and the
+  // redirect that replaced it hands over exactly that URL.
   const filterGroups = useMemo(() => buildInboxFilters(wsLabels, threads, myUserId ?? undefined), [wsLabels, threads, myUserId]);
   const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
-    useFilters<InboxThread>(threads, filterGroups);
-  const filter = (filterValues.channel as ChannelFilter) || 'all';
+    useFilters<InboxThread>(threads, filterGroups, { urlKey: 'f' });
+  const channelFilter = channelForSource(filterValues.source as string | undefined);
   const labelFilter = (filterValues.label as string) || null;
   // The Unread mailbox folder and the modal's Unread toggle are the same constraint.
   const unreadOnly = filterValues.unread === true;
@@ -235,7 +211,7 @@ const InboxPage: React.FC = () => {
     setLoadingThreads(true);
     try {
       const { threads } = await inboxApi.listThreads({
-        ...(filter === 'all' ? {} : { channel: filter }),
+        ...(channelFilter ? { channel: channelFilter } : {}),
         ...(allWorkspaces && isPlatformOperator ? { scope: 'all' as const } : {}),
         ...(showArchived ? { archived: true } : {}),
         ...(labelFilter ? { label_id: labelFilter } : {}),
@@ -246,7 +222,7 @@ const InboxPage: React.FC = () => {
     } finally {
       setLoadingThreads(false);
     }
-  }, [filter, allWorkspaces, isPlatformOperator, showArchived, labelFilter, toast]);
+  }, [channelFilter, allWorkspaces, isPlatformOperator, showArchived, labelFilter, toast]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
@@ -498,8 +474,9 @@ const InboxPage: React.FC = () => {
     }
   };
 
-  const threadDisplayName = (t: InboxThread) => t.subject
-    || (t.channel === 'whatsapp' ? 'WhatsApp contact' : t.channel === 'social' ? 'Social conversation' : 'Conversation');
+  // Falls back to the SOURCE, which is the one thing always known about a subject-less thread —
+  // "WhatsApp contact" beats "Conversation", and so does "Public profile enquiry".
+  const threadDisplayName = (t: InboxThread) => t.subject || `${inboxThreadSource(t).label} conversation`;
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
 
@@ -790,7 +767,7 @@ const InboxPage: React.FC = () => {
                   title={showArchived ? 'Nothing archived' : 'No conversations yet'}
                   description={showArchived
                     ? 'Deleted conversations rest here for 30 days before they are removed for good.'
-                    : 'WhatsApp and customer chats appear here automatically as they come in.'}
+                    : 'Email, WhatsApp, social and enquiries from your public profile all land here, each tagged with where it came from.'}
                 />
               )
             ) : groupedThreads.map(([bucket, items]) => (
@@ -799,7 +776,7 @@ const InboxPage: React.FC = () => {
                 {items.map((t) => {
                   const name = threadDisplayName(t);
                   const active = activeId === t.id;
-                  const { Icon: SrcIcon, label: srcLabel, className: srcClass } = channelMeta(t);
+                  const { Icon: SrcIcon, label: srcLabel, className: srcClass } = inboxThreadSource(t);
                   return (
                     <button
                       key={t.id}
@@ -882,7 +859,7 @@ const InboxPage: React.FC = () => {
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <span>{channelMeta(activeThread).label}</span>
+                    <span>{inboxThreadSource(activeThread).label}</span>
                     <span className="opacity-50">·</span>
                     <span>{activeCount} participant{activeCount === 1 ? '' : 's'}</span>
                   </div>
@@ -1817,6 +1794,7 @@ const DetailsRail: React.FC<{
   const subtitle = [contact?.position, company?.name].filter(Boolean).join(' · ');
   const metrics = context?.metrics ?? null;
   const invoices = context?.invoices ?? [];
+  const requestedServices = inboxRequestedServices(thread);
 
   // Information block: who's handling it + status (real data, no fabricated priority/response-rate).
   const agentActive = thread.agent_state === 'active';
@@ -2023,8 +2001,24 @@ const DetailsRail: React.FC<{
       <Separator className="bg-white/10" />
       <div className="p-5 space-y-2.5">
         <SectionTitle icon={<MessageSquare className="h-4 w-4" />}>Conversation</SectionTitle>
-        <Row icon={<MessagesSquare className="w-3.5 h-3.5" />}><span className="capitalize">{thread.channel} · {thread.thread_type}</span></Row>
+        <Row icon={<MessagesSquare className="w-3.5 h-3.5" />}>
+          <span>{inboxThreadSource(thread).label}</span>
+          <span className="opacity-50"> · </span>
+          <span className="capitalize">{thread.channel}</span>
+        </Row>
         <Row icon={<Hash className="w-3.5 h-3.5" />}><span className="capitalize">{thread.status}</span></Row>
+        {/* The one thing a public-profile enquiry carries that no channel does: which services
+            the visitor ticked. It used to be the only reason the separate profile inbox existed. */}
+        {requestedServices.length > 0 && (
+          <div className="pt-1 space-y-1.5">
+            <div className="text-[11px] text-muted-foreground">Asked about</div>
+            <div className="flex flex-wrap gap-1">
+              {requestedServices.map((s) => (
+                <Badge key={s} variant="neutral" className="text-[10px]">{s}</Badge>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="text-[11px] text-muted-foreground pt-0.5">Started {formatDate(thread.created_at, { withTime: true })}</div>
       </div>
     </div>

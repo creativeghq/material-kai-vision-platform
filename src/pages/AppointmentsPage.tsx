@@ -160,7 +160,7 @@ function AppointmentDetailDrawer({
   };
 
   const openInbox = () => {
-    navigate('/profile?tab=inbox');
+    navigate('/inbox');
     onClose();
   };
 

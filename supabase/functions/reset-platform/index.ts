@@ -339,7 +339,8 @@ const TABLES_TO_CLEAR = [
 
   // ── Profile / social requests & follows (user-generated) ────────────
   'profile_reviews',               // Reviews left on profiles
-  'profile_contact_requests',      // Contact requests
+  // Public-profile contact requests are Inbox threads now (source: public_profile) — cleared
+  // with inbox_threads, not from a table of their own.
   'factory_access_requests',       // Factory data-access requests
   'factory_registration_requests', // Factory registration requests
   'role_upgrade_requests',         // Role-upgrade requests

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook, BadgeCheck } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook, BadgeCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { filterUrl } from '@/components/core/filters';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
 import { AmbassadorTab } from '@/components/core/Profile/AmbassadorTab';
@@ -9,7 +10,6 @@ import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
 import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
 import { MyDocumentsTab } from '@/components/core/Profile/MyDocumentsTab';
-import { InboxTab } from '@/components/core/Profile/InboxTab';
 import { SocialHubPanel } from '@/modules/social-media/components/SocialHubPanel';
 import { WebsitesTab } from '@/components/core/Profile/WebsitesTab';
 import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
@@ -25,8 +25,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
+/**
+ * Where `?tab=inbox` goes now. Messages sent through a public profile stopped being their own
+ * store and their own screen — they are ordinary Inbox conversations tagged `Public profile`, so
+ * this tab is that Inbox with the Source filter already set. Bookmarks, the notification bell and
+ * every `hire_me` flow emitted before the change all keep working through this redirect.
+ */
+const PROFILE_INBOX_URL = filterUrl('/inbox', 'f', { source: 'public_profile' });
+
 export const UserProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { can } = usePermissions();
   const { workspaceRole, isPlatformOperator, activeWorkspaceId, activeWorkspace } = useWorkspace();
@@ -45,8 +54,9 @@ export const UserProfilePage: React.FC = () => {
 
   useEffect(() => {
     const tab = searchParams.get('tab') ?? 'profile';
+    if (tab === 'inbox') { navigate(PROFILE_INBOX_URL, { replace: true }); return; }
     setActiveTab(tab);
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const handleTabChange = (tab: string) => {
     // Heavy tab trees (several cards, each with its own fetch) block the paint on first
@@ -76,10 +86,6 @@ export const UserProfilePage: React.FC = () => {
           <TabsTrigger value="ambassador" className="flex items-center gap-2">
             <BadgeCheck className="h-4 w-4" />
             Ambassador
-          </TabsTrigger>
-          <TabsTrigger value="inbox" className="flex items-center gap-2">
-            <Inbox className="h-4 w-4" />
-            Inbox
           </TabsTrigger>
           <TabsTrigger value="appointments" className="flex items-center gap-2">
             <CalendarCheck className="h-4 w-4" />
@@ -153,10 +159,6 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="ambassador" className="space-y-6">
           <AmbassadorTab />
-        </TabsContent>
-
-        <TabsContent value="inbox" className="space-y-6">
-          <InboxTab />
         </TabsContent>
 
         <TabsContent value="appointments">

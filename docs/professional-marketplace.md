@@ -143,23 +143,49 @@ Visitors can contact a professional directly from their public profile.
 1. Visitor clicks **Hire Me** (global) or **Hire** on a specific service card
 2. `HireMeModal` opens with optional service pre-selected
 3. Visitor fills in name, email, message, and optionally selects services
-4. On submit: inserts a row into `profile_contact_requests` and emits a `hire_me_received` flow event
+4. On submit: POSTs `action: 'profile_contact'` to the `inbox-api` edge function — never a direct
+   client write. The modal renders on a page with no auth gate, so a browser-side insert fails for
+   exactly the audience the form exists for. The function is Turnstile-gated and rate-limited
+   (3 per sender / 10 min, 20 per recipient / hour), and both guards run BEFORE the bot check so a
+   malformed or flooding request never burns a Turnstile verification.
 
-### DB Table: `profile_contact_requests`
+### Where the enquiry lands: the unified Inbox
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK |
-| `to_user_id` | uuid | FK to `user_profiles.user_id` |
-| `from_name` | text | Requester's name |
-| `from_email` | text | Requester's email |
-| `message` | text | Message body |
-| `services_requested` | text[] | Selected service names (nullable) |
-| `created_at` | timestamptz | Auto |
+There is **no `profile_contact_requests` table** (dropped 2026-08-23). An enquiry is an ordinary
+`inbox_threads` row, so it gets everything the Inbox has — a reply that reaches the sender, their
+reply threading back, assignment, labels, archive, search, AI draft, and a CRM contact for the lead.
+
+| Field | Value |
+|---|---|
+| `thread_type` | `customer` |
+| `channel` | `email` — the transport a reply goes out on |
+| `metadata.source` | **`public_profile`** — the tag, and the one thing the channel cannot tell you |
+| `metadata.profile_user_id` | the profile owner; also the `owner` member participant |
+| `metadata.email_to` / `email_from` | the owner's inbound address / the visitor's — what the email relay needs |
+| `metadata.services_requested` | the services ticked on the form (rendered in the thread details) |
+| `agent_state` | `'off'`, deliberately — see below |
+
+- **Workspace** — `user_email_addresses.workspace_id` when the owner has an inbound address, else
+  the workspace they own/administer, else any active membership. Mail to their address and a
+  message through their profile are the same person being reached, so they must not split.
+- **The inbound address is allocated on demand.** Without a real mailbox on both ends the email
+  relay in `insertMessageAndNotify` silently skips: the member would see their own reply and the
+  sender would receive nothing.
+- **The assistant does NOT auto-engage**, unlike every other inbound channel. "Hire me" is
+  addressed to a person by someone who picked them off their profile; an instant AI answer is the
+  one reply that loses the job. The Bot toggle hands it over when the member wants that.
+- **A repeat enquiry from the same sender continues the open thread** (30-day window) rather than
+  stacking near-identical threads on a member who has answered none of them.
+
+The source tag is derived in one place — [`src/pages/Inbox/inboxSource.ts`](../src/pages/Inbox/inboxSource.ts),
+guarded by [tests/unit/inboxSource.test.ts](../tests/unit/inboxSource.test.ts). `/profile?tab=inbox`
+(the old separate screen) redirects to that Inbox with the Source filter pre-set.
 
 ### Flow Event
 
-Emits `hire_me_received` via `flowEventService` — can be used to trigger automated flows (e.g., email notification to the professional).
+Emits `hire_me_received` — the seeded, locked `Hire Me → Notify Recipient` flow owns delivery, so
+an admin can retarget it without a deploy. `action_url` is `/inbox?thread=<id>`: the bell opens the
+conversation itself.
 
 ---
 

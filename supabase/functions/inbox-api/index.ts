@@ -29,6 +29,7 @@ import {
   allocateUserEmailAddress,
   buildOutboundMessageId,
   buildReplyToAddress,
+  resolveCustomer,
 } from '../_shared/inbound-email.ts';
 import {
   intakeDisplayTotal,
@@ -989,6 +990,18 @@ async function insertMessageAndNotify(
     const meta = (thread.metadata as Json) || {};
     const toAddress = String(meta.email_from || '');
     const ourMailbox = String(meta.email_to || '');
+    // A recipient with no mailbox to send FROM used to fall straight through this branch: the
+    // member saw their own reply, the composer cleared, and nothing left the building. Inbound
+    // mail always carries `email_to`, but a public-profile enquiry files even when the owner's
+    // address could not be allocated (two people wanting the same handle), so the state is
+    // reachable — and a skipped relay is indistinguishable from a delivered one.
+    if (toAddress && !ourMailbox) {
+      throw new HttpError(
+        502,
+        'Message stored but NOT delivered: this conversation has no address to send from. '
+          + 'Pick your inbox email address first, then resend.',
+      );
+    }
     if (toAddress && ourMailbox) {
       const messageId = (msg as { id: string }).id;
       const domain = ourMailbox.split('@')[1] || '';
@@ -2895,9 +2908,18 @@ const TOKEN_ACTIONS = new Set(['token_get_thread', 'token_send_message', 'token_
 // profile_contact_requests straight from the browser and RLS only allows `authenticated` — so a
 // logged-out visitor always got "Failed to send". The form was inert for exactly the audience it
 // exists to serve. It posts here instead: Turnstile-gated, rate-limited, service-role insert.
+//
+// It now lands in the SAME Inbox as every other conversation, tagged `source: 'public_profile'`,
+// instead of a private table with its own screen. What that table could not do, and this does:
+// a reply that actually reaches the sender (their answer threads back in by email), assignment,
+// labels, archive, the AI draft, search, and a CRM contact for the lead. It could not even do
+// what it looked like it did — `profile_contact_requests` had no DELETE policy, so the "delete
+// message" button in that screen removed the row from the list and nothing from the database.
 const CONTACT_MAX_PER_RECIPIENT_HOUR = 20;   // stops one profile being flooded
 const CONTACT_MAX_PER_SENDER_WINDOW = 3;
 const CONTACT_SENDER_WINDOW_MS = 10 * 60_000;
+/** How far back a repeat enquiry is folded into the conversation it continues. */
+const CONTACT_THREAD_REUSE_DAYS = 30;
 
 function clientIp(req: Request): string {
   return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
@@ -2918,15 +2940,38 @@ async function verifyTurnstile(db: DbClient, token: string, ip: string): Promise
   return !!(await r.json().catch(() => ({ success: false }))).success;
 }
 
+/**
+ * The workspace an enquiry for this person files into.
+ *
+ * Their inbound address already names one, and that is the answer whenever it exists — mail to
+ * `you@mail.…` and a message through your profile are the same person being reached, so they must
+ * not split across two workspaces. Otherwise: the workspace they OWN or administer, and only then
+ * any active membership, so an enquiry for a professional never lands in someone else's team
+ * inbox while their own sits empty.
+ */
+async function profileHostWorkspace(db: DbClient, userId: string): Promise<string | null> {
+  const { data: addr } = await db
+    .from('user_email_addresses').select('workspace_id').eq('user_id', userId).maybeSingle();
+  const fromAddress = (addr as { workspace_id?: string } | null)?.workspace_id;
+  if (fromAddress) return fromAddress;
+
+  const { data: mems } = await db
+    .from('workspace_members').select('workspace_id, role, status').eq('user_id', userId);
+  const active = ((mems || []) as Array<{ workspace_id: string; role: string; status: string }>)
+    .filter((m) => ACTIVE_MEMBER(m.status));
+  const owned = active.find((m) => m.role === 'owner' || m.role === 'admin');
+  return (owned ?? active[0])?.workspace_id ?? null;
+}
+
 async function handleProfileContact(db: DbClient, req: Request, payload: Json): Promise<Response> {
   const toUserId = String((payload as Record<string, unknown>).to_user_id ?? '').trim();
   const name = String((payload as Record<string, unknown>).from_name ?? '').trim().slice(0, 200);
-  const email = String((payload as Record<string, unknown>).from_email ?? '').trim().slice(0, 200);
+  const email = String((payload as Record<string, unknown>).from_email ?? '').trim().slice(0, 200).toLowerCase();
   const message = String((payload as Record<string, unknown>).message ?? '').trim().slice(0, 5000);
   const servicesRaw = (payload as Record<string, unknown>).services_requested;
   const services = Array.isArray(servicesRaw)
     ? servicesRaw.map((s) => String(s).slice(0, 120)).slice(0, 20)
-    : null;
+    : [];
 
   if (!toUserId || !name || !email || !message) throw new HttpError(400, 'name, email and message are required');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
@@ -2935,13 +2980,17 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
   const { data: recipient } = await db.from('user_profiles').select('user_id').eq('user_id', toUserId).maybeSingle();
   if (!recipient) throw new HttpError(404, 'Profile not found');
 
+  // Rate limits count the MESSAGES this path has written, which is why each one carries
+  // `source`, `email_from` and `profile_user_id` in its own metadata — a thread is reused by a
+  // repeat sender, so counting threads would let the second enquiry onward through free.
   const since = new Date(Date.now() - CONTACT_SENDER_WINDOW_MS).toISOString();
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const contactMessages = () => db.from('inbox_messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('metadata->>source', 'public_profile');
   const [{ count: bySender }, { count: byRecipient }] = await Promise.all([
-    db.from('profile_contact_requests').select('*', { count: 'exact', head: true })
-      .eq('from_email', email).gte('created_at', since),
-    db.from('profile_contact_requests').select('*', { count: 'exact', head: true })
-      .eq('to_user_id', toUserId).gte('created_at', hourAgo),
+    contactMessages().eq('metadata->>email_from', email).gte('created_at', since),
+    contactMessages().eq('metadata->>profile_user_id', toUserId).gte('created_at', hourAgo),
   ]);
   if ((bySender ?? 0) >= CONTACT_MAX_PER_SENDER_WINDOW || (byRecipient ?? 0) >= CONTACT_MAX_PER_RECIPIENT_HOUR) {
     throw new HttpError(429, 'Too many messages right now — please try again later.');
@@ -2955,21 +3004,154 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
     throw new HttpError(400, 'Bot check failed — please retry.');
   }
 
-  // is_read is set server-side: a sender must never be able to pre-mark their own message read.
-  const { error } = await db.from('profile_contact_requests').insert({
-    to_user_id: toUserId, from_name: name, from_email: email, message,
-    services_requested: services && services.length ? services : null, is_read: false,
-  });
-  if (error) throw new HttpError(400, 'Could not send your message.');
+  const workspaceId = await profileHostWorkspace(db, toUserId);
+  // 5xx on purpose: a professional publishing a profile with nowhere to receive is a platform
+  // fault, and the api-logger reports 5xx to Sentry while it deliberately never reports a 4xx.
+  // Telling the visitor to try another way beats accepting a message into a hole.
+  if (!workspaceId) throw new HttpError(503, 'This profile cannot receive messages right now.');
 
-  // Same event the authenticated client path emits — the seeded "Hire Me Received" flow owns
-  // delivery, so an admin can retarget it without a deploy.
+  // The mailbox the reply will go OUT from, allocated on first need exactly as opening the Inbox
+  // allocates it. Without a real address on both ends the email relay in insertMessageAndNotify
+  // silently skips — the member would see their own reply and the sender would receive nothing.
+  const domain = (await resolveSecret(db, 'INBOUND_EMAIL_DOMAIN')).value || DEFAULT_INBOUND_DOMAIN;
+  const allocation = await allocateUserEmailAddress(db, { userId: toUserId, workspaceId, domain });
+  const { data: addrRow } = await db
+    .from('user_email_addresses').select('id, full_address').eq('user_id', toUserId).maybeSingle();
+  const mailbox = (addrRow as { full_address?: string } | null)?.full_address ?? null;
+  const addressId = (addrRow as { id?: string } | null)?.id ?? null;
+  // `taken`/`invalid` mean the handle needs a human choice; the enquiry still has to land, so it
+  // files without a reply-from address and the member answers from the composer once they pick one.
+  if (!allocation.ok && !mailbox) {
+    console.warn('[inbox-api] profile_contact: no inbound address for', toUserId, allocation.reason);
+  }
+
+  // The sender becomes a CRM contact the same way an inbound email sender does — same matcher,
+  // same `crm_contact_created` flow. An enquiry off a public profile IS a lead.
+  const customer = await resolveCustomer(db, workspaceId, email, name, toUserId);
+
+  const meta: Record<string, unknown> = {
+    // The one field the transport cannot tell you: `channel` says this replies by email, and
+    // says nothing about a stranger having found a public profile page. See inboxSource.ts.
+    source: 'public_profile',
+    profile_user_id: toUserId,
+    email_from: email,
+    ...(mailbox ? { email_to: mailbox } : {}),
+    ...(addressId ? { email_address_id: addressId } : {}),
+    from_name: name,
+    // The only thing this form carries that no channel does — rendered in the thread details.
+    ...(services.length ? { services_requested: services } : {}),
+  };
+
+  // Fold a repeat enquiry from the same person into the conversation it continues, rather than
+  // stacking three near-identical threads on a member who has answered none of them yet.
+  const reuseSince = new Date(Date.now() - CONTACT_THREAD_REUSE_DAYS * 86_400_000).toISOString();
+  const { data: existingThread } = await db.from('inbox_threads')
+    .select('id, metadata')
+    .eq('workspace_id', workspaceId)
+    .eq('metadata->>source', 'public_profile')
+    .eq('metadata->>profile_user_id', toUserId)
+    .eq('metadata->>email_from', email)
+    .is('archived_at', null)
+    .eq('status', 'open')
+    .gte('last_message_at', reuseSince)
+    .order('last_message_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let threadId = (existingThread as { id?: string } | null)?.id ?? null;
+  let customerParticipantId: string | null = null;
+
+  if (threadId) {
+    // Merge rather than replace: an earlier enquiry's services must survive a later message
+    // that ticked none.
+    const prior = ((existingThread as { metadata?: Record<string, unknown> } | null)?.metadata ?? {});
+    const priorServices = Array.isArray(prior.services_requested) ? prior.services_requested as string[] : [];
+    const merged = [...new Set([...priorServices, ...services])];
+    await db.from('inbox_threads')
+      .update({
+        metadata: { ...prior, ...meta, ...(merged.length ? { services_requested: merged } : {}) },
+        last_message_at: new Date().toISOString(),
+      })
+      .eq('id', threadId);
+    if (customer.contactId) {
+      const { data: cp } = await db.from('inbox_participants').select('id')
+        .eq('thread_id', threadId).eq('contact_id', customer.contactId).limit(1).maybeSingle();
+      customerParticipantId = (cp as { id?: string } | null)?.id ?? null;
+    }
+  } else {
+    // agent_state stays 'off'. Every other inbound channel auto-engages the assistant on the
+    // workspace setting, and this is the one place that would be wrong: "hire me" is addressed
+    // to a PERSON by someone who chose them off their profile, and an instant AI answer is the
+    // one reply that loses the job. The Bot toggle hands it over when the member wants that.
+    const { data: created, error: threadErr } = await db.from('inbox_threads')
+      .insert({
+        workspace_id: workspaceId,
+        thread_type: 'customer',
+        channel: 'email',
+        subject: `Enquiry from ${name}`,
+        status: 'open',
+        metadata: meta,
+        agent_state: 'off',
+        last_message_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (threadErr) throw new HttpError(500, 'Could not deliver your message.');
+    threadId = (created as { id: string }).id;
+
+    if (customer.contactId) {
+      const { data: cust } = await db.from('inbox_participants')
+        .insert({
+          thread_id: threadId, participant_type: 'customer',
+          contact_id: customer.contactId, thread_role: 'participant',
+        })
+        .select('id')
+        .single();
+      customerParticipantId = (cust as { id?: string } | null)?.id ?? null;
+    }
+
+    // The profile owner owns the thread — a message aimed at a person lands on that person,
+    // and the owner participant is also what makes it visible to them regardless of role.
+    const { error: ownerErr } = await db.from('inbox_participants').insert({
+      thread_id: threadId, participant_type: 'member', user_id: toUserId,
+      workspace_id: workspaceId, thread_role: 'owner', added_by: toUserId,
+    });
+    if (ownerErr) throw new HttpError(500, 'Could not deliver your message.');
+  }
+
+  const { error: msgErr } = await db.from('inbox_messages').insert({
+    thread_id: threadId,
+    sender_participant_id: customerParticipantId,
+    body: message,
+    attachments: [],
+    message_type: 'text',
+    metadata: {
+      channel: 'email',
+      direction: 'incoming',
+      source: 'public_profile',
+      profile_user_id: toUserId,
+      email_from: email,
+      ...(services.length ? { services_requested: services } : {}),
+    },
+  });
+  if (msgErr) throw new HttpError(500, 'Could not deliver your message.');
+
+  await db.from('inbox_threads').update({
+    status: 'open',
+    last_message_at: new Date().toISOString(),
+    last_message_preview: message.replace(/\s+/g, ' ').slice(0, 140),
+  }).eq('id', threadId);
+
+  // Same event as before — the seeded "Hire Me Received" flow owns delivery, so an admin can
+  // retarget it without a deploy. Only the destination changed: the bell now opens the
+  // conversation itself instead of a screen that no longer exists.
   await emitFlowEvent('hire_me_received', {
     user_id: toUserId, to_user_id: toUserId, type: 'hire_me',
     title: `New hire request from ${name}`,
-    body: services && services.length ? `Interested in: ${services.join(', ')}` : message.slice(0, 100),
-    action_url: '/profile?tab=inbox',
-    from_name: name, from_email: email, services_requested: services ?? [],
+    body: services.length ? `Interested in: ${services.join(', ')}` : message.slice(0, 100),
+    action_url: `/inbox?thread=${threadId}`,
+    thread_id: threadId,
+    from_name: name, from_email: email, services_requested: services,
     sent_at: new Date().toISOString(),
   }).catch(() => {});
 
@@ -3024,7 +3206,7 @@ async function handler(req: Request): Promise<Response> {
   }
 
   // Public branch — genuinely anonymous visitor on a public profile page. Turnstile + rate
-  // limited inside the handler; writes only profile_contact_requests.
+  // limited inside the handler; writes only a `source: public_profile` thread + its message.
   if (action === 'profile_contact') {
     return handleProfileContact(db, req, payload);
   }

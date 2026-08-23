@@ -4,10 +4,18 @@ import { hasCreds, serviceClient, createUser, teardown, runId, SUPABASE_URL, typ
 
 // Public "Hire me" contact form (PublicProfilePage → HireMeModal → inbox-api `profile_contact`).
 // Called with the ANON key only — exactly what a logged-out visitor's browser sends.
-// This path existed as a direct client insert into profile_contact_requests, which is
-// authenticated-only, so every anonymous submission failed with 42501 while the modal rendered
-// happily on a public page. It was moved server-side; these assertions pin the properties that
-// made the move necessary, so it can't silently regress to "inert form" again.
+//
+// Two shapes are pinned here, and both are things this path has actually been:
+//
+//  1. INERT. It began as a direct client insert into `profile_contact_requests`, which is
+//     authenticated-only, so every anonymous submission failed with 42501 while the modal
+//     rendered happily on a public page. Moving it server-side fixed that; these assertions keep
+//     the guards that made the move necessary observable.
+//  2. A SECOND INBOX. The message then landed in a private table with its own screen, no reply
+//     path (the only action was a mailto: link) and a delete button that deleted nothing — the
+//     table had no DELETE policy. It is now an ordinary `inbox_threads` row tagged
+//     `metadata.source = 'public_profile'`, which is what makes reply/assign/label/archive work.
+//     `profile_contact_requests` is GONE; a query against it here would be a false green.
 const suite = hasCreds ? describe : describe.skip;
 
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
@@ -19,7 +27,7 @@ suite('inbox-api · public profile contact', () => {
   const senderEmail = `e2e-contact-${rid}@materialshub.gr`;
 
   // Turnstile is LIVE and a test cannot mint a challenge token, so nothing here can reach the
-  // INSERT. That's fine: the function runs every cheap guard (shape, recipient, rate limit)
+  // thread write. That's fine: the function runs every cheap guard (shape, recipient, rate limit)
   // BEFORE the bot check precisely so they stay observable — and "a tokenless request is
   // refused" is itself the assertion that matters most now.
   async function contact(body: Record<string, unknown>) {
@@ -32,14 +40,24 @@ suite('inbox-api · public profile contact', () => {
     return { status: res.status, body: await res.json().catch(() => null) as any };
   }
 
+  /** Anything this run's senders managed to file, so a passing test leaves no mailbox behind. */
+  async function purgeThreads() {
+    const { data } = await svc.from('inbox_threads')
+      .select('id')
+      .eq('metadata->>source', 'public_profile')
+      .eq('metadata->>profile_user_id', recipient.id);
+    const ids = ((data ?? []) as Array<{ id: string }>).map((t) => t.id);
+    if (ids.length) await svc.from('inbox_threads').delete().in('id', ids);
+  }
+
   beforeAll(async () => {
     svc = serviceClient();
     recipient = await createUser(svc, 'contactrx', rid);
   });
 
   afterAll(async () => {
-    await svc.from('profile_contact_requests').delete().eq('to_user_id', recipient.id).then(() => {}, () => {});
-    await svc.from('profile_contact_requests').delete().eq('from_email', senderEmail).then(() => {}, () => {});
+    await purgeThreads().catch(() => {});
+    await svc.from('crm_contacts').delete().ilike('email', `e2e-%-${rid}@materialshub.gr`).then(() => {}, () => {});
     await teardown(svc, { userIds: [recipient.id] });
   });
 
@@ -86,6 +104,16 @@ suite('inbox-api · public profile contact', () => {
     // never advances — what this pins is that the limiter runs, and runs ahead of the gate.
     const first = await send(1);
     expect(first.body?.error, 'rate limiter did not run before the bot gate').toMatch(/bot check/i);
-    await svc.from('profile_contact_requests').delete().eq('from_email', email);
+  });
+
+  it('has no separate contact-request store to fall back to', async () => {
+    // The merge is only real if the old table is gone. While it existed, a regression could
+    // route enquiries back into it and every assertion above would still pass — the visitor's
+    // message would simply stop being a conversation anyone could answer.
+    const { error } = await svc.from('profile_contact_requests' as never).select('id').limit(1);
+    expect(
+      error?.message ?? '',
+      'profile_contact_requests still exists — public-profile enquiries have somewhere to hide again',
+    ).toMatch(/does not exist|schema cache|Could not find/i);
   });
 });

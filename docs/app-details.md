@@ -364,7 +364,10 @@ A B2B talent and services marketplace built on top of the platform, enabling pro
 1. Visitor clicks "Hire Me" or "Hire" on a specific service card
 2. Modal opens with optional service pre-selection
 3. Visitor fills in name, email, message
-4. Request stored in `profile_contact_requests` table
+4. Filed in the unified Inbox as a conversation tagged **Public profile**
+   (`inbox_threads.metadata.source = 'public_profile'`), owned by the professional — so it can be
+   replied to, assigned, labelled and archived like any other. There is no separate contact-request
+   table; see [professional-marketplace.md](professional-marketplace.md)
 5. `hire_me_received` flow event emitted → triggers configurable automation (email, Slack, CRM)
 6. Platform tracks service interest per professional in analytics
 

@@ -29,6 +29,9 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { HubId } from './nav-items';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
+// A filtered list is spelled ONE way. Hand-writing `?f={"source":…}` here is a URL every router
+// resolves and the Inbox reads as "no filter" — the exact silent shape filterUrl exists to stop.
+import { filterUrl } from '@/components/core/filters/filterUrl';
 
 export interface LauncherSection {
   label: string;
@@ -318,11 +321,13 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
     { label: 'Subscription', to: '/billing/subscriptions', icon: CreditCard },
   ],
   // Service is three agent surfaces (Inbox / WhatsApp / Reviews); the personal side of the same
-  // conversations lives on the profile and is otherwise unreachable from this menu.
+  // conversations lives on the profile and is otherwise unreachable from this menu — except
+  // profile enquiries, which are now Inbox threads tagged `Public profile` rather than a
+  // separate screen, so this points at that filtered view of the one Inbox.
   service: [
     { label: 'Reviews about you', to: '/profile?tab=reviews', icon: Star },
     { label: 'My appointments', to: '/profile?tab=appointments', icon: CalendarDays },
-    { label: 'My messages', to: '/profile?tab=inbox', icon: MessagesSquare },
+    { label: 'Profile enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: MessagesSquare },
   ],
   // The Projects card already lists the project / heat-pump / heating estimators, so the kitchen
   // calculator is the one that is missing — plus photo recognition and a board starting point.

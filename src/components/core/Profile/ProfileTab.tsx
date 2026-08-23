@@ -631,7 +631,15 @@ export const ProfileTab: React.FC = () => {
         supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
         supabase.from('user_profiles').select('featured_moodboard_id').eq('user_id', user.id).maybeSingle(),
         supabase.from('moodboards').select('id, view_count').eq('user_id', user.id),
-        supabase.from('profile_contact_requests').select('is_read').eq('to_user_id', user.id),
+        // Hire enquiries are Inbox threads tagged `source: public_profile` (there is no separate
+        // contact-request table any more). Read is the participant's own `last_read_at` against
+        // the thread's last message — the SAME read state the Inbox shows, rather than a second
+        // `is_read` flag that drifted from it.
+        supabase.from('inbox_participants')
+          .select('last_read_at, inbox_threads!inner(last_message_at, metadata)')
+          .eq('user_id', user.id)
+          .eq('participant_type', 'member')
+          .eq('inbox_threads.metadata->>source', 'public_profile'),
         supabase.from('appointments').select('status').eq('professional_user_id', user.id),
         supabase.from('profile_reviews').select('overall_rating').eq('to_user_id', user.id),
         supabase.from('moodboard_quote_requests').select('*', { count: 'exact', head: true }).eq('moodboard_creator_id', user.id),
@@ -655,10 +663,16 @@ export const ProfileTab: React.FC = () => {
         mbComments = cmtCount ?? 0;
       }
 
-      // Hire requests
-      const hireRows = (hireData ?? []) as { is_read: boolean }[];
+      // Hire requests. PostgREST types every embed as an array even where the FK makes it
+      // one row, so normalize rather than asserting a shape and being wrong on one of them.
+      type HireRow = { last_read_at: string | null; inbox_threads: { last_message_at: string } | { last_message_at: string }[] | null };
+      const hireRows = (hireData ?? []) as HireRow[];
       const hireTotal = hireRows.length;
-      const hireUnread = hireRows.filter((r) => !r.is_read).length;
+      const hireUnread = hireRows.filter((r) => {
+        const t = Array.isArray(r.inbox_threads) ? r.inbox_threads[0] : r.inbox_threads;
+        if (!t) return false;
+        return !r.last_read_at || new Date(t.last_message_at) > new Date(r.last_read_at);
+      }).length;
 
       // Appointments breakdown
       const apptRows = (apptData ?? []) as { status: string }[];

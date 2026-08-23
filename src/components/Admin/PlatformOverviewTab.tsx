@@ -384,10 +384,12 @@ export function PlatformOverviewTab() {
         supabase.from('user_profiles').select('id,professional_type,created_at').gte('created_at', ago12.toISOString()),
         // `quote_request_id` does not exist — the FK is `quote_id`.
         supabase.from('quote_items').select('product_id,quote_id').gte('created_at', ago12.toISOString()).limit(3000),
-        // `hire_me_requests` does not exist — the successor is `profile_contact_requests`,
-        // where the column is `services_requested` and there is NO `status` at all. The funnel
-        // that consumed `status` is removed below rather than faked. (audit #270)
-        supabase.from('profile_contact_requests').select('id,services_requested,created_at').gte('created_at', ago12.toISOString()),
+        // `hire_me_requests` does not exist, and neither does `profile_contact_requests` any
+        // more: a hire enquiry is an Inbox thread tagged `source: public_profile`, and the
+        // services the visitor ticked ride in its metadata. There is still NO status — the
+        // funnel that consumed one is removed below rather than faked. (audit #270)
+        supabase.from('inbox_threads').select('id,metadata,created_at')
+          .eq('metadata->>source', 'public_profile').gte('created_at', ago12.toISOString()),
         supabase.from('agent_runs').select('created_at,status,duration_ms,credits_debited,background_agents(agent_type)').gte('created_at', ago12.toISOString()),
         // vr_worlds has no `quality_preset` and no `credits_used` — the tier is `model` and
         // the charge is `credits_charged`. moodboard_items timestamps on `added_at`, not
@@ -461,12 +463,13 @@ export function PlatformOverviewTab() {
       // Hire Me breakdown
       const hireSvcMap = new Map<string, number>();
       (hireMe ?? []).forEach((h: any) => {
-        (h.services_requested ?? []).forEach((s: string) => hireSvcMap.set(s.replace(/_/g, ' '), (hireSvcMap.get(s.replace(/_/g, ' ')) ?? 0) + 1));
+        const svcs = Array.isArray(h.metadata?.services_requested) ? h.metadata.services_requested as string[] : [];
+        svcs.forEach((s: string) => hireSvcMap.set(s.replace(/_/g, ' '), (hireSvcMap.get(s.replace(/_/g, ' ')) ?? 0) + 1));
       });
       setHireMeServices(Array.from(hireSvcMap.entries()).sort((a, b) => b[1] - a[1]).map(([service, count]) => ({ service, count })));
-      // `profile_contact_requests` has no status column — a contact request is either made or it
-      // is not; there is no pipeline behind it. The funnel keyed on `h.status` was grouping
-      // `undefined`. Emptied rather than relabelled. (audit #270)
+      // A hire enquiry has no pipeline status of its own — a thread's `status` is the mailbox
+      // state (open/snoozed/closed), not a sales stage. The funnel keyed on `h.status` was
+      // grouping `undefined`. Emptied rather than relabelled. (audit #270)
       setHireMeFunnel([]);
 
       // Moodboard activity

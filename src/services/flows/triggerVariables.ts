@@ -38,7 +38,7 @@ const STANDARD: TriggerVariable[] = [
   { key: 'user_id', label: 'Recipient user ID', note: 'The user who receives the notification.', example: 'a1b2c3d4-…' },
   { key: 'title', label: 'Title', note: 'Pre-built notification/email title.', example: 'Your VR world is ready!' },
   { key: 'body', label: 'Body', note: 'Pre-built notification/email body text.', example: 'Your 3D environment has been generated.' },
-  { key: 'action_url', label: 'Action URL', note: 'Where the notification deep-links to.', example: '/profile?tab=inbox' },
+  { key: 'action_url', label: 'Action URL', note: 'Where the notification deep-links to.', example: '/inbox?thread=…' },
   { key: 'type', label: 'Type', note: 'Notification type / category key.', example: 'vr_world_ready' },
 ];
 

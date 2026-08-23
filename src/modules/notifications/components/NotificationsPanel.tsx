@@ -283,7 +283,7 @@ export const NotificationsPanel: React.FC = () => {
             <div className="border-t px-4 py-2 bg-muted/30">
               <button
                 className="text-xs text-primary hover:underline w-full text-center"
-                onClick={() => { setOpen(false); navigate('/profile?tab=inbox'); }}
+                onClick={() => { setOpen(false); navigate('/inbox'); }}
               >
                 View inbox
               </button>

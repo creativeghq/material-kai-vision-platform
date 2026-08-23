@@ -5,13 +5,18 @@
  * they are how you move around a mailbox, not a constraint you stack. Everything secondary
  * (channel, label, thread type, AI state, unread, recency) lives in the modal.
  *
- * `channel` and `label` carry no accessor on purpose: they are request parameters on
- * `inboxApi.listThreads`, so the server has already applied them and the client matcher
- * passes them through.
+ * `label` carries no accessor on purpose: it is a request parameter on `inboxApi.listThreads`,
+ * so the server has already applied it and the client matcher passes it through.
+ *
+ * `source` is BOTH: picking one narrows the `list_threads` request to the channel that source
+ * arrives on (so the server still does the coarse work) and then the accessor separates the
+ * sources that share a channel — a public-profile enquiry from ordinary mail, a DM from a
+ * comment. It replaced a bare `channel` filter, which could not tell any of those apart.
  */
 import { CalendarDays, MessagesSquare, Tag, UserRound } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import type { InboxLabel, InboxThread } from '@/services/inboxApi';
+import { inboxSourceKey, inboxSourceOptions } from './inboxSource';
 
 export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] = [], myUserId?: string): FilterGroupDef[] {
   const labelOptions: FilterOption[] = labels.map((l) => ({ value: l.id, label: l.name }));
@@ -20,15 +25,11 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
       key: 'conversation', label: 'Conversation', icon: MessagesSquare,
       fields: [
         {
-          key: 'channel', type: 'select', label: 'Channel',
-          description: 'Where the conversation is happening.',
-          placeholder: 'All channels',
-          options: [
-            { value: 'internal', label: 'Team' },
-            { value: 'whatsapp', label: 'WhatsApp' },
-            { value: 'email', label: 'Email' },
-            { value: 'social', label: 'Social' },
-          ],
+          key: 'source', type: 'select', label: 'Source',
+          description: 'Where the conversation reached you — the door it came through, not just the app it replies on.',
+          placeholder: 'All sources',
+          options: inboxSourceOptions(),
+          accessor: (t: InboxThread) => inboxSourceKey(t),
         },
         {
           // #342: an order read out of a conversation is the most actionable state a thread can

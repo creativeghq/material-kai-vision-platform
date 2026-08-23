@@ -66,9 +66,10 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
         .map((s) => s.name);
 
       // Goes through inbox-api, never a direct insert: this modal renders on a PUBLIC profile
-      // page and profile_contact_requests is authenticated-only, so a client-side insert fails
-      // for every logged-out visitor — the exact audience the form is for. The function is
-      // Turnstile-gated + rate-limited and sets is_read server-side.
+      // page, so a client-side write fails for every logged-out visitor — the exact audience the
+      // form is for. The function is Turnstile-gated + rate-limited, and it files the enquiry as
+      // an ordinary Inbox conversation tagged `Public profile`, which is what gives the
+      // recipient a reply that actually reaches this sender.
       const { error } = await supabase.functions.invoke('inbox-api', {
         body: {
           action: 'profile_contact',

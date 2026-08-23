@@ -485,9 +485,9 @@ Complete documentation for Material Kai Vision Platform.
 - Public profiles for architects, designers, consultants & all professional types
 - Discover directory (`/discover`) with search + tag filtering
 - Services with rich detail (name, description, price, previous work)
-- Hire Me flow → `profile_contact_requests` table + flow event
+- Hire Me flow → an Inbox thread tagged `source: public_profile` + a `hire_me_received` flow event
 - Social: follow/unfollow, profile views, moodboard comments
-- DB tables: `user_profiles`, `profile_contact_requests`, `user_follows`
+- DB tables: `user_profiles`, `user_follows` (enquiries live in `inbox_threads`, not a table of their own)
 
 **[email-system.md](email-system.md)** - Email system with Resend (migrated 2026-03-11)
 - Domain verification and management
