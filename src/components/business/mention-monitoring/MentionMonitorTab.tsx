@@ -45,6 +45,7 @@ import {
   getSubjectMonitoring, getSubjectFeed, getSubjectLlmVisibility,
   getSubjectLlmVisibilityTrend, probeSubjectLlm, refreshSubject,
   getSubjectOpportunities, Opportunity, OpportunitiesResponse,
+  getSubjectAiOverviewHistory, AiOverviewHistory,
   shareOfVoice, submitMentionClassifierCorrection,
   listExclusions, excludeMentionUrl, includeMentionUrl, promoteMentionUrl,
 } from '@/services/mentionMonitoringApi';
@@ -117,6 +118,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
   const [llm, setLlm] = useState<LlmVisibilitySnapshot | null>(null);
   const [llmTrend, setLlmTrend] = useState<LlmVisibilityTrend | null>(null);
   const [sov, setSov] = useState<ShareOfVoice | null>(null);
+  const [aio, setAio] = useState<AiOverviewHistory | null>(null);
   const [opps, setOpps] = useState<OpportunitiesResponse | null>(null);
   const [oppsLoading, setOppsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -174,23 +176,27 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
         // getSubjectSummary is deliberately NOT fetched: it was called on every tab open and
         // its result never read — the KPI strip renders from `tracked.current_*`. A paid
         // round-trip per open, discarded.
-        const [f, v, tr, sv] = await Promise.all([
+        const [f, v, tr, sv, ao] = await Promise.all([
           getSubjectFeed(subject, { limit: 100 }),
           getSubjectLlmVisibility(subject),
           getSubjectLlmVisibilityTrend(subject, 90),
           // Share of voice is subject-addressed on the backend, so a product enrolment
           // reaches it through its own tracked id once we have the row.
           shareOfVoice(t.id, 90).catch(() => null),
+          // A read of already-recorded checks — no SERP call, no credits.
+          getSubjectAiOverviewHistory(subject, 90).catch(() => null),
         ]);
         setFeed(f);
         setLlm(v);
         setLlmTrend(tr);
         setSov(sv);
+        setAio(ao);
       } else {
         setFeed([]);
         setLlm(null);
         setLlmTrend(null);
         setSov(null);
+        setAio(null);
       }
     } catch (e: any) {
       toast({ title: 'Load failed', description: String(e?.message || e), variant: 'destructive' });
@@ -832,6 +838,60 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                               </li>
                             ))}
                           </ul>
+                        </div>
+                      )}
+
+                      {aio?.totals && (
+                        <div>
+                          <div className="text-xs font-medium mb-1 flex items-center gap-1">
+                            <Globe className="h-3 w-3" />
+                            Google AI Overview · last {aio.days} days
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground">Overview shown</div>
+                              <div className="text-lg font-medium tabular-nums">
+                                {Math.round(aio.totals.present_rate * 100)}%
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {/* Denominator is CHECKS, not days — a subject nobody
+                                    refreshed has no opinion about Google. */}
+                                of {aio.totals.checks} check{aio.totals.checks === 1 ? '' : 's'}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Named in it</div>
+                              <div className="text-lg font-medium tabular-nums">
+                                {aio.totals.brand_named}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                of {aio.totals.ai_overview_appeared} shown
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Cited, not named</div>
+                              <div className="text-lg font-medium tabular-nums">
+                                {aio.totals.ghost_citations}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">ghost citations</div>
+                            </div>
+                          </div>
+                          {aio.totals.top_cited_domains.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {aio.totals.top_cited_domains.slice(0, 8).map(([domain, count]) => (
+                                <Badge key={domain} variant="outline" className="text-[10px]">
+                                  {domain} · {count}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {aio && !aio.totals && (
+                        <div className="text-xs text-muted-foreground">
+                          {/* Never asked is not the same as "Google does not show one". */}
+                          No AI Overview checks recorded yet — they are written by the
+                          opportunity scan, so run one from the Opportunities tab.
                         </div>
                       )}
 

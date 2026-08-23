@@ -249,6 +249,50 @@ export interface ShareOfVoice {
   competitor_mentions: Array<{ name: string; count: number }>;
 }
 
+/** One recorded Google AI Overview observation (issue #349 A6). */
+export interface AiOverviewCheck {
+  id: string;
+  checked_at: string;
+  seed_keyword: string;
+  seed_was_fallback: boolean;
+  /** `false` = we asked and Google showed no AI Overview. No row at all = never asked. */
+  present: boolean;
+  /** Null when `present` is false — there is no answer to be named in. */
+  brand_mentioned: boolean | null;
+  /** The CITED SOURCES, kept apart from the answer text so a ghost citation is visible. */
+  brand_in_references: boolean | null;
+  cited_domains: string[];
+  reference_count: number;
+  ai_text_snippet: string | null;
+}
+
+export interface AiOverviewHistory {
+  present: boolean;
+  days: number;
+  truncated?: boolean;
+  checks: AiOverviewCheck[];
+  totals: {
+    checks: number;
+    ai_overview_appeared: number;
+    /** Over the checks actually made, never over calendar days. */
+    present_rate: number;
+    brand_named: number;
+    brand_cited: number;
+    ghost_citations: number;
+    top_cited_domains: Array<[string, number]>;
+  } | null;
+}
+
+export async function getSubjectAiOverviewHistory(
+  ref: MentionSubjectRef,
+  days: number = 90,
+): Promise<AiOverviewHistory> {
+  const res = await api<{ success: boolean; data: AiOverviewHistory }>(
+    `${subjectBase(ref)}/ai-overview-history?days=${days}`, { method: 'GET' },
+  );
+  return res.data;
+}
+
 export interface MentionExclusion {
   id: string;
   tracked_mention_id: string;

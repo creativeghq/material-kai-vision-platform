@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
-  FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check,
+  FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
+import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
 import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
 import { WebsiteDomainIntelPanel } from '@/components/core/Profile/WebsiteDomainIntelPanel';
 import { Button } from '@/components/core/ui/button';
@@ -180,6 +181,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <TabsTrigger value="gsc" className="gap-1"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
           <TabsTrigger value="rankings" className="gap-1"><TrendingUp className="w-3.5 h-3.5" /> Rankings &amp; Links</TabsTrigger>
           <TabsTrigger value="health" className="gap-1"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
+          <TabsTrigger value="llms" className="gap-1"><Bot className="w-3.5 h-3.5" /> llms.txt</TabsTrigger>
         </TabsList>
 
         {/* Articles */}
@@ -455,6 +457,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* Site Health (Lighthouse + on-page) */}
         <TabsContent value="health">
           <WebsiteHealthPanel website={website} />
+        </TabsContent>
+
+        {/* llms.txt — derived from the crawled pages (#349 C2) */}
+        <TabsContent value="llms">
+          <WebsiteLlmsTxtPanel website={website} />
         </TabsContent>
       </Tabs>
 
