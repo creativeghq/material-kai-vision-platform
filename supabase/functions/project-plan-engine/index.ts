@@ -387,13 +387,24 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
     case 'create-from-blueprint': {
       const { project_id, blueprint_id, dimensions, title } = body;
       if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
+      // WHO THE PLAN BELONGS TO, when nobody is signed in (#382 Phase 4).
+      //
+      // `project_plans.user_id` is NOT NULL, and the embed's configurator is used by an anonymous
+      // visitor on a merchant's website — there is no caller to attribute it to. The embed surface
+      // resolves the workspace OWNER and passes it here, the same path `generate-interior-gemini`
+      // already exposes for exactly this shape.
+      //
+      // Honoured ONLY for a service-role caller. Accepting it from a JWT would let any signed-in
+      // user create a plan owned by somebody else, which is the body-supplied-identity mistake
+      // invariant 1 exists to prevent.
+      const bodyUserId = isService && typeof body?.user_id === 'string' ? body.user_id : null;
       const { data: bp, error: bpErr } = await supabase.from('blueprints').select('*').eq('id', blueprint_id).maybeSingle();
       if (bpErr) throw new HttpError(400, bpErr.message);
       if (!bp) throw new HttpError(404, 'Blueprint not found');
 
       // Resolve the target workspace + user. project_id (when given) determines workspace.
       let workspaceId: string;
-      let planUserId = userId;
+      let planUserId = userId ?? bodyUserId;
       if (project_id) {
         const { data: proj, error: pErr } = await supabase.from('projects').select('id, workspace_id, user_id').eq('id', project_id).maybeSingle();
         if (pErr) throw new HttpError(400, pErr.message);

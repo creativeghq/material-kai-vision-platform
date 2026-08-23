@@ -30,6 +30,8 @@ import { defaultComposition, hasComposition, rateChoices } from '@/utils/bluepri
 // at the call site, and it is guarded by tests/unit/configuratorPricing.test.ts.
 import { computeConfiguratorEstimate } from './configuratorPricing';
 import { formatMoney } from '@/utils/decimal';
+// One Turnstile loader per page, shared with the spec builder (#382).
+import { loadTurnstile, type TurnstileApi } from './turnstileLoader';
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
@@ -79,13 +81,18 @@ button.go { font:inherit; font-size:14px; padding:9px 18px; border-radius:999px;
             background:#1c1a1e; color:#fff; cursor:pointer; justify-self:start; }
 .state { font-size:13px; color:#6b6560; padding:18px 0; }
 .err { font-size:13px; color:#a3341f; }
+.quote { display:grid; gap:9px; border-top:1px solid #e3ddd2; padding-top:12px; }
+label.f { display:grid; gap:4px; font-size:12px; color:#6b6560; }
+.ok { font-size:13px; color:#2f7d50; margin:0; }
 @media (prefers-color-scheme: dark) {
   :host { color:#f2eef2; }
   .zone { background:#2c2833; border-color:#3d3745; }
   .lbl, p.hint, .zoneLen, .total .k, .schedRow, .addBtn, .iconBtn, .state { color:#a9a2ad; }
   .chip, select, input, .iconBtn { background:#221f26; border-color:#3d3745; color:#f2eef2; }
   .chip[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
-  .total, .addBtn { border-color:#3d3745; }
+  .total, .addBtn, .quote { border-color:#3d3745; }
+  label.f { color:#a9a2ad; }
+  .ok { color:#4fbe7e; }
   button.go { background:#f2eef2; color:#221f26; border-color:#f2eef2; }
   .issue, .err { color:#f08a72; }
 }
@@ -98,6 +105,16 @@ export class MaterialKaiConfigurator extends HTMLElement {
   private config: Composition = {};
   private started = false;
   private disposed = false;
+  // Quote form (#382 Phase 4). Collapsed until the visitor asks — a form nobody requested is noise
+  // on a product page, and the price is the thing they came for.
+  private asking = false;
+  private sent = false;
+  private sending = false;
+  private formError = '';
+  private siteKey: string | null = null;
+  private turnstileToken = '';
+  private challengeHost: HTMLDivElement | null = null;
+  private widgetId: string | undefined;
   private observer: IntersectionObserver | null = null;
 
   constructor() {
@@ -162,6 +179,9 @@ export class MaterialKaiConfigurator extends HTMLElement {
       }
       const body = await res.json();
       this.bp = body?.blueprint ?? null;
+      // Null when the platform has no Turnstile configured, in which case no challenge renders and
+      // the server rules on the submission — the same fail-open every public form here follows.
+      this.siteKey = typeof body?.turnstile_site_key === 'string' ? body.turnstile_site_key : null;
     } catch {
       this.paintState('Could not reach the configurator service.', true);
       return;
@@ -451,8 +471,23 @@ export class MaterialKaiConfigurator extends HTMLElement {
     cta.className = 'go';
     cta.type = 'button';
     cta.textContent = 'Request a quote';
-    cta.addEventListener('click', () => this.emitQuoteRequest(composed?.subtotal ?? 0));
-    wrap.appendChild(cta);
+    cta.addEventListener('click', () => {
+      // The event fires either way, so a merchant who wired their own handler keeps working
+      // exactly as before; the built-in form is for the many who will not wire anything.
+      this.emitQuoteRequest(composed?.subtotal ?? 0);
+      this.asking = true;
+      this.render();
+    });
+    if (!this.sent) wrap.appendChild(cta);
+
+    if (this.sent) {
+      const done = document.createElement('p');
+      done.className = 'ok';
+      done.textContent = 'Thank you — we have your configuration and will come back with a quote.';
+      wrap.appendChild(done);
+    } else if (this.asking) {
+      wrap.appendChild(this.renderQuoteForm());
+    }
 
     this.root.replaceChildren(style, wrap);
   }
@@ -469,6 +504,143 @@ export class MaterialKaiConfigurator extends HTMLElement {
    * Both channels, same reason as the product widget's add-to-cart: the tag may be mounted inline
    * or in an iframe and the merchant should not have to care.
    */
+  /**
+   * The quote form — name, email, a note, and the bot challenge.
+   *
+   * DELIBERATELY DOES NOT RE-RENDER ON FAILURE. `render()` rebuilds the whole shadow tree, which
+   * would wipe what the visitor just typed and — worse — throw away a solved Turnstile widget and
+   * make them do it again. Somebody who filled in a form and hit a transient error must not be
+   * punished for retrying. Only success re-renders, because that replaces the form with a thank-you.
+   */
+  private renderQuoteForm(): HTMLElement {
+    const form = document.createElement('div');
+    form.className = 'quote';
+
+    const fields: Array<[string, string, string]> = [
+      ['name', 'Your name', 'text'],
+      ['email', 'Email', 'email'],
+      ['message', 'Anything else we should know?', 'text'],
+    ];
+    const values: Record<string, string> = {};
+    for (const [key, label, type] of fields) {
+      const l = document.createElement('label');
+      l.className = 'f';
+      const span = document.createElement('span');
+      span.textContent = label;
+      const input = document.createElement('input');
+      input.type = type;
+      input.addEventListener('input', () => { values[key] = input.value; });
+      l.append(span, input);
+      form.appendChild(l);
+    }
+
+    // The challenge renders into a LIGHT-DOM host projected through a slot: Cloudflare's widget
+    // does not work inside a shadow root.
+    const slot = document.createElement('slot');
+    slot.name = 'turnstile';
+    form.appendChild(slot);
+    this.mountChallenge();
+
+    const err = document.createElement('p');
+    err.className = 'issue';
+    err.textContent = this.formError;
+    if (this.formError) form.appendChild(err);
+
+    const send = document.createElement('button');
+    send.className = 'go';
+    send.type = 'button';
+    send.textContent = this.sending ? 'Sending…' : 'Send my configuration';
+    send.disabled = this.sending;
+    send.addEventListener('click', async () => {
+      if (!values.name?.trim() || !values.email?.trim()) {
+        this.formError = 'Please add your name and email.';
+        err.textContent = this.formError;
+        if (!err.isConnected) form.insertBefore(err, send);
+        return;
+      }
+      this.sending = true;
+      send.textContent = 'Sending…';
+      send.disabled = true;
+      const failure = await this.submitQuote(values.name, values.email, values.message ?? '');
+      this.sending = false;
+      if (failure) {
+        this.formError = failure;
+        err.textContent = failure;
+        if (!err.isConnected) form.insertBefore(err, send);
+        send.textContent = 'Send my configuration';
+        send.disabled = false;
+      }
+    });
+    form.appendChild(send);
+    return form;
+  }
+
+  /**
+   * Create the light-DOM challenge host and render into it, at most once per element.
+   *
+   * Once, because Turnstile's widget is stateful: a second render into a fresh holder would leave
+   * the first still registered, and a visitor who solved the old one would send a token belonging
+   * to a widget nothing is watching.
+   */
+  private mountChallenge() {
+    if (!this.siteKey || this.challengeHost) return;
+    const holder = document.createElement('div');
+    holder.slot = 'turnstile';
+    holder.style.paddingBottom = '10px';
+    this.appendChild(holder);
+    this.challengeHost = holder;
+
+    loadTurnstile()
+      .then((api: TurnstileApi) => {
+        this.widgetId = api.render(holder, {
+          sitekey: this.siteKey,
+          action: 'embed_configurator_quote',
+          callback: (token: string) => { this.turnstileToken = token; },
+          // An expired token must be cleared, not left to be sent and rejected as stale.
+          'expired-callback': () => { this.turnstileToken = ''; },
+          'error-callback': () => { this.turnstileToken = ''; },
+        });
+      })
+      .catch(() => {
+        // Blocked or unreachable CDN. Submit without a token and let the server rule on it —
+        // holding the form hostage to a third-party script would lose the lead outright.
+        holder.remove();
+        this.challengeHost = null;
+      });
+  }
+
+  /** Send it. Returns an error string, or null on success. */
+  private async submitQuote(name: string, email: string, message: string): Promise<string | null> {
+    const key = this.getAttribute('api-key') ?? '';
+    try {
+      const res = await fetch(
+        `${this.apiBase}/functions/v1/products-3d-api?action=request_quote&key=${encodeURIComponent(key)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name, email, message,
+            // THE LAYOUT TRAVELS. `spec` alone would leave the operator reading adjectives and
+            // re-typing the kitchen; these two turn the lead into a real plan server-side.
+            blueprint_id: this.bp?.id,
+            composition: this.config,
+            turnstile_token: this.turnstileToken || undefined,
+          }),
+        },
+      );
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error ?? 'failed');
+      this.sent = true;
+      this.asking = false;
+      this.render();
+      return null;
+    } catch (e) {
+      return e instanceof Error && e.message !== 'failed'
+        ? e.message
+        : 'Could not send that. Please try again.';
+    }
+  }
+
   private emitQuoteRequest(total: number) {
     const detail = {
       type: 'materialkai:quote-request',

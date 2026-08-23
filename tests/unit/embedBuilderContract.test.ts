@@ -209,7 +209,11 @@ describe('the embed builder can actually pass the bot gate', () => {
   it('renders the challenge explicitly, never by Cloudflare class auto-scan', () => {
     // The auto-scan is a `document.querySelectorAll`, which does not descend into a shadow root:
     // the automatic mode finds nothing inside a web component and no challenge ever appears.
-    expect(SRC).toContain('render=explicit');
+    // The URL moved to `src/embed/turnstileLoader.ts` when the blueprint configurator gained a
+    // quote form too (#382 Phase 4) — Cloudflare's script defines a global, so the page gets one
+    // loader rather than one per widget. The assertion follows the code; what it protects is
+    // unchanged, and it now protects both widgets at once.
+    expect(readFileSync('src/embed/turnstileLoader.ts', 'utf8')).toContain('render=explicit');
     expect(SRC).toMatch(/api\.render\(\s*holder/);
     expect(SRC, 'cf-turnstile is the auto-scan class and cannot work in shadow DOM')
       .not.toContain('cf-turnstile');

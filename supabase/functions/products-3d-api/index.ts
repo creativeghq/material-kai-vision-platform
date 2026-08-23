@@ -598,6 +598,13 @@ Deno.serve(withApiLogging((req) => {
 
     return embedJson({
       ok: true,
+      // The site key ships WITH the configurator, for the same reason `spec_options` ships it: the
+      // widget must know whether to render a challenge BEFORE the visitor reaches the only action
+      // that writes. `verifyTurnstile` fails closed when a secret is configured — and it is — so a
+      // form that rendered no challenge would have every submission refused: the priced half
+      // looking perfect while lead capture returns "Bot check failed" forever.
+      turnstile_site_key: (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY')
+        .catch(() => ({ value: null })))?.value ?? null,
       blueprint: {
         ...bp,
         // Through `unknown`: PostgREST types a select() row as a union that includes
@@ -898,10 +905,87 @@ Deno.serve(withApiLogging((req) => {
       notes: typeof params.message === 'string' ? params.message.slice(0, 1000) : null,
     }).select('id').single();
     if (qErr) return embedJson({ error: 'Could not record your request' }, 500, cors);
+    const requestId = (request as { id: string }).id;
+
+    // ── #382 Phase 4: the lead arrives as a PLAN, not a chip list ──────────────────────────────
+    //
+    // A configurator lead carries the visitor's actual layout — zones, module widths, counts,
+    // appliances. Recording only `spec` meant the operator quoting it re-typed the kitchen from a
+    // facet list while the real thing existed and was discarded, which is precisely the re-typing
+    // the SDK exists to remove.
+    //
+    // DELEGATED, not reimplemented. `project-plan-engine`'s `create-from-blueprint` already loads
+    // the blueprint tree with sub-blueprint expansion, applies option defaults, FREEZES the rate
+    // tables (`snapshotRateTables`) and strips absorbed groups. A second copy here would be a
+    // second derivation of plan money, free to disagree with the one the operator then edits.
+    //
+    // AFTER the request, never before. If the plan cannot be created the lead must still land —
+    // losing a customer because a plan write failed is the worse failure by a distance.
+    let planId: string | null = null;
+    const blueprintId = String(params.blueprint_id ?? '').trim();
+    if (blueprintId) {
+      // Scope and publication, asked exactly as the `blueprint` action asks them. A composition is
+      // anonymous input; the blueprint it claims to configure has to be one this key may serve.
+      if (await isBlueprintInScope(supabase, auth.ctx, blueprintId)) {
+        // The plan needs an owner and there is no visitor to attribute it to, so it belongs to the
+        // workspace owner — the same resolution `visualize` uses to decide whose credits pay.
+        const { data: owner } = await supabase
+          .from('workspace_members')
+          .select('user_id')
+          .eq('workspace_id', workspaceId)
+          .eq('role', 'owner')
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+
+        if (owner?.user_id) {
+          let composition: unknown = params.composition;
+          if (typeof composition === 'string') {
+            try { composition = JSON.parse(composition); } catch { composition = undefined; }
+          }
+          // Cap it: this becomes a jsonb column written by an anonymous caller. The ENGINE derives
+          // every number from the blueprint's own schema and frozen rates, so an odd composition
+          // can only describe an odd layout — it cannot invent a price basis.
+          const safeComposition = composition && typeof composition === 'object' && !Array.isArray(composition)
+            && JSON.stringify(composition).length <= 20_000
+            ? composition
+            : undefined;
+
+          try {
+            const res = await fetch(`${supabaseUrl}/functions/v1/project-plan-engine`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                action: 'create-from-blueprint',
+                blueprint_id: blueprintId,
+                composition: safeComposition,
+                title: `${name.slice(0, 80)} — website enquiry`,
+                user_id: owner.user_id,
+              }),
+            });
+            const planBody = await res.json().catch(() => ({}));
+            if (res.ok && planBody?.plan?.id) {
+              planId = planBody.plan.id as string;
+              await supabase.from('quote_requests').update({ plan_id: planId }).eq('id', requestId);
+            } else {
+              console.error('[products-3d-api] plan creation failed', res.status, JSON.stringify(planBody).slice(0, 200));
+            }
+          } catch (e) {
+            console.error('[products-3d-api] plan creation threw', e instanceof Error ? e.message : e);
+          }
+        }
+      }
+    }
 
     return embedJson({
       ok: true,
-      quote_request_id: (request as { id: string }).id,
+      quote_request_id: requestId,
+      // Present only when the lead became a plan. Its absence is not an error — a spec-only
+      // request from the facet builder has no layout to turn into one.
+      plan_id: planId,
     }, 200, cors);
   }
 

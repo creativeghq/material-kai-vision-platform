@@ -16,6 +16,10 @@
  * cannot compute a price even in principle: it has no catalog, and it must not appear to have one.
  */
 
+// Shared with <materialkai-configurator>: Cloudflare's script defines a global, so the page
+// gets exactly one loader (#382).
+import { loadTurnstile, type TurnstileApi } from './turnstileLoader';
+
 interface SpecValue { value: string; in_catalog: boolean }
 interface SpecFacet { facet_key: string; label: string; in_catalog_count: number; values: SpecValue[] }
 
@@ -27,47 +31,6 @@ interface ResolveResult {
 }
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
-
-const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-
-interface TurnstileApi {
-  render(el: HTMLElement, opts: Record<string, unknown>): string;
-  reset(id?: string): void;
-}
-
-/**
- * Load Cloudflare's script once per page and resolve when its API is ready.
- *
- * Once PER PAGE, not per element: a merchant may place several widgets, and Cloudflare's script
- * defines a global. Loading it twice is at best wasted bytes and at worst a re-registration.
- *
- * Rejects rather than hanging if the script cannot load — the caller then submits without a token
- * and the server decides, which is the correct place for that decision. A blocked CDN must not
- * leave the visitor staring at a form that never enables.
- */
-let turnstileLoad: Promise<TurnstileApi> | null = null;
-function loadTurnstile(): Promise<TurnstileApi> {
-  const existing = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
-  if (existing) return Promise.resolve(existing);
-  if (turnstileLoad) return turnstileLoad;
-
-  turnstileLoad = new Promise<TurnstileApi>((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = TURNSTILE_SRC;
-    s.async = true;
-    s.defer = true;
-    s.onload = () => {
-      const api = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
-      if (api) resolve(api);
-      else reject(new Error('turnstile script loaded without an api'));
-    };
-    s.onerror = () => reject(new Error('turnstile script failed to load'));
-    document.head.appendChild(s);
-  });
-  // A failed load must not be cached as a permanent verdict — the next form gets a fresh attempt.
-  turnstileLoad.catch(() => { turnstileLoad = null; });
-  return turnstileLoad;
-}
 
 const STYLE = `
 :host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
