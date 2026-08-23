@@ -237,7 +237,20 @@ export class MaterialKaiAssistant extends HTMLElement {
     const rows = (Array.isArray(r.results) ? r.results
       : Array.isArray((r as { data?: unknown }).data) ? (r as { data: unknown[] }).data
         : []) as Array<Record<string, unknown>>;
-    if (!rows.length) return this.renderUnknown(r);
+    if (!rows.length) {
+      // An empty corpus is the honest, common case on a young catalogue — and dumping
+      // `corpus_size` / `processing_time` at a shopper is not an answer. Say it plainly and let
+      // the other buttons carry the visit.
+      const box2 = document.createElement('div');
+      box2.className = 'result';
+      const p = document.createElement('p');
+      p.className = 'sub';
+      p.textContent = r.corpus_empty
+        ? 'There is nothing in this catalogue to search yet.'
+        : 'Nothing matched that. Try fewer words, or a material name.';
+      box2.appendChild(p);
+      return box2;
+    }
 
     const s = document.createElement('div');
     s.className = 'sub';

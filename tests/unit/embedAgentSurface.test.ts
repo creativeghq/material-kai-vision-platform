@@ -51,10 +51,22 @@ describe('the public tool allowlist', () => {
     expect(PUBLIC_TOOL_NAMES.has('confirm')).toBe(false);
   });
 
-  it('every entry is deterministic, so a quick-start costs no model turn', () => {
-    // The whole reason the buttons exist: a visitor's first interaction returns real data and
-    // bills the merchant nothing. A non-deterministic entry would silently reintroduce that cost.
+  it('runs no agent loop, which is what makes the surface buttons rather than a chat box', () => {
     expect(PUBLIC_TOOLS.every((t) => t.deterministic)).toBe(true);
+  });
+
+  it('states each measured upstream cost rather than calling them all free', () => {
+    // "No agent loop" and "free" are different claims, and the first version of this file
+    // conflated them. `material_search` proxies MIVAA — query understanding plus embeddings — and
+    // books ~$0.0011 a call; the other two are pure SQL and measured at exactly zero rows in
+    // `ai_usage_logs` over repeated live runs. A surface a stranger can press, documented as
+    // costing nothing while it quietly bills the account, is the wrong direction to be wrong in.
+    const cost = (n: string) => PUBLIC_TOOLS.find((t) => t.name === n)!.upstreamCostUsd;
+    expect(cost('price_my_spec')).toBe(0);
+    expect(cost('calculate_kitchen_cost')).toBe(0);
+    expect(cost('raise_quote_request')).toBe(0);
+    expect(cost('material_search')).toBeGreaterThan(0);
+    for (const t of PUBLIC_TOOLS) expect(t.upstreamCostUsd).toBeGreaterThanOrEqual(0);
   });
 
   it('every entry carries a label, because it renders as a button', () => {
