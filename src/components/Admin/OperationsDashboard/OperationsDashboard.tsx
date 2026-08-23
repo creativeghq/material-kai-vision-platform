@@ -75,6 +75,7 @@ import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
+import { ChannelsCostPanel } from './ChannelsCostPanel';
 
 import type {
   UsageAnalytics,
@@ -525,7 +526,7 @@ const OperationsDashboardInner: React.FC = () => {
   // Fetch all-time totals per external service from ai_usage_logs
   useEffect(() => {
     const SERVICE_KEYS = [
-      'zernio-whatsapp',
+      'whatsapp-service', 'whatsapp-template',
       'apollo-enrich', 'apollo-people-match',
       'hunter-email-finder', 'hunter-domain-search',
       'zerobounce-validate', 'firecrawl-scrape',
@@ -1081,6 +1082,10 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* Services & Billing Tab — 3rd Party API Services */}
           <TabsContent value="services-billing" className="space-y-4">
+            {/* The per-workspace view first: the table below prices services, this says who is
+                actually costing and earning what. */}
+            <ChannelsCostPanel />
+
             <SectionHeader
               title="3rd Party Services"
               subtitle="Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google) see AI Configurations → Performance."
@@ -1111,7 +1116,10 @@ const OperationsDashboardInner: React.FC = () => {
                   <TableBody>
                     {[
                       { key: 'resend-email',           label: 'Resend Email',         category: 'Email',        unit: 'email',      raw: 0.0004, billed: null },
-                      { key: 'zernio-whatsapp',       label: 'Zernio WhatsApp',      category: 'Messaging',    unit: 'message',    raw: 0.005,  billed: 0.0075 },
+                      // Split 2026-08-23. One flat rate averaged a FREE 24h-window reply and a
+                      // Meta-billed marketing template together, understating the second ~10x.
+                      { key: 'whatsapp-service',      label: 'WhatsApp service reply', category: 'Messaging',  unit: 'message',    raw: 0,      billed: 0.064 },
+                      { key: 'whatsapp-template',     label: 'WhatsApp template',      category: 'Messaging',  unit: 'message',    raw: 0.06,   billed: 0.09 },
                       { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact',    raw: 0.05,   billed: 0.075 },
                       { key: 'apollo-people-match',   label: 'Apollo People Match',  category: 'B2B Data',     unit: 'match',      raw: 0.02,   billed: 0.03 },
                       { key: 'hunter-email-finder',   label: 'Hunter Email Finder',  category: 'B2B Data',     unit: 'email',      raw: 0.01,   billed: 0.015 },

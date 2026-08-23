@@ -24,6 +24,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
+import { checkChannelSeat } from '../../_shared/channel-seats.ts';
 import { zernioApi, zernioKey, ensureZernioSecrets, publicAppUrl, resolveWorkspaceProfile, fetchZernioAccount } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -139,6 +140,15 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
     // Connecting an account consumes the platform's Zernio subscription — paid module (#212).
     const connectEnt = await assertEntitled(supabase, workspace_id, 'social-media');
     if (!connectEnt.ok) return connectEnt.response;
+
+
+    // ...and it consumes a per-account monthly fee Zernio charges us for the third onward. This
+    // is checked BEFORE the OAuth URL is minted, not after the callback: sending someone through
+    // an authorisation flow and refusing the result is the worst place to say no.
+    const seat = await checkChannelSeat(supabase, workspace_id);
+    if (!seat.ok) {
+      return jsonResponse({ success: false, code: 'channel_seat_required', error: seat.message, usage: seat.usage }, 402);
+    }
 
     try {
       // Resolve (find-or-create) the workspace's Zernio profile.

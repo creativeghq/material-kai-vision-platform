@@ -18,6 +18,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
+import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -343,7 +344,17 @@ async function executeAction(
     case 'send_sms':
     case 'send_whatsapp': {
       // Fail-closed affordability gate: block a 0-credit tenant flow owner before the send.
-      { const g = await assertFlowCanAfford(supabase, userId, scope, 'zernio-whatsapp'); if (g) throw new Error(g); }
+      // Priced before the affordability gate so the gate asks about the RIGHT amount: a template
+      // send can cost an order of magnitude more than a service reply, and checking the cheap
+      // one lets a tenant who cannot afford the send through it.
+      const waPrice = await priceWhatsAppMessage(supabase, {
+        // `resolved` is the flow's config after variable substitution, so every field is unknown
+        // to the compiler; the send below coerces the same way.
+        to: String(resolved.to ?? ''),
+        isTemplate: Boolean(resolved.template_id || resolved.template_slug),
+        category: null,
+      });
+      { const g = await assertFlowCanAfford(supabase, userId, scope, waPrice.serviceKey); if (g) throw new Error(g); }
       const { data, error } = await supabase.functions.invoke('messaging-api', {
         body: {
           action: 'send',
@@ -354,7 +365,16 @@ async function executeAction(
         },
       });
       if (error) throw new Error(`WhatsApp send failed: ${error.message}`);
-      { const dt = resolveFlowDebit(userId, scope); if (dt) await debitExternalServiceCredits(supabase, dt.userId, 'zernio-whatsapp', 'flow_send_whatsapp', 1, { to: resolved.to }, dt.workspaceId); }
+      {
+        const dt = resolveFlowDebit(userId, scope);
+        if (dt) {
+          await debitExternalServiceCredits(
+            supabase, dt.userId, waPrice.serviceKey, 'flow_send_whatsapp', 1,
+            { to: resolved.to, rate_country: waPrice.country, rate_category: waPrice.category, rate_wildcard: waPrice.usedWildcard },
+            dt.workspaceId, {}, waPrice.costPerUnit,
+          );
+        }
+      }
       return { output: { sent: true, ...(data || {}) } };
     }
 

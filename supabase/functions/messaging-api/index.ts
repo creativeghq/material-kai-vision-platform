@@ -23,6 +23,8 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
+import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
+import { checkChannelSeat } from '../_shared/channel-seats.ts';
 import {
   zernioApi,
   zernioKey,
@@ -376,9 +378,29 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // callers (no billingUserId) — that path is billed upstream by the flow-engine.
           let debit: { success: boolean; credits_debited?: number; error?: string } = { success: true, credits_debited: 0 };
           if (billingUserId) {
+            // A template opens a paid Meta conversation priced by the recipient's country and the
+            // template's category; a free-form reply inside the 24h window costs nothing at all.
+            // One flat rate across both under-charged the first by roughly 10x and over-charged
+            // the second by infinity, and neither showed up as anything but a plausible number.
+            const priced = await priceWhatsAppMessage(supabaseClient, {
+              to,
+              isTemplate: Boolean(template),
+              category: template?.category ?? null,
+            });
             debit = await debitExternalServiceCredits(
-              supabaseClient, billingUserId, 'zernio-whatsapp', 'messaging_whatsapp', 1,
-              { to },
+              supabaseClient, billingUserId, priced.serviceKey, 'messaging_whatsapp', 1,
+              {
+                to,
+                template_id: body.templateId ?? null,
+                rate_country: priced.country,
+                rate_category: priced.category,
+                // Surfaced because the wildcard is the EXPENSIVE row: a country appearing here
+                // often is one whose real rate is worth adding to whatsapp_template_rates.
+                rate_wildcard: priced.usedWildcard,
+              },
+              tenantWsId,
+              {},
+              priced.costPerUnit,
             );
             if (!debit.success) {
               results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
@@ -483,9 +505,25 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // charge is refunded if its send fails. Skipped for service-role callers (billed upstream).
           let debit: { success: boolean; credits_debited?: number; error?: string } = { success: true, credits_debited: 0 };
           if (billingUserId) {
+            // Same split as the single send: bulk is almost always templated, and a template is
+            // a paid Meta conversation whose rate depends on the recipient's country.
+            const priced = await priceWhatsAppMessage(supabaseClient, {
+              to,
+              isTemplate: Boolean(template),
+              category: template?.category ?? null,
+            });
             debit = await debitExternalServiceCredits(
-              supabaseClient, billingUserId, 'zernio-whatsapp', 'messaging_bulk_whatsapp', 1,
-              { to },
+              supabaseClient, billingUserId, priced.serviceKey, 'messaging_bulk_whatsapp', 1,
+              {
+                to,
+                template_id: body.templateId ?? null,
+                rate_country: priced.country,
+                rate_category: priced.category,
+                rate_wildcard: priced.usedWildcard,
+              },
+              tenantWsId,
+              {},
+              priced.costPerUnit,
             );
             if (!debit.success) {
               results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
@@ -615,6 +653,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        // A WhatsApp number is a connected account on Zernio's bill exactly like an Instagram
+        // profile is, so it draws on the same allowance. Checked before the OAuth URL is minted:
+        // sending someone through Meta's Embedded Signup and refusing the result afterwards is
+        // the worst possible place to say no.
+        const waSeat = await checkChannelSeat(supabaseClient, wsId);
+        if (!waSeat.ok) {
+          return jsonResponse({ success: false, code: 'channel_seat_required', error: waSeat.message, usage: waSeat.usage }, 402);
+        }
+
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
         // A caller-supplied redirect is an open-redirect/phishing vector — require
@@ -736,7 +784,48 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             wantsWhatsapp: true,
             purchaseIntentId,
           });
-          return jsonResponse({ success: true, workspace_id: wsId, profile_id: profileId, ...outcome });
+          // Record it against the workspace that will be billed. Only on a completed purchase —
+          // a checkout URL means nothing exists yet, and a row for a number that was never paid
+          // for is a phantom line on somebody's invoice.
+          const attributionErrors: string[] = [];
+          if (outcome.kind === 'done') {
+            const owned = await listPhoneNumbers(supabaseClient, profileId);
+            for (const n of owned.filter((x) => !x.broughtYourOwn)) {
+              const { error: attrErr } = await supabaseClient.from('workspace_phone_numbers').upsert({
+                workspace_id: wsId,
+                zernio_number_id: n.id,
+                phone_number: n.phoneNumber,
+                country: n.country,
+                // What Zernio charges US. The tenant price is derived from it at billing time;
+                // storing both would be two copies of one money quantity.
+                monthly_cents: n.monthlyCents,
+                status: n.status ?? 'active',
+                purchased_by: auth.userId ?? null,
+              }, { onConflict: 'zernio_number_id' });
+              // The number is already bought and already costing us money. A failed attribution
+              // row means a recurring charge with NOBODY to bill it to, and the purchase cannot
+              // be un-done to make that safe — so it is reported loudly rather than swallowed
+              // behind a success the operator would never question.
+              if (attrErr) {
+                console.error('[messaging-api] phone number attribution FAILED', n.id, attrErr);
+                attributionErrors.push(`${n.phoneNumber}: ${attrErr.message}`);
+              }
+            }
+          }
+          return jsonResponse({
+            success: true,
+            workspace_id: wsId,
+            profile_id: profileId,
+            ...outcome,
+            ...(attributionErrors.length
+              ? {
+                  warning: 'The number was purchased but could not be attributed to this workspace '
+                    + 'for billing. It is costing the platform money with nobody to bill — fix the '
+                    + 'workspace_phone_numbers row before the next invoice.',
+                  attribution_errors: attributionErrors,
+                }
+              : {}),
+          });
         } catch (err) {
           // Zernio's specific refusals are actionable and a generic 500 throws that away.
           const status = (err as { status?: number })?.status;
@@ -776,6 +865,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         }
 
         const released = await releasePhoneNumber(supabaseClient, phoneNumberId);
+        // Stop billing for it. Marked released rather than deleted: a number charged for three
+        // months and then let go is a fact the invoice still needs.
+        await supabaseClient
+          .from('workspace_phone_numbers')
+          .update({ status: 'released', released_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('zernio_number_id', phoneNumberId)
+          .eq('workspace_id', wsId);
         // The channel row points at a number that no longer exists; leaving it active would keep
         // offering a sender whose every send fails.
         await supabaseClient

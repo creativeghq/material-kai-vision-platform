@@ -13,14 +13,46 @@
 
 import type { DbClient } from './supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { MARKUP_MULTIPLIER } from './pricing-constants.ts';
+import { MARKUP_MULTIPLIER, CREDIT_SALE_PRICE_USD, CREDITS_PER_USD } from './pricing-constants.ts';
 import { captureException } from './sentry.ts';
 
 // ── DB-backed external service pricing with in-memory cache ──
+type BillingMode = 'ai_markup' | 'passthrough' | 'flat_credits';
+
 interface ServicePricing {
   cost_per_unit: number;
   unit: string;
   markup_multiplier: number;
+  /**
+   * How cost becomes credits. Defaults to `ai_markup` so every existing row behaves exactly as
+   * it did before this existed.
+   */
+  billing_mode: BillingMode;
+  /** Explicit credit price. Only read when billing_mode is `flat_credits`. */
+  credits: number | null;
+}
+
+/**
+ * Credits for one unit of a service, by its billing mode.
+ *
+ *  - `ai_markup`    cost x markup x 100 — our own compute. Effective 12.75x raw once the credit
+ *                   is sold, which is right when nobody can price-compare a generated image.
+ *  - `passthrough`  cost x markup / credit sale price — somebody else's network. The tenant pays
+ *                   about cost x 1.5 in REAL money instead of 12.75x, because they can read
+ *                   Meta's or a carrier's published rate.
+ *  - `flat_credits` the stated price, for something that costs us nothing but is not free to
+ *                   offer. Stating it beats back-solving a fake cost that produces the number —
+ *                   a fabricated cost is a wrong number wearing the shape of a valid one.
+ */
+export function creditsForUnit(pricing: ServicePricing, units: number): number {
+  if (pricing.billing_mode === 'flat_credits') {
+    return Math.round((pricing.credits ?? 0) * units * 100) / 100;
+  }
+  const billed = pricing.cost_per_unit * units * pricing.markup_multiplier;
+  const raw = pricing.billing_mode === 'passthrough'
+    ? billed / CREDIT_SALE_PRICE_USD
+    : billed * CREDITS_PER_USD;
+  return Math.round(raw * 100) / 100;
 }
 
 const PRICING_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -33,33 +65,35 @@ let _pricingFetchPromise: Promise<Record<string, ServicePricing>> | null = null;
  * something rather than free service. Numbers must mirror the DB seed.
  */
 const FALLBACK_PRICING: Record<string, ServicePricing> = {
-  'zernio-whatsapp':      { cost_per_unit: 0.005,  unit: 'message',     markup_multiplier: MARKUP_MULTIPLIER },
-  'apollo-enrich':        { cost_per_unit: 0.05,   unit: 'enrichment',  markup_multiplier: MARKUP_MULTIPLIER },
-  'apollo-people-match':  { cost_per_unit: 0.03,   unit: 'lookup',      markup_multiplier: MARKUP_MULTIPLIER },
-  'hunter-email-finder':  { cost_per_unit: 0.01,   unit: 'search',      markup_multiplier: MARKUP_MULTIPLIER },
-  'hunter-domain-search': { cost_per_unit: 0.01,   unit: 'search',      markup_multiplier: MARKUP_MULTIPLIER },
-  'zerobounce-validate':  { cost_per_unit: 0.008,  unit: 'validation',  markup_multiplier: MARKUP_MULTIPLIER },
-  'firecrawl-scrape':     { cost_per_unit: 0.001,  unit: 'credit',      markup_multiplier: MARKUP_MULTIPLIER },
-  'xai-aurora':           { cost_per_unit: 0.07,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER },
-  'flux-2-pro':           { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER },
-  'flux-dev':             { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER },
-  'kling-3.0':            { cost_per_unit: 0.10,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
+  // Split 2026-08-23: a free 24h-window reply and a Meta-billed marketing template were one row.
+  'whatsapp-service':     { cost_per_unit: 0,      unit: 'message',     markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'flat_credits', credits: 0.75 },
+  'whatsapp-template':    { cost_per_unit: 0.06,   unit: 'message',     markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'passthrough',  credits: null },
+  'apollo-enrich':        { cost_per_unit: 0.05,   unit: 'enrichment',  markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'apollo-people-match':  { cost_per_unit: 0.03,   unit: 'lookup',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'hunter-email-finder':  { cost_per_unit: 0.01,   unit: 'search',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'hunter-domain-search': { cost_per_unit: 0.01,   unit: 'search',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'zerobounce-validate':  { cost_per_unit: 0.008,  unit: 'validation',  markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'firecrawl-scrape':     { cost_per_unit: 0.001,  unit: 'credit',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'xai-aurora':           { cost_per_unit: 0.07,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'flux-2-pro':           { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'flux-dev':             { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'kling-3.0':            { cost_per_unit: 0.10,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // 'kling-1.6-pro' and 'wan2.1-i2v' removed 2026-08-12 (issue #4) — both models 404 upstream,
   // so no call can reach these prices. Their ai_model_pricing rows are deactivated to match.
-  'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
+  'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // Veo is priced per SECOND and clamped to 8s by generate-interior-video-v2, so a full clip is
   // $2.80 — by some distance the most expensive thing this platform can be asked to make. It was
   // absent here while its siblings were present, so a DB outage silently dropped Veo's cost to
   // null while Kling and Runway kept theirs (#363 follow-up).
-  'veo-2':                { cost_per_unit: 0.35,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
-  'social-caption':       { cost_per_unit: 0.002,  unit: 'generation',  markup_multiplier: MARKUP_MULTIPLIER },
-  'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER },
+  'veo-2':                { cost_per_unit: 0.35,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'social-caption':       { cost_per_unit: 0.002,  unit: 'generation',  markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
 };
 
 async function fetchPricingFromDB(supabase: DbClient): Promise<Record<string, ServicePricing>> {
   const { data, error } = await supabase
     .from('ai_model_pricing')
-    .select('model_key, cost_per_unit, unit_label, markup_multiplier')
+    .select('model_key, cost_per_unit, unit_label, markup_multiplier, billing_mode, credits')
     .eq('billing_type', 'per_unit')
     .eq('category', 'external_service')
     .eq('is_active', true);
@@ -80,6 +114,8 @@ async function fetchPricingFromDB(supabase: DbClient): Promise<Record<string, Se
       cost_per_unit: Number(row.cost_per_unit) || 0,
       unit: row.unit_label || 'unit',
       markup_multiplier: Number(row.markup_multiplier) || MARKUP_MULTIPLIER,
+      billing_mode: (row.billing_mode as BillingMode) || 'ai_markup',
+      credits: row.credits == null ? null : Number(row.credits),
     };
   }
   return map;
@@ -153,6 +189,12 @@ export async function debitExternalServiceCredits(
   metadata?: Record<string, unknown>,
   workspaceId?: string | null,
   provenance: UsageProvenance = {},
+  /**
+   * Real cost of ONE unit, when only the caller can know it. Used by passthrough services whose
+   * rate varies per call — a WhatsApp template is priced by recipient country and category, so a
+   * single row cannot hold the answer. Ignored by flat_credits.
+   */
+  costPerUnitOverride?: number | null,
 ): Promise<CreditDebitResult> {
   try {
     const pricingMap = await getPricingMap(supabase);
@@ -171,9 +213,20 @@ export async function debitExternalServiceCredits(
       return { success: false, credits_debited: 0, raw_cost_usd: 0, billed_cost_usd: 0, error: `Unknown service: ${serviceName}` };
     }
 
-    const rawCost = pricing.cost_per_unit * units;
-    const billedCost = rawCost * pricing.markup_multiplier;
-    const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
+    // A passthrough caller knows the real cost per unit only at call time (a WhatsApp template's
+    // rate depends on the recipient's country and the template's category), so it may override
+    // the row's fallback. The row still supplies the MODE and the markup.
+    const unitCost = costPerUnitOverride ?? pricing.cost_per_unit;
+    const effective: ServicePricing = { ...pricing, cost_per_unit: unitCost };
+
+    const rawCost = unitCost * units;
+    const billedCost = pricing.billing_mode === 'flat_credits'
+      // Nothing was spent upstream, so there is no marked-up cost to report — the billed figure
+      // is whatever the stated credit price is worth. Reporting rawCost x markup here would log
+      // $0 revenue on a charged call.
+      ? creditsForUnit(effective, units) * CREDIT_SALE_PRICE_USD
+      : rawCost * pricing.markup_multiplier;
+    const creditsToDebit = creditsForUnit(effective, units);
 
     if (creditsToDebit <= 0) {
       // Zero is a legitimate price for a genuinely free service (`zernio-publish`), and it is

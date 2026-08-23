@@ -21,6 +21,7 @@ import { zernioKey, ensureZernioSecrets, sendWhatsAppMessage } from '../_shared/
 import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 
 const BATCH_SIZE = 10;
@@ -184,7 +185,26 @@ serve(withApiLogging('messaging-processor', async (req) => {
         // (don't churn the whole list into 'failed'). No owner → skip metering (shouldn't happen).
         let debitedCredits = 0;
         if (ownerId) {
-          const debit = await debitExternalServiceCredits(supabase, ownerId, 'zernio-whatsapp', 'messaging_campaign_whatsapp', 1, { to: recipient.phone_number });
+          // A campaign is a template blast by definition, so this is the branch where the old
+          // flat $0.005 was furthest from the truth — a European marketing template costs Meta
+          // roughly ten times that, and Meta bills the WABA directly so nothing here saw it.
+          const priced = await priceWhatsAppMessage(supabase, {
+            to: recipient.phone_number,
+            isTemplate: true,
+            category: (campaign as { template_category?: string } | null)?.template_category as never ?? null,
+          });
+          const debit = await debitExternalServiceCredits(
+            supabase, ownerId, priced.serviceKey, 'messaging_campaign_whatsapp', 1,
+            {
+              to: recipient.phone_number,
+              rate_country: priced.country,
+              rate_category: priced.category,
+              rate_wildcard: priced.usedWildcard,
+            },
+            (campaign as { workspace_id?: string | null } | null)?.workspace_id ?? null,
+            {},
+            priced.costPerUnit,
+          );
           if (!debit.success) {
             await supabase.from('messaging_campaign_recipients').update({ status: 'pending' }).eq('id', recipient.id);
             await supabase.from('campaigns').update({ status: 'paused', metadata: { blocked_reason: 'insufficient_credits', blocked_message: 'Paused — the workspace owner is out of credits. Resumes automatically once credits are added.' } }).eq('id', campaign.id);

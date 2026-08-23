@@ -16,6 +16,7 @@
 //     after verifying owner + that the plan tier already covers the module.
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
+import { grantBundle, revokeBundle } from '../../_shared/module-bundle.ts';
 import { jsonResponse as json } from '../../_shared/http.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
@@ -140,12 +141,11 @@ async function activateModule(req: Request, auth: AuthResult, body: Record<strin
   const covered = tierRank(mod.price_tier as string) <= (Number(planLevel) || 0)
     && !(isPaidAddon && tierRank(mod.price_tier as string) <= 0);
   if (covered) {
-    const { error } = await service.from('workspace_module_entitlements').upsert(
-      { workspace_id: workspaceId, module_slug: moduleSlug, enabled: true, granted_by: userId },
-      { onConflict: 'workspace_id,module_slug' },
-    );
-    if (error) return json({ error: error.message }, 500);
-    return json({ activated: true, free: true, module: moduleSlug });
+    // Bundled: Channels grants social-media alongside messaging. Read from modules.grants_slugs
+    // so this path and the two Stripe paths cannot disagree about what a purchase buys.
+    const { slugs, error } = await grantBundle(service, workspaceId, moduleSlug, userId);
+    if (error) return json({ error }, 500);
+    return json({ activated: true, free: true, module: moduleSlug, modules: slugs });
   }
 
   // PAID path: create a recurring Stripe checkout. The webhook grants the entitlement.
@@ -241,12 +241,8 @@ async function deactivateModule(auth: AuthResult, body: Record<string, unknown>)
   }
 
   // Free (plan-covered) module: just turn the entitlement off.
-  await service
-    .from('workspace_module_entitlements')
-    .update({ enabled: false, granted_by: userId, granted_at: new Date().toISOString() })
-    .eq('workspace_id', workspaceId)
-    .eq('module_slug', moduleSlug);
-  return json({ deactivated: true, module: moduleSlug });
+  const revoked = await revokeBundle(service, workspaceId, moduleSlug);
+  return json({ deactivated: true, module: moduleSlug, modules: revoked });
 }
 
 // A NON-owner member requests activation → notify the workspace owner(s). Uses the

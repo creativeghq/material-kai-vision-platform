@@ -40,6 +40,9 @@ export const EXT_SERVICE_LABELS: Record<string, string> = {
   'hunter-domain-search': 'Hunter Domain',
   'zerobounce-validate': 'ZeroBounce',
   'firecrawl-scrape': 'Firecrawl',
-  'zernio-whatsapp': 'Zernio WhatsApp',
+  // Retired 2026-08-23 but kept: historical ai_usage_logs rows still carry the old key.
+  'zernio-whatsapp': 'Zernio WhatsApp (retired)',
+  'whatsapp-service': 'WhatsApp service reply',
+  'whatsapp-template': 'WhatsApp template',
   'resend-email': 'Resend Email',
 };

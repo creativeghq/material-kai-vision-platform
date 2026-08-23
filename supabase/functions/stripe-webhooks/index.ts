@@ -1,4 +1,5 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { grantBundle, revokeBundle } from '../_shared/module-bundle.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -405,15 +406,12 @@ async function handleModuleAddonSubscription(subscription: Stripe.Subscription) 
   );
 
   if (subscription.status === 'active' || subscription.status === 'trialing') {
-    const { error } = await supabase.from('workspace_module_entitlements').upsert(
-      { workspace_id: workspaceId, module_slug: moduleSlug, enabled: true, granted_by: meta.user_id || null },
-      { onConflict: 'workspace_id,module_slug' },
-    );
+    const { slugs, error } = await grantBundle(supabase, workspaceId, moduleSlug, meta.user_id || null);
     if (error) {
       // Throw → non-2xx → Stripe retries. Upsert is idempotent so retry is safe.
-      throw new Error(`module entitlement grant failed for ${workspaceId}/${moduleSlug}: ${error.message}`);
+      throw new Error(`module entitlement grant failed for ${workspaceId}/${moduleSlug}: ${error}`);
     }
-    console.log(`Granted module '${moduleSlug}' to workspace ${workspaceId} (sub ${subscription.id})`);
+    console.log(`Granted module '${moduleSlug}' (bundle: ${slugs.join(', ')}) to workspace ${workspaceId} (sub ${subscription.id})`);
   }
 }
 
@@ -433,11 +431,10 @@ async function handleModuleAddonDeleted(subscription: Stripe.Subscription) {
   const covered = moduleTierRank((mod as { price_tier?: string | null } | null)?.price_tier) <= (Number(planLevel) || 0);
 
   if (!covered) {
-    await supabase
-      .from('workspace_module_entitlements')
-      .update({ enabled: false, granted_at: new Date().toISOString() })
-      .eq('workspace_id', workspaceId)
-      .eq('module_slug', moduleSlug);
+    // Withdraw the whole bundle, not just the slug that was billed — otherwise cancelling
+    // Channels leaves social-media entitled forever, which nobody reports because nobody
+    // complains about still having something.
+    await revokeBundle(supabase, workspaceId, moduleSlug);
   }
 
   await supabase
