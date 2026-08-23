@@ -210,15 +210,20 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
   return (
     <>
       {variant === 'bar' ? (
+        // Tokens, not white films. `bg-white/5` over a `border-white/10` edge is the
+        // treatment `Input` was moved off: the top bar is `bg-sidebar`, which is 97%
+        // lightness on the light themes, so a 5% white overlay and a 10% white edge
+        // are both literally invisible there and the trigger had no boundary at all.
+        // Sunken fill + hairline + the `outline` button's hover reads in all four.
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Search"
-          className="group hidden md:flex items-center gap-2 h-8 w-44 lg:w-56 xl:w-64 shrink-0 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors"
+          className="group hidden md:flex items-center gap-2 h-8 w-44 lg:w-56 xl:w-64 shrink-0 rounded-sm border border-hairline bg-surface-sunken px-2.5 text-sm text-muted-foreground transition-colors hover:border-muted-foreground/50 hover:bg-surface-hover hover:text-foreground"
         >
           <Search className="w-4 h-4 shrink-0" />
-          <span className="flex-1 text-left font-light truncate">Search…</span>
-          <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-muted-foreground">
+          <span className="flex-1 text-left truncate">Search…</span>
+          <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-muted-foreground">
             ⌘K
           </kbd>
         </button>

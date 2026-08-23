@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Search, ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -11,11 +11,19 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
     const q = query.trim();
-    if (!q) return;
+    // Empty is this control's RESTING state, so it must not be expressed by disabling
+    // the button: `disabled:opacity-50` over the olive light-theme primary drops white
+    // text to roughly 2:1, i.e. the hero's one CTA reads as broken on arrival. Send the
+    // caret where the missing input goes instead.
+    if (!q) {
+      inputRef.current?.focus();
+      return;
+    }
     onNavigate(`/agent-hub?q=${encodeURIComponent(q)}`);
   }
 
@@ -39,22 +47,28 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
           <span className="text-primary">{heroConfig.subtitle}</span>
         </h1>
 
-        {/* Search — the primary job of this surface */}
+        {/* Search — the primary job of this surface. Painted with the same tokens as
+            `Input`, but on `bg-background` so it reads as recessed inside this `bg-card`
+            panel: opaque fill, hairline edge, accent border + 3px halo on focus. The
+            pill it replaces was `border-white/10` over a translucent fill, which a light
+            theme cannot show at all, and a 999px radius wrapped around a 4px-radius
+            button. */}
         <form onSubmit={submitSearch}>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-background/70 backdrop-blur-sm p-1.5 pl-4 focus-within:border-primary/50 transition-colors">
+          <div className="flex items-center gap-2 rounded-sm border border-hairline bg-background p-1 pl-3 transition-colors hover:border-muted-foreground/50 focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
+              ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={heroConfig.searchPlaceholder}
               aria-label="Search materials"
               className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
-            <Button type="submit" disabled={!query.trim()} className="h-9 px-5 shrink-0">
+            <Button type="submit" className="h-8 px-4 shrink-0">
               Search
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2 ml-4">
+          <p className="text-[11px] text-muted-foreground mt-2 ml-3">
             Search by {heroConfig.searchHints.join(' · ')}
           </p>
         </form>
