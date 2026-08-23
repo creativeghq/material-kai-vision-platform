@@ -1,10 +1,14 @@
 # MaterialsHub — crawl policy
 #
 # A crawler obeys ONLY the most specific User-agent group that matches it, and
-# ignores every other group. That is why the Disallow list is repeated verbatim
-# under Googlebot and Bingbot instead of living once under `*` — a named group
-# with no Disallow lines is an unrestricted crawl, which is what this file
-# granted until 2026-08-10.
+# ignores every other group. A named group with no Disallow lines is therefore an
+# unrestricted crawl, which is what this file granted until 2026-08-10.
+#
+# The Disallow list below used to be pasted once per named agent. It is now written
+# ONCE under a group carrying several `User-agent:` lines — RFC 9309 §2.2.1: "if a
+# group contains multiple user-agent lines, the rules apply to all of them". Every
+# named crawler we allow shares one policy, so it lives in one place; four copies of
+# a 30-line list is four chances for the next addition to reach three of them.
 #
 # Two things are being kept out of the index here:
 #   1. The authenticated app surface. It renders an empty shell to a crawler
@@ -16,40 +20,28 @@
 # read it — those are handled by the rewrite exclusions in vercel.json, which
 # return a real 404 instead of the 5.5 KB app shell.
 
+# ── Search indexes and answer engines ───────────────────────────────────────────
+#
+# RETRIEVAL is not TRAINING, and until 2026-08-22 this file did not distinguish
+# them: OAI-SearchBot, ChatGPT-User, PerplexityBot and Perplexity-User were blocked
+# alongside GPTBot, so the platform was absent from every answer engine by
+# configuration — while public/llms.txt sat there addressed to exactly those agents.
+# The two files contradicted each other and our own AI visibility was structurally
+# zero, which is not something a measurement can detect.
+#
+# The agents below fetch a page to ANSWER a question a person just asked, or to keep
+# a search index that answers cite from. They are read the same way Googlebot is
+# read, and they get the same Disallow list. The training crawlers stay blocked in
+# the next section — that opt-out is unchanged.
 User-agent: Googlebot
-Allow: /
-Disallow: /admin
-Disallow: /auth
-Disallow: /profile
-Disallow: /settings
-Disallow: /billing
-Disallow: /inbox
-Disallow: /tasks
-Disallow: /monitoring
-Disallow: /analytics
-Disallow: /market-trends
-Disallow: /agent-hub
-Disallow: /search-hub
-Disallow: /finance
-Disallow: /crm
-Disallow: /my-hr
-Disallow: /pos
-Disallow: /health
-Disallow: /ready
-Disallow: /q/
-Disallow: /i/
-Disallow: /c/
-Disallow: /u/
-Disallow: /pay/
-Disallow: /statement/
-Disallow: /sheets/
-Disallow: /portal/
-Disallow: /tenant/
-Disallow: /buyer/
-Disallow: /supplier-portal
-Disallow: /client-portal
-
 User-agent: Bingbot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: meta-externalfetcher
 Allow: /
 Disallow: /admin
 Disallow: /auth
@@ -99,16 +91,19 @@ Allow: /
 User-agent: WhatsApp
 Allow: /
 
-# AI training / answer-engine crawlers. Blocked outright: they crawl broadly and
-# repeatedly, and this platform's public surface is three sitemap URLs, so there
-# is nothing here worth the traffic. Delete a line to opt back in.
+# ── AI training crawlers ────────────────────────────────────────────────────────
+#
+# Blocked outright. These build training corpora and grounding indexes rather than
+# answering a question in front of a user; the platform's public surface is small
+# and there is nothing here worth the repeated broad crawl. Google-Extended and
+# Applebot-Extended are the Gemini-app and Apple-Intelligence TRAINING opt-outs
+# specifically — neither governs the answer-engine retrieval allowed above, and
+# AI Overviews are served off the ordinary Googlebot crawl, which is permitted.
+#
+# Do not move an agent up into the allow group without checking which of the two
+# jobs it actually does; the vendors ship separate tokens precisely so this is a
+# separate decision.
 User-agent: GPTBot
-Disallow: /
-
-User-agent: OAI-SearchBot
-Disallow: /
-
-User-agent: ChatGPT-User
 Disallow: /
 
 User-agent: ClaudeBot
@@ -127,12 +122,6 @@ User-agent: Google-Extended
 Disallow: /
 
 User-agent: Applebot-Extended
-Disallow: /
-
-User-agent: PerplexityBot
-Disallow: /
-
-User-agent: Perplexity-User
 Disallow: /
 
 User-agent: Bytespider

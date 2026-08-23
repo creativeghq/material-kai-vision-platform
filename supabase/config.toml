@@ -94,6 +94,10 @@ verify_jwt = false
 [functions.seo-site-audit]
 verify_jwt = false
 
+# seo-content-freshness: cron-sweep only, authenticated by x-cron-secret at the handler.
+[functions.seo-content-freshness]
+verify_jwt = false
+
 # seo-domain-tracker: weekly rankings+backlinks snapshots. cron-run via x-cron-secret;
 # run self-authenticates. See supabase/functions/seo-domain-tracker/index.ts.
 [functions.seo-domain-tracker]

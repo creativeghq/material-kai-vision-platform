@@ -1585,6 +1585,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'content_brief', type: 'unknown', optional: true, description: 'Optional content brief' },
       { name: 'auto_fix', type: 'boolean', optional: true, description: 'Auto-fix content if score is below 70 (default: false)' },
       { name: 'max_iterations', type: 'number', optional: true, description: 'Max fix iterations (default: 2, max: 3)' },
+      { name: 'article_id', type: 'string', optional: true, description: 'Id of the stored seo_articles row, when re-analyzing an existing article. Lets the freshness signal read the real review date instead of scoring every article as brand new.' },
       { name: '_workflow_run_id', type: 'string', optional: true, description: 'Workflow run_id from the wizard prefix.' },
     ],
   },

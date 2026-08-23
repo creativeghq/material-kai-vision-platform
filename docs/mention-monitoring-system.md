@@ -24,6 +24,22 @@ Mirror of price-monitoring v3 for tracking subject mentions across **news, blogs
 
 **LLM mention probes** ([mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py](mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py)) — weekly cadence. 4 probe templates (generic recommendation / use-case / comparison / direct lookup) × 4 cheap models (`claude-haiku-4-5`, `gpt-4o-mini`, `gemini-2.0-flash`, `sonar`) = 16 calls/subject/week ≈ $0.008. Each response post-processed by Haiku tool use (`record_mention`) to extract: `mentioned`, `position`, `sentiment`, `competitors_mentioned[]`, `context_snippet`. Snapshot exposed via `/llm-visibility` endpoint with share-of-voice + avg-rank + top co-mentioned competitors.
 
+**What the probe measures (2026-08-23, #349 A1–A4).** Four things it captured and could not report,
+each of which returned a plausible number rather than failing:
+
+- **`cited_urls` + `brand_cited` — the ghost citation.** `record_mention` had no field for a URL and Perplexity Sonar's native `citations` array was read and thrown away. An answer that used our page as its SOURCE while never naming the brand is invisible to a mention count, and that is the case the whole product is about. Sonar's array is read natively (both `citations` and `search_results`, so a version bump dropping one does not take citations to zero silently); the other three models return links inline in prose, so the tool call carries them. `brand_cited` is **tri-state**: NULL when the subject has no `homepage_domain` to judge against — undecidable, not false. Matching is domain-or-subdomain, never substring: `blog.brand.com` is the brand, `notbrand.com` and `brand.com.evil.net` are not.
+- **`visibility_trend(days)` — movement.** `visibility_snapshot()` read exactly one `probe_run_id` while its docstring claimed "position trend". Every run since the feature shipped was in the table and nothing read across them. New `GET …/llm-visibility-trend?days=` returns one point per RUN (the run is the measurement bucket — same templates, same models) plus a `change` block; `null`, never 0, when there is nothing to compare against.
+- **Sentiment, aggregated and split per model.** It was persisted and then only ever shown inside four capped samples. Computed over the probes where the subject was **actually mentioned** — rolling in the extractor's `neutral` default for answers that never named it drags the score toward neutral in proportion to how invisible the brand is, which inverts the signal. `score: null` means never mentioned, which is not the same fact as a neutral verdict.
+- **`/share-of-voice` had two defects.** It counted competitors and never the subject, so the one brand the page belongs to had no share of its own voice; and its `days` parameter was declared, `ge=1, le=180`-validated and then never applied to the query, which filtered on the subject and took the newest 500 rows whatever window you asked for. Now bucketed per run, subject included, window honoured.
+
+**Where the arithmetic lives.** All of it in
+[llm_visibility_math.py](../mivaa-pdf-extractor/app/services/integrations/llm_visibility_math.py) —
+stdlib-only, no DB client. The service fetches rows and hands them over. That split is not
+cosmetic: MIVAA's CI installs pytest and nothing else, so a rollup living in the service is a
+rollup no test can exercise. Guarded by
+[test_llm_visibility_is_a_measurement.py](../mivaa-pdf-extractor/tests/unit/test_llm_visibility_is_a_measurement.py)
+(27 cases, watched to fire against all four original defects on 2026-08-23).
+
 **Cost discipline** (mirrors price v3):
 - Verdict cache: ~95% cache rate on stable subjects across daily refreshes.
 - Rule pre-filter eliminates ~60% of candidates before Haiku.
@@ -58,12 +74,13 @@ Internal product flow (session JWT):
 - `GET /api/v1/mention-monitoring/products/{id}/history?days=&sentiment=&outlet_type=` — historical rows
 - `GET /api/v1/mention-monitoring/products/{id}/summary?days=30` — aggregate snapshot
 - `GET /api/v1/mention-monitoring/products/{id}/llm-visibility` — most recent probe snapshot
+- `GET /api/v1/mention-monitoring/products/{id}/llm-visibility-trend?days=` — across RUNS, not the latest one
 - `POST /api/v1/mention-monitoring/products/{id}/probe-llm` — admin trigger
 
 Subject-id flow (brand/keyword):
 - `POST /track` / `GET|PUT|DELETE /track/{id}` — CRUD
 - `POST /track/{id}/refresh|exclude|include|promote|probe-llm`
-- `GET /track/{id}/feed|history|summary|llm-visibility|exclusions|share-of-voice`
+- `GET /track/{id}/feed|history|summary|llm-visibility|llm-visibility-trend|exclusions|share-of-voice`
 
 Cross-flow: `/classifier-correction`, `/cron-refresh`, `/cron-probe-llm` (latter two require `x-cron-secret`).
 
@@ -93,6 +110,12 @@ Channels (CHANNEL_CREDIT_COST): bell (0 cr), email (1 cr via `email-api` edge fu
 - `get_mention_summary` — pull rolling snapshot (0 cr)
 - `check_llm_visibility` — read latest snapshot or fire fresh probe with `force_run=true` (2 cr)
 - `find_negative_mentions` — filtered feed for reputation triage (0 cr)
+
+`check_llm_visibility` is also clustered under **AI Search Visibility** (`ai-visibility`) alongside
+`seo_brand_search_audit`, `seo_llm_mentions_search` and `seo_ai_keyword_volume` — it lived only in
+the `mentions` cluster and in none of the nine SEO ones, so someone doing SEO work never saw the
+one tool that measures how the brand shows up in AI answers (#349 A8). The tools stay in their
+original clusters too; a toolkit is a view, not ownership.
 
 Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types streamed back to AgentHub: `mention_summary`, `llm_visibility_result`, `mention_feed`, `mention_tracking_started`. Each renders as an inline card in chat (handlers in [src/components/features/ai/AgentHub.tsx](src/components/features/ai/AgentHub.tsx) — `mentionSummaryData` / `llmVisibilityData` / `mentionFeedData` message data fields).
 

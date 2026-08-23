@@ -143,14 +143,110 @@ export interface MentionSummary {
   latest_at: string | null;
 }
 
+/** Sentiment over the probes where the subject was ACTUALLY MENTIONED. */
+export interface LlmSentimentRollup {
+  positive: number;
+  neutral: number;
+  negative: number;
+  basis_probes: number;
+  /** -1 .. +1. `null` means never mentioned — NOT that the verdict was neutral. */
+  score: number | null;
+}
+
+export interface LlmCitationRollup {
+  probes_with_citations: number;
+  brand_cited: number;
+  /**
+   * Our page cited as the SOURCE while the brand is never named in the answer.
+   * Invisible to a mention count, which is why it needed its own number.
+   */
+  ghost_citations: number;
+  /** Probes we cannot judge: the subject has no `homepage_domain` set. */
+  undecidable_no_homepage_domain: number;
+  top_cited_domains: Array<[string, number]>;
+}
+
+export interface LlmProbeSample {
+  template: string | null;
+  response: string;
+  mentioned: boolean;
+  position: number | null;
+  sentiment: string | null;
+  context_snippet: string | null;
+  cited_urls: string[];
+  brand_cited: boolean | null;
+}
+
 export interface LlmVisibilitySnapshot {
   present: boolean;
   probe_run_id?: string;
+  run_at?: string | null;
   total_probes?: number;
   share_of_voice?: number;
   avg_position?: number | null;
-  per_model?: Record<string, { probes: number; mentioned: number; positions: number[] }>;
+  sentiment?: LlmSentimentRollup;
+  citations?: LlmCitationRollup;
+  per_model?: Record<string, {
+    probes: number;
+    mentioned: number;
+    positions: number[];
+    samples?: LlmProbeSample[];
+    sentiment?: LlmSentimentRollup;
+    citations?: LlmCitationRollup;
+  }>;
   top_competitors?: Array<[string, number]>;
+}
+
+/** One probe RUN. The run is the measurement bucket — same templates, same models. */
+export interface LlmVisibilityTrendPoint {
+  probe_run_id: string;
+  run_at: string;
+  total_probes: number;
+  mentioned: number;
+  share_of_voice: number;
+  avg_position: number | null;
+  sentiment_score: number | null;
+  ghost_citations: number;
+  brand_cited: number;
+}
+
+export interface LlmVisibilityTrend {
+  present: boolean;
+  days: number;
+  truncated?: boolean;
+  points: LlmVisibilityTrendPoint[];
+  change?: {
+    share_of_voice: number;
+    /** Negative = rank IMPROVED. `null` when there is nothing to compare against. */
+    avg_position: number | null;
+    runs_compared: number;
+  };
+}
+
+export interface ShareOfVoiceBucket {
+  probe_run_id: string;
+  run_at: string;
+  total_probes: number;
+  subject_mentions: number;
+  share_of_named_brands: number;
+  competitor_mentions: Array<{ name: string; count: number }>;
+}
+
+export interface ShareOfVoice {
+  tracked_mention_id: string;
+  days: number;
+  truncated?: boolean;
+  subject_label?: string;
+  buckets: ShareOfVoiceBucket[];
+  totals: {
+    probes: number;
+    subject_mentions: number;
+    subject_share_of_named_brands: number;
+    subject_share_of_probes: number;
+    competitor_mentions: Array<{ name: string; count: number }>;
+  } | null;
+  /** Kept pointing at `totals.competitor_mentions` for pre-#349 callers. */
+  competitor_mentions: Array<{ name: string; count: number }>;
 }
 
 export interface MentionExclusion {
@@ -300,6 +396,28 @@ export async function getProductLlmVisibility(
 ): Promise<LlmVisibilitySnapshot> {
   const res = await api<{ success: boolean; data: LlmVisibilitySnapshot }>(
     `/api/v1/mention-monitoring/products/${productId}/llm-visibility`,
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function getProductLlmVisibilityTrend(
+  productId: string,
+  days: number = 90,
+): Promise<LlmVisibilityTrend> {
+  const res = await api<{ success: boolean; data: LlmVisibilityTrend }>(
+    `/api/v1/mention-monitoring/products/${productId}/llm-visibility-trend?days=${days}`,
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function getTrackedLlmVisibilityTrend(
+  trackedMentionId: string,
+  days: number = 90,
+): Promise<LlmVisibilityTrend> {
+  const res = await api<{ success: boolean; data: LlmVisibilityTrend }>(
+    `/api/v1/mention-monitoring/track/${trackedMentionId}/llm-visibility-trend?days=${days}`,
     { method: 'GET' },
   );
   return res.data;
@@ -467,11 +585,8 @@ export async function promoteMentionUrl(args: {
 export async function shareOfVoice(
   trackedMentionId: string,
   days: number = 30,
-): Promise<{ tracked_mention_id: string; competitor_mentions: Array<{ name: string; count: number }> }> {
-  const res = await api<{
-    success: boolean;
-    data: { tracked_mention_id: string; competitor_mentions: Array<{ name: string; count: number }> };
-  }>(
+): Promise<ShareOfVoice> {
+  const res = await api<{ success: boolean; data: ShareOfVoice }>(
     `/api/v1/mention-monitoring/track/${trackedMentionId}/share-of-voice?days=${days}`,
     { method: 'GET' },
   );

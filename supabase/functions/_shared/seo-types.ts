@@ -311,6 +311,18 @@ export interface GEOScore {
      */
     claimAttribution: number;
     selfContainedParagraphs: number;
+    /**
+     * Content freshness (#349 C1). Answer engines cite recently-updated pages
+     * materially more often than the same page left to age, and nothing in this
+     * analyzer had any notion of age at all — a three-year-old article and one
+     * written this morning scored identically.
+     *
+     * Fed by `content_dated_at` on the request (the article's `last_reviewed_at`,
+     * falling back to `completed_at`). ABSENT for a draft being analysed before it
+     * has ever been published, which is not the same as stale: an unpublished draft
+     * scores full marks rather than being penalised for a date it cannot have.
+     */
+    freshness: number;
   };
   recommendations: string[];
 }
@@ -526,6 +538,23 @@ export interface SEOAnalyzeRequest {
    * rules (AI Overview match, featured-snippet alignment, PAA coverage,
    * related-search coverage, entity authority, intent alignment). */
   serp_signals?: SerpSignalBlob;
+  /**
+   * When this content was last materially written or reviewed, ISO-8601. Drives the
+   * `freshness` GEO signal. Omit for a draft that has never been published — the
+   * signal then scores full marks instead of penalising an article for having no
+   * publication date yet.
+   *
+   * Read it from `seo_article_freshness.content_dated_at`; do NOT pass `updated_at`,
+   * which any write touches and which therefore says nothing about the content.
+   */
+  content_dated_at?: string;
+  /**
+   * A stored `seo_articles` row to score. When supplied, the handler DERIVES
+   * `content_dated_at` from `seo_article_freshness` and ignores whatever the caller
+   * sent — the article's own review date is the fact, and a client-supplied one is at
+   * best a copy of it.
+   */
+  article_id?: string;
 }
 
 export interface SEOAnalyzeResponse {

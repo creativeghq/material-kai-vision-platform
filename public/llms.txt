@@ -22,6 +22,7 @@ Most of the platform is behind login. The public surfaces below are safe to read
 - Company slugs are per-workspace and are not enumerable; substitute a real slug you already have (the same slug appears in that company's careers URL).
 - A job posting is public only while its status is open AND it is not past its close date. Closed postings return 404 from the API and disappear from the board.
 - Share links of the form `/q/{token}`, `/cv/{token}`, `/sign/{token}`, `/i/{token}` and `/sheets/share/{token}` are private, single-purpose links. Do not crawl, index or share them.
+- **Crawl policy, stated once so it cannot contradict itself.** `robots.txt` allows the answer-engine and search agents — `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `meta-externalfetcher`, plus Googlebot and Bingbot — to read every public surface listed above. It blocks the training crawlers (`GPTBot`, `ClaudeBot`, `CCBot`, `Google-Extended`, `Applebot-Extended`, `Bytespider`, `meta-externalagent`, ...). Retrieving this content to answer someone's question is welcome; adding it to a training corpus is not. Both files express that one policy — if they ever disagree, `robots.txt` is the one machines obey.
 - Applications cannot be submitted through the job board API; it is read-only.
 
 ## Optional

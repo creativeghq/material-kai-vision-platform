@@ -281,7 +281,7 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
  */
 export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ content_markdown, article_plan, content_brief, auto_fix, max_iterations, _workflow_run_id }) => {
+    async ({ content_markdown, article_plan, content_brief, auto_fix, max_iterations, article_id, _workflow_run_id }) => {
       const emitter = _workflow_run_id ? createWorkflowEmitter({ onChunk, definition_id: 'seo-article', run_id: _workflow_run_id }) : null;
       emitter?.step({ step_id: STEPS.SEO_ARTICLE[3], status: 'running', status_line: 'Analyzing article…' });
       try {
@@ -291,6 +291,10 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
           content_markdown,
           article_plan,
           content_brief,
+          // Lets the handler derive the freshness date from the stored row. Without it
+          // the GEO freshness signal has nothing to measure and scores every article as
+          // brand new — a constant dressed as a measurement.
+          article_id,
           auto_fix: auto_fix ?? false,
           max_iterations: max_iterations ?? 2,
           user_id: userId,
@@ -338,6 +342,7 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
         content_brief: z.any().optional().describe('Optional content brief'),
         auto_fix: z.boolean().optional().describe('Auto-fix content if score is below 70 (default: false)'),
         max_iterations: z.number().optional().describe('Max fix iterations (default: 2, max: 3)'),
+        article_id: z.string().optional().describe('Id of the stored seo_articles row, when re-analyzing an existing article. Lets the freshness signal read the real review date instead of scoring every article as brand new.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }

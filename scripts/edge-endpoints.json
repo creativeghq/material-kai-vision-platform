@@ -2270,6 +2270,27 @@
     ]
   },
   {
+    "name": "seo-content-freshness",
+    "tag": "SEO",
+    "summary": "Content decay — raise generated articles that are past their own refresh cadence",
+    "description": "Weekly sweep over seo_article_freshness (the derived content-decay view). Emits a seo.article_refresh_due flow event per overdue article and stamps refresh_notified_at so one nudge lands per refresh cycle rather than per cron tick. Due-ness is derived in SQL by seo_article_refresh_due_at(); this function never re-adds an interval to a date. verify_jwt is disabled at the gateway and the only action self-authenticates with isCronAuthorized (x-cron-secret or service-role bearer).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "cron-sweep",
+        "description": "x-cron-secret only — notify the author of every article past its refresh due date.",
+        "params": [],
+        "response": "{ ok, due_count, already_notified, emitted, failed, errors, truncated }"
+      }
+    ]
+  },
+  {
     "name": "gsc-api",
     "tag": "SEO",
     "summary": "Google Search Console for connected websites (OAuth + performance sync)",

@@ -135,6 +135,9 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'seo-composite': {
     tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
   },
+  'ai-visibility': {
+    tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume'],
+  },
   'seo-article': {
     tool_ids: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
   },

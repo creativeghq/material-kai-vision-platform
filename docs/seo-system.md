@@ -106,6 +106,62 @@ Still open, deliberately not built: no scaled-content guard (Phase 5 auto-sugges
 topics with no check against the site's declared focus) and no YMYL gate. The `[SOURCE:]` and
 `[INTERNAL:]` quotas in checks 11/12 remain arbitrary counts.
 
+### 5.2 Content decay — freshness (2026-08-23, #349 C1)
+
+The pipeline generated articles and never revisited one. `freshness`, `decay`, `staleness` and
+`refresh-due` had **zero hits** anywhere in `seo-api/` or `_shared/seo-types.ts`, which is the
+gap that mattered: a page updated inside the last three months is cited noticeably more often by
+answer engines than the same page left to age, and a page going stale produces no error, no
+failed check and no row anywhere. It keeps ranking and simply stops being the page an engine
+reaches for.
+
+**One derivation.** `seo_article_refresh_due_at(completed_at, last_reviewed_at, refresh_interval_days)`
+is the single definition of when an article is due. The view `seo_article_freshness`
+(`security_invoker`, so RLS on `seo_articles` is the boundary) publishes `age_days`,
+`refresh_due_at`, `content_dated_at` and `is_due`. Nothing re-adds an interval to a date anywhere
+else — not the cron, not the edge handler, not the dashboard.
+
+| Column on `seo_articles` | Means |
+|---|---|
+| `last_reviewed_at` | The content was materially refreshed. NULL falls back to `completed_at`. **Never `updated_at`** — any write touches that, so a two-year-old article reports fresh the moment anything saves. |
+| `refresh_interval_days` | This article's own cadence. Default 90; an evergreen reference page can be longer. CHECK 7–730. |
+| `refresh_snoozed_until` | An explicit "not yet" from a human. Without it a page somebody has decided is fine nags forever and the queue trains people to ignore it. |
+| `refresh_notified_at` | Dedupe for the sweep: one nudge per refresh CYCLE, not per cron tick. |
+
+**Three surfaces, one fact.**
+
+- **The queue** — Profile → Websites → *Articles* shows *Due for a refresh* with age, last-review date and a **Mark reviewed** action, plus a content-age column on the main table. `is_due` already accounts for the cadence and any snooze, so no screen forms a second opinion about what "due" means.
+- **The nudge** — `seo-content-freshness` (`cron-sweep`, weekly Mon 05:15 UTC) emits `seo.article_refresh_due` per overdue article. Payload-only trigger, seeded active locked `system-default` flow, registered in the area registry. It stamps `refresh_notified_at` **after** the emit succeeds; stamping first would mark an article notified on a run that told nobody, and it would never be raised again.
+- **The score** — an 11th `GEOScore` signal, `freshness` (10 pts), banded 0–90d / 90–180d / 180–365d / 365d+. Fed by `content_dated_at`, which the handler DERIVES from the article row when the request carries an `article_id` — a client-supplied date is only honoured for content that is not a stored article. **No date means an unpublished draft and scores full marks**, which is not the same fact as stale.
+
+The 11 signals still sum to exactly 100: `freshness` was funded by taking 5 points from
+statistics-with-attribution (15 → 10) and 5 from self-contained-paragraphs (10 → 5). Adding it on
+top would have been silent — `overall` is clamped at 100, so a stale article with strong writing
+signals would have kept a perfect score and the new signal would only ever have bitten pages that
+were already scoring badly.
+
+**Backstop:** `ops.silent_zero` probe `seo_article_refresh_due_never_emitted` — overdue articles
+piling up with nothing stamped notified in 14 days. Watched to fire 2026-08-23.
+
+---
+
+### 5.3 Crawl policy — retrieval is not training (2026-08-23, #349 B4)
+
+`public/robots.txt` blocked `OAI-SearchBot`, `ChatGPT-User`, `PerplexityBot` and `Perplexity-User`
+in the same breath as `GPTBot` and `CCBot`. Those four are **retrieval** agents: they fetch a page
+to answer a question somebody is asking right now, or to keep the index an answer cites from.
+Blocking them removed the platform from every answer engine — so its AI-search visibility was
+structurally zero, which reads identically to being genuinely invisible. Meanwhile `public/llms.txt`
+sat there addressed to exactly those agents, describing surfaces they were forbidden to read.
+
+- **Allowed** (one group, several `User-agent:` lines — RFC 9309 §2.2.1): Googlebot, Bingbot, OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User, meta-externalfetcher. They share ONE Disallow list rather than four pasted copies, and it still excludes the app surface and every tokenised share URL — allowing a crawler is not opening the app, and `/q/{token}` IS a credential.
+- **Still blocked:** GPTBot, ClaudeBot, Claude-Web, anthropic-ai, CCBot, Google-Extended, Applebot-Extended, Bytespider, meta-externalagent, FacebookBot, cohere-ai, AI2Bot, and the commercial scrapers. `Google-Extended` and `Applebot-Extended` are the Gemini-app and Apple-Intelligence **training** controls specifically; AI Overviews are served off the ordinary Googlebot crawl, which is permitted.
+- The vendors ship separate tokens precisely so this is a separate decision. Do not move an agent between the groups without checking which of the two jobs it does.
+
+Guarded by [tests/unit/crawlPolicy.test.ts](../tests/unit/crawlPolicy.test.ts), which parses
+robots.txt into groups, applies longest-match Allow/Disallow, and pins llms.txt to the same
+allow-set so the two files cannot contradict each other again.
+
 ---
 
 ## 6. Crons
@@ -117,6 +173,7 @@ topics with no check against the site's declared focus) and no YMYL gate. The `[
 | `seo-domain-tracker-weekly` | Mon 03:30 | Rankings + backlinks snapshot. |
 | `seo-site-health-weekly` | Sun 04:00 | Lighthouse + on-page audit sweep. |
 | `user-website-recrawl-every-6h` | `0 */6 * * *` | Re-crawl connected sites into `user_website_pages`. |
+| `seo-content-freshness-weekly` | Mon 05:15 | Raise generated articles past their own refresh cadence (#349 C1). |
 
 ---
 

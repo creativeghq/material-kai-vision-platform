@@ -479,6 +479,25 @@ shape `inbound_doc_to_supplier_bill` already uses.
 - **Proven to fire:** 2026-08-22 — accept-with-no-JWT reproduced the break before the split and passes after it; a stranger calling the RPC is refused; a member calling twice gets the same order.
 - Two live BOLA holes were found this way and fixed: `generate_order_from_quote` (minted an order, burned an invoice number and issued a **live pay token** in any workspace) and `generate_supplier_bill_from_order` (booked a **payable** in any workspace). Both were `authenticated`-executable with a caller-supplied id and no check at all. A sweep for the same shape leaves ~10 more candidates, listed in #378 — mostly job/telemetry writers, one (`append_project_event`) able to forge an audit entry with an arbitrary `actor_id` and prune a project's history.
 
+### 15. Two files, one policy — and the contradiction has no observable
+
+`public/robots.txt` blocked `OAI-SearchBot`, `ChatGPT-User`, `PerplexityBot` and `Perplexity-User`
+alongside `GPTBot` and `CCBot`. Those four are RETRIEVAL agents — they fetch a page to answer a
+question someone is asking now, or to keep the index an answer cites from — so the platform was
+absent from every answer engine **by configuration**. Meanwhile `public/llms.txt` sat there
+addressed to exactly those agents, describing public surfaces they were forbidden to read.
+
+Two files, two contradictory policies, and nothing anywhere that could notice: robots.txt has no
+schema, no build step and no test. You find out by measuring an AI-visibility metric that has been
+structurally zero the whole time — **which reads identically to being genuinely invisible.** It is
+shape 4 (ambiguous zero) hiding in configuration rather than in code, and the ambiguity is worse
+here because the "fix" you reach for is to work harder on visibility.
+
+- **The generalisation:** whenever one policy is written down twice for two audiences, the copies are a drift surface, and a config file with no parser has no drift detector by default. The mechanism is the parser you write for the test.
+- **Guarded by:** [tests/unit/crawlPolicy.test.ts](../tests/unit/crawlPolicy.test.ts) — parses robots.txt into groups (multi-`User-agent:` groups included, RFC 9309 §2.2.1), applies longest-match Allow/Disallow, asserts every retrieval agent can read the public surface and *cannot* reach a tokenised share URL or the app, asserts every training crawler is blocked by a group **of its own** (a crawler with no group falls through to `*` and is allowed — the trap the file's own header documents), and pins llms.txt to the same allow-set.
+- **Proven to fire:** 2026-08-23, twice. (a) `Perplexity-User` moved back to the training block → the "may read the public surface" case failed, naming it. (b) The allow group's Disallow list deleted, leaving `Allow: /` — the exact "named group with no Disallow lines is an unrestricted crawl" trap — → **18 of 54** failed, every share-URL and app-surface case. Restored byte-identically both times; 54/54 green after.
+- **Blind spot:** llms.txt is prose. The test can stop it disagreeing with robots.txt on the agent list; it cannot check that the surfaces it advertises still exist.
+
 ---
 
 ## Mechanism inventory
@@ -497,7 +516,10 @@ shape `inbound_doc_to_supplier_bill` already uses.
 | `npm run lint:tenancy` | CI | invariant 1, two-doors | **yes** — self-test runs before every scan |
 | `ops.silent_zero` | nightly | shape 4 | no |
 | [tests/unit/inboxApiReachability.test.ts](../tests/unit/inboxApiReachability.test.ts) | `npm test`, blocking | shape 3 — an `inbox-api` action no screen can reach, and an intake price echoed back as the member's own | **yes** — mutation-tested by renaming both call sites and dropping the price guard; 3 of 5 assertions failed, naming the actions (2026-08-20) |
-| `ops.silent_zero_probe_missing` | nightly | shape 4g — a probe silently dropped from the detector by a full `CREATE OR REPLACE` | **yes** — watched to go 0 → 15 → 0 with the detector stubbed inside an aborted subtransaction (2026-08-20) |
+| `ops.silent_zero_probe_missing` | nightly | shape 4g — a probe silently dropped from the detector by a full `CREATE OR REPLACE` | **yes** — watched to go 0 → 15 → 0 with the detector stubbed inside an aborted subtransaction (2026-08-20); re-watched 2026-08-23 for the `seo #349` roster entry specifically |
+| [tests/unit/crawlPolicy.test.ts](../tests/unit/crawlPolicy.test.ts) | `npm test`, blocking | shape 15 — robots.txt and llms.txt expressing two different crawl policies, and retrieval agents blocked as if they were training crawlers | **yes** — two mutations, 1 and 18 assertions failed as intended (2026-08-23) |
+| [test_llm_visibility_is_a_measurement.py](../mivaa-pdf-extractor/tests/unit/test_llm_visibility_is_a_measurement.py) | MIVAA CI, blocking | shape 3 + shape 4 on the LLM-probe pipeline — a `days` param never applied, a sentiment score diluted by the probes that never mentioned the subject, a ghost citation nothing could see, a substring domain match | **yes** — three mutations restoring the original defects; 3, 3 and 1 assertions failed as intended (2026-08-23) |
+| `ops.silent_zero` probe `seo_article_refresh_due_never_emitted` | nightly | shape 4 — generated articles aging past their refresh cadence while the weekly sweep tells nobody | **yes** — 4 overdue fixtures inside a rolled-back transaction produced the finding; the same fixtures with `refresh_notified_at` set produced none (2026-08-23) |
 | [tests/unit/zernioSecretResolution.test.ts](../tests/unit/zernioSecretResolution.test.ts) | `npm test`, blocking | shapes 3 + 4 — an admin-editable secret read through `Deno.env` on the edge, where the DB→env bootstrap cannot work | **yes** — mutation-tested by restoring one of the four original hand-rolled getters; 2 of 6 assertions failed, naming the file |
 | `ops.page_embeddings_never_written` | nightly | shape 4, page channel (#239) | no — but it was run against the live DB on introduction and returned clean |
 | [tests/unit/test_page_embeddings.py](../mivaa-pdf-extractor/tests/unit/test_page_embeddings.py) | `pytest`, blocking | shape 4e + Phase-0 isolation on `page_embeddings` | **yes** — every assertion was mutation-tested against a deliberately broken copy of the code it guards |

@@ -360,6 +360,17 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'previous_score', label: 'Previous score', note: 'On-page score at the prior audit.' },
     { key: 'current_score', label: 'Current score', note: 'On-page score at this audit.' },
   ]),
+  'seo.article_refresh_due': withStandard([
+    { key: 'article_id', label: 'Article ID', note: 'The generated article that is due.' },
+    { key: 'article_title', label: 'Article title', note: 'Title of the article.' },
+    { key: 'target_keyword', label: 'Target keyword', note: 'The keyword the article targets.' },
+    { key: 'website_id', label: 'Website ID', note: 'The connected website it belongs to, when set.' },
+    { key: 'published_at', label: 'Published', note: 'When the article was first completed.' },
+    { key: 'last_reviewed_at', label: 'Last reviewed', note: 'When the content was last materially refreshed. Empty = never.' },
+    { key: 'refresh_due_at', label: 'Due date', note: 'Derived: last review (or publication) + the cadence.' },
+    { key: 'refresh_interval_days', label: 'Cadence (days)', note: 'This article\u2019s own refresh interval.', example: '90' },
+    { key: 'age_days', label: 'Age (days)', note: 'Days since the content was last reviewed.' },
+  ]),
 };
 
 /** The standard envelope every notification/email event carries. */
@@ -424,6 +435,7 @@ export const TRIGGER_TITLES: Record<string, string> = {
   'seo.ranking_movement': 'SEO Rankings Moved',
   'seo.backlink_movement': 'SEO Backlinks Moved',
   'seo.site_health_changed': 'SEO Site Health Changed',
+  'seo.article_refresh_due': 'SEO Article Due for Refresh',
 };
 
 /**

@@ -274,6 +274,7 @@ const GEO_SIGNAL_NAMES: Record<string, string> = {
   authorityTone: 'Authority Tone',
   claimAttribution: 'Claim Attribution',
   selfContainedParagraphs: 'Self-Contained Paragraphs',
+  freshness: 'Freshness',
 };
 
 // ─── Adaptive Polling Hook ──────────────────────────────────────

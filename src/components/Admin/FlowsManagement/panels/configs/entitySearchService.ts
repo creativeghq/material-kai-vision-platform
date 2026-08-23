@@ -141,6 +141,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'send-quote-email', label: 'send-quote-email', sublabel: 'Email a quote to a recipient with a public share link' },
   { id: 'seo-api', label: 'seo-api', sublabel: 'Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.' },
   { id: 'seo-domain-tracker', label: 'seo-domain-tracker', sublabel: 'Weekly Rankings + Backlinks snapshots for a connected website' },
+  { id: 'seo-content-freshness', label: 'seo-content-freshness', sublabel: 'Content decay — raise generated articles that are past their own refresh cadence' },
   { id: 'seo-site-audit', label: 'seo-site-audit', sublabel: 'Site Health — homepage Lighthouse + on-page audit for a connected website' },
   { id: 'stock-api', label: 'stock-api', sublabel: 'Stock / warehouse module - inventory, movements, counts, shipments and forecasting' },
   { id: 'storage-orphan-cleanup-cron', label: 'storage-orphan-cleanup-cron', sublabel: 'Nightly cron (04:00 UTC): delete storage objects with no live DB reference' },

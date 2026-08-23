@@ -199,6 +199,10 @@ export type TriggerType =
   | 'seo.ranking_movement'
   | 'seo.backlink_movement'
   | 'seo.site_health_changed'
+  // Content decay (#349 C1): a generated article has passed its own refresh cadence.
+  // Emitted by seo-content-freshness; payload-only. Nothing was ever revisited before
+  // this existed — an article silently stopped being cited and nobody was told.
+  | 'seo.article_refresh_due'
   // A watched non-price page changed — supplier T&C, a regulatory notice, partner
   // API docs, a competitor page (#331). Fired by the Firecrawl monitoring webhook.
   | 'page_watch_changed'
@@ -218,6 +222,7 @@ export interface RealestateListingPublishedTriggerConfig {}
 export interface SeoRankingMovementTriggerConfig {}
 export interface SeoBacklinkMovementTriggerConfig {}
 export interface SeoSiteHealthChangedTriggerConfig {}
+export interface SeoArticleRefreshDueTriggerConfig {}
 export interface HrApplicantStageChangedTriggerConfig {}
 export interface HrEmployeeAddedTriggerConfig {}
 export interface HrAbsenceRequestedTriggerConfig {}
@@ -535,6 +540,7 @@ export type TriggerConfigMap = {
   'seo.ranking_movement': SeoRankingMovementTriggerConfig;
   'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
   'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;
+  'seo.article_refresh_due': SeoArticleRefreshDueTriggerConfig;
   page_watch_changed: PageWatchChangedTriggerConfig;
   'asset.service_due': AssetServiceDueTriggerConfig;
   'asset.service_overdue': AssetServiceOverdueTriggerConfig;

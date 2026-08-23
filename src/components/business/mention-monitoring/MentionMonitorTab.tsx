@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import {
   RefreshCw, ExternalLink, AlertCircle, Sparkles, Bell, Globe,
   TrendingUp, TrendingDown, MessageSquare, Bot, Newspaper, ThumbsDown, Ban, ThumbsUp,
+  Link2, Ghost,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -25,9 +26,12 @@ import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildMentionFeedFilters } from './mentionFilters';
 import { formatDate } from '@/utils/datetime';
 import {
-  TrackedMention, MentionRow, LlmVisibilitySnapshot, MentionExclusion,
+  CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
+import {
+  TrackedMention, MentionRow, LlmVisibilitySnapshot, LlmVisibilityTrend, MentionExclusion,
   trackProduct, untrackProduct, getProductMonitoring, refreshProduct,
-  getProductFeed, getProductLlmVisibility, probeProductLlm,
+  getProductFeed, getProductLlmVisibility, getProductLlmVisibilityTrend, probeProductLlm,
   updateTrackedMention, submitMentionClassifierCorrection,
   listExclusions, excludeMentionUrl, includeMentionUrl, promoteMentionUrl,
 } from '@/services/mentionMonitoringApi';
@@ -71,9 +75,23 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const [showExclusions, setShowExclusions] = useState(false);
   const [busyUrl, setBusyUrl] = useState<string | null>(null);
   const [llm, setLlm] = useState<LlmVisibilitySnapshot | null>(null);
+  const [llmTrend, setLlmTrend] = useState<LlmVisibilityTrend | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [probing, setProbing] = useState(false);
+
+  // Formatted here, derived in MIVAA: `change` comes off the same windowed read the
+  // chart draws, so the headline delta and the line can never disagree.
+  const sovDelta = llmTrend?.change?.share_of_voice ?? null;
+  const rankDelta = llmTrend?.change?.avg_position ?? null;
+  const trendChartData = useMemo(
+    () => (llmTrend?.points || []).map((pt) => ({
+      label: formatDate(pt.run_at),
+      shareOfVoice: Math.round(pt.share_of_voice * 100),
+      avgPosition: pt.avg_position,
+    })),
+    [llmTrend],
+  );
 
   const feedFilterGroups = useMemo(() => buildMentionFeedFilters(feed), [feed]);
   const {
@@ -90,15 +108,18 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       if (t?.id) {
         // getProductSummary was fetched on every tab open and its result never read — the KPI
         // strip renders from `tracked.current_*`. A paid round-trip per open, discarded.
-        const [f, v] = await Promise.all([
+        const [f, v, tr] = await Promise.all([
           getProductFeed(productId, { limit: 100 }),
           getProductLlmVisibility(productId),
+          getProductLlmVisibilityTrend(productId, 90),
         ]);
         setFeed(f);
         setLlm(v);
+        setLlmTrend(tr);
       } else {
         setFeed([]);
         setLlm(null);
+        setLlmTrend(null);
       }
     } catch (e: any) {
       toast({ title: 'Load failed', description: String(e?.message || e), variant: 'destructive' });
@@ -147,8 +168,12 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
     try {
       const r = await probeProductLlm(productId);
       toast({ title: 'LLM probe complete', description: `${r.probe_count} probes, $${r.total_cost_usd.toFixed(4)}` });
-      const v = await getProductLlmVisibility(productId);
+      const [v, tr] = await Promise.all([
+        getProductLlmVisibility(productId),
+        getProductLlmVisibilityTrend(productId, 90),
+      ]);
       setLlm(v);
+      setLlmTrend(tr);
     } catch (e: any) {
       toast({ title: 'Probe failed', description: String(e?.message || e), variant: 'destructive' });
     } finally {
@@ -560,7 +585,8 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                 <div className="min-w-0">
                   <h4 className="text-sm font-medium">LLM Visibility</h4>
                   <p className="text-xs text-muted-foreground">
-                    How this product appears in AI answers across cheap-tier models.
+                    How this product appears in AI answers across cheap-tier models — and
+                    which sources those answers cite.
                   </p>
                 </div>
                 {admin && (
@@ -576,36 +602,155 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                     <div className="text-sm text-muted-foreground">No probes run yet.</div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div>
                           <div className="text-xs text-muted-foreground">Share of voice</div>
-                          <div className="text-2xl font-medium">
+                          <div className="text-2xl font-medium tabular-nums">
                             {((llm.share_of_voice || 0) * 100).toFixed(0)}%
                           </div>
+                          {sovDelta !== null && (
+                            <div className={`text-[11px] tabular-nums ${sovDelta >= 0 ? 'text-success' : 'text-destructive'}`}>
+                              {sovDelta >= 0 ? '+' : ''}{(sovDelta * 100).toFixed(0)} pts vs {llmTrend?.days}d ago
+                            </div>
+                          )}
                         </div>
                         <div>
                           <div className="text-xs text-muted-foreground">Average rank</div>
-                          <div className="text-2xl font-medium">
+                          <div className="text-2xl font-medium tabular-nums">
                             {llm.avg_position ? `#${llm.avg_position.toFixed(1)}` : '—'}
+                          </div>
+                          {rankDelta !== null && rankDelta !== 0 && (
+                            // A SMALLER rank number is better, so a negative delta is good news.
+                            <div className={`text-[11px] tabular-nums ${rankDelta < 0 ? 'text-success' : 'text-destructive'}`}>
+                              {rankDelta < 0 ? '▲' : '▼'} {Math.abs(rankDelta).toFixed(1)} ranks
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Sentiment</div>
+                          <div className="text-2xl font-medium tabular-nums">
+                            {llm.sentiment?.score == null
+                              ? '—'
+                              : `${llm.sentiment.score > 0 ? '+' : ''}${llm.sentiment.score.toFixed(2)}`}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {llm.sentiment?.score == null
+                              // Never mentioned is not the same fact as "the verdict was neutral".
+                              ? 'never mentioned'
+                              : `${llm.sentiment.positive}+ / ${llm.sentiment.neutral}· / ${llm.sentiment.negative}−`}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Ghost citations</div>
+                          <div className="text-2xl font-medium tabular-nums">
+                            {llm.citations?.undecidable_no_homepage_domain
+                              && !llm.citations?.brand_cited
+                              ? '—'
+                              : (llm.citations?.ghost_citations ?? 0)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {llm.citations?.undecidable_no_homepage_domain && !llm.citations?.brand_cited
+                              ? 'set a homepage domain'
+                              : 'cited, never named'}
                           </div>
                         </div>
                       </div>
+
+                      {llmTrend?.present && llmTrend.points.length > 1 && (
+                        <div>
+                          <div className="text-xs font-medium mb-1">
+                            Visibility over {llmTrend.days} days · {llmTrend.points.length} runs
+                          </div>
+                          <div className="h-40 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={trendChartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+                                <CartesianGrid stroke="hsl(var(--hairline))" vertical={false} />
+                                <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                                <YAxis
+                                  yAxisId="sov" tick={{ fontSize: 10 }} tickLine={false} axisLine={false}
+                                  domain={[0, 100]} width={44} unit="%"
+                                />
+                                <YAxis
+                                  yAxisId="rank" orientation="right" tick={{ fontSize: 10 }}
+                                  tickLine={false} axisLine={false} width={34}
+                                  // Rank 1 is the best rank, so the axis runs the other way up.
+                                  reversed domain={[1, 'dataMax']}
+                                />
+                                <Tooltip
+                                  contentStyle={{ fontSize: 11 }}
+                                  formatter={(value: any, name: string) =>
+                                    name === 'Share of voice' ? [`${value}%`, name] : [`#${value}`, name]}
+                                />
+                                <Line
+                                  yAxisId="sov" type="monotone" dataKey="shareOfVoice" name="Share of voice"
+                                  stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 2 }}
+                                />
+                                <Line
+                                  yAxisId="rank" type="monotone" dataKey="avgPosition" name="Average rank"
+                                  stroke="hsl(var(--muted-foreground))" strokeWidth={1.5}
+                                  strokeDasharray="4 3" dot={{ r: 2 }} connectNulls
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                          {llmTrend.truncated && (
+                            <div className="text-[11px] text-muted-foreground">
+                              Window capped — older runs are not shown.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {llmTrend && !llmTrend.present && (
+                        <div className="text-xs text-muted-foreground">
+                          One run only so far — the trend line needs a second probe.
+                        </div>
+                      )}
+
                       {llm.per_model && (
                         <div>
                           <div className="text-xs font-medium mb-1">Per model</div>
                           <ul className="text-xs space-y-1">
-                            {Object.entries(llm.per_model).map(([model, stats]: any) => (
-                              <li key={model} className="flex justify-between">
-                                <span>{model}</span>
-                                <span className="text-muted-foreground">
+                            {Object.entries(llm.per_model).map(([model, stats]) => (
+                              <li key={model} className="flex justify-between gap-2">
+                                <span className="truncate">{model}</span>
+                                <span className="text-muted-foreground shrink-0 tabular-nums">
                                   {stats.mentioned}/{stats.probes} mentions
                                   {stats.positions?.length
                                     ? ` · avg #${(stats.positions.reduce((a: number, b: number) => a + b, 0) / stats.positions.length).toFixed(1)}`
+                                    : ''}
+                                  {stats.sentiment?.score != null
+                                    ? ` · ${stats.sentiment.score > 0 ? '+' : ''}${stats.sentiment.score.toFixed(2)}`
+                                    : ''}
+                                  {stats.citations?.ghost_citations
+                                    ? ` · ${stats.citations.ghost_citations} ghost`
                                     : ''}
                                 </span>
                               </li>
                             ))}
                           </ul>
+                        </div>
+                      )}
+
+                      {!!llm.citations?.top_cited_domains?.length && (
+                        <div>
+                          <div className="text-xs font-medium mb-1 flex items-center gap-1">
+                            <Link2 className="h-3 w-3" />
+                            Sources these answers cited
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {llm.citations.top_cited_domains.slice(0, 10).map(([domain, count]) => (
+                              <Badge key={domain} variant="outline" className="text-[10px]">
+                                {domain} · {count}
+                              </Badge>
+                            ))}
+                          </div>
+                          {!!llm.citations.ghost_citations && (
+                            <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                              <Ghost className="h-3 w-3" />
+                              {llm.citations.ghost_citations} answer(s) used your page as a source without
+                              naming you — the citation is earned, the mention is not.
+                            </div>
+                          )}
                         </div>
                       )}
                       {llm.top_competitors && llm.top_competitors.length > 0 && (

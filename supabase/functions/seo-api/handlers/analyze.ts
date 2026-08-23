@@ -11,7 +11,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
@@ -98,6 +98,12 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
       return jsonResponse({ success: false, error: msg }, 402);
     }
 
+    // Freshness needs a DATE, and the authoritative one is on the article row. A
+    // client-supplied `content_dated_at` stays supported for content that is not a
+    // stored article (an existing page somebody pasted in), but when we know which
+    // article this is, the row wins — otherwise the signal grades itself.
+    const contentDatedAt = await resolveContentDate(supabase, userId, body);
+
     const autoFix = body.auto_fix !== false;
     const maxIterations = body.max_iterations || DEFAULT_MAX_ITERATIONS;
     let content = body.content_markdown;
@@ -106,7 +112,9 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 
     // Run analysis
-    let analysis = analyzeContent(content, body.article_plan, body.serp_signals, body.content_brief);
+    let analysis = analyzeContent(
+      content, body.article_plan, body.serp_signals, body.content_brief, contentDatedAt,
+    );
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
 
@@ -153,7 +161,9 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         fixIterations++;
 
         // Re-analyze
-        analysis = analyzeContent(content, body.article_plan, body.serp_signals, body.content_brief);
+        analysis = analyzeContent(
+          content, body.article_plan, body.serp_signals, body.content_brief, contentDatedAt,
+        );
         console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
 
         if (reachableScore(analysis) >= MIN_ACCEPTABLE_SCORE) break;
@@ -222,11 +232,46 @@ function reachableScore(analysis: ContentAnalysisResult): number {
   return Math.min(100, analysis.overallScore + unfixable);
 }
 
+/**
+ * When was this content last written or reviewed?
+ *
+ * `article_id` -> the derived `content_dated_at` on `seo_article_freshness`, which is
+ * `last_reviewed_at` falling back to `completed_at`. Never `updated_at`: any write
+ * touches that, so it reports a stale article as fresh the moment anything saves.
+ *
+ * Ownership is checked before the read even though the row carries no secrets — the
+ * service-role client is in hand, and "it's only a date" is how a BOLA hole starts
+ * (invariant 1). An article we cannot resolve returns undefined, which scores as an
+ * unpublished draft rather than as stale.
+ */
+async function resolveContentDate(
+  supabase: any, userId: string, body: any,
+): Promise<string | undefined> {
+  const articleId = typeof body?.article_id === 'string' ? body.article_id : '';
+  if (!articleId) return typeof body?.content_dated_at === 'string' ? body.content_dated_at : undefined;
+  try {
+    const { data } = await supabase
+      .from('seo_article_freshness')
+      .select('user_id, workspace_id, content_dated_at')
+      .eq('article_id', articleId)
+      .maybeSingle();
+    if (!data) return undefined;
+    const owns = data.user_id === userId
+      || (data.workspace_id && await userCanAccessWorkspace(supabase, userId, data.workspace_id));
+    if (!owns) return undefined;
+    return data.content_dated_at || undefined;
+  } catch (e) {
+    console.warn('[seo-analyze] freshness lookup failed:', e instanceof Error ? e.message : e);
+    return undefined;
+  }
+}
+
 function analyzeContent(
   markdown: string,
   plan: ArticlePlan,
   serpSignals?: SerpSignalBlob,
   brief?: ContentBrief,
+  contentDatedAt?: string,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
@@ -745,7 +790,7 @@ function analyzeContent(
   const sectionScores = buildSectionScores(fixes, plan, headings, wordCount, markdown);
 
   // ── GEO Score (AI-citation-friendliness) ──
-  const geoScore = analyzeGEO(markdown, plan);
+  const geoScore = analyzeGEO(markdown, plan, contentDatedAt);
 
   return {
     overallScore: score,
@@ -796,14 +841,20 @@ function buildSectionScores(
 // GEO SCORE — AI Citation Friendliness (10 signals, 0-100)
 // ════════════════════════════════════════════════════════════════
 
-function analyzeGEO(markdown: string, plan: ArticlePlan): GEOScore {
+// The 11 signals sum to exactly 100. `freshness` was funded by taking 5 points from
+// statistics-with-attribution (15 → 10, still tied for the largest bucket) and 5 from
+// self-contained-paragraphs (10 → 5, the most mechanical of the writing signals).
+// Adding it on top instead would have been silent: `overall` is clamped at 100, so a
+// stale article with strong writing signals would have kept a perfect score and the new
+// signal would only ever have bitten pages that were already scoring badly.
+function analyzeGEO(markdown: string, plan: ArticlePlan, contentDatedAt?: string): GEOScore {
   const content = markdown.toLowerCase();
   const recommendations: string[] = [];
 
-  // 1. Statistics with attribution (15 pts) — "According to [Source]", "data from [Source]"
+  // 1. Statistics with attribution (10 pts) — "According to [Source]", "data from [Source]"
   const attrPatterns = /according to|data from|research (from|by)|study (from|by)|report (from|by)|survey (from|by)/gi;
   const attrCount = (markdown.match(attrPatterns) || []).length;
-  const statisticsWithAttribution = Math.min(15, attrCount * 5);
+  const statisticsWithAttribution = Math.min(10, attrCount * 4);
   if (attrCount < 3) recommendations.push('Add statistics with source attribution (e.g., "According to [Source], 73% of...")');
 
   // 2. Named entities (10 pts) — proper nouns, company/person names from plan
@@ -883,13 +934,25 @@ function analyzeGEO(markdown: string, plan: ArticlePlan): GEOScore {
     return words >= 20 && words <= 100; // Not too short, not too long
   });
   const selfContainedParagraphs = contentParagraphs.length > 0
-    ? Math.min(10, Math.round((goodParagraphs.length / contentParagraphs.length) * 10))
+    ? Math.min(5, Math.round((goodParagraphs.length / contentParagraphs.length) * 5))
     : 0;
   if (goodParagraphs.length < contentParagraphs.length * 0.6) recommendations.push('Ensure each paragraph is self-contained (20-100 words) with a complete claim');
 
+  // 11. Freshness (10 pts) — how long since this content was last written or reviewed.
+  //
+  // A page does not break when it goes stale. It keeps ranking, keeps reading well, and
+  // simply stops being the thing an answer engine reaches for; nothing in the platform
+  // could see that, because every other signal here is computed from the text and the
+  // text has not changed.
+  //
+  // No date means a DRAFT that has never been published — full marks, because penalising
+  // an unpublished article for having no publication date would push the auto-fix loop
+  // at a problem it cannot fix by rewriting.
+  const freshness = scoreFreshness(contentDatedAt, recommendations);
+
   const overall = statisticsWithAttribution + namedEntities + structuredDefinitions +
     expertQuotes + faqCoverage + schemaCoverage + sourceCitationScore +
-    directAnswers + claimAttribution + selfContainedParagraphs;
+    directAnswers + claimAttribution + selfContainedParagraphs + freshness;
 
   return {
     overall: Math.min(100, overall),
@@ -904,9 +967,42 @@ function analyzeGEO(markdown: string, plan: ArticlePlan): GEOScore {
       directAnswers,
       claimAttribution,
       selfContainedParagraphs,
+      freshness,
     },
     recommendations: recommendations.slice(0, 5), // Top 5 recommendations
   };
+}
+
+/**
+ * Content age → 0-10, with the band boundaries the citation research actually measures.
+ *
+ * Deliberately a step function rather than a smooth decay: the useful output is an
+ * instruction ("this needs a refresh"), and a continuous curve turns that into a number
+ * that drifts a fraction every week and never crosses a line anybody acts on.
+ */
+function scoreFreshness(contentDatedAt: string | undefined, recommendations: string[]): number {
+  if (!contentDatedAt) return 10; // unpublished draft — see the note at the call site
+  const dated = new Date(contentDatedAt);
+  if (Number.isNaN(dated.getTime())) return 10;
+  const ageDays = Math.max(0, (Date.now() - dated.getTime()) / 86400000);
+
+  if (ageDays <= 90) return 10;   // inside the window where citation rates are measurably higher
+  if (ageDays <= 180) {
+    recommendations.push(
+      `Content is ${Math.round(ageDays)} days old — past the 3-month window where updated pages are cited noticeably more often. Refresh the statistics and examples.`,
+    );
+    return 7;
+  }
+  if (ageDays <= 365) {
+    recommendations.push(
+      `Content is ${Math.round(ageDays / 30)} months old. Re-check every figure and every cited source, then update the review date.`,
+    );
+    return 4;
+  }
+  recommendations.push(
+    `Content is over a year old (${Math.round(ageDays / 365 * 10) / 10} years). Treat this as a rewrite, not a touch-up — cited sources this old are frequently dead.`,
+  );
+  return 0;
 }
 
 // ════════════════════════════════════════════════════════════════

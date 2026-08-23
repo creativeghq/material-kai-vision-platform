@@ -2998,6 +2998,54 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    // AI-search visibility had no home. `check_llm_visibility` sat in the `mentions`
+    // cluster and in none of the nine SEO ones, so somebody doing SEO work never saw
+    // the one tool that measures how the brand shows up in AI answers — while three
+    // adjacent SEO tools measured pieces of the same question from the other side.
+    // This cluster is the question, not the department that owns it. The tools stay
+    // in their original clusters too; a toolkit is a view, not ownership.
+    id: 'ai-visibility',
+    name: 'AI Search Visibility',
+    description: 'How the brand shows up in AI answers: LLM probes across four models, Google AI Overview presence, what LLMs cite for a keyword, and AI-search keyword volume.',
+    icon: 'Bot',
+    tool_ids: [
+      'check_llm_visibility', 'seo_brand_search_audit',
+      'seo_llm_mentions_search', 'seo_ai_keyword_volume',
+    ],
+    quick_starts: [
+      {
+        label: 'Where do AI answers put us?',
+        description: 'Share of voice, rank and sentiment across four answer engines',
+        icon: 'Bot',
+        prompt: 'Show me the LLM visibility snapshot for one of my tracked brands, including how it has moved since the last probe.',
+        promptTemplate: 'Show me the LLM visibility snapshot for "{{subject}}", including how it has moved since the last probe.',
+        form: [
+          { key: 'subject', label: 'Tracked brand / subject', kind: 'text', required: true, placeholder: 'Flobali' },
+        ],
+      },
+      {
+        label: 'Are we in the AI Overview?',
+        description: 'Knowledge Panel + Google AI Overview brand mention',
+        icon: 'BadgeCheck',
+        prompt: 'Run a brand-search audit and tell me whether the brand appears in the Google AI Overview.',
+        promptTemplate: 'Run a brand-search audit for "{{brand}}" and tell me whether it appears in the Google AI Overview and its cited references.',
+        form: [
+          { key: 'brand', label: 'Brand', kind: 'text', required: true, placeholder: 'Flobali' },
+        ],
+      },
+      {
+        label: 'Who do LLMs cite instead?',
+        description: 'The pages answer engines reach for on a topic',
+        icon: 'Search',
+        prompt: 'Find which pages LLMs cite when answering questions about a topic, so I can see who is winning the citations.',
+        promptTemplate: 'Find which pages LLMs cite when answering questions about "{{keyword}}", so I can see who is winning the citations.',
+        form: [
+          { key: 'keyword', label: 'Keyword / Topic', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'seo-article',
     name: 'SEO Article Pipeline',
     description: 'Research → plan → write → analyze with auto-fix. Admin-only.',

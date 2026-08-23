@@ -81,6 +81,22 @@ export interface WebsiteSeoOverview {
   tracked_domains: { total: number; active: number; last_audited_at: string | null };
 }
 
+/** One row of `seo_article_freshness` — the derived content-decay view. */
+export interface SeoArticleFreshnessRow {
+  article_id: string;
+  title: string | null;
+  slug: string | null;
+  target_keyword: string | null;
+  published_at: string | null;
+  /** Null = never revisited since publication. */
+  last_reviewed_at: string | null;
+  refresh_interval_days: number;
+  /** Derived in SQL. Never recompute it client-side. */
+  refresh_due_at: string;
+  age_days: number;
+  is_due: boolean;
+}
+
 export interface SeoArticleRow {
   id: string;
   title: string | null;
@@ -320,6 +336,43 @@ export const userWebsitesService = {
       .limit(limit);
     if (error) throw error;
     return (data as SeoArticleRow[]) || [];
+  },
+
+  /**
+   * Content decay per article (issue #349 C1).
+   *
+   * Reads the DERIVED view, never `updated_at`: any write touches that column, so an
+   * article that has not been looked at in two years reports as fresh the moment
+   * anything about it saves. `refresh_due_at` and `age_days` come from
+   * `seo_article_refresh_due_at()` in SQL — the one definition of when a page is due.
+   *
+   * `seo_article_freshness` is security_invoker, so RLS on seo_articles is the boundary.
+   */
+  async freshness(websiteId: string, limit = 50): Promise<SeoArticleFreshnessRow[]> {
+    const { data, error } = await supabase
+      .from('seo_article_freshness' as never)
+      .select('article_id, title, slug, target_keyword, published_at, last_reviewed_at, refresh_interval_days, refresh_due_at, age_days, is_due')
+      .eq('website_id', websiteId)
+      .order('refresh_due_at', { ascending: true })
+      .limit(limit);
+    if (error) throw error;
+    return ((data as unknown) as SeoArticleFreshnessRow[]) || [];
+  },
+
+  /**
+   * Record that a human has actually revisited the content.
+   *
+   * Separate from any write to the article because it is a DIFFERENT claim: saving a
+   * title is not reviewing the substance, and a review date that any edit resets is the
+   * `updated_at` problem again under a new name. `refresh_notified_at` is cleared so the
+   * next cycle can raise it once more.
+   */
+  async markArticleReviewed(articleId: string): Promise<void> {
+    const { error } = await supabase
+      .from('seo_articles')
+      .update({ last_reviewed_at: new Date().toISOString(), refresh_notified_at: null } as never)
+      .eq('id', articleId);
+    if (error) throw error;
   },
 
   async keywordResearch(websiteId: string, limit = 50): Promise<SeoKeywordResearchRow[]> {

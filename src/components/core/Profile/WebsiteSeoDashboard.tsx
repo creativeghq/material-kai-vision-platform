@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
-  FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp,
+  FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
@@ -11,6 +11,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -18,6 +19,7 @@ import {
   type UserWebsite,
   type WebsiteSeoOverview,
   type SeoArticleRow,
+  type SeoArticleFreshnessRow,
   type SeoKeywordResearchRow,
   type SeoResearchRunRow,
   type SeoTrackedDomainRow,
@@ -54,23 +56,45 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
   const [recrawling, setRecrawling] = useState(false);
 
   const [articles, setArticles] = useState<SeoArticleRow[]>([]);
+  const [freshness, setFreshness] = useState<SeoArticleFreshnessRow[]>([]);
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const [research, setResearch] = useState<SeoKeywordResearchRow[]>([]);
   const [runs, setRuns] = useState<SeoResearchRunRow[]>([]);
   const [domains, setDomains] = useState<SeoTrackedDomainRow[]>([]);
   const [openArticleId, setOpenArticleId] = useState<string | null>(null);
 
+  // Formatted from the derived view. `is_due` already accounts for the article's own
+  // cadence and any snooze, so there is no second opinion about what "due" means here.
+  const dueForRefresh = freshness.filter((f) => f.is_due);
+  const freshnessById = new Map(freshness.map((f) => [f.article_id, f]));
+
+  const markReviewed = async (articleId: string) => {
+    setReviewing(articleId);
+    try {
+      await userWebsitesService.markArticleReviewed(articleId);
+      setFreshness(await userWebsitesService.freshness(website.id));
+      toast({ title: 'Marked reviewed', description: 'The refresh clock starts again from today.' });
+    } catch (e: any) {
+      toast({ title: 'Could not mark reviewed', description: e.message, variant: 'destructive' });
+    } finally {
+      setReviewing(null);
+    }
+  };
+
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [ov, ar, kr, rr, td] = await Promise.all([
+      const [ov, ar, fr, kr, rr, td] = await Promise.all([
         userWebsitesService.overview(website.id),
         userWebsitesService.articles(website.id),
+        userWebsitesService.freshness(website.id),
         userWebsitesService.keywordResearch(website.id),
         userWebsitesService.toolkitRuns(website.id),
         userWebsitesService.trackedDomains(website.id),
       ]);
       setOverview(ov);
       setArticles(ar);
+      setFreshness(fr);
       setResearch(kr);
       setRuns(rr);
       setDomains(td);
@@ -159,7 +183,80 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         </TabsList>
 
         {/* Articles */}
-        <TabsContent value="articles">
+        <TabsContent value="articles" className="space-y-4">
+          {/*
+            Content decay (issue #349 C1). An article does not break when it goes stale —
+            it keeps ranking, keeps reading well, and simply stops being the page an
+            answer engine reaches for. Nothing in the platform revisited one, so this
+            queue is the only place the fact is visible.
+
+            `refresh_due_at` and `age_days` are DERIVED in SQL by
+            seo_article_refresh_due_at(); this component formats them and never recomputes.
+          */}
+          {dueForRefresh.length > 0 && (
+            <Card className="dashboard-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4" />
+                  Due for a refresh
+                  <Badge variant="warning">{dueForRefresh.length}</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Content updated inside the last three months is cited noticeably more often by
+                  answer engines. Refresh the figures and examples, then mark it reviewed.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Keyword</TableHead>
+                      <TableHead className="text-right">Age</TableHead>
+                      <TableHead>Last reviewed</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dueForRefresh.map((f) => (
+                      <TableRow key={f.article_id}>
+                        <TableCell className="font-medium max-w-[280px] truncate">
+                          <button
+                            type="button"
+                            onClick={() => setOpenArticleId(f.article_id)}
+                            className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {f.title || f.target_keyword || 'Untitled article'}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[180px] truncate">
+                          {f.target_keyword || '—'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{f.age_days}d</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {/* Never reviewed is a different fact from reviewed a long time ago. */}
+                          {f.last_reviewed_at ? timeAgo(f.last_reviewed_at) : 'never'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reviewing === f.article_id}
+                            onClick={() => void markReviewed(f.article_id)}
+                          >
+                            {reviewing === f.article_id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Check className="w-3.5 h-3.5" />}
+                            <span className="ml-1">Mark reviewed</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
           <Card className="dashboard-card">
             <CardHeader>
               <CardTitle>SEO Articles</CardTitle>
@@ -180,6 +277,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                       <TableHead className="text-right">Words</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
+                      <TableHead>Content age</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -200,6 +298,17 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                         <TableCell className="text-right">{formatNumber(a.word_count)}</TableCell>
                         <TableCell className={STATUS_COLOR[a.status] || 'text-muted-foreground'}>{a.status}</TableCell>
                         <TableCell className="text-muted-foreground">{timeAgo(a.created_at)}</TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {freshnessById.get(a.id)
+                            ? (
+                              <span className={freshnessById.get(a.id)!.is_due ? 'text-destructive' : undefined}>
+                                {freshnessById.get(a.id)!.age_days}d
+                              </span>
+                            )
+                            // An unpublished draft has no content age — that is not the same
+                            // as being fresh, and it is not the same as being stale either.
+                            : '—'}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
