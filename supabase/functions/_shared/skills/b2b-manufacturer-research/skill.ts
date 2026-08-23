@@ -11,7 +11,7 @@ export default `---
 name: B2B Manufacturer Research
 slug: b2b-manufacturer-research
 description: Research a specific manufacturer or supplier — verify legitimacy, extract certifications, MOQ, lead time, regions served, and return a structured sourcing report with verifiable sources. Use when the user asks to "research", "verify", "check", or "find info about" a specific company, brand, or factory.
-agents: [kai]
+agents: [kai, product-business]
 tags: [b2b, sourcing, research, procurement]
 ---
 

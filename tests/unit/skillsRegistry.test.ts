@@ -134,4 +134,76 @@ describe('skills registry', () => {
         `ids are not the display names: JARVIS is "kai" and Trinity is "erp". Offenders: ${bad.join(', ')}.`,
     ).toEqual([]);
   });
+
+  it('a skill reaches every agent that can actually run it', () => {
+    // The bug this exists to stop, measured 2026-08-23: `b2b-manufacturer-research` declared
+    // `agents: [kai]`, but 66 of the 67 real `b2b_manufacturer_search` calls came from
+    // `product-business` — the orchestrator routes B2B work to Pepper by design. So the playbook
+    // was held by the agent doing 1.5% of the work and absent from the one doing the rest.
+    //
+    // Valid ids and a registered file are not enough: both were correct here. What was wrong was
+    // the PAIRING, and nothing looked at it. A skill whose procedure is built on a tool must be
+    // offered to every agent that binds that tool, or that agent improvises the procedure.
+    const src = read(AGENT_CHAT);
+    const start = src.indexOf('const AGENT_CONFIGS');
+    const block = src.slice(start, src.indexOf('\n};', start) + 3);
+
+    // agent id -> its declared tool ids.
+    //
+    // Sliced per entry rather than matched with one cross-entry regex: `demo` declares
+    // `tools: []` on a single line, and a lazy `[\s\S]*?` between `id:` and `tools:` simply runs
+    // past it into the NEXT agent's multi-line array — which credited demo with Vision's whole
+    // toolkit. Anchoring each agent to the span between its own `id:` and the following one is
+    // what makes an empty list read as empty.
+    const idPositions = [...block.matchAll(/^\s{4}id:\s*'([a-z0-9-]+)',/gm)];
+    const toolsByAgent = new Map<string, Set<string>>();
+    idPositions.forEach((m, i) => {
+      const from = m.index ?? 0;
+      const to = i + 1 < idPositions.length ? (idPositions[i + 1].index ?? block.length) : block.length;
+      const entry = block.slice(from, to);
+      const toolsMatch = entry.match(/tools:\s*\[([\s\S]*?)\]/);
+      const ids = toolsMatch ? [...toolsMatch[1].matchAll(/'([a-z0-9_]+)'/g)].map((t) => t[1]) : [];
+      // Legacy aliases repeat a real id with an empty list; keep the richest declaration.
+      const prev = toolsByAgent.get(m[1]);
+      if (!prev || ids.length > prev.size) toolsByAgent.set(m[1], new Set(ids));
+    });
+    expect(toolsByAgent.size, 'parsed no agent tool lists — the AGENT_CONFIGS slice is wrong').toBeGreaterThan(3);
+    expect(toolsByAgent.get('demo')?.size, 'demo declares no tools; a non-empty set means the slice leaked').toBe(0);
+
+    const gaps: string[] = [];
+    for (const d of skillDirs) {
+      const text = exportedText(d);
+      const fm = frontmatter(text);
+      const offeredTo = new Set(fm.agents as string[]);
+
+      // The tools this skill's procedure is built on: every `backtick_tool_name` in its body
+      // that is a real tool some agent declares. A passing mention still counts — a skill that
+      // names a tool is telling the reader how to use it.
+      const mentioned = new Set(
+        [...text.matchAll(/`([a-z][a-z0-9_]{4,})`/g)].map((m) => m[1])
+          .filter((t) => [...toolsByAgent.values()].some((s) => s.has(t))),
+      );
+      // Fewer than three named tools is not a procedure, it is a mention. Two shared core tools
+      // (`material_search`, `analyze_inspiration_url`) are bound by almost every agent, so a
+      // 2-tool threshold flags the entire roster on every skill and the signal disappears.
+      if (mentioned.size < 3) continue;
+
+      for (const [agentId, agentTools] of toolsByAgent) {
+        if (offeredTo.has(agentId)) continue;
+        // Only flag an agent that can run essentially the WHOLE procedure. A specialist holding
+        // one incidental tool out of eight is not the intended audience, and demanding otherwise
+        // would push every skill onto the generalist.
+        const covered = [...mentioned].filter((t) => agentTools.has(t));
+        if (covered.length >= 3 && covered.length / mentioned.size >= 0.8) {
+          gaps.push(`${d} → ${agentId} (binds ${covered.length}/${mentioned.size} of its tools, not offered the skill)`);
+        }
+      }
+    }
+    expect(
+      gaps.sort(),
+      `Agent(s) that bind a skill's tools but are never offered the skill — they will improvise ` +
+        `the procedure it exists to specify. Add the id to that skill's \`agents:\` and run ` +
+        `\`npm run skills:sync\`. Gaps: ${gaps.join(', ')}.`,
+    ).toEqual([]);
+  });
 });

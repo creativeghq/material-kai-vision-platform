@@ -18,15 +18,21 @@ import type { Skill, SkillMetadata } from './skills-types.ts';
 // getSkillsForAgent matches on the id, so a skill listing "jarvis" or "trinity" is simply never
 // offered to anyone, with nothing raised.
 import b2bManufacturerResearch from './skills/b2b-manufacturer-research/skill.ts';
+import customerFacingReply     from './skills/customer-facing-reply/skill.ts';
 import designToQuote           from './skills/design-to-quote/skill.ts';
 import interiorStagingWorkflow  from './skills/interior-staging-workflow/skill.ts';
 import materialSpecExtraction   from './skills/material-spec-extraction/skill.ts';
+import propertyLeadToViewing   from './skills/property-lead-to-viewing/skill.ts';
+import seoOpportunityTriage    from './skills/seo-opportunity-triage/skill.ts';
 
 const SKILL_FILES: Record<string, string> = {
   'b2b-manufacturer-research': b2bManufacturerResearch,
+  'customer-facing-reply':     customerFacingReply,
   'design-to-quote':           designToQuote,
   'interior-staging-workflow': interiorStagingWorkflow,
   'material-spec-extraction':  materialSpecExtraction,
+  'property-lead-to-viewing':  propertyLeadToViewing,
+  'seo-opportunity-triage':    seoOpportunityTriage,
 };
 
 /**
