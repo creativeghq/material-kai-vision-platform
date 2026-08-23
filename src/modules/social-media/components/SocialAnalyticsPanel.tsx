@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, todayLocalISO, localISODateOffset } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import {
   DailyReachChart, ContentDecayChart, PostingFrequencyTable,
@@ -115,6 +115,33 @@ const statusVariant = (s: string) =>
 
 /** `—` for an absent value, never 0: "not synced yet" and "nobody saw it" are different facts. */
 const num = (v: number | null | undefined) => (v == null ? '—' : formatNumber(v));
+
+/**
+ * LinkedIn's DAILY aggregate arrives as one date/count array PER METRIC; the chart wants one row
+ * per date. Reach is deliberately absent — LinkedIn does not compute unique members reached on a
+ * daily breakdown, only lifetime — so it stays undefined rather than being filled with
+ * impressions, which is a different quantity that would silently overstate it.
+ */
+type LinkedInDailySeries = Record<string, Array<{ date: string; count: number }> | undefined>;
+
+const linkedInDailyToPoints = (series: LinkedInDailySeries): DailyPoint[] => {
+  const byDate = new Map<string, DailyPoint>();
+  const put = (key: 'impressions' | 'likes' | 'comments' | 'shares' | 'saves', rows?: Array<{ date: string; count: number }>) => {
+    for (const row of rows ?? []) {
+      const point = byDate.get(row.date)
+        ?? { date: row.date, postCount: 0, metrics: {} as DailyPoint['metrics'] };
+      point.metrics[key] = row.count;
+      byDate.set(row.date, point);
+    }
+  };
+  put('impressions', series.impressions);
+  // LinkedIn calls them reactions; every other platform here calls them likes.
+  put('likes', series.reactions);
+  put('comments', series.comments);
+  put('shares', series.shares);
+  put('saves', series.saves);
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+};
 
 export const SocialAnalyticsPanel: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
@@ -217,20 +244,37 @@ export const SocialAnalyticsPanel: React.FC = () => {
     // one profile's missing scope must not blank the rest of the screen.
     const personal = ((a.data ?? []) as AccountRow[]).filter(needsUrlImport);
     if (personal.length) {
-      const results = await Promise.allSettled(
-        personal.map(acct => callAction('get_linkedin_aggregate', { social_account_id: acct.id })),
-      );
+      const results = await Promise.allSettled([
+        ...personal.map(acct => callAction('get_linkedin_aggregate', { social_account_id: acct.id })),
+        // DAILY for the reach chart above. `get_daily_metrics` is derived from a post list, so
+        // it is empty for a member account no matter how much reach the profile actually has —
+        // which is how a profile with 28k impressions rendered an empty chart.
+        callAction('get_linkedin_aggregate', {
+          social_account_id: personal[0].id,
+          aggregation: 'DAILY',
+          from_date: localISODateOffset(-29),
+          to_date: todayLocalISO(),
+        }),
+      ]);
       const totals: Record<string, LinkedInTotals> = {};
       let scopeMissing = false;
-      results.forEach((r, idx) => {
+      personal.forEach((acct, idx) => {
+        const r = results[idx];
         if (r.status === 'fulfilled') {
-          if (r.value?.analytics) totals[personal[idx].id] = r.value.analytics as LinkedInTotals;
+          if (r.value?.analytics) totals[acct.id] = r.value.analytics as LinkedInTotals;
         } else if ((r.reason as Error & { code?: string })?.code === 'missing_scope') {
           scopeMissing = true;
         }
       });
       setLiTotals(totals);
       setLiScopeMissing(scopeMissing);
+
+      const dailyRes = results[results.length - 1];
+      if (dm.status === 'rejected' || !(dm.value?.dailyData ?? []).length) {
+        if (dailyRes.status === 'fulfilled') {
+          setDaily(linkedInDailyToPoints(dailyRes.value?.analytics ?? {}));
+        }
+      }
     } else {
       setLiTotals({});
       setLiScopeMissing(false);
@@ -417,11 +461,11 @@ export const SocialAnalyticsPanel: React.FC = () => {
               <PlatformIcon platform="linkedin" className="h-4 w-4" /> LinkedIn lifetime totals
             </CardTitle>
             <CardDescription>
-              LinkedIn adds these up itself for a personal profile, so they need no post list —
-              which is why they work where the posts table cannot. Covers posts published{' '}
-              <strong>through this app</strong> only; anything written in the LinkedIn app is
-              outside what LinkedIn will report here. Saves and sends are personal-profile
-              figures — a company page returns 0 for both.
+              Lifetime totals across your profile’s posts. LinkedIn adds these up itself, so they
+              need no post list — which is why they work where the posts table cannot, and why
+              they cannot be broken down per post. Saves and sends are personal-profile figures;
+              a company page returns 0 for both, so these are not a lesser version of page
+              analytics but a different set.
             </CardDescription>
           </CardHeader>
           <CardContent>
