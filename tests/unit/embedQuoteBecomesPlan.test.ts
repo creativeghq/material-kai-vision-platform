@@ -71,8 +71,27 @@ describe('an anonymous composition cannot name its own tenant or blueprint', () 
   it('takes the owner from the workspace, never from the request', () => {
     const code = blankComments(API);
     const block = code.slice(code.indexOf("if (action === 'request_quote')"));
-    expect(block).toContain("eq('role', 'owner')");
+    expect(block).toContain('resolveWorkspacePrincipal');
     expect(block).not.toMatch(/params\.user_id/);
+  });
+
+  it('asks ONE function whose workspace it is, in both stranger-triggered paths', () => {
+    // `visualize` (credits) and the plan path answer the same question. Two `role = 'owner'`
+    // lookups was the first version, and a bare owner match returns nothing on a workspace whose
+    // only member is an admin — measured live, one of four workspaces is exactly that, so the AI
+    // impression had been answering `no_billable_owner` there since it shipped.
+    const code = blankComments(API);
+    expect(code.match(/resolveWorkspacePrincipal\(/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(code).not.toMatch(/eq\('role', 'owner'\)/);
+  });
+
+  it('the ladder falls through owner to admin to created_by, and never to nobody', () => {
+    const principal = blankComments(read('supabase/functions/_shared/workspace-principal.ts'));
+    expect(principal).toContain("pick('owner')");
+    expect(principal).toContain("pick('admin')");
+    expect(principal).toContain('created_by');
+    // Stable ordering: without it the same workspace could attribute two plans to two people.
+    expect(principal).toContain("order('created_at'");
   });
 
   it('caps the composition, which is anonymous input becoming a jsonb column', () => {

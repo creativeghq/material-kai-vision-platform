@@ -37,6 +37,9 @@ import { grossFromNet } from '../_shared/money.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 // Shared with public-project-plan so both anonymous surfaces answer identically (#382 Phase 1).
 import { ANON_BLUEPRINT_ITEM_COLUMNS, foldItemPricingForAnon } from '../_shared/blueprint/anon-pricing.ts';
+// ONE answer to "whose workspace is this", for the two paths a stranger can trigger: the AI
+// impression that spends credits, and the plan a configurator lead becomes (#382 Phase 4).
+import { resolveWorkspacePrincipal } from '../_shared/workspace-principal.ts';
 
 /** Page size ceiling — an embed grid is a shelf, not a catalog dump. */
 const MAX_LIMIT = 60;
@@ -705,15 +708,12 @@ Deno.serve(withApiLogging((req) => {
 
     // Credits belong to the WORKSPACE that owns the key, attributed to its owner — the merchant is
     // the one whose website this is and whose pool pays. Never the visitor: there isn't one.
-    const { data: owner } = await supabase
-      .from('workspace_members')
-      .select('user_id')
-      .eq('workspace_id', workspaceId)
-      .eq('role', 'owner')
-      .eq('status', 'active')
-      .limit(1)
-      .maybeSingle();
-    if (!owner?.user_id) {
+    // Owner → earliest active admin → workspaces.created_by. A bare `role = 'owner'` lookup was
+    // returning nothing on a workspace whose only member is an admin, so this action had been
+    // answering `no_billable_owner` there since it shipped — a 200 with `available:false`, which
+    // reads to the merchant as "the feature does not work" and to us as nothing at all.
+    const principal = await resolveWorkspacePrincipal(supabase, workspaceId);
+    if (!principal) {
       return embedJson({ ok: true, available: false, reason: 'no_billable_owner' }, 200, cors);
     }
 
@@ -737,7 +737,7 @@ Deno.serve(withApiLogging((req) => {
           item_type: 'product',
           item_name: typeof params.item_name === 'string' ? params.item_name.slice(0, 120) : 'product',
           spec: safeSpec,
-          user_id: owner.user_id,
+          user_id: principal,
           workspace_id: workspaceId,
           aspect_ratio: '1:1',
           // Attribution, not identity — the generator has already decided whose pool pays from
@@ -927,18 +927,11 @@ Deno.serve(withApiLogging((req) => {
       // Scope and publication, asked exactly as the `blueprint` action asks them. A composition is
       // anonymous input; the blueprint it claims to configure has to be one this key may serve.
       if (await isBlueprintInScope(supabase, auth.ctx, blueprintId)) {
-        // The plan needs an owner and there is no visitor to attribute it to, so it belongs to the
-        // workspace owner — the same resolution `visualize` uses to decide whose credits pay.
-        const { data: owner } = await supabase
-          .from('workspace_members')
-          .select('user_id')
-          .eq('workspace_id', workspaceId)
-          .eq('role', 'owner')
-          .eq('status', 'active')
-          .limit(1)
-          .maybeSingle();
+        // The plan needs an owner and there is no visitor to attribute it to — the same question
+        // `visualize` asks about credits, answered by the same function so the two cannot drift.
+        const planOwner = await resolveWorkspacePrincipal(supabase, workspaceId);
 
-        if (owner?.user_id) {
+        if (planOwner) {
           let composition: unknown = params.composition;
           if (typeof composition === 'string') {
             try { composition = JSON.parse(composition); } catch { composition = undefined; }
@@ -963,7 +956,7 @@ Deno.serve(withApiLogging((req) => {
                 blueprint_id: blueprintId,
                 composition: safeComposition,
                 title: `${name.slice(0, 80)} — website enquiry`,
-                user_id: owner.user_id,
+                user_id: planOwner,
               }),
             });
             const planBody = await res.json().catch(() => ({}));
