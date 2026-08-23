@@ -505,7 +505,7 @@ export const inboxApi = {
 export const LABEL_COLORS: Array<{ key: string; label: string; chip: string; dot: string }> = [
   { key: 'slate',   label: 'Slate',   chip: 'bg-slate-500/10 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/25 dark:border-slate-500/30',             dot: 'bg-slate-500 dark:bg-slate-400' },
   { key: 'rose',    label: 'Rose',    chip: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/25 dark:border-rose-500/30',                   dot: 'bg-rose-500 dark:bg-rose-400' },
-  { key: 'amber',   label: 'Amber',   chip: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30',             dot: 'bg-amber-500 dark:bg-amber-400' },
+  { key: 'amber',   label: 'Amber',   chip: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30',             dot: 'bg-amber-500 dark:bg-amber-400' },
   { key: 'emerald', label: 'Emerald', chip: 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 dark:border-emerald-500/30', dot: 'bg-emerald-500 dark:bg-emerald-400' },
   { key: 'sky',     label: 'Sky',     chip: 'bg-sky-500/10 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25 dark:border-sky-500/30',                         dot: 'bg-sky-500 dark:bg-sky-400' },
   { key: 'violet',  label: 'Violet',  chip: 'bg-violet-500/10 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25 dark:border-violet-500/30',       dot: 'bg-violet-500 dark:bg-violet-400' },

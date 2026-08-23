@@ -106,16 +106,16 @@ const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; ton
   whatsapp: {
     label: 'WhatsApp', Icon: MessageCircle,
     tone: {
-      tag: 'bg-green-500/10 dark:bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/25 dark:border-green-500/30',
-      text: 'text-green-700 dark:text-green-300',
+      tag: 'bg-green-500/10 dark:bg-green-500/15 text-green-800 dark:text-green-300 border-green-500/25 dark:border-green-500/30',
+      text: 'text-green-800 dark:text-green-300',
       dot: 'bg-green-500 dark:bg-green-400',
     },
   },
   email: {
     label: 'Email', Icon: Mail,
     tone: {
-      tag: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30',
-      text: 'text-amber-700 dark:text-amber-300',
+      tag: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30',
+      text: 'text-amber-800 dark:text-amber-300',
       dot: 'bg-amber-500 dark:bg-amber-400',
     },
   },
