@@ -600,7 +600,10 @@ Deno.serve(withApiLogging((req) => {
       ok: true,
       blueprint: {
         ...bp,
-        items: (items ?? []).map((it) => foldItemPricingForAnon(it as Record<string, unknown>)),
+        // Through `unknown`: PostgREST types a select() row as a union that includes
+        // GenericStringError, which does not overlap Record<string, unknown>. The itemsErr
+        // guard above has already ruled that arm out.
+        items: (items ?? []).map((it) => foldItemPricingForAnon(it as unknown as Record<string, unknown>)),
       },
     }, 200, cors);
   }
