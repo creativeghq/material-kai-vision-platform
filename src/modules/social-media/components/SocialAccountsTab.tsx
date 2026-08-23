@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, RefreshCw, Users, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Loader2, RefreshCw, Users, AlertTriangle, PenLine } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';
@@ -9,6 +9,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
+import { PlatformIcon, SOCIAL_PLATFORMS, platformLabel } from '@/components/core/icons/PlatformIcon';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
 
@@ -23,17 +24,6 @@ interface SocialAccount {
   last_synced_at: string | null;
   connected_at: string;
 }
-
-const PLATFORMS = [
-  { id: 'instagram',  label: 'Instagram',  emoji: '📸' },
-  { id: 'facebook',   label: 'Facebook',   emoji: '👥' },
-  { id: 'linkedin',   label: 'LinkedIn',   emoji: '💼' },
-  { id: 'tiktok',     label: 'TikTok',     emoji: '🎵' },
-  { id: 'pinterest',  label: 'Pinterest',  emoji: '📌' },
-  { id: 'youtube',    label: 'YouTube',    emoji: '▶️' },
-  { id: 'twitter',    label: 'Twitter / X', emoji: '𝕏' },
-  { id: 'threads',    label: 'Threads',    emoji: '🧵' },
-];
 
 function formatFollowers(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -257,6 +247,27 @@ export const SocialAccountsTab: React.FC = () => {
   return (
     <div className="space-y-6">
 
+      {/*
+        The one place a person lands after connecting an account, and until now it offered no way
+        to USE one. Composing is the agent's job (Hermes owns `manage_social`), so this hands off
+        rather than growing a second composer: `?capability=` resolves the owning agent and
+        `?quickstart=` opens the Publish form already primed. Both are checked against the catalog
+        by toolkitCoverage.test.ts, so a renamed quick-start breaks the build instead of the link.
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Social accounts</h3>
+          <p className="text-xs text-muted-foreground">
+            Connect the accounts you post from. Each person connects their own.
+          </p>
+        </div>
+        <Button asChild size="sm" disabled={configured === false}>
+          <Link to="/agent-hub?capability=social-post&quickstart=social:Publish%20a%20post">
+            <PenLine className="h-4 w-4 mr-1" /> New post
+          </Link>
+        </Button>
+      </div>
+
       {configured === false && (
         <div className="dashboard-card flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
@@ -285,13 +296,13 @@ export const SocialAccountsTab: React.FC = () => {
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Connected</h3>
           {accounts.map(account => {
-            const platform = PLATFORMS.find(p => p.id === account.platform);
+            const label = platformLabel(account.platform);
             return (
               <div key={account.id} className="dashboard-card flex items-center gap-4">
-                <span className="text-2xl">{platform?.emoji ?? '🔗'}</span>
+                <PlatformIcon platform={account.platform} className="h-6 w-6 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm">{platform?.label ?? account.platform}</p>
+                    <p className="font-medium text-sm">{label}</p>
                     <span className={`text-[10px] capitalize ${statusTone('connected')}`}>
                       Connected
                     </span>
@@ -311,7 +322,7 @@ export const SocialAccountsTab: React.FC = () => {
                   variant="outline"
                   size="sm"
                   className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                  onClick={() => handleDisconnect(account.id, platform?.label ?? account.platform)}
+                  onClick={() => handleDisconnect(account.id, label)}
                   disabled={disconnecting === account.id}
                 >
                   {disconnecting === account.id
@@ -330,9 +341,9 @@ export const SocialAccountsTab: React.FC = () => {
           {accounts.length > 0 ? 'Add another account' : 'Connect an account'}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {PLATFORMS.filter(p => !connectedPlatformIds.has(p.id)).map(platform => (
+          {SOCIAL_PLATFORMS.filter(p => !connectedPlatformIds.has(p.id)).map(platform => (
             <div key={platform.id} className="dashboard-card flex items-center gap-3">
-              <span className="text-2xl">{platform.emoji}</span>
+              <PlatformIcon platform={platform.id} className="h-6 w-6 shrink-0" />
               <div className="flex-1">
                 <p className="font-medium text-sm">{platform.label}</p>
                 <p className="text-xs text-muted-foreground">Not connected</p>
@@ -352,7 +363,7 @@ export const SocialAccountsTab: React.FC = () => {
           ))}
         </div>
 
-        {PLATFORMS.every(p => connectedPlatformIds.has(p.id)) && (
+        {SOCIAL_PLATFORMS.every(p => connectedPlatformIds.has(p.id)) && (
           <p className="text-sm text-muted-foreground text-center py-4">
             All platforms connected! 🎉
           </p>

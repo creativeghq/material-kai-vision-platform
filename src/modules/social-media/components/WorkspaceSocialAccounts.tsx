@@ -21,11 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/utils/datetime';
-
-const PLATFORM_EMOJI: Record<string, string> = {
-  instagram: '📸', facebook: '👥', linkedin: '💼', tiktok: '🎵',
-  pinterest: '📌', youtube: '▶️', twitter: '𝕏', threads: '🧵',
-};
+import { PlatformIcon, platformLabel } from '@/components/core/icons/PlatformIcon';
 
 interface SocialAccount {
   id: string;
@@ -88,8 +84,8 @@ export const WorkspaceSocialAccounts: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           {Object.entries(platformCounts).map(([platform, count]) => (
             <Badge key={platform} variant="outline" className="gap-1.5 px-3 py-1">
-              <span>{PLATFORM_EMOJI[platform] ?? '🔗'}</span>
-              <span className="capitalize">{platform}</span>
+              <PlatformIcon platform={platform} className="h-3.5 w-3.5 shrink-0" />
+              <span>{platformLabel(platform)}</span>
               <span className="text-muted-foreground">×{count}</span>
             </Badge>
           ))}
@@ -148,8 +144,8 @@ export const WorkspaceSocialAccounts: React.FC = () => {
                     <TableRow key={account.id} className={!account.is_active ? 'opacity-40' : ''}>
                       <TableCell>
                         <span className="flex items-center gap-2">
-                          <span className="text-lg">{PLATFORM_EMOJI[account.platform] ?? '🔗'}</span>
-                          <span className="capitalize text-sm">{account.platform}</span>
+                          <PlatformIcon platform={account.platform} className="h-4 w-4 shrink-0" />
+                          <span className="text-sm">{platformLabel(account.platform)}</span>
                         </span>
                       </TableCell>
                       <TableCell className="text-sm">

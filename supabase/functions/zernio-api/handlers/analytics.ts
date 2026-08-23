@@ -60,6 +60,100 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     callerWorkspaceIds = (mems ?? []).map((m: { workspace_id: string }) => m.workspace_id).filter(Boolean);
   }
 
+  // ── IMPORT EXTERNAL POSTS ──────────────────────────────────────────────────
+  //
+  // Analytics only ever covered posts WE published: get_post_analytics reads social_posts where
+  // zernio_post_id IS NOT NULL, and a post someone wrote in LinkedIn was never in that table at
+  // all. So a freshly connected account showed an empty Posts list and a refresh that "did
+  // nothing" — correct behaviour, and a useless answer, because the account plainly has posts.
+  //
+  // Zernio's `GET /v1/posts?source=external` returns the ones published outside it — roughly 12
+  // months of history per account. Importing them gives every post a zernio_post_id, after which
+  // the existing analytics sync covers native and platform-published posts identically.
+  if (action === 'import_external_posts') {
+    if (!workspace_id) return jsonResponse({ success: false, error: 'workspace_id required' }, 400);
+
+    const { data: accounts } = await supabase
+      .from('social_accounts')
+      .select('id, zernio_account_id, platform, user_id')
+      .eq('workspace_id', workspace_id)
+      .eq('is_active', true);
+
+    if (!accounts?.length) {
+      return jsonResponse({ success: true, imported: 0, accounts: 0, message: 'No connected accounts to import from' });
+    }
+
+    let imported = 0;
+    const errors: string[] = [];
+
+    for (const acct of accounts as Array<{ id: string; zernio_account_id: string; platform: string; user_id: string }>) {
+      if (!acct.zernio_account_id) continue;
+      try {
+        const qs = new URLSearchParams({
+          source: 'external',
+          accountId: acct.zernio_account_id,
+          status: 'published',
+          limit: '100',
+          sortBy: 'created-desc',
+        });
+        const page = await zernioApi('GET', `/posts?${qs.toString()}`);
+        const posts = (page?.posts ?? []) as Array<Record<string, any>>;
+
+        for (const post of posts) {
+          const zernioPostId = String(post._id ?? '');
+          if (!zernioPostId) continue;
+
+          // `platforms[]` carries the per-network result; take the entry for THIS account so a
+          // cross-posted item is attributed to the account it actually went out on.
+          const leg = (post.platforms ?? []).find(
+            (pl: Record<string, any>) => pl.accountId === acct.zernio_account_id,
+          ) ?? {};
+
+          const row = {
+            workspace_id,
+            // NOT NULL, and the honest answer is whoever authorised the account: an imported post
+            // has no author on our side, and stamping the syncing admin would credit them with
+            // somebody else's posting history.
+            user_id: acct.user_id,
+            social_account_id: acct.id,
+            platform: leg.platform ?? post.platform ?? acct.platform,
+            caption: post.content ?? post.title ?? null,
+            status: 'published',
+            zernio_post_id: zernioPostId,
+            published_at: post.publishedAt ?? post.scheduledFor ?? post.createdAt ?? null,
+            metadata: {
+              source: 'external',
+              platform_post_url: post.platformPostUrl ?? leg.platformPostUrl ?? null,
+              imported_at: new Date().toISOString(),
+            },
+          };
+
+          // Upsert on (workspace_id, zernio_post_id) — the partial unique index added for exactly
+          // this. Without it a second import duplicates the whole history.
+          const { error } = await supabase
+            .from('social_posts')
+            .upsert(row, { onConflict: 'workspace_id,zernio_post_id' });
+          if (error) {
+            errors.push(`${acct.platform} ${zernioPostId}: ${error.message}`);
+            continue;
+          }
+          imported++;
+        }
+      } catch (err) {
+        // One account failing must not abandon the others — a LinkedIn token expiring should not
+        // cost you the Instagram history in the same sweep.
+        errors.push(`${acct.platform}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    return jsonResponse({
+      success: true,
+      imported,
+      accounts: accounts.length,
+      errors: errors.length ? errors : undefined,
+    });
+  }
+
   // ── GET BEST TIME ──────────────────────────────────────────────────────────
   if (action === 'get_best_time') {
     if (!platform && !social_account_id) {

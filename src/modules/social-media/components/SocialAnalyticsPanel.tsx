@@ -23,13 +23,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { PlatformIcon, platformLabel } from '@/components/core/icons/PlatformIcon';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
-
-const PLATFORM_EMOJI: Record<string, string> = {
-  instagram: '📸', facebook: '👥', linkedin: '💼', tiktok: '🎵',
-  pinterest: '📌', youtube: '▶️', twitter: '𝕏', threads: '🧵',
-};
 
 interface PostRow {
   id: string;
@@ -142,13 +138,22 @@ export const SocialAnalyticsPanel: React.FC = () => {
           return j;
         });
 
+      // Import FIRST. Analytics only covers posts carrying a zernio_post_id, and a post written
+      // natively in LinkedIn has none until it is imported — which is why a freshly connected
+      // account used to show an empty list and a refresh that appeared to do nothing.
+      const importRes = await call('import_external_posts');
       // Post metrics for the workspace, then one insights call per connected account.
       await call('get_post_analytics');
       for (const acct of accounts) {
         await call('get_account_insights', { social_account_id: acct.id });
       }
       await load();
-      toast({ title: 'Analytics synced' });
+      toast({
+        title: 'Analytics synced',
+        description: importRes?.imported
+          ? `Imported ${importRes.imported} existing post${importRes.imported === 1 ? '' : 's'} from your accounts.`
+          : undefined,
+      });
     } catch (err) {
       toast({
         title: 'Sync failed',
@@ -161,8 +166,8 @@ export const SocialAnalyticsPanel: React.FC = () => {
   };
 
   const accountLabel = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const a of accounts) m[a.id] = `${PLATFORM_EMOJI[a.platform] ?? '🔗'} ${a.handle ?? a.platform}`;
+    const m: Record<string, { platform: string; text: string }> = {};
+    for (const a of accounts) m[a.id] = { platform: a.platform, text: a.handle ?? platformLabel(a.platform) };
     return m;
   }, [accounts]);
 
@@ -222,7 +227,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
                 <TableBody>
                   {insights.map(row => (
                     <TableRow key={row.social_account_id}>
-                      <TableCell>{accountLabel[row.social_account_id] ?? '—'}</TableCell>
+                      <TableCell>
+                        {accountLabel[row.social_account_id] ? (
+                          <span className="flex items-center gap-2">
+                            <PlatformIcon platform={accountLabel[row.social_account_id].platform} className="h-4 w-4 shrink-0" />
+                            <span className="text-sm">{accountLabel[row.social_account_id].text}</span>
+                          </span>
+                        ) : '—'}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{num(row.followers_count)}</TableCell>
                       <TableCell className="text-right tabular-nums">{num(row.posts_count)}</TableCell>
                       <TableCell className="text-right tabular-nums">
@@ -246,8 +258,9 @@ export const SocialAnalyticsPanel: React.FC = () => {
             <BarChart3 className="h-4 w-4" /> Posts
           </CardTitle>
           <CardDescription>
-            Everything this workspace has drafted, scheduled or published, newest first, with the
-            engagement Zernio reports for it.
+            Everything this workspace has drafted, scheduled or published, plus up to a year of
+            posts published natively on each connected account — Sync now imports those. Newest
+            first, with the engagement Zernio reports for each.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -256,7 +269,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
               variant="empty"
               icon={BarChart3}
               title="No posts yet"
-              description="Publish or schedule a post — ask Hermes in the agent, or use the Social toolkit — and it will appear here with its metrics."
+              description="Sync now to pull up to a year of posts already published on your connected accounts, or write a new one from My accounts."
             />
           ) : (
             <div className="overflow-x-auto">
@@ -280,7 +293,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
                       <TableRow key={post.id}>
                         <TableCell className="max-w-xs">
                           <div className="flex items-start gap-2">
-                            <span>{PLATFORM_EMOJI[post.platform] ?? '🔗'}</span>
+                            <PlatformIcon platform={post.platform} className="mt-0.5 h-4 w-4 shrink-0" />
                             <span className="truncate text-sm">{post.caption || <span className="text-muted-foreground">(no caption)</span>}</span>
                           </div>
                         </TableCell>
