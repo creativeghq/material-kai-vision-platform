@@ -1932,9 +1932,22 @@ async function handleJwtAction(
         // the one every screen already calls to open a thread — which is exactly why `mark_read`
         // has no caller and is listed as such in inboxApiReachability. Best-effort: a failed
         // receipt must never stop an operator reading their own inbox.
-        const convId = String(((thread.metadata as Json) || {}).zernio_conversation_id || '');
+        const meta = ((thread.metadata as Json) || {}) as Record<string, unknown>;
+        const convId = String(meta.zernio_conversation_id || '');
         if (convId && (thread.channel === 'whatsapp' || thread.channel === 'social')) {
-          await markConversationRead(convId);
+          // Per-number choice, because "they can see I read it" is a business decision, not a
+          // technical default. A sales team often wants the blue ticks; a support desk triaging
+          // overnight often does not, because a read receipt with no reply reads worse than
+          // silence. Absent = ON, which is what the receipt fix shipped as.
+          let sendReceipt = true;
+          const channelId = String(meta.channel_id || '');
+          if (thread.channel === 'whatsapp' && channelId) {
+            const { data: ch } = await db.from('messaging_channels')
+              .select('config').eq('id', channelId).maybeSingle();
+            const cfg = (ch?.config || {}) as Record<string, unknown>;
+            sendReceipt = cfg.send_read_receipts !== false;
+          }
+          if (sendReceipt) await markConversationRead(convId);
         }
       }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId) : null;

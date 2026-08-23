@@ -31,6 +31,8 @@ export const MessagingChannelsTab: React.FC = () => {
   const [connecting, setConnecting] = useState<WhatsAppOnboardingMode | null>(null);
   const [showConnect, setShowConnect] = useState(false);
   const [showOnboardingPicker, setShowOnboardingPicker] = useState(false);
+  // Which number's receipt switch is mid-save, so the row can disable rather than double-fire.
+  const [savingReceipts, setSavingReceipts] = useState<string | null>(null);
   const [webhook, setWebhook] = useState<ZernioWebhookStatus | null>(null);
   const [registeringWebhook, setRegisteringWebhook] = useState(false);
   const [health, setHealth] = useState<Record<string, ChannelHealthAccount>>({});
@@ -181,6 +183,48 @@ export const MessagingChannelsTab: React.FC = () => {
       toast({ title: 'Back-fill failed', description: error?.message || String(error), variant: 'destructive' });
     } finally {
       setBackfilling(false);
+    }
+  };
+
+  /**
+   * Blue ticks, per number.
+   *
+   * Opening a thread posts a read receipt to WhatsApp. Whether the customer should SEE that is a
+   * business decision that differs by desk — a sales line usually wants it, a support line
+   * triaging overnight usually does not, because "read, no reply" lands worse than silence. Off
+   * means we still mark it read for the team; only the customer's tick is withheld.
+   */
+  const handleReceiptsToggle = async (channelId: string, enabled: boolean) => {
+    setSavingReceipts(channelId);
+    // Optimistic: the switch must move under the finger, not after a round trip.
+    setChannels((prev) => prev.map((c) => (
+      c.id === channelId
+        ? { ...c, config: { ...(c.config || {}), send_read_receipts: enabled } }
+        : c
+    )));
+    try {
+      await messagingService.setChannelReadReceipts(channelId, enabled);
+      toast({
+        title: enabled ? 'Read receipts on' : 'Read receipts off',
+        description: enabled
+          ? 'Customers will see when you have read their message.'
+          : 'Customers will not see a read tick. Your team still sees the thread as read.',
+      });
+    } catch (error) {
+      // Put it back — a switch that stays where the user left it while the server disagrees is
+      // worse than one that visibly springs back.
+      setChannels((prev) => prev.map((c) => (
+        c.id === channelId
+          ? { ...c, config: { ...(c.config || {}), send_read_receipts: !enabled } }
+          : c
+      )));
+      toast({
+        title: 'Could not change read receipts',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingReceipts(null);
     }
   };
 
@@ -393,6 +437,23 @@ export const MessagingChannelsTab: React.FC = () => {
                     ? 'Reconnect'
                     : channel.is_active ? 'Active' : 'Inactive'}
                 </Badge>
+              </div>
+
+              <div className="mb-4 flex items-start justify-between gap-4 rounded-sm border border-hairline bg-surface-sunken px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Send read receipts</p>
+                  <p className="text-xs text-muted-foreground">
+                    {channel.config?.send_read_receipts === false
+                      ? 'Off — the sender sees no read tick. Your team still sees the thread as read.'
+                      : 'On — the sender sees a read tick when someone opens their message.'}
+                  </p>
+                </div>
+                <Switch
+                  aria-label={`Send read receipts from ${channel.sender_id}`}
+                  checked={channel.config?.send_read_receipts !== false}
+                  disabled={savingReceipts === channel.id}
+                  onCheckedChange={(v) => void handleReceiptsToggle(channel.id, v)}
+                />
               </div>
 
               {channel.config?.needs_reconnection && (

@@ -301,7 +301,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'purchase-phone-number', 'release-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
-      'bill-channels-monthly', 'set-channel-seats',
+      'bill-channels-monthly', 'set-channel-seats', 'set-channel-read-receipts',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -791,6 +791,40 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Read receipts, per number.
+      //
+      // Whether the customer sees a blue tick is a business decision and it differs by desk: a
+      // sales team usually wants it, a support desk triaging overnight usually does not, because
+      // "read, no reply" lands worse than silence. Stored on the channel rather than globally —
+      // one workspace can run both kinds of number.
+      // ─────────────────────────────────────────────────────────────
+      case 'set-channel-read-receipts': {
+        const channelId = String(requestBody.channelId || '').trim();
+        const enabled = requestBody.enabled !== false;
+        if (!channelId) throw new HttpError(400, 'channelId is required');
+
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+
+        // The channel id comes from the client, so it is bound to the caller's workspace before
+        // anything is written — otherwise one tenant could silence another tenant's receipts.
+        const { data: ch } = await supabaseClient
+          .from('messaging_channels').select('id, config, workspace_id')
+          .eq('id', channelId).maybeSingle();
+        if (!ch || ch.workspace_id !== wsId) throw new HttpError(404, 'No such channel on this workspace');
+
+        const { error } = await supabaseClient.from('messaging_channels')
+          .update({
+            config: { ...((ch.config || {}) as Record<string, unknown>), send_read_receipts: enabled },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', channelId);
+        if (error) throw new HttpError(500, `Could not save the setting: ${error.message}`);
+
+        return jsonResponse({ success: true, channel_id: channelId, send_read_receipts: enabled });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Charge the month's recurring channel lines.
       //
       // Seats and rented numbers were metered and never billed: a workspace could hold four
@@ -1164,7 +1198,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
 
-        const cap = Math.min(Math.max(Number(limit) || 50, 1), 200);
+        // Default raised with paging: 50 was a single page, and the old ceiling of 200 was
+        // chosen when one request was all we made.
+        const cap = Math.min(Math.max(Number(limit) || 500, 1), 1000);
 
         // Only this workspace's accounts. Zernio's key is platform-wide, so an unfiltered pull
         // would import another tenant's conversations into this inbox.
@@ -1201,8 +1237,22 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         for (const accountId of accountIds) {
           let convs: Array<Record<string, any>> = [];
           try {
-            const data = await zernioApi('GET', `/inbox/conversations?accountId=${encodeURIComponent(accountId)}&limit=${cap}`);
-            convs = (data.data ?? []) as Array<Record<string, any>>;
+            // PAGE through them. This read one page and stopped, so `limit` was not "how many to
+            // import" but "how many exist as far as we are concerned" — a number with hundreds of
+            // conversations back-filled the first fifty and reported success. Walk until a short
+            // page comes back, capped so a large account cannot run the function out of time.
+            const pageSize = 50;
+            for (let page = 1; page <= 20 && convs.length < cap; page++) {
+              const qs = new URLSearchParams({
+                accountId,
+                limit: String(Math.min(pageSize, cap - convs.length)),
+                page: String(page),
+              });
+              const data = await zernioApi('GET', `/inbox/conversations?${qs.toString()}`);
+              const batch = (data.data ?? data.conversations ?? []) as Array<Record<string, any>>;
+              convs.push(...batch);
+              if (batch.length < pageSize) break;
+            }
           } catch (err) {
             // One account's failure must not abandon the others — a revoked token on a single
             // number would otherwise silently truncate the whole backfill.

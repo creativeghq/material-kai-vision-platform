@@ -512,6 +512,20 @@ export class MessagingService {
     return data;
   }
 
+  /**
+   * Turn the customer-visible read tick on or off for ONE number.
+   *
+   * Per channel, not per workspace: one business can run a sales line that wants blue ticks and a
+   * support line that does not, and a single global flag forces the wrong answer on one of them.
+   */
+  async setChannelReadReceipts(channelId: string, enabled: boolean): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'set-channel-read-receipts', channelId, enabled },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to change read receipts'));
+    if (data?.error) throw new Error(data.error);
+  }
+
   /** Zernio plan headroom — see ZernioPlanStatus for why profileCeilingReached matters. */
   async getPlanStatus(): Promise<ZernioPlanStatus> {
     const { data, error } = await supabase.functions.invoke('messaging-api', {

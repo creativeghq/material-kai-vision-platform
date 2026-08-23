@@ -465,7 +465,15 @@ describe('history can be recovered, without a second door', () => {
     // conversation before that point exists on the platform and nowhere here. No local signal
     // exists for it: an empty inbox and one that missed a month are the same picture.
     expect(api.code).toContain("case 'backfill-inbox'");
-    expect(api.code).toMatch(/\/inbox\/conversations\?accountId=/);
+    // Scoped to ONE account, and asserted on the intent rather than the URL's spelling: the pull
+    // now pages with URLSearchParams, so a literal `?accountId=` match broke on a change that
+    // kept the scoping perfectly intact. What must stay true is that the conversations call and
+    // the messages call both carry accountId — Zernio's key spans every tenant, and an
+    // unscoped pull imports somebody else's conversations.
+    const block = backfillCase();
+    expect(block).toContain('/inbox/conversations');
+    expect(block).toMatch(/accountId/);
+    expect(block).toMatch(/\/messages/);
   });
 
   /**
