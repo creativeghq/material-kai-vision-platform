@@ -22,7 +22,7 @@ const ACCENT_OPTIONS: {
   {
     value: 'green',
     label: { light: 'Olive', dark: 'Magenta' },
-    description: 'The platform default — warm olive in light, magenta in dark.',
+    description: 'The platform default — green surfaces with an olive accent in light, magenta in dark.',
     gradient: {
       light: 'linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%)',
       dark: 'linear-gradient(135deg, #3a1230 0%, #7a2456 46%, #c93d84 100%)',

@@ -42,7 +42,7 @@
 
 /* Theme-driven background — resolves to dark by default (:root) or light (html.light). */
 body {
-  background: hsl(var(--background));  /* Dark: #121212 · Light: #f7f8f3 */
+  background: hsl(var(--background));  /* Dark: #0a090e · Light: #eff1ea */
   min-height: 100vh;
   color: hsl(var(--foreground));
   font-family: var(--font-sans);
@@ -406,42 +406,59 @@ All colors MUST be HSL.
      Activated by `html.light` (set by ThemeProvider).
      Overrides only the COLOR tokens — spacing, radii,
      typography and font weights are shared with dark.
-     Base surface: #f7f8f3 (hsl 72 24% 96%).
+     Base surface: #eff1ea (hsl 78 20% 93%).
+
+     The neutral ramp is GREEN-TINTED, not warm oat. The accent is named
+     `green` and its light half is olive, so a warm-cream ground made the
+     whole theme read as "cream" and left the green nowhere but the buttons.
+     It is a pure HUE rotation of the old warm ramp (42–48 → 78–80) at the
+     same lightness steps, so every elevation gap and contrast ratio is
+     unchanged — see the ladder note on --card below. Saturation drops a few
+     points at each step because green reads more strongly than oat at equal S.
      ======================================== */
   html.light {
-    /* Layered warm off-whites — the page is the deeper tone so cards read as
-       elevated WITHOUT being stark white. base #edefe6 → cards ~#f6f8f1. */
-    --background: 42 27% 93%;        /* #f2efe8 — warm oat main area */
-    --foreground: 46 14% 21%;        /* #3b382e — warm near-black ink */
+    /* Layered green-tinted off-whites — the page is the deeper tone so cards
+       read as elevated WITHOUT being stark white. base #eff1ea → cards #f8f9f5. */
+    --background: 78 20% 93%;        /* #eff1ea — soft green-grey main area */
+    --foreground: 78 12% 21%;        /* #383c2f — green near-black ink, 9.9:1 on page */
 
-    --page-background: 42 27% 93%;
+    --page-background: 78 20% 93%;
 
-    /* Surface hover — warm sand tint on cards, table rows and list items. */
-    --surface-hover: 44 24% 90%;
+    /* Surface hover — deeper green tint on cards, table rows and list items. */
+    --surface-hover: 78 20% 90%;
 
-    /* Cards — warm ivory, one step lighter than the oat page so panels lift. */
-    --card: 48 30% 97%;              /* #fbfaf5 */
-    --card-foreground: 46 14% 21%;
+    /* Cards — pale green-ivory, one step lighter than the page so panels lift.
+       The page/card luminance gap is 1.077 (the warm ramp's was 1.090) — do NOT
+       lighten the page to close it. That was tried in 7ba7149e (page → 97% L),
+       the gap collapsed to 1.02, and gradient card borders had to be bolted on
+       to fake the separation back. The page stays at 93% L. */
+    --card: 80 26% 97%;              /* #f8f9f5 */
+    --card-foreground: 78 12% 21%;
 
-    --popover: 48 30% 98%;
-    --popover-foreground: 46 14% 21%;
+    --popover: 80 26% 98%;
+    --popover-foreground: 78 12% 21%;
 
     /* Primary — muted khaki-olive (quiet-luxury); darkened to 37% L so white text
        clears WCAG AA (≥4.5:1) in fills and the assistant chat bubble. */
-    --primary: 56 24% 37%;           /* #6b6842 — white text ~4.9:1 */
+    --primary: 56 24% 37%;           /* #6b6842 — white text 5.70:1 (AA) */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — warm sand, deeper than cards (active-nav pill tone) */
-    --secondary: 44 28% 89%;         /* #ece7db */
-    --secondary-foreground: 46 16% 24%;
+    /* Secondary — deeper green, below cards (active-nav pill tone) */
+    --secondary: 78 22% 89%;         /* #e5e9dd */
+    --secondary-foreground: 78 14% 24%;  /* 7.9:1 on --secondary */
 
     /* Muted */
-    --muted: 44 26% 90%;
-    --muted-foreground: 48 16% 38%;  /* #767056 olive-grey — ~4.7:1 on oat bg (AA) */
+    --muted: 78 20% 90%;
+    /* Olive-grey secondary text. Measured against the DARKEST ground it lands on
+       — --surface-hover (90% L), not the page — because muted text sits on hovered
+       rows: 4.78:1 there, 5.06:1 on the page, 5.45:1 on a card. The previous
+       #767056 was 4.33:1 on the page and its comment claimed 4.7 (that figure was
+       the ratio on the CARD, i.e. measured against the wrong ground). */
+    --muted-foreground: 78 14% 36%;  /* #61694f */
 
-    /* Accent — warm sand hover */
-    --accent: 44 26% 87%;
-    --accent-foreground: 48 22% 28%;
+    /* Accent — deeper green hover */
+    --accent: 78 22% 87%;
+    --accent-foreground: 78 18% 28%;  /* 6.2:1 on --accent */
 
     /* Amber */
     --amber: 32 90% 42%;
@@ -455,20 +472,20 @@ All colors MUST be HSL.
     /* Olive brand gradient for identity surfaces (light) */
     --brand-gradient: linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%);
 
-    /* Borders / inputs — warm olive-grey lines */
-    --border: 46 18% 82%;
-    --input: 46 18% 83%;
+    /* Borders / inputs — olive-grey lines */
+    --border: 80 16% 82%;
+    --input: 80 16% 83%;
     --ring: 56 24% 37%;
 
-    /* Sidebar / TopNav — ivory bar, olive active */
-    --sidebar-background: 48 30% 97%;
-    --sidebar-foreground: 48 12% 40%;
+    /* Sidebar / TopNav — pale green bar, olive active */
+    --sidebar-background: 80 26% 97%;
+    --sidebar-foreground: 78 12% 40%;
     --sidebar-accent: 56 24% 37%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 46 18% 82%;
+    --sidebar-border: 80 16% 82%;
 
     /* Hero */
-    --hero-background: 48 30% 97%;
+    --hero-background: 80 26% 97%;
 
     /* Stat bubble colors — coloured fills with white text still read fine */
     --bubble-sage: 95 25% 45%;
@@ -479,8 +496,8 @@ All colors MUST be HSL.
     --bubble-text-muted: 0 0% 92%;
 
     /* Card gradients */
-    --card-gradient-start: 48 30% 98%;
-    --card-gradient-end: 46 24% 94%;
+    --card-gradient-start: 80 26% 98%;
+    --card-gradient-end: 80 22% 94%;
 
     /* Subtle gradients — black-based low-alpha so they show on light */
     --gradient-sage: linear-gradient(180deg, rgba(120, 140, 100, 0.07) 0%, rgba(120, 140, 100, 0.01) 100%);
@@ -545,8 +562,8 @@ All colors MUST be HSL.
     --badge-draft-border: 0 0% 82%;
 
     /* ===== SURFACE SYSTEM (Light) ===== */
-    --hairline: 46 18% 82%;
-    --surface-sunken: 44 24% 91%;
+    --hairline: 80 16% 82%;
+    --surface-sunken: 78 20% 91%;
     --glass-background: hsl(var(--card));
     --glass-blur: 0px;
     --glass-border: hsl(var(--hairline));
@@ -1503,9 +1520,9 @@ html.light .badge-neutral {
 /* (A panel no longer changes on hover unless it is itself the click target —
    `.panel-interactive` handles that, from tokens, in both themes.) */
 
-/* Unified hover tint (light) — cards, table rows and list items hover to the
-   previous page off-white (--surface-hover) so they read clearly against the
-   lighter #faf9f6 page. */
+/* Unified hover tint (light) — cards, table rows and list items hover one step
+   deeper than the page (--surface-hover, 90% L) so they read clearly against the
+   #eff1ea page. */
 html.light .hover\:bg-muted:hover,
 html.light .hover\:bg-muted\/20:hover,
 html.light .hover\:bg-muted\/30:hover,
