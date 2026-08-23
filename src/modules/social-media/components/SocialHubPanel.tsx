@@ -17,7 +17,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Bell, Building2,
+  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Bell, Building2, Phone,
 } from 'lucide-react';
 import { HubSideNav, type HubNavGroup } from '@/components/core/hub/HubSideNav';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -26,6 +26,7 @@ import { SocialAccountsTab } from './SocialAccountsTab';
 import { SocialAnalyticsPanel } from './SocialAnalyticsPanel';
 import { WorkspaceSocialAccounts } from './WorkspaceSocialAccounts';
 import { MessagingChannelsTab } from '@/modules/messaging/components/MessagingChannelsTab';
+import { PhoneNumbersTab } from '@/modules/messaging/components/PhoneNumbersTab';
 import { MessagingTemplatesTab } from '@/modules/messaging/components/MessagingTemplatesTab';
 import { MessagingCampaignsTab } from '@/modules/messaging/components/MessagingCampaignsTab';
 import { MessagingLogsTab } from '@/modules/messaging/components/MessagingLogsTab';
@@ -35,7 +36,8 @@ import { PushNotificationsTab } from '@/modules/messaging/components/PushNotific
 
 type SectionId =
   | 'accounts' | 'workspace-accounts' | 'analytics'
-  | 'whatsapp' | 'wa-templates' | 'wa-campaigns' | 'wa-logs' | 'wa-analytics' | 'wa-optouts' | 'wa-push';
+  | 'whatsapp' | 'wa-numbers' | 'wa-templates' | 'wa-campaigns' | 'wa-logs' | 'wa-analytics'
+  | 'wa-optouts' | 'wa-push';
 
 const DEFAULT_SECTION: SectionId = 'accounts';
 
@@ -48,6 +50,7 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   'workspace-accounts': WorkspaceSocialAccounts,
   'analytics': SocialAnalyticsPanel,
   'whatsapp': MessagingChannelsTab,
+  'wa-numbers': PhoneNumbersTab,
   'wa-templates': MessagingTemplatesTab,
   'wa-campaigns': MessagingCampaignsTab,
   'wa-logs': MessagingLogsTab,
@@ -79,6 +82,9 @@ export const SocialHubPanel: React.FC = () => {
         label: 'WhatsApp',
         items: [
           { id: 'whatsapp', label: 'Number & channel', icon: Settings },
+          // First in the order a workspace without WhatsApp actually needs: get a number,
+          // then everything else. It used to be the one step the product did not offer.
+          { id: 'wa-numbers', label: 'Get a number', icon: Phone },
           { id: 'wa-templates', label: 'Templates', icon: FileText },
           { id: 'wa-campaigns', label: 'Campaigns', icon: Send },
           { id: 'wa-logs', label: 'Message log', icon: MessageCircle },

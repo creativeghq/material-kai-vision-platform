@@ -316,3 +316,41 @@ export interface MessagingCampaignStats {
   readRate: number;
   totalCost: number;
 }
+
+/** One number Zernio has on offer in a country. */
+export interface AvailablePhoneNumber {
+  phoneNumber: string;
+  features: string[];
+}
+
+export interface PhoneNumberSearchResult {
+  country: string;
+  numberType: string | null;
+  requireSms: boolean;
+  numbers: AvailablePhoneNumber[];
+}
+
+/** A number this workspace holds — bought through us, or brought and connected by the tenant. */
+export interface OwnedPhoneNumber {
+  id: string;
+  phoneNumber: string;
+  country: string | null;
+  status: string | null;
+  profileId: string | null;
+  /** NULL for a brought-your-own number: Zernio does not bill it and we must not imply a price. */
+  monthlyCents: number | null;
+  callingEnabled: boolean;
+  broughtYourOwn: boolean;
+  displayName: string | null;
+}
+
+/**
+ * The three ways a purchase can end without failing. They are deliberately NOT collapsed into a
+ * boolean: `checkout` means nothing is bought yet (Stripe still has to be paid) and `kyc_required`
+ * means the country wants identity documents first. Reporting either as "purchased" would be a lie
+ * the operator only discovers when the number never appears.
+ */
+export type PurchaseOutcome =
+  | { kind: 'checkout'; message: string | null; checkoutUrl: string; workspace_id: string; profile_id: string }
+  | { kind: 'kyc_required'; country: string | null; numberType: string | null; kycUrl: string; workspace_id: string; profile_id: string }
+  | { kind: 'done'; message: string | null; workspace_id: string; profile_id: string };

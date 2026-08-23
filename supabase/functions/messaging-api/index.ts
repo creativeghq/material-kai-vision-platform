@@ -36,6 +36,13 @@ import {
   resolveWorkspaceProfile,
   sendWhatsAppMessage,
 } from '../_shared/zernio.ts';
+import {
+  searchAvailablePhoneNumbers,
+  listPhoneNumbers,
+  purchasePhoneNumber,
+  releasePhoneNumber,
+  assertOwnProfile,
+} from '../_shared/zernio-phone-numbers.ts';
 
 interface SendMessageRequest {
   to: string | string[];
@@ -283,6 +290,11 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox',
+      // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
+      // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
+      // platform's money and the platform's lifecycle, so they sit with the other operator
+      // actions. Searching availability and listing what a workspace already has are reads.
+      'purchase-phone-number', 'release-phone-number',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -667,6 +679,112 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
 
         return jsonResponse({ success: true, channel: saved, account });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Phone numbers: search / list / buy / release.
+      //
+      // The gap this closes: connecting WhatsApp assumed you already owned a number. Zernio
+      // sells them in 54 countries and we never offered it, so a workspace without one had no
+      // route to WhatsApp at all.
+      //
+      // Tenancy on all four is the workspace's own Zernio profile — purchases go into it, lists
+      // are filtered by it, and a release is verified against it before the id is passed on.
+      // ─────────────────────────────────────────────────────────────
+      case 'search-phone-numbers': {
+        const { country, numberType, prefix, locality, contains, sms, limit } = requestBody;
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        if (!(await isWorkspaceEntitled(supabaseClient, wsId, 'messaging'))) return notEntitledResponse('messaging');
+
+        const result = await searchAvailablePhoneNumbers(supabaseClient, {
+          country, type: numberType, prefix, locality, contains, sms: Boolean(sms), limit,
+        });
+        return jsonResponse({ success: true, ...result });
+      }
+
+      case 'list-phone-numbers': {
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        if (!(await isWorkspaceEntitled(supabaseClient, wsId, 'messaging'))) return notEntitledResponse('messaging');
+
+        const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
+        const numbers = await listPhoneNumbers(supabaseClient, profileId, requestBody.status);
+        return jsonResponse({ success: true, numbers, profile_id: profileId });
+      }
+
+      case 'purchase-phone-number': {
+        const { country, numberType, areaCode, wantsSms, purchaseIntentId } = requestBody;
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
+        // Never spend into a profile this workspace shares with other tenants.
+        await assertOwnProfile(supabaseClient, wsId, profileId);
+
+        try {
+          const outcome = await purchasePhoneNumber(supabaseClient, {
+            profileId,
+            country,
+            numberType,
+            areaCode,
+            wantsSms: Boolean(wantsSms),
+            // A number bought from inside the WhatsApp screen is for WhatsApp. Buying one that
+            // then has to be connected by hand is the same dead end in two steps.
+            connectWhatsapp: true,
+            wantsWhatsapp: true,
+            purchaseIntentId,
+          });
+          return jsonResponse({ success: true, workspace_id: wsId, profile_id: profileId, ...outcome });
+        } catch (err) {
+          // Zernio's specific refusals are actionable and a generic 500 throws that away.
+          const status = (err as { status?: number })?.status;
+          const text = err instanceof Error ? err.message : String(err);
+          if (status === 402) {
+            throw new HttpError(402, 'Zernio has no payment method on file. Add one in the Zernio dashboard before buying a number.');
+          }
+          if (status === 409 && /VELOCITY/i.test(text)) {
+            throw new HttpError(409, 'Zernio blocked this as a duplicate purchase within 10 minutes. Wait, or confirm you really want a second number.');
+          }
+          if (status === 409) {
+            throw new HttpError(409, 'That area code has no numbers available right now — try another, or drop the area code.');
+          }
+          throw err;
+        }
+      }
+
+      case 'release-phone-number': {
+        const { phoneNumberId } = requestBody;
+        if (!phoneNumberId) throw new HttpError(400, 'phoneNumberId is required');
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
+        await assertOwnProfile(supabaseClient, wsId, profileId);
+
+        // Ownership comes from the SAME authority that will perform the delete, filtered to this
+        // workspace's profile. Trusting the id from the body would let one tenant cancel another
+        // tenant's number and disconnect their WhatsApp with it. 404, not 403, so a probe cannot
+        // tell "not yours" from "does not exist".
+        const owned = await listPhoneNumbers(supabaseClient, profileId);
+        const target = owned.find((n) => n.id === phoneNumberId);
+        if (!target) throw new HttpError(404, 'No such phone number on this workspace');
+        if (target.broughtYourOwn) {
+          throw new HttpError(400, 'This is a number you connected yourself, not one bought here. Disconnect the WhatsApp channel instead of releasing it.');
+        }
+
+        const released = await releasePhoneNumber(supabaseClient, phoneNumberId);
+        // The channel row points at a number that no longer exists; leaving it active would keep
+        // offering a sender whose every send fails.
+        await supabaseClient
+          .from('messaging_channels')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('workspace_id', wsId)
+          .eq('sender_id', target.phoneNumber);
+
+        return jsonResponse({ success: true, ...released });
       }
 
       // ─────────────────────────────────────────────────────────────

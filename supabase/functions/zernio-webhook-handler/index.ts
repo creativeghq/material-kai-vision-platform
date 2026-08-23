@@ -478,15 +478,18 @@ async function handleMessageSent(supabase: any, payload: any): Promise<void> {
 async function resolveSocialWorkspace(
   supabase: any,
   zernioAccountId: string | undefined,
-): Promise<{ workspaceId: string | null; socialAccountId: string | null; platform: string | null }> {
-  if (!zernioAccountId) return { workspaceId: null, socialAccountId: null, platform: null };
+): Promise<{ workspaceId: string | null; socialAccountId: string | null; platform: string | null; connectedBy: string | null }> {
+  if (!zernioAccountId) return { workspaceId: null, socialAccountId: null, platform: null, connectedBy: null };
   const { data } = await supabase
-    .from('social_accounts').select('id, workspace_id, platform')
+    .from('social_accounts').select('id, workspace_id, platform, user_id')
     .eq('zernio_account_id', zernioAccountId).maybeSingle();
   return {
     workspaceId: data?.workspace_id ?? null,
     socialAccountId: data?.id ?? null,
     platform: data?.platform ?? null,
+    // Who authorised this account. They are the right owner for a thread on it — see
+    // findOrCreateSocialThread.
+    connectedBy: data?.user_id ?? null,
   };
 }
 
@@ -528,6 +531,12 @@ async function findOrCreateSocialThread(supabase: any, params: {
   at: string;
   /** A DM is a 1:1 service conversation like WhatsApp; a comment thread is not. */
   allowAgent: boolean;
+  /**
+   * Who connected the account this arrived on. Preferred over "first owner/admin we find",
+   * which is what this used to do: on a workspace with four admins the thread landed on an
+   * arbitrary one of them, and the person whose Instagram it actually is was not told at all.
+   */
+  preferredOwner?: string | null;
 }): Promise<string> {
   const { data: existing } = await supabase
     .from('inbox_threads').select('id')
@@ -571,7 +580,7 @@ async function findOrCreateSocialThread(supabase: any, params: {
     if (aErr) console.error('[zernio-webhook] social agent participant insert FAILED', threadId, aErr);
   }
 
-  const owner = await resolveWorkspaceOwner(supabase, params.workspaceId);
+  const owner = params.preferredOwner || (await resolveWorkspaceOwner(supabase, params.workspaceId));
   if (owner) {
     const { error: pErr } = await supabase.from('inbox_participants').insert({
       thread_id: threadId, participant_type: 'member', user_id: owner,
@@ -586,7 +595,7 @@ async function findOrCreateSocialThread(supabase: any, params: {
 async function handleSocialDirectMessage(supabase: any, payload: any): Promise<void> {
   const msg = payload.message || {};
   const accountId = accountIdOf(payload.account);
-  const { workspaceId, socialAccountId, platform } = await resolveSocialWorkspace(supabase, accountId);
+  const { workspaceId, socialAccountId, platform, connectedBy } = await resolveSocialWorkspace(supabase, accountId);
   if (!workspaceId) {
     console.warn(`[zernio-webhook] no workspace for social account ${accountId} — DM dropped`);
     return;
@@ -610,6 +619,7 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
   const threadId = await findOrCreateSocialThread(supabase, {
     allowAgent: autoRespond,
     workspaceId,
+    preferredOwner: connectedBy,
     externalKey: `dm:${plat}:${participantId}`,
     subject: `${plat} · ${handle}`,
     metadata: {
@@ -665,7 +675,7 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
 async function handleSocialComment(supabase: any, payload: any): Promise<void> {
   const comment = payload.comment || payload.message || {};
   const accountId = accountIdOf(payload.account);
-  const { workspaceId, socialAccountId, platform } = await resolveSocialWorkspace(supabase, accountId);
+  const { workspaceId, socialAccountId, platform, connectedBy } = await resolveSocialWorkspace(supabase, accountId);
   if (!workspaceId) {
     console.warn(`[zernio-webhook] no workspace for social account ${accountId} — comment dropped`);
     return;
@@ -689,6 +699,7 @@ async function handleSocialComment(supabase: any, payload: any): Promise<void> {
   const threadId = await findOrCreateSocialThread(supabase, {
     allowAgent: false,          // never auto-answer in public
     workspaceId,
+    preferredOwner: connectedBy,
     externalKey: `comments:${plat}:${postId}`,
     subject: `${plat} comments · ${String(payload.post?.content ?? postId).substring(0, 60)}`,
     metadata: {
