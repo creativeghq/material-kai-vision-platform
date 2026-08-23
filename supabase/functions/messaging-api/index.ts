@@ -1126,7 +1126,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           return jsonResponse({ success: true, imported: 0, message: 'No connected accounts to back-fill from.' });
         }
 
-        let imported = 0;
+        // Count what LANDS, not what was accepted. The webhook handler answers 200 to a message it
+        // deliberately drops — an unresolvable workspace, an echo of our own reply, an event it
+        // does not branch on are all "handled". Counting res.ok therefore reported a backfill of
+        // N messages while the inbox stayed empty, which is the exit-code-instead-of-the-world
+        // mistake this codebase keeps paying for.
+        const { count: messagesBefore } = await supabaseClient
+          .from('inbox_messages').select('*', { count: 'exact', head: true });
+
+        let accepted = 0;
         let scanned = 0;
         const errors: string[] = [];
 
@@ -1192,17 +1200,32 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
                 },
                 body: replayBody,
               });
-              if (res.ok) imported++;
+              if (res.ok) accepted++;
               else errors.push(`replay ${m.id}: ${res.status}`);
             }
           }
         }
 
+        const { count: messagesAfter } = await supabaseClient
+          .from('inbox_messages').select('*', { count: 'exact', head: true });
+        const imported = Math.max((messagesAfter ?? 0) - (messagesBefore ?? 0), 0);
+
         return jsonResponse({
           success: true,
           accounts: accountIds.length,
           conversations: scanned,
+          // The real answer: rows that appeared in the inbox.
           imported,
+          // Kept separate rather than collapsed, because the gap between them IS the diagnosis.
+          // accepted >> imported means the handler took every message and filed none — a
+          // resolution problem, not a transport one — and that is invisible if only one is shown.
+          accepted,
+          dropped_silently: Math.max(accepted - imported, 0),
+          message: accepted > 0 && imported === 0
+            ? 'Every message was accepted and none was filed. The handler could not resolve them '
+              + 'to a workspace or treated them as echoes of our own replies — check the '
+              + 'zernio-webhook-handler logs for "dropped".'
+            : undefined,
           // Never a silent partial: a truncated backfill that reports plain success is
           // indistinguishable from one that found nothing.
           errors: errors.slice(0, 20),
