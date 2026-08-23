@@ -38,10 +38,15 @@ pass, the client spoke only one of them.
 `tracked_mentions` holds a PRODUCT enrolment (`product_id` set, served at
 `/products/{id}/…`) and a free brand/keyword SUBJECT (served at `/track/{id}/…`). MIVAA
 has served both since the feature shipped. Every client reader existed once, in its
-product form — and **all 17 tracked rows on this platform are the subject kind**, so the
-admin list rendered its `Open` link `if (r.product_id)` for none of them. 636 probe rows
-across 50 runs had no screen at all, `shareOfVoice()` had zero callers, so did
-`createTrackedMention`, and so did both opportunity readers.
+product form.
+
+Measured against the live DB on 2026-08-23: the **internal flow holds zero subjects** —
+none created and none creatable, because `createTrackedMention` had no caller anywhere in
+`src/`. The 17 rows that exist all carry `api_key_id`; they came through the `kai_*`
+partner API, and the admin dashboard filters `.is('api_key_id', null)` on purpose, so that
+screen has always rendered an empty list. Their 636 probe rows across 50 runs are reachable
+through the partner's own API and through nothing in this app. `shareOfVoice()` had zero
+callers on the day it was fixed, and so did both opportunity readers.
 
 - **`MentionSubjectRef`** is the fix: `{kind:'product',productId}` | `{kind:'subject',trackedMentionId}`. One set of readers takes it, so a reader cannot exist for one kind and not the other. `getSubject{Monitoring,Feed,LlmVisibility,LlmVisibilityTrend,Opportunities}`, `probeSubjectLlm`, `refreshSubject`.
 - **`MentionMonitorTab` takes the ref**, so the admin list opens any row in a sheet. Product enrolment still lives on the product page.

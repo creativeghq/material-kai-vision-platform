@@ -503,14 +503,23 @@ here because the "fix" you reach for is to work harder on visibility.
 Shape 3's bigger brother. `tracked_mentions` is reached two ways — `/products/{id}/…` for a
 product enrolment, `/track/{id}/…` for a free brand/keyword subject — and MIVAA has served
 both since the feature shipped. The client implemented every reader once, in its product
-form. Because **all 17 tracked rows on this platform are the subject kind**, the effect was
-total: the admin list rendered its `Open` link `if (r.product_id)`, which was true for none
-of them; 636 probe rows across 50 runs had nowhere to be displayed; `shareOfVoice()` had
-zero callers on the day it was fixed; so did `createTrackedMention` and both opportunity
-readers, the latter being the read side of a ~2,000-line scoring service.
+form, so the subject arm had no screen; and `createTrackedMention`, the only way to make a
+subject, had no caller either. The internal flow therefore held **zero** subjects: not
+"none openable", none created and none creatable. `shareOfVoice()` had zero callers on the
+day it was fixed, as did both opportunity readers — the read side of a ~2,000-line service
+scoring AI Overview presence, PAA gaps and competitor rankings.
+
+**The measurement trap, worth recording because it produced a wrong first reading.** There
+ARE 17 rows in `tracked_mentions`, with 636 probe rows behind them, and the obvious reading
+is "17 subjects nobody can open". They all carry `api_key_id` — they arrived through the
+`kai_*` partner API, and the admin dashboard filters `.is('api_key_id', null)` deliberately,
+because a partner's rows are not the operator's. So the count that matters is the filtered
+one, and the honest statement is stronger, not weaker: the internal surface had no rows at
+all. Counting a table without applying the screen's own filter is the same error shape as
+`reltuples` (audit trap, #314) — a real number answering a different question.
 
 Nothing failed. Every wrapper typechecked, every route routed, the suite was green, and the
-admin page rendered a list of seventeen rows that looked completely healthy.
+admin page rendered a clean empty state.
 
 - **Why it is worse than a dead action.** `inboxApiReachability` catches a single unreachable action. Here the unreachable thing was a *category of row*, and the guard you would naturally write — "does this reader have a caller?" — passes as soon as any one screen calls it with the kind it does support.
 - **The tell:** a reader whose only parameter is one kind's id. `getProductLlmVisibility(productId)` cannot serve a subject however many callers it has.

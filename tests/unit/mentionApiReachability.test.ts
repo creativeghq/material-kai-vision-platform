@@ -8,17 +8,26 @@
  * `tracked_mentions` holds two kinds of row: a PRODUCT enrolment (`product_id` set,
  * served at `/products/{id}/…`) and a free brand/keyword SUBJECT (served at
  * `/track/{id}/…`). MIVAA has served both families since the feature shipped. The client
- * only ever spoke the product one — and on this platform **all 17 tracked subjects are
- * the subject kind**, so the screens could not open a single real row. The admin list
- * rendered its `Open` link `if (r.product_id)`, which was true for none of them.
+ * only ever spoke the product one.
  *
- * Behind those 17 rows sat 636 probe rows across 50 runs: real measurements, correctly
- * computed, displayable nowhere. `shareOfVoice()` — an endpoint that had just been fixed
- * — had zero callers. So did `createTrackedMention`, so did both opportunity readers,
- * which are the read side of a ~2,000-line service scoring AI Overview presence, PAA gaps
- * and competitor rankings.
+ * The measured state, checked against the live DB on 2026-08-23:
  *
- * Nothing failed. Every wrapper typechecked, every route routed, the suite was green.
+ *   - The INTERNAL flow holds **zero** subjects. Not "none openable" — none created, and
+ *     none creatable: `createTrackedMention` had no caller anywhere in `src/`. The only
+ *     ways in were curl and the agent tool, and the agent tool is product-only too.
+ *   - The 17 rows that do exist all carry `api_key_id` — they came through the `kai_*`
+ *     partner API, and `MentionMonitoringDashboard` filters `.is('api_key_id', null)` on
+ *     purpose, so that screen has always rendered an empty list. Their 636 probe rows
+ *     across 50 runs are reachable by the partner's own API calls and by nothing in this
+ *     app.
+ *   - `shareOfVoice()` had zero callers on the day it was fixed. So did both opportunity
+ *     readers, which are the read side of a ~2,000-line service scoring AI Overview
+ *     presence, PAA gaps and competitor rankings.
+ *
+ * So the product had a create path with no door and a read path that could only address
+ * the minority kind of row. Nothing failed: every wrapper typechecked, every route
+ * routed, the suite was green, and the admin page rendered a clean empty state.
+ *
  * This is `inboxApiReachability`'s shape one level up: there, an action had no caller;
  * here, a whole ADDRESSING MODE had no screen. A typed wrapper is not a surface, and a
  * route is not one either.
@@ -81,7 +90,7 @@ describe('mention-monitoring API reachability', () => {
       dead,
       `Unreachable mention-monitoring reader(s): ${dead.join(', ')}. Every one of these is a `
       + `complete, typed, working call to a live endpoint that no screen makes. That is how `
-      + `17 subjects and 636 probe rows ended up with nowhere to be seen.`,
+      + `the internal subject flow ended up with no create door and no detail screen.`,
     ).toEqual([]);
   });
 
@@ -125,7 +134,7 @@ describe('both kinds of subject have a screen', () => {
   it('the admin list can OPEN a subject, not only a product', () => {
     const dash = read(DASHBOARD);
     // The pre-#349 affordance was an <a> rendered `if (r.product_id)` pointing at another
-    // page — true for none of the 17 rows.
+    // page, so a subject row had no way in at all.
     expect(dash).toContain('MentionMonitorTab');
     expect(dash).toMatch(/kind:\s*'subject',\s*trackedMentionId:/);
   });
