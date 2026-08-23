@@ -468,20 +468,36 @@ describe('history can be recovered, without a second door', () => {
     expect(api.code).toMatch(/\/inbox\/conversations\?accountId=/);
   });
 
+  /**
+   * The backfill case, to its real end rather than a fixed character count.
+   *
+   * These assertions used to read the first 6000 characters after `case 'backfill-inbox'`. That
+   * is a guard whose reach depends on how much COMMENT the code above happens to carry: adding
+   * six lines of explanation pushed `truncated` past the window and failed a test about
+   * truncation, which is a self-parody. Slice the real block instead — the assertion gets
+   * stronger and stops depending on prose length.
+   */
+  const backfillCase = (): string => {
+    const start = api.code.indexOf("case 'backfill-inbox'");
+    const rest = api.code.slice(start + 1);
+    const next = /\n {6}case '/.exec(rest);
+    return next ? api.code.slice(start, start + 1 + next.index) : api.code.slice(start);
+  };
+
   it('replays through the real signature check, not a service-role bypass', () => {
     // Invariant 6 is verify-before-process, fail closed. A second door added "only for replay"
     // is the one that ends up reachable.
     expect(client.code).toContain('export async function signZernioBody');
-    const block = api.code.slice(api.code.indexOf("case 'backfill-inbox'"));
-    expect(block.slice(0, 6000)).toContain('X-Zernio-Signature');
-    expect(block.slice(0, 6000)).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    const block = backfillCase();
+    expect(block).toContain('X-Zernio-Signature');
+    expect(block).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
   });
 
   it('scopes the pull to the caller workspace and never truncates silently', () => {
     // Zernio's key is platform-wide: an unfiltered pull imports other tenants' conversations.
-    const block = api.code.slice(api.code.indexOf("case 'backfill-inbox'"));
-    expect(block.slice(0, 6000)).toMatch(/\.eq\('workspace_id', wsId\)/);
-    expect(block.slice(0, 6000)).toContain('truncated');
+    const block = backfillCase();
+    expect(block).toMatch(/\.eq\('workspace_id', wsId\)/);
+    expect(block).toContain('truncated');
   });
 });
 
