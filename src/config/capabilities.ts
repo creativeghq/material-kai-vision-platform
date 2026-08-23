@@ -74,7 +74,10 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'price-monitoring', label: 'Price Monitoring', hub: 'sales', pageRoute: '/admin/monitoring', agentId: 'kai', agentTool: 'track_product_prices', toolkitId: 'price-monitoring', recordTable: 'tracked_queries', canvasKind: 'result', moduleSlug: 'price-monitoring' },
   { id: 'messaging', label: 'WhatsApp', hub: 'service', pageRoute: '/messaging', agentId: 'social-media', agentTool: 'manage_messaging', toolkitId: 'messaging', recordTable: 'messaging_channels', moduleSlug: 'messaging' },
   { id: 'inbox', label: 'Inbox', hub: 'service', pageRoute: '/inbox', agentId: 'social-media', agentTool: 'manage_inbox', toolkitId: 'inbox', quickStartLabel: 'Open conversations', recordTable: 'inbox_threads', moduleSlug: 'inbox' },
-  { id: 'reviews', label: 'Reviews', hub: 'service', agentId: 'social-media', agentTool: 'manage_reviews', toolkitId: 'reviews', quickStartLabel: 'Unanswered reviews', recordTable: 'profile_reviews', moduleSlug: 'reviews' },
+  // `profile_reviews` is scoped to the signed-in user, and Profile → Reviews is the surface that
+  // shows exactly that set — so the reviews card has a real page to hand off to. openInLabel
+  // because "Open in Service Hub" would name a hub, not the screen it lands on.
+  { id: 'reviews', label: 'Reviews', hub: 'service', openInLabel: 'Reviews', pageRoute: '/profile?tab=reviews', agentId: 'social-media', agentTool: 'manage_reviews', toolkitId: 'reviews', quickStartLabel: 'Unanswered reviews', recordTable: 'profile_reviews', moduleSlug: 'reviews' },
 
   // ── Sales ──
   { id: 'quote', label: 'Quote', hub: 'sales', pageRoute: '/quotes', agentId: 'erp', agentTool: 'create_quote', toolkitId: 'quotes', recordTable: 'quotes', canvasKind: 'quote', moduleSlug: 'quotes' },
@@ -128,7 +131,62 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // no way to reach one — no open, no edit, not even a link to the page they live on. The handoff
   // machinery was already built; `flows_list` simply was not registered to use it.
   flows_list: 'flow',
+  reviews_list: 'reviews',
 };
+
+/**
+ * Result types whose "add one of these" is a SETUP flow that only exists in the app UI.
+ *
+ * The generic card offers "Add {thing}" under any list by asking the agent for it. That is right
+ * for a contact and wrong for a connected account: connecting one is an OAuth handshake with
+ * Meta/LinkedIn, and no tool can perform it — `manage_social`'s own description says so. Asking
+ * the model anyway produces a paragraph explaining where to go, which is the dead end the button
+ * was supposed to remove. So these link to the place instead of prompting.
+ *
+ * `destination` is an id in `appDestinations.ts` — that file owns the route, this one owns which
+ * result type belongs to it.
+ */
+export const RESULT_SETUP_DESTINATION: Record<string, { destination: string; label: string }> = {
+  social_accounts: { destination: 'social-accounts', label: 'Connect an account' },
+  // A WhatsApp sender is Meta Embedded Signup brokered by Zernio — same shape, same reason.
+  messaging_channels_list: { destination: 'messaging-channels', label: 'Connect a channel' },
+  // An embed key is minted on the Keys tab with its own domain allowlist — not by an agent, and
+  // "Add key" was the button the list key produced. The tool text already points at
+  // Profile → Keys, so the card may as well BE the way there.
+  embed_readiness_result: { destination: 'workspace-keys', label: 'Manage embed keys' },
+  embed_overview_result: { destination: 'workspace-keys', label: 'Manage embed keys' },
+};
+
+/**
+ * Result types where "Add {thing}" is not a thing anybody can do — the list is observations, or
+ * arrivals, or somebody else's register. The card offers the page handoff and nothing else.
+ *
+ * The `seo_` family is covered by prefix: every one of those ~25 cards is research output read
+ * from DataForSEO/GSC, so "Add keyword"/"Add backlink" is meaningless on all of them at once.
+ */
+const UNCREATABLE_RESULT_TYPES = new Set([
+  'record_search_results',    // search hits — you add the record, not the hit
+  'industrial_facilities',    // the EU industrial register; we do not write to it
+  'inbox_threads_list',       // a customer opens a thread; we cannot open one for them
+  'reviews_list',             // a review you write about yourself is a fake review
+  'price_summary',            // competitor prices are observations
+  'price_lookup_matches',
+  'job_digest_preview',       // a preview of a digest, not a list of things to add to
+  'stock_movements',          // a movement is the RECORD of an adjustment, made by adjusting
+  'my_hr_documents',          // HR issues these; an employee cannot add one from chat
+  'my_hr_punches',            // clock-ins come from the kiosk
+  'social_insights',
+  'social_post_analytics',
+  'social_best_time',
+]);
+
+/** Whether the generic result card should offer "Add {thing}" under this result's list. */
+export function resultOffersCreate(resultType?: string): boolean {
+  if (!resultType) return true;
+  if (resultType in RESULT_SETUP_DESTINATION) return false; // the setup link IS the action
+  if (resultType.startsWith('seo_')) return false;
+  return !UNCREATABLE_RESULT_TYPES.has(resultType);
+}
 
 /** Per-result-type payload key that holds the record id to deep-link (when the page has a detail route). */
 export const RESULT_RECORD_KEY: Record<string, string> = {

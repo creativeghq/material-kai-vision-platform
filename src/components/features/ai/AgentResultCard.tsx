@@ -1,6 +1,11 @@
 import React from 'react';
-import { ExternalLink, Plus } from 'lucide-react';
-import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
+import { ExternalLink, Plus, Link2 } from 'lucide-react';
+import { Link, useInRouterContext } from 'react-router-dom';
+import {
+  RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, RESULT_SETUP_DESTINATION,
+  buildPageUrl, capabilityHubLabel, resultOffersCreate,
+} from '@/config/capabilities';
+import { getDestination } from '@/config/appDestinations';
 import { Badge } from '@/components/core/ui/badge';
 import { formatDate } from '@/utils/datetime';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -301,13 +306,48 @@ export const AgentResultCard: React.FC<{
   const recordId = capId && resultType ? (data?.[RESULT_RECORD_KEY[resultType]] as string | undefined) : undefined;
   const pageUrl = capId ? buildPageUrl(capId, recordId) : null;
   const hubLabel = capId ? capabilityHubLabel(capId) : undefined;
+  const inRouter = useInRouterContext();
+
+  // The setup flow this list is fed by, when adding one is not something the agent can do.
+  const setup = resultType ? RESULT_SETUP_DESTINATION[resultType] : undefined;
+  const setupDest = setup ? getDestination(setup.destination) : undefined;
+
+  const entries = Object.entries(data ?? {}).filter(([k, v]) => !isPlumbing(k, v));
+  // The LIST this result is about — the one array among the fields. `{days: 7, appointments: []}`
+  // is a list result with a scalar hint attached, not two peers.
+  const listEntry = entries.find(([, v]) => Array.isArray(v)) as [string, any[]] | undefined;
+  // An empty list renders its own empty state WITH the action in it, so the footer must not
+  // repeat the same button four lines lower.
+  const showsEmptyState = !!listEntry && listEntry[1].length === 0;
 
   // What this result is a LIST of, singular — "contacts" → "contact". Only list-shaped results
   // get a create action: "add another" makes sense under a list of contacts and makes none under
   // a single enrichment record or a calculation.
-  const listKey = Object.entries(data ?? {})
-    .find(([k, v]) => Array.isArray(v) && !isPlumbing(k, v))?.[0];
-  const addLabel = listKey ? singularize(labelize(listKey)) : undefined;
+  const addLabel = listEntry && resultOffersCreate(resultType)
+    ? singularize(labelize(listEntry[0]))
+    : undefined;
+
+  // Goes THERE, rather than telling the reader where "there" is. In-app when a router is around
+  // (the Hub always has one); a plain anchor otherwise, so the card stays renderable on its own.
+  const setupLink = setupDest ? (
+    inRouter ? (
+      <Link
+        to={setupDest.route}
+        className="inline-flex items-center gap-1.5 rounded-sm border border-primary/40 px-3 py-1 text-xs text-foreground transition-colors hover:bg-primary/10"
+      >
+        <Link2 className="h-3.5 w-3.5" />
+        {setup!.label}
+      </Link>
+    ) : (
+      <a
+        href={setupDest.route}
+        className="inline-flex items-center gap-1.5 rounded-sm border border-primary/40 px-3 py-1 text-xs text-foreground transition-colors hover:bg-primary/10"
+      >
+        <Link2 className="h-3.5 w-3.5" />
+        {setup!.label}
+      </a>
+    )
+  ) : null;
 
   return (
     <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
@@ -319,11 +359,6 @@ export const AgentResultCard: React.FC<{
         a heading nobody needs.
       */}
       {(() => {
-        const entries = Object.entries(data ?? {}).filter(([k, v]) => !isPlumbing(k, v));
-        // The LIST this result is about — the one array among the fields. `{days: 7,
-        // appointments: []}` is a list result with a scalar hint attached, not two peers.
-        const listEntry = entries.find(([, v]) => Array.isArray(v)) as [string, any[]] | undefined;
-
         if (listEntry) {
           const [key, rows] = listEntry;
           // The commonest real payload on this platform is an EMPTY list — measured across saved
@@ -336,9 +371,15 @@ export const AgentResultCard: React.FC<{
             return (
               <HubEmptyState
                 title={`No ${labelize(key).toLowerCase()} yet`}
-                description={hubLabel
-                  ? `Nothing to show right now. ${hubLabel} is where these get created.`
-                  : 'The search ran fine — there is simply nothing here yet.'}
+                description={setupDest
+                  // Naming the place AND linking to it: the description says where, the action
+                  // goes there. This is the case the whole registry exists for — zero connected
+                  // accounts is exactly when somebody needs the connect flow, not a paragraph.
+                  ? `${setupDest.breadcrumb} is where these get set up.`
+                  : hubLabel
+                    ? `Nothing to show right now. ${hubLabel} is where these get created.`
+                    : 'The search ran fine — there is simply nothing here yet.'}
+                action={setupLink}
               />
             );
           }
@@ -361,8 +402,12 @@ export const AgentResultCard: React.FC<{
         }
         return <KeyValues obj={data} />;
       })()}
-      {(pageUrl || addLabel) && (
+      {(pageUrl || addLabel || (setupLink && !showsEmptyState)) && (
         <div className="mt-3 flex flex-wrap justify-end gap-2">
+          {/* Where adding one means connecting something, the button is a LINK to that flow.
+              Asking the agent instead is what produced "you'll need to go to Profile → Social
+              Accounts" — a button whose entire effect was to name a place. */}
+          {!showsEmptyState && setupLink}
           {/* A list you cannot act on is a report, not a product surface. The create action sits
               beside the handoff so "show me my contacts" is one click from "add another". */}
           {addLabel && onAsk && (

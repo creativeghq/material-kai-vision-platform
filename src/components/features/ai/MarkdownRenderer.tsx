@@ -6,16 +6,28 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Link, useInRouterContext } from 'react-router-dom';
+
+import { linkifyDestinations } from '@/utils/linkifyDestinations';
 
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  /**
+   * Turn the platform's own place names ("Profile → Social Accounts") into links.
+   * On by default — a reply that names where to go and does not go there is a dead end.
+   * Opt out only where the destination would be meaningless (content rendered outside the app).
+   */
+  linkifyRoutes?: boolean;
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   className = '',
+  linkifyRoutes = true,
 }) => {
+  const inRouter = useInRouterContext();
+  const source = linkifyRoutes ? linkifyDestinations(content) : content;
   return (
     <div className={`markdown-content text-sm leading-relaxed ${className}`}>
       <ReactMarkdown
@@ -63,17 +75,27 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           },
           // Horizontal rule
           hr: () => <hr className="my-3 border-white/30" />,
-          // Links
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              className="underline opacity-90 hover:opacity-100"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {children}
-            </a>
-          ),
+          // Links. An in-app route is navigated, not opened in a new tab: the reader asked to
+          // GO somewhere in the product, and a second tab of the same app is not that.
+          a: ({ children, href }) => {
+            const internal = !!href && href.startsWith('/') && !href.startsWith('//');
+            if (internal && inRouter) {
+              return (
+                <Link to={href!} className="underline opacity-90 hover:opacity-100">
+                  {children}
+                </Link>
+              );
+            }
+            return (
+              <a
+                href={href}
+                className="underline opacity-90 hover:opacity-100"
+                {...(internal ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+              >
+                {children}
+              </a>
+            );
+          },
           // Blockquotes
           blockquote: ({ children }) => (
             <blockquote className="border-l-2 border-white/40 pl-3 my-2 italic opacity-80">
@@ -97,7 +119,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           ),
         }}
       >
-        {content}
+        {source}
       </ReactMarkdown>
     </div>
   );
