@@ -2771,6 +2771,10 @@ async function executeAgent(
       userInput,
       isDirectToolRun: Boolean(directTool),
       onChunk,
+      // Logged under the real tool name so `knowledge_base_search` does not read as 0 calls on
+      // every dashboard while it runs on every turn — that is the silent-zero shape, and
+      // authoring one while fixing another would be a poor trade.
+      observability: { supabase, userId, workspaceId, agentId, conversationId: conversation_id ?? null },
     });
     if (grounding.block) systemPrompt += grounding.block;
     console.log(

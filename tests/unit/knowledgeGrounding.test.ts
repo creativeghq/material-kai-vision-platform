@@ -229,6 +229,18 @@ describe('knowledge grounding: it is actually wired into the turn', () => {
     expect(groundAt).toBeLessThan(stateAt);
   });
 
+  it('the automatic lookup is logged, so the tool does not read as unused', () => {
+    // Grounding runs outside the graph's tool node, so it writes no row unless it writes its own.
+    // Without this, `knowledge_base_search` shows 0 calls on every dashboard and silent-zero probe
+    // precisely while it runs on every turn — inventing the exact blind spot this work removed.
+    expect(MODULE_SRC).toContain("from('agent_tool_call_logs')");
+    expect(MODULE_SRC).toMatch(/tool_name:\s*'knowledge_base_search'/);
+    expect(MODULE_SRC).toMatch(/_via:\s*'grounding'/);
+    // and it must reuse the one derivation of "did this produce anything"
+    expect(MODULE_SRC).toContain('shapeToolResult');
+    expect(AGENT_CHAT_SRC).toMatch(/groundTurnInWorkspaceKnowledge\(\{[\s\S]{0,600}?observability:/);
+  });
+
   it('grounding failure cannot take the turn down', () => {
     const call = AGENT_CHAT_SRC.slice(
       AGENT_CHAT_SRC.indexOf('Automatic knowledge grounding'),

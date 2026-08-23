@@ -88,8 +88,18 @@ export async function groundTurnInWorkspaceKnowledge(opts: {
   isDirectToolRun?: boolean;
   // deno-lint-ignore no-explicit-any
   onChunk?: (chunk: any) => void;
+  /**
+   * Where to record the lookup. Grounding runs OUTSIDE the graph's tool node, so without this it
+   * writes no row — and `knowledge_base_search` then reads as 0 calls forever on every dashboard
+   * and `ops.silent_zero` probe, precisely while it is running on every single turn. Inventing
+   * that blind spot while fixing one would be a poor trade, so the lookup logs itself under the
+   * real tool name, marked `_via: 'grounding'` in tool_args so automatic and model-initiated
+   * calls stay tellable apart.
+   */
+  // deno-lint-ignore no-explicit-any
+  observability?: { supabase: any; userId?: string | null; workspaceId?: string | null; agentId?: string | null; conversationId?: string | null };
 }): Promise<GroundingOutcome> {
-  const { tools, userInput, isDirectToolRun, onChunk } = opts;
+  const { tools, userInput, isDirectToolRun, onChunk, observability } = opts;
 
   // ── The skip list. Every entry is a structural fact, not a judgement about the message. ──
   if (isDirectToolRun) return { ...EMPTY, skippedReason: 'direct_tool_run' };
@@ -101,15 +111,19 @@ export async function groundTurnInWorkspaceKnowledge(opts: {
   const kbTool = tools.find((t) => t?.name === 'knowledge_base_search');
   if (!kbTool) return { ...EMPTY, skippedReason: 'tool_not_bound' };
 
+  const topK = MAX_SECTIONS + 2;
+  const startedAt = Date.now();
   let parsed: Record<string, unknown>;
   try {
     onChunk?.({ type: 'status', message: 'Consulting the knowledge base…' });
     // topK slightly above MAX_SECTIONS: the floor below rejects, so ask for a little headroom.
-    const raw = await kbTool.invoke({ query, topK: MAX_SECTIONS + 2 });
+    const raw = await kbTool.invoke({ query, topK });
     parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw as Record<string, unknown>);
+    logLookup(observability, query, topK, raw, Date.now() - startedAt, null);
   } catch (err) {
     // Never fail a turn over grounding. An un-grounded answer is a worse answer, not a broken one.
     console.warn('[grounding] knowledge base lookup failed, continuing ungrounded:', err);
+    logLookup(observability, query, topK, null, Date.now() - startedAt, err);
     return { ...EMPTY, skippedReason: 'lookup_failed' };
   }
 
@@ -193,4 +207,45 @@ export async function groundTurnInWorkspaceKnowledge(opts: {
 /** Minimal attribute escaping — these values land inside a quoted XML-ish attribute. */
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Record the automatic lookup in `agent_tool_call_logs`, under the SAME tool name the model would
+ * have used.
+ *
+ * Fire-and-forget, and it uses `shapeToolResult` rather than counting here — that module is the
+ * one derivation of "did this produce anything", and a second one written inline is how the
+ * counting bug this platform just fixed came to exist in the first place.
+ */
+function logLookup(
+  // deno-lint-ignore no-explicit-any
+  observability: { supabase: any; userId?: string | null; workspaceId?: string | null; agentId?: string | null; conversationId?: string | null } | undefined,
+  query: string,
+  topK: number,
+  raw: unknown,
+  durationMs: number,
+  err: unknown,
+): void {
+  if (!observability?.supabase) return;
+  try {
+    // Imported lazily so this module stays loadable in a plain test runner.
+    import('./tool-result-shape.ts').then(({ shapeToolResult }) => {
+      const shape = err ? null : shapeToolResult(raw);
+      observability.supabase.from('agent_tool_call_logs').insert({
+        conversation_id: observability.conversationId ?? null,
+        user_id: observability.userId ?? null,
+        workspace_id: observability.workspaceId ?? null,
+        agent_id: observability.agentId ?? null,
+        tool_name: 'knowledge_base_search',
+        // `_via` is what separates the automatic lookup from one the model chose to make.
+        tool_args: { query, topK, _via: 'grounding' },
+        result_summary: shape?.summary ?? null,
+        result_count: shape?.resultCount ?? null,
+        zero_result: shape?.zeroResult ?? false,
+        duration_ms: durationMs,
+        success: !err && (shape?.ok ?? true),
+        error_message: err ? (err instanceof Error ? err.message : String(err)) : (shape?.errorMessage ?? null),
+      }).then(() => {}, () => {});
+    }, () => {});
+  } catch { /* logging must never affect the turn */ }
 }
