@@ -47,7 +47,7 @@ export const AppLauncher: React.FC = () => {
   // ...and a rail shortcut can point at a route wrapped in a CapabilityGuard, which is a gate on the
   // PERSON rather than on the purchase. Both filters run, for the same reason: never offer a click
   // whose destination will refuse it.
-  const { can } = usePermissions();
+  const { can, isWorkspaceManager } = usePermissions();
 
   useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
 
@@ -68,8 +68,13 @@ export const AppLauncher: React.FC = () => {
    * apps a one-click home, and an app appearing in both places would be the duplicate all over again.
    */
   const appLinks = (app: LauncherApp) => {
+    // All three gates, for the one reason: never offer a click whose destination will refuse it.
+    // Only the module gate ran here before — `requireAnyCapability` was declared on the type,
+    // documented as the person-gate, and then never read on this path (the rail below applied it).
     const sections = (LAUNCHER_SECTIONS[app.id] ?? [])
-      .filter((s) => !s.moduleSlug || isModuleAvailable(s.moduleSlug));
+      .filter((s) => !s.moduleSlug || isModuleAvailable(s.moduleSlug))
+      .filter((s) => !s.requireAnyCapability || s.requireAnyCapability.some(can))
+      .filter((s) => !s.requireWorkspaceAdmin || isWorkspaceManager);
     const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
     const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
     const quickStarts = cap?.quickStarts ?? [];

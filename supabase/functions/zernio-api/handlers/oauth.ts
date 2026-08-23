@@ -92,6 +92,13 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
     return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
   }
 
+  // Is the integration configured at all? Answered BEFORE the 503 below, because the whole point
+  // is to let the connect UI say so up front instead of rendering eight platform buttons that all
+  // fail on click. Returns a boolean and nothing else — never the key, never its length.
+  if (body?.action === 'config_status') {
+    return jsonResponse({ success: true, configured: Boolean(zernioKey()) });
+  }
+
   if (!zernioKey()) {
     return jsonResponse({ success: false, error: 'Social accounts integration is not configured (missing ZERNIO_API_KEY)' }, 503);
   }

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, RefreshCw, Users } from 'lucide-react';
+import { Plus, Trash2, Loader2, RefreshCw, Users, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
@@ -61,12 +63,38 @@ export const SocialAccountsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  // null = not asked yet. Connecting is impossible without the operator's Zernio key, and the only
+  // signal used to be a 503 toast AFTER the click, on a page showing eight inviting Connect
+  // buttons. Ask up front and say so instead.
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const { isOperator } = usePermissions();
 
   useEffect(() => {
     if (!user) return;
     loadAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, workspaceId]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'config_status' }),
+        });
+        const json = await res.json();
+        // Unreachable/failed probe must not claim "configured" — that is the banner switching
+        // itself off exactly when something is wrong.
+        setConfigured(res.ok && json?.success ? Boolean(json.configured) : false);
+      } catch {
+        setConfigured(false);
+      }
+    })();
+  }, [user]);
 
   // Zernio redirects the OAuth tab back here with ?connected=<platform>&accountId=<id>.
   // This tab shares the user's Supabase session, so we persist the account via the
@@ -228,6 +256,29 @@ export const SocialAccountsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+
+      {configured === false && (
+        <div className="dashboard-card flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
+          <div className="text-sm">
+            <p className="font-medium">Social publishing isn&rsquo;t switched on yet</p>
+            <p className="text-muted-foreground mt-1">
+              Connecting an account needs the platform&rsquo;s Zernio credentials, which aren&rsquo;t set.
+              {isOperator
+                ? ' Add them on the module settings page, then register event delivery there too.'
+                : ' Ask your administrator to finish the setup — nothing here will work until then.'}
+            </p>
+            {isOperator && (
+              <Link
+                to="/admin/modules/social-media/settings"
+                className="mt-2 inline-block text-sm underline underline-offset-2"
+              >
+                Open Social Media settings
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Connected accounts */}
       {accounts.length > 0 && (
