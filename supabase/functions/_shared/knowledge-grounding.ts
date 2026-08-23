@@ -227,6 +227,11 @@ function logLookup(
   err: unknown,
 ): void {
   if (!observability?.supabase) return;
+  // The write is best-effort but NOT invisible (semgrep `no-swallowed-write`, #309 item 6). A
+  // silently-failed insert would put this tool back to reading as 0 calls on every dashboard —
+  // the exact blind spot this function exists to prevent — so a failure has to say so out loud.
+  const reportFailure = (stage: string) => (e: unknown) =>
+    console.warn(`[grounding] tool-call log ${stage} failed; this lookup will not appear in agent_tool_call_logs:`, e);
   try {
     // Imported lazily so this module stays loadable in a plain test runner.
     import('./tool-result-shape.ts').then(({ shapeToolResult }) => {
@@ -245,7 +250,17 @@ function logLookup(
         duration_ms: durationMs,
         success: !err && (shape?.ok ?? true),
         error_message: err ? (err instanceof Error ? err.message : String(err)) : (shape?.errorMessage ?? null),
-      }).then(() => {}, () => {});
-    }, () => {});
-  } catch { /* logging must never affect the turn */ }
+      }).then(
+        ({ error }: { error?: { message?: string } | null }) => {
+          // supabase-js RESOLVES on an RLS denial rather than throwing, so the rejection handler
+          // below would never see one. The row simply would not exist.
+          if (error) reportFailure('insert')(error.message ?? error);
+        },
+        reportFailure('insert'),
+      );
+    }, reportFailure('module load'));
+  } catch (e) {
+    // Never let logging affect the turn — but never let it disappear either.
+    reportFailure('setup')(e);
+  }
 }
