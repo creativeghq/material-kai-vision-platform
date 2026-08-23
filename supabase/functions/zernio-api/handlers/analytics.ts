@@ -14,7 +14,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
-import { zernioApi, ensureZernioSecrets } from '../zernio.ts';
+import { zernioApi, ensureZernioSecrets, resolveWorkspaceProfile } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -58,6 +58,95 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
       .eq('user_id', auth.userId)
       .eq('status', 'active');
     callerWorkspaceIds = (mems ?? []).map((m: { workspace_id: string }) => m.workspace_id).filter(Boolean);
+  }
+
+  // ── DERIVED ANALYTICS (pass-through) ───────────────────────────────────────
+  //
+  // Five endpoints on the plan we already pay the analytics add-on for, called by nothing:
+  // daily metrics, content decay, posting frequency, one post's timeline, follower history.
+  //
+  // Pass-through by design — NOT persisted. Every one of them is a DERIVATION Zernio already
+  // performs (a rollup, a correlation, a decay curve). Storing a copy would be a second
+  // derivation of the same quantity that drifts the moment either side changes, and there is
+  // nothing here a later read cannot ask for again.
+  //
+  // TENANCY: `profileId` defaults to "all" on every one of these. Omitting it does not error —
+  // it silently returns every tenant's analytics on the operator's account. It is passed on
+  // every call, always, from the workspace's own profile.
+  //
+  // The add-on gate is 402/403 with a specific message; surfacing that as a generic 500 would
+  // send an operator debugging code when the answer is "buy the add-on".
+  if (
+    action === 'get_daily_metrics' || action === 'get_content_decay'
+    || action === 'get_posting_frequency' || action === 'get_follower_stats'
+  ) {
+    if (!workspace_id) return jsonResponse({ success: false, error: 'workspace_id required' }, 400);
+
+    const profileId = await resolveWorkspaceProfile(supabase, workspace_id);
+    const qs = new URLSearchParams({ profileId });
+    if (body.platform) qs.set('platform', body.platform);
+    if (body.source) qs.set('source', body.source);
+    if (body.from_date) qs.set('fromDate', body.from_date);
+    if (body.to_date) qs.set('toDate', body.to_date);
+
+    const path = action === 'get_daily_metrics' ? '/analytics/daily-metrics'
+      : action === 'get_content_decay' ? '/analytics/content-decay'
+        : action === 'get_posting_frequency' ? '/analytics/posting-frequency'
+          : '/accounts/follower-stats';
+
+    if (action === 'get_follower_stats' && body.granularity) qs.set('granularity', body.granularity);
+
+    try {
+      const data = await zernioApi('GET', `${path}?${qs.toString()}`);
+      return jsonResponse({ success: true, ...data });
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      if (status === 402 || status === 403) {
+        return jsonResponse({
+          success: false,
+          code: 'analytics_addon_required',
+          error: 'This needs the Zernio Analytics add-on, which the platform account does not currently have.',
+        }, 402);
+      }
+      throw err;
+    }
+  }
+
+  // One post's day-by-day accumulation. The post id comes from the CLIENT, so it is checked
+  // against the caller's workspaces first — otherwise any tenant could read the engagement
+  // history of any post on the shared operator account by passing its id.
+  if (action === 'get_post_timeline') {
+    const postId = body.post_id;
+    if (!postId) return jsonResponse({ success: false, error: 'post_id required' }, 400);
+
+    const { data: post } = await supabase
+      .from('social_posts')
+      .select('id, workspace_id, zernio_post_id')
+      .eq('id', postId)
+      .maybeSingle();
+
+    // 404 rather than 403 on a foreign post: the two answers must be indistinguishable.
+    if (!post || (!isSecretCaller && !callerWorkspaceIds.includes(post.workspace_id))) {
+      return jsonResponse({ success: false, error: 'No such post' }, 404);
+    }
+    if (!post.zernio_post_id) {
+      return jsonResponse({ success: true, timeline: [], message: 'This post was never published through Zernio, so it has no timeline.' });
+    }
+
+    try {
+      const data = await zernioApi('GET', `/analytics/post-timeline?postId=${encodeURIComponent(post.zernio_post_id)}`);
+      return jsonResponse({ success: true, ...data });
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      if (status === 402 || status === 403) {
+        return jsonResponse({
+          success: false,
+          code: 'analytics_addon_required',
+          error: 'This needs the Zernio Analytics add-on, which the platform account does not currently have.',
+        }, 402);
+      }
+      throw err;
+    }
   }
 
   // ── IMPORT EXTERNAL POSTS ──────────────────────────────────────────────────

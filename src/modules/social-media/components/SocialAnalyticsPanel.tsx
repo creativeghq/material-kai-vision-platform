@@ -11,7 +11,7 @@
  * not likes+comments over reach computed a second time in TypeScript.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, RefreshCw, Loader2, Users, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { BarChart3, RefreshCw, Loader2, Users, Eye, Heart, MessageCircle, Share2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -23,6 +23,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import {
+  DailyReachChart, ContentDecayChart, PostingFrequencyTable,
+  type DailyPoint, type PlatformTotals, type DecayBucket, type FrequencyRow,
+} from './SocialInsightsCharts';
 import { PlatformIcon, platformLabel } from '@/components/core/icons/PlatformIcon';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
@@ -77,6 +81,32 @@ export const SocialAnalyticsPanel: React.FC = () => {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [daily, setDaily] = useState<DailyPoint[]>([]);
+  const [platformTotals, setPlatformTotals] = useState<PlatformTotals[]>([]);
+  const [decay, setDecay] = useState<DecayBucket[]>([]);
+  const [frequency, setFrequency] = useState<FrequencyRow[]>([]);
+  // Distinguished from "no data": these five endpoints are gated on Zernio's Analytics add-on,
+  // and an empty chart because the plan lacks it needs a different answer from an empty chart
+  // because nobody has posted.
+  const [addonMissing, setAddonMissing] = useState(false);
+
+  /** POST one zernio-api action for this workspace. Throws with the server's own message. */
+  const callAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, workspace_id: activeWorkspaceId, ...extra }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json?.success === false) {
+      const err = new Error(json?.error || `${action} failed (${res.status})`);
+      (err as Error & { code?: string }).code = json?.code;
+      throw err;
+    }
+    return json;
+  }, [activeWorkspaceId]);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
@@ -115,8 +145,26 @@ export const SocialAnalyticsPanel: React.FC = () => {
       return true;
     }));
     setAccounts((a.data ?? []) as AccountRow[]);
+
+    // The derived views are read live from Zernio, never stored — it already computes them, and
+    // a cached rollup would be a second derivation of the same number. Settled, not all: the
+    // decay curve failing must not blank the daily chart beside it.
+    const [dm, cd, pf] = await Promise.allSettled([
+      callAction('get_daily_metrics'),
+      callAction('get_content_decay'),
+      callAction('get_posting_frequency'),
+    ]);
+    const addonGated = [dm, cd, pf].some(
+      (r) => r.status === 'rejected' && (r.reason as Error & { code?: string })?.code === 'analytics_addon_required',
+    );
+    setAddonMissing(addonGated);
+    setDaily(dm.status === 'fulfilled' ? (dm.value.dailyData ?? []) : []);
+    setPlatformTotals(dm.status === 'fulfilled' ? (dm.value.platformBreakdown ?? []) : []);
+    setDecay(cd.status === 'fulfilled' ? (cd.value.buckets ?? []) : []);
+    setFrequency(pf.status === 'fulfilled' ? (pf.value.frequency ?? []) : []);
+
     setLoading(false);
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, callAction]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -125,18 +173,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
     if (!activeWorkspaceId) return;
     setSyncing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-      const call = (action: string, extra: Record<string, unknown> = {}) =>
-        fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, workspace_id: activeWorkspaceId, ...extra }),
-        }).then(async (r) => {
-          const j = await r.json().catch(() => ({}));
-          if (!r.ok || j?.success === false) throw new Error(j?.error || `${action} failed (${r.status})`);
-          return j;
-        });
+      const call = callAction;
 
       // Import FIRST. Analytics only covers posts carrying a zernio_post_id, and a post written
       // natively in LinkedIn has none until it is imported — which is why a freshly connected
@@ -184,6 +221,19 @@ export const SocialAnalyticsPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {addonMissing && (
+        <div className="dashboard-card flex items-start gap-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--warning))]" />
+          <div>
+            <p className="font-medium">Some of these need the Zernio Analytics add-on</p>
+            <p className="text-muted-foreground mt-1">
+              Reach over time, content decay, cadence and follower history are gated behind it, and
+              the platform account does not have it. Post-level engagement below still works.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
@@ -252,6 +302,10 @@ export const SocialAnalyticsPanel: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      <DailyReachChart daily={daily} platforms={platformTotals} />
+      <ContentDecayChart buckets={decay} />
+      <PostingFrequencyTable rows={frequency} />
 
       <Card>
         <CardHeader>
