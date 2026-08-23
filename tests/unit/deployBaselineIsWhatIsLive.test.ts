@@ -40,9 +40,11 @@ describe('deploy baseline', () => {
     // A missing marker must mean "undeployed", never "unchanged". The safe direction is the
     // expensive one, and it is only ever taken once.
     expect(wf).toMatch(/no deployed\/frontend marker/);
-    expect(wf).toMatch(/No deployed\/functions marker/);
     expect(wf).toMatch(/frontend=true/);
-    expect(wf).toMatch(/functions=true/);
+    // The functions half is no longer a `functions=true` echo beside the frontend one. The
+    // missing-marker case fills the LIST with every function and the gate is derived from the
+    // list, so the guarantee is asserted where it now lives — same property, one copy of it.
+    expect(wf).toMatch(/No deployed\/functions marker — deploying ALL functions/);
   });
 
   it('gates both deploy jobs on a verdict that knows about a missing marker', () => {
@@ -51,7 +53,9 @@ describe('deploy baseline', () => {
     // the marker was never created, and the missing-marker recovery path could never run — it was
     // unreachable precisely when it was needed. Both outputs must come from the resolved verdict.
     expect(wf).toContain('frontend: ${{ steps.areas.outputs.frontend }}');
-    expect(wf).toContain('functions: ${{ steps.areas.outputs.functions }}');
+    // Derived in `changed-functions` now, from the same diff that builds the list — see the
+    // "one base per question" block at the bottom of this file for why it cannot be `areas`.
+    expect(wf).toContain('functions: ${{ steps.changed-functions.outputs.functions_changed }}');
     expect(
       /^\s+functions: \$\{\{ steps\.filter\.outputs\.functions \}\}/m.test(wf),
       'the functions job gate reads paths-filter directly again — the missing-marker path becomes unreachable',
@@ -128,5 +132,92 @@ describe('deploy wiring', () => {
       ).toBeUndefined();
       groups.set(group!, job);
     }
+  });
+});
+
+/**
+ * Guard: one base per question. Every FUNCTION verdict is measured against the FUNCTIONS marker.
+ *
+ * `dorny/paths-filter` takes a single base and it is the frontend's. That was harmless while the
+ * two markers moved together — and they stop the moment one area deploys and the other does not.
+ * On 2026-08-23 the frontend promoted while deploy-functions was cancelled, leaving the functions
+ * marker four commits behind, and two questions were then being put to the wrong baseline:
+ *
+ *   - `shared` — "did _shared change?" A module added in the superseded commit sits BEHIND the
+ *     frontend base, so the answer came back "no" and the deploy-ALL case never fired. The
+ *     directory scan still catches every function whose own files changed, but a function that
+ *     merely IMPORTS the new module has an untouched directory. Replayed against that exact
+ *     marker pair: 15 functions would have kept running old code against a changed `ai-client.ts`
+ *     or `base-agent.ts`.
+ *   - `functions` — the JOB GATE. `count=5, functions=false` was reachable, and then the job
+ *     skipped with five functions pending, the marker therefore never moved, and those five
+ *     stayed stranded until some later commit happened to touch a function directory.
+ *
+ * Neither is visible from the outside. Both fail by deploying LESS, and a deploy that ships
+ * nothing is a green deploy.
+ */
+function computeStep(): string {
+  const job = jobBlock('changes');
+  const start = job.indexOf('id: changed-functions');
+  if (start === -1) throw new Error('the `changed-functions` step is gone — it was renamed or removed');
+  const rest = job.slice(start);
+  const end = rest.indexOf('\n      - name:');
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+describe('one base per question', () => {
+  it('never asks paths-filter a question about functions', () => {
+    // paths-filter is pinned to the FRONTEND marker, so any filter declared here can only ever
+    // answer "since the last frontend deploy" — which is a different question wearing the same
+    // words the moment the markers diverge.
+    const filters = /filters: \|\n([\s\S]*?)\n\n/.exec(wfLF)?.[1] ?? '';
+    expect(filters, 'the paths-filter block was not found — every assertion below is vacuous').toContain('frontend:');
+
+    for (const key of ['functions:', 'shared:']) {
+      expect(
+        new RegExp(`^\\s+${key}$`, 'm').test(filters),
+        `paths-filter declares a "${key}" filter again. It is measured against the FRONTEND ` +
+          'marker, so it answers the wrong question whenever the two markers diverge — which is ' +
+          'exactly when a function is waiting to be deployed.',
+      ).toBe(false);
+    }
+
+    // And nothing reads one, however it got back in.
+    for (const ref of ['steps.filter.outputs.functions', 'steps.filter.outputs.shared']) {
+      expect(wf.includes(ref), `${ref} is read again — see above`).toBe(false);
+    }
+  });
+
+  it('asks the _shared question against the functions marker', () => {
+    const step = computeStep();
+    // The diff, the _shared test and the directory scan all come off ONE `git diff`, anchored on
+    // the functions base. Splitting them is how they came to disagree.
+    expect(step).toContain('steps.base.outputs.functions_base');
+    expect(step).toMatch(/DIFF=\$\(git diff --name-only "\$BASE"/);
+    expect(
+      /grep -q '\^supabase\/functions\/_shared\//.test(step),
+      'the _shared test no longer reads the functions-base diff — a shared module added while ' +
+        'the functions deploy was cancelled stops triggering the deploy-ALL case, and every ' +
+        'function that only IMPORTS it silently keeps running old code',
+    ).toBe(true);
+    expect(step).toContain('shared_changed=$SHARED');
+  });
+
+  it('derives the job gate FROM the list, so the two cannot disagree', () => {
+    const step = computeStep();
+    // Both branches present, and both downstream of $COUNT — the verdict is a restatement of the
+    // list, not a second opinion about it.
+    expect(step).toMatch(/if \[ "\$COUNT" = "0" \]; then\s*\n\s*echo "functions_changed=false"/);
+    expect(step).toMatch(/echo "functions_changed=true"/);
+
+    const gate = /^\s+if: (.+)$/m.exec(jobBlock('deploy-functions'))?.[1]?.trim() ?? '';
+    expect(gate, 'deploy-functions has no `if:` — it now runs on every push').not.toBe('');
+    expect(gate).toContain('changed_functions_count');
+    expect(
+      /needs\.changes\.outputs\.functions\b/.test(gate),
+      'the gate consults a second verdict alongside the count again. Whatever it is measured ' +
+        'against, it can now say "nothing to do" while the list holds pending functions — and ' +
+        'the job skips, so the marker never moves and they stay pending.',
+    ).toBe(false);
   });
 });

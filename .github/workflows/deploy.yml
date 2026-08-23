@@ -85,8 +85,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.areas.outputs.frontend }}
-      functions: ${{ steps.areas.outputs.functions }}
-      shared: ${{ steps.filter.outputs.shared }}
+      # Both function verdicts are DERIVED in `changed-functions`, from one diff taken against
+      # the FUNCTIONS marker. They used to come from paths-filter, which takes a single base and
+      # it is the frontend's — see the comment on that step for why that is not a detail.
+      functions: ${{ steps.changed-functions.outputs.functions_changed }}
+      shared: ${{ steps.changed-functions.outputs.shared_changed }}
       tests: ${{ steps.filter.outputs.tests }}
       changed_functions: ${{ steps.changed-functions.outputs.list }}
       changed_functions_count: ${{ steps.changed-functions.outputs.count }}
@@ -130,11 +133,18 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
-          # Diff against what is live. paths-filter takes one base, and it is the FRONTEND marker
-          # because the frontend is what its `frontend` output gates; the function list below is
-          # computed separately against the functions marker. An empty base makes paths-filter
-          # compare against the default branch, which is why the fallback is handled explicitly in
-          # the step after this one rather than by leaving this blank.
+          # Diff against what is live. paths-filter takes ONE base and it is the FRONTEND
+          # marker, so this step may only answer FRONTEND questions. That is a hard boundary,
+          # not a preference: the two markers say when each area last reached production, and
+          # they diverge the moment one deploys and the other does not. On 2026-08-23 the
+          # frontend promoted while deploy-functions was cancelled, leaving the functions marker
+          # four commits behind — anything measured here would have called that work "already
+          # live". Every function verdict is therefore computed in `changed-functions`, against
+          # the functions marker. Do not add a `functions:` or `shared:` filter back.
+          #
+          # An empty base makes paths-filter compare against the default branch, which is why the
+          # fallback is handled explicitly in the step after this one rather than by leaving this
+          # blank.
           base: ${{ steps.base.outputs.frontend_base }}
           filters: |
             frontend:
@@ -150,14 +160,10 @@ jobs:
               - 'tsconfig.json'
               - 'index.html'
               - 'vercel.json'
-            functions:
-              - 'supabase/functions/**'
-            shared:
-              - 'supabase/functions/_shared/**'
             tests:
               - 'tests/**'
 
-      - name: 🧭 Resolve the per-area verdicts
+      - name: 🧭 Resolve the frontend verdict
         id: areas
         run: |
           set -euo pipefail
@@ -172,51 +178,66 @@ jobs:
             echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
           fi
 
-          # Same for functions, and it needs saying separately because the JOB GATE reads this
-          # output while the function LIST is computed further down. Deriving the list from the
-          # missing marker but leaving the gate on the raw paths-filter answer meant the job was
-          # skipped, the marker was therefore never created, and the missing-marker path could
-          # never run — a recovery route that was unreachable exactly when it was needed. Caught
-          # on the first real run of this change, which skipped deploy-functions and left
-          # deployed/functions absent.
-          if [ -z "${{ steps.base.outputs.functions_base }}" ]; then
-            echo "⚠️  no deployed/functions marker — treating all functions as undeployed"
-            echo "functions=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "functions=${{ steps.filter.outputs.functions }}" >> "$GITHUB_OUTPUT"
-          fi
+          # The functions verdict is NOT resolved here. It used to be, from paths-filter, and
+          # that is precisely the bug the next step exists to close: the gate said one thing
+          # (measured against the frontend marker) while the list said another (measured against
+          # the functions marker), and `count=5, functions=false` was reachable — the job skipped
+          # with five functions pending, so the marker never moved and they stayed stranded until
+          # some later commit happened to touch a function directory. One diff, one answer.
 
       - name: 🧮 Compute changed functions
         id: changed-functions
         run: |
           set -euo pipefail
+          ALL=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
           FUNCS=""
+          SHARED=false
 
           # Case 1: manual run, or explicit "force all" toggle.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
              [ "${{ github.event.inputs.force_full_functions_deploy }}" = "true" ]; then
             echo "ℹ️  Manual / forced run — deploying ALL functions"
-            FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
+            FUNCS="$ALL"
 
-          # Case 2: _shared changed — every dependent must redeploy.
-          # Walking the import graph is more work than it saves; redeploy all.
-          elif [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
-            echo "ℹ️  supabase/functions/_shared/** changed — deploying ALL functions"
-            FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
-
-          # Case 3: normal diff-based selection.
-          # Case 3: diff against the last commit whose FUNCTIONS actually deployed.
+          # Case 2: no marker — nothing can be proven live, so everything ships.
           elif [ -z "${{ steps.base.outputs.functions_base }}" ]; then
             echo "ℹ️  No deployed/functions marker — deploying ALL functions"
-            FUNCS=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
+            FUNCS="$ALL"
 
+          # Case 3: diff against the last commit whose FUNCTIONS actually deployed.
           else
             BASE="${{ steps.base.outputs.functions_base }}"
             echo "ℹ️  Diffing $BASE..${{ github.sha }} (last DEPLOYED functions commit, not HEAD~1)"
-            FUNCS=$(git diff --name-only "$BASE" "${{ github.sha }}" \
-                    | grep -oP '^supabase/functions/\K[^/]+(?=/)' \
-                    | grep -v '^_shared$' \
-                    | sort -u || true)
+            DIFF=$(git diff --name-only "$BASE" "${{ github.sha }}" || true)
+
+            # _shared changed — every dependent must redeploy. Walking the import graph is more
+            # work than it saves; redeploy all.
+            #
+            # The question is asked HERE, against the functions marker, and that placement is the
+            # whole fix. It used to read paths-filter's `shared` output, which is measured against
+            # the FRONTEND marker — and the two diverge the moment one area deploys and the other
+            # does not. On 2026-08-23 the frontend promoted while deploy-functions was cancelled,
+            # so a module added in the superseded commit sat BEHIND the frontend base and the
+            # question answered "no". The directory scan below still catches every function whose
+            # own files changed; a function that merely IMPORTS the new module has an untouched
+            # directory, so it would never ship. Nothing goes red — the importer keeps running old
+            # code, and the only symptom is that whatever the new module does silently does not
+            # happen.
+            if printf '%s\n' "$DIFF" | grep -q '^supabase/functions/_shared/'; then
+              SHARED=true
+              echo "ℹ️  supabase/functions/_shared/** changed since the last functions deploy — deploying ALL"
+              FUNCS="$ALL"
+            else
+              # sed, not `grep -oP '\K'`. PCRE is a build option AND refuses to run outside a
+              # unibyte/UTF-8 locale, so the identical command that works on the runner dies with
+              # "grep: -P supports only unibyte and UTF-8 locales" on the machine of anyone
+              # reproducing this by hand — and an extraction that comes back empty deploys
+              # nothing while printing a cheerful "0 functions".
+              FUNCS=$(printf '%s\n' "$DIFF" \
+                      | sed -n 's|^supabase/functions/\([^/][^/]*\)/.*|\1|p' \
+                      | grep -v '^_shared$' \
+                      | sort -u || true)
+            fi
           fi
 
           # Filter to directories that still exist and have index.ts.
@@ -232,6 +253,16 @@ jobs:
           echo "📦 Functions to deploy ($COUNT): $VALID"
           echo "list=$VALID" >> "$GITHUB_OUTPUT"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "shared_changed=$SHARED" >> "$GITHUB_OUTPUT"
+
+          # The job gate and the list are ONE answer. Deriving the verdict FROM the list is what
+          # makes the two incapable of disagreeing — which they could, and did, while the gate
+          # read paths-filter and the list read this diff.
+          if [ "$COUNT" = "0" ]; then
+            echo "functions_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "functions_changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: 📋 Summary
         run: |
@@ -239,9 +270,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Area | Changed |" >> $GITHUB_STEP_SUMMARY
           echo "|------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${{ steps.filter.outputs.frontend }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Supabase functions | ${{ steps.filter.outputs.functions }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| _shared/ | ${{ steps.filter.outputs.shared }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend (since the last FRONTEND deploy) | ${{ steps.areas.outputs.frontend }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supabase functions (since the last FUNCTIONS deploy) | ${{ steps.changed-functions.outputs.functions_changed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| _shared/ (since the last FUNCTIONS deploy) | ${{ steps.changed-functions.outputs.shared_changed }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Functions to deploy | ${{ steps.changed-functions.outputs.count }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -n "${{ steps.changed-functions.outputs.list }}" ]; then
@@ -566,14 +597,14 @@ jobs:
   # ────────────────────────────────────────────────────────────────────
   deploy-functions:
     needs: [changes, unit-tests, lint]
-    # Run when the diff touched functions, OR on a manual/forced dispatch (the changes job fills
-    # changed_functions with ALL functions in that case — gating on the paths-filter `functions`
-    # output alone made the force_full_functions_deploy toggle inert on a frontend-only HEAD).
-    if: >-
-      (needs.changes.outputs.functions == 'true'
-       || github.event_name == 'workflow_dispatch'
-       || github.event.inputs.force_full_functions_deploy == 'true')
-      && needs.changes.outputs.changed_functions_count != '0'
+    # One condition, because there is now one answer. The count already folds in the manual /
+    # forced dispatch (Case 1 fills the list with every function) and the missing marker (Case 2
+    # does the same), so the three-way `||` this replaced was not belt-and-braces — it was a
+    # SECOND verdict, measured against the frontend marker and free to contradict the list. It
+    # could read `false` while the list held five pending functions, and then the job skipped, the
+    # marker never moved, and those five stayed stranded until some later commit happened to touch
+    # a function directory. If there is something to deploy, deploy it.
+    if: needs.changes.outputs.changed_functions_count != '0'
     runs-on: ubuntu-latest
     # One sweep against the Supabase project at a time — the CLI is not safe to run
     # concurrently against one project even from separate runners (see the deploy step's
