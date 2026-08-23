@@ -53,15 +53,17 @@ const SECTIONS: Record<ScheduleSectionId, React.ComponentType> = {
 
 /**
  * Two groups, because these are two different kinds of time and merging them into one list would
- * imply they are the same: **Bookings** is what strangers do to your calendar through your public
+ * imply they are the same: **Calendar** is what strangers do to your calendar through your public
  * profile, **Meetings** is what you logged against a CRM party yourself.
+ *
+ * Labels are free to change; the `id`s are the external contract (`?section=`) and are not.
  */
 const GROUPS: HubNavGroup[] = [
   {
-    label: 'Bookings',
+    label: 'Calendar',
     items: [
-      { id: 'appointments', label: 'Booked with you', icon: CalendarCheck },
-      { id: 'availability', label: 'When you are free', icon: Clock },
+      { id: 'appointments', label: 'Bookings', icon: CalendarCheck },
+      { id: 'availability', label: 'Availability', icon: Clock },
     ],
   },
   {
