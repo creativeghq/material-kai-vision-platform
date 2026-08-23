@@ -2748,6 +2748,39 @@ async function executeAgent(
     };
   }
 
+  // ─── Automatic knowledge grounding ───────────────────────────────────────
+  //
+  // The workspace's own documents reach the model whether or not the model thinks to ask. This
+  // used to depend entirely on the agent choosing to call `knowledge_base_search` — bound, always
+  // on, one call away — and on 2026-08-23 it simply did not: "What is product discovery?" produced
+  // ZERO tool calls and a clarifying question, while the workspace held a 253-section document of
+  // that exact name. "What does OUR knowledge base say about product discovery?" searched
+  // immediately. Same agent, same tools, opposite behaviour, decided by phrasing.
+  //
+  // A prompt rule fixes that most of the time, which is the problem: an instruction is not an
+  // enforcement mechanism. So the retrieval is no longer the model's decision. See
+  // `_shared/knowledge-grounding.ts` for why the gate is a list of structural facts rather than an
+  // LLM classifier or a keyword heuristic — both of which reintroduce the failure they replace.
+  //
+  // It runs AFTER tool binding (it reuses the bound tool, so scoping/RBAC/re-ranking come with it)
+  // and BEFORE the graph, so the sections are in the system prompt for the very first model turn.
+  try {
+    const { groundTurnInWorkspaceKnowledge } = await import('../_shared/knowledge-grounding.ts');
+    const grounding = await groundTurnInWorkspaceKnowledge({
+      tools,
+      userInput,
+      isDirectToolRun: Boolean(directTool),
+      onChunk,
+    });
+    if (grounding.block) systemPrompt += grounding.block;
+    console.log(
+      `[grounding] ${grounding.checked ? `checked, ${grounding.sections} section(s) injected` : `skipped (${grounding.skippedReason})`}`,
+    );
+  } catch (groundErr) {
+    // Never fail a turn over grounding — an ungrounded answer is worse, not broken.
+    console.warn('[grounding] skipped after error:', groundErr);
+  }
+
   // Select model based on agent + per-turn complexity heuristic
   const hasDocuments = Array.isArray(documents) && documents.length > 0;
   const selectedModel = getModelForAgent(agentId, modelOverride);
