@@ -35,7 +35,10 @@ const read = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'
 const NO_CALLER_EXPECTED: Record<string, string> = {
   // Redundant by construction: `get_thread` already stamps `last_read_at` on the accessing
   // participant, so opening a conversation marks it read without a second round trip.
-  mark_read: 'get_thread marks the thread read on open; an explicit call would be a no-op',
+  // True again as of the receipt fix: get_thread now moves last_read_at AND posts the read
+  // receipt to the platform, so an explicit mark_read really is a no-op. Until then the claim
+  // was half right — the local flag moved, the customer's app still showed the message unseen.
+  mark_read: 'get_thread marks the thread read on open, receipt included; an explicit call would be a no-op',
   // A real gap, recorded rather than hidden: participants can be added from the rail and never
   // removed. Building the affordance is its own change, not a side effect of this one.
   remove_participant: 'no remove affordance exists in the rail yet — an unbuilt surface, not a dead action',

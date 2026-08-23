@@ -1920,6 +1920,22 @@ async function handleJwtAction(
 
       if (access.participant) {
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id);
+
+        // ...and tell the PLATFORM, not just our own table.
+        //
+        // Opening a thread moved `last_read_at` here and nowhere else, so the customer's message
+        // stayed marked unread in WhatsApp: an operator could read a message, answer it, and the
+        // sender's app would still show it as never seen. Zernio's unread counts drifted from
+        // ours permanently for the same reason.
+        //
+        // The receipt belongs on THIS path rather than in the `mark_read` action, because this is
+        // the one every screen already calls to open a thread — which is exactly why `mark_read`
+        // has no caller and is listed as such in inboxApiReachability. Best-effort: a failed
+        // receipt must never stop an operator reading their own inbox.
+        const convId = String(((thread.metadata as Json) || {}).zernio_conversation_id || '');
+        if (convId && (thread.channel === 'whatsapp' || thread.channel === 'social')) {
+          await markConversationRead(convId);
+        }
       }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId) : null;
       return json({ thread, participants: participants || [], messages: messages || [], whatsapp_window: wa });
