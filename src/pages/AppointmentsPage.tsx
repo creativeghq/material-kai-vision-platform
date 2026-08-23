@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Calendar, Clock, Loader2, User, Mail, MessageSquare, CheckCircle2,
   XCircle, ChevronRight, Inbox, StickyNote, Link2 as LinkIcon,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
@@ -332,8 +333,17 @@ function AppointmentDetailDrawer({
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
-export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+/**
+ * Booking requests from clients on your public profile.
+ *
+ * Rendered ONLY as the `appointments` section of Profile → Schedule (`SchedulePanel`). It used to
+ * take an `embedded` prop guarding a standalone `<h1>`, which was dead the whole time: there has
+ * never been an `/appointments` route, so the un-embedded branch could not be reached. The rail
+ * supplies the heading now.
+ */
+export const AppointmentsPage: React.FC = () => {
   const { user } = useAuth();
+  const [, setSearchParams] = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Appointment | null>(null);
@@ -362,14 +372,7 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
 
   return (
-    <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 max-w-4xl mx-auto space-y-6'}>
-      {embedded ? null : (
-        <div>
-          <h1 className="text-2xl font-light tracking-tight">Appointments</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage booking requests from clients on your public profile.</p>
-        </div>
-      )}
-
+    <div className="space-y-6">
       <FilterBar
         groups={filterGroups}
         values={filterValues}
@@ -390,12 +393,35 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="rounded-2xl">
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <Calendar className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p>{activeCount > 0 ? 'No appointments match your filters.' : 'No appointments yet.'}</p>
-          </CardContent>
-        </Card>
+        activeCount > 0 ? (
+          <HubEmptyState
+            icon={Calendar}
+            variant="filtered"
+            title="No appointments match your filters"
+            description={`Your filters exclude all ${appointments.length} of them.`}
+            action={<Button size="sm" variant="outline" onClick={() => setFilterValues({})}>Clear filters</Button>}
+          />
+        ) : (
+          // The way out of an empty Appointments list is one section away in the same rail, which
+          // is the whole reason these three surfaces merged: a professional with no bookings is
+          // usually a professional who never turned Accept bookings on, and that answer used to
+          // live two tabs from the list that raised the question. Nobody can "add" an appointment
+          // here — a client makes it — so the action published the hours, it does not create a row.
+          <HubEmptyState
+            icon={Calendar}
+            title="No appointments yet"
+            description="Clients book you from your public profile, inside the hours you publish."
+            action={(
+              <Button size="sm" onClick={() => setSearchParams((p) => {
+                const next = new URLSearchParams(p);
+                next.set('section', 'availability');
+                return next;
+              }, { replace: true })}>
+                Set your availability
+              </Button>
+            )}
+          />
+        )
       ) : (
         <div className="space-y-3">
           {filtered.map((appt) => (

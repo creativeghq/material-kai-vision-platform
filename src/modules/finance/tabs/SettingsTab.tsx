@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -72,7 +72,23 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   const { isOperator } = usePermissions();
   const { activeWorkspace } = useWorkspace();
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
-  const [activeTab, setActiveTab] = useState('general');
+  // `?section=` is a real deep-link into this pane: the Revolut reconciler and the bank-sync
+  // both notify with `/finance?tab=settings&section=banks`. Until this read it, every one of
+  // those landed on **General** — the route resolved, the Settings pane opened, and the operator
+  // was simply somewhere else, with no sign anything had been missed.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawSection = searchParams.get('section');
+  const [activeTab, setActiveTab] = useState(
+    () => (SETTINGS_SECTIONS.some((s) => s.value === rawSection) ? rawSection! : 'general'),
+  );
+  // Round-trip it, so the pane you are looking at is the pane a copied URL reopens.
+  useEffect(() => {
+    if (searchParams.get('section') === activeTab) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('section', activeTab);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'cover' | 'footer' | null>(null);

@@ -75,7 +75,7 @@ export const BookingModal: React.FC<{
       type: 'appointment_booked',
       title: `New appointment request from ${name.trim()}`,
       body: `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatSlot(timeSlot)}${selectedService ? ` · ${selectedService.name}` : ''}`,
-      action_url: '/profile?tab=appointments',
+      action_url: '/profile?tab=schedule&section=appointments',
       appointment_id: data.id,
       professional_user_id: professionalUserId,
       client_name: name.trim(),

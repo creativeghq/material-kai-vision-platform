@@ -82,7 +82,11 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // ── Sales ──
   { id: 'quote', label: 'Quote', hub: 'sales', pageRoute: '/quotes', agentId: 'erp', agentTool: 'create_quote', toolkitId: 'quotes', recordTable: 'quotes', canvasKind: 'quote', moduleSlug: 'quotes' },
   { id: 'crm-company', label: 'CRM Company', hub: 'sales', pageRoute: '/crm', agentId: 'kai', agentTool: 'create_company_from_vat', toolkitId: 'crm', recordTable: 'crm_companies', moduleSlug: 'crm' },
-  { id: 'appointments', label: 'Appointments', hub: 'sales', pageRoute: '/profile?tab=calendar', agentId: 'kai', agentTool: 'manage_appointments', toolkitId: 'appointments', quickStartLabel: 'This week', recordTable: 'crm_meetings', moduleSlug: 'crm' },
+  // `crm_meetings` is what this capability lists, so it opens the Calendar SECTION — the
+  // Schedule tab's default section is Appointments (public-profile bookings), which is a
+  // different table. A link that lands one section away from its own records is the mismatch
+  // deepLinkTargets.test.ts exists to catch.
+  { id: 'appointments', label: 'Appointments', hub: 'sales', pageRoute: '/profile?tab=schedule&section=calendar', agentId: 'kai', agentTool: 'manage_appointments', toolkitId: 'appointments', quickStartLabel: 'This week', recordTable: 'crm_meetings', moduleSlug: 'crm' },
   // Sales rep portal — the page is literally "the rep portal for quotes", and the `quotes` toolkit
   // (create_quote / generate_quote_pdf / list_my_quotes) is not admin-gated, so a rep can drive it
   // from chat. Wired to that toolkit; no quickStartLabel so opening it primes the toolkit and shows

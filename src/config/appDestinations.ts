@@ -52,7 +52,28 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   { id: 'modules', breadcrumb: 'Profile → Modules', route: '/profile?tab=modules', aliases: ['Settings → Modules', 'Profile → Apps'] },
   { id: 'workspace-keys', breadcrumb: 'Profile → Keys', route: '/profile?tab=keys', aliases: ['Settings → Keys'] },
   { id: 'team', breadcrumb: 'Profile → Team', route: '/profile?tab=team' },
-  { id: 'calendar', breadcrumb: 'Profile → Calendar', route: '/profile?tab=calendar' },
+  // Calendar and Appointments are SECTIONS of the Schedule tab now, and the breadcrumb keeps
+  // naming the section rather than the tab: a reply that says "Profile → Schedule" and lands on
+  // Appointments would be the mismatch this file exists to remove. The tab's own name is the
+  // alias, so prose spelling it that way still links somewhere real.
+  {
+    id: 'calendar',
+    breadcrumb: 'Profile → Calendar',
+    route: '/profile?tab=schedule&section=calendar',
+    aliases: ['Profile → Schedule → Calendar', 'Profile → My Calendar'],
+  },
+  {
+    id: 'appointments',
+    breadcrumb: 'Profile → Appointments',
+    route: '/profile?tab=schedule&section=appointments',
+    aliases: ['Profile → Schedule → Appointments'],
+  },
+  {
+    id: 'availability',
+    breadcrumb: 'Profile → Availability',
+    route: '/profile?tab=schedule&section=availability',
+    aliases: ['Profile → Schedule → Availability', 'Profile → Appointment Availability'],
+  },
   { id: 'websites', breadcrumb: 'Profile → Websites', route: '/profile?tab=websites' },
   { id: 'webhooks', breadcrumb: 'Profile → Webhooks', route: '/profile?tab=webhooks' },
   { id: 'credits', breadcrumb: 'Profile → Credits', route: '/profile?tab=credits' },

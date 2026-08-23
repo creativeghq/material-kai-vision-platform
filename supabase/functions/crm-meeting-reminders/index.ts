@@ -92,7 +92,7 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
           title: `Meeting reminder: ${m.subject || 'Meeting'}`,
           body: `${party ? `With ${party}. ` : ''}${whenLong}`,
           type: 'info',
-          action_url: '/profile?tab=calendar',
+          action_url: '/profile?tab=schedule&section=calendar',
           is_read: false,
           metadata: { feature: 'crm_meeting_reminder', meeting_id: m.id, channel: 'whatsapp_bell_fallback' },
         });

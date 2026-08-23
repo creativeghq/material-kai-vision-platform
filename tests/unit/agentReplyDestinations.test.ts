@@ -97,17 +97,12 @@ describe('the destination registry points at real places', () => {
     }
   });
 
-  it('every ?section= names a section that rail still offers', () => {
-    // A stale section id does not 404 — it silently lands on the rail's default, which is the
-    // same "valid URL, wrong pane" failure a wrong ?tab= produces.
-    const RAIL = 'src/modules/social-media/components/SocialHubPanel.tsx';
-    for (const d of APP_DESTINATIONS) {
-      const section = new URLSearchParams(d.route.split('?')[1] ?? '').get('section');
-      if (!section) continue;
-      expect(read(RAIL), `${d.id} → no section "${section}" on the channels rail`)
-        .toContain(`id: '${section}'`);
-    }
-  });
+  // `?section=` used to be checked here, against ONE hardcoded rail — the channels rail was the
+  // only one with sections when it was written. There are four now (schedule, social-accounts,
+  // keys, finance settings), and a check that resolves every section against the wrong rail is
+  // worse than none: it convicts correct links and vouches for nothing. Moved and generalised to
+  // tests/unit/profileSectionLinks.test.ts, which resolves each link against the rail its OWN tab
+  // renders and covers `APP_DESTINATIONS` among the other section links in the codebase.
 
   it('every breadcrumb names at least two segments', () => {
     // A one-word destination ("Inbox") cannot be linkified without swallowing the word wherever

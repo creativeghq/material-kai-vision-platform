@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook, BadgeCheck } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, CalendarCheck, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook, BadgeCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { filterUrl } from '@/components/core/filters';
@@ -18,8 +18,7 @@ import { AccountStatusCard } from '@/components/core/Profile/AccountStatusCard';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
 import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import SupplierPortalPage from './SupplierPortalPage';
-import { AppointmentsPage } from './AppointmentsPage';
-import { ProfileMeetingsTab } from '@/components/core/Profile/ProfileMeetingsTab';
+import { SchedulePanel } from '@/components/core/Profile/SchedulePanel';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -32,6 +31,21 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
  * every `hire_me` flow emitted before the change all keep working through this redirect.
  */
 const PROFILE_INBOX_URL = filterUrl('/inbox', 'f', { source: 'public_profile' });
+
+/**
+ * Tabs that became SECTIONS of another tab, and the section each one is now.
+ *
+ * A stored `action_url` outlives the screen it was written for: notification rows, the CRM
+ * meeting-reminder edge function and anyone's bookmarks all still spell these. An unknown `?tab=`
+ * renders the strip with nothing selected and an EMPTY body — the route resolves, the page loads,
+ * and the reader is looking at a blank panel — so a retired tab redirects rather than 404s
+ * quietly. Source call sites are updated too; this covers what we cannot reach.
+ */
+const RETIRED_TABS: Record<string, string> = {
+  appointments: '/profile?tab=schedule&section=appointments',
+  calendar: '/profile?tab=schedule&section=calendar',
+  inbox: PROFILE_INBOX_URL,
+};
 
 export const UserProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,7 +68,8 @@ export const UserProfilePage: React.FC = () => {
 
   useEffect(() => {
     const tab = searchParams.get('tab') ?? 'profile';
-    if (tab === 'inbox') { navigate(PROFILE_INBOX_URL, { replace: true }); return; }
+    const retired = RETIRED_TABS[tab];
+    if (retired) { navigate(retired, { replace: true }); return; }
     setActiveTab(tab);
   }, [searchParams, navigate]);
 
@@ -87,13 +102,11 @@ export const UserProfilePage: React.FC = () => {
             <BadgeCheck className="h-4 w-4" />
             Ambassador
           </TabsTrigger>
-          <TabsTrigger value="appointments" className="flex items-center gap-2">
+          {/* Availability + Appointments + Calendar, which were three tabs answering one
+              question between them. The rail inside splits them into sections. */}
+          <TabsTrigger value="schedule" className="flex items-center gap-2">
             <CalendarCheck className="h-4 w-4" />
-            Appointments
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4" />
-            Calendar
+            Schedule
           </TabsTrigger>
           <TabsTrigger value="reviews" className="flex items-center gap-2">
             <Star className="h-4 w-4" />
@@ -161,12 +174,8 @@ export const UserProfilePage: React.FC = () => {
           <AmbassadorTab />
         </TabsContent>
 
-        <TabsContent value="appointments">
-          <AppointmentsPage embedded />
-        </TabsContent>
-
-        <TabsContent value="calendar">
-          <ProfileMeetingsTab />
+        <TabsContent value="schedule">
+          <SchedulePanel />
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">

@@ -281,13 +281,26 @@ Displays: aggregate score card, AI summary, per-dimension stars, individual revi
 ## Appointment Booking
 
 ### DB Tables
-- `appointment_availability` — per-user per-day availability. Columns: `day_of_week` (0–6), `slots` (text[]), `timezone`, `is_active`.
-- `appointments` — bookings. Columns: `professional_user_id`, `client_*`, `appointment_date`, `appointment_time`, `status` (pending/confirmed/cancelled/completed), `notes`, `inbox_conversation_id`.
+- `appointment_availability` — availability for one CALENDAR DATE, not a weekly pattern. Columns: `user_id`, `available_date` (date), `time_ranges` (jsonb `[{start,end}]`). There is no `day_of_week`, no `slots`, no `timezone` and no `is_active` — the toggle is `user_profiles.booking_enabled`.
+- `appointments` — bookings. Columns: `professional_user_id`, `client_*`, `appointment_date`, `appointment_time`, `status` (pending/confirmed/cancelled/completed), `notes`, `inbox_conversation_id`, plus the single-subject link (`project_id` / `deal_id` / `property_id` / `order_id`, at most one, enforced by `appointments_single_subject_ck`).
 
-### Routes
-| Route | Component | Access |
-|-------|-----------|--------|
-| `/appointments` | `AppointmentsPage` | Authenticated (own appointments only) |
+### Where it lives: Profile → Schedule
+
+Availability, the bookings it produces and your CRM calendar are one tab with a side rail
+(`SchedulePanel`), addressed by `?section=`. They used to be three separate places — availability
+was a card partway down the Profile tab, Appointments and Calendar were tabs of their own — which
+meant "why has nobody booked me?" took three tabs to answer.
+
+| Section | URL | Component | Shows |
+|---|---|---|---|
+| Appointments (default) | `/profile?tab=schedule&section=appointments` | `AppointmentsPage` | Bookings clients made from your public profile |
+| Availability | `/profile?tab=schedule&section=availability` | `AvailabilitySettings` | The dates and hours you publish |
+| Calendar | `/profile?tab=schedule&section=calendar` | `ProfileMeetingsTab` | `crm_meetings` you logged against a party |
+
+There is **no `/appointments` route** — `AppointmentsPage` renders only inside that rail. The
+retired `?tab=appointments` and `?tab=calendar` redirect (`RETIRED_TABS` in `UserProfilePage`), so
+stored notification `action_url`s and bookmarks keep working. `?section=` ids are pinned by
+[tests/unit/profileSectionLinks.test.ts](../tests/unit/profileSectionLinks.test.ts).
 
 ### Flow Events
 | Event | When |

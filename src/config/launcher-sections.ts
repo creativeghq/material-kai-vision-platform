@@ -326,7 +326,7 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   // separate screen, so this points at that filtered view of the one Inbox.
   service: [
     { label: 'Reviews about you', to: '/profile?tab=reviews', icon: Star },
-    { label: 'My appointments', to: '/profile?tab=appointments', icon: CalendarDays },
+    { label: 'My appointments', to: '/profile?tab=schedule&section=appointments', icon: CalendarDays },
     { label: 'Profile enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: MessagesSquare },
   ],
   // The Projects card already lists the project / heat-pump / heating estimators, so the kitchen
@@ -340,7 +340,7 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   people: [
     { label: 'Onboarding templates', to: '/templates?type=hr_onboarding', icon: ClipboardCheck },
     { label: 'My documents', to: '/profile?tab=documents', icon: FolderOpen },
-    { label: 'My calendar', to: '/profile?tab=calendar', icon: CalendarDays },
+    { label: 'My calendar', to: '/profile?tab=schedule&section=calendar', icon: CalendarDays },
   ],
 };
 
