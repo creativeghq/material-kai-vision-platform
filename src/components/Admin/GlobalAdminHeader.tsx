@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface GlobalAdminHeaderProps {
   title: string;
@@ -18,6 +19,11 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   badge,
 }) => {
   const navigate = useNavigate();
+  // This header is used by 15 TENANT pages as well as the operator consoles — CRM, Finance, POS,
+  // Quotes, Email, Messaging. The two jump buttons below are operator chrome: "Main" goes to the
+  // platform root and "Admin" to /admin, which a tenant cannot open at all. Every customer on
+  // those pages was being shown a button to somebody else's console.
+  const { isOperator } = usePermissions();
 
   return (
     <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-hairline">
@@ -37,24 +43,28 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
 
         {/* Right: nav buttons + badge */}
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2"
-          >
-            <Brain className="h-4 w-4" />
-            <span className="hidden sm:inline">Main</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/admin')}
-            className="flex items-center gap-2"
-          >
-            <Activity className="h-4 w-4" />
-            <span className="hidden sm:inline">Admin</span>
-          </Button>
+          {isOperator && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Brain className="h-4 w-4" />
+                <span className="hidden sm:inline">Main</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-2"
+              >
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Button>
+            </>
+          )}
           {badge && (
             <Badge className="text-xs px-2 py-0.5">{badge}</Badge>
           )}

@@ -213,6 +213,11 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // every surface" pattern. moduleSlug gates them into the launcher (active if entitled, else an
   // "available to add" upsell card).
   { id: 'social', label: 'Social Media', path: '/agent-hub?capability=social-post', icon: Share2, requireCapability: 'agent.use', moduleSlug: 'social-media', surface: 'app', hub: 'marketing', description: 'Publish & schedule social posts with the AI studio.' },
+  // WhatsApp sits under Social Media because that is how an operator thinks about it — both are
+  // channels you publish on, both run on the same Zernio account. The Service-hub `messaging` tile
+  // is the AGENT deep-link and stays as it is; this one opens the management surface, which now
+  // lives beside the social accounts on the profile rather than on its own admin-shaped page.
+  { id: 'whatsapp', label: 'WhatsApp', path: '/profile?tab=social-accounts&section=whatsapp', icon: MessageCircle, moduleSlug: 'messaging', surface: 'app', hub: 'marketing', description: 'Your number, templates, campaigns and the message log.' },
   // SEO & Content — one tile for the whole seo-toolkit; the launcher center lists research/audits +
   // article writing as sections (Content Writer merged in here, no longer a separate tile). Mention
   // Monitoring is nested under Social Media (see LAUNCHER_SECTIONS) to keep the Marketing list lean.

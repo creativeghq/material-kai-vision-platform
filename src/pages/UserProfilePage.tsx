@@ -10,7 +10,7 @@ import { CreditsTab } from '@/components/core/Profile/CreditsTab';
 import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
 import { MyDocumentsTab } from '@/components/core/Profile/MyDocumentsTab';
 import { InboxTab } from '@/components/core/Profile/InboxTab';
-import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccountsTab';
+import { SocialHubPanel } from '@/modules/social-media/components/SocialHubPanel';
 import { WebsitesTab } from '@/components/core/Profile/WebsitesTab';
 import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
 import { WebhooksTab } from '@/components/core/Profile/WebhooksTab';
@@ -188,7 +188,7 @@ export const UserProfilePage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="social-accounts" className="space-y-6">
-          <SocialAccountsTab />
+          <SocialHubPanel />
         </TabsContent>
 
         <TabsContent value="websites" className="space-y-6">

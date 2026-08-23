@@ -106,13 +106,25 @@ async function resolveAccountWorkspace(
 ): Promise<{ workspaceId: string | null; channelId: string | null; profileId: string | null }> {
   if (!accountId) return { workspaceId: null, channelId: null, profileId: null };
   const { data: channel } = await supabase
-    .from('messaging_channels').select('id, config').eq('zernio_account_id', accountId).maybeSingle();
+    .from('messaging_channels').select('id, config, workspace_id')
+    .eq('zernio_account_id', accountId).maybeSingle();
   const profileId = (channel?.config as { profile_id?: string } | null)?.profile_id ?? null;
-  let workspaceId: string | null = null;
-  if (profileId) {
+
+  // The channel row OWNS the answer. This used to resolve only via config.profile_id →
+  // social_zernio_profiles, two hops that are each nullable: a channel written before that key
+  // existed, or one whose profile row was reaped, resolved to NO workspace and the message was
+  // dropped on the floor — indistinguishable from "nobody messaged us".
+  let workspaceId: string | null = channel?.workspace_id ?? null;
+
+  // Fall back to the profile map only when the direct binding is absent, and repair the row so
+  // the next delivery takes the short path.
+  if (!workspaceId && profileId) {
     const { data: prof } = await supabase
       .from('social_zernio_profiles').select('workspace_id').eq('zernio_profile_id', profileId).maybeSingle();
     workspaceId = prof?.workspace_id ?? null;
+    if (workspaceId && channel?.id) {
+      await supabase.from('messaging_channels').update({ workspace_id: workspaceId }).eq('id', channel.id);
+    }
   }
   return { workspaceId, channelId: channel?.id ?? null, profileId };
 }

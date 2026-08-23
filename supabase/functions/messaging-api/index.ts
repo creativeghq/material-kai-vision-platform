@@ -192,6 +192,10 @@ async function upsertWhatsAppChannel(
     const { data, error } = await supabaseClient
       .from('messaging_channels')
       .update({
+        // workspace_id is set on INSERT and was left alone here, so a channel row that predates
+        // the column — or one reconnected from a different workspace — kept a stale/NULL owner,
+        // and the webhook resolver reads exactly this column to route inbound messages.
+        workspace_id: params.workspaceId,
         sender_id: params.senderId,
         display_name: params.displayName || params.senderId,
         is_active: true,

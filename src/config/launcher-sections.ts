@@ -180,19 +180,6 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // deep-link straight into real `generation` toolkit quick-starts via `?quickstart=<toolkit>:<label>`
   // (honored by pages/AgentHub.tsx independently of ?capability=). Labels after the colon MUST match
   // the toolkit quick_start `label` verbatim; the display label here is ours (image-neutral wording).
-  // Social Media. The tile deep-links into Hermes, so the two surfaces a human still needs had no
-  // entry anywhere in the menu: the per-user OAuth page where accounts are actually connected, and
-  // the workspace-wide list of who has connected what.
-  social: [
-    { label: 'My accounts', to: '/profile?tab=social-accounts', icon: Share2 },
-    { label: 'Workspace accounts', to: '/social-media/accounts', icon: Users, requireWorkspaceAdmin: true },
-  ],
-  // WhatsApp deep-links into the agent for the same reason, which left /messaging — where the
-  // channel is connected, templates are submitted to Meta and campaigns are sent — reachable only
-  // by typing the URL. The page has no ?tab= handling (its Tabs are useState), so link it plain.
-  messaging: [
-    { label: 'Channels & campaigns', to: '/messaging', icon: MessagesSquare, requireWorkspaceAdmin: true },
-  ],
   'image-studio': [
     { label: 'Edit an image', to: '/agent-hub?capability=image-studio&generation_mode=image-edit&quickstart=generation:Edit%20a%20photo', icon: Wand2 },
     { label: 'Re-light an image', to: '/agent-hub?capability=image-studio&quickstart=generation:Re-light%20a%20room', icon: Lightbulb },
@@ -311,9 +298,7 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   // The channels marketing actually has to keep connected, plus the one-off scan that needs no
   // module (the Mention Monitoring tile is the subscribed version of the same capability).
   marketing: [
-    // 'Social accounts' used to live here because the Social Media card had no chips to hang it on.
-    // It now does (LAUNCHER_SECTIONS.social), and the rail exists for apps the centre cannot reach —
-    // keeping both is the duplicate launcherHubShortcuts.test.ts is there to catch.
+    { label: 'Social accounts', to: '/profile?tab=social-accounts', icon: Share2 },
     { label: 'My websites', to: '/profile?tab=websites', icon: Globe },
     { label: 'Quick mention scan', to: '/tools/mention-scan', icon: Radar },
   ],
