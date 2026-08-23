@@ -855,7 +855,7 @@ const InboxPage: React.FC = () => {
         </aside>
 
         {/* ── Column 1 · Message list ── */}
-        <div className={`dashboard-card md:col-span-4 lg:col-span-3 2xl:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`dashboard-card md:col-span-4 lg:col-span-3 flex-1 min-h-0 md:flex-none flex flex-col overflow-hidden p-0 ${activeId ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-3 border-b border-hairline bg-surface-sunken space-y-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -1022,10 +1022,11 @@ const InboxPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Column 2 · Conversation ── */}
-        <div className={`dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${
-          activeThread ? '2xl:col-span-4' : '2xl:col-span-7'
-        } ${activeId ? 'flex' : 'hidden md:flex'}`}>
+        {/* ── Column 2 · Conversation ──
+            Takes every column the sidebar and the list do not, at every breakpoint. The
+            customer profile is a drawer now (opened from the name or the person icon in this
+            header), so there is no fourth column to make room for. */}
+        <div className={`dashboard-card md:col-span-5 lg:col-span-7 flex-1 min-h-0 flex flex-col overflow-hidden p-0 ${activeId ? 'flex' : 'hidden md:flex'}`}>
           {!activeThread ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
               <MessageSquare className="w-10 h-10 opacity-30" />
@@ -1043,14 +1044,35 @@ const InboxPage: React.FC = () => {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <Avatar className="h-10 w-10 shrink-0">
-                  <AvatarFallback className={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}>
-                    {initials(threadDisplayName(activeThread))}
-                  </AvatarFallback>
-                </Avatar>
+                {/* Avatar and name both OPEN the profile drawer — clicking who you are talking
+                    to is the affordance people reach for before they look for a button, and it
+                    costs the header no width. The person icon on the right is the same action
+                    for anyone who does not think to try the name. Two tight targets rather than
+                    one block: the meta row under the name is read, not pressed, and a click
+                    target that tall swallows the label chips beside it. */}
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(true)}
+                  title="Customer profile — contact, quotes, invoices & projects"
+                  aria-label={`Open the profile for ${threadDisplayName(activeThread)}`}
+                  className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}>
+                      {initials(threadDisplayName(activeThread))}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <div className="truncate text-[15px] font-semibold">{threadDisplayName(activeThread)}</div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDetails(true)}
+                      title="Customer profile — contact, quotes, invoices & projects"
+                      className="min-w-0 truncate text-left text-[15px] font-semibold rounded-sm hover:underline decoration-hairline underline-offset-2"
+                    >
+                      {threadDisplayName(activeThread)}
+                    </button>
                     {activeThread.archived_at && (
                       <Badge variant="neutral" className="text-[10px] shrink-0"><Archive className="w-2.5 h-2.5" />Archived</Badge>
                     )}
@@ -1068,12 +1090,15 @@ const InboxPage: React.FC = () => {
                 </div>
                 {/* Desktop: inline member controls. Mobile: collapsed into the details sheet. */}
                 {memberControls && <div className="hidden md:flex items-center gap-1.5">{memberControls}</div>}
-                {/* Open the Customer Profile drawer (only present while a conversation is open) */}
+                {/* Open the Customer Profile drawer (only present while a conversation is open).
+                    No longer `2xl:hidden`: the profile is a drawer at EVERY width now, so this
+                    is the icon half of the two ways in, not a small-screen stand-in. */}
                 <Button
                   variant="outline" size="sm"
                   onClick={() => setShowDetails(true)}
                   title="Customer profile — contact, quotes, invoices & projects"
-                  className="shrink-0 gap-1.5 2xl:hidden"
+                  aria-label="Customer profile"
+                  className="shrink-0 gap-1.5"
                 >
                   <UserIcon className="w-4 h-4" /> <span className="hidden sm:inline">Profile</span>
                 </Button>
@@ -1191,28 +1216,12 @@ const InboxPage: React.FC = () => {
         </div>
 
         {/*
-          ── Column 3 · Customer profile ──
-          Standing, not slid over, from 2xl (1536px) up. Both reference layouts keep the
-          contact permanently beside the conversation, and the reason is not decoration: who
-          this person is, what they owe and what is open for them is context you read WHILE
-          composing a reply. Behind a drawer it costs a click and covers the message you were
-          answering, so in practice it goes unread.
-
-          Below 2xl there is no room for a fourth column and it stays the Sheet it was — which
-          is why the Profile button in the header is `2xl:hidden` rather than removed.
+          There is no standing profile column. It used to be a fourth pane from 2xl up; the
+          conversation is what an operator is actually working in, so the profile is a drawer
+          at every width and the conversation keeps the room. It opens from the contact's name
+          or the person icon in the conversation header — see the Sheet at the bottom of this
+          component, which is now the ONLY renderer of DetailsRail.
         */}
-        {activeThread && (
-          <aside className="dashboard-card hidden 2xl:flex 2xl:col-span-3 min-h-0 flex-col overflow-hidden p-0">
-            <DetailsRail
-              thread={activeThread}
-              context={context}
-              participants={participants}
-              labels={labels}
-              isMember={isMember}
-              onIntakeChanged={() => { void openThread(activeThread.id); }}
-            />
-          </aside>
-        )}
       </div>
 
       {showNew && activeWorkspaceId && (
@@ -1231,8 +1240,9 @@ const InboxPage: React.FC = () => {
       )}
 
       {/* Contact / CRM details rail — a slide-over on every breakpoint (bottom on mobile,
-          right on desktop). Member controls are only surfaced here on mobile, where the
-          conversation header hides them. */}
+          right on desktop), and the only place DetailsRail renders. Opened from the contact's
+          name or the person icon in the conversation header. Member controls are only surfaced
+          here on mobile, where the conversation header hides them. */}
       {activeThread && (
         <Sheet open={showDetails} onOpenChange={setShowDetails}>
           <SheetContent
