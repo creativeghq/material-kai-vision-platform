@@ -3257,10 +3257,20 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'price-monitoring': 'sales',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-article': 'marketing',
+  // The newest SEO cluster and the only one that was missing from both maps: unmapped toolkits
+  // fall into the picker's "Other" group beside core and admin-misc, so AI Search Visibility sat
+  // apart from the seven siblings it belongs with — findable only by someone already scrolling.
+  'ai-visibility': 'marketing',
+  // Nine clusters were in neither map, not just this one, so they all landed in the same catch-all
+  // group. Placed from the hub the matching NAV item already uses rather than a fresh opinion —
+  // Real Estate is hub 'sales' in SIDEBAR_NAV_ITEMS, so its toolkit is too.
+  'website-embed': 'marketing',
   // Sales
   quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales', crm: 'sales', appointments: 'sales',
+  'real-estate': 'sales', sourcing: 'sales', calculators: 'sales',
   // Finance
   stock: 'finance', finance: 'finance', contracts: 'finance',
+  'trip-expenses': 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
   // People
@@ -3380,6 +3390,9 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'seo-research': ['marketing'], 'seo-domain': ['marketing'], 'seo-backlinks': ['marketing'],
   'seo-content': ['marketing'], 'seo-multi-engine': ['marketing'], 'seo-composite': ['marketing'],
   'seo-article': ['marketing'], mentions: ['marketing'], 'email-marketing': ['marketing'],
+  // Same omission, worse consequence: with no owning agent the picker cannot scope this cluster
+  // to Edith, so selecting her hid the one toolkit that answers "do LLMs mention us at all".
+  'ai-visibility': ['marketing'],
   // Social + WhatsApp + Inbox + Reviews → Hermes (the comms agent)
   social: ['social-media'], messaging: ['social-media'], inbox: ['social-media'], reviews: ['social-media'],
   // Finance / quotes → Trinity

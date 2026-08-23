@@ -53,7 +53,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
-  TOOLKITS, renderPromptTemplate, TOOLKIT_AGENTS, GENERALIST_AGENT_ID,
+  TOOLKITS, renderPromptTemplate, TOOLKIT_AGENTS, TOOLKIT_HUB, GENERALIST_AGENT_ID,
   getToolkitOwnerAgents, resolveToolkitAgent,
 } from '@/components/features/ai/agentToolsCatalog';
 import { CAPABILITIES } from '@/config/capabilities';
@@ -533,6 +533,50 @@ describe('quick-start agent resolution', () => {
     expect(
       offenders,
       `A quick-start moved the user off an agent that already owns the toolkit:\n  ${offenders.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  /**
+   * `ai-visibility` — the whole LLM-search-visibility cluster — was absent from BOTH maps while
+   * its seven SEO siblings were in both. Nothing failed: an unmapped toolkit silently drops into
+   * the picker's "Other" group beside `core` and `admin-misc`, and with no owning agent the picker
+   * cannot scope it to Edith, so selecting her hid it entirely. A whole feature reachable only by
+   * someone already scrolling past the group it should have been in.
+   *
+   * Both maps are hand-kept lists keyed by toolkit id, which is exactly the shape that rots when
+   * a cluster is added. The four listed below are deliberately hub-less (see TOOLKIT_HUB's own
+   * comment); everything else must be placed.
+   */
+  it('every business toolkit is placed in a hub and owned by an agent', () => {
+    // Genuinely hub-less, each for a stated reason — not a dumping ground. `docs` joins the
+    // original four on the same grounds nav-items gives Templates: it is not a business module,
+    // it cuts across all of them, so filing it under one hub would be a lie about where it
+    // belongs rather than a fix.
+    const HUBLESS = new Set(['core', 'tech-radar', 'sub-agents', 'admin-misc', 'docs']);
+    const missingHub: string[] = [];
+    const missingAgent: string[] = [];
+
+    for (const tk of TOOLKITS) {
+      if (HUBLESS.has(tk.id)) continue;
+      if (!TOOLKIT_HUB[tk.id]) missingHub.push(tk.id);
+      // An EMPTY agent entry is legitimate — TOOLKIT_AGENTS' own comment says the generalist owns
+      // everything implicitly, so twelve clusters with no specialist are a design choice, not a
+      // gap. The real invariant is narrower: the SEO family is Edith's, all of it. ai-visibility
+      // was the one member of that family with no owner, so selecting her hid it while showing
+      // its seven siblings — an inconsistency inside a family, not a missing universal rule.
+      if (/^seo-|^ai-visibility$/.test(tk.id) && !TOOLKIT_AGENTS[tk.id]?.length) missingAgent.push(tk.id);
+    }
+
+    expect(
+      missingHub,
+      `Toolkits with no TOOLKIT_HUB entry fall into the picker "Other" group, away from their `
+      + `siblings. Add them, or add them to HUBLESS here with a reason: ${missingHub.join(', ')}`,
+    ).toEqual([]);
+
+    expect(
+      missingAgent,
+      `SEO-family toolkits with no TOOLKIT_AGENTS entry cannot be scoped to the marketing `
+      + `specialist, so selecting her HIDES them while their siblings show: ${missingAgent.join(', ')}`,
     ).toEqual([]);
   });
 
