@@ -76,6 +76,8 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
       return requestModule(auth, body);
     case 'list-stripe-products':
       return listStripeProducts(auth);
+    case 'verify-catalogue-prices':
+      return verifyCataloguePrices(auth);
     case 'create-addon-product':
       return createAddonProduct(auth, body);
     default:
@@ -395,6 +397,119 @@ async function createAddonProduct(auth: AuthResult, body: Record<string, unknown
       price: { id: price.id, unit_amount: amountCents, currency, interval },
     },
   });
+}
+
+/**
+ * Does the price we SHOW match the price Stripe CHARGES?
+ *
+ * Found the hard way: subscription_plans said Pro $99 and Enterprise $299 while Stripe was billing
+ * €25 and €500. Enterprise was charging roughly twice what the page advertised, in a different
+ * currency, and nothing anywhere compared the two — the catalogue is what the pricing page renders
+ * and Stripe is what takes the money, and neither has ever had to agree with the other.
+ *
+ * A wrong price is a valid price, so no typecheck and no integrity probe could see it. This is the
+ * comparison, and it runs where the SQL probes cannot: only Stripe knows Stripe.
+ *
+ * Drift is logged at WARNING as well as returned, so a scheduled run lands somewhere a human
+ * already looks (the admin Log Viewer) instead of in a cron response nobody reads.
+ */
+async function verifyCataloguePrices(auth: AuthResult): Promise<Response> {
+  if (!isAdminAccess(auth) && !(await isOperator(auth.supabase, auth.userId))) {
+    return json({ error: 'Operator access required', code: 'not_operator' }, 403);
+  }
+  const stripe = await getPlatformBillingStripe();
+  if (!stripe) return noPaymentProviderResponse(corsHeaders);
+  const service = auth.supabase;
+
+  const products = await stripe.products.list({ active: true, limit: 100, expand: ['data.default_price'] });
+  const byProduct = new Map<string, { cents: number | null; currency: string | null; recurring: boolean }>();
+  for (const p of products.data) {
+    const dp = p.default_price;
+    const price = dp && typeof dp === 'object' ? dp : null;
+    byProduct.set(p.id, {
+      cents: price?.unit_amount ?? null,
+      currency: price?.currency ?? null,
+      recurring: Boolean(price?.recurring),
+    });
+  }
+
+  const drift: Array<Record<string, unknown>> = [];
+
+  // Add-ons: bound 1:1 to a product, so the comparison is exact.
+  const { data: addons } = await service
+    .from('modules')
+    .select('slug, name, addon_price_cents, addon_currency, addon_stripe_product_id')
+    .eq('is_addon', true)
+    .not('addon_stripe_product_id', 'is', null);
+
+  for (const m of ((addons ?? []) as Array<Record<string, string | number | null>>)) {
+    const live = byProduct.get(String(m.addon_stripe_product_id));
+    if (!live) {
+      drift.push({ kind: 'addon', slug: m.slug, issue: 'bound product not found or inactive in Stripe' });
+      continue;
+    }
+    if (!live.recurring) {
+      drift.push({ kind: 'addon', slug: m.slug, issue: 'product default price is not recurring — activation will refuse it' });
+    }
+    if (live.cents !== null && Number(m.addon_price_cents) !== live.cents) {
+      drift.push({
+        kind: 'addon', slug: m.slug, issue: 'price mismatch',
+        catalogue_cents: Number(m.addon_price_cents), stripe_cents: live.cents,
+      });
+    }
+    if (live.currency && String(m.addon_currency ?? '').toLowerCase() !== live.currency) {
+      drift.push({
+        kind: 'addon', slug: m.slug, issue: 'currency mismatch',
+        catalogue_currency: m.addon_currency, stripe_currency: live.currency,
+      });
+    }
+  }
+
+  // Plans are matched by NAME, because subscription_plans carries no Stripe product id at all —
+  // which is the deeper reason they were free to drift. Reported as unverifiable rather than
+  // passed: "we could not check" and "it matches" must never look the same.
+  const { data: plans } = await service
+    .from('subscription_plans').select('name, price_in_cents, currency, stripe_product_id').eq('is_active', true);
+
+  for (const pl of ((plans ?? []) as Array<Record<string, string | number | null>>)) {
+    if (Number(pl.price_in_cents) === 0) continue; // a free tier has nothing in Stripe to match
+    const bound = pl.stripe_product_id ? byProduct.get(String(pl.stripe_product_id)) : undefined;
+    if (!bound) {
+      drift.push({
+        kind: 'plan', name: pl.name,
+        issue: 'not bound to a Stripe product — the displayed price cannot be verified against what is charged',
+        catalogue_cents: Number(pl.price_in_cents), catalogue_currency: pl.currency,
+      });
+      continue;
+    }
+    if (bound.cents !== null && Number(pl.price_in_cents) !== bound.cents) {
+      drift.push({
+        kind: 'plan', name: pl.name, issue: 'price mismatch',
+        catalogue_cents: Number(pl.price_in_cents), stripe_cents: bound.cents,
+      });
+    }
+    if (bound.currency && String(pl.currency ?? '').toLowerCase() !== bound.currency) {
+      drift.push({
+        kind: 'plan', name: pl.name, issue: 'currency mismatch',
+        catalogue_currency: pl.currency, stripe_currency: bound.currency,
+      });
+    }
+  }
+
+  if (drift.length) {
+    // WARNING and above is never dropped by the log sink's denylist, and 30-day retention means a
+    // scheduled run is still readable in the admin Log Viewer a month later.
+    const { error: logErr } = await service.from('system_logs').insert({
+      level: 'WARNING',
+      logger_name: 'stripe-api.verify-catalogue-prices',
+      message: `[price-drift] ${drift.length} catalogue/Stripe disagreement(s) — the page and the charge do not match`,
+      context: { drift },
+    });
+    // Checked: a check whose own alarm fails silently is not a check.
+    if (logErr) console.error('[verify-catalogue-prices] could not record drift:', logErr.message);
+  }
+
+  return json({ ok: drift.length === 0, checked: (addons?.length ?? 0) + (plans?.length ?? 0), drift });
 }
 
 async function listStripeProducts(auth: AuthResult): Promise<Response> {
