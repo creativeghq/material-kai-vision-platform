@@ -40,6 +40,7 @@ import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog'
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
+import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesDialog';
 import {
   INBOUND_SOURCE_CHIP, inboundDocumentNumber, isReverseCharged, needsLineDetail,
 } from '@/modules/finance/utils/inboundProvenance';
@@ -1132,6 +1133,8 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
+  /** Document whose value-only lines are being completed (issue #377, Phase 1b). */
+  const [detailDoc, setDetailDoc] = React.useState<InboundDocument | null>(null);
   /** Document being paid before it is an expense — the conversion happens when that form saves. */
   const [payDoc, setPayDoc] = React.useState<InboundDocument | null>(null);
   /** Document being turned into the purchase order it was always for. */
@@ -1316,6 +1319,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                     // unreachable from this table — the menu item simply did not exist.
                     onOpenPayments={d.created_supplier_bill_id ? () => onOpenExpense(d.created_supplier_bill_id!) : undefined}
                     onReceiveStock={() => setReceiveDoc(d)}
+                    onAddLineDetail={() => setDetailDoc(d)}
                     onDismiss={() => dismiss(d.id)}
                     onChanged={onChanged}
                   />
@@ -1326,6 +1330,13 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           );
         })}
       </tbody>
+      {detailDoc && (
+        <CompleteLinesDialog
+          doc={detailDoc}
+          onOpenChange={(v) => { if (!v) setDetailDoc(null); }}
+          onDone={() => { setDetailDoc(null); onChanged(); }}
+        />
+      )}
       {receiveDoc && workspaceId && (
         <ReceiveToWarehouseDialog
           doc={receiveDoc}

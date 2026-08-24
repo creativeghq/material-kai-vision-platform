@@ -14,7 +14,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart, Receipt } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart, Receipt } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -29,7 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { companiesAPI } from '@/services/crm.service';
 import { researchCompany, greekAfm, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
-import { isPayrollDocument } from '@/modules/finance/utils/inboundProvenance';
+import { docFamily, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
 interface Props {
@@ -62,6 +62,8 @@ interface Props {
    */
   onOpenPayments?: () => void;
   onReceiveStock: () => void;
+  /** Opens the complete-the-document editor. Absent where the surface cannot host a dialog. */
+  onAddLineDetail?: () => void;
   onDismiss: () => void;
   onChanged?: () => void;
 }
@@ -69,7 +71,7 @@ interface Props {
 /** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
 const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onOpenPayments, onReceiveStock, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -86,6 +88,13 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // And nothing was delivered, so there is nothing to receive either.
   const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll;
   const canDismiss = doc.status === 'new';
+  /** Value-only lines: the money is known, what was bought is not. Blocks warehouse receive. */
+  const needsDetail = needsLineDetail(doc);
+  // Offered on `lines_source='none'` and nowhere else — a document whose lines arrived under the
+  // supplier's own MARK must not be rewritten, or our records diverge from the tax record. Rent
+  // and payroll have nothing to itemise, so they are not asked to.
+  const canAddDetail = needsDetail && !isPayroll && docFamily(doc.doc_type) !== '16'
+    && doc.status !== 'dismissed' && !!onAddLineDetail && (doc.total_net ?? 0) > 0;
   // Paying settles an expense that EXISTS. A document that hasn't been booked yet is settled by
   // booking it — "Add to Expenses" carries a "Mark as paid" tick — so there is one way in and it
   // always leaves an order behind the money. This item used to convert the document itself on
@@ -221,9 +230,21 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
             </DropdownMenuItem>
           )}
+          {/* Before receiving is possible at all, the document has to NAME something. This is the
+              one thing standing between a 14.x (or any thin 2.x) and the entire existing intake
+              chain, so it sits directly above it and only appears when it is the blocker. */}
+          {canAddDetail && (
+            <DropdownMenuItem onClick={onAddLineDetail}>
+              <ListPlus className="h-4 w-4 mr-2" /> Add line detail
+            </DropdownMenuItem>
+          )}
           {/* Same act as the order menu's entry — one name for it, the goods-receipt term. Once an
               order exists it owns the receipt, so this is disabled rather than explained. */}
-          <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
+          <DropdownMenuItem
+            onClick={onReceiveStock}
+            disabled={!canReceive || needsDetail}
+            title={needsDetail ? 'This document has no itemised lines yet — add the detail first.' : undefined}
+          >
             <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
           </DropdownMenuItem>
 

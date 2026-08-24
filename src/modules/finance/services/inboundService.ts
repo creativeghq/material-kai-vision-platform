@@ -220,6 +220,32 @@ export const inboundService = {
     return (data as IssuerProfile | null) ?? null;
   },
 
+  /**
+   * Record what was actually on a document that arrived with value-only lines (issue #377,
+   * Phase 1b). The RPC is the authority: it refuses a document whose lines came under a MARK,
+   * and refuses any set that does not foot to `total_net`. Once this returns, the whole existing
+   * chain — warehouse receive, product extraction, catalog, the markup ladder — works unchanged,
+   * because all of it keys on `lines[].item_description` and nothing else.
+   */
+  async setLines(
+    docId: string,
+    lines: {
+      item_description: string;
+      item_code: string | null;
+      quantity: number | null;
+      measurement_unit: number | null;
+      net_value: number | null;
+      vat_category: number | null;
+      vat_amount: number | null;
+    }[],
+  ): Promise<{ lines: number; lines_total: number; document_total_net: number }> {
+    const { data, error } = await supabase.rpc('inbound_doc_set_lines' as never, {
+      p_doc_id: docId, p_lines: lines,
+    } as never);
+    if (error) throw error;
+    return data as unknown as { lines: number; lines_total: number; document_total_net: number };
+  },
+
   async toSupplierBill(docId: string): Promise<string> {
     const { data, error } = await supabase.rpc('inbound_doc_to_supplier_bill', { p_doc_id: docId });
     if (error) throw error;

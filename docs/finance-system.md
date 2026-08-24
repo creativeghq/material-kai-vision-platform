@@ -171,6 +171,16 @@ A foreign supplier is not a myDATA obligor, so nobody files their invoice agains
 - **In the UI these are FILTERS, not a second tab** — Source and Detail on the Expenses inbox. Once a `14.x` has lines it is indistinguishable from a `1.1` to warehouse, catalog, payables and P&L, so a provenance tab would partition the work queue by the wrong axis.
 - **Downstream**: `inbound_doc_to_supplier_bill(p_doc_id)` creates a `supplier_bills` row; `inbound_doc_receive_to_warehouse(p_doc_id, p_mappings)` records stock-in (see [warehouse doc](warehouse-and-billing.md)).
 
+### Complete-the-document (`inbound_doc_set_lines`)
+
+A `14.x` carries one value-only line; so does most `2.x` Greek service billing — **1,161 of 1,769** received documents name nothing at all. Every downstream consumer keys on `lines[].item_description`, so those documents are correctly skipped by warehouse receive and AI extraction, and the purchase never reaches stock. The document has no lines; the transaction did.
+
+- **`total_net` is the anchor.** Supplier, issue date, total and MARK come from AADE and are not editable. Typed lines MUST foot to `total_net` (±0.01 — one rounding step off the supplier's PDF, never enough to hide a transcription error), or the document would state two different amounts for one purchase and both would be valid numbers.
+- **Offered on `lines_source='none'` and nowhere else.** A `1.1`'s lines were transmitted under the supplier's own MARK; rewriting those makes our records diverge from the tax record. The RPC refuses it, not just the UI.
+- **Paste, don't fill in.** `parseSupplierLine` reads `"AMALFI GRIS 80X80 A' -3 -1"` / qty 17.92 / net €295.86 into an 80×80 tile at €16.51/m², so the operator pastes the supplier's own rows.
+- On success: `lines_source='user'`, `lines_reconciled=true`. **Nothing downstream changed** — measured, the document goes from absent to present in `inbound_docs_needing_extraction` and gains receivable lines with no code change anywhere in that chain.
+- Payroll (`17.x`) and rent (`16.1`) are not offered it — there is nothing to itemise. Guarded by [tests/unit/lineFooting.test.ts](../tests/unit/lineFooting.test.ts).
+
 ### Supplier cost-list import (`parse-supplier-cost-list`)
 
 Procurement-cost maintenance without editing product rows. An admin pastes a supplier's price list into a `kb_docs` row tagged `price_doc_type='supplier_cost_list'` (a Markdown table), then POSTs `{ kb_doc_id, dry_run? }`. The function parses SKU/cost/currency columns (case-insensitive header detection; strips `€$£`, handles comma separators), looks up `products` by `sku` (fallback `external_sku`) within the doc's `workspace_id`, and updates `products.cost` / `cost_currency` / `cost_updated_at` / `cost_source='kb_price_list'`. `dry_run:true` reports matched/unmatched without writing. Auth `admin/super_admin/owner`; 0 credits; manually invoked (no cron). Unmatched SKUs are reported, not errored.
