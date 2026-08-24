@@ -158,13 +158,17 @@ describe('business identity reaches the model that speaks for the business', () 
   });
 
   it('withholds the identity block on a PUBLIC thread', () => {
-    const src = read(INBOX);
-    const draft = src.slice(src.indexOf('async function buildAgentDraft'));
-
-    // `audienceNote` already forbids posting a phone number or an email under our own social post.
-    // Handing the model both while another sentence says not to use them is a coin flip, not a
-    // rule — the same reason the account tools are withheld outright rather than refused in prose.
-    expect(draft).toMatch(/isPublic\s*\?\s*null\s*:\s*await resolveBusinessIdentity/);
+    // The guard moved with the logic: the Inbox no longer builds its own prompt, so the decision
+    // now lives where the prompt is assembled — agent-chat, keyed on the thread's own channel and
+    // social_kind rather than on anything a caller passed.
+    //
+    // It matters because the block ends with "share any of the above when asked" while the
+    // public-thread guardrail says never post a phone number or an email under our own post.
+    // Handing the model both and hoping it picks the second is a coin flip, not a rule — the same
+    // reason the account tools are withheld outright there rather than refused in prose.
+    const src = code(AGENT_CHAT);
+    expect(src).toMatch(/if \(workspaceId && !\(forCustomer && customerPublicThread\)\)/);
+    expect(src).toMatch(/customerPublicThread = t\.channel === 'social'/);
   });
 });
 

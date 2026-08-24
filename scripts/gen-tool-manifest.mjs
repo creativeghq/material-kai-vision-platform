@@ -230,9 +230,31 @@ function summarize(desc) {
   return out.length > 220 ? `${out.slice(0, 217)}…` : out;
 }
 
+/**
+ * Tool modules that are NOT part of the agent tool surface, and must not enter the manifest.
+ *
+ * The manifest exists to answer "which tools can an agent be given, and are they all reachable" —
+ * `toolkitCoverage.test.ts` reads it and fails the build for any tool that is in no cluster or
+ * that no agent lists. That check has no escape hatch by design (`KNOWN_UNCLUSTERED` was deleted,
+ * not emptied), and it is right not to.
+ *
+ * `customer-account-tools.ts` is not in that surface. Its three tools are bound only by
+ * agent-chat's customer-audience path, only when an Inbox thread has resolved to a real CRM
+ * contact and the workspace allows account answers. Putting them in a cluster would make them
+ * selectable in an operator chat, where they are a strictly worse copy of the finance tools — and
+ * an entry in the manifest without a cluster is a red build. So the file is excluded HERE, once,
+ * with the reason, rather than by weakening the coverage rule for everyone.
+ *
+ * A new entry needs the same argument: bound outside `registerTools`, and unreachable by
+ * selection. If a module does not clear that bar, cluster it instead.
+ */
+const NON_AGENT_TOOL_MODULES = new Set([
+  'customer-account-tools.ts',
+]);
+
 export function buildManifest() {
   const files = readdirSync(TOOLS_DIR)
-    .filter((f) => f.endsWith('.ts'))
+    .filter((f) => f.endsWith('.ts') && !NON_AGENT_TOOL_MODULES.has(f))
     .sort()
     .map((f) => join(TOOLS_DIR, f));
 

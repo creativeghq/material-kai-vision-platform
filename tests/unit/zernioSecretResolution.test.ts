@@ -436,9 +436,16 @@ describe('social lands in the inbox, and public stays public', () => {
     // would not have. The rule is that the PUBLIC comment thread is created with the agent
     // off, so that is what is pinned: the flag, in the call that builds the comments thread.
     expect(handler.code).toMatch(/allowAgent: false,[\s\S]{0,400}?externalKey: `comments:/);
-    expect(inboxApi.code).toContain('publicThread');
-    expect(inboxApi.code).toMatch(/&& !publicThread\)/);
-    expect(inboxApi.code).toMatch(/posted PUBLICLY as a comment/);
+
+    // The second half moved. inbox-api no longer builds the reply itself — a customer turn runs
+    // JARVIS with `audience: 'customer'` — so the withholding now lives where the prompt and the
+    // tools are assembled, in agent-chat, keyed on the THREAD's own channel and social_kind rather
+    // than on anything a caller passed. Same rule, one layer over; pinned at its new home so this
+    // guard cannot pass by checking a file that stopped making the decision.
+    const agentChat = code(readFileSync(join(FUNCTIONS_DIR, 'agent-chat', 'index.ts'), 'utf-8'));
+    expect(agentChat).toMatch(/customerPublicThread = t\.channel === 'social'/);
+    expect(agentChat).toMatch(/allowAccountData && contactId && !customerPublicThread/);
+    expect(agentChat).toMatch(/THIS REPLY IS PUBLIC|publicThread/);
   });
 
   it('withholds an order confirmation from a public thread', () => {

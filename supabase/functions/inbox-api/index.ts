@@ -20,6 +20,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
+import { runInBackground } from '../_shared/background.ts';
 import { formatBusinessIdentityForPrompt, resolveBusinessIdentity } from '../_shared/business-identity.ts';
 import {
   sendWhatsAppReply, sendWhatsAppMessage,
@@ -45,7 +46,6 @@ import {
 } from '../_shared/order-intake/index.ts';
 import { matchByText } from '../_shared/order-intake/match.ts';
 import { resolveLinePrice } from '../_shared/order-intake/price.ts';
-import { generateWithClaudeTools } from '../_shared/ai-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { tool } from 'npm:ai@6';
@@ -56,8 +56,6 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const ATTACHMENT_BUCKET = 'generation-images';
-// Phase-2 agent takeover (§9): the workspace owner is billed per auto-reply.
-const INBOX_AGENT_REPLY_COST = 1;
 const DEFAULT_INBOX_AGENT_ID = 'kai';
 /** Receiving domain for inbound mail (#342). Overridable via the INBOUND_EMAIL_DOMAIN secret. */
 const DEFAULT_INBOUND_DOMAIN = 'mail.materialshub.gr';
@@ -271,89 +269,6 @@ async function resolveThreadCustomerScope(
 }
 
 /**
- * Read-only self-service tools for the customer-facing agent. CRITICAL: every query is scoped by
- * (workspace_id, contact_id) captured from the THREAD — never from tool arguments or the customer's
- * message — so the customer can only ever read their own records and cannot widen scope by prompt
- * injection. The tools intentionally take no scoping parameters.
- */
-function buildCustomerSupportTools(db: DbClient, scope: { workspaceId: string; contactId: string }) {
-  return {
-    get_account_statement: tool({
-      description:
-        "The customer's current outstanding balance split into aging buckets (not yet due, 0-30, " +
-        '31-90, and 90+ days overdue), the total owed, how many documents are open, and the most ' +
-        'overdue day count. Use for any question about how much they owe or their statement.',
-      inputSchema: z.object({}),
-      execute: async () => {
-        const { data } = await db
-          .from('vw_customer_aging_buckets')
-          .select('total_outstanding, not_due, due_0_30, due_31_90, due_90_plus, max_days_overdue, open_doc_count')
-          .eq('workspace_id', scope.workspaceId)
-          .eq('customer_contact_id', scope.contactId);
-        const rows = (data || []) as Array<Record<string, number>>;
-        if (!rows.length) return { has_balance: false, message: 'No outstanding balance on record.' };
-        const sum = (k: string) => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
-        const { data: inv } = await db.from('invoices').select('currency')
-          .eq('workspace_id', scope.workspaceId).eq('customer_contact_id', scope.contactId)
-          .gt('amount_due', 0).limit(1).maybeSingle();
-        return {
-          has_balance: true,
-          currency: (inv as { currency?: string } | null)?.currency || 'EUR',
-          total_outstanding: sum('total_outstanding'),
-          not_due: sum('not_due'),
-          due_0_30: sum('due_0_30'),
-          due_31_90: sum('due_31_90'),
-          due_90_plus: sum('due_90_plus'),
-          open_document_count: sum('open_doc_count'),
-          max_days_overdue: Math.max(0, ...rows.map((r) => Number(r.max_days_overdue || 0))),
-        };
-      },
-    }),
-    list_open_invoices: tool({
-      description:
-        "The customer's unpaid or partially-paid invoices: document number, amount still due, " +
-        'currency, due date, status, and a secure payment link when one is available. Use to ' +
-        'itemise what is open or to give them a way to pay.',
-      inputSchema: z.object({}),
-      execute: async () => {
-        const { data } = await db.from('invoices')
-          .select('internal_number, legal_number, amount_due, currency, due_at, status, pay_token, pay_token_expires_at')
-          .eq('workspace_id', scope.workspaceId).eq('customer_contact_id', scope.contactId)
-          .gt('amount_due', 0).order('due_at', { ascending: true }).limit(10);
-        const now = Date.now();
-        return ((data || []) as Array<Record<string, unknown>>).map((r) => {
-          const tokenOk = r.pay_token &&
-            (!r.pay_token_expires_at || new Date(String(r.pay_token_expires_at)).getTime() > now);
-          return {
-            number: r.legal_number || r.internal_number,
-            amount_due: Number(r.amount_due || 0),
-            currency: r.currency || 'EUR',
-            due_at: r.due_at,
-            status: r.status,
-            pay_url: tokenOk ? `${PUBLIC_APP_URL}/pay/${r.pay_token}` : null,
-          };
-        });
-      },
-    }),
-    list_quotes_and_projects: tool({
-      description:
-        "The customer's recent quotes (with status and total) and projects. Use for questions about " +
-        'their orders, quotes, proposals, or project status.',
-      inputSchema: z.object({}),
-      execute: async () => {
-        const [{ data: quotes }, { data: projects }] = await Promise.all([
-          db.from('quotes').select('quote_number, name, status, grand_total, currency, created_at')
-            .eq('customer_contact_id', scope.contactId).order('created_at', { ascending: false }).limit(8),
-          db.from('projects').select('name, status, created_at')
-            .eq('client_contact_id', scope.contactId).order('created_at', { ascending: false }).limit(8),
-        ]);
-        return { quotes: quotes || [], projects: projects || [] };
-      },
-    }),
-  };
-}
-
-/**
  * Editable inbox-agent persona/policy — `prompts` row (prompt_type='agent', category='inbox').
  *
  * There is no inline fallback, and that is the point. A byte-similar
@@ -496,44 +411,29 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
     const owner = await workspaceOwner(db, workspaceId);
     if (!owner) return;
 
-    // Bill the owner only now that we've committed to replying; skip (leave for a human) if unpaid.
-    const { data: debit } = await db.rpc('debit_credits', {
-      p_user_id: owner,
-      p_amount: INBOX_AGENT_REPLY_COST,
-      p_operation_type: 'inbox_agent_reply',
-      p_description: 'Inbox agent auto-reply (1 turn)',
-      p_metadata: { thread_id: threadId, billing_type: 'inbox_agent_reply' },
-      p_workspace_id: workspaceId,  // draw from the workspace pool when funded, else owner personal
-    });
-    const debitRes = Array.isArray(debit) ? debit[0] : debit;
-    if (!debitRes?.success) return;
-
-    // Refund the owner (pool → personal) for any post-debit failure — a blank draft, a
-    // draft-generation throw, or a failed post — so an auto-reply that never reached the
-    // customer isn't billed. Mirrors the suggest_reply refund below.
-    const refundReply = () => db.rpc('refund_credits', {
-      p_user_id: owner,
-      p_amount: INBOX_AGENT_REPLY_COST,
-      p_operation_type: 'inbox_agent_reply_refund',
-      p_description: 'Refund — agent auto-reply produced no message',
-      p_metadata: { thread_id: threadId },
-      p_workspace_id: workspaceId,
-      // A PostgREST builder is PromiseLike: it implements `then` but NOT `catch`, so
-      // `.catch(...)` threw a synchronous TypeError and the refund never issued. `then`'s
-      // second argument is the supported way to swallow the failure.
-    }).then(() => {}, () => {});
-
+    // ── Billing ──────────────────────────────────────────────────────────
+    // No debit here any more, and no refund, because there is nothing left to refund.
+    //
+    // This used to charge a FLAT one-credit fee before generating, then hand it back on
+    // a blank draft or a failed post. That fee was calibrated for what this function used to be: a
+    // single ~700-token call with three tools. The turn now runs on JARVIS, where cost depends on
+    // what the question needed — a grounded, tool-using answer is not the same purchase as a
+    // one-liner, and pretending otherwise would either overcharge every short reply or quietly
+    // subsidise every long one.
+    //
+    // agent-chat already meters the real turn into `agent_usage_logs` against `owner`, and gates
+    // it up front with `preflight_credits` — which returns 402 when the owner cannot pay, and
+    // `buildAgentDraft` turns that into an empty draft, i.e. exactly the old "leave it for a
+    // human" outcome. Keeping our own debit on top would be two ledgers for one reply, which is
+    // the precise shape that made `credit_transactions` and `ai_usage_logs` disagree about which
+    // feature had run (see `billedTo` below).
     let replyText: string;
     try {
       replyText = await buildAgentDraft(db, thread, { userId: owner, task: 'inbox_agent_reply' });
     } catch (draftErr) {
-      await refundReply();
       throw draftErr;
     }
-    if (!replyText) {
-      await refundReply();
-      return;
-    }
+    if (!replyText) return;
 
     // The agent participant (created when the thread was handed over / auto-engaged).
     const { data: agentP } = await db
@@ -552,7 +452,6 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
         senderLabel: 'Assistant',
       });
     } catch (postErr) {
-      await refundReply();
       throw postErr;
     }
   } catch (e) {
@@ -671,62 +570,106 @@ async function buildAgentDraft(
   const rows = (history || []) as Array<{
     body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null;
   }>;
-  const settings = await inboxAgentSettings(db, workspaceId);
   const transcript = await buildTranscript(db, threadId, rows);
-  // Self-service tools — only when we know which customer this is AND the workspace allows account
-  // answers. Scope is derived from the thread, never from the message (injection-proof).
-  const scope = await resolveThreadCustomerScope(db, threadId);
-  // Withheld entirely on a public thread: a tool that returns a real balance or invoice is one
-  // sentence away from publishing it under a post. Refusing in the prompt is not enough when the
-  // tool is still callable.
-  const publicThread = thread.channel === 'social'
-    && ((thread.metadata as Json) || {}).social_kind === 'comments';
-  const tools = (settings.allowAccountData && scope.contactId && !publicThread)
-    ? buildCustomerSupportTools(db, { workspaceId, contactId: scope.contactId })
-    : {};
-  const personaBase = await loadInboxAgentPersona(db);
-  // PUBLIC vs private is the one channel fact that changes what is safe to say. A comment reply
-  // is posted under the post for the account's whole audience, so account data, order details
-  // and anything else customer-specific must not appear in one — the model cannot infer that
-  // from the channel name alone, and `social` covers both cases.
-  const threadMeta = (thread.metadata as Json) || {};
-  const isPublic = thread.channel === 'social' && threadMeta.social_kind === 'comments';
-  const audienceNote = isPublic
-    ? 'This reply will be posted PUBLICLY as a comment under our own social post, visible to ' +
-      'everyone. Never include order details, account data, prices quoted to an individual, ' +
-      'phone numbers or email addresses. Keep it short and friendly, and move anything specific ' +
-      'to a private channel by inviting them to message us directly. '
-    : '';
+  if (!transcript.trim()) return '';
 
-  // Who we ARE. Until 2026-08-24 this was one field — `workspaces.name`, which on the workspace
-  // that reported this reads "Default Workspace" — so a supplier asking `your email address,
-  // please` was told *"I don't have an email address to share here"* while the database held the
-  // trading name, the VAT number, the street and a live workspace mailbox. See
-  // `_shared/business-identity.ts` for the derivation and the reachability ladder.
+  // ── The turn runs on JARVIS ──────────────────────────────────────────────
+  // Everything that made this function clever used to live HERE — a persona, a hand-built tool
+  // map, a hand-built system prompt, one `generateWithClaudeTools` call. All of it is gone, and
+  // that is the change: there is ONE assistant on this platform and the Inbox runs it. A customer
+  // conversation now gets the same 36k system prompt, the same shared operating doctrine, the same
+  // unconditional grounding in the workspace's own documents and the same reasoning the operator
+  // gets in their own chat — so improving JARVIS improves every customer conversation, instead of
+  // improving one of two assistants while the customer-facing one stays at 816 characters.
   //
-  // Withheld on a PUBLIC thread for the same reason the account tools are: `audienceNote` forbids
-  // posting a phone number or an email under our own social post, and a block that hands the model
-  // both while another sentence tells it not to use them is a coin flip, not a rule.
-  const identity = isPublic ? null : await resolveBusinessIdentity(db, workspaceId);
-  const businessName = identity?.name || 'our team';
-
-  const systemPrompt =
-    `${personaBase}\n\n` +
-    `Business: ${businessName}. Channel: ${String(thread.channel)}. ` +
-    audienceNote +
-    (Object.keys(tools).length
-      ? "Use the tools to look up THIS customer's own account (statement/balance, open invoices, " +
-        'quotes & projects); always call a tool for real figures and only share a payment link a tool returns.'
-      : 'You do not have access to account data in this conversation.') +
-    (identity ? formatBusinessIdentityForPrompt(identity) : '');
-  const result = await generateWithClaudeTools(
-    `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
-    {
-      systemPrompt, maxTokens: 700, temperature: 0.4, tools, maxSteps: 6,
-      task: billedTo.task, userId: billedTo.userId, workspaceId,
+  // `audience: 'customer'` is what makes that safe rather than reckless. agent-chat clamps 166
+  // tools down to a read-only handful, drops long-term memory in BOTH directions, unbinds the
+  // meta-tools and fences this transcript as DATA. The clamp is on the agent's PERMITTED set, so
+  // `load_toolkit` cannot widen it either. See `_shared/customer-audience.ts`.
+  //
+  // Only the service-role bearer may claim that audience, which is why this is a function-to-
+  // function call and not something the browser could ever make.
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/agent-chat`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
     },
-  );
-  return (result.text || '').trim();
+    body: JSON.stringify({
+      agentId: DEFAULT_INBOX_AGENT_ID,
+      audience: 'customer',
+      thread_id: threadId,
+      workspace_id: workspaceId,
+      // Attribution and billing. agent-chat meters the turn into `agent_usage_logs` against this
+      // user, which is why `maybeRunAgentReply` no longer debits a flat fee of its own — two
+      // ledgers for one reply is how `credit_transactions` and `ai_usage_logs` came to disagree
+      // about which feature had run.
+      user_id: billedTo.userId ?? null,
+      // ONE synthetic user message holding the whole transcript. Not a replayed message array:
+      // the roles here are Customer / Our team / Assistant, which is not the two-role shape a
+      // chat history has, and flattening it into `user`/`assistant` would tell the model that a
+      // colleague's sentence was its own.
+      messages: [{ role: 'user', content: transcript }],
+      // The reply is a single message, so there is no conversation to continue and nothing should
+      // be written to one. A null id also keeps a customer thread out of the operator's Studio.
+      conversation_id: null,
+    }),
+  });
+
+  if (!resp.ok) {
+    // 402 is the credit gate saying the owner cannot pay for this turn. That is not an error to
+    // retry or report — it is the documented "leave it for a human" outcome, and the caller
+    // treats an empty draft exactly that way.
+    if (resp.status === 402) {
+      console.log(`[inbox-api] agent reply skipped on ${threadId}: insufficient credits`);
+      return '';
+    }
+    throw new Error(`agent-chat ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
+  }
+
+  return await readAgentChatReply(resp, threadId);
+}
+
+/**
+ * Pull the final answer out of agent-chat's stream.
+ *
+ * agent-chat speaks newline-delimited JSON, not `data:`-prefixed SSE — one object per line, of
+ * which we want exactly one: `final_result`, whose `text` is the reply. Everything else on the
+ * wire (heartbeats, `tool_call`, `text_chunk`, `agent_routed`) exists for the Studio's live view
+ * and means nothing to a WhatsApp message that is sent whole.
+ *
+ * Reading the body to the end rather than bailing on the first match is deliberate: `final_result`
+ * is the second-to-last chunk, `done` follows it, and abandoning a half-read body leaves the
+ * upstream isolate writing into a closed pipe.
+ */
+async function readAgentChatReply(resp: Response, threadId: string): Promise<string> {
+  const raw = await resp.text();
+  let text = '';
+  let sawFinal = false;
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let chunk: { type?: string; text?: string; error?: string; message?: string };
+    try {
+      chunk = JSON.parse(trimmed);
+    } catch {
+      // A partial line is normal at a chunk boundary; a persistently unparseable body is not, but
+      // it surfaces below as an empty draft rather than as a crash on the customer's turn.
+      continue;
+    }
+    if (chunk.type === 'final_result') {
+      sawFinal = true;
+      text = String(chunk.text || '');
+    } else if (chunk.type === 'error') {
+      console.warn(`[inbox-api] agent-chat error chunk on ${threadId}:`, chunk.error || chunk.message);
+    }
+  }
+  if (!sawFinal) {
+    // The stream ended without an answer. Distinguished from "answered with nothing" on purpose —
+    // the first is a broken turn worth seeing in the logs, the second is a legitimate decline.
+    console.warn(`[inbox-api] agent-chat produced no final_result for ${threadId}`);
+  }
+  return text.trim();
 }
 
 /**
@@ -1832,10 +1775,13 @@ async function handleJwtAction(
       const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
       if (!operator && !callerRole) throw new HttpError(403, 'You are not a member of that workspace');
       const settings = await inboxAgentSettings(db, workspaceId);
+      // `reply_cost` is gone rather than zeroed. A reply is a metered JARVIS turn now, so there is
+      // no single number to publish — and a stale "1 credit" in the settings panel is worse than
+      // no figure, because an operator budgets against it. The real spend is in `agent_usage_logs`
+      // where every other agent turn already is.
       return json({
         settings,
         can_edit: operator || callerRole === 'owner' || callerRole === 'admin',
-        reply_cost: INBOX_AGENT_REPLY_COST,
       });
     }
 
@@ -2532,27 +2478,14 @@ async function handleJwtAction(
       if (!access.isMember) throw new HttpError(403, 'Only thread members may draft AI replies');
       const workspaceId = String(thread.workspace_id);
 
-      const { data: debit } = await db.rpc('debit_credits', {
-        p_user_id: userId,
-        p_amount: INBOX_AGENT_REPLY_COST,
-        p_operation_type: 'inbox_agent_suggest',
-        p_description: 'Inbox AI draft reply (help me write)',
-        p_metadata: { thread_id: threadId, billing_type: 'inbox_agent_suggest' },
-        p_workspace_id: workspaceId,
-      });
-      const debitRes = Array.isArray(debit) ? debit[0] : debit;
-      if (!debitRes?.success) throw new HttpError(402, 'Not enough credits for an AI draft');
-
+      // No flat debit + refund pair here either. Same reason as the auto-reply path: the draft is
+      // now a real JARVIS turn, agent-chat meters it against `userId` in `agent_usage_logs` and
+      // refuses up front with a 402 when they cannot pay. Charging a fixed fee on top would bill
+      // the same reply into two ledgers that then disagree.
       const draft = await buildAgentDraft(db, thread, { userId, task: 'inbox_agent_suggest' });
       if (!draft) {
-        // Nothing to say — refund the debit so a blank draft isn't charged.
-        await db.rpc('refund_credits', {
-          p_user_id: userId, p_amount: INBOX_AGENT_REPLY_COST,
-          p_operation_type: 'inbox_agent_suggest_refund',
-          p_description: 'Refund — AI draft produced no text',
-          // See the note on refundReply above: a PostgREST builder has no `catch`.
-          p_metadata: { thread_id: threadId }, p_workspace_id: workspaceId,
-        }).then(() => {}, () => {});
+        // An empty draft is either "the credit gate said no" or "the turn produced nothing". Both
+        // leave the member exactly where they were, with nothing charged.
         throw new HttpError(502, 'The assistant could not draft a reply — try again.');
       }
       return json({ draft });
@@ -3306,9 +3239,25 @@ async function handler(req: Request): Promise<Response> {
     // #342: this is the shared inbound chokepoint for BOTH channels — zernio-webhook-handler
     // (WhatsApp) and email-webhooks (email) already call it, so neither needed a change to get
     // order intake. Intake runs first so the assistant's reply can acknowledge the order.
-    await maybeRunOrderIntake(db, threadId);
-    await maybeRunAgentReply(db, threadId);
-    return json({ ok: true });
+    //
+    // BACKGROUNDED, and this became necessary when the reply moved onto JARVIS. Both callers are
+    // provider webhooks that `await` this request: Zernio and the mail webhook want a prompt 200
+    // and retry when they do not get one. The old one-shot answered in a few seconds; a real
+    // agent turn grounds itself in the knowledge base and may call tools, which is tens of
+    // seconds — comfortably inside the edge function's own 150s ceiling, and comfortably past
+    // what a webhook will wait for. A retry would then deliver the same message twice.
+    //
+    // `runInBackground` (EdgeRuntime.waitUntil), never a bare floating promise: the isolate is
+    // torn down the moment this handler resolves, and an unkept promise dies mid-flight with
+    // nothing thrown and nothing logged — the platform's dominant failure shape.
+    runInBackground(
+      (async () => {
+        await maybeRunOrderIntake(db, threadId);
+        await maybeRunAgentReply(db, threadId);
+      })(),
+      `inbox-agent-reply:${threadId}`,
+    );
+    return json({ ok: true, queued: true });
   }
 
   // token_claim is the POST-signup conversion handshake — it enrolls a
