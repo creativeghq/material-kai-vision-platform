@@ -1523,6 +1523,11 @@ const MessageBubble: React.FC<{
   // than keep apologising for it.
   const mediaPlaceholder = meta.attachment_unresolved === true
     && (m.attachments || []).length === 0;
+  // Emoji reacted onto THIS message. Written by the reaction.received webhook against the message
+  // the reaction names, so they render on it rather than as a message of their own.
+  const reactions: string[] = Array.isArray(meta.reactions)
+    ? (meta.reactions as unknown[]).filter((r): r is string => typeof r === 'string' && !!r)
+    : [];
   const externalAuthor = !m.sender_participant_id && typeof meta.author_handle === 'string'
     ? (meta.author_handle as string)
     : null;
@@ -1619,6 +1624,21 @@ const MessageBubble: React.FC<{
             return <AttachmentView key={k || i} att={a} href={urls[k] || a.url} />;
           })}
         </div>
+        {/* Reactions sit ON the message they belong to, overlapping its lower edge the way every
+            chat app puts them — a reaction is about that message, and a row of its own would read
+            as a reply. Stored by the reaction.received webhook against the reacted-to message. */}
+        {reactions.length > 0 && (
+          <div className={`-mt-2 z-10 flex gap-0.5 ${ours ? 'mr-2 self-end' : 'ml-2 self-start'}`}>
+            {reactions.map((emoji, i) => (
+              <span
+                key={`${emoji}-${i}`}
+                className="rounded-full border border-hairline bg-card px-1.5 py-0.5 text-[11px] leading-none shadow-overlay"
+              >
+                {emoji}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="text-[10px] mt-1 px-1 text-muted-foreground flex items-center gap-1.5">
           <span>{formatDate(m.created_at, { withTime: true })}</span>
           {/* Only on OUR side, and only on a channel that reports back. An incoming message has

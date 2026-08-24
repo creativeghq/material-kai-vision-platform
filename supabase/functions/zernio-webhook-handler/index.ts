@@ -287,6 +287,22 @@ export function isMediaPlaceholder(text: unknown): boolean {
   return MEDIA_PLACEHOLDERS.has(t.slice(1, -1).trim().toLowerCase());
 }
 
+/**
+ * A reaction arriving dressed as a message.
+ *
+ * Reacting with 👍 on the phone produces BOTH a `reaction.received` event — which carries the
+ * emoji and the message it belongs to — and a `message.sent` whose entire text is the literal
+ * string `[reaction]`. Filing the second one puts a message in the thread that reads "[reaction]",
+ * attached to nothing, signed by whoever reacted. That is what the operator saw.
+ *
+ * The reaction event is the real one and it is handled; this is its shadow, and it is dropped.
+ */
+export function isReactionPlaceholder(text: unknown): boolean {
+  if (typeof text !== 'string') return false;
+  const t = text.trim().toLowerCase();
+  return t === '[reaction]' || t === '[reacted]';
+}
+
 /** Where inbound files land — the same bucket and prefix inbox-api writes outbound ones to. */
 const INBOX_ATTACHMENT_BUCKET = 'generation-images';
 
@@ -542,6 +558,13 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // Not a duplicate risk for a message sent FROM here: the relay stores the wamid Meta returns,
   // and the echo carries that same wamid, so the dedupe below recognises it as already filed.
   const isOutgoingEcho = !!msg.direction && msg.direction !== 'incoming';
+
+  // A reaction's shadow message. The `reaction.received` event carries the real thing — the emoji
+  // and which message it belongs on — so filing this too would put "[reaction]" in the thread as
+  // a message of its own, attached to nothing.
+  if (isReactionPlaceholder(msg.text)) {
+    return { outcome: 'dropped', reason: 'reaction placeholder (handled by reaction.received)' };
+  }
 
   // Is this a live message, or history being replayed by the back-fill?
   //
@@ -991,19 +1014,49 @@ async function handleMessageDeleted(supabase: any, payload: any): Promise<void> 
  * unread count and re-notify every participant for a thumbs-up.
  */
 async function handleReaction(supabase: any, payload: any): Promise<void> {
-  const msg = payload.message || {};
-  const emoji: string | null = payload.reaction?.emoji ?? payload.emoji ?? null;
-  const row = await findInboxMessageByProviderId(supabase, msg);
-  if (!row) return;
+  const reaction = payload.reaction || {};
 
-  const reactions = Array.isArray(row.metadata?.reactions) ? row.metadata.reactions : [];
-  // WhatsApp sends an EMPTY emoji to mean "reaction removed".
-  const next = emoji ? [...reactions.filter((r: string) => r !== emoji), emoji] : [];
+  // The reacted-to message is named by `reaction.platformMessageId`, NOT by `payload.message`.
+  //
+  // A reaction payload has no `message` object at all — its required fields are id, event,
+  // reaction, conversation, account, timestamp. This read `payload.message`, got `{}`, produced no
+  // id candidates and returned null EVERY TIME. So no reaction has ever attached to anything, in
+  // silence, while the placeholder text Zernio sends alongside ("[reaction]") got filed as an
+  // ordinary message — which is what an operator sees instead of an emoji on their own reply.
+  const targetIds = [reaction.platformMessageId, reaction.messageId]
+    .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0);
+  if (!targetIds.length) {
+    console.warn('[zernio-webhook] reaction without a target message id — dropped');
+    return;
+  }
 
-  const { error } = await supabase.from('inbox_messages').update({
-    metadata: { ...(row.metadata ?? {}), reactions: next },
-  }).eq('id', row.id);
-  if (error) console.error('[zernio-webhook] reaction update FAILED', row.id, error);
+  const row = await findInboxMessageByProviderId(supabase, {
+    platformMessageId: targetIds[0],
+    id: targetIds[1],
+  });
+  if (!row) {
+    // The reacted-to message is not one we hold — an older chat, or one that predates the import.
+    console.warn(`[zernio-webhook] reaction targets an unknown message: ${targetIds.join(',')}`);
+    return;
+  }
+
+  const emoji: string = typeof reaction.emoji === 'string' ? reaction.emoji : '';
+  // `action` is authoritative. WhatsApp reports an EMPTY emoji on removal (Meta does not say which
+  // one went), so inferring the action from the emoji conflates "removed" with "sent nothing".
+  const removed = reaction.action === 'removed' || (!emoji && reaction.action !== 'added');
+
+  const existing: string[] = Array.isArray(row.metadata?.reactions) ? row.metadata.reactions : [];
+  const next = removed
+    // Meta does not say WHICH emoji was removed, so a removal clears them. One reaction per person
+    // per message is the platform rule, and this inbox shows the business's own side.
+    ? (emoji ? existing.filter((r: string) => r !== emoji) : [])
+    : [...existing.filter((r: string) => r !== emoji), emoji];
+
+  const { error } = await supabase.rpc('inbox_message_merge_metadata', {
+    p_message_id: row.id,
+    p_patch: { reactions: next },
+  });
+  if (error) console.error('[zernio-webhook] reaction update FAILED', row.id, error.message);
 }
 
 /**

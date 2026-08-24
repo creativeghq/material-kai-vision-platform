@@ -402,3 +402,44 @@ describe('message.sent is how the operator’s reply reaches us', () => {
 // `participantName`), so the hunt is gone — and a guard describing how to do it correctly
 // would only keep the idea alive. The "reads the profile off the WEBHOOK" case above fails
 // if any of it comes back.
+
+describe('a reaction belongs ON a message', () => {
+  it('finds the reacted-to message by reaction.platformMessageId', () => {
+    // A reaction payload has NO `message` object — its required fields are id, event, reaction,
+    // conversation, account, timestamp. The handler read `payload.message`, got `{}`, produced no
+    // id candidates and returned null every single time. No reaction has ever attached to
+    // anything, silently.
+    expect(hook).toMatch(/reaction\.platformMessageId/);
+    expect(
+      /const msg = payload\.message \|\| \{\};[\s\S]{0,300}?findInboxMessageByProviderId\(supabase, msg\)[\s\S]{0,200}?reactions/
+        .test(stripComments(hook)),
+      'handleReaction reads payload.message again — that object does not exist on a reaction',
+    ).toBe(false);
+  });
+
+  it('trusts reaction.action rather than inferring removal from an empty emoji', () => {
+    // WhatsApp reports an empty emoji on removal because Meta does not say which one went.
+    // Inferring from emptiness conflates "removed" with "sent nothing".
+    expect(hook).toMatch(/reaction\.action === 'removed'/);
+  });
+
+  it('drops the placeholder message a reaction arrives alongside', () => {
+    // Reacting on the phone produces BOTH reaction.received AND a message.sent whose whole text is
+    // "[reaction]". Filing the second puts a message in the thread reading "[reaction]", attached
+    // to nothing — which is exactly what the operator saw.
+    expect(hook).toMatch(/export function isReactionPlaceholder/);
+    expect(hook).toMatch(/reaction placeholder \(handled by reaction\.received\)/);
+  });
+
+  it('merges the metadata instead of read-modify-writing it', () => {
+    // The old handler read the row, spread its metadata and wrote it back. A delivery receipt
+    // landing in between is lost — rare, silent, and a valid row either way.
+    expect(hook).toMatch(/inbox_message_merge_metadata/);
+  });
+
+  it('renders the emoji on the message', () => {
+    // Stored correctly and never shown is the same outcome as not stored.
+    expect(inboxPage).toMatch(/meta\.reactions/);
+    expect(inboxPage).toMatch(/reactions\.length > 0/);
+  });
+});
