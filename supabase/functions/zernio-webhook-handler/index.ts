@@ -1537,7 +1537,20 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
 
   const { event, post, account } = payload as any;
 
+  // 200 characters truncates before `conversation` on every inbox event, which is exactly the
+  // object we needed to see — twice, while getting the profile picture wrong in both directions.
+  // The conversation block is small and is logged in full, with its keys named: an optional field
+  // that is ABSENT on WhatsApp and PRESENT on Instagram is a fact about the platform, and the only
+  // way to know which is to look rather than to reason about the schema.
   console.log(`[zernio-webhook] Event: ${event}`, JSON.stringify(payload).substring(0, 200));
+  if (typeof event === 'string' && (event.startsWith('message.') || event.startsWith('reaction.'))) {
+    const c = (payload as any).conversation;
+    console.log(
+      `[zernio-webhook] conversation keys: ${c ? Object.keys(c).join(',') : 'ABSENT'}`
+      + ` | participantPicture: ${c?.participantPicture ? 'present' : 'absent'}`
+      + ` | sender keys: ${(payload as any).message?.sender ? Object.keys((payload as any).message.sender).join(',') : 'ABSENT'}`,
+    );
+  }
 
   try {
     // ── WhatsApp messaging events (Zernio inbox) ────────────────────

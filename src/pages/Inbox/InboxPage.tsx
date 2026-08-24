@@ -987,9 +987,7 @@ const InboxPage: React.FC = () => {
                       className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
                     >
                       <div className="relative shrink-0 mt-0.5">
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className={`text-xs ${avatarTint(name)}`}>{initials(name)}</AvatarFallback>
-                        </Avatar>
+                        <ThreadAvatar thread={t} name={name} className="h-9 w-9" />
                         {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
                             and the glyph inside it needs a ground to sit on. */}
                         <span
@@ -1073,11 +1071,12 @@ const InboxPage: React.FC = () => {
                   aria-label={`Open the profile for ${threadDisplayName(activeThread)}`}
                   className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}>
-                      {initials(threadDisplayName(activeThread))}
-                    </AvatarFallback>
-                  </Avatar>
+                  <ThreadAvatar
+                    thread={activeThread}
+                    name={threadDisplayName(activeThread)}
+                    className="h-10 w-10"
+                    fallbackClassName={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}
+                  />
                 </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -1356,6 +1355,48 @@ const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) =>
  * looking at attachments on their phone instead. Download stays available, because sometimes you
  * genuinely do want the file.
  */
+/**
+ * A thread's counterparty avatar, wherever one is drawn.
+ *
+ * There are FIVE places the inbox draws this face — the conversation list, the conversation
+ * header, the message bubbles, the profile drawer and the details rail — and the first version of
+ * the stored-picture work wired exactly one of them. So the picture could be fetched, stored and
+ * signed correctly and the operator would still see "DD" in the list, which is the only place they
+ * look before opening anything.
+ *
+ * One component, so a sixth site cannot be added without it, and so "does this thread have a
+ * picture" is answered in one place rather than five.
+ */
+const ThreadAvatar: React.FC<{
+  thread?: Pick<InboxThread, 'metadata'> | null;
+  name: string;
+  className?: string;
+  fallbackClassName?: string;
+}> = ({ thread, name, className, fallbackClassName }) => {
+  const wa = ((thread?.metadata as Record<string, unknown> | undefined)?.wa_profile ?? null) as
+    Record<string, unknown> | null;
+  const bucket = typeof wa?.avatar_bucket === 'string' ? wa.avatar_bucket : null;
+  const path = typeof wa?.avatar_path === 'string' ? wa.avatar_path : null;
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bucket || !path) { setUrl(null); return; }
+    let alive = true;
+    void signInboxAttachment({ storage_bucket: bucket, storage_object_path: path })
+      .then((u) => { if (alive) setUrl(u); });
+    return () => { alive = false; };
+  }, [bucket, path]);
+
+  return (
+    <Avatar className={className}>
+      {url && <AvatarImage src={url} alt={name} className="object-cover" />}
+      <AvatarFallback className={fallbackClassName ?? `text-xs ${avatarTint(name)}`}>
+        {initials(name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+};
+
 const AttachmentLightbox: React.FC<{
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -2305,19 +2346,8 @@ const ChannelIdentityPanel: React.FC<{
   const waStr = (k: string): string | null => (typeof wa?.[k] === 'string' && wa[k] ? String(wa[k]) : null);
   const waSites = Array.isArray(wa?.websites) ? (wa.websites as unknown[]).filter((w): w is string => typeof w === 'string') : [];
 
-  // The logo is stored as an object, not a link — a provider URL expires and a contact card whose
-  // photo becomes a broken square is worse than one that never had a photo.
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  useEffect(() => {
-    const bucket = waStr('avatar_bucket');
-    const path = waStr('avatar_path');
-    if (!bucket || !path) { setAvatarUrl(null); return; }
-    let alive = true;
-    void signInboxAttachment({ storage_bucket: bucket, storage_object_path: path })
-      .then((u) => { if (alive) setAvatarUrl(u); });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thread.id, meta.wa_profile_checked_at]);
+  // The picture itself is resolved by ThreadAvatar — one signer for all five places the inbox
+  // draws this face, rather than a bespoke effect here and initials everywhere else.
 
   const [linking, setLinking] = useState(false);
   const addToCrm = async () => {
@@ -2383,12 +2413,12 @@ const ChannelIdentityPanel: React.FC<{
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="border-b border-hairline px-4 py-4 flex items-start gap-3">
-        <Avatar className="h-12 w-12 shrink-0 rounded-sm">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={waStr('name') || waName} className="object-cover" />}
-          <AvatarFallback className={`text-sm rounded-sm ${avatarTint(waName || phone)}`}>
-            {initials(waNameIsJustTheNumber ? (phone || '?') : waName)}
-          </AvatarFallback>
-        </Avatar>
+        <ThreadAvatar
+          thread={thread}
+          name={waNameIsJustTheNumber ? (phone || '?') : waName}
+          className="h-12 w-12 shrink-0 rounded-sm"
+          fallbackClassName={`text-sm rounded-sm ${avatarTint(waName || phone)}`}
+        />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-semibold truncate">
             {waStr('name') || (waNameIsJustTheNumber ? (phone || 'Unknown number') : waName)}
@@ -2617,9 +2647,12 @@ const DetailsRail: React.FC<{
         the reader is scanning for a fact, not admiring a header.
       */}
       <div className="border-b border-hairline px-4 py-4 flex items-start gap-3">
-        <Avatar className="h-12 w-12 shrink-0 rounded-sm">
-          <AvatarFallback className={`text-sm rounded-sm ${avatarTint(displayName)}`}>{initials(displayName)}</AvatarFallback>
-        </Avatar>
+        <ThreadAvatar
+          thread={thread}
+          name={displayName}
+          className="h-12 w-12 shrink-0 rounded-sm"
+          fallbackClassName={`text-sm rounded-sm ${avatarTint(displayName)}`}
+        />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-semibold truncate">{displayName}</div>
           {contact?.position && <div className="text-xs text-muted-foreground truncate">{contact.position}</div>}

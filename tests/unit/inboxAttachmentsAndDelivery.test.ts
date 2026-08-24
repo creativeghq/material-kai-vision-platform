@@ -443,3 +443,35 @@ describe('a reaction belongs ON a message', () => {
     expect(inboxPage).toMatch(/reactions\.length > 0/);
   });
 });
+
+describe('the counterparty face is drawn the same way everywhere', () => {
+  it('resolves the avatar in ONE component', () => {
+    // The inbox draws this face in five places — conversation list, conversation header, message
+    // bubbles, profile drawer, details rail — and the first version of the stored-picture work
+    // wired exactly one of them. So the picture could be fetched, stored and signed correctly and
+    // the operator would still see initials in the list, which is the only place they look before
+    // opening anything.
+    expect(inboxPage).toMatch(/const ThreadAvatar/);
+    // No second signer: a bespoke createSignedUrl effect beside it is how the five drift apart.
+    const signers = inboxPage.match(/signInboxAttachment\(\{ storage_bucket: /g) ?? [];
+    expect(
+      signers.length,
+      'more than one place signs the avatar — fold it onto ThreadAvatar',
+    ).toBeLessThanOrEqual(1);
+  });
+
+  it('uses it in the list, the header and the rail, not just the drawer', () => {
+    const uses = inboxPage.match(/<ThreadAvatar/g) ?? [];
+    expect(uses.length, 'a place that draws the counterparty is back on a bare AvatarFallback')
+      .toBeGreaterThanOrEqual(4);
+  });
+
+  it('logs what the conversation object actually contains', () => {
+    // The payload log truncated at 200 characters, which cut off before `conversation` on every
+    // inbox event — the one object needed to settle whether a WhatsApp participant picture exists.
+    // Reasoning from the schema got it wrong in both directions; the field is OPTIONAL, so only
+    // looking at a real payload answers it.
+    expect(hook).toMatch(/conversation keys:/);
+    expect(hook).toMatch(/participantPicture: \$\{c\?\.participantPicture \? 'present' : 'absent'\}/);
+  });
+});
