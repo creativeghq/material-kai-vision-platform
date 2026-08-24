@@ -342,9 +342,9 @@ alone would let a fanned-out `send_email` straight past). A muted action records
 **A tenant's own flow is never subject to this** — it is already theirs to pause via
 `toggle_simple_flow`, and two independent off switches would disagree.
 
-#### Customising one = forking it
+#### Reusing one = forking it
 
-Switching a default off is not the same as changing it. **Customise** copies the
+Switching a default off is not the same as changing it. **Reuse** copies the
 default into the workspace as an ordinary automation and disables the global for
 that workspace **in the same transaction** — leave a window where both are live
 and the owner gets every notification twice, which is the opposite of why they
@@ -359,7 +359,7 @@ opened the screen.
 `invoice_paid`, `appointment_booked`. The rest are listed and switchable but not
 editable, because `enforce_tenant_flow_allowlist` would reject the INSERT. The UI
 reads the server-derived `forkable` flag rather than keeping its own list of
-editable triggers, so the button appears exactly where the write would succeed.
+editable triggers, so the Reuse button appears exactly where the write would succeed.
 Widening that set is a per-trigger security decision, not a UI change: several are
 in `SERVER_ONLY_EVENTS` precisely because a forged payload reaches a mailbox.
 

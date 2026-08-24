@@ -85,7 +85,7 @@ describe('platform defaults — tenant surface', () => {
     const page = readCode(PAGE);
     expect(page).toContain('PlatformDefaultsSection');
     // Matches the element with or without props — it gained `onOpenFlow`/`refreshTick` when
-    // Customise landed, and a self-closing-only pattern would have failed on a working page.
+    // Reuse landed, and a self-closing-only pattern would have failed on a working page.
     expect(
       /<PlatformDefaultsSection[\s>]/.test(page),
       `${PAGE} imports PlatformDefaultsSection but never renders it`,
@@ -143,7 +143,7 @@ describe('platform defaults — tenant surface', () => {
   });
 });
 
-describe('platform defaults — customise is a fork', () => {
+describe('platform defaults — Reuse is a fork', () => {
   it('forks through the RPC and never inserts a flow from the client', () => {
     // The fork has to happen in ONE transaction: create the copy AND disable the global for this
     // workspace. A client doing it in two calls leaves a window where both are live, and the owner
@@ -157,7 +157,7 @@ describe('platform defaults — customise is a fork', () => {
     ).toBe(false);
   });
 
-  it('offers Customise only where the server says forkable', () => {
+  it('offers Reuse only where the server says forkable', () => {
     // `forkable` is derived server-side from the same vocabulary functions the fork RPC and the
     // table trigger read. Deciding it in the client instead means a second, hand-kept list of
     // "editable triggers" — and the moment it drifts the button is offered on a row where the
@@ -165,7 +165,7 @@ describe('platform defaults — customise is a fork', () => {
     const src = readCode(SECTION);
     expect(
       /row\.forkable/.test(src),
-      'the Customise button must be gated on the server-derived `forkable` flag',
+      'the Reuse button must be gated on the server-derived `forkable` flag',
     ).toBe(true);
     for (const banned of ['inbox.message_received', 'quote_approved', 'appointment_booked']) {
       expect(
@@ -180,10 +180,10 @@ describe('platform defaults — customise is a fork', () => {
     // automation, so flow-engine debits the workspace pool per run. On inbox messages that is a
     // real bill, and it must be agreed to BEFORE the fork rather than discovered on the invoice.
     const src = readCode(SECTION);
-    const fn = src.slice(src.indexOf('const customise'), src.indexOf('const filtered'));
+    const fn = src.slice(src.indexOf('const reuse'), src.indexOf('const filtered'));
     expect(
       /credits/i.test(fn),
-      'the Customise confirmation must say the copy is billed per run',
+      'the Reuse confirmation must say the copy is billed per run',
     ).toBe(true);
   });
 });

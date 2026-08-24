@@ -197,7 +197,7 @@ legal or delivery obligation (myDATA rejection, email bounce, Ergani filing), an
 to a CUSTOMER — silencing one of those hides breakage rather than noise. The engine applies mutes in
 `executeAction`, the one point both the BFS walk and the loop-node body pass through, keyed on the **event's**
 workspace (a global flow's own `workspace_id` is NULL, so scoping to the flow would silently never match).
-**Editing a default means FORKING it** — `fork_workspace_flow_default` copies it into the workspace and
+**Reusing a default means FORKING it** — `fork_workspace_flow_default` copies it into the workspace and
 disables the global there in the SAME transaction (both live = every notification twice), and
 `forked_flow_id` is `ON DELETE CASCADE` so deleting your copy restores the default instead of leaving the
 global silently off. The copy is a tenant flow and is therefore BILLED per run where the default was free —

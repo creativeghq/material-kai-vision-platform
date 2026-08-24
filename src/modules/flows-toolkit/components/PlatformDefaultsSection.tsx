@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronDown, Mail, MessageCircle, Pencil, Search, ShieldCheck, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { Bell, ChevronDown, Mail, MessageCircle, Pencil, Recycle, Search, ShieldCheck, SlidersHorizontal, Wand2 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -39,7 +39,7 @@ interface FlowDefault {
   enabled: boolean;
   muted_actions: string[];
   /** Can a workspace flow legally look like this one? Derived server-side from the SAME vocabulary
-   *  the fork RPC and the table trigger read, so Customise is offered exactly when it would work. */
+   *  the fork RPC and the table trigger read, so Reuse is offered exactly when it would work. */
   forkable: boolean;
   /** This workspace's own editable copy, once it took one. */
   forked_flow_id: string | null;
@@ -129,7 +129,7 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
   };
 
   /**
-   * Customise = FORK. The operator's row keeps serving every workspace that has not touched it;
+   * Reuse = FORK. The operator's row keeps serving every workspace that has not touched it;
    * this one takes a copy and the global is switched off here in the same transaction, so the two
    * never both fire.
    *
@@ -138,11 +138,11 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
    * run from the workspace pool. On a busy trigger — inbox messages above all — that is a real
    * bill the owner has to agree to before, not discover after.
    */
-  const customise = async (row: FlowDefault) => {
+  const reuse = async (row: FlowDefault) => {
     if (!activeWorkspaceId) return;
     if (row.forked_flow_id) { onOpenFlow(row.forked_flow_id); return; }
     const ok = window.confirm(
-      `Make "${row.title}" your own?`
+      `Reuse "${row.title}" as your own automation?`
       + '\n\nYou get an editable copy in Your automations, and this platform default switches off '
       + 'for this workspace so you are not notified twice.'
       + '\n\nYour copy is billed like any workspace automation \u2014 20 credits (\u20ac0.20) per run, '
@@ -157,7 +157,7 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
     } as never);
     setBusy(null);
     if (error) {
-      toast({ title: 'Could not customise', description: error.message, variant: 'destructive' });
+      toast({ title: 'Could not reuse', description: error.message, variant: 'destructive' });
       return;
     }
     const newId = data as unknown as string;
@@ -362,11 +362,11 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
                                   variant="ghost"
                                   className="gap-1"
                                   disabled={rowBusy}
-                                  onClick={() => void customise(row)}
-                                  title="Take an editable copy of this automation"
+                                  onClick={() => void reuse(row)}
+                                  title="Reuse this as your own editable automation"
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  Customise
+                                  <Recycle className="h-3.5 w-3.5" />
+                                  Reuse
                                 </Button>
                               )}
 
