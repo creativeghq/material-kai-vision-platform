@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, ChevronDown, Mail, MessageCircle, Search, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Bell, ChevronDown, Mail, MessageCircle, Pencil, Search, ShieldCheck, SlidersHorizontal, Wand2 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -38,6 +38,18 @@ interface FlowDefault {
   available_channels: string[];
   enabled: boolean;
   muted_actions: string[];
+  /** Can a workspace flow legally look like this one? Derived server-side from the SAME vocabulary
+   *  the fork RPC and the table trigger read, so Customise is offered exactly when it would work. */
+  forkable: boolean;
+  /** This workspace's own editable copy, once it took one. */
+  forked_flow_id: string | null;
+}
+
+interface Props {
+  /** Open the visual builder on a flow id — the page owns that view. */
+  onOpenFlow: (flowId: string) => void;
+  /** Bumped by the page when the builder closes, so a fork edited in it re-reads its state. */
+  refreshTick?: number;
 }
 
 /**
@@ -52,7 +64,7 @@ const CHANNELS: Record<string, { label: string; icon: typeof Bell }> = {
   send_whatsapp: { label: 'WhatsApp', icon: MessageCircle },
 };
 
-export function PlatformDefaultsSection() {
+export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) {
   const { activeWorkspaceId, workspaceRole } = useWorkspace();
   const { toast } = useToast();
 
@@ -84,7 +96,7 @@ export function PlatformDefaultsSection() {
     setLoading(false);
   }, [activeWorkspaceId, toast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, refreshTick]);
 
   /** One write path for both switches: the RPC takes the whole desired state, not a delta. */
   const save = async (row: FlowDefault, next: { enabled?: boolean; muted?: string[] }) => {
@@ -116,6 +128,48 @@ export function PlatformDefaultsSection() {
     void save(row, { muted });
   };
 
+  /**
+   * Customise = FORK. The operator's row keeps serving every workspace that has not touched it;
+   * this one takes a copy and the global is switched off here in the same transaction, so the two
+   * never both fire.
+   *
+   * The billing line in the confirm is not boilerplate. A platform default is an operator flow and
+   * runs FREE; the copy is an ordinary workspace automation, so flow-engine debits 20 credits per
+   * run from the workspace pool. On a busy trigger — inbox messages above all — that is a real
+   * bill the owner has to agree to before, not discover after.
+   */
+  const customise = async (row: FlowDefault) => {
+    if (!activeWorkspaceId) return;
+    if (row.forked_flow_id) { onOpenFlow(row.forked_flow_id); return; }
+    const ok = window.confirm(
+      `Make "${row.title}" your own?`
+      + '\n\nYou get an editable copy in Your automations, and this platform default switches off '
+      + 'for this workspace so you are not notified twice.'
+      + '\n\nYour copy is billed like any workspace automation \u2014 20 credits (\u20ac0.20) per run, '
+      + 'plus any per-action cost. The platform default was free.'
+      + '\n\nDeleting your copy later restores the default.',
+    );
+    if (!ok) return;
+    setBusy(row.flow_id);
+    const { data, error } = await supabase.rpc('fork_workspace_flow_default' as never, {
+      p_workspace_id: activeWorkspaceId,
+      p_flow_id: row.flow_id,
+    } as never);
+    setBusy(null);
+    if (error) {
+      toast({ title: 'Could not customise', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const newId = data as unknown as string;
+    setRows((prev) => prev.map((r) =>
+      r.flow_id === row.flow_id ? { ...r, enabled: false, muted_actions: [], forked_flow_id: newId } : r));
+    toast({
+      title: 'It is yours now',
+      description: `"${row.title}" was copied into Your automations. Edit it however you like.`,
+    });
+    onOpenFlow(newId);
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
@@ -136,7 +190,7 @@ export function PlatformDefaultsSection() {
   }, [filtered]);
 
   // How many defaults this workspace has actually changed — the reason to open the section at all.
-  const changedCount = rows.filter((r) => !r.enabled || r.muted_actions.length > 0).length;
+  const changedCount = rows.filter((r) => !r.enabled || r.muted_actions.length > 0 || r.forked_flow_id).length;
 
   const toggleCategory = (category: string) => {
     setOpenCategories((prev) => {
@@ -201,7 +255,7 @@ export function PlatformDefaultsSection() {
           {grouped.map(([category, items]) => {
             // A search is a request to see the matches, so it opens every group it matched.
             const open = openCategories.has(category) || query.trim() !== '';
-            const off = items.filter((r) => !r.enabled || r.muted_actions.length > 0).length;
+            const off = items.filter((r) => !r.enabled || r.muted_actions.length > 0 || r.forked_flow_id).length;
             return (
               <div key={category} className="border-b border-hairline last:border-b-0">
                 <button
@@ -223,61 +277,107 @@ export function PlatformDefaultsSection() {
                   <div>
                     {items.map((row) => {
                       const rowBusy = busy === row.flow_id;
+                      // A FORKED row is no longer a platform default for this workspace — it is a
+                      // pointer at their own automation. Showing it with an "off" switch would be
+                      // technically true and completely misleading: nothing was turned off, it was
+                      // replaced. So the switch and the chips go away and the row says where it went.
+                      const forked = !!row.forked_flow_id;
                       return (
                         <div
                           key={row.flow_id}
                           className="flex flex-wrap items-center gap-3 border-t border-hairline px-4 py-3 pl-9"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className={cn('truncate text-sm', !row.enabled && 'text-muted-foreground')}>
-                              {row.title}
-                            </p>
-                            {row.description && (
+                            <div className="flex items-center gap-2">
+                              <p className={cn('truncate text-sm', !row.enabled && !forked && 'text-muted-foreground')}>
+                                {row.title}
+                              </p>
+                              {forked && (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                  <Wand2 className="h-3 w-3" />
+                                  Yours
+                                </span>
+                              )}
+                            </div>
+                            {forked ? (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                You have your own copy in Your automations. The platform default is off here,
+                                so this only notifies you once.
+                              </p>
+                            ) : row.description ? (
                               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.description}</p>
-                            )}
+                            ) : null}
                           </div>
 
-                          <div className="flex items-center gap-1.5">
-                            {row.available_channels.map((channel) => {
-                              const meta = CHANNELS[channel];
-                              if (!meta) return null;
-                              const Icon = meta.icon;
-                              const muted = row.muted_actions.includes(channel);
-                              // A disabled flow delivers nothing, so its channel chips read as off
-                              // rather than claiming a channel that cannot fire.
-                              const live = row.enabled && !muted;
-                              return (
-                                <button
-                                  key={channel}
-                                  type="button"
-                                  disabled={!canEdit || rowBusy || !row.enabled}
-                                  onClick={() => toggleChannel(row, channel)}
-                                  title={
-                                    !row.enabled
-                                      ? `${meta.label} — off, because this notification is switched off`
-                                      : muted ? `Turn ${meta.label} back on` : `Stop sending ${meta.label}`
-                                  }
-                                  className={cn(
-                                    'inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs transition-colors',
-                                    'disabled:cursor-not-allowed disabled:opacity-60',
-                                    live
-                                      ? 'border-primary/30 bg-primary/10 text-primary'
-                                      : 'border-hairline bg-surface-sunken text-muted-foreground line-through',
-                                  )}
+                          {forked ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                              onClick={() => onOpenFlow(row.forked_flow_id as string)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit your copy
+                            </Button>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                {row.available_channels.map((channel) => {
+                                  const meta = CHANNELS[channel];
+                                  if (!meta) return null;
+                                  const Icon = meta.icon;
+                                  const muted = row.muted_actions.includes(channel);
+                                  // A disabled flow delivers nothing, so its channel chips read as
+                                  // off rather than claiming a channel that cannot fire.
+                                  const live = row.enabled && !muted;
+                                  return (
+                                    <button
+                                      key={channel}
+                                      type="button"
+                                      disabled={!canEdit || rowBusy || !row.enabled}
+                                      onClick={() => toggleChannel(row, channel)}
+                                      title={
+                                        !row.enabled
+                                          ? `${meta.label} — off, because this notification is switched off`
+                                          : muted ? `Turn ${meta.label} back on` : `Stop sending ${meta.label}`
+                                      }
+                                      className={cn(
+                                        'inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs transition-colors',
+                                        'disabled:cursor-not-allowed disabled:opacity-60',
+                                        live
+                                          ? 'border-primary/30 bg-primary/10 text-primary'
+                                          : 'border-hairline bg-surface-sunken text-muted-foreground line-through',
+                                      )}
+                                    >
+                                      <Icon className="h-3 w-3" />
+                                      {meta.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {canEdit && row.forkable && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="gap-1"
+                                  disabled={rowBusy}
+                                  onClick={() => void customise(row)}
+                                  title="Take an editable copy of this automation"
                                 >
-                                  <Icon className="h-3 w-3" />
-                                  {meta.label}
-                                </button>
-                              );
-                            })}
-                          </div>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Customise
+                                </Button>
+                              )}
 
-                          <Switch
-                            checked={row.enabled}
-                            disabled={!canEdit || rowBusy}
-                            onCheckedChange={(checked) => void save(row, { enabled: checked })}
-                            aria-label={`${row.title} — ${row.enabled ? 'on' : 'off'}`}
-                          />
+                              <Switch
+                                checked={row.enabled}
+                                disabled={!canEdit || rowBusy}
+                                onCheckedChange={(checked) => void save(row, { enabled: checked })}
+                                aria-label={`${row.title} — ${row.enabled ? 'on' : 'off'}`}
+                              />
+                            </>
+                          )}
                         </div>
                       );
                     })}

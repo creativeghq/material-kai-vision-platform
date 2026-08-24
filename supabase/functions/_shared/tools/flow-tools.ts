@@ -35,14 +35,17 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 const MODULE_SLUG = 'flows-toolkit';
 
-// Curated tenant-safe vocabulary — MUST stay in sync with the allowlists in
-// create_simple_flow (the RPC is the enforcer; this is for the LLM + graceful errors).
+// Curated tenant-safe vocabulary — the TypeScript mirror of `tenant_flow_allowed_triggers()` /
+// `tenant_flow_allowed_actions()`, the ONE SQL source both create_simple_flow and the
+// enforce_tenant_flow_allowlist table trigger now read. It used to be three lists, not two: the
+// table trigger was never given `payment_sent`, so a "notify me when a payment goes out" flow
+// passed zod, passed the RPC, and then died on a raw 42501 from the trigger nobody had listed.
 // Only triggers with a real workspace-scoped emitter belong here. A trigger with no emitter,
 // or one emitted without a workspace_id (an appointment booked by a non-member, say), can never
 // match a tenant flow. Add a trigger only once a trusted server-side emitter stamps workspace_id.
 const TENANT_TRIGGERS = [
-  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
-  'inbox.message_received',
+  'manual', 'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
+  'inbox.message_received', 'appointment_booked',
 ] as const;
 const TENANT_ACTIONS = [
   'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',

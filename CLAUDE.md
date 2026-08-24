@@ -197,7 +197,21 @@ legal or delivery obligation (myDATA rejection, email bounce, Ergani filing), an
 to a CUSTOMER — silencing one of those hides breakage rather than noise. The engine applies mutes in
 `executeAction`, the one point both the BFS walk and the loop-node body pass through, keyed on the **event's**
 workspace (a global flow's own `workspace_id` is NULL, so scoping to the flow would silently never match).
+**Editing a default means FORKING it** — `fork_workspace_flow_default` copies it into the workspace and
+disables the global there in the SAME transaction (both live = every notification twice), and
+`forked_flow_id` is `ON DELETE CASCADE` so deleting your copy restores the default instead of leaving the
+global silently off. The copy is a tenant flow and is therefore BILLED per run where the default was free —
+say so before the fork. Only the defaults whose trigger and actions are in the tenant vocabulary are forkable
+(4 of 86 today); the UI reads the server-derived `forkable` flag, never its own list of editable triggers.
 Guarded by [tests/unit/workspaceFlowDefaults.test.ts](tests/unit/workspaceFlowDefaults.test.ts).
+**The tenant vocabulary is ONE list and it was THREE.** `tenant_flow_allowed_triggers()` /
+`tenant_flow_allowed_actions()` are the single SQL source, read by BOTH `create_simple_flow` and the
+`enforce_tenant_flow_allowlist` table trigger; `TENANT_TRIGGERS`/`TENANT_ACTIONS` are the TypeScript mirror.
+The trigger was the copy nobody had listed — it never received `payment_sent`, so that flow passed zod,
+passed the RPC and died on a raw `42501` one layer below where the guard test can see. Never add a fourth
+list. A trigger needs a union entry AND a workspace-stamping emitter; `manual` is the exception (no emitter
+by design — `createFlowForWorkspace` stamps it on every empty automation, so dropping it breaks *New
+automation*).
 Tenant vocabulary is likewise two copies — `TENANT_TRIGGERS`/`TENANT_ACTIONS` (offered) vs
 `create_simple_flow`'s `v_allowed_*` (enforced); change both in one go. Guarded by
 [tests/unit/flowEventContract.test.ts](tests/unit/flowEventContract.test.ts).

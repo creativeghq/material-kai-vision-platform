@@ -20,7 +20,6 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@anthropic-ai/sdk@0.67",
         "npm:@dnd-kit/core@^6.3.1",
         "npm:@dnd-kit/sortable@10",
         "npm:@hookform/resolvers@^5.2.1",
@@ -81,7 +80,6 @@
         "npm:@types/istanbul-lib-coverage@^2.0.6",
         "npm:@types/istanbul-lib-report@^3.0.3",
         "npm:@types/istanbul-reports@^3.0.4",
-        "npm:@types/jest@30",
         "npm:@types/json5@^0.0.30",
         "npm:@types/node@^20.19.17",
         "npm:@types/offscreencanvas@^2019.7.3",
@@ -120,8 +118,6 @@
         "npm:html2canvas@^1.4.1",
         "npm:immer@^11.0.1",
         "npm:input-otp@^1.4.2",
-        "npm:jest-junit@16",
-        "npm:jest@^30.1.1",
         "npm:js-yaml@^4.1.0",
         "npm:jspdf@^4.2.0",
         "npm:leva@~0.10.1",
@@ -149,7 +145,6 @@
         "npm:tailwindcss-animate@^1.0.7",
         "npm:tailwindcss@^3.4.18",
         "npm:three@0.178",
-        "npm:ts-jest@^29.4.1",
         "npm:typescript@^5.9.3",
         "npm:vaul@^1.1.2",
         "npm:vite@^7.1.7",

@@ -972,7 +972,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'action', type: 'enum', enum: ['list', 'create', 'toggle', 'remove'], optional: true },
       { name: 'name', type: 'string', optional: true, description: 'Human name for the flow (create).' },
-      { name: 'trigger_type', type: 'enum', enum: ['scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent', 'inbox.message_received'], optional: true, description: 'The event that starts the flow.' },
+      { name: 'trigger_type', type: 'enum', enum: ['manual', 'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent', 'inbox.message_received', 'appointment_booked'], optional: true, description: 'The event that starts the flow.' },
       { name: 'trigger_config', type: 'object', optional: true, description: 'Trigger config. For scheduled: {cron, timezone?}. Others: {} (payload rides in trigger.data).' },
       { name: 'actions', type: 'array', optional: true, description: 'Ordered actions to run when the trigger fires (create).' },
       { name: 'flow_id', type: 'string', optional: true, description: 'Target flow (toggle/remove).' },

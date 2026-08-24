@@ -342,6 +342,45 @@ alone would let a fanned-out `send_email` straight past). A muted action records
 **A tenant's own flow is never subject to this** — it is already theirs to pause via
 `toggle_simple_flow`, and two independent off switches would disagree.
 
+#### Customising one = forking it
+
+Switching a default off is not the same as changing it. **Customise** copies the
+default into the workspace as an ordinary automation and disables the global for
+that workspace **in the same transaction** — leave a window where both are live
+and the owner gets every notification twice, which is the opposite of why they
+opened the screen.
+
+- `fork_workspace_flow_default(ws, flow)` — admin-gated, idempotent (a second click returns the copy you already have), and it pre-checks the vocabulary so the caller gets a sentence, not a raw `42501`.
+- The copy drops the `system-default` tag and gains `from-platform-default`.
+- `workspace_flow_preferences.forked_flow_id` points at it, **`ON DELETE CASCADE`**: deleting your copy drops the whole preference row, which restores the platform default. Without the cascade you would delete your copy and be left with the global silently off forever.
+- **The copy is BILLED.** A platform default is an operator flow and runs free; a workspace flow costs 20 credits/run from the workspace pool plus per-action cost. On `inbox.message_received` that is a real bill, so the confirmation says so before the fork, not after.
+
+**Only 4 of the 86 are forkable today** — `inbox.message_received`, `quote_approved`,
+`invoice_paid`, `appointment_booked`. The rest are listed and switchable but not
+editable, because `enforce_tenant_flow_allowlist` would reject the INSERT. The UI
+reads the server-derived `forkable` flag rather than keeping its own list of
+editable triggers, so the button appears exactly where the write would succeed.
+Widening that set is a per-trigger security decision, not a UI change: several are
+in `SERVER_ONLY_EVENTS` precisely because a forged payload reaches a mailbox.
+
+#### The tenant vocabulary is ONE list (it was three)
+
+`TENANT_TRIGGERS`/`TENANT_ACTIONS` (offered to the LLM), `create_simple_flow`'s
+`v_allowed_*` (the agent create path) and **`enforce_tenant_flow_allowlist`** (a
+`BEFORE INSERT OR UPDATE` trigger on `flows` — the real floor, crossed by every
+write path). The docs and the guard test both described **two**. `payment_sent`
+was added to the first two when this drift was last "fixed"; the trigger never got
+it, so *notify me when a payment goes out* passed zod, passed the RPC, and died on
+a raw `42501` one layer below where anyone had looked.
+
+Both SQL halves now read `tenant_flow_allowed_triggers()` /
+`tenant_flow_allowed_actions()`. One list in the database, one mirror in
+TypeScript, pinned by `flowEventContract.test.ts`. **Do not add a fourth.**
+
+Membership rules, both learned the hard way:
+- a trigger needs a TriggerType-union entry **and** a workspace-stamping emitter, or a flow bound to it can never fire and nothing reports that. `product_added` had neither and was dropped;
+- `manual` has no emitter **by design** — it is what `createFlowForWorkspace` stamps on every empty automation the builder creates. Remove it from the floor and the *New automation* button starts raising `42501`.
+
 Guarded by [tests/unit/workspaceFlowDefaults.test.ts](../tests/unit/workspaceFlowDefaults.test.ts).
 Not repo-checkable: the RPC bodies live in `pg_proc`, so the admin gate and the
 `tenant_configurable` filter are enforced by the functions and probed by hand.

@@ -145,20 +145,24 @@ describe('flow event contract', () => {
 });
 
 /**
- * The tenant flow vocabulary is TWO copies, and only one of them enforces.
+ * The tenant flow vocabulary was THREE copies, and the one nobody had listed was the enforcer.
  *
  * `TENANT_TRIGGERS` / `TENANT_ACTIONS` in flow-tools.ts become the zod enum handed to the LLM —
- * what a user is OFFERED. `create_simple_flow`'s `v_allowed_triggers` / `v_allowed_actions` are
- * what is ALLOWED. The tool's own comment says they "MUST stay in sync"; nothing checked, and
- * they drifted: the enum carried `payment_sent`, the RPC did not, so every "notify me when a
- * payment goes out" flow passed zod, reached the RPC and raised
- * `42501 trigger_type "payment_sent" is not allowed for tenant flows`. Offered, accepted,
- * impossible — and the only way to find out was to click it.
+ * what a user is OFFERED. `create_simple_flow`'s `v_allowed_*` gate the agent's create path. But
+ * the REAL floor is `enforce_tenant_flow_allowlist`, a BEFORE INSERT OR UPDATE trigger on `flows`
+ * that every write path crosses, and it had its own third array.
  *
- * The RPC lives in the database, so no unit test can read it. What this CAN do is refuse to let
- * the TypeScript half change quietly: the pin below fails the build on any edit, and the message
- * says to apply the matching migration in the same change. A silent drift becomes a deliberate
- * one, which is the whole difference.
+ * That is not hypothetical, and this comment used to describe it in the past tense while it was
+ * still live. `payment_sent` was added to the first two when the drift was "fixed"; the table
+ * trigger never got it, so "notify me when a payment goes out" still passed zod, still passed the
+ * RPC, and still died on a raw `42501` one layer further down. Offered, accepted, impossible —
+ * exactly as before, one level below where anyone had looked.
+ *
+ * Fixed structurally 2026-08-24: both SQL halves now read `tenant_flow_allowed_triggers()` /
+ * `tenant_flow_allowed_actions()`, so there is ONE list in the database and one mirror in
+ * TypeScript. The pin below is that mirror. A unit test cannot read pg_proc, so it cannot verify
+ * the database side — what it CAN do is refuse to let the TypeScript half move quietly, turning a
+ * silent drift into a deliberate one.
  */
 describe('tenant flow vocabulary', () => {
   const TOOL_FILE = 'supabase/functions/_shared/tools/flow-tools.ts';
@@ -171,10 +175,10 @@ describe('tenant flow vocabulary', () => {
     return [...body.matchAll(/'([a-zA-Z0-9_.]+)'/g)].map((m) => m[1]);
   };
 
-  // Must equal create_simple_flow's v_allowed_triggers / v_allowed_actions, verbatim.
+  // Must equal tenant_flow_allowed_triggers() / tenant_flow_allowed_actions(), verbatim.
   const RPC_TRIGGERS = [
-    'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
-    'inbox.message_received',
+    'manual', 'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
+    'inbox.message_received', 'appointment_booked',
   ];
   const RPC_ACTIONS = [
     'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
@@ -182,8 +186,9 @@ describe('tenant flow vocabulary', () => {
 
   const SYNC_HINT =
     'Changing the tenant vocabulary means changing BOTH halves in the same change: this constant ' +
-    '(what the LLM is offered) and create_simple_flow (what the RPC allows), applied via ' +
-    'mcp__supabase__apply_migration. Update the pinned list here once the migration is applied.';
+    '(the TypeScript mirror) and tenant_flow_allowed_triggers() / tenant_flow_allowed_actions() ' +
+    '(the ONE database list, read by create_simple_flow AND the enforce_tenant_flow_allowlist ' +
+    'table trigger), applied via mcp__supabase__apply_migration. Do NOT add a fourth list.';
 
   it('the offered triggers are exactly the ones create_simple_flow allows', () => {
     expect([...readConst('TENANT_TRIGGERS')].sort(), SYNC_HINT).toEqual([...RPC_TRIGGERS].sort());
@@ -206,8 +211,11 @@ describe('tenant flow vocabulary', () => {
    * — it saves, it activates, it shows up in the list, and it never once fires.
    */
   it('every tenant trigger has an emitter (or is an entry point)', () => {
-    // 'scheduled' is cron-driven — flow-engine wakes it, no emit call exists or should.
-    const ENTRY_POINTS = new Set(['scheduled']);
+    // Entry points are STARTED, not emitted, so no emitter exists or should. 'scheduled' is
+    // cron-driven (flow-engine wakes it); 'manual' is what createFlowForWorkspace stamps on every
+    // empty automation the tenant builder creates, which is why the table guard must keep allowing
+    // it — drop it and the New automation button starts raising 42501.
+    const ENTRY_POINTS = new Set(['scheduled', 'manual']);
     // collectEmits() only sees STRING-LITERAL event names, by deliberate design (see its comment).
     // 'quote_approved' is emitted through a ternary — `const eventName = accepted ? 'quote_approved'
     // : 'quote_rejected'; flowEventService.emit(eventName, { …, workspace_id })` in
