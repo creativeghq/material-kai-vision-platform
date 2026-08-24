@@ -152,6 +152,96 @@ export async function zernioApi(
 }
 
 /**
+ * One inbound attachment, fetched from the endpoint that actually serves it.
+ *
+ * `GET /inbox/conversations/{conversationId}/messages/{messageId}/attachments/{index}` — Zernio
+ * addresses attachments SEPARATELY from the message. That is why nothing arrived by reading the
+ * webhook payload: measured 2026-08-24, 36 inbound messages and zero stored attachments, five of
+ * them carrying the placeholder `[Unsupported message]` where the customer's file should be.
+ *
+ * The response contract is not documented, and both plausible shapes are real APIs, so both are
+ * handled rather than assumed:
+ *   • the bytes themselves, with a content-type; or
+ *   • JSON carrying a (usually short-lived) URL to follow.
+ *
+ * Returns BYTES in either case. A URL is followed here rather than stored, because a link that
+ * expires is not an attachment — storage convention #7: persist the object, never the URL.
+ */
+export async function fetchZernioAttachment(params: {
+  conversationId: string;
+  messageId: string;
+  index: number;
+}): Promise<{ bytes: Uint8Array; contentType: string; fileName?: string } | null> {
+  const path = `/inbox/conversations/${encodeURIComponent(params.conversationId)}`
+    + `/messages/${encodeURIComponent(params.messageId)}`
+    + `/attachments/${params.index}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${ZERNIO_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${zernioKey()}` },
+    });
+  } catch (err) {
+    console.warn(`[zernio] attachment fetch failed (network): ${path}`, err);
+    return null;
+  }
+
+  // 404 is the normal way to learn there is no attachment at this index — the caller walks
+  // upwards until it gets one, because the message does not reliably say how many there are.
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    console.warn(`[zernio] attachment fetch failed: ${res.status} ${path} — ${await res.text().catch(() => '')}`);
+    return null;
+  }
+
+  const ct = res.headers.get('content-type') ?? '';
+
+  // Shape B: JSON pointing at the file. Follow it now; the link is the vendor's, and short-lived.
+  if (ct.includes('application/json')) {
+    let doc: Record<string, unknown>;
+    try {
+      doc = JSON.parse(await res.text()) as Record<string, unknown>;
+    } catch {
+      console.warn(`[zernio] attachment JSON did not parse: ${path}`);
+      return null;
+    }
+    const inner = (doc.data ?? doc.attachment ?? doc) as Record<string, unknown>;
+    const url = [inner.url, inner.downloadUrl, inner.signedUrl, inner.fileUrl, inner.mediaUrl]
+      .find((v): v is string => typeof v === 'string' && v.length > 0);
+    if (!url) {
+      console.warn(`[zernio] attachment JSON carried no url: ${path} keys=${Object.keys(inner).join(',')}`);
+      return null;
+    }
+    // NOT through the SSRF guard on purpose: this URL is not user-influenced — it comes from an
+    // authenticated response from a fixed vendor host, on a path we constructed. Invariant 7 is
+    // about fetching URLs a user can steer.
+    const bin = await fetch(url).catch((err) => {
+      console.warn('[zernio] attachment url fetch failed:', err);
+      return null;
+    });
+    if (!bin || !bin.ok) return null;
+    return {
+      bytes: new Uint8Array(await bin.arrayBuffer()),
+      contentType: bin.headers.get('content-type')
+        || (typeof inner.contentType === 'string' ? inner.contentType : '')
+        || 'application/octet-stream',
+      fileName: typeof inner.fileName === 'string' ? inner.fileName
+        : (typeof inner.name === 'string' ? inner.name : undefined),
+    };
+  }
+
+  // Shape A: the bytes, directly.
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1];
+  return {
+    bytes: new Uint8Array(await res.arrayBuffer()),
+    contentType: ct || 'application/octet-stream',
+    fileName: named ? decodeURIComponent(named) : undefined,
+  };
+}
+
+/**
  * Fetch ONE connected account by its Zernio id.
  *
  * There is no `GET /v1/accounts/{accountId}` — the spec exposes only PUT / PATCH / DELETE on

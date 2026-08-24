@@ -28,6 +28,7 @@ const ROOT = join(__dirname, '..', '..');
 const hook = readFileSync(join(ROOT, 'supabase', 'functions', 'zernio-webhook-handler', 'index.ts'), 'utf8');
 const messagingApi = readFileSync(join(ROOT, 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
 const inboxPage = readFileSync(join(ROOT, 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
+const zernioClient = readFileSync(join(ROOT, 'supabase', 'functions', '_shared', 'zernio.ts'), 'utf8');
 
 describe('inbound attachments are not guessed at by field name', () => {
   it('normalises through one function rather than reading a single key', () => {
@@ -126,5 +127,57 @@ describe('a message the customer never received says so', () => {
     expect(inboxPage).toMatch(/<img/);
     expect(inboxPage).toMatch(/<video/);
     expect(inboxPage).toMatch(/<audio/);
+  });
+});
+
+describe('the file is fetched, not waited for', () => {
+  it('calls the endpoint that actually serves an attachment', () => {
+    // Zernio addresses attachments at
+    // /inbox/conversations/{id}/messages/{messageId}/attachments/{index}, separately from the
+    // message. Reading the webhook payload alone was never going to produce a file, which is why
+    // 36 inbound messages yielded zero. "WhatsApp does not give us attachments" was never true —
+    // we had not asked.
+    expect(zernioClient).toMatch(/export async function fetchZernioAttachment/);
+    expect(zernioClient).toMatch(/\/attachments\//);
+    expect(hook).toMatch(/fetchAndStoreInboundAttachments/);
+  });
+
+  it('stores the BYTES, never the vendor url', () => {
+    // Storage convention #7: a link that expires is not an attachment. Both response shapes end
+    // as bytes — the JSON one is followed here rather than persisted.
+    expect(zernioClient).toMatch(/bytes: Uint8Array/);
+    expect(hook).toMatch(/storage_object_path: path/);
+    expect(hook).toMatch(/\.upload\(path, got\.bytes/);
+  });
+
+  it('repairs a message whose file was never retrieved, instead of skipping it', () => {
+    // The dedupe guard would otherwise refuse every attempt to go back for the five
+    // `[Unsupported message]` rows already in the inbox — they would stay unreadable forever.
+    expect(hook).toMatch(/attachment_unresolved === true/);
+    expect(hook).toMatch(/attachment_recovered: true/);
+  });
+
+  it('only reaches for a file when the message looks like it has one', () => {
+    // One wasted round trip per plain text message would be a real cost on a busy number.
+    expect(hook).toMatch(/looksLikeMedia/);
+  });
+});
+
+describe('one person, one contact, one thread', () => {
+  it('resolves contact and thread atomically rather than check-then-insert', () => {
+    // 2026-08-24: two messages ~90ms apart produced two CRM contacts (69ms apart) and two threads
+    // (1.06s apart) for one person, because every resolve was a SELECT followed by an INSERT with
+    // a gap. Both webhooks returned 200 and both threads looked normal.
+    expect(hook).toMatch(/whatsapp_resolve_contact_and_thread/);
+    expect(
+      /matchOrCreateContact/.test(stripComments(hook)),
+      'the old select-then-insert contact resolver is back — the duplicate race with it',
+    ).toBe(false);
+  });
+
+  it('leaves the agent decision to the caller, which knows if this is an import', () => {
+    // The resolver always creates a thread with the assistant OFF. That is the safe direction if
+    // the arming block below it ever stops running.
+    expect(hook).toMatch(/r\.thread_created && await shouldAutoEngageAgent/);
   });
 });

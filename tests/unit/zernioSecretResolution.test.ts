@@ -375,7 +375,13 @@ describe('service stability', () => {
     // Zernio does not resend after a 200, so anything carrying customer CONTENT must 5xx on a
     // transient fault. Status/lifecycle syncs must NOT — they reconverge on the next event or
     // sync, and retrying them just loops.
-    const block = handler.code.slice(handler.code.indexOf('catch (err)'));
+    // Anchored on the RETRY DECISION itself, not on "the first catch (err) in the file".
+    // That anchor silently slid the moment an unrelated try/catch was added earlier in the
+    // source — which happened when inbound attachment fetching landed — and a guard that
+    // relocates itself is a guard reading whatever it happens to land on.
+    const decision = handler.code.indexOf('Transient failure handling');
+    expect(decision, 'the transient-failure 5xx branch is gone from the webhook dispatcher').toBeGreaterThan(-1);
+    const block = handler.code.slice(handler.code.lastIndexOf('catch (err)', decision), decision + 200);
     expect(block).toMatch(/message\.received/);
     expect(block).toMatch(/message\.edited/);
     expect(block).toMatch(/message\.deleted/);

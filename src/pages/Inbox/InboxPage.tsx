@@ -1488,14 +1488,14 @@ const MessageBubble: React.FC<{
         <div className={`rounded-2xl px-3.5 py-2 text-left ${bubbleClass}`}>
           {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
           {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> KAI assistant</div>}
-          {/* `[Unsupported message]` is the CHANNEL's placeholder for media it did not hand over,
-              not something the customer typed. Shown raw it reads as a fault in their phone;
-              what it actually means is that they sent a file and we could not fetch it. Say the
-              second thing — an operator who knows a file is missing can ask for it again. */}
+          {/* `[Unsupported message]` is the CHANNEL's placeholder for media, not something the
+              customer typed — shown raw it reads as a fault in their phone. We now fetch the file
+              from Zernio's attachment endpoint, so this only survives when that fetch has not
+              succeeded yet, and it says exactly that rather than telling anyone to give up. */}
           {m.body && (mediaPlaceholder ? (
             <div className="flex items-start gap-1.5 text-sm text-muted-foreground italic">
               <Paperclip className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>They sent a file that WhatsApp did not pass on. Ask them to resend it, or open the chat on your phone.</span>
+              <span>They sent a file. It has not been retrieved yet — re-run the import for this conversation to fetch it.</span>
             </div>
           ) : (
             <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>

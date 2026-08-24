@@ -28,7 +28,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { ensureZernioSecrets, zernioWebhookSecret } from '../_shared/zernio.ts';
+import { ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
@@ -165,52 +165,9 @@ async function resolveWorkspaceOwner(supabase: any, workspaceId: string): Promis
   return data?.user_id ?? null;
 }
 
-/** Match an existing CRM contact by phone within a workspace, or create one. */
-async function matchOrCreateContact(
-  supabase: any,
-  workspaceId: string,
-  phone: string,
-  name: string | null,
-  createdBy: string | null,
-): Promise<string | null> {
-  // `phone` originates from the webhook payload (sender.phoneNumber). Strip everything that isn't a
-  // digit or '+' before building the PostgREST .or() filter — a crafted value containing `,`/`)`/
-  // `and(...)` would otherwise alter the query grammar (filter injection). A valid E.164 phone is
-  // only `+` and digits, so this is loss-free for legitimate input.
-  const safePhone = phone.replace(/[^\d+]/g, '');
-  const { data: existing } = await supabase
-    .from('crm_contacts').select('id')
-    .eq('workspace_id', workspaceId).or(`phone.eq.${safePhone},mobile.eq.${safePhone}`).limit(1).maybeSingle();
-  if (existing?.id) return existing.id;
-  // A contact's ADDITIONAL named numbers (crm_phones) count too — someone replying from the
-  // number saved as "Warehouse" is the same contact, not a new lead. Matched on the generated
-  // `phone_normalized` column so "+30 210 123 4567" resolves against an E.164 payload.
-  const { data: byExtraPhone } = await supabase
-    .from('crm_phones').select('contact_id')
-    .eq('workspace_id', workspaceId).eq('phone_normalized', safePhone)
-    .not('contact_id', 'is', null).limit(1).maybeSingle();
-  if (byExtraPhone?.contact_id) return byExtraPhone.contact_id;
-  // crm_contacts.created_by is NOT NULL — fall back to the workspace owner.
-  const owner = createdBy || (await resolveWorkspaceOwner(supabase, workspaceId));
-  if (!owner) return null;
-  const { data: created } = await supabase.from('crm_contacts').insert({
-    workspace_id: workspaceId, name: name || phone, phone, created_by: owner, lead_source: 'whatsapp',
-  }).select('id').single();
-  // A WhatsApp reply from an unknown number is a genuine new lead written directly to crm_contacts
-  // (bypassing crm-api), so fire crm_contact_created here or the "new lead → notify/assign" flow never
-  // runs for it. Notify workspace owners/admins. Best-effort.
-  if (created?.id) {
-    try {
-      await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
-        type: 'crm_contact_created', workspace_id: workspaceId, user_id: uid,
-        contact_id: created.id, contact_name: name || phone, lead_source: 'whatsapp',
-        title: 'New WhatsApp lead', body: `${name || phone} messaged you on WhatsApp.`,
-        action_url: `/crm/contacts/${created.id}`,
-      }));
-    } catch { /* best-effort */ }
-  }
-  return created?.id ?? null;
-}
+// `matchOrCreateContact` lived here. It was a SELECT-then-INSERT with no lock, and it is
+// gone rather than merely unused: `whatsapp_resolve_contact_and_thread` does the same job
+// atomically, and a second contact resolver sitting in this file is how the race comes back.
 
 /**
  * Inbound WhatsApp reply (message.received) → the unified inbox.
@@ -326,6 +283,87 @@ export function isMediaPlaceholder(text: unknown): boolean {
   return MEDIA_PLACEHOLDERS.has(t.slice(1, -1).trim().toLowerCase());
 }
 
+/** Where inbound files land — the same bucket and prefix inbox-api writes outbound ones to. */
+const INBOX_ATTACHMENT_BUCKET = 'generation-images';
+
+/**
+ * Pull the customer's files off Zernio and into OUR storage.
+ *
+ * Reading the webhook payload was never going to work: Zernio serves attachments from
+ * `/inbox/conversations/{id}/messages/{messageId}/attachments/{index}`, addressed separately from
+ * the message. So the file has to be FETCHED, and it has to be fetched now — the vendor's links
+ * are short-lived and the customer will not resend a spec sheet because our importer was late.
+ *
+ * The bytes are stored, never the URL (storage convention #7), and the row records
+ * bucket + object path so the frontend mints a signed URL per read.
+ *
+ * Walks upward from index 0 until the endpoint says there is nothing there, because a message
+ * does not reliably declare how many attachments it has. Capped, so a malformed count cannot turn
+ * one webhook into an unbounded fetch loop.
+ */
+async function fetchAndStoreInboundAttachments(
+  supabase: any,
+  params: { threadId: string; conversationId: string; messageId: string; max?: number },
+): Promise<Array<Record<string, unknown>>> {
+  const out: Array<Record<string, unknown>> = [];
+  if (!params.conversationId || !params.messageId) return out;
+
+  const max = params.max ?? 10;
+  for (let i = 0; i < max; i++) {
+    let got: Awaited<ReturnType<typeof fetchZernioAttachment>>;
+    try {
+      got = await fetchZernioAttachment({
+        conversationId: params.conversationId,
+        messageId: params.messageId,
+        index: i,
+      });
+    } catch (err) {
+      console.warn('[zernio-webhook] attachment fetch threw:', err);
+      break;
+    }
+    if (!got) break;                      // no attachment at this index — we have them all
+    if (!got.bytes.byteLength) continue;  // an empty body is not a file; keep looking
+
+    const ext = extensionFor(got.contentType, got.fileName);
+    const safeName = (got.fileName || `attachment-${i + 1}${ext}`).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `inbox/${params.threadId}/${crypto.randomUUID()}-${safeName}`;
+
+    const { error } = await supabase.storage
+      .from(INBOX_ATTACHMENT_BUCKET)
+      .upload(path, got.bytes, { contentType: got.contentType, upsert: false });
+    if (error) {
+      // Loud, and not fatal: the message body must still be filed. A dropped file the operator
+      // knows about beats a message that never arrives.
+      console.error(`[zernio-webhook] attachment upload failed for ${params.messageId}#${i}:`, error.message);
+      continue;
+    }
+
+    out.push({
+      storage_bucket: INBOX_ATTACHMENT_BUCKET,
+      storage_object_path: path,
+      name: got.fileName || safeName,
+      content_type: got.contentType,
+      size: got.bytes.byteLength,
+    });
+  }
+  return out;
+}
+
+/** A file extension for a name that has none, so the browser and our renderer both know what it is. */
+function extensionFor(contentType: string, fileName?: string): string {
+  if (fileName && /\.[a-z0-9]{2,5}$/i.test(fileName)) return '';
+  const ct = contentType.split(';')[0].trim().toLowerCase();
+  const map: Record<string, string> = {
+    'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
+    'image/webp': '.webp', 'video/mp4': '.mp4', 'video/quicktime': '.mov', 'audio/ogg': '.ogg',
+    'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'text/vcard': '.vcf',
+    'application/msword': '.doc', 'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  };
+  return map[ct] ?? '';
+}
+
 export function parseSentAt(raw: unknown): string | null {
   if (typeof raw !== 'string' && typeof raw !== 'number') return null;
   const d = new Date(raw);
@@ -378,8 +416,31 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // import ran, which is why it found 8 conversations and not the whole address book). Without
   // this, catching up on what has since arrived also files a second copy of everything that
   // already had. Cheap: one indexed lookup against inbox_messages_wamid_unique.
-  if (await findInboxMessageByProviderId(supabase, msg)) {
-    return { outcome: 'dropped', reason: 'already imported' };
+  const alreadyFiled = await findInboxMessageByProviderId(supabase, msg);
+  if (alreadyFiled) {
+    // ...with ONE exception: a message we filed but whose file we never retrieved. Skipping it
+    // outright would mean the five `[Unsupported message]` rows already in the inbox stay
+    // unreadable forever, because the dedupe guard would refuse every attempt to go back for
+    // them. A re-import REPAIRS those; it still does not duplicate anything.
+    const filedMeta = (alreadyFiled.metadata ?? {}) as Record<string, unknown>;
+    const missingItsFile = filedMeta.attachment_unresolved === true;
+    if (!missingItsFile) return { outcome: 'dropped', reason: 'already imported' };
+
+    const { data: row } = await supabase
+      .from('inbox_messages').select('thread_id').eq('id', alreadyFiled.id).maybeSingle();
+    const repaired = await fetchAndStoreInboundAttachments(supabase, {
+      threadId: String((row as { thread_id?: string } | null)?.thread_id ?? ''),
+      conversationId: String(msg.conversationId ?? ''),
+      messageId: String(msg.id ?? msg.platformMessageId ?? ''),
+    });
+    if (!repaired.length) {
+      return { outcome: 'dropped', reason: 'already imported (its file is still unavailable)' };
+    }
+    const { attachment_unresolved: _cleared, provider_keys: _keys, ...keep } = filedMeta;
+    await supabase.from('inbox_messages')
+      .update({ attachments: repaired, metadata: { ...keep, attachment_recovered: true } })
+      .eq('id', alreadyFiled.id);
+    return { outcome: 'filed', reason: `recovered ${repaired.length} attachment(s)` };
   }
 
   // STOP / START keyword compliance (independent of thread resolution).
@@ -404,18 +465,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
 
   const owner = (await resolveCampaignOwner(supabase, phone)) || (await resolveWorkspaceOwner(supabase, workspaceId));
   const contactName = msg.sender?.name ?? null;
-  const contactId = await matchOrCreateContact(supabase, workspaceId, phone, contactName, owner);
-
-  // Find the existing whatsapp thread for this contact in this workspace.
-  let threadId: string | null = null;
-  if (contactId) {
-    const { data: cp } = await supabase
-      .from('inbox_participants').select('thread_id, inbox_threads!inner(channel, workspace_id)')
-      .eq('contact_id', contactId).eq('status', 'active')
-      .eq('inbox_threads.channel', 'whatsapp').eq('inbox_threads.workspace_id', workspaceId)
-      .limit(1).maybeSingle();
-    threadId = (cp as { thread_id?: string } | null)?.thread_id ?? null;
-  }
 
   const meta = {
     zernio_account_id: accountId,
@@ -424,86 +473,73 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     contact_phone: phone,
   };
 
-  let customerParticipantId: string | null = null;
+  // Contact, thread and participants resolved in ONE transaction, under an advisory lock on this
+  // workspace+number.
+  //
+  // This was four separate round trips — find contact, create contact, find thread, create thread
+  // — and every one of them was a check followed by an insert with a gap in between. On
+  // 2026-08-24 two messages from the same person landed ~90ms apart and each webhook walked the
+  // gap: two CRM contacts 69ms apart, then two threads 1.06s apart, because the thread lookup is
+  // keyed on contact_id and each webhook only knew about the contact it had just made itself. One
+  // person, two inboxes, and the operator's reply goes to whichever they happen to open. Nothing
+  // errored — both webhooks returned 200 and both threads looked perfectly normal.
+  const { data: resolved, error: resolveErr } = await supabase.rpc('whatsapp_resolve_contact_and_thread', {
+    p_workspace_id: workspaceId,
+    p_phone: phone,
+    p_name: contactName,
+    p_owner: owner,
+    p_metadata: meta,
+    p_at: msg.sentAt || new Date().toISOString(),
+  });
+  if (resolveErr) {
+    // Transient DB fault — throw so the webhook returns 5xx and Zernio retries, rather than
+    // permanently dropping the customer's message.
+    throw new Error(`whatsapp_resolve_contact_and_thread failed: ${resolveErr.message}`);
+  }
+  const r = (resolved ?? {}) as {
+    contact_id?: string; thread_id?: string; customer_participant_id?: string;
+    contact_created?: boolean; thread_created?: boolean;
+  };
+  const contactId = r.contact_id ?? null;
+  const threadId = r.thread_id ?? null;
+  const customerParticipantId = r.customer_participant_id ?? null;
+  if (!threadId) throw new Error('whatsapp_resolve_contact_and_thread returned no thread');
 
-  if (!threadId) {
-    // Hand the thread to the AI only if a PERSON asked for that — `settings.inbox_agent
-    // .auto_respond` explicitly on, and never on replayed history. See _shared/inbox-autopilot.ts;
-    // this used to read `auto_respond !== false`, so a workspace that had never heard of the
-    // setting got an assistant answering its customers. The internal_agent_reply call below only
-    // acts when agent_state='active', so this line is what does or does not start it.
-    const autoRespond = await shouldAutoEngageAgent(supabase, workspaceId, { historical });
+  // Whether the assistant engages is decided HERE, not in the resolver: only this side knows
+  // whether the message is live or a replayed import. The resolver always creates the thread with
+  // the agent off, which is the safe direction if this block ever stops running.
+  if (r.thread_created && await shouldAutoEngageAgent(supabase, workspaceId, { historical })) {
+    await supabase.from('inbox_threads')
+      .update({ agent_state: 'active', agent_id: 'kai' }).eq('id', threadId);
+    await supabase.from('inbox_participants').insert({
+      thread_id: threadId, participant_type: 'agent', agent_id: 'kai', thread_role: 'agent',
+    });
+    await supabase.from('inbox_messages').insert({
+      thread_id: threadId, message_type: 'system',
+      body: 'The AI assistant is responding to new messages on this conversation.',
+    });
+  }
 
-    // New thread + customer participant + owner member participant (assign-on-reply).
-    const { data: thread, error: threadErr } = await supabase.from('inbox_threads').insert({
-      workspace_id: workspaceId, thread_type: 'customer', channel: 'whatsapp',
-      subject: contactName || phone, status: 'open', metadata: meta,
-      agent_state: autoRespond ? 'active' : 'off', agent_id: autoRespond ? 'kai' : null,
-      last_message_at: msg.sentAt || new Date().toISOString(),
-    }).select('id').single();
-    if (threadErr) {
-      // Transient DB fault — throw so the webhook returns 5xx and Zernio retries
-      // (rather than permanently dropping the inbound reply).
-      throw new Error(`inbox_threads insert failed: ${threadErr.message}`);
-    }
-    threadId = thread?.id ?? null;
-    if (!threadId) throw new Error('inbox_threads insert returned no id');
+  // A WhatsApp reply from an unknown number is a genuine new lead written straight to
+  // crm_contacts, so the "new lead → notify/assign" flow has to be fired by hand here or it never
+  // runs for one. Only on a real creation, and never on an import.
+  if (r.contact_created && contactId && !historical) {
+    await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
+      type: 'crm_contact_created', workspace_id: workspaceId, user_id: uid,
+      contact_id: contactId, contact_name: contactName || phone, lead_source: 'whatsapp',
+      title: 'New WhatsApp lead', body: `${contactName || phone} messaged you on WhatsApp.`,
+      action_url: `/crm/contacts/${contactId}`,
+    })).catch(() => {});
+  }
 
-    if (autoRespond) {
-      await supabase.from('inbox_participants').insert({
-        thread_id: threadId, participant_type: 'agent', agent_id: 'kai', thread_role: 'agent',
-      });
-      await supabase.from('inbox_messages').insert({
-        thread_id: threadId, message_type: 'system',
-        body: 'The AI assistant is responding to new messages on this conversation.',
-      });
-    }
-
-    const { data: cust, error: custErr } = await supabase.from('inbox_participants').insert({
-      thread_id: threadId, participant_type: 'customer', contact_id: contactId, thread_role: 'participant',
-    }).select('id').single();
-    if (custErr) {
-      throw new Error(`inbox_participants (customer) insert failed: ${custErr.message}`);
-    }
-    customerParticipantId = cust?.id ?? null;
-
-    if (owner) {
-      const { error: ownerErr } = await supabase.from('inbox_participants').insert({
-        thread_id: threadId, participant_type: 'member', user_id: owner,
-        workspace_id: workspaceId, thread_role: 'owner', added_by: owner,
-      });
-      if (ownerErr) {
-        throw new Error(`inbox_participants (owner) insert failed: ${ownerErr.message}`);
-      }
-      // Not on an import: back-filling 8 conversations would post 8 "you were assigned" cards for
-      // chats the operator has been reading on their phone for months.
-      if (!historical) {
-        await emitFlowEvent('inbox.thread_assigned', {
-          user_id: owner, type: 'inbox_assigned',
-          title: 'You were assigned a WhatsApp conversation',
-          body: contactName || phone, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
-        }).catch(() => {});
-      }
-    }
-  } else {
-    // Existing thread: refresh channel binding + assign an owner if none yet.
-    await supabase.from('inbox_threads').update({
-      metadata: meta, status: 'open', last_message_at: msg.sentAt || new Date().toISOString(),
-    }).eq('id', threadId);
-
-    const { data: cp } = await supabase
-      .from('inbox_participants').select('id').eq('thread_id', threadId).eq('contact_id', contactId).maybeSingle();
-    customerParticipantId = (cp as { id?: string } | null)?.id ?? null;
-
-    const { data: ownerP } = await supabase
-      .from('inbox_participants').select('id').eq('thread_id', threadId)
-      .eq('participant_type', 'member').eq('status', 'active').limit(1).maybeSingle();
-    if (!ownerP && owner) {
-      await supabase.from('inbox_participants').insert({
-        thread_id: threadId, participant_type: 'member', user_id: owner,
-        workspace_id: workspaceId, thread_role: 'owner', added_by: owner,
-      });
-    }
+  // Not on an import: back-filling 8 conversations would post 8 "you were assigned" cards for
+  // chats the operator has been reading on their phone for months.
+  if (r.thread_created && owner && !historical) {
+    await emitFlowEvent('inbox.thread_assigned', {
+      user_id: owner, type: 'inbox_assigned',
+      title: 'You were assigned a WhatsApp conversation',
+      body: contactName || phone, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
+    }).catch(() => {});
   }
 
   const preview = (msg.text || '[attachment]').substring(0, 200);
@@ -514,7 +550,22 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // `now()`: `sentAt` there is the same instant, and trusting a remote clock for ordering on the
   // live path buys nothing while a skewed or future one would sort a reply above its question.
   const originalSentAt = historical ? parseSentAt(msg.sentAt) : null;
-  const inboundAttachments = normalizeInboundAttachments(msg);
+  let inboundAttachments = normalizeInboundAttachments(msg);
+
+  // Nothing inline? Then ask the endpoint that actually serves the file. This is the difference
+  // between "WhatsApp does not give us attachments" — which is not true — and "we never asked".
+  // Only when the message looks like it HAS media: no readable text, or an inline entry we could
+  // not address. Fetching for every text message would be one wasted round trip per message.
+  const looksLikeMedia = !msg.text || isMediaPlaceholder(msg.text)
+    || inboundAttachments.some((a) => !a.url);
+  if (looksLikeMedia) {
+    const fetched = await fetchAndStoreInboundAttachments(supabase, {
+      threadId,
+      conversationId: String(msg.conversationId ?? ''),
+      messageId: String(msg.id ?? msg.platformMessageId ?? ''),
+    });
+    if (fetched.length) inboundAttachments = fetched;
+  }
 
   // A message with neither text nor a recognised attachment is not "an empty message" — WhatsApp
   // does not send those. It is a file we failed to read, and it renders as a blank bubble. Say so
