@@ -988,7 +988,7 @@ const App = () => (
 
                 {/* Discover — authenticated. Reachable by anyone who works with the catalog
                     (browse + material search): marketplace buyers AND clients who build
-                    moodboards/quotes. The Profiles/Brand/Marketplace tabs self-gate on
+                    moodboards/quotes. The Profiles/Marketplace tabs self-gate on
                     marketplace.browse inside the page; the Products tab is open to all who reach it. */}
                 <Route
                   path="/discover"

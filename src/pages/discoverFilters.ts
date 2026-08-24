@@ -1,5 +1,5 @@
 /**
- * Filter definitions for the three client-side Discover tabs (profiles / brands / products).
+ * Filter definitions for the client-side Discover tabs (profiles / products).
  *
  * Every option list is derived from the loaded rows rather than a hand-rolled
  * `Array.from(new Set(...))`, so each facet carries a live count and a category that nobody
@@ -16,11 +16,6 @@ export interface ProfileFilterRow {
   location?: string;
   services: string[];
   professional_type?: string | null;
-}
-
-export interface FactoryFilterRow {
-  name: string;
-  categories: string[];
 }
 
 export interface ProductFilterRow {
@@ -57,28 +52,6 @@ export function buildProfileFilters(rows: ProfileFilterRow[]): FilterGroupDef[] 
           key: 'location', type: 'multi', label: 'Location',
           options: optionsFromRows(rows, (r) => r.location?.trim()),
           accessor: (r) => r.location?.trim(),
-        },
-      ],
-    },
-  ];
-}
-
-export function buildFactoryFilters(rows: FactoryFilterRow[]): FilterGroupDef[] {
-  return [
-    {
-      key: 'brand', label: 'Brand', icon: Building2,
-      fields: [
-        {
-          key: 'q', type: 'text', label: 'Search',
-          placeholder: 'Search brands…',
-          accessor: (r) => r.name,
-        },
-        {
-          // A brand carries several categories, so this is a "publishes in any of" match.
-          key: 'category', type: 'multi', label: 'Material category',
-          description: 'Brands publishing at least one material in the category.',
-          options: optionsFromRows(rows, (r) => r.categories, catLabel),
-          accessor: (r) => r.categories,
         },
       ],
     },

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
-  Users, MapPin, Globe, Building2, Package,
-  Layers, X, Package2, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
+  Users, MapPin, Globe, Package,
+  Layers, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
   Sparkles, LayoutList, Home,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
@@ -16,7 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
-import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,7 +34,7 @@ import {
   CAT_COLORS, PROFESSIONAL_TYPE_LABELS,
   detectCat, catLabel, initials,
 } from '@/lib/materialCategories';
-import { buildFactoryFilters, buildProductFilters, buildProfileFilters } from '@/pages/discoverFilters';
+import { buildProductFilters, buildProfileFilters } from '@/pages/discoverFilters';
 import {
 
   PRODUCT_IMAGE_SELECT,
@@ -98,12 +97,6 @@ interface RawProduct {
   imageUrl?: string | null;
 }
 
-interface Factory {
-  name: string;
-  productCount: number;
-  categories: string[];
-}
-
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
 function SkeletonRows({ count = 6 }: { count?: number }) {
@@ -118,16 +111,6 @@ function SkeletonRows({ count = 6 }: { count?: number }) {
           </div>
           <div className="h-4 w-16 skeleton rounded" />
         </div>
-      ))}
-    </div>
-  );
-}
-
-function SkeletonCards({ count = 6 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="h-32 rounded-2xl skeleton" />
       ))}
     </div>
   );
@@ -312,116 +295,26 @@ function ProductList({ products, onView, surplus }: { products: RawProduct[]; on
   );
 }
 
-// ─── Factory Modal ────────────────────────────────────────────────────────────
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-function FactoryModal({
-  factory,
-  products,
-  onClose,
-  onViewProduct,
-}: {
-  factory: Factory | null;
-  products: RawProduct[];
-  onClose: () => void;
-  onViewProduct: (p: RawProduct) => void;
-}) {
-  if (!factory) return null;
+/**
+ * The tabs this page actually renders. `activeTab` is controlled, so a value with no matching
+ * <TabsContent> leaves the tab bar sitting above an empty body — indistinguishable from a page
+ * that failed to load. Deep links outlive the tabs they point at: `?tab=factory` (the removed
+ * Brand tab) is still in notification action_urls and browser history, and `?tab=properties`
+ * arrives whenever the Real Estate module is off. Both resolve to a tab that exists.
+ */
+const DISCOVER_TABS = ['profiles', 'products', 'marketplace', 'properties'] as const;
+type DiscoverTab = (typeof DISCOVER_TABS)[number];
 
-  return (
-    <Dialog open={!!factory} onOpenChange={() => onClose()}>
-      {/* 92dvh, not 92vh — 92% of the LARGE viewport puts the bottom of the
-          modal (the end of the products list) under mobile Safari's toolbar. */}
-      <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92dvh] flex flex-col">
-        {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
-            warning without one and, more importantly, a screen reader announces the dialog with
-            no name at all. */}
-        <DialogTitle className="sr-only">Profile</DialogTitle>
-        {/* Banner */}
-        <div
-          className="h-28 sm:h-36 relative overflow-hidden shrink-0"
-          style={{ background: 'var(--brand-gradient)' }}
-        >
-          <div className="absolute -top-12 -left-12 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-10 right-1/3 w-80 h-80 rounded-full bg-surface-hover blur-3xl pointer-events-none" />
-
-          {/* Top-right controls */}
-          {/* `hideClose` on the DialogContent means this is the ONLY way out on
-              touch — 28px was under any usable tap target. */}
-          <div className="absolute top-2 right-2 flex items-center gap-1.5 sm:top-3 sm:right-3">
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="w-9 h-9 sm:w-7 sm:h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-            >
-              <X className="h-4 w-4 sm:h-3.5 sm:w-3.5 text-white" />
-            </button>
-          </div>
-        </div>
-
-        {/* Info header — outside overflow-y so icon isn't clipped by scroll container */}
-        <div className="bg-card border-b border-border/30 shrink-0 relative z-10 px-3 sm:px-6 pb-4">
-          <div className="flex items-start gap-4">
-            {/* Factory icon pulled up over banner */}
-            <div
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-background shadow-xl flex items-center justify-center shrink-0 -mt-10 sm:-mt-12"
-              style={{ background: 'var(--brand-gradient)' }}
-            >
-              <Building2 className="h-8 w-8 text-white" />
-            </div>
-
-            {/* Name + categories */}
-            <div className="flex-1 min-w-0 pt-3">
-              <h2 className="text-xl font-semibold tracking-tight">{factory.name}</h2>
-              {factory.categories.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {factory.categories.map((c) => (
-                    <Badge
-                      key={c}
-                      className="text-xs px-1.5 py-0"
-                      style={{
-                        backgroundColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}18`,
-                        color: CAT_COLORS[c] ?? CAT_COLORS.other,
-                        borderColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}40`,
-                      }}
-                    >
-                      {catLabel(c)}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="flex items-center gap-4 sm:gap-8 mt-4 pt-4 border-t">
-            <div className="text-center">
-              <p className="text-lg font-semibold tabular-nums">{factory.productCount}</p>
-              <p className="text-xs text-muted-foreground">Materials</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-semibold tabular-nums">{factory.categories.length}</p>
-              <p className="text-xs text-muted-foreground">Categories</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 bg-background">
-          {/* Products list */}
-          <div className="p-3 sm:p-6 space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">
-              All Materials <span className="text-xs">({products.length})</span>
-            </p>
-            {products.length === 0 ? (
-              <Empty icon={Package2} text="No materials found." />
-            ) : (
-              <ProductList products={products} onView={onViewProduct} />
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+function resolveTab(raw: string | null, canMarketplace: boolean, realEstate: boolean): DiscoverTab {
+  const fallback: DiscoverTab = canMarketplace ? 'profiles' : 'products';
+  if (!raw || !(DISCOVER_TABS as readonly string[]).includes(raw)) return fallback;
+  const tab = raw as DiscoverTab;
+  // Products is the only tab a non-marketplace persona gets; Properties needs the module.
+  if (!canMarketplace) return 'products';
+  if (tab === 'properties' && !realEstate) return fallback;
+  return tab;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -429,7 +322,7 @@ function FactoryModal({
 export const DiscoverPage: React.FC = () => {
   const { user } = useAuth();
   // The catalog (Products tab) is open to anyone who reaches this page (clients building
-  // moodboards/quotes included). The network-discovery tabs — Profiles, Brand, Marketplace —
+  // moodboards/quotes included). The network-discovery tabs — Profiles, Marketplace —
   // stay marketplace-only. CapabilityGuard blocks render until permissions load, so `can` is
   // reliable here (no default-tab flicker).
   const { can } = usePermissions();
@@ -440,22 +333,19 @@ export const DiscoverPage: React.FC = () => {
   // Profiles
   const [creators, setCreators] = useState<PublicCreator[]>([]);
 
-  // Products / Factories
+  // Products
   const [products, setProducts] = useState<RawProduct[]>([]);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   // Sorting is a separate control from filtering — it never belongs in the filter modal.
   const [profileSort, setProfileSort] = useState<'followers' | 'views' | 'name'>('followers');
-  const [factorySort, setFactorySort] = useState<'count' | 'name'>('count');
   const [productSort, setProductSort] = useState<'name' | 'factory'>('name');
-  // Controlled so a deep-link (?tab=products&factory=…) can open the right tab. Non-marketplace
-  // personas only get Products, so gated tabs coerce to it.
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    const t = searchParams.get('tab');
-    if (t && (canMarketplace || t === 'products')) return t;
-    return canMarketplace ? 'profiles' : 'products';
-  });
+  // Controlled so a deep-link (?tab=products&factory=…) can open the right tab. Gated and
+  // retired tabs coerce to one that exists — see resolveTab.
+  const [activeTab, setActiveTab] = useState<DiscoverTab>(() =>
+    resolveTab(searchParams.get('tab'), canMarketplace, realEstateEnabled),
+  );
 
   // Products tab has two modes: "browse" (the filterable catalog list) and "smart" (the
   // 7-vector fusion search moved here from the old /search page). `?mode=smart&q=…` deep-links
@@ -466,7 +356,6 @@ export const DiscoverPage: React.FC = () => {
   const smartInitialQuery = searchParams.get('q') || undefined;
 
   // Modals
-  const [selectedFactory, setSelectedFactory] = useState<Factory | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
 
@@ -572,7 +461,7 @@ export const DiscoverPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
 
-  // Deep-link: /discover?product=<id> (e.g. from a Brand page) opens that
+  // Deep-link: /discover?product=<id> (e.g. from a public brand page) opens that
   // product's detail modal once the catalog has loaded.
   useEffect(() => {
     const pid = searchParams.get('product');
@@ -582,33 +471,18 @@ export const DiscoverPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, products]);
 
-  // Deep-link: /discover?tab=<name> opens that tab (the `factory` half of the link is
-  // consumed by `productInitial` below).
+  // Deep-link: /discover?tab=<name> opens that tab. The `factory` query param is a separate
+  // half of the same link, consumed by `productInitial` below to seed the Products brand facet.
+  // realEstateEnabled is a dep because it resolves async — ?tab=properties must survive the flip.
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t) setActiveTab(canMarketplace || t === 'products' ? t : 'products');
+    if (t) setActiveTab(resolveTab(t, canMarketplace, realEstateEnabled));
     const m = searchParams.get('mode');
     if (m === 'smart') setProductMode('smart');
     else if (m === 'browse') setProductMode('browse');
-  }, [searchParams, canMarketplace]);
-
-  // Derived factories
-  const factories = useMemo<Factory[]>(() => {
-    const map = new Map<string, { count: number; cats: Set<string> }>();
-    products.forEach((p) => {
-      if (!map.has(p.factoryName)) map.set(p.factoryName, { count: 0, cats: new Set() });
-      const e = map.get(p.factoryName)!;
-      e.count++;
-      if (p.detectedCat !== 'other') e.cats.add(p.detectedCat);
-    });
-    return Array.from(map.entries())
-      .filter(([name]) => name !== 'Unknown')
-      .map(([name, { count, cats }]) => ({ name, productCount: count, categories: Array.from(cats) }))
-      .sort((a, b) => b.productCount - a.productCount);
-  }, [products]);
+  }, [searchParams, canMarketplace, realEstateEnabled]);
 
   const profileGroups = useMemo(() => buildProfileFilters(creators), [creators]);
-  const factoryGroups = useMemo(() => buildFactoryFilters(factories), [factories]);
   const productGroups = useMemo(() => buildProductFilters(products, surplus), [products, surplus]);
 
   // /discover?tab=products&factory=<name> seeds the brand facet; once the user touches the
@@ -619,7 +493,6 @@ export const DiscoverPage: React.FC = () => {
   }, [searchParams]);
 
   const profileFilters = useFilters(creators, profileGroups, { urlKey: 'pf' });
-  const factoryFilters = useFilters(factories, factoryGroups, { urlKey: 'bf' });
   const productFilters = useFilters(products, productGroups, { urlKey: 'prf', initial: productInitial });
 
   const filteredProfiles = useMemo(() =>
@@ -631,13 +504,6 @@ export const DiscoverPage: React.FC = () => {
     [profileFilters.filtered, profileSort],
   );
 
-  const filteredFactories = useMemo(() =>
-    [...factoryFilters.filtered].sort((a, b) =>
-      factorySort === 'name' ? a.name.localeCompare(b.name) : b.productCount - a.productCount,
-    ),
-    [factoryFilters.filtered, factorySort],
-  );
-
   const filteredProducts = useMemo(() =>
     [...productFilters.filtered].sort((a, b) =>
       productSort === 'factory'
@@ -647,32 +513,24 @@ export const DiscoverPage: React.FC = () => {
     [productFilters.filtered, productSort],
   );
 
-  const factoryModalProducts = useMemo(() =>
-    selectedFactory ? products.filter((p) => p.factoryName === selectedFactory.name) : [],
-    [products, selectedFactory],
-  );
-
   return (
     <div className="min-h-full w-full">
       <PageHeader
         icon={canMarketplace ? Layers : Package}
         title={canMarketplace ? 'Discover' : 'Products'}
         subtitle={canMarketplace
-          ? 'Explore profiles, brands, and materials from the community.'
+          ? 'Explore profiles, materials, and marketplace listings from the community.'
           : 'Browse and search the material catalog.'}
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DiscoverTab)}>
           {/* Network-discovery tabs are marketplace-only; Products is always available. When the
               user only has Products, drop the single-tab bar entirely. */}
           {canMarketplace && (
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
               <TabsTrigger value="profiles" className="flex items-center gap-2">
                 <Users className="h-4 w-4" /> Profiles
-              </TabsTrigger>
-              <TabsTrigger value="factory" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" /> Brand
               </TabsTrigger>
               <TabsTrigger value="products" className="flex items-center gap-2">
                 <Package className="h-4 w-4" /> Products
@@ -788,70 +646,6 @@ export const DiscoverPage: React.FC = () => {
             )}
           </TabsContent>
 
-          {/* ── FACTORY ───────────────────────────────────────────────── */}
-          <TabsContent value="factory" className="mt-6 space-y-4">
-            <FilterBar
-              groups={factoryGroups}
-              values={factoryFilters.values}
-              onChange={factoryFilters.setValues}
-              previewCount={factoryFilters.previewCount}
-              title="Filter brands"
-              searchPlaceholder="Search brands…"
-            >
-              <Select value={factorySort} onValueChange={(v) => setFactorySort(v as 'count' | 'name')}>
-                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="count">Most materials</SelectItem>
-                  <SelectItem value="name">Name A–Z</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterBar>
-
-            {loading ? (
-              <SkeletonCards count={6} />
-            ) : filteredFactories.length === 0 ? (
-              <Empty icon={Building2} text="No brands found." />
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredFactories.map((factory) => (
-                  <Card
-                    key={factory.name}
-                    onClick={() => setSelectedFactory(factory)}
-                    className="rounded-2xl cursor-pointer transition-all hover:shadow-md hover:ring-1 hover:ring-primary/30"
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                          <Building2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{factory.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {factory.productCount} material{factory.productCount !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </div>
-                      {factory.categories.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {factory.categories.slice(0, 4).map((c) => (
-                            <Badge key={c} className="text-xs px-1.5 py-0"
-                              style={{
-                                backgroundColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}18`,
-                                color: CAT_COLORS[c] ?? CAT_COLORS.other,
-                                borderColor: `${CAT_COLORS[c] ?? CAT_COLORS.other}40`,
-                              }}>
-                              {catLabel(c)}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
           {/* ── PRODUCTS ──────────────────────────────────────────────── */}
           <TabsContent value="products" className="mt-6 space-y-4">
             {/* Browse the catalog, or run the 7-vector "smart" search (text / image / color /
@@ -923,14 +717,6 @@ export const DiscoverPage: React.FC = () => {
           )}
         </Tabs>
       </div>
-
-      {/* Factory modal */}
-      <FactoryModal
-        factory={selectedFactory}
-        products={factoryModalProducts}
-        onClose={() => setSelectedFactory(null)}
-        onViewProduct={openProduct}
-      />
 
       {/* Profile modal */}
       <ProfileModal
