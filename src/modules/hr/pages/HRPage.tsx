@@ -8,6 +8,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
+import { HubRailSectionLabel } from '@/components/core/hub';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { OverviewSection } from '../components/OverviewSection';
 import { EmployeesSection } from '../components/EmployeesSection';
@@ -30,14 +31,6 @@ import { CompanyAssetsPanel } from '@/components/business/assets/CompanyAssetsPa
 // attendance/ergani/accounting) also stays MOUNTED once visited, so a revisit never re-flashes.
 // (Edge-backed tabs aren't preloaded — they'd fire an edge call on open even if never opened.)
 const PRELOAD_TABS = ['overview', 'employees', 'departments', 'timeoff', 'recruitment', 'onboarding', 'documents', 'payroll', 'assets'];
-
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
-    <span className="h-px flex-1 bg-foreground/40" aria-hidden="true" />
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
-    <span className="h-px flex-1 bg-foreground/40" aria-hidden="true" />
-  </div>
-);
 
 export default function HRPage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
@@ -94,17 +87,17 @@ export default function HRPage() {
             <TabsTrigger value="schedules" className="w-full justify-start"><CalendarClock className="h-4 w-4 mr-2" /> Schedules</TabsTrigger>
             <TabsTrigger value="overtime" className="w-full justify-start"><Timer className="h-4 w-4 mr-2" /> Overtime</TabsTrigger>
 
-            <SectionLabel>Recruiting</SectionLabel>
+            <HubRailSectionLabel>Recruiting</HubRailSectionLabel>
             <TabsTrigger value="recruitment" className="w-full justify-start"><Briefcase className="h-4 w-4 mr-2" /> Jobs &amp; Applicants</TabsTrigger>
             <TabsTrigger value="onboarding" className="w-full justify-start"><ClipboardCheck className="h-4 w-4 mr-2" /> Onboarding</TabsTrigger>
 
-            <SectionLabel>Records</SectionLabel>
+            <HubRailSectionLabel>Records</HubRailSectionLabel>
             <TabsTrigger value="documents" className="w-full justify-start"><FolderOpen className="h-4 w-4 mr-2" /> Documents</TabsTrigger>
             <TabsTrigger value="assets" className="w-full justify-start"><Package className="h-4 w-4 mr-2" /> Assets</TabsTrigger>
             <TabsTrigger value="payroll" className="w-full justify-start"><Wallet className="h-4 w-4 mr-2" /> Payroll</TabsTrigger>
             <TabsTrigger value="accounting" className="w-full justify-start"><Receipt className="h-4 w-4 mr-2" /> Accounting</TabsTrigger>
 
-            <SectionLabel>Compliance</SectionLabel>
+            <HubRailSectionLabel>Compliance</HubRailSectionLabel>
             <TabsTrigger value="separations" className="w-full justify-start"><UserMinus className="h-4 w-4 mr-2" /> Departures</TabsTrigger>
             <TabsTrigger value="ergani" className="w-full justify-start"><Landmark className="h-4 w-4 mr-2" /> Ergani</TabsTrigger>
           </TabsList>

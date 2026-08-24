@@ -32,7 +32,7 @@ export { HubTimeline, HubTimelineGroup, HubTimelineItem } from './HubTimeline';
 export { HubStatTile, HubStatGrid } from './HubStatTile';
 export type { HubStatDelta } from './HubStatTile';
 
-export { HubSideNav } from './HubSideNav';
+export { HubSideNav, HubRailSectionLabel } from './HubSideNav';
 export type { HubNavItem, HubNavGroup } from './HubSideNav';
 
 export { HubTabNav, HubTabAddAction } from './HubTabNav';

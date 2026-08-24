@@ -88,7 +88,7 @@ import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
 import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers, CheckCircle2 } from 'lucide-react';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -109,15 +109,6 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
   { value: FINANCE_TAB.deliveryNotes, type: 'delivery_notes', label: 'Delivery Notes', icon: Truck },
   { value: FINANCE_TAB.cheques, type: 'cheques', label: 'Cheques', icon: FileSignature },
 ];
-
-// Sidebar group label rendered as a centered title flanked by hairlines: ──── Tools ────
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
-    <span className="h-px flex-1 bg-foreground/50" aria-hidden="true" />
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</span>
-    <span className="h-px flex-1 bg-foreground/50" aria-hidden="true" />
-  </div>
-);
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
@@ -496,25 +487,40 @@ const FinancePage: React.FC = () => {
         <Tabs value={activeTab} onValueChange={onTabChange} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             {/* Shortcuts out of Finance into the two operational surfaces — icon-only so they
-                read as jump-offs, not as tabs of this page. */}
+                read as jump-offs, not as tabs of this page.
+
+                NO BORDER, and the separation below is a hairline rather than nothing:
+                everything under this row is a borderless underline rail, so an outlined pair
+                at the top was the only boxed object in the column — and its own left edge
+                landed in exactly the column the active tab's indicator uses, which is the one
+                vertical stroke in this rail that is supposed to carry meaning. The tint alone
+                says "these are not tabs"; the rule says where the page's own sections start.
+                Spacing was the other half: `gap-1` put them 4px from Dashboard, close enough
+                to read as the first two rows of the list they are meant to sit outside of.
+
+                This wrapper is a `div`, so `.finance-tabs-list > div` hides it below lg along
+                with the section dividers. That is deliberate here — the horizontal strip has
+                no room for them, and both surfaces are one tap away in the bottom nav. */}
             {!isAccountant && (
-              <div className="flex w-full items-center gap-1">
-                <Link
-                  to="/pos"
-                  title="Point of Sale"
-                  aria-label="Point of Sale"
-                  className="flex h-9 flex-1 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary transition-colors hover:bg-primary/20"
-                >
-                  <Receipt className="h-4 w-4" />
-                </Link>
-                <Link
-                  to="/warehouse"
-                  title="Warehouse — stock, dispatch board & loading"
-                  aria-label="Warehouse"
-                  className="flex h-9 flex-1 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary transition-colors hover:bg-primary/20"
-                >
-                  <PackageCheck className="h-4 w-4" />
-                </Link>
+              <div className="mb-2 w-full border-b border-hairline pb-2">
+                <div className="flex w-full items-center gap-1">
+                  <Link
+                    to="/pos"
+                    title="Point of Sale"
+                    aria-label="Point of Sale"
+                    className="flex h-9 flex-1 items-center justify-center rounded-sm bg-primary/10 text-primary transition-colors hover:bg-primary/20"
+                  >
+                    <Receipt className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    to="/warehouse"
+                    title="Warehouse — stock, dispatch board & loading"
+                    aria-label="Warehouse"
+                    className="flex h-9 flex-1 items-center justify-center rounded-sm bg-primary/10 text-primary transition-colors hover:bg-primary/20"
+                  >
+                    <PackageCheck className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
             )}
             <TabsTrigger value="dashboard" className="w-full justify-start">
@@ -535,13 +541,13 @@ const FinancePage: React.FC = () => {
               </TabsTrigger>
             )}
 
-            <SectionLabel>Documents</SectionLabel>
+            <HubRailSectionLabel>Documents</HubRailSectionLabel>
             {DOC_TABS.map((d) => (
               <TabsTrigger key={d.value} value={d.value} className="w-full justify-start">
                 <d.icon className="h-4 w-4 mr-2" /> {d.label}
               </TabsTrigger>
             ))}
-            <SectionLabel>Tools</SectionLabel>
+            <HubRailSectionLabel>Tools</HubRailSectionLabel>
 
             <TabsTrigger value="planning" className="w-full justify-start">
               <CalendarClock className="h-4 w-4 mr-2" /> Planning

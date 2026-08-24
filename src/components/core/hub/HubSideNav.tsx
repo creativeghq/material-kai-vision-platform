@@ -76,6 +76,28 @@ export const HubSideNav: React.FC<HubSideNavProps> = ({
   </nav>
 );
 
+/**
+ * A group separator for a rail built from a FLAT list of rows.
+ *
+ * `HubSideNav` groups its items structurally, so a plain heading is enough. Finance's and HR's
+ * section rails are Radix `TabsList`s — every trigger is a sibling, there is no group element to
+ * hang a heading off — so the flanking rules are what turns a caption into a boundary.
+ *
+ * The rules are `--hairline`, the app's ONE rule colour. They were `foreground/50` in Finance and
+ * `foreground/40` in HR: two copies of one component that had already drifted, and both several
+ * times heavier than any other line in the app, so a 10px muted caption arrived flanked by the
+ * loudest strokes on the screen. One copy now, at the weight every other divider uses.
+ */
+export const HubRailSectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex w-full items-center gap-2 px-3 pb-1 pt-3">
+    <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </span>
+    <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+  </div>
+);
+
 const HubSideNavRow: React.FC<{
   item: HubNavItem;
   activeId?: string;
