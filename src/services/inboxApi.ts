@@ -180,9 +180,17 @@ export interface InboxThreadContext {
   metrics?: InboxCustomerMetrics | null;
 }
 
-/** Per-workspace AI-assistant config (workspaces.settings.inbox_agent). Both default true server-side. */
+/**
+ * Per-workspace AI-assistant config (`workspaces.settings.inbox_agent`).
+ *
+ * `auto_respond` defaults to **false** server-side — unset means off. It used to default true
+ * (`!== false`), which is how a workspace that had never been asked ended up with an assistant
+ * answering 26 real customers on 2026-08-24. `allow_account_data` still defaults true: it only
+ * narrows what an assistant that is ALREADY running may read, so it cannot start a conversation
+ * with anybody. See supabase/functions/_shared/inbox-autopilot.ts.
+ */
 export interface InboxAgentSettings {
-  /** Auto-engage the assistant so it first-responds on new customer threads. */
+  /** Auto-engage the assistant so it first-responds on new customer threads. Default OFF. */
   auto_respond: boolean;
   /** Allow the assistant to answer the customer's own account/billing questions (statement, invoices). */
   allow_account_data: boolean;
@@ -348,7 +356,7 @@ export const inboxApi = {
     return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
   },
   getAgentSettings(workspace_id: string) {
-    return call<{ settings: InboxAgentSettings; can_edit: boolean; reply_cost: number }>(
+    return call<{ settings: InboxAgentSettings; can_edit: boolean }>(
       'get_agent_settings', { workspace_id },
     );
   },

@@ -1264,6 +1264,9 @@ const InboxPage: React.FC = () => {
                 participants={participants}
                 labels={labels}
                 isMember={isMember}
+                // The channel tab derives the 24-hour service window from the last INBOUND
+                // message, so it needs the transcript, not just the thread row.
+                messages={messages}
                 // Approving writes a `system` message onto the thread; reopen so the transcript
                 // shows it without the member having to click away and back.
                 onIntakeChanged={() => { void openThread(activeThread.id); }}
@@ -2024,14 +2027,220 @@ const OrderIntakePanel: React.FC<{
   );
 };
 
+/**
+ * What the CHANNEL knows about the person, as opposed to what our CRM knows.
+ *
+ * These are different questions and the drawer used to answer only the second one, so a WhatsApp
+ * thread showed a CRM card for a contact that was itself created from the conversation — a
+ * tautology, and on the numbers imported on 2026-08-24 a contact literally named
+ * "8613360315779". The facts that decide what you may DO here (can we message them outside the
+ * 24-hour window, have they sent STOP, which of our numbers did they reach) lived nowhere.
+ *
+ * Everything shown is something we hold or can derive. Nothing is inferred, and where WhatsApp
+ * gives us nothing the panel says so rather than rendering an empty field — an empty field reads
+ * as "this person has no company", not as "Meta does not tell us".
+ */
+const ChannelIdentityPanel: React.FC<{
+  thread: InboxThread;
+  context: InboxThreadContext | null;
+  messages: InboxMessage[];
+  isMember: boolean;
+}> = ({ thread, context, messages, isMember }) => {
+  const meta = (thread.metadata || {}) as Record<string, unknown>;
+  const phone = String(meta.contact_phone || '').trim();
+  const digits = phone.replace(/\D/g, '');
+  const contact = context?.contact ?? null;
+  const isWhatsApp = thread.channel === 'whatsapp';
+
+  // The name WhatsApp itself reports, which is NOT the CRM name and is worth showing separately:
+  // the CRM row is ours to edit and drifts, this is what the person calls themselves on WhatsApp.
+  const waName = (thread.subject || '').trim();
+  const waNameIsJustTheNumber = !waName || waName.replace(/\D/g, '') === digits;
+
+  // A CRM row auto-created from the phone number and never named. It is not a customer record,
+  // it is a placeholder, and showing it as though somebody filed it is how the CRM fills up with
+  // 8 contacts called by their own phone number.
+  const crmIsPlaceholder = !!contact
+    && (!contact.name || contact.name.replace(/\D/g, '') === digits)
+    && !contact.email;
+
+  // Last INBOUND customer message — the clock Meta runs. Free-form replies are refused outside
+  // 24 hours of it, which is why all 22 auto-replies to imported history failed delivery.
+  const lastInbound = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      const dir = (m.metadata as Record<string, unknown> | null)?.direction;
+      if (m.message_type === 'text' && dir === 'incoming') return m.created_at;
+    }
+    return null;
+  }, [messages]);
+
+  const windowState = useMemo(() => {
+    if (!lastInbound) return null;
+    const hrs = (Date.now() - new Date(lastInbound).getTime()) / 3_600_000;
+    if (hrs >= 24) return { open: false, label: 'Closed', detail: 'Only an approved template can be sent.' };
+    const left = 24 - hrs;
+    return {
+      open: true,
+      label: left >= 1 ? `${Math.floor(left)}h left` : `${Math.max(1, Math.round(left * 60))}m left`,
+      detail: 'You can reply freely until it closes.',
+    };
+  }, [lastInbound]);
+
+  const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="min-w-0 text-right">{children}</span>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="border-b border-hairline px-4 py-4 flex items-start gap-3">
+        <Avatar className="h-12 w-12 shrink-0 rounded-sm">
+          <AvatarFallback className={`text-sm rounded-sm ${avatarTint(waName || phone)}`}>
+            {initials(waNameIsJustTheNumber ? (phone || '?') : waName)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold truncate">
+            {waNameIsJustTheNumber ? (phone || 'Unknown number') : waName}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            {isWhatsApp ? 'WhatsApp' : 'Social'} · {phone || 'no number on file'}
+          </div>
+          {isWhatsApp && phone && (
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                {/* wa.me, not our relay: this opens the chat on the operator's OWN phone, which is
+                    the point of a coexistence number — some conversations are handled there. */}
+                <a href={`https://wa.me/${digits}`} target="_blank" rel="noreferrer">
+                  <ExternalLink className="w-3 h-3 mr-1" />Open in WhatsApp
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+                <a href={`tel:${phone}`}><Phone className="w-3 h-3 mr-1" />Call</a>
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* The 24-hour service window. It decides whether the composer below will actually deliver,
+          and until now nothing in the UI said so — a message typed outside it is accepted, gets a
+          message id, and is refused by Meta a second later. */}
+      {isWhatsApp && windowState && (
+        <div className="p-5 border-b border-hairline space-y-2.5">
+          <SectionTitle icon={<MessagesSquare className="h-4 w-4" />}>Service window</SectionTitle>
+          <Row label="Free-form replies">
+            <Badge variant={windowState.open ? 'success' : 'warning'} className="text-[10px]">
+              {windowState.label}
+            </Badge>
+          </Row>
+          <p className="text-[11px] text-muted-foreground">
+            {windowState.detail} WhatsApp allows free replies for 24 hours after the customer’s last
+            message; after that Meta accepts the send and then fails delivery.
+          </p>
+        </div>
+      )}
+
+      {/* What WhatsApp does and does not hand over. Stated, because the absence is the surprising
+          part — the operator can see a photo and a business card on their phone and reasonably
+          expects them here. */}
+      {isWhatsApp && (
+        <div className="p-5 border-b border-hairline space-y-2.5">
+          <SectionTitle icon={<UserIcon className="h-4 w-4" />}>WhatsApp profile</SectionTitle>
+          <Row label="Display name">
+            {waNameIsJustTheNumber
+              ? <span className="text-muted-foreground">Not sent</span>
+              : <span className="truncate">{waName}</span>}
+          </Row>
+          <Row label="Number"><span className="tabular-nums">{phone || '—'}</span></Row>
+          <p className="text-[11px] text-muted-foreground">
+            Profile photo, “about”, and business details are not part of the WhatsApp Business API —
+            Meta sends us the display name and the number only. What you see on the phone app comes
+            from WhatsApp itself, and is not available to any integration.
+          </p>
+        </div>
+      )}
+
+      {/* Where it came in. Matters the moment there is more than one number, and it is the first
+          thing support asks for. */}
+      <div className="p-5 border-b border-hairline space-y-2.5">
+        <SectionTitle icon={<Hash className="h-4 w-4" />}>Connection</SectionTitle>
+        <Row label="Messages">{messages.length}</Row>
+        {lastInbound && (
+          <Row label="Last from them"><span className="tabular-nums">{formatDate(lastInbound)}</span></Row>
+        )}
+        {isMember && !!meta.zernio_conversation_id && (
+          <Row label="Conversation id">
+            <span className="text-[11px] font-mono text-muted-foreground break-all">
+              {String(meta.zernio_conversation_id)}
+            </span>
+          </Row>
+        )}
+      </div>
+
+      {/* CRM. The action the user asked for, and it is deliberately phrased by STATE: a contact
+          auto-created from a phone number is not "linked", it is unfiled, and offering "View in
+          CRM" for it sends someone to a record with nothing in it. */}
+      <div className="p-5 space-y-2.5">
+        <SectionTitle icon={<UserPlus className="h-4 w-4" />}>CRM</SectionTitle>
+        {!contact && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Nobody in the CRM is linked to this conversation.
+            </p>
+            <Button asChild size="sm" variant="secondary" className="w-full">
+              <a href={`/admin/crm?tab=contacts&create=1&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(waNameIsJustTheNumber ? '' : waName)}`}>
+                <UserPlus className="w-3.5 h-3.5 mr-1.5" />Create a CRM contact
+              </a>
+            </Button>
+          </>
+        )}
+        {contact && crmIsPlaceholder && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              A contact was created automatically from the phone number and has never been filled
+              in — no name, no email. It will read as “{contact.name}” everywhere in the CRM until
+              somebody names it.
+            </p>
+            <Button asChild size="sm" variant="secondary" className="w-full">
+              <a href={`/admin/crm?tab=contacts&contact=${contact.id}`}>
+                <UserIcon className="w-3.5 h-3.5 mr-1.5" />Complete this contact
+              </a>
+            </Button>
+          </>
+        )}
+        {contact && !crmIsPlaceholder && (
+          <>
+            <Row label="Contact"><span className="truncate">{contact.name || '—'}</span></Row>
+            {contact.email && <Row label="Email"><span className="truncate">{contact.email}</span></Row>}
+            <Button asChild size="sm" variant="outline" className="w-full mt-1">
+              <a href={`/admin/crm?tab=contacts&contact=${contact.id}`}>
+                <ChevronRight className="w-3.5 h-3.5 mr-1.5" />Open in CRM
+              </a>
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DetailsRail: React.FC<{
   thread: InboxThread;
   context: InboxThreadContext | null;
   participants: InboxParticipant[];
   labels: Map<string, ParticipantLabel>;
   isMember: boolean;
+  messages?: InboxMessage[];
   onIntakeChanged?: () => void;
-}> = ({ thread, context, participants, labels, isMember, onIntakeChanged }) => {
+}> = ({ thread, context, participants, labels, isMember, messages = [], onIntakeChanged }) => {
+  // A channel tab only where there IS a channel identity distinct from the CRM one. An internal
+  // or email thread has nothing to put in it, and an empty tab is worse than no tab.
+  const hasChannelIdentity = thread.channel === 'whatsapp' || thread.channel === 'social';
+  const [tab, setTab] = useState<'profile' | 'channel'>('profile');
   const contact = context?.contact ?? null;
   const company = context?.company ?? null;
   const quotes = context?.quotes ?? [];
@@ -2051,10 +2260,29 @@ const DetailsRail: React.FC<{
   void subtitle;
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="px-4 py-2.5 border-b border-hairline bg-surface-sunken flex items-center justify-between sticky top-0 z-10">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-hairline bg-surface-sunken flex items-center justify-between shrink-0">
         <span className="text-sm font-semibold">Customer profile</span>
       </div>
+      {/* Underline tabs, per the design system — a filled pill here would carry the silhouette of
+          a primary button on a panel whose only real action lives further down. */}
+      {hasChannelIdentity && (
+        <div className="px-4 border-b border-hairline shrink-0">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as 'profile' | 'channel')}>
+            <TabsList className="h-auto bg-transparent p-0 gap-4">
+              <TabsTrigger value="profile" className="px-0 text-xs">Profile</TabsTrigger>
+              <TabsTrigger value="channel" className="px-0 text-xs">
+                {thread.channel === 'whatsapp' ? 'WhatsApp' : 'Social'}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+      {hasChannelIdentity && tab === 'channel' && (
+        <ChannelIdentityPanel thread={thread} context={context} messages={messages} isMember={isMember} />
+      )}
+      {(!hasChannelIdentity || tab === 'profile') && (
+    <div className="flex-1 overflow-y-auto">
       {/*
         Identity block. It used to open with a gradient cover banner and a gradient avatar
         floating on a coloured shadow — the marketing language, on the panel whose job is
@@ -2294,6 +2522,8 @@ const DetailsRail: React.FC<{
         <div className="text-[11px] text-muted-foreground pt-0.5">Started {formatDate(thread.created_at, { withTime: true })}</div>
       </div>
     </div>
+      )}
+    </div>
   );
 };
 
@@ -2309,13 +2539,12 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
   const [saving, setSaving] = useState<string | null>(null);
   const [settings, setSettings] = useState<InboxAgentSettings | null>(null);
   const [canEdit, setCanEdit] = useState(false);
-  const [replyCost, setReplyCost] = useState(1);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     inboxApi.getAgentSettings(workspaceId)
-      .then((r) => { setSettings(r.settings); setCanEdit(r.can_edit); setReplyCost(r.reply_cost); })
+      .then((r) => { setSettings(r.settings); setCanEdit(r.can_edit); })
       .catch((e) => toast({ title: 'Failed to load settings', description: (e as Error).message, variant: 'destructive' }))
       .finally(() => setLoading(false));
   }, [open, workspaceId, toast]);
@@ -2346,7 +2575,9 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
           <div>
             <div className="text-sm font-medium">AI assistant</div>
             <div className="text-xs text-muted-foreground">
-              Applies to every customer conversation in this workspace. {replyCost} credit{replyCost === 1 ? '' : 's'} per reply.
+              Applies to every customer conversation in this workspace. Replies run on the full
+              assistant and are metered per turn, like a chat in the Studio — a short answer costs
+              a fraction of a researched one.
             </div>
           </div>
           {loading || !settings ? (
@@ -2358,7 +2589,13 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <Label className="text-sm">Auto-respond to new chats</Label>
-                  <div className="text-xs text-muted-foreground">The assistant answers first on new customer conversations.</div>
+                  {/* Off by default and spelled out, because the cost of a wrong guess here is
+                      paid by the CUSTOMER, not by the operator: the assistant writes to them
+                      under the business's name and a sent message cannot be unsent. */}
+                  <div className="text-xs text-muted-foreground">
+                    The assistant answers first, on its own, on every new customer conversation —
+                    including WhatsApp numbers and social DMs. Off unless you turn it on.
+                  </div>
                 </div>
                 <Switch
                   checked={settings.auto_respond}
