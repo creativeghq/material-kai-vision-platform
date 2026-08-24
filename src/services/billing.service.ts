@@ -2,7 +2,16 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface SubscriptionPlan {
   id: string;
+  /**
+   * STABLE IDENTIFIER — free | pro | enterprise. `tier_rank()` matches these literally and
+   * `workspace_plan_level()` feeds the result to every entitlement check, so renaming one for
+   * presentation silently drops its subscribers to free-tier access. Show `display_name`.
+   */
   name: string;
+  /** What a human reads. Falls back to `name` when unset. */
+  display_name?: string | null;
+  /** An enquiry tier, not a purchase: the card shows a form instead of a checkout button. */
+  contact_sales?: boolean;
   description?: string;
   price_in_cents: number;
   currency: string;

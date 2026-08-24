@@ -16,6 +16,7 @@ import { billingService, SubscriptionPlan, UserSubscription } from '@/services/b
 import { supabase } from '@/integrations/supabase/client';
 import { tierRank } from '@/services/planAdminService';
 import { formatMoney } from '@/utils/decimal';
+import { SelfHostingRequestDialog } from './SelfHostingRequestDialog';
 
 export const SubscriptionPlansPage: React.FC = () => {
   const { toast } = useToast();
@@ -24,6 +25,7 @@ export const SubscriptionPlansPage: React.FC = () => {
   const [currentSubscription, setCurrentSubscription] = useState<UserSubscription | null>(null);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
   const [modules, setModules] = useState<{ name: string; price_tier: string | null; enabled: boolean }[]>([]);
+  const [selfHostingOpen, setSelfHostingOpen] = useState(false);
 
   // Modules a plan unlocks = every enabled module whose tier is at/below the plan's tier.
   const modulesForPlan = (planName: string): string[] => {
@@ -163,7 +165,7 @@ export const SubscriptionPlansPage: React.FC = () => {
                     <Badge className="bg-purple-600 text-white">Current</Badge>
                   )}
                 </div>
-                <CardTitle className="text-white text-2xl">{plan.name}</CardTitle>
+                <CardTitle className="text-white text-2xl">{plan.display_name || plan.name}</CardTitle>
                 <CardDescription className="text-white/60">
                   {plan.description || 'Premium features and benefits'}
                 </CardDescription>
@@ -172,10 +174,21 @@ export const SubscriptionPlansPage: React.FC = () => {
               <CardContent className="space-y-4">
                 {/* Price */}
                 <div className="text-center py-4">
-                  <div className="text-4xl font-bold text-white">
-                    {formatPrice(plan.price_in_cents, plan.currency)}
-                  </div>
-                  <p className="text-white/60 text-sm mt-1">per month</p>
+                  {plan.contact_sales ? (
+                    <>
+                      {/* No figure at all. A "€0" on an enquiry tier reads as free, which is the
+                          one thing self hosting is not. */}
+                      <div className="text-2xl font-semibold text-white">Let&rsquo;s talk</div>
+                      <p className="text-white/60 text-sm mt-1">priced to your deployment</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-4xl font-bold text-white">
+                        {formatPrice(plan.price_in_cents, plan.currency)}
+                      </div>
+                      <p className="text-white/60 text-sm mt-1">per month</p>
+                    </>
+                  )}
                 </div>
 
                 {/* Features */}
@@ -208,6 +221,14 @@ export const SubscriptionPlansPage: React.FC = () => {
               </CardContent>
 
               <CardFooter>
+                {plan.contact_sales ? (
+                  <Button
+                    onClick={() => setSelfHostingOpen(true)}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Request self hosting
+                  </Button>
+                ) : (
                 <Button
                   onClick={() => handleSubscribe(plan.id)}
                   disabled={isCurrentPlan || isProcessing}
@@ -228,6 +249,7 @@ export const SubscriptionPlansPage: React.FC = () => {
                     'Subscribe Now'
                   )}
                 </Button>
+                )}
               </CardFooter>
             </Card>
           );
@@ -245,6 +267,8 @@ export const SubscriptionPlansPage: React.FC = () => {
           </Card>
         </div>
       )}
+
+      <SelfHostingRequestDialog open={selfHostingOpen} onClose={() => setSelfHostingOpen(false)} />
     </div>
   );
 };

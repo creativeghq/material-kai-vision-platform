@@ -1,16 +1,18 @@
 /**
- * Bill the two recurring lines the platform records and never charges for: paid channel seats and
- * rented phone numbers.
+ * Bill the recurring line the platform records and never charged for: rented phone numbers.
  *
- * Both are real monthly costs Zernio puts on the operator's card, and both were being absorbed —
- * a workspace could hold four connected accounts and a Greek number, cost $15/month, and pay
- * nothing for any of it. The metering has existed since the seat work; only the charge was
- * missing.
+ * A number is a real monthly cost Zernio puts on the operator's card, tied to one workspace, and
+ * it was being absorbed in full.
  *
- * Charged in CREDITS, not as Stripe subscription items. Credits work today, the add-on's Stripe
- * product is not bound yet, and a credit debit lands in the same ledger as every other kind of
- * spend — so these appear beside the message and image charges instead of in a parallel system
- * nobody reconciles. When Stripe seats exist this becomes the fallback, not the only path.
+ * Connected CHANNELS are deliberately NOT billed (2026-08-24). Zernio charges per account past
+ * the free two and the platform absorbs it: a workspace onboards as many accounts as it wants
+ * rather than meeting a wall while setting up. The count still reaches the operator cost view, so
+ * the absorbed total is visible per tenant instead of arriving as one unattributed invoice line —
+ * measuring a cost and charging for it are separate decisions, and only the second was reversed.
+ *
+ * Charged in CREDITS, not as Stripe subscription items: a credit debit lands in the same ledger as
+ * every other kind of spend, so it appears beside the message and image charges instead of in a
+ * parallel system nobody reconciles.
  *
  * Idempotency is the UNIQUE (workspace, type, month) constraint, not a flag or a timestamp
  * comparison: the cron can fire twice, or be re-run by hand after a partial failure, and the
@@ -20,9 +22,6 @@ import { CREDIT_SALE_PRICE_USD, MARKUP_MULTIPLIER } from './pricing-constants.ts
 
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = { from: (t: string) => any; rpc: (fn: string, args: Record<string, unknown>) => any };
-
-/** What one extra connected channel costs us per month, at Zernio's 3–10 tier. */
-const SEAT_COST_USD = 6;
 
 export interface ChargeLine {
   workspaceId: string;
@@ -136,10 +135,8 @@ async function chargeOne(
 /**
  * Bill every workspace for the month.
  *
- * Seats are charged on what is CONNECTED beyond the included two, not on what was purchased —
- * `workspace_channel_usage` is the single derivation, so the number billed is the number the
- * connect gate enforces and the number the admin view displays. A workspace over its allowance
- * because the cap could not enforce yet is still using the channels, and still costs us the fee.
+ * Numbers only. Each is priced from its own captured `monthly_cents` rather than a blended rate,
+ * because a $3 Greek line and a $21 line are not the same line.
  */
 export async function billChannelsForMonth(
   supabase: SupabaseLike,
@@ -161,24 +158,17 @@ export async function billChannelsForMonth(
 
     if (!member?.user_id) {
       lines.push({
-        workspaceId: ws.id, workspaceName: ws.name, chargeType: 'seat', quantity: 0,
-        unitCostUsd: SEAT_COST_USD, credits: 0, status: 'skipped',
+        workspaceId: ws.id, workspaceName: ws.name, chargeType: 'number', quantity: 0,
+        unitCostUsd: 0, credits: 0, status: 'skipped',
         error: 'no owner or admin to bill',
       });
       continue;
     }
 
-    const { data: usage } = await supabase.rpc('workspace_channel_usage', { p_workspace_id: ws.id });
-    const u = (Array.isArray(usage) ? usage[0] : usage) as Record<string, number> | undefined;
-    const overIncluded = Math.max((Number(u?.total) || 0) - (Number(u?.included) || 0), 0);
-
-    if (overIncluded > 0) {
-      lines.push(await chargeOne(supabase, {
-        workspaceId: ws.id, workspaceName: ws.name, billingUserId: member.user_id,
-        chargeType: 'seat', quantity: overIncluded, unitCostUsd: SEAT_COST_USD, month,
-        detail: { connected: Number(u?.total) || 0, included: Number(u?.included) || 0 },
-      }));
-    }
+    // No seat charge. Channels are unmetered by decision (2026-08-24) — a workspace connects as
+    // many accounts as it wants and the platform absorbs Zernio's per-account fee. The count is
+    // still surfaced in the operator cost view, which is where that absorbed cost becomes
+    // visible per tenant instead of arriving as one unattributed invoice line.
 
     // Numbers are priced from what Zernio actually charges for each one, captured at purchase —
     // a $3 Greek line and a $21 line must not be billed at one blended rate.

@@ -105,6 +105,10 @@ export type TriggerType =
   // Banking (#315): a company-card spend of ≥€100 landed (filter higher via amount)
   | 'card_spend_threshold'
   | 'module_access_requested'
+  // Someone asked to run the platform on their own infrastructure. Operator-facing:
+  // the most valuable message this platform receives, so it gets its own trigger
+  // rather than borrowing one whose name would misdescribe it in every flow list.
+  | 'self_hosting_requested'
   // HR: an employee has not clocked in past their start time + grace (payload-only)
   | 'hr_late_checkin'
   // HR recruiting: a job applicant moved through the pipeline (payload-only, dotted key)
@@ -215,6 +219,7 @@ export type TriggerType =
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
+export interface SelfHostingRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
 export interface RealestateBuyerMatchesFoundTriggerConfig {}
 export interface RealestateNewListingForBuyerTriggerConfig {}
@@ -492,6 +497,7 @@ export type TriggerConfigMap = {
   bank_payment_unmatched: BankPaymentUnmatchedTriggerConfig;
   card_spend_threshold: CardSpendThresholdTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
+  self_hosting_requested: SelfHostingRequestedTriggerConfig;
   hr_late_checkin: HrLateCheckinTriggerConfig;
   'hr.applicant_stage_changed': HrApplicantStageChangedTriggerConfig;
   'hr.employee_added': HrEmployeeAddedTriggerConfig;
@@ -983,6 +989,11 @@ export interface Flow {
   /** True = operator flow that fires across ALL workspaces (operator-only toggle);
    *  false = tenant flow scoped to workspace_id. */
   is_global?: boolean;
+  /** Global flows only: may a workspace owner see this on their Automations page and switch it off
+   *  (or mute one of its channels) via `workspace_flow_preferences`? Never lets them EDIT the
+   *  graph. Default false is fail-closed — a new operator flow stays invisible to tenants until
+   *  it is deliberately opened. */
+  tenant_configurable?: boolean;
   created_by: string | null;
   updated_by: string | null;
   last_run_at: string | null;

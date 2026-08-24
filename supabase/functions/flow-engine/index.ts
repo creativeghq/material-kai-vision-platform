@@ -1954,6 +1954,9 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'stripe_payment_succeeded', 'stripe_payment_failed',
   'role_upgrade_approved', 'role_upgrade_rejected', 'role_upgrade_request_submitted',
   'finance_follow_up', 'finance_document_requested', 'module_access_requested',
+  // A self-hosting enquiry emails the platform operator. Server-only, or any authenticated
+  // user could POST a forged one and put attacker-chosen text in that mailbox.
+  'self_hosting_requested',
   // #193 — both assert a fact about a LEGAL document / the operator's provider account.
   'fiscal_document_rejected', 'fiscal_credits_low',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',

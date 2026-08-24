@@ -45,10 +45,17 @@ Deno.serve(withApiLogging('stripe-api', async (req) => {
     case 'request-module':
     case 'list-stripe-products':
     case 'create-addon-product':
+    case 'verify-catalogue-prices':
+    case 'request-self-hosting':
       return handleModuleAction(req, body);
     default:
       return new Response(JSON.stringify({
-        error: `Unknown action '${action}'. Available: checkout, customer_portal, activate-module, deactivate-module, request-module, list-stripe-products`,
+        // Listed exhaustively and kept in step with the switch above: 'create-addon-product' was
+        // routable and unlisted for its whole life, so the only way to discover it was to read
+        // the source. An action the error message denies existing is an action nobody calls.
+        error: `Unknown action '${action}'. Available: checkout, customer_portal, activate-module, `
+          + `deactivate-module, request-module, list-stripe-products, create-addon-product, `
+          + `verify-catalogue-prices, request-self-hosting`,
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

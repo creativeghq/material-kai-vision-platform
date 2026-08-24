@@ -68,6 +68,7 @@ import {
   AlarmClock,
   ShieldCheck,
   Coins, MessagesSquare, PhoneOff, Link2, Unlink,
+  EyeOff, SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -179,6 +180,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   pricing_change_requested: ClipboardCheck,
   pricing_change_decided: CheckCircle2,
   module_access_requested: Package,
+  self_hosting_requested: Package,
   hr_late_checkin: Clock,
   'hr.applicant_stage_changed': UserPlus,
   'hr.employee_added': UserPlus,
@@ -312,6 +314,7 @@ const triggerLabels: Record<TriggerType, string> = {
   expense_card_requested: 'Expense Card Requested',
   pricing_change_requested: 'Discount Approval Requested',
   module_access_requested: 'Module Activation Requested',
+  self_hosting_requested: 'Self-Hosting Requested',
   pricing_change_decided: 'Discount Approval Decided',
   hr_late_checkin: 'HR — Late Check-in',
   'hr.applicant_stage_changed': 'HR — Applicant Stage Changed',
@@ -457,6 +460,42 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
     }
   };
 
+  // Operator "Workspace-configurable" toggle. A global flow runs inside every workspace, so it
+  // raises THEIR bells and sends THEIR members email — but is invisible on every tenant surface,
+  // which left an owner no way to stop it. Turning this on lists the flow under Automations →
+  // Platform defaults for every workspace, where an owner may switch it off or silence one of its
+  // channels. It never exposes the graph and never lets a tenant edit it.
+  // Leave it OFF for the operator's own business, for an alarm about the platform failing a legal
+  // or delivery obligation, and for delivery of a document to a CUSTOMER — silencing one of those
+  // hides breakage rather than noise.
+  const handleToggleTenantConfigurable = async (flow: Flow) => {
+    const next = !flow.tenant_configurable;
+    if (next && !flow.is_global) {
+      toast({
+        title: 'Not a platform default',
+        description: 'Only a global flow runs inside other workspaces, so only a global flow has anything for an owner to switch off.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      await flowService.updateFlow(flow.id, { tenant_configurable: next });
+      toast({
+        title: next ? 'Workspace-configurable' : 'Operator-only',
+        description: next
+          ? `Workspace owners can now switch "${flow.name}" off or mute one of its channels.`
+          : `"${flow.name}" is hidden from tenants again. Existing per-workspace settings are kept but stop applying.`,
+      });
+      onRefresh();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update tenant visibility',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleCreate = async () => {
     if (!newFlow.name.trim()) {
       toast({ title: 'Error', description: 'Flow name is required', variant: 'destructive' });
@@ -593,6 +632,12 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                             Locked
                           </span>
                         )}
+                        {flow.is_global && flow.tenant_configurable && (
+                          <span className="text-xs inline-flex items-center gap-1 text-teal-700 dark:text-teal-300">
+                            <SlidersHorizontal className="h-3 w-3" />
+                            Tenant-configurable
+                          </span>
+                        )}
                         {flow.is_global ? (
                           <span className="text-xs inline-flex items-center gap-1 text-blue-500">
                             <Globe className="h-3 w-3" />
@@ -683,6 +728,21 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                             </>
                           )}
                         </DropdownMenuItem>
+                        {flow.is_global && (
+                          <DropdownMenuItem onClick={() => handleToggleTenantConfigurable(flow)}>
+                            {flow.tenant_configurable ? (
+                              <>
+                                <EyeOff className="h-4 w-4 mr-2" />
+                                Hide from workspace owners
+                              </>
+                            ) : (
+                              <>
+                                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                                Let workspaces switch this off
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleToggleLock(flow)}>
                           {flow.is_locked ? (
                             <>

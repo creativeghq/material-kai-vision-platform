@@ -98,6 +98,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   bank_payment_unmatched: Landmark,
   card_spend_threshold: CreditCard,
   module_access_requested: LayoutGrid,
+  self_hosting_requested: LayoutGrid,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,

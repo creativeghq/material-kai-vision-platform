@@ -74,6 +74,8 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
       return deactivateModule(auth, body);
     case 'request-module':
       return requestModule(auth, body);
+    case 'request-self-hosting':
+      return requestSelfHosting(auth, body);
     case 'list-stripe-products':
       return listStripeProducts(auth);
     case 'verify-catalogue-prices':
@@ -510,6 +512,90 @@ async function verifyCataloguePrices(auth: AuthResult): Promise<Response> {
   }
 
   return json({ ok: drift.length === 0, checked: (addons?.length ?? 0) + (plans?.length ?? 0), drift });
+}
+
+/**
+ * Self-hosting enquiry from the plans page.
+ *
+ * Replaces the Enterprise tier, which was a purchasable plan nobody could sensibly buy: running
+ * this platform on someone else's infrastructure is a conversation, not a checkout.
+ *
+ * The ROW is written first and the notification second. A flow can be paused and an email can
+ * bounce; a self-hosting enquiry is the most valuable message this platform receives, so a
+ * delivery failure must cost a delay rather than the lead. `notified` records whether delivery
+ * actually happened instead of assuming it did — the same reason the back-fill now counts what
+ * lands rather than what returned 200.
+ */
+async function requestSelfHosting(auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
+  const userId = auth.userId;
+  if (!userId) return json({ error: 'Sign in required' }, 401);
+
+  const contactEmail = String(body.contact_email || auth.user?.email || '').trim();
+  if (!contactEmail || !contactEmail.includes('@')) {
+    return json({ error: 'A contact email is required so we can reply' }, 400);
+  }
+
+  const service = auth.supabase;
+  const workspaceId = body.workspace_id ? String(body.workspace_id) : null;
+
+  // Allowlisted, never spread: this is a request body reaching a DB write (invariant 8), and the
+  // status / notified / requested_by fields are ours to set.
+  const { data: row, error } = await service.from('self_hosting_requests').insert({
+    workspace_id: workspaceId,
+    requested_by: userId,
+    contact_email: contactEmail,
+    contact_name: body.contact_name ? String(body.contact_name).slice(0, 200) : null,
+    company: body.company ? String(body.company).slice(0, 200) : null,
+    team_size: body.team_size ? String(body.team_size).slice(0, 50) : null,
+    message: body.message ? String(body.message).slice(0, 4000) : null,
+  }).select('id').single();
+
+  if (error) return json({ error: `Could not record the request: ${error.message}` }, 500);
+
+  // Who to tell, DERIVED: the operators of the root workspace. Resolves to the platform owner
+  // today and keeps resolving if that address ever changes — a hardcoded mailbox is one
+  // handover away from delivering enquiries to nobody.
+  const { data: operators } = await service
+    .from('workspace_members')
+    .select('user_id, workspaces!inner(is_root)')
+    .eq('status', 'active')
+    .in('role', ['owner', 'admin'])
+    .eq('workspaces.is_root', true);
+
+  let notified = 0;
+  for (const op of ((operators ?? []) as Array<{ user_id: string }>)) {
+    try {
+      await emitFlowEvent('self_hosting_requested', {
+        user_id: op.user_id,
+        type: 'self_hosting_requested',
+        title: 'Self-hosting requested',
+        body: `${body.company ? String(body.company) + ' — ' : ''}${contactEmail}`
+          + `${body.team_size ? ` · ${String(body.team_size)}` : ''}`
+          + `${body.message ? `\n\n${String(body.message).slice(0, 500)}` : ''}`,
+        action_url: '/admin',
+        request_id: row.id,
+        contact_email: contactEmail,
+        contact_name: body.contact_name ? String(body.contact_name) : null,
+        company: body.company ? String(body.company) : null,
+        team_size: body.team_size ? String(body.team_size) : null,
+        message: body.message ? String(body.message) : null,
+        workspace_id: workspaceId,
+      });
+      notified++;
+    } catch (e) {
+      console.error('[request-self-hosting] notify failed:', e);
+    }
+  }
+
+  if (notified > 0) {
+    const { error: markErr } = await service
+      .from('self_hosting_requests').update({ notified: true }).eq('id', row.id);
+    if (markErr) console.error('[request-self-hosting] could not stamp notified:', markErr.message);
+  }
+
+  // Always 200 to the requester: their enquiry IS recorded, and telling them it failed because an
+  // internal flow is paused would lose a lead over something they cannot act on.
+  return json({ ok: true, request_id: row.id, notified });
 }
 
 async function listStripeProducts(auth: AuthResult): Promise<Response> {
