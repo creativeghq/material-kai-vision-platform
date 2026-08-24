@@ -34,6 +34,11 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const SUPPORTED_PLATFORMS = [
   'instagram', 'facebook', 'linkedin', 'tiktok',
   'pinterest', 'youtube', 'twitter', 'threads',
+  // Google Business. Unlike every other platform this one has a SECOND step after OAuth: an
+  // account can own many locations, and reviews belong to a location rather than to the account,
+  // so `connect/googlebusiness/locations` + `select-location` decide which one this workspace is.
+  // Connecting without choosing leaves an account that receives nothing.
+  'googlebusiness',
 ];
 
 

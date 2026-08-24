@@ -13,6 +13,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { handleZernioAnalytics } from './handlers/analytics.ts';
 import { handleZernioOauth } from './handlers/oauth.ts';
 import { handleZernioPublish } from './handlers/publish.ts';
+import { handleZernioReviews } from './handlers/reviews.ts';
 
 const ANALYTICS_ACTIONS = new Set([
   'get_best_time', 'get_post_analytics', 'get_account_insights', 'import_external_posts',
@@ -31,6 +32,9 @@ const ANALYTICS_ACTIONS = new Set([
 ]);
 const OAUTH_ACTIONS = new Set(['connect', 'callback', 'disconnect', 'config_status']);
 const PUBLISH_ACTIONS = new Set(['schedule', 'publish_now']);
+
+/** Reviews on a connected profile (Google Business). Reading is a plain RLS-scoped select. */
+const REVIEW_ACTIONS = new Set(['sync_reviews', 'reply_review']);
 
 Deno.serve(withApiLogging('zernio-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -59,10 +63,11 @@ Deno.serve(withApiLogging('zernio-api', async (req) => {
   if (ANALYTICS_ACTIONS.has(action)) return handleZernioAnalytics(req, body);
   if (OAUTH_ACTIONS.has(action)) return handleZernioOauth(req, body);
   if (PUBLISH_ACTIONS.has(action)) return handleZernioPublish(req, body);
+  if (REVIEW_ACTIONS.has(action)) return handleZernioReviews(req, body);
 
   return new Response(JSON.stringify({
     success: false,
-    error: `Unknown action '${action}'. Available: ${[...ANALYTICS_ACTIONS, ...OAUTH_ACTIONS, ...PUBLISH_ACTIONS].join(', ')}`,
+    error: `Unknown action '${action}'. Available: ${[...ANALYTICS_ACTIONS, ...OAUTH_ACTIONS, ...PUBLISH_ACTIONS, ...REVIEW_ACTIONS].join(', ')}`,
   }), {
     status: 400,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

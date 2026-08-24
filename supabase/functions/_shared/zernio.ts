@@ -437,6 +437,11 @@ export const ZERNIO_WEBHOOK_EVENTS = [
   'account.connected', 'account.disconnected',
   // Comments on our own posts, routed into the unified inbox as a `social` thread.
   'comment.received',
+  // Reviews on a connected profile (Google Business). These PUSH — there is no polling to
+  // build. `review.updated` fires when the reviewer edits their text or rating AND when a
+  // reply is added, including a reply written directly on Google, so the two events are the
+  // whole lifecycle.
+  'review.new', 'review.updated',
   // Publishing outcomes.
   'post.scheduled', 'post.published', 'post.partial', 'post.failed', 'post.cancelled',
   'post.platform.published', 'post.platform.failed',

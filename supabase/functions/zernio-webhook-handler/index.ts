@@ -969,6 +969,85 @@ async function handleReaction(supabase: any, payload: any): Promise<void> {
 }
 
 /**
+ * review.new / review.updated — a review on a connected profile (Google Business).
+ *
+ * Reviews PUSH. There is no polling to build: `review.new` on arrival, `review.updated` when the
+ * reviewer edits their text or rating, and `review.updated` again when a reply is added —
+ * including a reply written directly on Google rather than through us. So the two events are the
+ * entire lifecycle and the same upsert serves both.
+ *
+ * `rating` arrives as an INTEGER 1-5. Zernio has already normalised Google's `ONE`..`FIVE` enum,
+ * which is the shape that would otherwise have become a silent zero on every row.
+ */
+async function handleReview(supabase: any, payload: any): Promise<void> {
+  const review = payload.review || {};
+  const acct = payload.account || {};
+  const externalId = typeof review.id === 'string' ? review.id : '';
+  if (!externalId) {
+    console.warn('[zernio-webhook] review without an id — dropped');
+    return;
+  }
+
+  // `accountId` is the canonical field for account filtering per the spec; `id` is the same value
+  // and is what older payloads carry.
+  const zernioAccountId = String(acct.accountId ?? acct.id ?? '');
+  const { workspaceId, socialAccountId } = await resolveSocialWorkspace(supabase, zernioAccountId);
+  if (!workspaceId) {
+    console.warn(`[zernio-webhook] review for an unmapped account ${zernioAccountId} — dropped`);
+    return;
+  }
+
+  const reviewer = review.reviewer || {};
+  const rating = Number(review.rating);
+
+  const row = {
+    workspace_id: workspaceId,
+    platform: String(review.platform ?? acct.platform ?? 'googlebusiness'),
+    external_id: externalId,
+    social_account_id: socialAccountId,
+    zernio_account_id: zernioAccountId || null,
+    // Out-of-range is a shape we do not understand, and a CHECK violation would drop the whole
+    // review. Store it unrated rather than lose the customer's words.
+    rating: Number.isFinite(rating) && rating >= 1 && rating <= 5 ? Math.round(rating) : null,
+    comment: typeof review.text === 'string' ? review.text : null,
+    reviewer_name: typeof reviewer.name === 'string' ? reviewer.name : null,
+    // Null on anonymous Google reviews, which the spec calls out as common.
+    reviewer_id: typeof reviewer.id === 'string' ? reviewer.id : null,
+    reviewer_avatar_url: typeof reviewer.profileImage === 'string' ? reviewer.profileImage : null,
+    reply_text: review.hasReply && typeof review.reply === 'string' ? review.reply
+      : (typeof review.reply?.comment === 'string' ? review.reply.comment : null),
+    replied_at: review.hasReply ? (review.reply?.updateTime ?? payload.timestamp ?? null) : null,
+    posted_at: review.createdAt ?? null,
+    updated_at_remote: review.updatedAt ?? payload.timestamp ?? null,
+    raw: review,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Upsert on (platform, external_id): `review.updated` is the SAME review, and a second row for
+  // it would double the count on every screen that sums them.
+  const { error } = await supabase
+    .from('external_reviews')
+    .upsert(row, { onConflict: 'platform,external_id' });
+  if (error) {
+    // Throw so the dispatcher answers 5xx and Zernio retries — a review we drop is not resent.
+    throw new Error(`external_reviews upsert failed: ${error.message}`);
+  }
+
+  // NO flow event yet, deliberately.
+  //
+  // A new review IS a business event — a 1-star needs somebody today — but emitting
+  // `review_received` now would be undeliverable in the exact way this codebase keeps paying for:
+  // flow-engine matches zero flows for a trigger that is not in the TriggerType union and returns
+  // {triggered: 0} without error. §8 of docs/flows-notification-system.md is six coordinated
+  // changes (union, icon/label maps, paletteItems, a seeded locked default flow, a
+  // flow_area_registry row), and the notification also needs somewhere to send people: there is no
+  // reviews screen to link to yet.
+  //
+  // Half-registering it would be worse than not having it, so it lands with the UI. Tracked in
+  // issue #384. The reviews themselves are stored either way — this is the alert, not the data.
+}
+
+/**
  * message.sent — Meta accepted an outbound message.
  *
  * The send path already writes `status: 'sent'` optimistically from the API response, so this
@@ -1511,6 +1590,10 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       await handleReaction(supabase, payload);
       return jsonResponse({ received: true, event });
     }
+    if (event === 'review.new' || event === 'review.updated') {
+      await handleReview(supabase, payload);
+      return jsonResponse({ received: true, event });
+    }
     if (event === 'comment.received') {
       await handleSocialComment(supabase, payload);
       return jsonResponse({ received: true, event });
@@ -1886,7 +1969,11 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     // Zernio does not resend on a 200. Status/lifecycle syncs stay 200 — they are best-effort
     // and reconverge on the next event or sync, so retrying them just loops.
     if (event === 'message.received' || event === 'message.edited'
-        || event === 'message.deleted' || event === 'comment.received') {
+        || event === 'message.deleted' || event === 'comment.received'
+        // A review is customer CONTENT and Zernio does not resend after a 200, so a transient
+        // fault here loses it permanently. The upsert is keyed on (platform, external_id), which
+        // is what makes the retry converge instead of duplicating.
+        || event === 'review.new' || event === 'review.updated') {
       return jsonResponse({ error: `Transient failure handling ${event}`, event }, 500);
     }
   }
