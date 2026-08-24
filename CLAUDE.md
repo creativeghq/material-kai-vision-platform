@@ -183,6 +183,21 @@ the boundary easy to breach by accident. A tenant-facing read of `flows` therefo
 `.eq('is_global', false)` even where RLS says the same thing — `manage_flows` can run under the service role
 (partner `kai_` keys, admin-secret paths), and there RLS does not apply at all, so the filter *is* the
 boundary rather than a duplicate of one. Deleting it as redundant discloses the whole operator automation set.
+**There is exactly ONE sanctioned exception, and it is not a read of `flows`.** "Invisible to the tenant" was
+also a real defect: a global flow raises that workspace's bells and mails its members, so the seeded
+`inbox.message_received` flow emailed an owner on every WhatsApp reply with no off switch anywhere — 115 flows
+existed, every one of them global, so Automations was structurally EMPTY for every workspace that has ever
+existed. The fix is an OVERLAY, never a per-workspace copy of the defaults: `flows.tenant_configurable`
+(default **false**, fail-closed) marks a global flow an owner may govern, `workspace_flow_preferences` records
+only a workspace's DEVIATION (absent row = platform default, fully on), and the tenant surface reads
+`get_workspace_flow_defaults` — a **projection** (title/description/channels/state) that never returns
+`graph_definition`. One operator row stays the single source, so a fix to a default still reaches everyone.
+Leave `tenant_configurable` OFF for the operator's own business, for an alarm about the platform failing a
+legal or delivery obligation (myDATA rejection, email bounce, Ergani filing), and for delivery of a document
+to a CUSTOMER — silencing one of those hides breakage rather than noise. The engine applies mutes in
+`executeAction`, the one point both the BFS walk and the loop-node body pass through, keyed on the **event's**
+workspace (a global flow's own `workspace_id` is NULL, so scoping to the flow would silently never match).
+Guarded by [tests/unit/workspaceFlowDefaults.test.ts](tests/unit/workspaceFlowDefaults.test.ts).
 Tenant vocabulary is likewise two copies — `TENANT_TRIGGERS`/`TENANT_ACTIONS` (offered) vs
 `create_simple_flow`'s `v_allowed_*` (enforced); change both in one go. Guarded by
 [tests/unit/flowEventContract.test.ts](tests/unit/flowEventContract.test.ts).

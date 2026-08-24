@@ -23,6 +23,7 @@ import { statusTone } from '@/utils/statusTone';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { FlowBuilderTab } from '@/components/Admin/FlowsManagement/FlowBuilderTab';
 import { flowService } from '@/services/flows';
+import { PlatformDefaultsSection } from '../components/PlatformDefaultsSection';
 
 interface WorkspaceFlow {
   id: string;
@@ -190,10 +191,16 @@ export default function FlowsPage() {
         }
       />
 
-      <div className="p-3 sm:p-6 space-y-4">
-        <p className="text-xs text-muted-foreground">
-          Each run costs 20 credits ($0.20) from your workspace pool, plus any per-action cost.
-        </p>
+      <div className="p-3 sm:p-6 space-y-6">
+        {/* The workspace's OWN automations. The platform defaults below are a separate thing and
+            are labelled as such: one is built here and billed here, the other ships switched on. */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold">Your automations</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each run costs 20 credits ($0.20) from your workspace pool, plus any per-action cost.
+            </p>
+          </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -288,6 +295,12 @@ export default function FlowsPage() {
             })}
           </div>
         )}
+        </div>
+
+        {/* Notifications this workspace gets from the platform's own seeded flows. Rendered even
+            when the list above is empty — an owner drowning in inbox email arrives here looking
+            for the off switch, and "No automations yet" was the whole page before. */}
+        <PlatformDefaultsSection />
       </div>
     </div>
   );

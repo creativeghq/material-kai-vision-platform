@@ -119,7 +119,7 @@ class FlowService {
     return (data ?? []) as unknown as Flow[];
   }
 
-  async updateFlow(id: string, updates: Partial<Pick<Flow, 'name' | 'description' | 'status' | 'trigger_type' | 'trigger_config' | 'tags' | 'is_global'>>): Promise<Flow> {
+  async updateFlow(id: string, updates: Partial<Pick<Flow, 'name' | 'description' | 'status' | 'trigger_type' | 'trigger_config' | 'tags' | 'is_global' | 'tenant_configurable'>>): Promise<Flow> {
     const { data: { user } } = await supabase.auth.getUser();
 
     const { data, error } = await supabase

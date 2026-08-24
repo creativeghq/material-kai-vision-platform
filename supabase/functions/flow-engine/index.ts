@@ -75,6 +75,10 @@ interface FlowScope {
   /** The flow owner (flows.created_by) — the acting user for workspace-pool debits when a
    *  tenant flow runs off a 'system' trigger (no real acting user). */
   ownerUserId: string | null;
+  /** Delivery channels the EVENT's workspace has muted on this (global) flow — see
+   *  `workspace_flow_preferences`. Empty/absent means deliver everything, which is the
+   *  platform default. Applied in executeAction, the one place every action passes through. */
+  mutedActions?: Set<string>;
 }
 
 // Every TENANT flow RUN costs a base fee (billed to the workspace credit pool),
@@ -323,6 +327,16 @@ async function executeAction(
   scope?: FlowScope,
 ): Promise<{ output: Record<string, unknown> }> {
   const { actionType, config } = node.data;
+
+  // The workspace this event belongs to has switched this channel off (Automations → Platform
+  // defaults). Checked HERE because executeAction is the single point every action passes through —
+  // the BFS walk and the loop-node body both call it, and a check at either call site alone would
+  // let a looped send straight past. Recorded as a skipped step so a run still shows WHY nothing
+  // was sent; an action that silently no-ops is indistinguishable from one that failed.
+  if (actionType && scope?.mutedActions?.has(actionType)) {
+    return { output: { skipped: true, reason: 'muted_by_workspace', action: actionType } };
+  }
+
   const resolved = resolveAllTemplates(
     config as Record<string, unknown>,
     context as unknown as Record<string, unknown>,
@@ -1758,6 +1772,9 @@ async function handleExecuteFlow(
   isTestRun: boolean,
   initiatedBy: string,
   access?: { trusted: boolean; callerUserId: string | null },
+  /** Channels the EVENT's workspace muted on this flow (trigger-event dispatch only — a manual
+   *  admin Run has no tenant context and is never muted). */
+  mutedActions?: string[],
 ): Promise<Response> {
   const { flow_id, trigger_data = {} } = body;
 
@@ -1843,6 +1860,7 @@ async function handleExecuteFlow(
     workspaceId: (flow.workspace_id as string | null) ?? null,
     isGlobal: flow.is_global === true,
     ownerUserId: (flow.created_by as string | null) ?? null,
+    mutedActions: mutedActions && mutedActions.length ? new Set(mutedActions) : undefined,
   };
 
   // Every TENANT flow RUN costs a base fee billed to the workspace credit pool
@@ -2091,11 +2109,43 @@ async function handleTriggerEvent(
     return true;
   };
 
-  const flows = (allFlows ?? []).filter((f) =>
+  const configMatched = (allFlows ?? []).filter((f) =>
     matchesConfig((f as { trigger_config?: Record<string, unknown> }).trigger_config));
 
   if (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
+  }
+
+  /**
+   * Per-workspace overrides on the OPERATOR's seeded defaults (`workspace_flow_preferences`).
+   *
+   * A global flow runs inside every workspace, so before this the seeded "Inbox Message → Notify
+   * Recipient" mailed every member on every WhatsApp reply with no off switch anywhere — the flow
+   * is invisible to the tenant by design (is_global is the operator's), so there was nothing to
+   * pause. The overlay is read here rather than baked into the match query because it is SPARSE:
+   * no row means the platform default, and the overwhelmingly common case is no rows at all.
+   *
+   * Only global flows are subject to it — a tenant's OWN flow is already theirs to pause.
+   */
+  const mutedByFlow = new Map<string, string[]>();
+  let flows = configMatched;
+  if (workspaceId && configMatched.length) {
+    const globalIds = configMatched
+      .filter((f) => (f as { is_global?: boolean }).is_global === true)
+      .map((f) => f.id as string);
+    if (globalIds.length) {
+      const { data: prefs } = await supabase
+        .from('workspace_flow_preferences')
+        .select('flow_id, enabled, muted_actions')
+        .eq('workspace_id', workspaceId)
+        .in('flow_id', globalIds);
+      const disabled = new Set<string>();
+      for (const p of (prefs ?? []) as Array<{ flow_id: string; enabled: boolean; muted_actions: string[] | null }>) {
+        if (p.enabled === false) disabled.add(p.flow_id);
+        else if (p.muted_actions?.length) mutedByFlow.set(p.flow_id, p.muted_actions);
+      }
+      if (disabled.size) flows = configMatched.filter((f) => !disabled.has(f.id as string));
+    }
   }
 
   if (!flows || flows.length === 0) {
@@ -2105,7 +2155,14 @@ async function handleTriggerEvent(
   // Execute each matching flow
   const results = await Promise.allSettled(
     flows.map((flow) =>
-      handleExecuteFlow(supabase, { flow_id: flow.id, trigger_data: data }, false, 'system')
+      handleExecuteFlow(
+        supabase,
+        { flow_id: flow.id, trigger_data: data },
+        false,
+        'system',
+        undefined,
+        mutedByFlow.get(flow.id as string),
+      )
     ),
   );
 

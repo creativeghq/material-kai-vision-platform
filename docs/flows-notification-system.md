@@ -286,6 +286,71 @@ exist so a flow can't be accidentally deleted or an area left without a handler.
   raises an error if `is_locked` — so even a direct API/SQL delete is blocked
   until the flow is unlocked. The frontend surfaces this as a clear message.
 
+### 5c. Platform defaults — the workspace owner's off switch
+
+A `system-default` flow is `is_global` with `workspace_id IS NULL`, and the engine
+matches `is_global.eq.true` for **every** workspace. So it genuinely runs inside a
+tenant's workspace, raising its bells and mailing its members — while being invisible
+on every tenant surface, and locked against the operator's own delete.
+
+That was a real hole, not just a missing feature. Measured 2026-08-24: **115 flows,
+all of them global, zero workspace-owned** — so *Automations* was structurally empty
+for every workspace that has ever existed, and the seeded `Inbox Message → Notify
+Recipient` flow (`create_notification` **+** `send_email`) mailed the owner on every
+inbox message, WhatsApp replies included, with no off switch anywhere in the product.
+
+**The fix is an overlay, never a per-workspace copy of the 113 defaults.** Copies
+would drift the moment the operator fixed a default, need seeding for every new
+workspace and back-filling for every new default. Instead:
+
+| Piece | What it is |
+|---|---|
+| `flows.tenant_configurable` | Operator marks a global flow as one an owner may govern. Default **false** = fail-closed: a newly seeded flow is invisible to tenants until deliberately opened. Toggled per row in **/admin → Flows** ("Let workspaces switch this off"). |
+| `workspace_flow_preferences` | Sparse `(workspace_id, flow_id) → {enabled, muted_actions[]}`. **No row = the platform default**, fully on. SELECT policy for members; no write policy at all. |
+| `get_workspace_flow_defaults(ws)` | The tenant read. A **projection** — title, description, category, trigger, channels, state. Never returns `graph_definition`, so a tenant learns what a notification *is*, never how the operator builds one. Self-guarding on `is_workspace_member`. |
+| `set_workspace_flow_preference(...)` | The tenant write. Requires `is_workspace_admin`; refuses any flow that is not `is_global AND tenant_configurable AND active`; narrows `muted_actions` to channels the flow actually has. |
+| Automations → **Platform defaults** | `PlatformDefaultsSection.tsx`. Grouped by area category, searchable, one master switch + per-channel chips per row. |
+
+**Mutable channels are delivery only** — `create_notification`, `send_email`,
+`send_whatsapp`. `run_edge_function` and friends are mechanism: muting one would
+half-break the automation rather than quieten it.
+
+**Which defaults stay operator-only.** `tenant_configurable` is left **false** for
+four kinds, because silencing any of them hides breakage rather than noise:
+1. the operator's own business / the platform account tier (`role_upgrade_*`,
+   `stripe_payment_*`, `module_access_requested`, `→ Notify Operator` flows);
+2. flows where **the email IS the feature** — invite sends. Muting one does not
+   quieten anything, it breaks inviting people with no other symptom;
+3. alarms about the platform failing a legal or delivery obligation
+   (`fiscal_document_rejected`, `email_bounced`, `email_complained`,
+   `email_sender_not_configured`, `hr.ergani_filing_failed`);
+4. delivery of a business document to the **customer** (`invoice_issued`,
+   `payment_received`, `receipt_issued`, `payment_sent`, `order_dispatched`) — a
+   finance decision made on the finance surface, so an owner who "turned off email
+   noise" never discovers they also stopped invoicing customers.
+
+Starting split: **86 configurable / 25 operator-only.**
+
+**Engine.** `handleTriggerEvent` resolves the overlay once per event, keyed on the
+**event's** workspace — a global flow's own `workspace_id` is NULL, so scoping to the
+flow would silently never match. Disabled flows are dropped from the match; muted
+channels are threaded down and skipped inside **`executeAction`**, the single point
+both the BFS walk and the loop-node body pass through (a check at either call site
+alone would let a fanned-out `send_email` straight past). A muted action records a
+`skipped / muted_by_workspace` step, so a run still shows why nothing was sent.
+
+**A tenant's own flow is never subject to this** — it is already theirs to pause via
+`toggle_simple_flow`, and two independent off switches would disagree.
+
+Guarded by [tests/unit/workspaceFlowDefaults.test.ts](../tests/unit/workspaceFlowDefaults.test.ts).
+Not repo-checkable: the RPC bodies live in `pg_proc`, so the admin gate and the
+`tenant_configurable` filter are enforced by the functions and probed by hand.
+
+**Known gap:** the switch is per **workspace**, not per **member**. An owner can stop
+the workspace being emailed; one member cannot mute only their own copy while
+colleagues keep theirs. That needs a recipient-level evaluation inside the action
+loop rather than a per-event lookup.
+
 ### 5b. System Areas (coverage registry)
 - `flow_area_registry` — one row per platform area that should always have a flow
   pointed at it: `{ area_key, title, description, category, trigger_type,
