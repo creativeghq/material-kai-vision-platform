@@ -1707,6 +1707,80 @@ async function handleJwtAction(
       return json({ ok: true, hidden });
     }
 
+    // Add this conversation's counterparty to the CRM — because a PERSON pressed the button.
+    //
+    // The webhook used to do this on its own for every unknown number that wrote in, which is how
+    // the CRM filled with records named after a phone number. It links an existing contact and
+    // creates nothing; this is the deliberate other half, offered from the WhatsApp tab of the
+    // profile drawer.
+    case 'create_contact_from_thread': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may add a contact');
+
+      const workspaceId = String(thread.workspace_id);
+      const tmeta = (thread.metadata as Json) || {};
+      const waProfile = (tmeta.wa_profile ?? {}) as Record<string, unknown>;
+      const phone = String(tmeta.contact_phone || '').trim();
+      if (!phone) throw new HttpError(400, 'This conversation has no phone number to file against');
+
+      // Already linked, or already in the CRM under this number? Then say so rather than making a
+      // second record — the whole point of moving this behind a button is to stop duplicating people.
+      const { data: existingP } = await db.from('inbox_participants')
+        .select('id, contact_id').eq('thread_id', threadId).eq('participant_type', 'customer')
+        .limit(1).maybeSingle();
+      const participant = existingP as { id?: string; contact_id?: string } | null;
+      if (participant?.contact_id) {
+        return json({ ok: true, contact_id: participant.contact_id, created: false, reason: 'already linked' });
+      }
+
+      const digits = phone.replace(/[^\d]/g, '');
+      const { data: dupe } = await db.from('crm_contacts')
+        .select('id').eq('workspace_id', workspaceId)
+        .or(`phone.eq.+${digits},mobile.eq.+${digits}`).limit(1).maybeSingle();
+      let contactId = (dupe as { id?: string } | null)?.id ?? null;
+      let created = false;
+
+      if (!contactId) {
+        // Prefer what the caller typed, then what WhatsApp reports, and only fall back to the
+        // number. A record named after a phone number is the thing we are trying to stop making.
+        const name = String(payload.name || waProfile.name || thread.subject || '').trim() || phone;
+        const { data: made, error: makeErr } = await db.from('crm_contacts').insert({
+          workspace_id: workspaceId,
+          name,
+          phone: `+${digits}`,
+          email: (payload.email as string | undefined) || (waProfile.email as string | undefined) || null,
+          company: (payload.company as string | undefined) || null,
+          website: Array.isArray(waProfile.websites) ? String(waProfile.websites[0] ?? '') || null : null,
+          city: (waProfile.address as string | undefined) || null,
+          created_by: userId,
+          lead_source: 'whatsapp',
+        }).select('id').single();
+        if (makeErr) throw new HttpError(500, `Could not create the contact: ${makeErr.message}`);
+        contactId = (made as { id: string }).id;
+        created = true;
+
+        await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
+          type: 'crm_contact_created', workspace_id: workspaceId, user_id: uid,
+          contact_id: contactId, contact_name: name, lead_source: 'whatsapp',
+          title: 'New CRM contact', body: `${name} was added from a WhatsApp conversation.`,
+          action_url: `/crm/contacts/${contactId}`,
+        })).catch(() => {});
+      }
+
+      // Adopt the conversation that was already here.
+      if (participant?.id) {
+        await db.from('inbox_participants').update({ contact_id: contactId }).eq('id', participant.id);
+      } else {
+        await db.from('inbox_participants').insert({
+          thread_id: threadId, participant_type: 'customer', contact_id: contactId, thread_role: 'participant',
+        });
+      }
+      return json({ ok: true, contact_id: contactId, created });
+    }
+
     case 'set_status': {
       const threadId = String(payload.thread_id || '');
       const status = String(payload.status || '');

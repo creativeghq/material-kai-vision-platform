@@ -355,6 +355,18 @@ export const inboxApi = {
   setAgent(thread_id: string, agent_state: 'off' | 'active', agent_id?: string) {
     return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
   },
+  /**
+   * File this conversation's counterparty in the CRM, on purpose.
+   *
+   * The webhook no longer does this by itself — it links a contact that already exists and creates
+   * none, which is why the CRM stopped filling with records named after a phone number. This is
+   * the deliberate half, from the WhatsApp tab of the profile drawer.
+   */
+  createContactFromThread(thread_id: string, fields?: { name?: string; email?: string; company?: string }) {
+    return call<{ ok: boolean; contact_id: string; created: boolean; reason?: string }>(
+      'create_contact_from_thread', { thread_id, ...(fields ?? {}) },
+    );
+  },
   getAgentSettings(workspace_id: string) {
     return call<{ settings: InboxAgentSettings; can_edit: boolean }>(
       'get_agent_settings', { workspace_id },

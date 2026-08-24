@@ -151,6 +151,123 @@ export async function zernioApi(
   }
 }
 
+/** What WhatsApp knows about the person on the other end, in our shape. */
+export interface WhatsAppProfile {
+  name?: string;
+  about?: string;
+  /** A WhatsApp BUSINESS account exposes far more than a personal one. */
+  isBusiness?: boolean;
+  description?: string;
+  category?: string;
+  address?: string;
+  email?: string;
+  websites?: string[];
+  hours?: string;
+  avatarUrl?: string;
+  /** Every field the provider returned, so a shape we did not map is still recoverable. */
+  raw?: Record<string, unknown>;
+}
+
+/**
+ * The counterparty's WhatsApp profile.
+ *
+ * I previously told the operator this was not obtainable. That was wrong, and their own screenshot
+ * of the WhatsApp contact card — logo, "Avers-techno", "Metal fabricator", the Kyiv address, the
+ * email, the website, opening hours — is the disproof. A WhatsApp BUSINESS account publishes a
+ * business profile, and Zernio exposes both `/whatsapp/number-info` and its own `/contacts`.
+ * Nobody had called either.
+ *
+ * The exact response shape is not documented, so every endpoint is tried in turn and every
+ * plausible field name is mapped, with the whole payload kept under `raw`. Returns null only when
+ * no endpoint answered — which is different from "answered with nothing", and the caller records
+ * that difference.
+ */
+export async function fetchWhatsAppProfile(params: {
+  phone: string;
+  accountId?: string;
+  conversationId?: string;
+}): Promise<WhatsAppProfile | null> {
+  const digits = params.phone.replace(/[^\d]/g, '');
+  if (!digits) return null;
+
+  const attempts: string[] = [
+    `/whatsapp/number-info?phoneNumber=${encodeURIComponent('+' + digits)}`
+      + (params.accountId ? `&accountId=${encodeURIComponent(params.accountId)}` : ''),
+    `/whatsapp/number-info?number=${encodeURIComponent(digits)}`
+      + (params.accountId ? `&accountId=${encodeURIComponent(params.accountId)}` : ''),
+    `/contacts?search=${encodeURIComponent('+' + digits)}`,
+  ];
+  if (params.conversationId) {
+    attempts.unshift(`/inbox/conversations/${encodeURIComponent(params.conversationId)}`);
+  }
+
+  for (const path of attempts) {
+    let doc: any;
+    try {
+      doc = await zernioApi('GET', path);
+    } catch (err) {
+      // 404 just means this endpoint is not the one; anything else is worth seeing once.
+      if (!(err instanceof ZernioApiError && err.status === 404)) {
+        console.warn(`[zernio] profile lookup failed on ${path}:`, err instanceof Error ? err.message : String(err));
+      }
+      continue;
+    }
+
+    // Unwrap the several envelopes these endpoints use, and pick the first list entry if it is a
+    // search result rather than a single record.
+    let node: Record<string, unknown> | undefined =
+      (doc?.data ?? doc?.contact ?? doc?.profile ?? doc?.numberInfo ?? doc) as Record<string, unknown>;
+    const list = (doc?.data ?? doc?.contacts ?? doc?.results) as unknown;
+    if (Array.isArray(list)) node = list[0] as Record<string, unknown> | undefined;
+    if (!node || typeof node !== 'object') continue;
+
+    // A conversation record nests the counterparty rather than being one.
+    const inner = (node.participant ?? node.contact ?? node.businessProfile ?? node.profile ?? node) as Record<string, unknown>;
+    const merged = { ...node, ...inner } as Record<string, unknown>;
+
+    const str = (...keys: string[]): string | undefined => {
+      for (const k of keys) {
+        const v = merged[k];
+        if (typeof v === 'string' && v.trim()) return v.trim();
+      }
+      return undefined;
+    };
+
+    const websitesRaw = merged.websites ?? merged.website ?? merged.urls ?? merged.url;
+    const websites = Array.isArray(websitesRaw)
+      ? websitesRaw.filter((w): w is string => typeof w === 'string' && !!w)
+      : (typeof websitesRaw === 'string' && websitesRaw ? [websitesRaw] : undefined);
+
+    const profile: WhatsAppProfile = {
+      name: str('name', 'displayName', 'profileName', 'verifiedName', 'participantName', 'businessName'),
+      about: str('about', 'status', 'statusMessage'),
+      isBusiness: typeof merged.isBusiness === 'boolean' ? merged.isBusiness
+        : (typeof merged.is_business === 'boolean' ? merged.is_business as boolean
+          : (merged.accountType === 'business' || merged.businessProfile != null ? true : undefined)),
+      description: str('description', 'businessDescription', 'about_business'),
+      category: str('category', 'vertical', 'businessCategory', 'industry'),
+      address: str('address', 'businessAddress', 'location'),
+      email: str('email', 'businessEmail'),
+      websites,
+      hours: str('hours', 'openingHours', 'businessHours'),
+      avatarUrl: str('profilePicture', 'profilePictureUrl', 'avatar', 'avatarUrl', 'photoUrl', 'imageUrl', 'pictureUrl'),
+      raw: merged,
+    };
+
+    // Something usable, or keep trying the next endpoint. A record with only a phone number in it
+    // is not a profile — returning it would stop the search and store nothing worth showing.
+    const usable = profile.name || profile.avatarUrl || profile.description
+      || profile.category || profile.address || profile.email || profile.websites?.length;
+    if (usable) {
+      console.log(`[zernio] profile resolved via ${path.split('?')[0]} (keys: ${Object.keys(merged).join(',')})`);
+      return profile;
+    }
+  }
+
+  console.warn(`[zernio] no endpoint returned a usable WhatsApp profile for +${digits}`);
+  return null;
+}
+
 /**
  * One inbound attachment, fetched from the endpoint that actually serves it.
  *

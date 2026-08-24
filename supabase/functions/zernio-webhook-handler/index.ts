@@ -28,7 +28,9 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment } from '../_shared/zernio.ts';
+import {
+  ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment, fetchWhatsAppProfile,
+} from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
@@ -349,6 +351,84 @@ async function fetchAndStoreInboundAttachments(
   return out;
 }
 
+/**
+ * Fetch the counterparty's WhatsApp profile onto the thread, once.
+ *
+ * The operator can see a logo, a trading name, "Metal fabricator", a Kyiv address, an email and a
+ * website on their own phone. None of it was anywhere in the platform, because nothing had ever
+ * asked Zernio for it — not because WhatsApp withholds it.
+ *
+ * The avatar is DOWNLOADED, not linked: a provider's image URL expires, and a contact card whose
+ * photo turns into a broken square in a month is worse than one that never had a photo. Same rule
+ * as attachments (storage convention #7).
+ *
+ * Best-effort throughout. A profile is enrichment, and no part of it is worth failing a customer's
+ * message over.
+ */
+async function refreshWhatsAppProfile(
+  supabase: any,
+  params: { threadId: string; phone: string; accountId?: string; conversationId?: string },
+): Promise<void> {
+  try {
+    const profile = await fetchWhatsAppProfile({
+      phone: params.phone,
+      accountId: params.accountId,
+      conversationId: params.conversationId,
+    });
+    if (!profile) {
+      // Recorded, so "we looked and WhatsApp had nothing" is distinguishable from "we never
+      // looked" — the distinction that made this invisible for as long as it was.
+      await supabase.rpc('inbox_thread_merge_metadata', {
+        p_thread_id: params.threadId,
+        p_patch: { wa_profile_checked_at: new Date().toISOString(), wa_profile_found: false },
+      });
+      return;
+    }
+
+    let avatarPath: string | null = null;
+    if (profile.avatarUrl) {
+      try {
+        const res = await fetch(profile.avatarUrl);
+        if (res.ok) {
+          const bytes = new Uint8Array(await res.arrayBuffer());
+          const ct = res.headers.get('content-type') || 'image/jpeg';
+          const path = `inbox/${params.threadId}/profile/${crypto.randomUUID()}${extensionFor(ct) || '.jpg'}`;
+          const { error } = await supabase.storage
+            .from(INBOX_ATTACHMENT_BUCKET)
+            .upload(path, bytes, { contentType: ct, upsert: true });
+          if (error) console.warn('[zernio-webhook] profile avatar upload failed:', error.message);
+          else avatarPath = path;
+        }
+      } catch (err) {
+        console.warn('[zernio-webhook] profile avatar fetch failed:', err);
+      }
+    }
+
+    await supabase.rpc('inbox_thread_merge_metadata', {
+      p_thread_id: params.threadId,
+      p_patch: {
+        wa_profile_checked_at: new Date().toISOString(),
+        wa_profile_found: true,
+        wa_profile: {
+          name: profile.name ?? null,
+          about: profile.about ?? null,
+          is_business: profile.isBusiness ?? null,
+          description: profile.description ?? null,
+          category: profile.category ?? null,
+          address: profile.address ?? null,
+          email: profile.email ?? null,
+          websites: profile.websites ?? null,
+          hours: profile.hours ?? null,
+          avatar_bucket: avatarPath ? INBOX_ATTACHMENT_BUCKET : null,
+          avatar_path: avatarPath,
+        },
+      },
+    });
+  } catch (err) {
+    console.warn('[zernio-webhook] profile refresh failed:', err instanceof Error ? err.message : String(err));
+  }
+}
+
 /** A file extension for a name that has none, so the browser and our renderer both know what it is. */
 function extensionFor(contentType: string, fileName?: string): string {
   if (fileName && /\.[a-z0-9]{2,5}$/i.test(fileName)) return '';
@@ -553,6 +633,26 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
       thread_id: threadId, message_type: 'system',
       body: 'The AI assistant is responding to new messages on this conversation.',
     });
+  }
+
+  // Who is this, according to WhatsApp? Fetched on a new thread, and refreshed when the answer on
+  // file is older than a week — a business changes its address or its hours, and a card that is
+  // right once and then frozen is a card nobody trusts. Never on an import: back-filling 8
+  // conversations would fire 8 profile lookups for chats already on the operator's phone.
+  if (!historical) {
+    const threadMeta = (await supabase.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle())
+      .data?.metadata as Record<string, unknown> | undefined;
+    const checkedAt = typeof threadMeta?.wa_profile_checked_at === 'string'
+      ? Date.parse(threadMeta.wa_profile_checked_at) : NaN;
+    const stale = !Number.isFinite(checkedAt) || (Date.now() - checkedAt) > 7 * 24 * 3600 * 1000;
+    if (stale) {
+      await refreshWhatsAppProfile(supabase, {
+        threadId,
+        phone,
+        accountId,
+        conversationId: String(msg.conversationId ?? ''),
+      });
+    }
   }
 
   // A WhatsApp reply from an unknown number is a genuine new lead written straight to

@@ -29,6 +29,7 @@ const hook = readFileSync(join(ROOT, 'supabase', 'functions', 'zernio-webhook-ha
 const messagingApi = readFileSync(join(ROOT, 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
 const inboxPage = readFileSync(join(ROOT, 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
 const zernioClient = readFileSync(join(ROOT, 'supabase', 'functions', '_shared', 'zernio.ts'), 'utf8');
+const inboxApiSrc = readFileSync(join(ROOT, 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
 
 describe('inbound attachments are not guessed at by field name', () => {
   it('normalises through one function rather than reading a single key', () => {
@@ -228,5 +229,64 @@ describe('one press, one message', () => {
     expect(inboxPage).toMatch(/sendInFlight\.current = false;/);
     // And the keyboard path, which was the one with no guard at all.
     expect(inboxPage).toMatch(/!waBlocked && !sending\) send\(\)/);
+  });
+});
+
+describe('the CRM is not filled in behind your back', () => {
+  it('the resolver links an existing contact and creates none', () => {
+    // The webhook used to create one for every unknown number that wrote in, which is how the CRM
+    // got records named after a phone number. Recognition is free to automate; creation is a
+    // decision, and it now lives behind a button in the drawer.
+    // The webhook must not write to crm_contacts at all any more — that is the property, and it
+    // is checkable directly rather than by inference.
+    expect(
+      /from\('crm_contacts'\)[\s\S]{0,120}?\.insert\(/.test(stripComments(hook)),
+      'the webhook creates CRM contacts again — a message arriving is not a decision to keep somebody',
+    ).toBe(false);
+    expect(inboxApiSrc).toMatch(/case 'create_contact_from_thread'/);
+  });
+
+  it('the drawer action is a real call, not a link out to the CRM list', () => {
+    expect(inboxPage).toMatch(/createContactFromThread/);
+    expect(inboxPage).toMatch(/Add .* to CRM|to CRM/);
+  });
+
+  it('refuses to make a second record for a number already on file', () => {
+    // The whole reason it moved behind a button is to stop duplicating people, so the button
+    // itself must not duplicate them either.
+    expect(inboxApiSrc).toMatch(/already linked/);
+    expect(inboxApiSrc).toMatch(/crm_contacts'\)\s*[\s\S]{0,200}?\.or\(`phone\.eq/);
+  });
+});
+
+describe('the WhatsApp profile is fetched and shown', () => {
+  it('asks WhatsApp who they are', () => {
+    // A business account publishes a trading name, category, description, address, email, site,
+    // hours and a logo. None of it reached the platform because nothing had ever asked for it —
+    // which is not the same as WhatsApp withholding it.
+    expect(zernioClient).toMatch(/export async function fetchWhatsAppProfile/);
+    expect(zernioClient).toMatch(/number-info/);
+    expect(hook).toMatch(/refreshWhatsAppProfile/);
+  });
+
+  it('stores the logo as an object, never as the provider url', () => {
+    // A provider image url expires; a contact card whose photo becomes a broken square is worse
+    // than one that never had a photo.
+    expect(hook).toMatch(/avatar_path/);
+    expect(hook).toMatch(/\.upload\(path, bytes/);
+  });
+
+  it('merges thread metadata instead of overwriting it', () => {
+    // PostgREST .update({metadata}) is a whole-column assignment. Writing the profile that way
+    // would delete zernio_conversation_id and contact_phone — the thread's identity. This file
+    // already learned that on the delivery-receipt path.
+    expect(hook).toMatch(/inbox_thread_merge_metadata/);
+  });
+
+  it('renders only what came back', () => {
+    // An empty row reads as "this business has no address", not as "not provided".
+    expect(inboxPage).toMatch(/wa_profile/);
+    expect(inboxPage).toMatch(/AvatarImage/);
+    expect(inboxPage).toMatch(/wa_profile_checked_at/);
   });
 });
