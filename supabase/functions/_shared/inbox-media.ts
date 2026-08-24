@@ -7,6 +7,7 @@
  *     provider link the browser cannot load and are stuck that way permanently otherwise.
  */
 import { fetchZernioMediaUrl } from './zernio.ts';
+import { fetchImageGuardedOrNull } from './fetch-image.ts';
 
 /** Where inbound files land — the same bucket and prefix inbox-api writes outbound ones to. */
 export const INBOX_ATTACHMENT_BUCKET = 'generation-images';
@@ -107,3 +108,62 @@ export function extensionFor(contentType: string, fileName?: string): string {
   return map[ct] ?? '';
 }
 
+
+/**
+ * Store a counterparty's profile picture on their thread.
+ *
+ * Shared for the same reason as the media download above: TWO callers reach it — the webhook,
+ * when a live payload happens to carry `conversation.participantPicture`, and messaging-api's
+ * `sync-avatars`, which is the one that actually gets them.
+ *
+ * The picture is DOWNLOADED, never linked. A platform CDN url expires, and the api-hosted ones
+ * need our bearer key, so a stored link renders as a broken square in the browser — the same
+ * reason inbound media is pulled rather than referenced.
+ *
+ * Returns whether an image was actually stored, so a caller can report a real count instead of
+ * assuming its own success.
+ */
+export async function storeParticipantPicture(
+  supabase: any,
+  threadId: string,
+  pictureUrl: string,
+  name: string,
+): Promise<boolean> {
+  try {
+    const img = await fetchImageGuardedOrNull(pictureUrl);
+    let avatarPath: string | null = null;
+    if (img) {
+      const path = `inbox/${threadId}/profile/${crypto.randomUUID()}${extensionFor(img.mimeType) || '.jpg'}`;
+      const { error } = await supabase.storage
+        .from(INBOX_ATTACHMENT_BUCKET)
+        .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
+      if (error) console.warn('[inbox-media] participant picture upload failed:', error.message);
+      else avatarPath = path;
+    }
+    // MERGE, not assign: `wa_profile` also carries the display name, and a whole-column write
+    // would drop it. PostgREST `.update({metadata})` replaces the column outright.
+    const { data: row } = await supabase
+      .from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle();
+    const known = ((row?.metadata as Record<string, unknown> | undefined)?.wa_profile ?? {}) as Record<string, unknown>;
+    await supabase.rpc('inbox_thread_merge_metadata', {
+      p_thread_id: threadId,
+      p_patch: {
+        wa_profile: {
+          ...known,
+          name: name || (known.name as string | undefined) || null,
+          // Kept so the next pass can tell "same picture" from "they changed it" without
+          // downloading anything. Cleared bytes with a live source would re-download forever.
+          avatar_source: avatarPath ? pictureUrl : null,
+          avatar_bucket: avatarPath ? INBOX_ATTACHMENT_BUCKET : null,
+          avatar_path: avatarPath,
+        },
+        wa_profile_checked_at: new Date().toISOString(),
+        wa_profile_found: true,
+      },
+    });
+    return avatarPath !== null;
+  } catch (err) {
+    console.warn('[inbox-media] participant picture failed:', err instanceof Error ? err.message : String(err));
+    return false;
+  }
+}

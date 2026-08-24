@@ -470,6 +470,33 @@ export class MessagingService {
     return data;
   }
 
+  /**
+   * Download the profile photos WhatsApp will give us.
+   *
+   * A photo is not pushed: `conversation.participantPicture` is optional on a webhook and was
+   * absent on every real payload we measured, which is why every thread showed initials. It IS a
+   * documented field on `GET /v1/inbox/conversations`, so this goes and reads it — the same
+   * fetch-the-bytes rule that makes inbound attachments work.
+   *
+   * The counts come back separated on purpose: a run that finds no photos and a run that finds
+   * photos it already had are the same "0 stored" and completely different problems.
+   */
+  async syncAvatars(workspaceId: string, threadId?: string): Promise<{
+    conversations: number;
+    with_picture: number;
+    stored: number;
+    own_avatar: boolean;
+    message: string;
+    errors?: string[];
+  }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'sync-avatars', workspaceId, threadId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Failed to sync profile photos'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
   /** What this workspace already holds, bought or brought. */
   async listPhoneNumbers(workspaceId: string, status?: string): Promise<OwnedPhoneNumber[]> {
     const { data, error } = await supabase.functions.invoke('messaging-api', {

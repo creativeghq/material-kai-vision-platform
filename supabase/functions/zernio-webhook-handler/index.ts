@@ -35,7 +35,7 @@ import {
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import {
-  INBOX_ATTACHMENT_BUCKET, materialiseInlineAttachments, extensionFor,
+  INBOX_ATTACHMENT_BUCKET, materialiseInlineAttachments, extensionFor, storeParticipantPicture,
 } from '../_shared/inbox-media.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
@@ -370,58 +370,16 @@ async function fetchAndStoreInboundAttachments(
   return out;
 }
 
-// `refreshWhatsAppProfile` lived here. It tried three endpoints for a profile photo that
-// arrives in every webhook as `conversation.participantPicture`, and settled for a Zernio CRM
-// row whose `name` was the phone number. Deleted rather than left unused: a second profile
-// path is how the guessing comes back. See storeParticipantPicture below.
+// `refreshWhatsAppProfile` lived here. It tried three endpoints for a profile photo —
+// `/whatsapp/number-info`, `/inbox/conversations/{id}`, `/contacts` — and settled for a Zernio
+// CRM row whose `name` was the phone number. Deleted rather than left unused: a second profile
+// path is how the guessing comes back. The photo comes from ONE place now, the documented
+// `participantPicture` on `GET /v1/inbox/conversations`, read by messaging-api `sync-avatars`.
 
-/**
- * Store the counterparty's WhatsApp/social profile picture on the thread.
- *
- * The URL is the platform's own CDN link from `conversation.participantPicture`. Guarded (invariant
- * 7) because it is a value from an external payload; downloaded rather than linked because those
- * links expire.
- */
-async function storeParticipantPicture(
-  supabase: any,
-  threadId: string,
-  pictureUrl: string,
-  name: string,
-): Promise<void> {
-  try {
-    const img = await fetchImageGuardedOrNull(pictureUrl);
-    let avatarPath: string | null = null;
-    if (img) {
-      const path = `inbox/${threadId}/profile/${crypto.randomUUID()}${extensionFor(img.mimeType) || '.jpg'}`;
-      const { error } = await supabase.storage
-        .from(INBOX_ATTACHMENT_BUCKET)
-        .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
-      if (error) console.warn('[zernio-webhook] participant picture upload failed:', error.message);
-      else avatarPath = path;
-    }
-    await supabase.rpc('inbox_thread_merge_metadata', {
-      p_thread_id: threadId,
-      p_patch: {
-        wa_profile: {
-          name: name || null,
-          // The source URL is kept so the next message can tell "same picture" from "they changed
-          // it" without downloading anything.
-          avatar_source: pictureUrl,
-          avatar_bucket: avatarPath ? INBOX_ATTACHMENT_BUCKET : null,
-          avatar_path: avatarPath,
-        },
-        wa_profile_checked_at: new Date().toISOString(),
-        wa_profile_found: true,
-      },
-    });
-  } catch (err) {
-    console.warn('[zernio-webhook] participant picture failed:', err instanceof Error ? err.message : String(err));
-  }
-}
-
-// materialiseInlineAttachments / normalizeMediaType / extensionFor moved to
-// _shared/inbox-media.ts — messaging-api's repair-attachments needs the identical download,
-// and two copies of "how a provider link becomes a stored file" is how they drift.
+// materialiseInlineAttachments / normalizeMediaType / extensionFor / storeParticipantPicture all
+// live in _shared/inbox-media.ts — messaging-api needs the identical download for
+// repair-attachments and sync-avatars, and two copies of "how a provider link becomes a stored
+// file" is how they drift.
 
 export function parseSentAt(raw: unknown): string | null {
   if (typeof raw !== 'string' && typeof raw !== 'number') return null;
@@ -685,10 +643,12 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // conversations would fire 8 profile lookups for chats already on the operator's phone.
   // The counterparty's photo and display name come from the WEBHOOK, not from a lookup.
   //
-  // `conversation.participantPicture` is in every payload. The previous version tried three
-  // endpoints for it — `/whatsapp/number-info`, `/inbox/conversations/{id}`, `/contacts` — none of
-  // which returns it, and settled for `/contacts`' CRM row whose `name` was the phone number. All
-  // of that was solving a problem that did not exist.
+  // `conversation.participantPicture` is OPTIONAL on a webhook — measured absent on four real
+  // `message.received` payloads, which is why nothing had a photo. It is a documented field on
+  // `GET /v1/inbox/conversations`, so the picture is FETCHED there by messaging-api's
+  // `sync-avatars`; this block is the opportunistic path for when a payload does carry one.
+  // Reading it here alone was the bug: waiting for a push that is not guaranteed, on a field the
+  // list endpoint will hand over on request.
   //
   // Still downloaded rather than linked: a provider image URL expires, and a card whose photo
   // becomes a broken square is worse than one that never had a photo.
@@ -991,7 +951,7 @@ async function handleReview(supabase: any, payload: any): Promise<void> {
   // `accountId` is the canonical field for account filtering per the spec; `id` is the same value
   // and is what older payloads carry.
   const zernioAccountId = String(acct.accountId ?? acct.id ?? '');
-  const { workspaceId, socialAccountId } = await resolveSocialWorkspace(supabase, zernioAccountId);
+  const { workspaceId, socialAccountId, connectedBy } = await resolveSocialWorkspace(supabase, zernioAccountId);
   if (!workspaceId) {
     console.warn(`[zernio-webhook] review for an unmapped account ${zernioAccountId} — dropped`);
     return;
@@ -1033,18 +993,40 @@ async function handleReview(supabase: any, payload: any): Promise<void> {
     throw new Error(`external_reviews upsert failed: ${error.message}`);
   }
 
-  // NO flow event yet, deliberately.
+  // A new review is a business event: a 1-star needs somebody today, and nobody is watching a
+  // screen they do not know changed. Registered per §8 of docs/flows-notification-system.md and
+  // delivered by the seeded `Review Received → Notify Owner` default flow.
   //
-  // A new review IS a business event — a 1-star needs somebody today — but emitting
-  // `review_received` now would be undeliverable in the exact way this codebase keeps paying for:
-  // flow-engine matches zero flows for a trigger that is not in the TriggerType union and returns
-  // {triggered: 0} without error. §8 of docs/flows-notification-system.md is six coordinated
-  // changes (union, icon/label maps, paletteItems, a seeded locked default flow, a
-  // flow_area_registry row), and the notification also needs somewhere to send people: there is no
-  // reviews screen to link to yet.
-  //
-  // Half-registering it would be worse than not having it, so it lands with the UI. Tracked in
-  // issue #384. The reviews themselves are stored either way — this is the alert, not the data.
+  // `review.updated` fires again when the reviewer edits, AND when a reply is added — including
+  // our own reply. Alerting on those would notify the operator about their own answer, so only a
+  // review that has NOT been replied to is announced.
+  if (payload.event === 'review.new' || !row.reply_text) {
+    const stars = row.rating ?? 0;
+    const who = row.reviewer_name || 'Someone';
+    try {
+      await emitFlowEvent('review_received', {
+        type: 'review_received',
+        workspace_id: workspaceId,
+        // Who authorised the profile. The seeded flow templates this; a flow can retarget it.
+        user_id: connectedBy,
+        review_id: externalId,
+        social_account_id: socialAccountId,
+        platform: row.platform,
+        // A NUMBER, under the same key the trigger_config rating filter names — flow-engine
+        // matches config generically by key, so a mismatch here is a filter that never fires.
+        rating: row.rating,
+        reviewer_name: row.reviewer_name,
+        comment: row.comment,
+        title: stars ? `${stars}★ review from ${who}` : `New review from ${who}`,
+        body: row.comment ? String(row.comment).slice(0, 200) : 'No comment was left.',
+        action_url: '/social-media/reviews',
+      });
+    } catch (err) {
+      // Best-effort: the review itself is already stored, and losing the alert must never cost
+      // Zernio a 5xx that would replay the whole upsert.
+      console.warn('[zernio-webhook] review_received emit failed', err);
+    }
+  }
 }
 
 /**

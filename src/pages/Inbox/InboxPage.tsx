@@ -347,6 +347,39 @@ const InboxPage: React.FC = () => {
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
+  /**
+   * Go and get the profile photos, once, when some thread is missing one.
+   *
+   * Not a button the operator has to know about: nobody opens an inbox thinking "the avatars need
+   * synchronising". WhatsApp does not push a photo — `participantPicture` is optional on the
+   * webhook and was absent on every real payload — so somebody has to ask
+   * `GET /inbox/conversations` for it, and the honest place to do that is the moment we can see
+   * that a photo is missing.
+   *
+   * Once per mount, guarded by a ref: the thread list refreshes on every realtime event, and a
+   * fetch-per-render would page the whole conversation list on each new message. A thread that
+   * genuinely has no photo just stays without one until the next visit, which is the right cost
+   * for a decoration.
+   */
+  const avatarSyncDone = useRef(false);
+  useEffect(() => {
+    if (avatarSyncDone.current || !activeWorkspaceId || !threads.length) return;
+    const missing = threads.some((t) => {
+      if (t.channel !== 'whatsapp') return false;
+      const wa = ((t.metadata as Record<string, unknown> | undefined)?.wa_profile ?? null) as
+        Record<string, unknown> | null;
+      return !wa || typeof wa.avatar_path !== 'string';
+    });
+    if (!missing) return;
+    avatarSyncDone.current = true;
+    void messagingService.syncAvatars(activeWorkspaceId)
+      // Reload only when something actually landed — a no-op refresh on every inbox open is
+      // a wasted round trip and a visible flicker for nothing.
+      .then((r) => { if (r.stored > 0) loadThreads(); })
+      .catch(() => { /* decoration: a failure here must never interrupt reading messages */ });
+  }, [threads, activeWorkspaceId, loadThreads]);
+
+
   // Workspace labels drive the filter pills + the per-thread assignment popover.
   const loadLabels = useCallback(async () => {
     if (!activeWorkspaceId) { setWsLabels([]); setCanManageLabels(false); return; }
@@ -398,6 +431,32 @@ const InboxPage: React.FC = () => {
           profMap[p.user_id] = p;
         }
       }
+      /**
+       * OUR side's photo.
+       *
+       * A member's avatar comes from `user_profiles.avatar_url`, and on a WhatsApp thread that is
+       * the wrong place to stop: the operator already has a photo — the one their customers see
+       * beside every message — and it lives on the WhatsApp Business profile, not on our upload
+       * form. Asking them to upload a second copy of a picture they already published is the
+       * platform failing to look where the answer is.
+       *
+       * So: uploaded photo first (an explicit choice always wins), the number's business photo
+       * second. Fetched by messaging-api `sync-avatars`; null here simply means it has not run
+       * yet, and initials are the honest fallback for that.
+       */
+      let channelAvatarUrl: string | null = null;
+      const threadChannelId = (thread.metadata as Record<string, unknown> | undefined)?.channel_id;
+      if (typeof threadChannelId === 'string' && threadChannelId) {
+        const { data: chan } = await supabase
+          .from('messaging_channels').select('config').eq('id', threadChannelId).maybeSingle();
+        const cfg = ((chan as { config?: Record<string, unknown> } | null)?.config ?? {}) as Record<string, unknown>;
+        if (typeof cfg.avatar_bucket === 'string' && typeof cfg.avatar_path === 'string') {
+          channelAvatarUrl = await signInboxAttachment({
+            storage_bucket: cfg.avatar_bucket, storage_object_path: cfg.avatar_path,
+          }).catch(() => null);
+        }
+      }
+
       const customerName = ctx?.contact?.name || thread.subject || 'Customer';
       const next = new Map<string, ParticipantLabel>();
       for (const p of participants) {
@@ -409,7 +468,7 @@ const InboxPage: React.FC = () => {
             // transcript that says "You" answers a different question for every reader —
             // the one thing it never tells anyone is which colleague replied.
             label: prof?.full_name || prof?.email || (isMe ? 'You' : 'Team member'),
-            kind: 'member', userId: p.user_id, avatarUrl: prof?.avatar_url ?? null,
+            kind: 'member', userId: p.user_id, avatarUrl: prof?.avatar_url ?? channelAvatarUrl,
           });
         } else if (p.participant_type === 'customer') {
           next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id });
@@ -1254,9 +1313,21 @@ const InboxPage: React.FC = () => {
                   </div>
                 )}
                 <div className="flex items-end gap-2">
+                  <div className="shrink-0">
+                    <EmojiPicker
+                      disabled={waBlocked}
+                      onPick={(e) => setDraft((d) => d + e)}
+                    />
+                  </div>
                   <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">
                     <Paperclip className="w-4 h-4 text-muted-foreground" />
-                    <input type="file" className="hidden" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} />
+                    {/* `accept` names what the channel can actually carry, so the picker does not
+                        offer a file the send will reject. */}
+                    <input
+                      type="file" className="hidden"
+                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                      onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                    />
                   </label>
                   <Textarea
                     value={draft}
@@ -1451,6 +1522,58 @@ const ThreadAvatar: React.FC<{
  */
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
+/**
+ * A compact emoji picker for the composer.
+ *
+ * Hand-rolled rather than a dependency: a full picker library is ~1MB of emoji metadata for a
+ * feature that is "put a 👍 in the message". These are the ones people actually use in a business
+ * chat, grouped so the list is scannable rather than a wall.
+ */
+const COMPOSER_EMOJI: Array<{ group: string; emoji: string[] }> = [
+  { group: 'Common', emoji: ['👍', '🙏', '👌', '👏', '🙌', '💪', '🤝', '✅', '❌', '⚠️'] },
+  { group: 'Faces', emoji: ['🙂', '😊', '😃', '😉', '😍', '🤔', '😅', '😂', '😢', '😮'] },
+  { group: 'Work', emoji: ['📦', '📸', '📄', '📐', '🔧', '🚚', '🏗️', '🧱', '🪵', '🪟'] },
+  { group: 'Signals', emoji: ['🔥', '⭐', '💡', '⏰', '📌', '💰', '📈', '🎉', '❤️', '👀'] },
+];
+
+const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; disabled?: boolean }> = ({ onPick, disabled }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button" title="Insert emoji" disabled={disabled}
+          className="p-2 rounded-sm hover:bg-surface-hover disabled:opacity-40 disabled:pointer-events-none"
+        >
+          <Smile className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-2">
+        <div className="max-h-64 overflow-y-auto space-y-2">
+          {COMPOSER_EMOJI.map(({ group, emoji }) => (
+            <div key={group}>
+              <div className="text-[10px] font-semibold text-muted-foreground mb-1 px-0.5">{group}</div>
+              <div className="grid grid-cols-10 gap-0.5">
+                {emoji.map((e) => (
+                  <button
+                    key={e} type="button"
+                    // Stays open: picking two in a row is normal, and a picker that closes on
+                    // every choice makes "😊👍" three clicks instead of two.
+                    onClick={() => onPick(e)}
+                    className="text-lg leading-none rounded-sm py-1 hover:bg-surface-hover"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const MessageActions: React.FC<{
   onReply?: () => void;
   onReact?: (emoji: string) => void;
@@ -1508,7 +1631,17 @@ const AttachmentLightbox: React.FC<{
   href?: string;
   name: string;
   kind: 'image' | 'pdf';
-}> = ({ open, onOpenChange, href, name, kind }) => (
+  /** The stored object, for the agent hand-off — which needs a durable URL, not a signed one. */
+  att?: InboxAttachment;
+}> = ({ open, onOpenChange, href, name, kind, att }) => {
+  // The agent is handed a PUBLIC url, not the signed one the lightbox renders. A signed URL
+  // expires in an hour and the agent may act on it later — a visual search that 403s halfway
+  // through is a worse answer than not offering the button. `generation-images` is public-read,
+  // so the object already has a stable address.
+  const publicUrl = att?.storage_bucket && att?.storage_object_path
+    ? supabase.storage.from(att.storage_bucket).getPublicUrl(att.storage_object_path).data.publicUrl
+    : null;
+  return (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-5xl w-[92vw] p-0 overflow-hidden">
       <DialogHeader className="px-4 py-2.5 border-b border-hairline bg-surface-sunken">
@@ -1533,6 +1666,19 @@ const AttachmentLightbox: React.FC<{
             <Download className="w-3 h-3 mr-1.5" />Download
           </a>
         </Button>
+        {/* Hand the photo to the agent's visual search. A customer sending a picture of a tile
+            and asking "do you have this" is the single commonest thing on a materials WhatsApp,
+            and answering it meant describing the photo into a different screen by hand. */}
+        {kind === 'image' && publicUrl && (
+          <Button asChild variant="secondary" size="sm" className="h-8 text-xs">
+            <a href={`/agent-hub?agent=kai&image=${encodeURIComponent(publicUrl)}&prompt=${encodeURIComponent(
+              'Find products in our catalogue that match this image — closest visual matches first, '
+              + 'with the product name and code for each.',
+            )}`}>
+              <Search className="w-3 h-3 mr-1.5" />Find matching products
+            </a>
+          </Button>
+        )}
         <Button asChild variant="outline" size="sm" className="h-8 text-xs">
           <a href={href} target="_blank" rel="noreferrer">
             <ExternalLink className="w-3 h-3 mr-1.5" />Open original
@@ -1541,7 +1687,8 @@ const AttachmentLightbox: React.FC<{
       </div>
     </DialogContent>
   </Dialog>
-);
+  );
+};
 
 const AttachmentView: React.FC<{
   att: InboxAttachment;
@@ -1642,7 +1789,7 @@ const AttachmentView: React.FC<{
                        group-hover:border-primary/40 transition-colors"
           />
         </button>
-        <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="image" />
+        <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="image" att={att} />
       </>
     );
   }
@@ -1673,7 +1820,7 @@ const AttachmentView: React.FC<{
             </span>
           </span>
         </button>
-        <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="pdf" />
+        <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="pdf" att={att} />
       </>
     );
   }

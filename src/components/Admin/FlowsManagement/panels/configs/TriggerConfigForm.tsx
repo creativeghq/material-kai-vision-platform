@@ -22,8 +22,56 @@ import type {
   MoodboardCommentedTriggerConfig,
   HireMeReceivedTriggerConfig,
   MaterialReviewedTriggerConfig,
+  ReviewReceivedTriggerConfig,
 } from '@/services/flows/types';
 import { EntityPicker } from './EntityPicker';
+
+/**
+ * Which star ratings a review trigger fires on.
+ *
+ * Writes a LIST under the key `rating`, because that is the key the event payload carries and
+ * flow-engine matches trigger_config generically: same-named key, equal value, or — for an
+ * array — membership. A "minimum rating" control cannot be expressed that way; the one that used
+ * to be here wrote `filter_min_rating`, which matched no event and silently fired never.
+ */
+function RatingFilter({
+  value,
+  onChange,
+}: {
+  value: number[] | undefined;
+  onChange: (next: number[] | undefined) => void;
+}) {
+  const selected = new Set(value ?? []);
+  const toggle = (star: number) => {
+    const next = new Set(selected);
+    if (next.has(star)) next.delete(star); else next.add(star);
+    onChange(next.size ? Array.from(next).sort((a, b) => a - b) : undefined);
+  };
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Star ratings</Label>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Button
+            key={star}
+            type="button"
+            size="sm"
+            variant={selected.has(star) ? 'secondary' : 'outline'}
+            className="h-8 flex-1 px-0 text-xs"
+            onClick={() => toggle(star)}
+          >
+            {star}★
+          </Button>
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        {selected.size
+          ? `Fires only on ${Array.from(selected).sort((a, b) => a - b).join(', ')} star reviews.`
+          : 'None selected — fires on every review.'}
+      </p>
+    </div>
+  );
+}
 
 interface TriggerConfigFormProps {
   data: TriggerNodeData;
@@ -413,23 +461,26 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
           <div className="text-xs text-muted-foreground">
             Fires when a user submits a material review. Available data: product_id, user_id, rating, review_id, has_text.
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Minimum rating (optional)</Label>
-            <Select
-              value={cfg.filter_min_rating?.toString() || ''}
-              onValueChange={(val) =>
-                onChange({ ...cfg, filter_min_rating: val ? Number(val) : undefined })
-              }
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Any rating" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4">4+ stars</SelectItem>
-                <SelectItem value="5">5 stars only</SelectItem>
-              </SelectContent>
-            </Select>
+          <RatingFilter
+            value={cfg.rating}
+            onChange={(rating) => onChange({ ...cfg, rating })}
+          />
+        </div>
+      );
+    }
+
+    case 'review_received': {
+      const cfg = config as ReviewReceivedTriggerConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Fires when a review lands on a connected Google Business profile. Available data:
+            review_id, platform, rating, reviewer_name, comment, action_url.
           </div>
+          <RatingFilter
+            value={cfg.rating}
+            onChange={(rating) => onChange({ ...cfg, rating })}
+          />
         </div>
       );
     }

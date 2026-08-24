@@ -282,28 +282,63 @@ describe('the CRM is not filled in behind your back', () => {
 });
 
 describe('the WhatsApp profile is fetched and shown', () => {
-  it('reads the profile off the WEBHOOK, not out of a lookup endpoint', () => {
-    // `conversation.participantPicture` and `participantName` are in EVERY inbox webhook, per
-    // Zernio's OpenAPI spec. The previous version hunted three endpoints for them — none of which
-    // returns a counterparty profile — and settled for a Zernio CRM row whose `name` was the phone
-    // number. The hunt is deleted rather than unused, so it cannot be picked back up.
+  it('FETCHES the photo from the conversations list rather than waiting to be pushed one', () => {
+    // The whole reason every thread showed coloured initials: `conversation.participantPicture` is
+    // OPTIONAL on a webhook — measured absent on four consecutive real `message.received` payloads
+    // — and reading it there was the only place we ever looked. It is a documented field on
+    // `GET /v1/inbox/conversations`, so the fix is to go and ask, exactly like inbound media,
+    // which works for precisely that reason.
+    expect(stripComments(messagingApi)).toMatch(/\/inbox\/conversations\?/);
+    expect(stripComments(messagingApi)).toMatch(/participantPicture/);
+    expect(stripComments(messagingApi)).toMatch(/storeParticipantPicture\(/);
+    // The webhook still uses one when a payload happens to carry it — free, and it means a new
+    // conversation has its photo immediately rather than at the next sync.
     expect(hook).toMatch(/convParticipantPicture/);
     expect(hook).toMatch(/storeParticipantPicture/);
+    // The old hunt stays deleted: three endpoints tried for a counterparty profile, settling for a
+    // Zernio CRM row whose `name` was the phone number.
     expect(
       /fetchWhatsAppProfile|number-info/.test(stripComments(hook) + stripComments(zernioClient)),
-      'the profile lookup hunt is back — the answer is already in the webhook payload',
+      'the profile lookup hunt is back — the photo has one source, the conversations list',
     ).toBe(false);
+  });
+
+  it('matches a conversation to OUR thread by id, never by guessing at the phone', () => {
+    // Every thread carries the `zernio_conversation_id` it mirrors, so the join is exact. A
+    // digits-of-the-phone match would silently attach one person's photo to another's thread when
+    // two numbers differ only by a country prefix.
+    expect(stripComments(messagingApi)).toMatch(/zernio_conversation_id/);
+  });
+
+  it('reports what it found in parts, so a zero is diagnosable', () => {
+    // "Synced 0" is three different problems wearing one hat: the listing failed, the platform
+    // withholds photos, or we already hold them all. This is the silent-zero shape the platform
+    // keeps paying for, so each count is returned separately.
+    const api = stripComments(messagingApi);
+    expect(api).toMatch(/with_picture/);
+    expect(api).toMatch(/own_avatar/);
+    expect(api).toMatch(/conversations === 0/);
+  });
+
+  it('uses the WhatsApp Business photo for our own side instead of asking for an upload', () => {
+    // The operator already has a photo — the one their customers see beside every message. A
+    // member with no `user_profiles.avatar_url` falls back to the number's business profile
+    // rather than rendering initials next to a prompt to upload a second copy of it.
+    expect(stripComments(inboxPage)).toMatch(/prof\?\.avatar_url \?\? channelAvatarUrl/);
+    // And it is the STORED object, not the provider link, for the same expiry reason as any
+    // other avatar here.
+    expect(stripComments(messagingApi)).toMatch(/avatar_path: path/);
   });
 
   it('stores the logo as an object, never as the provider url', () => {
     // A provider image url expires; a contact card whose photo becomes a broken square is worse
     // than one that never had a photo.
-    expect(hook).toMatch(/avatar_path/);
+    expect(inboxMedia).toMatch(/avatar_path/);
     // Matches the local name loosely on purpose. The claim is "the BYTES are uploaded", and pinning
     // the exact identifier made this fail when the fetch moved behind the SSRF guard and `bytes`
     // became `img.bytes` — a test that breaks on a rename it does not care about teaches people to
     // edit the assertion rather than read it.
-    expect(hook).toMatch(/\.upload\(path, (?:img\.)?bytes/);
+    expect(inboxMedia).toMatch(/\.upload\(path, (?:img\.)?bytes/);
   });
 
   it('fetches the avatar through the SSRF guard', () => {
@@ -311,15 +346,15 @@ describe('the WhatsApp profile is fetched and shown', () => {
     // invariant 7. A bare fetch() there follows redirects into link-local space and reads an
     // unbounded body. Semgrep caught this one on main (`no-unguarded-download-of-user-url`);
     // the rule only fires on the raw-fetch shape, so this pins the fix from the other direction.
-    expect(hook).toMatch(/fetchImageGuardedOrNull\(pictureUrl\)/);
-    expect(hook).not.toMatch(/await fetch\(pictureUrl\)/);
+    expect(inboxMedia).toMatch(/fetchImageGuardedOrNull\(pictureUrl\)/);
+    expect(inboxMedia).not.toMatch(/await fetch\(pictureUrl\)/);
   });
 
   it('merges thread metadata instead of overwriting it', () => {
     // PostgREST .update({metadata}) is a whole-column assignment. Writing the profile that way
     // would delete zernio_conversation_id and contact_phone — the thread's identity. This file
     // already learned that on the delivery-receipt path.
-    expect(hook).toMatch(/inbox_thread_merge_metadata/);
+    expect(inboxMedia).toMatch(/inbox_thread_merge_metadata/);
   });
 
   it('renders only what came back', () => {

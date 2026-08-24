@@ -69,6 +69,9 @@ export type TriggerType =
   | 'inbox.thread_assigned'
   // #342: an order was read out of a customer conversation and is waiting for approval
   | 'inbox.order_intake_ready'
+  // A review was left on a connected platform profile (Google Business). A low rating is the
+  // one that needs somebody today, and nobody is watching a screen they do not know changed.
+  | 'review_received'
   // Surplus marketplace: a new listing matched a buyer's saved alert
   | 'marketplace_want_match'
   // Expense cards (trip / monthly / …): submit→finance, review→rep, request→rep
@@ -284,6 +287,14 @@ export interface OrderDispatchedTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
 export interface InboxOrderIntakeReadyTriggerConfig {}
+export interface ReviewReceivedTriggerConfig {
+  /**
+   * Only fire on these star ratings — the usual answer is the low ones, since a 1-star needs
+   * somebody today and a 5-star does not. Unset or empty = every review.
+   * Same list-not-threshold reason as `MaterialReviewedTriggerConfig.rating`.
+   */
+  rating?: number[];
+}
 export interface MarketplaceWantMatchTriggerConfig {}
 export interface ExpenseCardSubmittedTriggerConfig {}
 export interface ExpenseCardReviewedTriggerConfig {}
@@ -388,8 +399,16 @@ export interface ProfileFollowedTriggerConfig {}
 export interface ProfilePublishedTriggerConfig {}
 
 export interface MaterialReviewedTriggerConfig {
-  /** Only fire when rating is at least this value */
-  filter_min_rating?: number;
+  /**
+   * Only fire on these star ratings. Unset or empty = every review.
+   *
+   * A LIST, not a `min`, because flow-engine's `trigger_config` matcher is deliberately
+   * domain-free: every key must EQUAL (or, for an array, contain) the same-named key in the
+   * event payload. The old `filter_min_rating: 4` therefore asked for an event whose
+   * `filter_min_rating` was 4 — a key nothing emits — so the flow matched nothing, forever, and
+   * reported `{triggered: 0}` without an error. No stored flow used it (checked 2026-08-24).
+   */
+  rating?: number[];
 }
 
 export interface PreferredFactoryAddedTriggerConfig {}
@@ -475,6 +494,7 @@ export type TriggerConfigMap = {
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
   'inbox.order_intake_ready': InboxOrderIntakeReadyTriggerConfig;
+  review_received: ReviewReceivedTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;
   expense_card_submitted: ExpenseCardSubmittedTriggerConfig;
   expense_card_reviewed: ExpenseCardReviewedTriggerConfig;

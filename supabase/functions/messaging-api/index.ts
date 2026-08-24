@@ -16,7 +16,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
-import { materialiseInlineAttachments } from '../_shared/inbox-media.ts';
+import { materialiseInlineAttachments, storeParticipantPicture } from '../_shared/inbox-media.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -296,7 +296,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
-      'open-whatsapp-thread',
+      'open-whatsapp-thread', 'sync-avatars',
       // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
@@ -1423,6 +1423,180 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             : stillBroken > 0
               ? `${repaired} recovered; ${stillBroken} could not be fetched (the media may have expired on WhatsApp).`
               : `${repaired} attachment(s) recovered.`,
+          errors: errors.slice(0, 10),
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // sync-avatars — go and GET the profile photos.
+      //
+      // Every WhatsApp thread rendered as coloured initials because the only place we ever looked
+      // for a photo was `conversation.participantPicture` on an inbound webhook, and that field is
+      // OPTIONAL: measured absent on four consecutive real `message.received` payloads.
+      //
+      // `GET /v1/inbox/conversations` documents `participantPicture` on every conversation it
+      // returns, and each of our threads carries the `zernio_conversation_id` it belongs to, so
+      // the match is exact rather than a phone-number guess. Same shape as inbound media, which
+      // works for exactly this reason: we fetch the bytes instead of waiting to be handed a link.
+      //
+      // Also refreshes OUR OWN number's photo — a different endpoint, because that is a business
+      // profile rather than a conversation participant.
+      // ─────────────────────────────────────────────────────────────
+      case 'sync-avatars': {
+        const { workspaceId, threadId: onlyThreadId } = requestBody;
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        const { data: channels } = await supabaseClient
+          .from('messaging_channels')
+          .select('id, config, zernio_account_id')
+          .eq('workspace_id', wsId)
+          .eq('channel_type', 'whatsapp')
+          .not('zernio_account_id', 'is', null);
+
+        const chans = (channels ?? []) as Array<{ id: string; config: Record<string, unknown>; zernio_account_id: string }>;
+        if (!chans.length) {
+          return jsonResponse({
+            success: true, conversations: 0, with_picture: 0, stored: 0, own_avatar: false,
+            message: 'No connected WhatsApp number in this workspace.',
+          });
+        }
+
+        // Our threads for this workspace, keyed by the Zernio conversation each one mirrors.
+        let tq = supabaseClient
+          .from('inbox_threads')
+          .select('id, metadata')
+          .eq('workspace_id', wsId)
+          .eq('channel', 'whatsapp');
+        if (onlyThreadId) tq = tq.eq('id', String(onlyThreadId));
+        const { data: threadRows, error: tErr } = await tq;
+        if (tErr) throw new HttpError(500, `Could not read threads: ${tErr.message}`);
+
+        const byConversation = new Map<string, { id: string; avatarSource: string | null }>();
+        for (const t of (threadRows ?? []) as Array<{ id: string; metadata: Record<string, unknown> }>) {
+          const meta = (t.metadata ?? {}) as Record<string, unknown>;
+          const convId = typeof meta.zernio_conversation_id === 'string' ? meta.zernio_conversation_id : '';
+          if (!convId) continue;
+          const prof = (meta.wa_profile ?? {}) as Record<string, unknown>;
+          byConversation.set(convId, {
+            id: t.id,
+            // Present AND already downloaded. A source recorded next to a null path means the last
+            // download failed, so that one is retried rather than counted as done.
+            avatarSource: (typeof prof.avatar_source === 'string' && typeof prof.avatar_path === 'string')
+              ? prof.avatar_source : null,
+          });
+        }
+
+        let conversations = 0;
+        let withPicture = 0;
+        let stored = 0;
+        let ownAvatar = false;
+        const errors: string[] = [];
+
+        for (const chan of chans) {
+          const accountId = chan.zernio_account_id;
+
+          // ── our own number's photo (a business profile, not a conversation) ──
+          try {
+            const bp = await zernioApi('GET', `/whatsapp/business-profile?accountId=${encodeURIComponent(accountId)}`);
+            const profile = (bp?.businessProfile ?? bp?.data ?? null) as Record<string, unknown> | null;
+            const picUrl = typeof profile?.profilePictureUrl === 'string' ? profile.profilePictureUrl : '';
+            const knownCfg = (chan.config ?? {}) as Record<string, unknown>;
+            if (picUrl && knownCfg.avatar_source !== picUrl) {
+              const img = await fetchImageGuardedOrNull(picUrl);
+              if (img) {
+                const path = `inbox/channel/${accountId}/${crypto.randomUUID()}.jpg`;
+                const { error: upErr } = await supabaseClient.storage
+                  .from('generation-images')
+                  .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
+                if (upErr) errors.push(`own avatar: ${upErr.message}`);
+                else {
+                  // CHECKED: supabase-js RESOLVES on an RLS denial, so an unchecked write here
+                  // would report the photo as synced while the row still points at nothing —
+                  // and the operator would keep seeing initials with everything reporting fine.
+                  const { error: cfgErr } = await supabaseClient.from('messaging_channels').update({
+                    config: {
+                      ...knownCfg,
+                      business_profile: profile,
+                      avatar_source: picUrl,
+                      avatar_bucket: 'generation-images',
+                      avatar_path: path,
+                    },
+                    updated_at: new Date().toISOString(),
+                  }).eq('id', chan.id);
+                  if (cfgErr) errors.push(`own avatar: ${cfgErr.message}`);
+                  else ownAvatar = true;
+                }
+              }
+            } else if (picUrl) {
+              ownAvatar = true;            // already stored, and unchanged
+            } else if (profile) {
+              // The profile exists and simply has no photo on it. Said out loud rather than
+              // counted as a failure: "you have not set one" and "we could not fetch it" are
+              // different answers, and only one of them is ours to fix.
+              errors.push('own avatar: no profile picture is set on this WhatsApp Business number');
+            }
+          } catch (err) {
+            errors.push(`own avatar: ${err instanceof Error ? err.message : String(err)}`);
+          }
+
+          // ── every counterparty ──
+          let cursor: string | undefined;
+          let pages = 0;
+          for (;;) {
+            if (pages >= 20) { errors.push(`${accountId}: stopped at 20 pages — run again to continue`); break; }
+            const qs = new URLSearchParams({ accountId, limit: '100' });
+            if (cursor) qs.set('cursor', cursor);
+
+            let page: any;
+            try {
+              page = await zernioApi('GET', `/inbox/conversations?${qs.toString()}`);
+            } catch (err) {
+              errors.push(`${accountId}: ${err instanceof Error ? err.message : String(err)}`);
+              break;
+            }
+
+            const items = (page?.data ?? page?.conversations ?? []) as Array<Record<string, any>>;
+            for (const conv of items) {
+              conversations++;
+              const convId = typeof conv.id === 'string' ? conv.id : '';
+              const pic = typeof conv.participantPicture === 'string' ? conv.participantPicture : '';
+              if (!pic) continue;
+              withPicture++;
+              const target = convId ? byConversation.get(convId) : undefined;
+              if (!target) continue;                      // a conversation we never imported
+              if (target.avatarSource === pic) continue;  // the same photo, already held
+              const ok = await storeParticipantPicture(
+                supabaseClient, target.id, pic,
+                typeof conv.participantName === 'string' ? conv.participantName : '',
+              );
+              if (ok) stored++;
+            }
+
+            cursor = page?.nextCursor ?? page?.cursor ?? undefined;
+            pages++;
+            if (!cursor || !items.length) break;
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          conversations,
+          with_picture: withPicture,
+          stored,
+          own_avatar: ownAvatar,
+          // Every count is a different diagnosis, and one "synced N" would hide all of them: no
+          // conversations = the listing failed; conversations but no pictures = the platform
+          // withholds them; pictures but nothing stored = we already hold them, or those threads
+          // were never imported.
+          message: conversations === 0
+            ? 'Zernio returned no conversations for this number.'
+            : withPicture === 0
+              ? `${conversations} conversation(s) checked — none carries a profile photo (WhatsApp only exposes one when the contact allows it).`
+              : stored === 0
+                ? `${withPicture} of ${conversations} conversation(s) have a photo, and every one was already stored.`
+                : `${stored} profile photo(s) downloaded, out of ${withPicture} available.`,
           errors: errors.slice(0, 10),
         });
       }
