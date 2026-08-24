@@ -301,8 +301,8 @@ function ProductList({ products, onView, surplus }: { products: RawProduct[]; on
  * The tabs this page actually renders. `activeTab` is controlled, so a value with no matching
  * <TabsContent> leaves the tab bar sitting above an empty body — indistinguishable from a page
  * that failed to load. Deep links outlive the tabs they point at: `?tab=factory` (the removed
- * Brand tab) is still in notification action_urls and browser history, and `?tab=properties`
- * arrives whenever the Real Estate module is off. Both resolve to a tab that exists.
+ * Brand tab) survives in bookmarks and browser history, and `?tab=properties` arrives whenever
+ * the Real Estate module is off. Both resolve to a tab that exists.
  */
 const DISCOVER_TABS = ['profiles', 'products', 'marketplace', 'properties'] as const;
 type DiscoverTab = (typeof DISCOVER_TABS)[number];
