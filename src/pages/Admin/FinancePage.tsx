@@ -485,24 +485,30 @@ const FinancePage: React.FC = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={onTabChange} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
-            {/* Shortcuts out of Finance into the two operational surfaces — icon-only so they
-                read as jump-offs, not as tabs of this page.
+          {/* Left column: the two operational jump-offs, then the section rail.
 
-                NO BORDER, and the separation below is a hairline rather than nothing:
-                everything under this row is a borderless underline rail, so an outlined pair
-                at the top was the only boxed object in the column — and its own left edge
-                landed in exactly the column the active tab's indicator uses, which is the one
-                vertical stroke in this rail that is supposed to carry meaning. The tint alone
-                says "these are not tabs"; the rule says where the page's own sections start.
-                Spacing was the other half: `gap-1` put them 4px from Dashboard, close enough
-                to read as the first two rows of the list they are meant to sit outside of.
+              Shortcuts out of Finance into POS and the Warehouse — icon-only so they read as
+              jump-offs, not as tabs of this page.
 
-                This wrapper is a `div`, so `.finance-tabs-list > div` hides it below lg along
-                with the section dividers. That is deliberate here — the horizontal strip has
-                no room for them, and both surfaces are one tap away in the bottom nav. */}
+              NO BORDER, and the separation below is a hairline rather than nothing:
+              everything under this row is a borderless underline rail, so an outlined pair
+              at the top was the only boxed object in the column — and its own left edge
+              landed in exactly the column the active tab's indicator uses, which is the one
+              vertical stroke in this rail that is supposed to carry meaning. The tint alone
+              says "these are not tabs"; the rule says where the page's own sections start.
+              Spacing was the other half: `gap-1` put them 4px from Dashboard, close enough
+              to read as the first two rows of the list they are meant to sit outside of.
+
+              OUTSIDE the `TabsList`, which is the other half of the same argument: the list
+              carries the rail's trailing rule (`data-[orientation=vertical]:border-r`), and
+              that rule belongs to the SECTIONS. Nested inside, it ran up the right of the two
+              buttons and closed the pair into a box — the one thing this row is styled not to
+              be. Being outside also means `hidden lg:block` rather than leaning on
+              `.finance-tabs-list > div`: the horizontal strip below lg has no room for them,
+              and both surfaces are one tap away in the bottom nav. */}
+          <div className="w-full shrink-0 lg:w-56">
             {!isAccountant && (
-              <div className="mb-2 w-full border-b border-hairline pb-2">
+              <div className="mb-2 hidden w-full border-b border-hairline pb-2 lg:block">
                 <div className="flex w-full items-center gap-1">
                   <Link
                     to="/pos"
@@ -523,66 +529,69 @@ const FinancePage: React.FC = () => {
                 </div>
               </div>
             )}
-            <TabsTrigger value="dashboard" className="w-full justify-start">
-              <PieChart className="h-4 w-4 mr-2" /> Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="ar" className="w-full justify-start">
-              <ArrowDownCircle className="h-4 w-4 mr-2" /> Receivables ({ar.length})
-            </TabsTrigger>
-            <TabsTrigger value="ap" className="w-full justify-start">
-              <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
-            </TabsTrigger>
-            <TabsTrigger value="bank_feed" className="w-full justify-start">
-              <Landmark className="h-4 w-4 mr-2" /> Bank feed
-            </TabsTrigger>
-            {!isAccountant && (
-              <TabsTrigger value="supplier_portal" className="w-full justify-start">
-                <Truck className="h-4 w-4 mr-2" /> Supplier Portal
-              </TabsTrigger>
-            )}
 
-            <HubRailSectionLabel>Documents</HubRailSectionLabel>
-            {DOC_TABS.map((d) => (
-              <TabsTrigger key={d.value} value={d.value} className="w-full justify-start">
-                <d.icon className="h-4 w-4 mr-2" /> {d.label}
+            <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
+              <TabsTrigger value="dashboard" className="w-full justify-start">
+                <PieChart className="h-4 w-4 mr-2" /> Dashboard
               </TabsTrigger>
-            ))}
-            <HubRailSectionLabel>Tools</HubRailSectionLabel>
+              <TabsTrigger value="ar" className="w-full justify-start">
+                <ArrowDownCircle className="h-4 w-4 mr-2" /> Receivables ({ar.length})
+              </TabsTrigger>
+              <TabsTrigger value="ap" className="w-full justify-start">
+                <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
+              </TabsTrigger>
+              <TabsTrigger value="bank_feed" className="w-full justify-start">
+                <Landmark className="h-4 w-4 mr-2" /> Bank feed
+              </TabsTrigger>
+              {!isAccountant && (
+                <TabsTrigger value="supplier_portal" className="w-full justify-start">
+                  <Truck className="h-4 w-4 mr-2" /> Supplier Portal
+                </TabsTrigger>
+              )}
 
-            <TabsTrigger value="planning" className="w-full justify-start">
-              <CalendarClock className="h-4 w-4 mr-2" /> Planning
-            </TabsTrigger>
-            <TabsTrigger value="trip_cards" className="w-full justify-start">
-              <Plane className="h-4 w-4 mr-2" /> Expense Cards
-            </TabsTrigger>
-            <TabsTrigger value="assets" className="w-full justify-start">
-              <Boxes className="h-4 w-4 mr-2" /> Assets
-            </TabsTrigger>
-            {!isAccountant && (
-              <TabsTrigger value="time" className="w-full justify-start">
-                <Clock className="h-4 w-4 mr-2" /> Time &amp; Billing
+              <HubRailSectionLabel>Documents</HubRailSectionLabel>
+              {DOC_TABS.map((d) => (
+                <TabsTrigger key={d.value} value={d.value} className="w-full justify-start">
+                  <d.icon className="h-4 w-4 mr-2" /> {d.label}
+                </TabsTrigger>
+              ))}
+              <HubRailSectionLabel>Tools</HubRailSectionLabel>
+
+              <TabsTrigger value="planning" className="w-full justify-start">
+                <CalendarClock className="h-4 w-4 mr-2" /> Planning
               </TabsTrigger>
-            )}
-            <TabsTrigger value="reports" className="w-full justify-start">
-              <BarChart3 className="h-4 w-4 mr-2" /> Reports
-            </TabsTrigger>
-            <TabsTrigger value="parties" className="w-full justify-start">
-              <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
-            </TabsTrigger>
-            <TabsTrigger value="followups" className="w-full justify-start">
-              <Bell className="h-4 w-4 mr-2" /> Follow-Ups ({followUps.length})
-            </TabsTrigger>
-            {!isAccountant && (
-              <TabsTrigger value="sourcing" className="w-full justify-start">
-                <PackageSearch className="h-4 w-4 mr-2" /> Sourcing
+              <TabsTrigger value="trip_cards" className="w-full justify-start">
+                <Plane className="h-4 w-4 mr-2" /> Expense Cards
               </TabsTrigger>
-            )}
-            {!isAccountant && (
-              <TabsTrigger value="settings" className="w-full justify-start">
-                <SettingsIcon className="h-4 w-4 mr-2" /> Settings
+              <TabsTrigger value="assets" className="w-full justify-start">
+                <Boxes className="h-4 w-4 mr-2" /> Assets
               </TabsTrigger>
-            )}
-          </TabsList>
+              {!isAccountant && (
+                <TabsTrigger value="time" className="w-full justify-start">
+                  <Clock className="h-4 w-4 mr-2" /> Time &amp; Billing
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="reports" className="w-full justify-start">
+                <BarChart3 className="h-4 w-4 mr-2" /> Reports
+              </TabsTrigger>
+              <TabsTrigger value="parties" className="w-full justify-start">
+                <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
+              </TabsTrigger>
+              <TabsTrigger value="followups" className="w-full justify-start">
+                <Bell className="h-4 w-4 mr-2" /> Follow-Ups ({followUps.length})
+              </TabsTrigger>
+              {!isAccountant && (
+                <TabsTrigger value="sourcing" className="w-full justify-start">
+                  <PackageSearch className="h-4 w-4 mr-2" /> Sourcing
+                </TabsTrigger>
+              )}
+              {!isAccountant && (
+                <TabsTrigger value="settings" className="w-full justify-start">
+                  <SettingsIcon className="h-4 w-4 mr-2" /> Settings
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           <div className="min-w-0 flex-1 space-y-4">
           {/* ─────────── DASHBOARD ─────────── */}
