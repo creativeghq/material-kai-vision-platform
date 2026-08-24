@@ -347,3 +347,55 @@ describe('a photo renders as a photo, and opens in place', () => {
     expect(hook).toMatch(/hasUnfetchedLink/);
   });
 });
+
+describe('message.sent is how the operator’s reply reaches us', () => {
+  it('files a message.sent, not just a campaign-log row', () => {
+    // Verified in the live webhook log: a reply typed in WhatsApp Web arrives as `message.sent`,
+    // NOT as `message.received` with a direction. The echo handling added to the inbound path
+    // therefore never ran for the case it was written for, and two live threads sat at
+    // `outgoing: 0` while the operator was looking at their own replies on WhatsApp.
+    const sentBranch = hook.slice(hook.indexOf("if (event === 'message.sent')"));
+    expect(sentBranch.slice(0, 1800)).toMatch(/handleInboundMessage\(supabase, echo\)/);
+    expect(sentBranch.slice(0, 1800)).toMatch(/direction: 'outgoing'/);
+  });
+
+  it('routes it through the SAME handler rather than a second filing path', () => {
+    // Two importers that drift is the failure this codebase keeps paying for; the wamid dedupe
+    // is also what stops a platform-sent message being filed twice, and it only lives on the one
+    // path.
+    expect(hook).toMatch(/const echo = \{/);
+    expect(hook).toMatch(/\.\.\.payload,/);
+  });
+
+  it('finds the counterparty from the conversation when the echo names no recipient', () => {
+    // A message.sent payload is about the message, not about who it went to. Dropping it for
+    // "no resolvable recipient" is the same silence in a different costume.
+    expect(hook).toMatch(/isOutgoingEcho && msg\.conversationId/);
+    expect(hook).toMatch(/metadata->>zernio_conversation_id/);
+  });
+});
+
+describe('the profile lookup asks the right endpoint, the right way', () => {
+  it('sends accountId to the conversation endpoint', () => {
+    // Without it: 400 {"code":"missing_required_field","param":"accountId"} on every lookup —
+    // the same omission that made the back-fill read zero messages from five conversations.
+    expect(zernioClient).toMatch(/missing_required_field/);
+    expect(zernioClient).toMatch(/\/inbox\/conversations\/\$\{encodeURIComponent\(params\.conversationId\)\}/);
+  });
+
+  it('refuses a "name" that is just the phone number', () => {
+    // /contacts answered with Zernio's own CRM row — `{ name: "+306955948979" }` and nothing else
+    // — and the old check accepted it because `name` was truthy, stopping the search at the least
+    // informative source and recording wa_profile_found: true over one phone number.
+    expect(zernioClient).toMatch(/nameIsJustTheNumber/);
+    expect(zernioClient).toMatch(/profile\.name = undefined/);
+  });
+
+  it('tries the WhatsApp endpoint before Zernio’s own contact list', () => {
+    const numberInfo = zernioClient.indexOf('/whatsapp/number-info?phoneNumber=');
+    const contacts = zernioClient.indexOf('/contacts?search=');
+    expect(numberInfo).toBeGreaterThan(-1);
+    expect(contacts).toBeGreaterThan(-1);
+    expect(numberInfo < contacts, 'the least informative source is tried first again').toBe(true);
+  });
+});

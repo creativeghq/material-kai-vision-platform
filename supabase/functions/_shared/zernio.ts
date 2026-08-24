@@ -191,16 +191,25 @@ export async function fetchWhatsAppProfile(params: {
   const digits = params.phone.replace(/[^\d]/g, '');
   if (!digits) return null;
 
+  const acct = params.accountId ? `&accountId=${encodeURIComponent(params.accountId)}` : '';
   const attempts: string[] = [
-    `/whatsapp/number-info?phoneNumber=${encodeURIComponent('+' + digits)}`
-      + (params.accountId ? `&accountId=${encodeURIComponent(params.accountId)}` : ''),
-    `/whatsapp/number-info?number=${encodeURIComponent(digits)}`
-      + (params.accountId ? `&accountId=${encodeURIComponent(params.accountId)}` : ''),
-    `/contacts?search=${encodeURIComponent('+' + digits)}`,
+    // Most specific first. `/contacts` is LAST on purpose — see the usability check below: it
+    // answers with Zernio's own CRM row, whose `name` is the phone number when nobody has named
+    // it, and accepting that stopped the search before the real profile was ever asked for.
+    `/whatsapp/number-info?phoneNumber=${encodeURIComponent('+' + digits)}${acct}`,
+    `/whatsapp/number-info?number=${encodeURIComponent(digits)}${acct}`,
   ];
   if (params.conversationId) {
-    attempts.unshift(`/inbox/conversations/${encodeURIComponent(params.conversationId)}`);
+    // `accountId` is REQUIRED here. Without it this answers
+    //   400 {"code":"missing_required_field","param":"accountId"}
+    // which is exactly what it did on every lookup — the same omission that made the back-fill
+    // read zero messages from five conversations.
+    attempts.push(
+      `/inbox/conversations/${encodeURIComponent(params.conversationId)}`
+      + (params.accountId ? `?accountId=${encodeURIComponent(params.accountId)}` : ''),
+    );
   }
+  attempts.push(`/contacts?search=${encodeURIComponent('+' + digits)}`);
 
   for (const path of attempts) {
     let doc: any;
@@ -255,8 +264,17 @@ export async function fetchWhatsAppProfile(params: {
       raw: merged,
     };
 
-    // Something usable, or keep trying the next endpoint. A record with only a phone number in it
-    // is not a profile — returning it would stop the search and store nothing worth showing.
+    // A NAME THAT IS THE PHONE NUMBER IS NOT A NAME.
+    //
+    // `/contacts` returned `{ name: "+306955948979" }` and nothing else — Zernio's own CRM row for
+    // a contact nobody has named — and the old check accepted it because `name` was truthy. So the
+    // search stopped at the least informative source, stored a "profile" of one phone number, and
+    // recorded `wa_profile_found: true`. Same mistake as treating `[Unsupported message]` as text:
+    // a placeholder passing for content.
+    const nameIsJustTheNumber = !!profile.name
+      && profile.name.replace(/[^\d]/g, '') === digits;
+    if (nameIsJustTheNumber) profile.name = undefined;
+
     const usable = profile.name || profile.avatarUrl || profile.description
       || profile.category || profile.address || profile.email || profile.websites?.length;
     if (usable) {

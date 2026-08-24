@@ -585,10 +585,25 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // On an inbound message that is the sender. On an echo of our own it is the RECIPIENT — the
   // sender there is our own WABA number, and resolving on it would open a thread with ourselves
   // and mint a CRM contact for the company's own line.
-  const counterparty = isOutgoingEcho
+  let counterparty = isOutgoingEcho
     ? (contactPhoneOf(msg.recipient) ?? contactPhoneOf(msg.to) ?? contactPhoneOf(msg.participant)
        ?? contactPhoneOf({ id: msg.conversationParticipantId }))
     : contactPhoneOf(msg.sender);
+
+  // An echo often names no recipient at all — a `message.sent` payload is about the message, not
+  // about who it went to. The conversation id is always there, and the thread it belongs to
+  // already knows the number. Without this the operator's own replies are dropped for "no
+  // resolvable recipient", which is the same silence in a different costume.
+  if (!counterparty && isOutgoingEcho && msg.conversationId) {
+    const { data: byConv } = await supabase
+      .from('inbox_threads').select('metadata')
+      .eq('channel', 'whatsapp')
+      .eq('metadata->>zernio_conversation_id', String(msg.conversationId))
+      .limit(1).maybeSingle();
+    const known = (byConv as { metadata?: Record<string, unknown> } | null)?.metadata?.contact_phone;
+    if (typeof known === 'string' && known) counterparty = known;
+  }
+
   const phone = counterparty;
   if (!phone) {
     console.warn(
@@ -1443,7 +1458,10 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     return jsonResponse({ error: 'Invalid signature' }, 401);
   }
 
-  let payload: { event: string; post?: any; account?: any };
+  // `message` declared explicitly: the message.sent branch builds an echo from it, and the
+  // implicit-any spread was the only thing hiding that it was never part of this type.
+  // deno-lint-ignore no-explicit-any
+  let payload: { event: string; post?: any; account?: any; message?: any };
   try {
     const text = new TextDecoder().decode(rawBody);
     payload = JSON.parse(text);
@@ -1469,8 +1487,29 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       return jsonResponse({ received: true, event });
     }
     if (event === 'message.sent') {
+      // Campaign bookkeeping first — this is the only thing it used to do.
       await handleMessageSent(supabase, payload);
-      return jsonResponse({ received: true, event });
+
+      // ...and then FILE it, because this is how the operator's own replies reach us.
+      //
+      // A reply typed in WhatsApp Web or on the phone comes back as `message.sent`, not as
+      // `message.received` with a direction. So the echo handling added to the inbound path
+      // never ran for the case it was written for, and two live threads showed `outgoing: 0`
+      // while the operator was looking at their own replies on WhatsApp. Verified in the
+      // webhook log:
+      //
+      //   [zernio-webhook] Event: message.sent {"message":{"conversationId":"6a8b3716…"}}
+      //
+      // Routed through the SAME handler as an inbound message, with the direction forced, so
+      // there is one filing path rather than a second that drifts. The wamid dedupe means a
+      // message sent from the platform — which also emits message.sent — is recognised as
+      // already filed instead of appearing twice.
+      const echo = {
+        ...payload,
+        message: { ...(payload.message ?? {}), direction: 'outgoing' },
+      };
+      const outcome = await handleInboundMessage(supabase, echo);
+      return jsonResponse({ received: true, event, ...outcome });
     }
     if (event === 'message.edited') {
       await handleMessageEdited(supabase, payload);
