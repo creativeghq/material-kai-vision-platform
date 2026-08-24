@@ -7,6 +7,8 @@
  * by typecheck, by a DB constraint, or by an integrity probe over stored data — the stored data
  * is flawless in all of them. So they are caught here.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   INBOUND_SOURCE_CHIP,
@@ -144,6 +146,36 @@ describe('provenance and line-detail are separate facts', () => {
     // Typed by hand and read off an attached PDF are the same fact to the reader: it is done.
     expect(inboundDetailLabel('user')).toBe(inboundDetailLabel('document'));
     expect(inboundDetailLabel(null)).toBe('Needs detail');
+  });
+});
+
+describe('the inbox is ordered by the date it SHOWS', () => {
+  const src = readFileSync(
+    join(process.cwd(), 'src/modules/finance/services/inboundService.ts'), 'utf8',
+  );
+
+  it('orders by issue_date, not by when we happened to fetch the row', () => {
+    // `created_at` and `issue_date` agree only while a single inlet polls daily. The first
+    // RequestTransmittedDocs run inserted 87 documents spanning 2024-02 to 2026-06 within one
+    // second, so ordering by created_at put all of them ahead of every supplier invoice and
+    // buried the inbox under four and a half pages of backfill. Nothing was misfiled; the list
+    // was answering "most recently fetched" to a question nobody asked. Any future inlet that
+    // backfills history — email, upload, Peppol — re-creates this the same way.
+    const list = src.slice(src.indexOf('async list('), src.indexOf('async setLines('));
+    expect(list).toMatch(/\.order\(\s*'issue_date'/);
+    const issueAt = list.indexOf("order('issue_date'");
+    const createdAt = list.indexOf("order('created_at'");
+    expect(issueAt).toBeGreaterThan(-1);
+    // created_at may remain as the tie-break, but never as the primary sort.
+    if (createdAt > -1) expect(issueAt).toBeLessThan(createdAt);
+  });
+
+  it('reports the total so a capped list cannot pass for a complete one', () => {
+    // A list that stops at its limit looks exactly like a list that short. The cap has to be
+    // visible to the operator, or "my 2024 invoices are missing" is the next bug report.
+    const list = src.slice(src.indexOf('async list('), src.indexOf('async setLines('));
+    expect(list).toMatch(/count:\s*'exact'/);
+    expect(list).toMatch(/total/);
   });
 });
 

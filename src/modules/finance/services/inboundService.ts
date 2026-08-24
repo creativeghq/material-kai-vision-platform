@@ -121,6 +121,15 @@ export interface InboundDocument {
   created_at: string;
 }
 
+/**
+ * How many documents the Expenses inbox holds in memory. It filters and pages client-side, so
+ * this is the whole world as far as that surface is concerned — anything past it is unreachable,
+ * not merely on a later page. Sized to cover years of daily polling for a real workspace (1,857
+ * documents over 29 months here); when a workspace outgrows it the UI says so out loud rather
+ * than quietly showing a prefix.
+ */
+export const INBOUND_LIST_LIMIT = 2000;
+
 export const inboundService = {
   /**
    * Columns the LIST needs. Deliberately not `*`.
@@ -141,18 +150,35 @@ export const inboundService = {
     'status', 'created_supplier_bill_id', 'category_id', 'created_at', 'updated_at',
   ].join(', '),
 
-  async list(workspaceId: string, limit = 500): Promise<InboundDocument[]> {
-    const { data, error } = await supabase
+  /**
+   * Ordered by ISSUE DATE, which is the date the table shows and the only one the operator has
+   * any reason to think in. It used to order by `created_at` — when WE happened to poll the row
+   * — and the two agreed by accident for as long as there was a single inlet fetching daily.
+   *
+   * Backfilling history broke the accident on the first run: 87 self-transmitted documents
+   * spanning 2024-02 to 2026-06 were all inserted within the same second, so they took the top 87
+   * places and buried every supplier invoice under four and a half pages of them. The documents
+   * were not misfiled — the list was answering "most recently fetched" to a question nobody asked.
+   *
+   * Returns the total as well as the page, because the cap below is otherwise invisible: a list
+   * that stops at 500 of 1,857 looks exactly like a list of 500.
+   */
+  async list(workspaceId: string, limit = INBOUND_LIST_LIMIT): Promise<{ rows: InboundDocument[]; total: number }> {
+    const { data, error, count } = await supabase
       .from('inbound_documents')
-      .select(this.LIST_COLUMNS)
+      .select(this.LIST_COLUMNS, { count: 'exact' })
       .eq('workspace_id', workspaceId)
+      // Nulls last: a document with no issue date is not the newest thing that ever happened.
+      .order('issue_date', { ascending: false, nullsFirst: false })
+      // Same-day documents fall back to arrival order, so the sort is total and paging is stable.
       .order('created_at', { ascending: false })
       // Bounded. The list had no LIMIT at all, so it grew linearly with inbound myDATA volume.
       .limit(limit);
     if (error) throw error;
     // The heavy columns are absent by design — `lines` defaults to [] so a consumer that reads it
     // before hydrating renders empty rather than crashing.
-    return (data ?? []).map((d: any) => ({ lines: [], ...d })) as InboundDocument[];
+    const rows = (data ?? []).map((d: any) => ({ lines: [], ...d })) as InboundDocument[];
+    return { rows, total: count ?? rows.length };
   },
 
   /**

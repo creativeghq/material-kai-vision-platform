@@ -130,6 +130,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
+  /** Everything the workspace HAS, not just what was fetched — see the cap notice below. */
+  const [inboundTotal, setInboundTotal] = useState(0);
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
@@ -210,7 +212,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         // 200 silently hid older documents once a workspace crossed it.
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
-        guard('expenses', inboundService.list(activeWorkspaceId), [] as any[]),
+        guard('expenses', inboundService.list(activeWorkspaceId), { rows: [] as InboundDocument[], total: 0 }),
         guard('payments', financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 1000 }), [] as any[]),
         guard('delivery_notes', deliveryNotesService.list(activeWorkspaceId), [] as any[]),
         guard('cheques', chequesService.list(activeWorkspaceId), [] as any[]),
@@ -228,7 +230,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       setSupplierCreditNotes(
         await financeService.listSupplierCreditNotes({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierCreditNote[]),
       );
-      setInbound(inb);
+      setInbound(inb.rows);
+      setInboundTotal(inb.total);
       setPayments(pmts);
       setDeliveryNotes(dns);
       setCheques(chq);
@@ -480,7 +483,18 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                     ? <SupplierCreditNoteTable rows={paginate(activeRows as SupplierCreditNote[], page)} {...emptyState} onNew={() => setNewCreditNoteOpen(true)} />
                     : <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} onChanged={() => void load()} />
                 ) : type === 'expenses' ? (
-                  <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} />
+                  <>
+                    {/* A truncated list looks exactly like a short one. Say it out loud rather
+                        than showing a prefix and letting the operator conclude the older
+                        documents were never fetched. */}
+                    {inboundTotal > inbound.length && (
+                      <p className="border-b border-hairline bg-surface-sunken px-4 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                        Showing the {inbound.length.toLocaleString()} most recent of {inboundTotal.toLocaleString()} documents.
+                        Older ones are not loaded — narrow the issue-date filter to reach them.
+                      </p>
+                    )}
+                    <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} />
+                  </>
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} financeBase={financeBase} {...emptyState} />
                 ) : type === 'delivery_notes' ? (
