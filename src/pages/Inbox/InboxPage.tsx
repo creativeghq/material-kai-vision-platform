@@ -295,6 +295,8 @@ const InboxPage: React.FC = () => {
     }
   }, [activeWorkspaceId, searchParams, setSearchParams]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  /** True while a send is in flight. See `send` — a ref, because the state read is stale there. */
+  const sendInFlight = useRef(false);
   const isMobile = useIsMobile();
 
   // Mobile drill-in: return from the open conversation to the thread list.
@@ -453,6 +455,19 @@ const InboxPage: React.FC = () => {
 
   const send = useCallback(async () => {
     if (!activeId || (!draft.trim() && !attachment)) return;
+    // Re-entrancy guard, on a ref rather than the `sending` state.
+    //
+    // The send button is disabled while in flight, but the textarea's Enter handler was not — and
+    // `send` itself only checked that there was something to send. A second Enter inside the ~1s
+    // round trip therefore ran the whole function again on a draft that had not been cleared yet.
+    // Verified on the operator's own thread: "Thank you very much, appreciated it a lot." went out
+    // TWICE, 1.2 seconds apart, two distinct wamids, both delivered and read. The customer got it
+    // twice and nothing anywhere looked wrong.
+    //
+    // A ref, because `sending` read from this closure is the value at the time the callback was
+    // created — exactly the stale read that lets the second call through.
+    if (sendInFlight.current) return;
+    sendInFlight.current = true;
     setSending(true);
     try {
       let attachments;
@@ -478,6 +493,7 @@ const InboxPage: React.FC = () => {
     } catch (e) {
       toast({ title: 'Send failed', description: (e as Error).message, variant: 'destructive' });
     } finally {
+      sendInFlight.current = false;
       setSending(false);
     }
   }, [activeId, draft, attachment, isNote, isMember, activeThread, toast]);
@@ -1201,7 +1217,7 @@ const InboxPage: React.FC = () => {
                   <Textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked) send(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked && !sending) send(); } }}
                     placeholder={isNote ? 'Write a private note (only your team sees this)…' : waBlocked ? 'Reply window closed — template required' : 'Type a message…'}
                     className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
                     disabled={waBlocked}

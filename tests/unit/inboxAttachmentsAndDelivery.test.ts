@@ -181,3 +181,52 @@ describe('one person, one contact, one thread', () => {
     expect(hook).toMatch(/r\.thread_created && await shouldAutoEngageAgent/);
   });
 });
+
+describe('a coexistence number shows the WHOLE conversation', () => {
+  it('files the operator’s own message instead of dropping it', () => {
+    // Verified against the operator's phone on 2026-08-24: their 10:51 "Hello, Good Morning" and
+    // their 11:21 "Can you do a small follow for me, with your sales manager?" existed on
+    // WhatsApp and in no thread of ours. Every echo hit `return` on the direction guard, so the
+    // Inbox showed the customer's half and called it the conversation.
+    expect(hook).toMatch(/isOutgoingEcho/);
+    expect(
+      /if \(msg\.direction && msg\.direction !== 'incoming'\) \{\s*return/.test(stripComments(hook)),
+      'outgoing echoes are dropped again — the inbox goes back to showing half the conversation',
+    ).toBe(false);
+  });
+
+  it('identifies the conversation by the RECIPIENT on an echo', () => {
+    // The sender on our own message is our own WABA number. Resolving on it would open a thread
+    // with ourselves and mint a CRM contact for the company's own line.
+    expect(hook).toMatch(/isOutgoingEcho\s*\?\s*\(contactPhoneOf\(msg\.recipient\)/);
+  });
+
+  it('never reads STOP out of our own words', () => {
+    // Consent is the customer's to withdraw. An operator writing "STOP by the showroom tomorrow"
+    // must not opt their own customer out of every future message.
+    expect(hook).toMatch(/const text = isOutgoingEcho \? '' :/);
+  });
+
+  it('does not notify or wake the agent for our own message', () => {
+    expect(hook).toMatch(/outgoing echo filed/);
+    const echoReturn = hook.indexOf('outgoing echo filed');
+    const agentCall = hook.indexOf("action: 'internal_agent_reply'");
+    expect(echoReturn).toBeGreaterThan(-1);
+    expect(echoReturn < agentCall, 'the agent can now answer the operator’s own message').toBe(true);
+  });
+});
+
+describe('one press, one message', () => {
+  it('guards the send against re-entry', () => {
+    // "Thank you very much, appreciated it a lot." went to the customer TWICE, 1.2s apart, two
+    // distinct wamids, both delivered and read. The button was disabled while in flight; the
+    // textarea's Enter handler was not, and `send` itself only checked there was something to
+    // send. A ref, not the `sending` state — the state read from that closure is stale, which is
+    // exactly what let the second call through.
+    expect(inboxPage).toMatch(/sendInFlight/);
+    expect(inboxPage).toMatch(/if \(sendInFlight\.current\) return;/);
+    expect(inboxPage).toMatch(/sendInFlight\.current = false;/);
+    // And the keyboard path, which was the one with no guard at all.
+    expect(inboxPage).toMatch(/!waBlocked && !sending\) send\(\)/);
+  });
+});

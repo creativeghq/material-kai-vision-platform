@@ -377,9 +377,22 @@ export function parseSentAt(raw: unknown): string | null {
 
 async function handleInboundMessage(supabase: any, payload: any): Promise<InboundOutcome> {
   const msg = payload.message || {};
-  if (msg.direction && msg.direction !== 'incoming') {
-    return { outcome: 'dropped', reason: 'not an incoming message' };
-  }
+
+  // A message the OPERATOR sent, echoed back to us. It is filed, not dropped.
+  //
+  // This used to `return` here, and on a coexistence number that means the Inbox shows half a
+  // conversation. Verified 2026-08-24 against the operator's own phone: their 10:51 "Hello, Good
+  // Morning" and their 11:21 "Can you do a small follow for me, with your sales manager?" are on
+  // WhatsApp and in neither our thread nor anywhere else — because they were typed in the
+  // WhatsApp Business app, and every echo of them was discarded on this line. The customer's
+  // replies landed, so the thread reads as a stranger answering questions nobody asked.
+  //
+  // Coexistence exists precisely so a number can be worked from both the phone and the platform.
+  // A platform that only records its own half is not showing the conversation.
+  //
+  // Not a duplicate risk for a message sent FROM here: the relay stores the wamid Meta returns,
+  // and the echo carries that same wamid, so the dedupe below recognises it as already filed.
+  const isOutgoingEcho = !!msg.direction && msg.direction !== 'incoming';
 
   // Is this a live message, or history being replayed by the back-fill?
   //
@@ -403,10 +416,28 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   }
 
   const accountId = accountIdOf(payload.account);
-  const phone = contactPhoneOf(msg.sender);
+
+  // WHOSE number identifies the conversation.
+  //
+  // On an inbound message that is the sender. On an echo of our own it is the RECIPIENT — the
+  // sender there is our own WABA number, and resolving on it would open a thread with ourselves
+  // and mint a CRM contact for the company's own line.
+  const counterparty = isOutgoingEcho
+    ? (contactPhoneOf(msg.recipient) ?? contactPhoneOf(msg.to) ?? contactPhoneOf(msg.participant)
+       ?? contactPhoneOf({ id: msg.conversationParticipantId }))
+    : contactPhoneOf(msg.sender);
+  const phone = counterparty;
   if (!phone) {
-    console.warn('[zernio-webhook] inbound message without resolvable phone');
-    return { outcome: 'dropped', reason: 'no resolvable phone on the sender' };
+    console.warn(
+      `[zernio-webhook] ${isOutgoingEcho ? 'outgoing echo' : 'inbound message'} without a resolvable `
+      + `counterparty number. message keys: ${Object.keys(msg).join(',')}`,
+    );
+    return {
+      outcome: 'dropped',
+      reason: isOutgoingEcho
+        ? 'no resolvable recipient on the outgoing echo'
+        : 'no resolvable phone on the sender',
+    };
   }
 
   // Already have it? Then this is a re-import, and a re-import must be a no-op.
@@ -444,14 +475,18 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   }
 
   // STOP / START keyword compliance (independent of thread resolution).
-  const text = String(msg.text || '').trim();
+  //
+  // The CUSTOMER's words only. Consent is theirs to withdraw, and an operator typing "stop" — or
+  // "STOP by the showroom tomorrow" — must not opt their own customer out of every future
+  // message. Reading an echo here would let us withdraw consent on the customer's behalf.
+  const text = isOutgoingEcho ? '' : String(msg.text || '').trim();
   const upper = text.toUpperCase();
-  if (OPT_OUT_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
+  if (text && OPT_OUT_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
     await supabase.from('messaging_optouts').upsert({
       phone_number: phone, channel_type: 'whatsapp',
       reason: `STOP keyword: ${text}`, source: 'keyword', opted_out_at: new Date().toISOString(),
     }, { onConflict: 'phone_number,channel_type' });
-  } else if (OPT_IN_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
+  } else if (text && OPT_IN_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
     await supabase.from('messaging_optouts').delete().eq('phone_number', phone).eq('channel_type', 'whatsapp');
   }
 
@@ -584,9 +619,22 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     );
   }
 
+  // An echo is OUR message: it belongs to the member who owns the thread, on the right-hand side
+  // of the transcript. Attributing it to the customer participant would show the operator's own
+  // words as though the customer had written them — and the agent's own guard reads exactly that
+  // field to decide whether a customer is waiting for an answer.
+  let senderParticipantId: string | null = customerParticipantId;
+  if (isOutgoingEcho) {
+    const { data: memberP } = await supabase
+      .from('inbox_participants').select('id')
+      .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active')
+      .limit(1).maybeSingle();
+    senderParticipantId = (memberP as { id?: string } | null)?.id ?? null;
+  }
+
   const { error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
-    sender_participant_id: customerParticipantId,
+    sender_participant_id: senderParticipantId,
     body: msg.text ?? null,
     attachments: inboundAttachments,
     message_type: 'text',
@@ -594,7 +642,11 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     metadata: {
       channel: 'whatsapp',
       wamid: msg.platformMessageId || msg.id || null,
-      direction: 'incoming',
+      direction: isOutgoingEcho ? 'outgoing' : 'incoming',
+      // Where it was typed. The operator can then tell their own phone reply from a platform one,
+      // and `whatsappWindow` — which measures the 24h clock from the last INCOMING message — is
+      // not moved by our own words.
+      ...(isOutgoingEcho ? { sent_from: 'device' } : {}),
       ...(unresolvedMedia ? { attachment_unresolved: true, provider_keys: Object.keys(msg) } : {}),
       // Kept whether or not it was usable as `created_at`, so "why is this message stamped
       // today" is answerable from the row rather than from a guess.
@@ -618,6 +670,13 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // old chat, and — the one that actually reached customers — hand each thread to the assistant.
   if (historical) {
     return { outcome: 'filed', reason: 'imported (no notification, no agent reply)' };
+  }
+
+  // Neither does our own message. Notifying the operator that they have a new message, because
+  // they just sent one, is noise; and handing the thread to the assistant off the back of the
+  // operator's own words is how a bot answers its own colleague. The customer is not waiting.
+  if (isOutgoingEcho) {
+    return { outcome: 'filed', reason: 'outgoing echo filed (sent from the device)' };
   }
 
   // Notify every member participant via the unified inbox event.
