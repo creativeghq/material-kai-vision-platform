@@ -73,6 +73,22 @@ describe('inbound attachments are not guessed at by field name', () => {
     ).toBe(false);
   });
 
+  it('treats the channel placeholder as an absence, not as text', () => {
+    // The first version of the unresolved check asked `!msg.text`. Zernio substitutes
+    // `[Unsupported message]` for media it does not hand over — a TRUTHY string — so the
+    // diagnostic written to catch exactly this sat silent through five of them, from the first
+    // import at 04:20 to 08:27 the same day. A placeholder is the absence of the message wearing
+    // text's clothes.
+    expect(hook).toMatch(/export function isMediaPlaceholder/);
+    expect(hook).toMatch(/'unsupported message'/);
+    expect(
+      /!msg\.text && inboundAttachments\.length === 0/.test(stripComments(hook)),
+      'the unresolved check reads msg.text as truthy again — a placeholder body will pass as content',
+    ).toBe(false);
+    // Exact bracketed names only. A customer writing "[urgent]" is sending a message.
+    expect(hook).toMatch(/startsWith\('\['\)/);
+  });
+
   it('marks a message it could not read, rather than filing a blank one', () => {
     // WhatsApp does not send empty messages. No text and no recognised attachment means we
     // failed to read a file, and that must be recoverable from the row — with the payload's own

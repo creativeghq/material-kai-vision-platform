@@ -298,6 +298,34 @@ export function normalizeInboundAttachments(msg: Record<string, unknown>): Array
   return out;
 }
 
+/**
+ * Is this "text" actually the channel telling us it could not give us the message?
+ *
+ * Zernio substitutes a bracketed placeholder — `[Unsupported message]` — for media it does not
+ * hand over inline. Measured 2026-08-24: 5 inbound messages carry exactly that string, from the
+ * first import at 04:20 through to 08:27, and the customer's actual photo or PDF is in none of
+ * them.
+ *
+ * This exists because the first version of the unresolved-media check asked `!msg.text`, which is
+ * FALSE for a placeholder — so the diagnostic built to catch precisely this case sat silent
+ * through five of them. A placeholder is not text; it is the absence of the message wearing text's
+ * clothes, and any check that treats it as content will pass while the file is lost.
+ *
+ * Matched as an exact, small, case-insensitive set rather than "anything in brackets": a customer
+ * writing `[urgent]` is sending a message, not a media placeholder.
+ */
+const MEDIA_PLACEHOLDERS = new Set([
+  'unsupported message', 'unsupported', 'image', 'photo', 'video', 'audio', 'voice message',
+  'document', 'file', 'sticker', 'contact', 'location', 'attachment', 'media',
+]);
+
+export function isMediaPlaceholder(text: unknown): boolean {
+  if (typeof text !== 'string') return false;
+  const t = text.trim();
+  if (!t.startsWith('[') || !t.endsWith(']')) return false;
+  return MEDIA_PLACEHOLDERS.has(t.slice(1, -1).trim().toLowerCase());
+}
+
 export function parseSentAt(raw: unknown): string | null {
   if (typeof raw !== 'string' && typeof raw !== 'number') return null;
   const d = new Date(raw);
@@ -493,11 +521,15 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // on the row AND in the log, with the payload's own key names, so the shape we are missing is
   // recoverable from the next real one instead of staying a guess. (Pipeline convention #1:
   // explicit failure markers, never an empty return.)
-  const unresolvedMedia = !msg.text && inboundAttachments.length === 0;
+  // `[Unsupported message]` counts as no text — see isMediaPlaceholder. Asking `!msg.text` alone
+  // is what let five of these through in silence.
+  const hasRealText = !!msg.text && !isMediaPlaceholder(msg.text);
+  const unresolvedMedia = !hasRealText && inboundAttachments.length === 0;
   if (unresolvedMedia) {
     console.warn(
-      '[zernio-webhook] inbound message has no text and no attachment we recognise — '
-      + `media may be arriving under an unhandled key. message keys: ${Object.keys(msg).join(',')}`,
+      '[zernio-webhook] inbound message carries no readable text and no attachment we recognise — '
+      + `media is arriving under an unhandled key. body=${JSON.stringify(msg.text ?? null)} `
+      + `message keys: ${Object.keys(msg).join(',')}`,
     );
   }
 
@@ -830,6 +862,17 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
     at,
   });
 
+  // Computed once, not twice: the second call was a separate evaluation of the same question,
+  // which is how the marker and the stored attachments get to disagree about one message.
+  const socialAttachments = normalizeInboundAttachments(msg);
+  const socialUnresolved = !(msg.text && !isMediaPlaceholder(msg.text)) && socialAttachments.length === 0;
+  if (socialUnresolved) {
+    console.warn(
+      `[zernio-webhook] social DM on ${plat} carries no readable text and no attachment we `
+      + `recognise. body=${JSON.stringify(msg.text ?? null)} message keys: ${Object.keys(msg).join(',')}`,
+    );
+  }
+
   const { error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: null,          // external author, no participant row
@@ -837,15 +880,13 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
     // Same normaliser as WhatsApp. An Instagram DM is more likely to be a photo than a sentence,
     // so the channel where dropping media hurts most must not be the one still assuming a single
     // field name.
-    attachments: normalizeInboundAttachments(msg),
+    attachments: socialAttachments,
     message_type: 'text',
     metadata: {
       channel: 'social', direction: 'incoming', platform: plat,
       wamid: msg.platformMessageId || msg.id || null,
       author_handle: handle, author_id: participantId,
-      ...(!msg.text && normalizeInboundAttachments(msg).length === 0
-        ? { attachment_unresolved: true, provider_keys: Object.keys(msg) }
-        : {}),
+      ...(socialUnresolved ? { attachment_unresolved: true, provider_keys: Object.keys(msg) } : {}),
     },
   });
   if (msgErr) throw new Error(`social DM inbox_messages insert failed: ${msgErr.message}`);

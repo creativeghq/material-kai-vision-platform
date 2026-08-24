@@ -1433,6 +1433,11 @@ const MessageBubble: React.FC<{
   // so without this every social message renders as an unattributed grey bubble and a thread
   // of ten different commenters looks like one anonymous person talking to themselves.
   const meta = (m.metadata ?? {}) as Record<string, unknown>;
+  // A channel placeholder standing in for media, with nothing attached to show for it. Both
+  // halves matter: once the attachment IS captured, the bubble should render the file rather
+  // than keep apologising for it.
+  const mediaPlaceholder = meta.attachment_unresolved === true
+    && (m.attachments || []).length === 0;
   const externalAuthor = !m.sender_participant_id && typeof meta.author_handle === 'string'
     ? (meta.author_handle as string)
     : null;
@@ -1483,7 +1488,18 @@ const MessageBubble: React.FC<{
         <div className={`rounded-2xl px-3.5 py-2 text-left ${bubbleClass}`}>
           {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
           {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> KAI assistant</div>}
-          {m.body && <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>}
+          {/* `[Unsupported message]` is the CHANNEL's placeholder for media it did not hand over,
+              not something the customer typed. Shown raw it reads as a fault in their phone;
+              what it actually means is that they sent a file and we could not fetch it. Say the
+              second thing — an operator who knows a file is missing can ask for it again. */}
+          {m.body && (mediaPlaceholder ? (
+            <div className="flex items-start gap-1.5 text-sm text-muted-foreground italic">
+              <Paperclip className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>They sent a file that WhatsApp did not pass on. Ask them to resend it, or open the chat on your phone.</span>
+            </div>
+          ) : (
+            <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>
+          ))}
           {/* A public comment answered in public stays public. These are the two ways out:
               answer the person privately, or take the comment down. Both are one-shot at the
               platform (Meta allows a single private reply per comment, inside a window), so
