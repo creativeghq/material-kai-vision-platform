@@ -273,7 +273,20 @@ describe('the WhatsApp profile is fetched and shown', () => {
     // A provider image url expires; a contact card whose photo becomes a broken square is worse
     // than one that never had a photo.
     expect(hook).toMatch(/avatar_path/);
-    expect(hook).toMatch(/\.upload\(path, bytes/);
+    // Matches the local name loosely on purpose. The claim is "the BYTES are uploaded", and pinning
+    // the exact identifier made this fail when the fetch moved behind the SSRF guard and `bytes`
+    // became `img.bytes` — a test that breaks on a rename it does not care about teaches people to
+    // edit the assertion rather than read it.
+    expect(hook).toMatch(/\.upload\(path, (?:img\.)?bytes/);
+  });
+
+  it('fetches the avatar through the SSRF guard', () => {
+    // `avatarUrl` arrives inside a provider API response, so this runtime did not choose it —
+    // invariant 7. A bare fetch() there follows redirects into link-local space and reads an
+    // unbounded body. Semgrep caught this one on main (`no-unguarded-download-of-user-url`);
+    // the rule only fires on the raw-fetch shape, so this pins the fix from the other direction.
+    expect(hook).toMatch(/fetchImageGuardedOrNull\(profile\.avatarUrl\)/);
+    expect(hook).not.toMatch(/await fetch\(profile\.avatarUrl\)/);
   });
 
   it('merges thread metadata instead of overwriting it', () => {
