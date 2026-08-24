@@ -1477,24 +1477,35 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const { data: threadRows, error: tErr } = await tq;
         if (tErr) throw new HttpError(500, `Could not read threads: ${tErr.message}`);
 
-        const byConversation = new Map<string, { id: string; avatarSource: string | null }>();
+        type AvatarTarget = { id: string; avatarSource: string | null; hasPhoto: boolean; name: string };
+        const byConversation = new Map<string, AvatarTarget>();
+        // A second index by phone digits, because the contacts endpoint identifies people by
+        // `platformIdentifier` (the number) while conversations identify them by id.
+        const byPhone = new Map<string, AvatarTarget>();
         for (const t of (threadRows ?? []) as Array<{ id: string; metadata: Record<string, unknown> }>) {
           const meta = (t.metadata ?? {}) as Record<string, unknown>;
-          const convId = typeof meta.zernio_conversation_id === 'string' ? meta.zernio_conversation_id : '';
-          if (!convId) continue;
           const prof = (meta.wa_profile ?? {}) as Record<string, unknown>;
-          byConversation.set(convId, {
+          const target: AvatarTarget = {
             id: t.id,
             // Present AND already downloaded. A source recorded next to a null path means the last
             // download failed, so that one is retried rather than counted as done.
             avatarSource: (typeof prof.avatar_source === 'string' && typeof prof.avatar_path === 'string')
               ? prof.avatar_source : null,
-          });
+            hasPhoto: typeof prof.avatar_path === 'string',
+            name: typeof prof.name === 'string' ? prof.name : '',
+          };
+          const convId = typeof meta.zernio_conversation_id === 'string' ? meta.zernio_conversation_id : '';
+          if (convId) byConversation.set(convId, target);
+          const phone = typeof meta.contact_phone === 'string' ? meta.contact_phone.replace(/\D/g, '') : '';
+          if (phone) byPhone.set(phone, target);
         }
 
         let conversations = 0;
         let withPicture = 0;
         let stored = 0;
+        let contactsScanned = 0;
+        let contactsWithAvatar = 0;
+        let fromContacts = 0;
         let ownAvatar = false;
         const errors: string[] = [];
 
@@ -1549,12 +1560,57 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
                 supabaseClient, target.id, pic,
                 typeof conv.participantName === 'string' ? conv.participantName : '',
               );
-              if (ok) stored++;
+              if (ok) { stored++; target.hasPhoto = true; }
             }
 
             cursor = page?.nextCursor ?? page?.cursor ?? undefined;
             pages++;
             if (!cursor || !items.length) break;
+          }
+
+          // ── second source: Zernio's own contact records ──
+          //
+          // The conversations list is the documented place for a participant photo and it is the
+          // one Meta feeds, so it comes first. But this number runs in COEXISTENCE mode, where the
+          // phone's own address book is synced across, and `/v1/contacts` carries an `avatarUrl`
+          // that the conversation shape has no field for. Two different origins, so checking only
+          // one and concluding "no photos exist" would be the same mistake that started this.
+          //
+          // Only for threads still without a photo, and matched on the digits of the number
+          // because contacts are keyed by `platformIdentifier` rather than by conversation id.
+          if (Array.from(byPhone.values()).some((t) => !t.hasPhoto)) {
+            let skip = 0;
+            for (let cpage = 0; cpage < 10; cpage++) {
+              let cres: any;
+              try {
+                const cqs = new URLSearchParams({
+                  accountId, platform: 'whatsapp', limit: '200', skip: String(skip),
+                });
+                cres = await zernioApi('GET', `/contacts?${cqs.toString()}`);
+              } catch (err) {
+                errors.push(`contacts: ${err instanceof Error ? err.message : String(err)}`);
+                break;
+              }
+              const cItems = (cres?.contacts ?? cres?.data ?? []) as Array<Record<string, any>>;
+              if (!cItems.length) break;
+              for (const c of cItems) {
+                contactsScanned++;
+                const avatar = typeof c.avatarUrl === 'string' ? c.avatarUrl : '';
+                if (!avatar) continue;
+                contactsWithAvatar++;
+                const digits = String(c.platformIdentifier ?? c.displayIdentifier ?? '').replace(/\D/g, '');
+                if (!digits) continue;
+                const target = byPhone.get(digits);
+                if (!target || target.hasPhoto || target.avatarSource === avatar) continue;
+                const ok = await storeParticipantPicture(
+                  supabaseClient, target.id, avatar,
+                  typeof c.name === 'string' ? c.name : target.name,
+                );
+                if (ok) { fromContacts++; target.hasPhoto = true; }
+              }
+              if (cItems.length < 200) break;
+              skip += 200;
+            }
           }
         }
 
@@ -1562,19 +1618,25 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           success: true,
           conversations,
           with_picture: withPicture,
+          contacts_scanned: contactsScanned,
+          contacts_with_avatar: contactsWithAvatar,
+          from_contacts: fromContacts,
           stored,
           own_avatar: ownAvatar,
           // Every count is a different diagnosis, and one "synced N" would hide all of them: no
           // conversations = the listing failed; conversations but no pictures = the platform
           // withholds them; pictures but nothing stored = we already hold them, or those threads
           // were never imported.
+          // BOTH sources are named in the answer. "No photos" is only true once the conversation
+          // list AND the contact records have both been asked, and saying which one had them is
+          // what turns a bare zero into something anybody can act on.
           message: conversations === 0
             ? 'Zernio returned no conversations for this number.'
-            : withPicture === 0
-              ? `${conversations} conversation(s) checked — none carries a profile photo (WhatsApp only exposes one when the contact allows it).`
-              : stored === 0
-                ? `${withPicture} of ${conversations} conversation(s) have a photo, and every one was already stored.`
-                : `${stored} profile photo(s) downloaded, out of ${withPicture} available.`,
+            : (stored + fromContacts) > 0
+              ? `${stored + fromContacts} profile photo(s) downloaded (${stored} from conversations, ${fromContacts} from contact records).`
+              : (withPicture + contactsWithAvatar) === 0
+                ? `${conversations} conversation(s) and ${contactsScanned} contact record(s) checked — neither source carries a photo. WhatsApp does not hand a customer's profile picture to a business unless that contact has made it public.`
+                : `${withPicture + contactsWithAvatar} photo(s) are available and every one was already stored.`,
           errors: errors.slice(0, 10),
         });
       }

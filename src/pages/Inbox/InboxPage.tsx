@@ -376,7 +376,9 @@ const InboxPage: React.FC = () => {
       // Reload only when something actually landed — a no-op refresh on every inbox open is
       // a wasted round trip and a visible flicker for nothing.
       .then((r) => { if (r.stored > 0) loadThreads(); })
-      .catch(() => { /* decoration: a failure here must never interrupt reading messages */ });
+      // Never a toast: a photo failing must not interrupt reading messages. But not swallowed
+      // either — a silent catch here is how "the avatars do not work" becomes unanswerable.
+      .catch((e) => console.warn('[inbox] profile photo sync failed:', (e as Error).message));
   }, [threads, activeWorkspaceId, loadThreads]);
 
 
