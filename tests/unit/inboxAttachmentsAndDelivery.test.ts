@@ -29,6 +29,9 @@ const hook = readFileSync(join(ROOT, 'supabase', 'functions', 'zernio-webhook-ha
 const messagingApi = readFileSync(join(ROOT, 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
 const inboxPage = readFileSync(join(ROOT, 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
 const zernioClient = readFileSync(join(ROOT, 'supabase', 'functions', '_shared', 'zernio.ts'), 'utf8');
+// The download itself moved to _shared/inbox-media.ts so messaging-api's repair action and the
+// webhook handler share ONE implementation. Assertions follow it there.
+const inboxMedia = readFileSync(join(ROOT, 'supabase', 'functions', '_shared', 'inbox-media.ts'), 'utf8');
 const inboxApiSrc = readFileSync(join(ROOT, 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
 
 describe('inbound attachments are not guessed at by field name', () => {
@@ -147,8 +150,8 @@ describe('the file is fetched, not waited for', () => {
     // Storage convention #7: a link that expires is not an attachment. Both response shapes end
     // as bytes — the JSON one is followed here rather than persisted.
     expect(zernioClient).toMatch(/bytes: Uint8Array/);
-    expect(hook).toMatch(/storage_object_path: path/);
-    expect(hook).toMatch(/\.upload\(path, got\.bytes/);
+    expect(inboxMedia).toMatch(/storage_object_path: path/);
+    expect(inboxMedia).toMatch(/\.upload\(path, got\.bytes/);
   });
 
   it('repairs a message whose file was never retrieved, instead of skipping it', () => {
@@ -332,15 +335,15 @@ describe('a photo renders as a photo, and opens in place', () => {
     // The real payload carries `content_type: "image"` — no slash. Every renderer tested
     // `startsWith('image/')`, so two real photos came out as a paperclip labelled "attachment".
     expect(inboxPage).toMatch(/ct\.includes\('\/'\) \? ct\.split\('\/'\)\[0\] : ct/);
-    expect(hook).toMatch(/export function normalizeMediaType/);
-    expect(hook).toMatch(/image: 'image\/jpeg'/);
+    expect(inboxMedia).toMatch(/export function normalizeMediaType/);
+    expect(inboxMedia).toMatch(/image: 'image\/jpeg'/);
   });
 
   it('holds the bytes rather than the provider link', () => {
     // The inline url is `https://zernio.com/api/v1/whatsapp/media/…` — an API endpoint needing the
     // bearer key. A browser gets a broken image, and it expires besides.
     expect(zernioClient).toMatch(/export async function fetchZernioMediaUrl/);
-    expect(hook).toMatch(/materialiseInlineAttachments/);
+    expect(inboxMedia).toMatch(/export async function materialiseInlineAttachments/);
     expect(zernioClient).toMatch(/hostname\.endsWith\('zernio\.com'\)/);
     // Guarded, with the bearer passed THROUGH it — needing a header is not a reason to
     // fetch a provider URL raw (invariant 7).
@@ -358,8 +361,11 @@ describe('a photo renders as a photo, and opens in place', () => {
 
   it('says so when a file could not be downloaded', () => {
     // A link that goes nowhere is worse than an honest failure.
-    expect(hook).toMatch(/fetch_failed: true/);
-    expect(inboxPage).toMatch(/could not be downloaded/);
+    expect(inboxMedia).toMatch(/fetch_failed: true/);
+    // The card also covers the row that holds a provider link and was never fetched at all —
+    // rendering that as an <img> is what produced a broken-image icon in the thread.
+    expect(inboxPage).toMatch(/not downloaded yet/);
+    expect(inboxPage).toMatch(/repairAttachments\(\{ messageId \}\)/);
   });
 
   it('repairs a message left holding an unopenable link', () => {

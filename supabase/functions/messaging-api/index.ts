@@ -15,6 +15,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
+import { materialiseInlineAttachments } from '../_shared/inbox-media.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -293,7 +294,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const OPERATOR_ACTIONS = new Set([
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
-      'register-webhook', 'create-whatsapp-template', 'backfill-inbox',
+      'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
       // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
@@ -1283,6 +1284,78 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // rather than a second importer: the one thing worse than a missing conversation is two
       // import paths that disagree about how a message becomes a thread.
       // ─────────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────
+      // repair-attachments — fetch media we filed a LINK to but never downloaded.
+      //
+      // An inbound media message arrives with the provider's own URL:
+      //   https://zernio.com/api/v1/whatsapp/media/{id}?accountId=...
+      // which is an authenticated API endpoint, not a file. Until the bytes are pulled server-side
+      // the browser cannot render it — it shows a broken image — and the message is stuck that way
+      // permanently, because a webhook fires once.
+      //
+      // Cheaper and narrower than the back-fill, which lists conversations from Zernio and replays
+      // every message: this reads the rows that are actually broken and fetches only those.
+      // ─────────────────────────────────────────────────────────────
+      case 'repair-attachments': {
+        const { workspaceId, threadId, messageId } = requestBody;
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        let q = supabaseClient
+          .from('inbox_messages')
+          .select('id, thread_id, attachments, inbox_threads!inner(workspace_id, channel)')
+          .eq('inbox_threads.workspace_id', wsId)
+          .not('attachments', 'eq', '[]')
+          .limit(200);
+        if (messageId) q = q.eq('id', String(messageId));
+        else if (threadId) q = q.eq('thread_id', String(threadId));
+
+        const { data: rows, error: readErr } = await q;
+        if (readErr) throw new HttpError(500, `Could not read messages: ${readErr.message}`);
+
+        let repaired = 0;
+        let stillBroken = 0;
+        const errors: string[] = [];
+
+        for (const row of (rows ?? []) as Array<{ id: string; thread_id: string; attachments: Array<Record<string, unknown>> }>) {
+          const atts = Array.isArray(row.attachments) ? row.attachments : [];
+          // Only the ones holding a link we never resolved. An attachment already in our storage
+          // is left alone — re-fetching it would burn a download to produce the same bytes.
+          const broken = atts.filter((a) => !a.storage_object_path && typeof a.url === 'string' && a.url);
+          if (!broken.length) continue;
+
+          try {
+            const fixed = await materialiseInlineAttachments(supabaseClient, row.thread_id, broken);
+            const ok = fixed.filter((a) => a.storage_object_path);
+            if (!ok.length) { stillBroken++; continue; }
+
+            // Keep the ones that were already fine, replace the ones we just fetched.
+            const merged = [...atts.filter((a) => a.storage_object_path), ...ok];
+            const { error: upErr } = await supabaseClient
+              .from('inbox_messages').update({ attachments: merged }).eq('id', row.id);
+            if (upErr) { errors.push(`${row.id}: ${upErr.message}`); continue; }
+            repaired += ok.length;
+          } catch (err) {
+            errors.push(`${row.id}: ${String(err)}`);
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          scanned: (rows ?? []).length,
+          repaired,
+          still_broken: stillBroken,
+          // Never a silent partial — "0 repaired" and "0 needed repair" are different answers.
+          message: repaired === 0 && stillBroken === 0
+            ? 'Nothing needed repairing — every attachment is already stored.'
+            : stillBroken > 0
+              ? `${repaired} recovered; ${stillBroken} could not be fetched (the media may have expired on WhatsApp).`
+              : `${repaired} attachment(s) recovered.`,
+          errors: errors.slice(0, 10),
+        });
+      }
+
       case 'backfill-inbox': {
         const { workspaceId, limit, phone: onlyPhone, conversationId: onlyConversationId } = requestBody;
         // Compare digits only: Zernio hands back `306948408542`, a person types `+30 694 840 8542`,

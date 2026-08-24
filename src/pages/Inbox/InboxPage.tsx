@@ -13,6 +13,7 @@ import { projectPlansService } from '@/services/projectPlansService';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
+import { messagingService } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -53,7 +54,13 @@ import {
 interface WorkspaceMemberOption { user_id: string; label: string; }
 
 /** {label, kind, userId} keyed by participant id — drives sender names + bubble alignment. */
-interface ParticipantLabel { label: string; kind: 'member' | 'customer' | 'agent'; userId: string | null; }
+interface ParticipantLabel {
+  label: string;
+  kind: 'member' | 'customer' | 'agent';
+  userId: string | null;
+  /** The member's own photo. `user_profiles.avatar_url` existed all along and was never selected. */
+  avatarUrl?: string | null;
+}
 
 
 function timeAgo(iso: string): string {
@@ -380,11 +387,11 @@ const InboxPage: React.FC = () => {
       const memberIds = participants
         .filter((p) => p.participant_type === 'member' && p.user_id)
         .map((p) => p.user_id as string);
-      const profMap: Record<string, { full_name?: string; email?: string }> = {};
+      const profMap: Record<string, { full_name?: string; email?: string; avatar_url?: string }> = {};
       if (memberIds.length) {
         const { data: profs } = await supabase
-          .from('user_profiles').select('user_id, full_name, email').in('user_id', memberIds);
-        for (const p of (profs || []) as Array<{ user_id: string; full_name?: string; email?: string }>) {
+          .from('user_profiles').select('user_id, full_name, email, avatar_url').in('user_id', memberIds);
+        for (const p of (profs || []) as Array<{ user_id: string; full_name?: string; email?: string; avatar_url?: string }>) {
           profMap[p.user_id] = p;
         }
       }
@@ -394,7 +401,10 @@ const InboxPage: React.FC = () => {
         if (p.participant_type === 'member') {
           const isMe = p.user_id && p.user_id === myUserId;
           const prof = p.user_id ? profMap[p.user_id] : undefined;
-          next.set(p.id, { label: isMe ? 'You' : (prof?.full_name || prof?.email || 'Team member'), kind: 'member', userId: p.user_id });
+          next.set(p.id, {
+            label: isMe ? 'You' : (prof?.full_name || prof?.email || 'Team member'),
+            kind: 'member', userId: p.user_id, avatarUrl: prof?.avatar_url ?? null,
+          });
         } else if (p.participant_type === 'customer') {
           next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id });
         } else {
@@ -1128,6 +1138,7 @@ const InboxPage: React.FC = () => {
                     info={m.sender_participant_id ? labels.get(m.sender_participant_id) : undefined}
                     myUserId={myUserId}
                     isCustomerThread={activeThread.thread_type !== 'internal'}
+                    onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
                     onPrivateReply={isCommentThread && isMember ? handlePrivateReply : undefined}
                     onToggleHidden={isCommentThread && isMember ? handleToggleHidden : undefined}
                   />
@@ -1430,11 +1441,19 @@ const AttachmentLightbox: React.FC<{
   </Dialog>
 );
 
-const AttachmentView: React.FC<{ att: InboxAttachment; href?: string }> = ({ att, href }) => {
+const AttachmentView: React.FC<{
+  att: InboxAttachment;
+  href?: string;
+  /** For the retry: repair is scoped to the one message rather than the whole workspace. */
+  messageId?: string;
+  onRepaired?: () => void;
+}> = ({ att, href, messageId, onRepaired }) => {
   const name = att.name || 'attachment';
   const ct = (att.content_type || '').toLowerCase();
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   const [zoom, setZoom] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const { toast } = useToast();
 
   // The family, whether or not it arrived as a real MIME type.
   //
@@ -1450,13 +1469,47 @@ const AttachmentView: React.FC<{ att: InboxAttachment; href?: string }> = ({ att
     : ct === 'application/pdf' || family === 'document' || ext === 'pdf' ? 'pdf'
     : 'file';
 
-  // Fetched but unopenable — the provider link needed credentials the browser does not have, or
-  // the download failed. Say so rather than offering a link that goes nowhere.
-  if ((att as { fetch_failed?: boolean }).fetch_failed) {
+  // NOT RETRIEVED: the row still holds the provider's own URL rather than a path in our storage.
+  //
+  // That URL is an authenticated API endpoint — `zernio.com/api/v1/whatsapp/media/{id}` needs a
+  // bearer token the browser does not have — so rendering it as an <img> produces a broken-image
+  // icon with the word "attachment" beside it. Which is exactly what shipped: recognising the type
+  // turned a harmless paperclip link into a visibly broken picture.
+  //
+  // A message filed before the download path existed is in this state permanently until it is
+  // re-fetched, so this offers the re-fetch rather than describing the problem.
+  const notRetrieved = (att as { fetch_failed?: boolean }).fetch_failed
+    || (!att.storage_object_path && !!att.url);
+  if (notRetrieved) {
     return (
-      <div className="flex items-center gap-1.5 text-xs mt-1 text-muted-foreground">
-        <AlertTriangle className="w-3 h-3 shrink-0 text-destructive" />
-        <span>{kind === 'image' ? 'Photo' : 'File'} could not be downloaded — re-import to retry.</span>
+      <div className="flex items-center gap-2 mt-1.5 rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-warning" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium">
+            {kind === 'image' ? 'Photo' : kind === 'video' ? 'Video' : 'File'} not downloaded yet
+          </span>
+          <span className="block text-[10px] text-muted-foreground">
+            It is still on WhatsApp — we hold a link that needs our server to fetch it.
+          </span>
+        </span>
+        {messageId && (
+          <Button
+            size="sm" variant="outline" className="h-7 text-[11px] shrink-0"
+            disabled={fetching}
+            onClick={async () => {
+              setFetching(true);
+              try {
+                const r = await messagingService.repairAttachments({ messageId });
+                if (r.repaired > 0) { onRepaired?.(); }
+                else { toast({ title: 'Could not fetch it', description: r.message, variant: 'destructive' }); }
+              } catch (e) {
+                toast({ title: 'Could not fetch it', description: (e as Error).message, variant: 'destructive' });
+              } finally { setFetching(false); }
+            }}
+          >
+            {fetching ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Fetch'}
+          </Button>
+        )}
       </div>
     );
   }
@@ -1535,10 +1588,12 @@ const MessageBubble: React.FC<{
   info?: ParticipantLabel;
   myUserId: string | null;
   isCustomerThread: boolean;
+  /** Re-read the thread after an attachment is fetched, so the file replaces the placeholder. */
+  onAttachmentsRepaired?: () => void;
   /** Present only on a social COMMENT thread — a DM has neither affordance. */
   onPrivateReply?: (m: InboxMessage) => void;
   onToggleHidden?: (m: InboxMessage, hidden: boolean) => void;
-}> = ({ m, info, myUserId, isCustomerThread, onPrivateReply, onToggleHidden }) => {
+}> = ({ m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onPrivateReply, onToggleHidden }) => {
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     (async () => {
@@ -1600,6 +1655,11 @@ const MessageBubble: React.FC<{
   return (
     <div className={`flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
       <Avatar className="h-7 w-7 mt-5 shrink-0">
+        {/* A member's own photo, which was never selected from user_profiles — so every operator
+            in every thread rendered as initials no matter what they had uploaded. */}
+        {!isAgent && info?.avatarUrl && (
+          <AvatarImage src={info.avatarUrl} alt={displayLabel ?? ''} className="object-cover" />
+        )}
         <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(displayLabel)}`}>
           {isAgent ? <Bot className="w-3.5 h-3.5" /> : initials(displayLabel)}
         </AvatarFallback>
@@ -1662,7 +1722,12 @@ const MessageBubble: React.FC<{
           )}
           {(m.attachments || []).map((a, i) => {
             const k = a.storage_object_path || a.url || '';
-            return <AttachmentView key={k || i} att={a} href={urls[k] || a.url} />;
+            return (
+              <AttachmentView
+                key={k || i} att={a} href={urls[k] || a.url}
+                messageId={m.id} onRepaired={onAttachmentsRepaired}
+              />
+            );
           })}
         </div>
         {/* Reactions sit ON the message they belong to, overlapping its lower edge the way every

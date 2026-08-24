@@ -553,6 +553,25 @@ export class MessagingService {
   }
 
   /**
+   * Download media we only hold a provider LINK to.
+   *
+   * An inbound media message arrives with `https://zernio.com/api/v1/whatsapp/media/{id}` — an
+   * authenticated API endpoint, not a file. Until the bytes are pulled server-side the browser
+   * renders a broken image, and a webhook fires once, so the row is stuck that way permanently.
+   * Narrower than the back-fill: this touches only the rows that are actually broken.
+   */
+  async repairAttachments(options: { workspaceId?: string; threadId?: string; messageId?: string } = {}): Promise<{
+    success: boolean; scanned: number; repaired: number; still_broken: number;
+    message?: string; errors?: string[];
+  }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'repair-attachments', ...options },
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
    * Pull conversation history from Zernio into the inbox.
    *
    * Webhooks are push-only with no history — Zernio does not resend after a 200, and the
