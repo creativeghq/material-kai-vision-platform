@@ -2189,11 +2189,17 @@ const ChannelIdentityPanel: React.FC<{
         {!contact && (
           <>
             <p className="text-xs text-muted-foreground">
-              Nobody in the CRM is linked to this conversation.
+              Nobody in the CRM is linked to this conversation. Search{' '}
+              <span className="font-mono">{phone || 'the number'}</span> before adding anyone — the
+              same person often already exists under a different spelling of their name.
             </p>
+            {/* The contacts LIST, not `/crm/contacts/new`. A CRM party has to go through the
+                duplicate search before it exists, and a button that jumps straight to a blank
+                create form is how the same customer ends up in there three times. Same reason
+                AgentResultCard refuses to deep-link that route. */}
             <Button asChild size="sm" variant="secondary" className="w-full">
-              <a href={`/admin/crm?tab=contacts&create=1&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(waNameIsJustTheNumber ? '' : waName)}`}>
-                <UserPlus className="w-3.5 h-3.5 mr-1.5" />Create a CRM contact
+              <a href="/crm?tab=contacts">
+                <UserPlus className="w-3.5 h-3.5 mr-1.5" />Find or add in CRM
               </a>
             </Button>
           </>
@@ -2206,7 +2212,7 @@ const ChannelIdentityPanel: React.FC<{
               somebody names it.
             </p>
             <Button asChild size="sm" variant="secondary" className="w-full">
-              <a href={`/admin/crm?tab=contacts&contact=${contact.id}`}>
+              <a href={`/crm/contacts/${contact.id}`}>
                 <UserIcon className="w-3.5 h-3.5 mr-1.5" />Complete this contact
               </a>
             </Button>
@@ -2217,7 +2223,7 @@ const ChannelIdentityPanel: React.FC<{
             <Row label="Contact"><span className="truncate">{contact.name || '—'}</span></Row>
             {contact.email && <Row label="Email"><span className="truncate">{contact.email}</span></Row>}
             <Button asChild size="sm" variant="outline" className="w-full mt-1">
-              <a href={`/admin/crm?tab=contacts&contact=${contact.id}`}>
+              <a href={`/crm/contacts/${contact.id}`}>
                 <ChevronRight className="w-3.5 h-3.5 mr-1.5" />Open in CRM
               </a>
             </Button>
