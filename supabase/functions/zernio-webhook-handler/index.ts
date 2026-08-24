@@ -32,6 +32,7 @@ import {
   ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment, fetchWhatsAppProfile,
 } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
 
@@ -385,22 +386,22 @@ async function refreshWhatsAppProfile(
       return;
     }
 
+    // SSRF (invariant 7): `avatarUrl` arrives in a WhatsApp/Zernio API response, so this runtime
+    // did not choose it. A bare fetch() follows redirects into link-local space — 169.254.169.254
+    // included — and arrayBuffer() reads an unbounded body into a 256 MB isolate. The guarded
+    // helper resolves DNS and rejects private ranges, pins `redirect: 'error'`, caps the size and
+    // requires an image content-type. `OrNull` keeps the existing best-effort behaviour: a blocked
+    // or broken avatar means no avatar, never a failed profile sync.
     let avatarPath: string | null = null;
     if (profile.avatarUrl) {
-      try {
-        const res = await fetch(profile.avatarUrl);
-        if (res.ok) {
-          const bytes = new Uint8Array(await res.arrayBuffer());
-          const ct = res.headers.get('content-type') || 'image/jpeg';
-          const path = `inbox/${params.threadId}/profile/${crypto.randomUUID()}${extensionFor(ct) || '.jpg'}`;
-          const { error } = await supabase.storage
-            .from(INBOX_ATTACHMENT_BUCKET)
-            .upload(path, bytes, { contentType: ct, upsert: true });
-          if (error) console.warn('[zernio-webhook] profile avatar upload failed:', error.message);
-          else avatarPath = path;
-        }
-      } catch (err) {
-        console.warn('[zernio-webhook] profile avatar fetch failed:', err);
+      const img = await fetchImageGuardedOrNull(profile.avatarUrl);
+      if (img) {
+        const path = `inbox/${params.threadId}/profile/${crypto.randomUUID()}${extensionFor(img.mimeType) || '.jpg'}`;
+        const { error } = await supabase.storage
+          .from(INBOX_ATTACHMENT_BUCKET)
+          .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
+        if (error) console.warn('[zernio-webhook] profile avatar upload failed:', error.message);
+        else avatarPath = path;
       }
     }
 
