@@ -13,6 +13,7 @@
  */
 
 import { resolveSecret } from './secrets.ts';
+import { fetchBinaryGuarded, SSRFError } from './fetch-image.ts';
 
 type SupabaseLike = { from: (t: string) => any };
 
@@ -266,6 +267,55 @@ export async function fetchWhatsAppProfile(params: {
 
   console.warn(`[zernio] no endpoint returned a usable WhatsApp profile for +${digits}`);
   return null;
+}
+
+/**
+ * Download a Zernio-hosted media URL, authenticated.
+ *
+ * This is the contract the real payloads turned out to use — the guessed per-index endpoint was
+ * not it. An inbound media message carries, inline:
+ *
+ *   { "url": "https://zernio.com/api/v1/whatsapp/media/1634823348214373?accountId=…",
+ *     "content_type": "image" }
+ *
+ * That URL is an API endpoint, not a public file: it needs the bearer key, so a browser cannot
+ * load it and the operator sees a broken image. Storing it and rendering it directly is therefore
+ * not an option even ignoring expiry — it has to be pulled server-side and kept.
+ */
+export async function fetchZernioMediaUrl(
+  url: string,
+): Promise<{ bytes: Uint8Array; contentType: string; fileName?: string } | null> {
+  try {
+    // Our own key goes ONLY to our own vendor's host. The url arrives in a signed webhook payload,
+    // but "it came from a source we trust" is not a reason to hand a bearer token to whatever
+    // hostname it happens to name.
+    const isZernio = (() => {
+      try { return new URL(url).hostname.endsWith('zernio.com'); } catch { return false; }
+    })();
+
+    // Through the guard, not a bare fetch (invariant 7). The url is a value from an external API
+    // response, which is exactly the "user-influenced URL" the rule is about — a bare fetch would
+    // follow a redirect into link-local space (169.254.169.254 included) and read an unbounded
+    // body into the isolate. `fetchBinaryGuarded` resolves DNS, rejects private ranges, pins
+    // `redirect: 'error'` and caps the size; it takes headers precisely so that needing an
+    // Authorization bearer is not a reason to go around it.
+    const { bytes, mimeType } = await fetchBinaryGuarded(url, {
+      headers: isZernio ? { 'Authorization': `Bearer ${zernioKey()}` } : undefined,
+      maxBytes: 32 * 1024 * 1024,   // WhatsApp caps documents at ~100MB; 32 is generous for a chat
+      timeoutMs: 30_000,
+    });
+    return {
+      bytes,
+      contentType: mimeType || 'application/octet-stream',
+      // content-disposition is not surfaced by the guard. The caller derives a name from the
+      // content type, which is what it did for the unnamed case anyway.
+      fileName: undefined,
+    };
+  } catch (err) {
+    const why = err instanceof SSRFError ? 'blocked by the SSRF guard' : String(err);
+    console.warn(`[zernio] media download failed: ${url.split('?')[0]} → ${why}`);
+    return null;
+  }
 }
 
 /**

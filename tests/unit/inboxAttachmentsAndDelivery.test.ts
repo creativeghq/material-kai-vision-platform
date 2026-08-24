@@ -160,7 +160,9 @@ describe('the file is fetched, not waited for', () => {
 
   it('only reaches for a file when the message looks like it has one', () => {
     // One wasted round trip per plain text message would be a real cost on a busy number.
-    expect(hook).toMatch(/looksLikeMedia/);
+    // Inline media first (the shape real payloads use); the per-index endpoint only as a fallback.
+    expect(hook).toMatch(/if \(inboundAttachments\.length\) \{/);
+    expect(hook).toMatch(/\} else if \(!msg\.text \|\| isMediaPlaceholder\(msg\.text\)\) \{/);
   });
 });
 
@@ -301,5 +303,47 @@ describe('the WhatsApp profile is fetched and shown', () => {
     expect(inboxPage).toMatch(/wa_profile/);
     expect(inboxPage).toMatch(/AvatarImage/);
     expect(inboxPage).toMatch(/wa_profile_checked_at/);
+  });
+});
+
+describe('a photo renders as a photo, and opens in place', () => {
+  it('accepts a BARE media family, not just a MIME type', () => {
+    // The real payload carries `content_type: "image"` — no slash. Every renderer tested
+    // `startsWith('image/')`, so two real photos came out as a paperclip labelled "attachment".
+    expect(inboxPage).toMatch(/ct\.includes\('\/'\) \? ct\.split\('\/'\)\[0\] : ct/);
+    expect(hook).toMatch(/export function normalizeMediaType/);
+    expect(hook).toMatch(/image: 'image\/jpeg'/);
+  });
+
+  it('holds the bytes rather than the provider link', () => {
+    // The inline url is `https://zernio.com/api/v1/whatsapp/media/…` — an API endpoint needing the
+    // bearer key. A browser gets a broken image, and it expires besides.
+    expect(zernioClient).toMatch(/export async function fetchZernioMediaUrl/);
+    expect(hook).toMatch(/materialiseInlineAttachments/);
+    expect(zernioClient).toMatch(/hostname\.endsWith\('zernio\.com'\)/);
+    // Guarded, with the bearer passed THROUGH it — needing a header is not a reason to
+    // fetch a provider URL raw (invariant 7).
+    expect(zernioClient).toMatch(/fetchBinaryGuarded\(url, \{/);
+  });
+
+  it('opens full view in place instead of a new tab', () => {
+    // Reviewing a conversation should not cost you the conversation.
+    expect(inboxPage).toMatch(/const AttachmentLightbox/);
+    expect(inboxPage).toMatch(/kind="image"/);
+    expect(inboxPage).toMatch(/kind="pdf"/);
+    // `contain`: a cropped photo of a damaged tile is a photo of the wrong bit.
+    expect(inboxPage).toMatch(/object-contain/);
+  });
+
+  it('says so when a file could not be downloaded', () => {
+    // A link that goes nowhere is worse than an honest failure.
+    expect(hook).toMatch(/fetch_failed: true/);
+    expect(inboxPage).toMatch(/could not be downloaded/);
+  });
+
+  it('repairs a message left holding an unopenable link', () => {
+    // The first two real photos were filed with the provider url. Repairing only the
+    // never-found case would have left them broken permanently.
+    expect(hook).toMatch(/hasUnfetchedLink/);
   });
 });

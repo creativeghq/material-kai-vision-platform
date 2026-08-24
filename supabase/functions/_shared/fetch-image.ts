@@ -59,6 +59,19 @@ export interface FetchBinaryOptions {
    *  Omit to accept anything. */
   contentTypePrefix?: string;
   timeoutMs?: number;
+  /**
+   * Extra request headers — an Authorization bearer, in practice.
+   *
+   * Some media lives behind the vendor's own API rather than on a public CDN: WhatsApp
+   * attachments arrive as `https://zernio.com/api/v1/whatsapp/media/{id}`, which answers 401
+   * without the key. Before this existed the only way to fetch one was a bare `fetch()`, i.e.
+   * around the guard — so the option is here precisely so that "I need a header" stops being a
+   * reason to skip DNS validation and the size cap.
+   *
+   * The CALLER decides which hosts get a credential; `redirect: 'error'` below is what stops one
+   * being replayed to somewhere else.
+   */
+  headers?: Record<string, string>;
 }
 
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024; // 8 MB, matching branding.ts's old intent
@@ -111,7 +124,11 @@ export async function fetchBinaryGuarded(
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    const res = await fetch(safeUrl, { redirect: 'error', signal: ctl.signal });
+    const res = await fetch(safeUrl, {
+      redirect: 'error',
+      signal: ctl.signal,
+      ...(opts.headers ? { headers: opts.headers } : {}),
+    });
     if (!res.ok) {
       await res.body?.cancel();
       throw new Error(`Fetch failed: HTTP ${res.status}`);

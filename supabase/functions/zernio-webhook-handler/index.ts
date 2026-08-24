@@ -30,6 +30,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import {
   ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment, fetchWhatsAppProfile,
+  fetchZernioMediaUrl,
 } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
@@ -430,6 +431,87 @@ async function refreshWhatsAppProfile(
   }
 }
 
+/**
+ * Pull inline media URLs into our own storage.
+ *
+ * The real payload carries `{ url: "https://zernio.com/api/v1/whatsapp/media/…", content_type:
+ * "image" }`. Keeping that url is useless twice over: it needs the API bearer key, so the browser
+ * gets a broken image, and it is the vendor's to expire. Both are fixed by holding the bytes.
+ */
+async function materialiseInlineAttachments(
+  supabase: any,
+  threadId: string,
+  atts: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const out: Array<Record<string, unknown>> = [];
+  for (const [i, a] of atts.entries()) {
+    const url = typeof a.url === 'string' ? a.url : '';
+    // Already ours (a previous run stored it) or nothing to fetch — pass through untouched.
+    if (!url || a.storage_object_path) { out.push(a); continue; }
+
+    const got = await fetchZernioMediaUrl(url);
+    if (!got || !got.bytes.byteLength) {
+      // Keep the entry so the message still shows SOMETHING was sent, and mark why it is not
+      // openable — a silently dropped attachment is the failure this whole path exists to end.
+      out.push({ ...a, fetch_failed: true });
+      continue;
+    }
+
+    // Prefer the server's content type over the payload's: the payload says "image", the response
+    // says "image/jpeg", and only one of those tells a browser what to do.
+    const contentType = got.contentType && got.contentType !== 'application/octet-stream'
+      ? got.contentType
+      : normalizeMediaType(String(a.content_type ?? ''));
+    const ext = extensionFor(contentType, got.fileName);
+    const base = got.fileName || (typeof a.name === 'string' && a.name ? a.name : `attachment-${i + 1}${ext}`);
+    const safeName = base.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `inbox/${threadId}/${crypto.randomUUID()}-${safeName}`;
+
+    const { error } = await supabase.storage
+      .from(INBOX_ATTACHMENT_BUCKET)
+      .upload(path, got.bytes, { contentType, upsert: false });
+    if (error) {
+      console.error('[zernio-webhook] inline attachment upload failed:', error.message);
+      out.push({ ...a, fetch_failed: true });
+      continue;
+    }
+
+    out.push({
+      storage_bucket: INBOX_ATTACHMENT_BUCKET,
+      storage_object_path: path,
+      name: base,
+      content_type: contentType,
+      size: got.bytes.byteLength,
+    });
+  }
+  return out;
+}
+
+/**
+ * `"image"` is not a MIME type, and `startsWith('image/')` says so.
+ *
+ * The payload's `content_type` is a bare family — image, video, audio, document, sticker. Every
+ * renderer in this codebase tests `startsWith('image/')`, so a bare `"image"` fell through to the
+ * generic-file branch and the operator got a paperclip labelled "attachment" instead of a photo.
+ */
+export function normalizeMediaType(raw: string): string {
+  const t = raw.trim().toLowerCase();
+  if (!t) return 'application/octet-stream';
+  if (t.includes('/')) return t;                    // already a MIME type
+  const family: Record<string, string> = {
+    image: 'image/jpeg',
+    photo: 'image/jpeg',
+    sticker: 'image/webp',
+    video: 'video/mp4',
+    audio: 'audio/ogg',
+    voice: 'audio/ogg',
+    ptt: 'audio/ogg',
+    document: 'application/pdf',
+    file: 'application/octet-stream',
+  };
+  return family[t] ?? 'application/octet-stream';
+}
+
 /** A file extension for a name that has none, so the browser and our renderer both know what it is. */
 function extensionFor(contentType: string, fileName?: string): string {
   if (fileName && /\.[a-z0-9]{2,5}$/i.test(fileName)) return '';
@@ -535,16 +617,33 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     // unreadable forever, because the dedupe guard would refuse every attempt to go back for
     // them. A re-import REPAIRS those; it still does not duplicate anything.
     const filedMeta = (alreadyFiled.metadata ?? {}) as Record<string, unknown>;
-    const missingItsFile = filedMeta.attachment_unresolved === true;
+    // Two ways a filed message can still be missing its file: we never found one, or we recorded
+    // a link we cannot actually open. The second shape is what the first real media messages
+    // produced — a Zernio media URL needing the API key, useless to a browser — so repairing only
+    // the first would leave them broken for good.
+    const filedAtts = await supabase.from('inbox_messages')
+      .select('attachments, thread_id').eq('id', alreadyFiled.id).maybeSingle();
+    const filedRow = filedAtts.data as { attachments?: Array<Record<string, unknown>>; thread_id?: string } | null;
+    const hasUnfetchedLink = (filedRow?.attachments ?? []).some((a) => !a.storage_object_path);
+    const missingItsFile = filedMeta.attachment_unresolved === true || hasUnfetchedLink;
     if (!missingItsFile) return { outcome: 'dropped', reason: 'already imported' };
 
-    const { data: row } = await supabase
-      .from('inbox_messages').select('thread_id').eq('id', alreadyFiled.id).maybeSingle();
-    const repaired = await fetchAndStoreInboundAttachments(supabase, {
-      threadId: String((row as { thread_id?: string } | null)?.thread_id ?? ''),
-      conversationId: String(msg.conversationId ?? ''),
-      messageId: String(msg.id ?? msg.platformMessageId ?? ''),
-    });
+    const repairThreadId = String(filedRow?.thread_id ?? '');
+    // Prefer the links already on the row: they are the ones that failed, and they came from the
+    // provider verbatim. Only fall back to the per-index endpoint when there is nothing to retry.
+    let repaired: Array<Record<string, unknown>> = [];
+    const retryable = (filedRow?.attachments ?? []).filter((a) => !a.storage_object_path && a.url);
+    if (retryable.length) {
+      repaired = (await materialiseInlineAttachments(supabase, repairThreadId, retryable))
+        .filter((a) => a.storage_object_path);
+    }
+    if (!repaired.length) {
+      repaired = await fetchAndStoreInboundAttachments(supabase, {
+        threadId: repairThreadId,
+        conversationId: String(msg.conversationId ?? ''),
+        messageId: String(msg.id ?? msg.platformMessageId ?? ''),
+      });
+    }
     if (!repaired.length) {
       return { outcome: 'dropped', reason: 'already imported (its file is still unavailable)' };
     }
@@ -692,9 +791,12 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // between "WhatsApp does not give us attachments" — which is not true — and "we never asked".
   // Only when the message looks like it HAS media: no readable text, or an inline entry we could
   // not address. Fetching for every text message would be one wasted round trip per message.
-  const looksLikeMedia = !msg.text || isMediaPlaceholder(msg.text)
-    || inboundAttachments.some((a) => !a.url);
-  if (looksLikeMedia) {
+  if (inboundAttachments.length) {
+    // Inline media is the shape the real payloads use. Pull the bytes in — the url they carry is
+    // an authenticated API endpoint, so the browser cannot render it and it expires besides.
+    inboundAttachments = await materialiseInlineAttachments(supabase, threadId, inboundAttachments);
+  } else if (!msg.text || isMediaPlaceholder(msg.text)) {
+    // Nothing inline but the message clearly had something: fall back to the per-index endpoint.
     const fetched = await fetchAndStoreInboundAttachments(supabase, {
       threadId,
       conversationId: String(msg.conversationId ?? ''),

@@ -1348,15 +1348,77 @@ const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) =>
  * `content_type` is the primary signal and the extension is the fallback, because a channel
  * attachment often arrives with no MIME type at all.
  */
+/**
+ * Full view, in place.
+ *
+ * A photo or a spec sheet is often the whole message, and reviewing it used to mean opening a new
+ * tab per file — which loses the conversation you are reading, and is why the operator ended up
+ * looking at attachments on their phone instead. Download stays available, because sometimes you
+ * genuinely do want the file.
+ */
+const AttachmentLightbox: React.FC<{
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  href?: string;
+  name: string;
+  kind: 'image' | 'pdf';
+}> = ({ open, onOpenChange, href, name, kind }) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="max-w-5xl w-[92vw] p-0 overflow-hidden">
+      <DialogHeader className="px-4 py-2.5 border-b border-hairline bg-surface-sunken">
+        <DialogTitle className="text-sm font-semibold truncate pr-8">{name}</DialogTitle>
+        <DialogDescription className="sr-only">Full view of the attached {kind}</DialogDescription>
+      </DialogHeader>
+      <div className="bg-surface-sunken flex items-center justify-center" style={{ height: '78vh' }}>
+        {href && kind === 'image' && (
+          // `contain`, not `cover`: a cropped photo of a damaged tile is a photo of the wrong bit.
+          <img src={href} alt={name} className="max-h-full max-w-full object-contain" />
+        )}
+        {href && kind === 'pdf' && (
+          <iframe src={href} title={name} className="w-full h-full border-0" />
+        )}
+      </div>
+      <div className="px-4 py-2.5 border-t border-hairline flex justify-end">
+        <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+          <a href={href} target="_blank" rel="noreferrer">
+            <ExternalLink className="w-3 h-3 mr-1.5" />Open original
+          </a>
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
+);
+
 const AttachmentView: React.FC<{ att: InboxAttachment; href?: string }> = ({ att, href }) => {
   const name = att.name || 'attachment';
   const ct = (att.content_type || '').toLowerCase();
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  const kind = ct.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'].includes(ext) ? 'image'
-    : ct.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v'].includes(ext) ? 'video'
-    : ct.startsWith('audio/') || ['mp3', 'ogg', 'wav', 'm4a', 'opus'].includes(ext) ? 'audio'
-    : ct === 'application/pdf' || ext === 'pdf' ? 'pdf'
+  const [zoom, setZoom] = useState(false);
+
+  // The family, whether or not it arrived as a real MIME type.
+  //
+  // WhatsApp media comes through as a bare `"image"` — not `"image/jpeg"` — and every test here
+  // was `startsWith('image/')`, which a bare family fails. Two real photos rendered as a paperclip
+  // labelled "attachment" because of the missing slash.
+  const family = ct.includes('/') ? ct.split('/')[0] : ct;
+  const kind = family === 'image' || family === 'photo' || family === 'sticker'
+      || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'].includes(ext) ? 'image'
+    : family === 'video' || ['mp4', 'mov', 'webm', 'm4v'].includes(ext) ? 'video'
+    : family === 'audio' || family === 'voice' || family === 'ptt'
+      || ['mp3', 'ogg', 'wav', 'm4a', 'opus'].includes(ext) ? 'audio'
+    : ct === 'application/pdf' || family === 'document' || ext === 'pdf' ? 'pdf'
     : 'file';
+
+  // Fetched but unopenable — the provider link needed credentials the browser does not have, or
+  // the download failed. Say so rather than offering a link that goes nowhere.
+  if ((att as { fetch_failed?: boolean }).fetch_failed) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs mt-1 text-muted-foreground">
+        <AlertTriangle className="w-3 h-3 shrink-0 text-destructive" />
+        <span>{kind === 'image' ? 'Photo' : 'File'} could not be downloaded — re-import to retry.</span>
+      </div>
+    );
+  }
 
   // No signed URL yet (still minting) or none obtainable. Say which — a bare filename that does
   // nothing when clicked reads as a broken link rather than as a file still loading.
@@ -1372,14 +1434,20 @@ const AttachmentView: React.FC<{ att: InboxAttachment; href?: string }> = ({ att
 
   if (kind === 'image') {
     return (
-      <a href={href} target="_blank" rel="noreferrer" className="block mt-1.5">
-        <img
-          src={href}
-          alt={name}
-          loading="lazy"
-          className="max-h-64 w-auto max-w-full rounded-sm border border-hairline object-contain"
-        />
-      </a>
+      <>
+        {/* A button, not a link: opening a new tab loses the conversation you are reading. The
+            thumbnail is the message — a photo of the damaged tile IS what the customer said. */}
+        <button type="button" onClick={() => setZoom(true)} className="block mt-1.5 group">
+          <img
+            src={href}
+            alt={name}
+            loading="lazy"
+            className="max-h-64 w-auto max-w-full rounded-sm border border-hairline object-contain
+                       group-hover:border-primary/40 transition-colors"
+          />
+        </button>
+        <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="image" />
+      </>
     );
   }
   if (kind === 'video') {
@@ -1391,25 +1459,26 @@ const AttachmentView: React.FC<{ att: InboxAttachment; href?: string }> = ({ att
     return <audio src={href} controls preload="metadata" className="mt-1.5 w-full max-w-[260px]" />;
   }
   if (kind === 'pdf') {
-    // An <embed> inside a chat bubble is unreadable at bubble width and fights the scroll
-    // container, so: name it, size it, and open it full-window. The label is what makes it
-    // reviewable at a glance, which was the actual complaint.
+    // A PDF is unreadable at bubble width, so the bubble gets a card and the READING happens in
+    // the same full-view modal the images use. Not a new tab: you are reviewing a conversation,
+    // and losing your place in it to look at a spec sheet is the thing that makes people stop.
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-2 mt-1.5 rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2 hover:border-primary/40 transition-colors"
-      >
-        <FileText className="w-4 h-4 shrink-0 text-destructive" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-medium truncate">{name}</span>
-          <span className="block text-[10px] text-muted-foreground">
-            PDF{att.size ? ` · ${Math.max(1, Math.round(att.size / 1024))} KB` : ''} · opens in a new tab
+      <>
+        <button
+          type="button"
+          onClick={() => setZoom(true)}
+          className="flex w-full items-center gap-2 mt-1.5 rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2 text-left hover:border-primary/40 transition-colors"
+        >
+          <FileText className="w-4 h-4 shrink-0 text-destructive" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-medium truncate">{name}</span>
+            <span className="block text-[10px] text-muted-foreground">
+              PDF{att.size ? ` · ${Math.max(1, Math.round(att.size / 1024))} KB` : ''} · click to read
+            </span>
           </span>
-        </span>
-        <ExternalLink className="w-3 h-3 shrink-0 text-muted-foreground" />
-      </a>
+        </button>
+        <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="pdf" />
+      </>
     );
   }
   return (
