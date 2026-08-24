@@ -244,6 +244,60 @@ export interface InboundOutcome {
  * does not fail: it silently files the message at the wrong end of the thread, and a message
  * dated 1970 or 2087 sorts above or below every real one forever.
  */
+/**
+ * The attachments on an inbound message, in OUR shape.
+ *
+ * This existed as `msg.attachments ?? []`, which assumed one field name and one array shape.
+ * Measured 2026-08-24 across 36 inbound WhatsApp/social messages: **zero** carried an
+ * attachment — while the assistant's own replies in those same threads read "Sorry, I can't open
+ * PDFs or attachments here". So files were arriving and every one of them was discarded. Two of
+ * those messages had no text either, which means they rendered in the inbox as an empty bubble:
+ * the customer sent a document and the operator saw nothing at all.
+ *
+ * Zernio's own surface is `GET /inbox/conversations/{id}/messages/{messageId}/attachments/{index}`
+ * — attachments are addressed separately from the message — so the inline shape is not something
+ * to assume. Every plausible spelling is accepted here rather than picked; being wrong about the
+ * field name must not be the same as the customer having sent nothing.
+ */
+export function normalizeInboundAttachments(msg: Record<string, unknown>): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+
+  const push = (raw: unknown) => {
+    if (!raw || typeof raw !== 'object') return;
+    const a = raw as Record<string, unknown>;
+    const url = a.url ?? a.link ?? a.mediaUrl ?? a.fileUrl ?? a.downloadUrl ?? a.href;
+    const name = a.name ?? a.filename ?? a.fileName ?? a.caption ?? a.title;
+    const type = a.contentType ?? a.content_type ?? a.mimeType ?? a.mime_type ?? a.type;
+    if (!url && !name) return;      // nothing addressable and nothing to name — not an attachment
+    out.push({
+      url: typeof url === 'string' ? url : undefined,
+      name: typeof name === 'string' ? name : undefined,
+      content_type: typeof type === 'string' ? type : undefined,
+      size: typeof a.size === 'number' ? a.size : (typeof a.fileSize === 'number' ? a.fileSize : undefined),
+      // Kept so the per-index endpoint can be used later without re-deriving which one this was.
+      provider_index: typeof a.index === 'number' ? a.index : undefined,
+      provider_id: typeof a.id === 'string' ? a.id : undefined,
+    });
+  };
+
+  for (const key of ['attachments', 'media', 'files', 'documents']) {
+    const v = msg[key];
+    if (Array.isArray(v)) v.forEach(push);
+  }
+  // Singular forms — one media item promoted to a top-level object rather than an array.
+  for (const key of ['attachment', 'file', 'document', 'image', 'video', 'audio']) {
+    if (msg[key] && typeof msg[key] === 'object') push(msg[key]);
+  }
+  // Fully flattened: the url and its type sitting directly on the message.
+  if (!out.length) {
+    const flatUrl = msg.mediaUrl ?? msg.fileUrl ?? msg.attachmentUrl;
+    if (typeof flatUrl === 'string' && flatUrl) {
+      push({ url: flatUrl, contentType: msg.mediaType ?? msg.mimeType, name: msg.fileName ?? msg.caption });
+    }
+  }
+  return out;
+}
+
 export function parseSentAt(raw: unknown): string | null {
   if (typeof raw !== 'string' && typeof raw !== 'number') return null;
   const d = new Date(raw);
@@ -432,17 +486,33 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // `now()`: `sentAt` there is the same instant, and trusting a remote clock for ordering on the
   // live path buys nothing while a skewed or future one would sort a reply above its question.
   const originalSentAt = historical ? parseSentAt(msg.sentAt) : null;
+  const inboundAttachments = normalizeInboundAttachments(msg);
+
+  // A message with neither text nor a recognised attachment is not "an empty message" — WhatsApp
+  // does not send those. It is a file we failed to read, and it renders as a blank bubble. Say so
+  // on the row AND in the log, with the payload's own key names, so the shape we are missing is
+  // recoverable from the next real one instead of staying a guess. (Pipeline convention #1:
+  // explicit failure markers, never an empty return.)
+  const unresolvedMedia = !msg.text && inboundAttachments.length === 0;
+  if (unresolvedMedia) {
+    console.warn(
+      '[zernio-webhook] inbound message has no text and no attachment we recognise — '
+      + `media may be arriving under an unhandled key. message keys: ${Object.keys(msg).join(',')}`,
+    );
+  }
+
   const { error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: customerParticipantId,
     body: msg.text ?? null,
-    attachments: msg.attachments ?? [],
+    attachments: inboundAttachments,
     message_type: 'text',
     ...(originalSentAt ? { created_at: originalSentAt } : {}),
     metadata: {
       channel: 'whatsapp',
       wamid: msg.platformMessageId || msg.id || null,
       direction: 'incoming',
+      ...(unresolvedMedia ? { attachment_unresolved: true, provider_keys: Object.keys(msg) } : {}),
       // Kept whether or not it was usable as `created_at`, so "why is this message stamped
       // today" is answerable from the row rather than from a guess.
       ...(historical ? { imported: true, sent_at: msg.sentAt ?? null } : {}),
@@ -764,12 +834,18 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
     thread_id: threadId,
     sender_participant_id: null,          // external author, no participant row
     body: msg.text ?? null,
-    attachments: msg.attachments ?? [],
+    // Same normaliser as WhatsApp. An Instagram DM is more likely to be a photo than a sentence,
+    // so the channel where dropping media hurts most must not be the one still assuming a single
+    // field name.
+    attachments: normalizeInboundAttachments(msg),
     message_type: 'text',
     metadata: {
       channel: 'social', direction: 'incoming', platform: plat,
       wamid: msg.platformMessageId || msg.id || null,
       author_handle: handle, author_id: participantId,
+      ...(!msg.text && normalizeInboundAttachments(msg).length === 0
+        ? { attachment_unresolved: true, provider_keys: Object.keys(msg) }
+        : {}),
     },
   });
   if (msgErr) throw new Error(`social DM inbox_messages insert failed: ${msgErr.message}`);
@@ -971,6 +1047,13 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
       p_wamid: candidate,
       p_status: status,
       p_at: at,
+      // Meta's own words. They were already being read for `messaging_logs` above and thrown away
+      // here — so a CAMPAIGN send recorded why it failed and a CONVERSATION, where a human is
+      // waiting for an answer, did not. Measured 2026-08-24: 23 of 27 outbound messages on the
+      // first connected number reported FAILED and not one carried a reason, which is why "we
+      // are not sending to WhatsApp" could not be told apart from "Meta is refusing them".
+      p_error_code: payload.error?.code != null ? String(payload.error.code) : null,
+      p_error_message: payload.error?.message ?? null,
     });
     receiptErr = r.error;
     receiptRows = r.data;

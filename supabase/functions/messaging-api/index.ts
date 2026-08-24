@@ -1377,6 +1377,20 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               // Replay each one through the webhook handler's own path so the backfill and the
               // live path can never diverge into two different importers — the second copy is
               // exactly how "it works live but not on replay" gets built.
+              // Media keys forwarded WHOLESALE rather than picked.
+              //
+              // The replay used to hand the handler `attachments: m.attachments ?? []` — one
+              // guessed field name, resolved HERE, before the handler's normaliser could look at
+              // anything else. So a message whose media arrived under `media` or `mediaUrl` was
+              // stripped in transit and the handler correctly reported no attachment on a payload
+              // that no longer had one. Whatever Zernio calls it, it reaches the normaliser.
+              const mediaPassthrough: Record<string, unknown> = {};
+              for (const k of ['attachments', 'media', 'files', 'documents', 'attachment', 'file',
+                               'document', 'image', 'video', 'audio', 'mediaUrl', 'fileUrl',
+                               'attachmentUrl', 'mediaType', 'mimeType', 'fileName', 'caption']) {
+                if (m[k] !== undefined) mediaPassthrough[k] = m[k];
+              }
+
               const replayBody = JSON.stringify({
                   event: 'message.received',
                   // THE flag that separates "a customer just wrote to us" from "we are filing
@@ -1393,7 +1407,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
                     platform: conv.platform,
                     direction: m.direction ?? 'incoming',
                     text: m.text ?? m.message ?? null,
-                    attachments: m.attachments ?? [],
+                    ...mediaPassthrough,
                     conversationId: conv.id,
                     sentAt: m.sentAt ?? m.createdTime ?? null,
                     sender: {

@@ -44,7 +44,7 @@ import {
 } from '@/components/core/ui/dialog';
 import {
   inboxApi, signInboxAttachment, LABEL_COLORS, labelChipClass,
-  type InboxThread, type InboxMessage, type InboxParticipant,
+  type InboxThread, type InboxMessage, type InboxParticipant, type InboxAttachment,
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
   type IntakeConfirmation, type IntakeMatchMethod, type UserEmailAddress,
@@ -1283,6 +1283,127 @@ const InboxPage: React.FC = () => {
 // Message bubble
 // ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * Did the customer actually GET it?
+ *
+ * Nothing in this UI answered that, and the answer was routinely no. Measured 2026-08-24 on the
+ * first connected WhatsApp number: 27 outbound messages, all 27 accepted by Meta with a message
+ * id returned — and 23 of them reported FAILED a second later. The operator saw 27 ordinary sent
+ * bubbles. That is the precise reason "we are not sending messages to WhatsApp" was the
+ * reasonable conclusion: we send them correctly, and the platform's own report that they did not
+ * arrive was written to a metadata key with no reader.
+ *
+ * `failed` is deliberately loud and carries Meta's reason. The commonest one is the 24-hour
+ * service window having closed, which is not a bug and is fixable by the operator — but only if
+ * they are told.
+ */
+const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) => {
+  const status = typeof meta.delivery_status === 'string' ? meta.delivery_status : null;
+  if (!status) return null;
+
+  if (status === 'failed' || status === 'relay_failed') {
+    const code = meta.delivery_error_code;
+    const detail = typeof meta.delivery_error_message === 'string' ? meta.delivery_error_message : null;
+    const reason = [detail, code != null ? `(${String(code)})` : null].filter(Boolean).join(' ');
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-destructive"
+        title={reason || 'WhatsApp did not report a reason.'}
+      >
+        <AlertTriangle className="w-2.5 h-2.5" />
+        {status === 'relay_failed' ? 'Not sent' : 'Not delivered'}
+        {reason && <span className="opacity-80">· {reason}</span>}
+      </span>
+    );
+  }
+  if (status === 'read') return <span className="inline-flex items-center gap-1 text-primary"><CheckCircle2 className="w-2.5 h-2.5" />Read</span>;
+  if (status === 'delivered') return <span className="inline-flex items-center gap-1"><Check className="w-2.5 h-2.5" />Delivered</span>;
+  if (status === 'sent') return <span className="inline-flex items-center gap-1 opacity-80"><Check className="w-2.5 h-2.5" />Sent</span>;
+  return null;
+};
+
+/**
+ * An attachment rendered as the thing it IS.
+ *
+ * Every attachment used to render as one paperclip link with a filename, so reviewing a
+ * conversation meant opening each file in a new tab to find out what it was — and a customer's
+ * photo of the damaged tile, which is the whole message, showed as "attachment".
+ *
+ * `content_type` is the primary signal and the extension is the fallback, because a channel
+ * attachment often arrives with no MIME type at all.
+ */
+const AttachmentView: React.FC<{ att: InboxAttachment; href?: string }> = ({ att, href }) => {
+  const name = att.name || 'attachment';
+  const ct = (att.content_type || '').toLowerCase();
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const kind = ct.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'].includes(ext) ? 'image'
+    : ct.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v'].includes(ext) ? 'video'
+    : ct.startsWith('audio/') || ['mp3', 'ogg', 'wav', 'm4a', 'opus'].includes(ext) ? 'audio'
+    : ct === 'application/pdf' || ext === 'pdf' ? 'pdf'
+    : 'file';
+
+  // No signed URL yet (still minting) or none obtainable. Say which — a bare filename that does
+  // nothing when clicked reads as a broken link rather than as a file still loading.
+  if (!href) {
+    return (
+      <div className="flex items-center gap-1 text-xs mt-1 text-muted-foreground">
+        <Paperclip className="w-3 h-3 shrink-0" />
+        <span className="truncate">{name}</span>
+        <span className="opacity-70">· preparing…</span>
+      </div>
+    );
+  }
+
+  if (kind === 'image') {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className="block mt-1.5">
+        <img
+          src={href}
+          alt={name}
+          loading="lazy"
+          className="max-h-64 w-auto max-w-full rounded-sm border border-hairline object-contain"
+        />
+      </a>
+    );
+  }
+  if (kind === 'video') {
+    // `controls` and nothing else: no autoplay, because a thread of six clips would all start at
+    // once the moment it opens.
+    return <video src={href} controls preload="metadata" className="mt-1.5 max-h-64 w-full rounded-sm border border-hairline" />;
+  }
+  if (kind === 'audio') {
+    return <audio src={href} controls preload="metadata" className="mt-1.5 w-full max-w-[260px]" />;
+  }
+  if (kind === 'pdf') {
+    // An <embed> inside a chat bubble is unreadable at bubble width and fights the scroll
+    // container, so: name it, size it, and open it full-window. The label is what makes it
+    // reviewable at a glance, which was the actual complaint.
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-2 mt-1.5 rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2 hover:border-primary/40 transition-colors"
+      >
+        <FileText className="w-4 h-4 shrink-0 text-destructive" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium truncate">{name}</span>
+          <span className="block text-[10px] text-muted-foreground">
+            PDF{att.size ? ` · ${Math.max(1, Math.round(att.size / 1024))} KB` : ''} · opens in a new tab
+          </span>
+        </span>
+        <ExternalLink className="w-3 h-3 shrink-0 text-muted-foreground" />
+      </a>
+    );
+  }
+  return (
+    <a href={href} target="_blank" rel="noreferrer"
+       className="flex items-center gap-1 text-xs mt-1 underline text-primary">
+      <Paperclip className="w-3 h-3 shrink-0" /> <span className="truncate">{name}</span>
+    </a>
+  );
+};
+
 const MessageBubble: React.FC<{
   m: InboxMessage;
   info?: ParticipantLabel;
@@ -1394,15 +1515,15 @@ const MessageBubble: React.FC<{
           )}
           {(m.attachments || []).map((a, i) => {
             const k = a.storage_object_path || a.url || '';
-            return (
-              <a key={k || i} href={urls[k]} target="_blank" rel="noreferrer"
-                 className="flex items-center gap-1 text-xs mt-1 underline text-primary">
-                <Paperclip className="w-3 h-3" /> {a.name || 'attachment'}
-              </a>
-            );
+            return <AttachmentView key={k || i} att={a} href={urls[k] || a.url} />;
           })}
         </div>
-        <div className="text-[10px] mt-1 px-1 text-muted-foreground">{formatDate(m.created_at, { withTime: true })}</div>
+        <div className="text-[10px] mt-1 px-1 text-muted-foreground flex items-center gap-1.5">
+          <span>{formatDate(m.created_at, { withTime: true })}</span>
+          {/* Only on OUR side, and only on a channel that reports back. An incoming message has
+              no delivery state of ours to show, and an internal note never leaves the building. */}
+          {ours && !isNote && <DeliveryState meta={meta} />}
+        </div>
       </div>
     </div>
   );
