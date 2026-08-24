@@ -149,8 +149,11 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Blueprints. Previously reachable ONLY from a button on the Projects list page — the nav comment
   // claimed they "live under Projects", which was true of the page and not of any menu. Gated like
   // MoodBoards and Room Planner (no module, no extra capability): `blueprints` is workspace-scoped
-  // by RLS and the editor draws the workspace's own catalogue.
-  { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', hub: 'studio', description: 'Reusable room and scope templates that price a project in one click.' },
+  // by RLS and the editor draws the workspace's own catalogue. No `hub` on purpose, same reason as
+  // Templates below: a blueprint is a reusable starting point that prices a project, a quote or an
+  // order, so it cuts across Studio, Sales and Finance rather than belonging to any one of them —
+  // which puts it in the launcher's catch-all "More" group.
+  { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', description: 'Reusable room and scope templates that price a project in one click.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
@@ -260,7 +263,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     surface: 'app',
     description: 'Reusable starting points for invoices, quotes, projects and moodboards.',
   },
-  // Blueprints live under Projects. Supplier portal lives under Finance → Payables /
+  // Supplier portal lives under Finance → Payables /
   // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the
   // workspace switcher.
 ];
