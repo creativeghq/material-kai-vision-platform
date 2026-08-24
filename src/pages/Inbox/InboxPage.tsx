@@ -8,6 +8,7 @@ import {
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, EyeOff, Eye, Reply,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, Link2,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
+  Smile, Copy, Download,
 } from 'lucide-react';
 import { projectPlansService } from '@/services/projectPlansService';
 import { supabase } from '@/integrations/supabase/client';
@@ -285,6 +286,8 @@ const InboxPage: React.FC = () => {
   const [isNote, setIsNote] = useState(false);
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState<File | null>(null);
+  /** The message being answered. WhatsApp renders it as the quoted block above our reply. */
+  const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [aiDrafting, setAiDrafting] = useState(false);
   const [aiDraftShown, setAiDraftShown] = useState(false);
 
@@ -402,7 +405,10 @@ const InboxPage: React.FC = () => {
           const isMe = p.user_id && p.user_id === myUserId;
           const prof = p.user_id ? profMap[p.user_id] : undefined;
           next.set(p.id, {
-            label: isMe ? 'You' : (prof?.full_name || prof?.email || 'Team member'),
+            // Their NAME, not "You". A shared inbox is read by the whole team, and a
+            // transcript that says "You" answers a different question for every reader —
+            // the one thing it never tells anyone is which colleague replied.
+            label: prof?.full_name || prof?.email || (isMe ? 'You' : 'Team member'),
             kind: 'member', userId: p.user_id, avatarUrl: prof?.avatar_url ?? null,
           });
         } else if (p.participant_type === 'customer') {
@@ -492,9 +498,12 @@ const InboxPage: React.FC = () => {
         body: draft.trim() || undefined,
         attachments,
         message_type: isNote ? 'note' : 'text',
+        // A private note quotes nothing on the platform — there is no platform message to quote.
+        reply_to_message_id: !isNote && replyTo ? replyTo.id : undefined,
       });
       setDraft('');
       setAttachment(null);
+      setReplyTo(null);
       setAiDraftShown(false);
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
       if (!isNote && isMember && activeThread?.agent_state === 'active') {
@@ -506,7 +515,7 @@ const InboxPage: React.FC = () => {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachment, isNote, isMember, activeThread, toast]);
+  }, [activeId, draft, attachment, isNote, isMember, activeThread, replyTo, toast]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
   const aiSuggest = useCallback(async () => {
@@ -1139,6 +1148,15 @@ const InboxPage: React.FC = () => {
                     myUserId={myUserId}
                     isCustomerThread={activeThread.thread_type !== 'internal'}
                     onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
+                    onReplyTo={(msg) => setReplyTo(msg)}
+                    onReact={async (msg, emoji) => {
+                      try {
+                        await inboxApi.reactMessage(activeThread.id, msg.id, emoji);
+                        void openThread(activeThread.id);
+                      } catch (e) {
+                        toast({ title: 'Could not react', description: (e as Error).message, variant: 'destructive' });
+                      }
+                    }}
                     onPrivateReply={isCommentThread && isMember ? handlePrivateReply : undefined}
                     onToggleHidden={isCommentThread && isMember ? handleToggleHidden : undefined}
                   />
@@ -1210,6 +1228,22 @@ const InboxPage: React.FC = () => {
                     <span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI draft — review and edit before you send.</span>
                     <button onClick={() => { setDraft(''); setAiDraftShown(false); }} className="inline-flex items-center gap-1 hover:underline shrink-0">
                       <X className="w-3 h-3" /> Reject
+                    </button>
+                  </div>
+                )}
+                {replyTo && (
+                  <div className="flex items-start gap-2 mb-2 rounded-sm border-l-2 border-primary bg-surface-sunken px-2.5 py-1.5">
+                    <Reply className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 text-[11px]">
+                      <span className="block text-muted-foreground">
+                        Replying to {labels.get(replyTo.sender_participant_id ?? '')?.label ?? 'this message'}
+                      </span>
+                      <span className="block truncate">
+                        {replyTo.body || (replyTo.attachments?.length ? 'Attachment' : '—')}
+                      </span>
+                    </span>
+                    <button onClick={() => setReplyTo(null)} className="shrink-0 hover:text-foreground" title="Cancel reply">
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 )}
@@ -1408,6 +1442,66 @@ const ThreadAvatar: React.FC<{
   );
 };
 
+/**
+ * The actions WhatsApp has on a message and this inbox did not: react, reply, copy.
+ *
+ * On hover rather than always-on — a row of buttons under every bubble turns a conversation into a
+ * control panel, and the thing people read a thread for is the words. Keyboard-reachable because
+ * hover-only is unusable without a mouse: the group is focusable and the bar shows on focus too.
+ */
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+const MessageActions: React.FC<{
+  onReply?: () => void;
+  onReact?: (emoji: string) => void;
+  onCopy?: () => void;
+  ours: boolean;
+}> = ({ onReply, onReact, onCopy, ours }) => {
+  const [pickingEmoji, setPickingEmoji] = useState(false);
+  return (
+    <div
+      className={`absolute -top-3 ${ours ? 'right-2' : 'left-2'} z-20 hidden group-hover/msg:flex
+                  group-focus-within/msg:flex items-center gap-0.5 rounded-full border border-hairline
+                  bg-card px-1 py-0.5 shadow-overlay`}
+    >
+      {onReact && (
+        <Popover open={pickingEmoji} onOpenChange={setPickingEmoji}>
+          <PopoverTrigger asChild>
+            <button type="button" title="React" className="p-1 rounded-full hover:bg-surface-hover">
+              <Smile className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-1.5" align={ours ? 'end' : 'start'}>
+            <div className="flex gap-0.5">
+              {QUICK_REACTIONS.map((e) => (
+                <button
+                  key={e} type="button"
+                  onClick={() => { onReact(e); setPickingEmoji(false); }}
+                  className="text-lg leading-none rounded-sm px-1.5 py-1 hover:bg-surface-hover"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+      {onReply && (
+        <button type="button" title="Reply to this message" onClick={onReply}
+                className="p-1 rounded-full hover:bg-surface-hover">
+          <Reply className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      )}
+      {onCopy && (
+        <button type="button" title="Copy text" onClick={onCopy}
+                className="p-1 rounded-full hover:bg-surface-hover">
+          <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 const AttachmentLightbox: React.FC<{
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -1430,7 +1524,15 @@ const AttachmentLightbox: React.FC<{
           <iframe src={href} title={name} className="w-full h-full border-0" />
         )}
       </div>
-      <div className="px-4 py-2.5 border-t border-hairline flex justify-end">
+      <div className="px-4 py-2.5 border-t border-hairline flex justify-end gap-2">
+        {/* A real download, not just "open in a tab": the operator wants the file on disk to send
+            to a supplier or drop into a quote. `download` on a signed same-origin URL saves it
+            under the message's own filename rather than a storage UUID. */}
+        <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+          <a href={href} download={name}>
+            <Download className="w-3 h-3 mr-1.5" />Download
+          </a>
+        </Button>
         <Button asChild variant="outline" size="sm" className="h-8 text-xs">
           <a href={href} target="_blank" rel="noreferrer">
             <ExternalLink className="w-3 h-3 mr-1.5" />Open original
@@ -1590,10 +1692,15 @@ const MessageBubble: React.FC<{
   isCustomerThread: boolean;
   /** Re-read the thread after an attachment is fetched, so the file replaces the placeholder. */
   onAttachmentsRepaired?: () => void;
+  /** Quote this message in the composer. */
+  onReplyTo?: (m: InboxMessage) => void;
+  /** React to it. One per person per message — a second replaces the first. */
+  onReact?: (m: InboxMessage, emoji: string) => void;
   /** Present only on a social COMMENT thread — a DM has neither affordance. */
   onPrivateReply?: (m: InboxMessage) => void;
   onToggleHidden?: (m: InboxMessage, hidden: boolean) => void;
-}> = ({ m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onPrivateReply, onToggleHidden }) => {
+}> = ({ m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact, onPrivateReply, onToggleHidden }) => {
+  const { toast } = useToast();
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     (async () => {
@@ -1653,7 +1760,18 @@ const MessageBubble: React.FC<{
         : 'bg-card border border-border rounded-tl-sm';
 
   return (
-    <div className={`flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
+    <div className={`group/msg relative flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
+      {!isSystem && (
+        <MessageActions
+          ours={ours}
+          onReply={onReplyTo ? () => onReplyTo(m) : undefined}
+          onReact={onReact ? (e) => onReact(m, e) : undefined}
+          onCopy={m.body ? () => {
+            void navigator.clipboard.writeText(m.body ?? '');
+            toast({ title: 'Copied' });
+          } : undefined}
+        />
+      )}
       <Avatar className="h-7 w-7 mt-5 shrink-0">
         {/* A member's own photo, which was never selected from user_profiles — so every operator
             in every thread rendered as initials no matter what they had uploaded. */}

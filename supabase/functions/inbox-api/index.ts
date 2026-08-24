@@ -23,7 +23,7 @@ import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
 import { runInBackground } from '../_shared/background.ts';
 import { formatBusinessIdentityForPrompt, resolveBusinessIdentity } from '../_shared/business-identity.ts';
 import {
-  sendWhatsAppReply, sendWhatsAppMessage,
+  sendWhatsAppReply, sendWhatsAppMessage, setMessageReaction,
   sendSocialCommentReply, sendSocialDirectMessage,
   sendCommentPrivateReply, setCommentHidden, markConversationRead,
   ensureZernioSecrets,
@@ -855,9 +855,13 @@ async function insertMessageAndNotify(
     messageType: 'text' | 'system' | 'agent' | 'note';
     senderUserId?: string | null;
     senderLabel?: string;
+    /** Platform id of the message being replied to — WhatsApp renders it as a quoted block. */
+    replyToWamid?: string;
+    /** Our own id for the same message, so the transcript can render the quote locally too. */
+    replyToMessageId?: string;
   },
 ): Promise<Record<string, unknown>> {
-  const { thread, senderParticipantId, body, attachments, messageType } = opts;
+  const { thread, senderParticipantId, body, attachments, messageType, replyToWamid, replyToMessageId } = opts;
   const threadId = String(thread.id);
 
   const { data: msg, error } = await db
@@ -868,6 +872,10 @@ async function insertMessageAndNotify(
       body,
       attachments,
       message_type: messageType,
+      // Recorded so the transcript can render the quoted block locally. WhatsApp shows it on the
+      // customer's side from `replyTo`; without this OUR side would show a bare reply and the
+      // operator could not see what they had answered.
+      ...(replyToMessageId ? { metadata: { reply_to: replyToMessageId } } : {}),
     })
     .select('*')
     .single();
@@ -925,6 +933,7 @@ async function insertMessageAndNotify(
         message: body ?? undefined,
         attachmentUrl,
         attachmentType,
+        replyTo: replyToWamid,
       });
       // Store the returned message id as `wamid` so the zernio-webhook-handler's
       // message.delivered|read|failed handler (which matches `metadata->>wamid`) can apply
@@ -1550,6 +1559,53 @@ async function handleJwtAction(
       return json({ ok: true });
     }
 
+    // React to a message with an emoji — the affordance WhatsApp has and this inbox did not.
+    //
+    // One reaction per person per message is the platform rule, so setting a second REPLACES the
+    // first and clearing takes no emoji. The local row is updated optimistically; the
+    // `reaction.received` webhook follows and reconciles, including for a reaction added on the
+    // phone rather than here.
+    case 'react_message': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+      const emoji = payload.emoji == null ? null : String(payload.emoji);
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only members may react');
+
+      const { data: target } = await db
+        .from('inbox_messages').select('id, metadata')
+        .eq('id', messageId).eq('thread_id', threadId).maybeSingle();
+      if (!target) throw new HttpError(404, 'Message not found');
+      const tmeta = ((target as { metadata?: Record<string, unknown> }).metadata ?? {}) as Record<string, unknown>;
+
+      if (thread.channel === 'whatsapp') {
+        const meta = (thread.metadata as Json) || {};
+        const conversationId = String(meta.zernio_conversation_id || '');
+        const wamid = typeof tmeta.wamid === 'string' ? tmeta.wamid : '';
+        if (!conversationId || !wamid) {
+          throw new HttpError(409, 'That message has no platform id to react to.');
+        }
+        const res = await setMessageReaction({ conversationId, messageId: wamid, emoji });
+        if (!res.success) {
+          // Not stored on failure: a reaction shown here that the customer never sees is the same
+          // lie as a sent bubble for a message WhatsApp refused.
+          throw new HttpError(502, `WhatsApp rejected the reaction: ${res.error ?? 'unknown error'}`);
+        }
+      }
+
+      const existing: string[] = Array.isArray(tmeta.reactions) ? tmeta.reactions as string[] : [];
+      const next = emoji ? [...existing.filter((r) => r !== emoji), emoji] : [];
+      const { error: reactErr } = await db.rpc('inbox_message_merge_metadata', {
+        p_message_id: messageId,
+        p_patch: { reactions: next },
+      });
+      if (reactErr) throw new HttpError(500, `Could not record the reaction: ${reactErr.message}`);
+      return json({ ok: true, reactions: next });
+    }
+
     case 'send_message': {
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
@@ -1575,6 +1631,21 @@ async function handleJwtAction(
       if (!senderParticipantId && access.isMember) {
         senderParticipantId = await ensureMemberParticipant(db, thread, userId);
       }
+      // Replying TO a specific message. We hold our own message ids; WhatsApp wants the platform
+      // id, so resolve it here rather than trusting the client to hand us a wamid. A note is
+      // internal and has nothing to quote on the platform.
+      let replyToWamid: string | undefined;
+      const replyToId = payload.reply_to_message_id ? String(payload.reply_to_message_id) : '';
+      if (replyToId && messageType !== 'note') {
+        const { data: target } = await db
+          .from('inbox_messages').select('metadata, thread_id')
+          .eq('id', replyToId).eq('thread_id', threadId).maybeSingle();
+        const wamid = (target as { metadata?: Record<string, unknown> } | null)?.metadata?.wamid;
+        // Scoped to THIS thread: quoting a message from another conversation would either fail at
+        // the platform or, worse, quote a stranger's words into someone else's chat.
+        if (typeof wamid === 'string' && wamid) replyToWamid = wamid;
+      }
+
       const msg = await insertMessageAndNotify(db, {
         thread,
         senderParticipantId,
@@ -1583,6 +1654,8 @@ async function handleJwtAction(
         messageType: messageType === 'note' ? 'note' : 'text',
         senderUserId: userId,
         senderLabel: 'New message',
+        replyToWamid,
+        replyToMessageId: replyToWamid ? replyToId : undefined,
       });
       // Mark the sender as caught up.
       if (senderParticipantId) {

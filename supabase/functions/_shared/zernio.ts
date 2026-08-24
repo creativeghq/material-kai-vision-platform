@@ -850,16 +850,47 @@ export async function sendSocialDirectMessage(params: {
  * Send a freeform reply inside an existing conversation (24h service window).
  * Used by the agent reply surface — not by campaign sends.
  */
+/**
+ * React to a message with an emoji, or clear our reaction.
+ *
+ * WhatsApp allows ONE reaction per person per message, so adding a second replaces the first —
+ * which is why removal takes no emoji: there is only ever one of ours to remove.
+ */
+export async function setMessageReaction(params: {
+  conversationId: string;
+  messageId: string;
+  emoji: string | null;
+}): Promise<ZernioSendResult> {
+  const path = `/inbox/conversations/${encodeURIComponent(params.conversationId)}`
+    + `/messages/${encodeURIComponent(params.messageId)}/reactions`;
+  try {
+    if (params.emoji) await zernioApi('POST', path, { emoji: params.emoji });
+    else await zernioApi('DELETE', path);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function sendWhatsAppReply(params: {
   accountId: string;
   conversationId: string;
   message?: string;
   attachmentUrl?: string;
   attachmentType?: 'image' | 'video' | 'audio' | 'file';
+  /**
+   * The PLATFORM id (wamid) of the message being replied to.
+   *
+   * WhatsApp renders it as the quoted block above the reply — the affordance people use to answer
+   * one thing in a busy thread. Without it a reply to the third of five questions is just another
+   * message and the customer has to guess which one it answers.
+   */
+  replyTo?: string;
 }): Promise<ZernioSendResult> {
   try {
     const body: Record<string, unknown> = { accountId: params.accountId };
     if (params.message) body.message = params.message;
+    if (params.replyTo) body.replyTo = params.replyTo;
     if (params.attachmentUrl) {
       body.attachmentUrl = params.attachmentUrl;
       body.attachmentType = params.attachmentType || 'file';

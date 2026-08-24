@@ -323,7 +323,11 @@ export const inboxApi = {
       whatsapp_window: WhatsAppWindow | null;
     }>('get_thread', { thread_id });
   },
-  sendMessage(input: { thread_id: string; body?: string; attachments?: AttachmentInput[]; message_type?: 'text' | 'note' }) {
+  sendMessage(input: {
+    thread_id: string; body?: string; attachments?: AttachmentInput[]; message_type?: 'text' | 'note';
+    /** Our id for the message being answered — resolved server-side to the platform id. */
+    reply_to_message_id?: string;
+  }) {
     return call<{ message: InboxMessage }>('send_message', input);
   },
   getThreadContext(thread_id: string) {
@@ -351,6 +355,10 @@ export const inboxApi = {
   },
   setStatus(thread_id: string, status: InboxThreadStatus) {
     return call<{ ok: boolean }>('set_status', { thread_id, status });
+  },
+  /** React to a message, or clear our reaction (`emoji: null`). One per person per message. */
+  reactMessage(thread_id: string, message_id: string, emoji: string | null) {
+    return call<{ ok: boolean; reactions: string[] }>('react_message', { thread_id, message_id, emoji });
   },
   setAgent(thread_id: string, agent_state: 'off' | 'active', agent_id?: string) {
     return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
