@@ -65,6 +65,7 @@ let authenticate: any, isAdminAccess: any;
 let getSkillsForAgent: any, getSkillContent: any, formatSkillsForSystemPrompt: any;
 let emitFlowEvent: any;
 let aiCallLogger: any;
+let resolveBusinessIdentity: any, formatBusinessIdentityForPrompt: any;
 
 async function initRuntime() {
   if (_initialized) return;
@@ -78,7 +79,7 @@ async function initRuntime() {
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
 
   // Load all shared modules + npm packages in parallel
-  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod] = await Promise.all([
+  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod, bizMod] = await Promise.all([
     import('../_shared/credit-utils.ts'),
     import('../_shared/prompt-utils.ts'),
     import('../_shared/langgraph-core.ts'),
@@ -93,6 +94,7 @@ async function initRuntime() {
     import('@langchain/core/messages'),
     import('../_shared/ai-logger.ts'),
     import('../_shared/agent-memory.ts'),
+    import('../_shared/business-identity.ts'),
   ]);
 
   debitAgentChatTurn = creditMod.debitAgentChatTurn;
@@ -112,6 +114,8 @@ async function initRuntime() {
   getSkillContent = skillsMod.getSkillContent;
   formatSkillsForSystemPrompt = skillsMod.formatSkillsForSystemPrompt;
   emitFlowEvent = flowMod.emitFlowEvent;
+  resolveBusinessIdentity = bizMod.resolveBusinessIdentity;
+  formatBusinessIdentityForPrompt = bizMod.formatBusinessIdentityForPrompt;
   createClient = sbMod.createClient;
   ChatAnthropic = anthropicMod.ChatAnthropic;
   tool = toolsMod.tool;
@@ -1528,6 +1532,23 @@ async function executeAgent(
   // written into each agent's own prompt: 8 of 15 prompts were confirm-first and only 5 had any
   // counterweight, so this is an ABSENCE being filled, and fifteen hand-kept copies would drift.
   systemPrompt += `\n\n${await getSharedOperatingDoctrine(supabase)}`;
+
+  // Who the workspace IS. Not a toolkit and not a lookup: "what is our VAT number", "what address
+  // do we invoice from", "what do we actually sell" are facts every agent needs on every turn and
+  // none of them had. The Inbox assistant proved what the absence costs — asked for the business's
+  // email over WhatsApp it answered "I don't have an email address to share here" while
+  // `finance_settings` held the trading name, the VAT number and the street, and a live workspace
+  // mailbox sat one table over. ~60 tokens, one STABLE SQL call; see `_shared/business-identity.ts`.
+  if (workspaceId) {
+    try {
+      systemPrompt += formatBusinessIdentityForPrompt(
+        await resolveBusinessIdentity(supabase, workspaceId),
+      );
+    } catch (bizErr) {
+      console.warn('[agent-chat] business identity resolve failed:',
+        bizErr instanceof Error ? bizErr.message : bizErr);
+    }
+  }
 
   // 🧠 Long-term Memory: recall the slice relevant to THIS turn (#233).
   // Ranked by cosine against the user's message, not by `created_at desc` — the old

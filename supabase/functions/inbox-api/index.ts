@@ -20,6 +20,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
+import { formatBusinessIdentityForPrompt, resolveBusinessIdentity } from '../_shared/business-identity.ts';
 import {
   sendWhatsAppReply, sendWhatsAppMessage,
   sendSocialCommentReply, sendSocialDirectMessage,
@@ -559,6 +560,84 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
   }
 }
 
+/** A file the model cannot open, named so it can at least say what arrived. */
+interface TranscriptAttachment { name?: string; filename?: string; type?: string; mime_type?: string }
+
+/**
+ * The conversation as the model reads it.
+ *
+ * Two things this fixes, both of which the one-line `.map()` it replaced got wrong.
+ *
+ * **1. The speakers were merged.** Every row was labelled `Customer/Team` unless it was the
+ * assistant's own — and a member's reply is `message_type='text'` exactly like the customer's, so
+ * there was no way to tell "the customer asked for a discount" from "my colleague offered one".
+ * The participant row is what separates them, and it is the same read the reply guard already
+ * trusts to decide whether the latest message is even answerable.
+ *
+ * **2. An attachment was invisible.** `m.body || '[attachment]'` only fired when the body was
+ * EMPTY, so an email carrying an invoice PDF *and* a covering sentence rendered as the sentence
+ * alone. The model then answered as though nothing had been sent. Naming the file does not let it
+ * read the file — it lets it say "I can see invoice-4471.pdf and I've passed it to the team",
+ * which is true, instead of "I can't open PDFs", which reads as a refusal.
+ *
+ * Provider placeholders (`[Unsupported message]` from Zernio, for a WhatsApp document we never
+ * downloaded) are rewritten to say what actually happened. Left alone, the model treats the phrase
+ * as the customer's words and argues with it — which is precisely how one thread went, three
+ * messages deep, while the customer insisted they had sent the invoice.
+ */
+const PROVIDER_PLACEHOLDER_BODIES = new Set(['[unsupported message]', '[unsupported]', '[media]']);
+
+async function buildTranscript(
+  db: DbClient,
+  threadId: string,
+  rows: Array<{
+    body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null;
+  }>,
+): Promise<string> {
+  // One read for every speaker in the window, rather than one per message.
+  const { data: parts } = await db.from('inbox_participants')
+    .select('id, participant_type').eq('thread_id', threadId);
+  const typeById = new Map<string, string>(
+    ((parts || []) as Array<{ id: string; participant_type: string }>)
+      .map((p) => [p.id, p.participant_type]),
+  );
+
+  const speaker = (m: { message_type: string; sender_participant_id: string | null }): string => {
+    if (m.message_type === 'agent') return 'Assistant (you, earlier)';
+    if (m.message_type === 'system') return 'System';
+    const t = m.sender_participant_id ? typeById.get(m.sender_participant_id) : undefined;
+    if (t === 'customer') return 'Customer';
+    if (t === 'member') return 'Our team';
+    if (t === 'agent') return 'Assistant (you, earlier)';
+    // No participant row. Social counterparties never get one (a handle with no phone and no
+    // email), so an external author is the likeliest reading — but it is a guess, and the label
+    // says so rather than picking a side.
+    return 'Customer (unidentified sender)';
+  };
+
+  const files = (raw: Json | null): string => {
+    const list = Array.isArray(raw) ? (raw as TranscriptAttachment[]) : [];
+    const names = list
+      .map((a) => (a && typeof a === 'object' ? (a.name || a.filename || a.type || a.mime_type) : null))
+      .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+      .slice(0, 5);
+    if (!names.length) return '';
+    return ` [attached, and you CANNOT open it: ${names.join(', ')}]`;
+  };
+
+  return rows.slice().reverse().map((m) => {
+    const raw = (m.body || '').trim();
+    let body = raw;
+    if (!raw) {
+      body = '[sent something with no text]';
+    } else if (PROVIDER_PLACEHOLDER_BODIES.has(raw.toLowerCase())) {
+      body = '[sent a file or media that did not reach us in a readable form — these are NOT their '
+        + 'words, so do not quote them back or argue about them]';
+    }
+    return `${speaker(m)}: ${body}${files(m.attachments)}`;
+  }).join('\n');
+}
+
 /**
  * Generate the agent's next-reply draft for a thread — the shared brain behind both the auto-reply
  * (maybeRunAgentReply) and the member-initiated "help me write" suggestion (suggest_reply action).
@@ -583,19 +662,17 @@ async function buildAgentDraft(
   const workspaceId = String(thread.workspace_id);
   const { data: history } = await db
     .from('inbox_messages')
-    .select('body, message_type')
+    .select('body, message_type, attachments, sender_participant_id')
     .eq('thread_id', threadId)
     .is('deleted_at', null)
     .neq('message_type', 'note')
     .order('created_at', { ascending: false })
     .limit(20);
-  const rows = (history || []) as Array<{ body: string | null; message_type: string }>;
+  const rows = (history || []) as Array<{
+    body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null;
+  }>;
   const settings = await inboxAgentSettings(db, workspaceId);
-  const { data: ws } = await db.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
-  const businessName = (ws as { name?: string } | null)?.name || 'our team';
-  const transcript = rows.slice().reverse()
-    .map((m) => `${m.message_type === 'agent' ? 'Assistant' : 'Customer/Team'}: ${m.body || '[attachment]'}`)
-    .join('\n');
+  const transcript = await buildTranscript(db, threadId, rows);
   // Self-service tools — only when we know which customer this is AND the workspace allows account
   // answers. Scope is derived from the thread, never from the message (injection-proof).
   const scope = await resolveThreadCustomerScope(db, threadId);
@@ -621,6 +698,18 @@ async function buildAgentDraft(
       'to a private channel by inviting them to message us directly. '
     : '';
 
+  // Who we ARE. Until 2026-08-24 this was one field — `workspaces.name`, which on the workspace
+  // that reported this reads "Default Workspace" — so a supplier asking `your email address,
+  // please` was told *"I don't have an email address to share here"* while the database held the
+  // trading name, the VAT number, the street and a live workspace mailbox. See
+  // `_shared/business-identity.ts` for the derivation and the reachability ladder.
+  //
+  // Withheld on a PUBLIC thread for the same reason the account tools are: `audienceNote` forbids
+  // posting a phone number or an email under our own social post, and a block that hands the model
+  // both while another sentence tells it not to use them is a coin flip, not a rule.
+  const identity = isPublic ? null : await resolveBusinessIdentity(db, workspaceId);
+  const businessName = identity?.name || 'our team';
+
   const systemPrompt =
     `${personaBase}\n\n` +
     `Business: ${businessName}. Channel: ${String(thread.channel)}. ` +
@@ -628,7 +717,8 @@ async function buildAgentDraft(
     (Object.keys(tools).length
       ? "Use the tools to look up THIS customer's own account (statement/balance, open invoices, " +
         'quotes & projects); always call a tool for real figures and only share a payment link a tool returns.'
-      : 'You do not have access to account data in this conversation.');
+      : 'You do not have access to account data in this conversation.') +
+    (identity ? formatBusinessIdentityForPrompt(identity) : '');
   const result = await generateWithClaudeTools(
     `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
     {
