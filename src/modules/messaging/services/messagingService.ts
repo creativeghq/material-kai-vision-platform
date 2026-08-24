@@ -553,6 +553,24 @@ export class MessagingService {
   }
 
   /**
+   * Open (or find) the WhatsApp conversation for a phone number, and return its thread id.
+   *
+   * Sends NOTHING. "Does this number have WhatsApp" cannot be answered in advance — Meta withdrew
+   * the contact-validation endpoint and nothing replaces it — so this opens the conversation and
+   * lets the composer's own 24-hour-window rules apply, rather than a CRM button re-implementing
+   * them or a green tick claiming something we cannot know.
+   */
+  async openWhatsAppThread(input: { phone: string; name?: string; workspaceId?: string }): Promise<{
+    success: boolean; thread_id: string; created: boolean; note?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'open-whatsapp-thread', ...input },
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
    * Download media we only hold a provider LINK to.
    *
    * An inbound media message arrives with `https://zernio.com/api/v1/whatsapp/media/{id}` — an

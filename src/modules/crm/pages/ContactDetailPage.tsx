@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
+import { messagingService } from '@/modules/messaging/services/messagingService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
@@ -146,6 +147,7 @@ interface Contact {
 export const ContactDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [openingWhatsApp, setOpeningWhatsApp] = useState(false);
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const { enabled: realEstateEnabled } = useModule('real-estate'); // Property tab when module on
@@ -737,7 +739,7 @@ export const ContactDetailPage: React.FC = () => {
                     {!hasCompany && contact.is_supplier && <Badge variant="secondary">Supplier</Badge>}
                   </div>
                 )}
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-5 gap-1.5">
                   <button type="button" onClick={() => activityRef.current?.composeEmail(contact.email ? { email: contact.email, name: contact.name || null } : undefined)} disabled={!contact.email}
                     className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none">
                     <Mail className="h-4 w-4" /> Email
@@ -753,6 +755,31 @@ export const ContactDetailPage: React.FC = () => {
                       <Phone className="h-4 w-4" /> Call
                     </button>
                   )}
+                  {/* WhatsApp. There is deliberately no "has WhatsApp?" indicator: Meta withdrew the
+                      contact-validation endpoint and nothing replaces it, so a green tick here would
+                      be a claim we cannot back. This opens (or finds) the conversation and drops you
+                      in the Inbox — where the 24-hour-window rules already live — and sends nothing. */}
+                  <button type="button" disabled={!contact.phone || openingWhatsApp}
+                    onClick={async () => {
+                      if (!contact.phone) return;
+                      setOpeningWhatsApp(true);
+                      try {
+                        const r = await messagingService.openWhatsAppThread({
+                          phone: contact.phone, name: contact.name || undefined,
+                        });
+                        navigate(`/inbox?thread=${r.thread_id}`);
+                      } catch (e) {
+                        toast({
+                          title: 'Could not open WhatsApp',
+                          description: (e as Error).message, variant: 'destructive',
+                        });
+                      } finally { setOpeningWhatsApp(false); }
+                    }}
+                    className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none">
+                    {openingWhatsApp
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <MessageCircle className="h-4 w-4" />} WhatsApp
+                  </button>
                   <button type="button" onClick={() => setMainTab('activity')}
                     className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
                     <MessageSquare className="h-4 w-4" /> Note

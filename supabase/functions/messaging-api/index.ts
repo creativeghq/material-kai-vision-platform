@@ -15,6 +15,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import { materialiseInlineAttachments } from '../_shared/inbox-media.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -295,6 +296,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
+      'open-whatsapp-thread',
       // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
@@ -364,6 +366,75 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // ─────────────────────────────────────────────────────────────
       // Send single message (1+ recipients)
       // ─────────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────
+      // open-whatsapp-thread — from a CRM contact's phone number to a conversation.
+      //
+      // "Does this number have WhatsApp" is NOT answerable in advance: Meta withdrew the contact
+      // validation endpoint, and nothing in Zernio's API replaces it. Claiming otherwise would be a
+      // green tick in the CRM that means nothing. What IS true is that most mobile numbers do, so
+      // this OPENS the conversation and reports honestly if the platform refuses.
+      //
+      // It does not send anything. It resolves (or creates) the thread and hands back its id so the
+      // UI can drop the operator into the Inbox with the composer focused — where the 24-hour
+      // window rules already apply, rather than being re-implemented in a CRM button.
+      // ─────────────────────────────────────────────────────────────
+      case 'open-whatsapp-thread': {
+        const { workspaceId, phone, name } = requestBody;
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+
+        const digits = String(phone ?? '').replace(/[^0-9]/g, '');
+        if (digits.length < 6) throw new HttpError(400, 'A phone number in international format is required');
+        const e164 = `+${digits}`;
+
+        // Already talking to them? Then this is a navigation, not a creation.
+        const { data: existing } = await supabaseClient
+          .from('inbox_threads').select('id')
+          .eq('workspace_id', wsId).eq('channel', 'whatsapp')
+          .eq('metadata->>contact_phone', e164)
+          .order('last_message_at', { ascending: false })
+          .limit(1).maybeSingle();
+        if (existing) {
+          return jsonResponse({ success: true, thread_id: (existing as { id: string }).id, created: false });
+        }
+
+        const { data: channel } = await supabaseClient
+          .from('messaging_channels').select('zernio_account_id')
+          .eq('workspace_id', wsId).eq('channel_type', 'whatsapp').eq('is_active', true)
+          .not('zernio_account_id', 'is', null)
+          .limit(1).maybeSingle();
+        const accountId = (channel as { zernio_account_id?: string } | null)?.zernio_account_id;
+        if (!accountId) {
+          throw new HttpError(409, 'No active WhatsApp number is connected for this workspace.');
+        }
+
+        // The thread is created LOCALLY and empty. Nothing is sent — a business-initiated message
+        // outside the 24-hour window needs an approved template, and silently spending one because
+        // somebody clicked a CRM row would be the platform acting on its own again.
+        const { data: created, error: createErr } = await supabaseClient
+          .from('inbox_threads').insert({
+            workspace_id: wsId,
+            thread_type: 'customer',
+            channel: 'whatsapp',
+            subject: (typeof name === 'string' && name.trim()) ? name.trim() : e164,
+            status: 'open',
+            agent_state: 'off',
+            metadata: { contact_phone: e164, zernio_account_id: accountId, opened_from: 'crm' },
+            last_message_at: new Date().toISOString(),
+          }).select('id').single();
+        if (createErr) throw new HttpError(500, `Could not open the conversation: ${createErr.message}`);
+
+        return jsonResponse({
+          success: true,
+          thread_id: (created as { id: string }).id,
+          created: true,
+          // Said plainly: the operator is about to type into a thread whose first message is
+          // business-initiated, and that is template territory unless the customer wrote first.
+          note: 'Nothing sent yet. A first message to a number that has not written to you needs an approved template.',
+        });
+      }
+
       case 'send': {
         const body: SendMessageRequest = requestBody;
         const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), body.from);
@@ -1757,8 +1828,49 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (!accountId || !senderId) continue;
 
           const { data: existing } = await supabaseClient
-            .from('messaging_channels').select('id')
+            .from('messaging_channels').select('id, config')
             .eq('zernio_account_id', accountId).maybeSingle();
+
+          // The number's OWN WhatsApp Business profile — including the photo customers actually
+          // see beside our messages. `GET /whatsapp/business-profile` returns it; nothing had ever
+          // asked, so the operator's side of every thread rendered as initials while their real
+          // avatar sat on WhatsApp. This is OUR profile: unlike a counterparty's, Meta does expose
+          // it, and confusing the two is what made me tell the operator it was unavailable.
+          let businessProfile: Record<string, unknown> | null = null;
+          try {
+            const bp = await zernioApi('GET', `/whatsapp/business-profile?accountId=${encodeURIComponent(accountId)}`);
+            businessProfile = (bp?.businessProfile ?? bp?.data ?? null) as Record<string, unknown> | null;
+          } catch (err) {
+            // Enrichment. A number with no profile set, or a transient failure, must not fail the
+            // sync that keeps the channel connected.
+            console.warn(`[messaging-api] business profile unavailable for ${accountId}:`, err instanceof Error ? err.message : String(err));
+          }
+
+          // Meta's CDN link expires, so the bytes are held rather than the URL — same rule as
+          // inbox media. Re-downloaded only when the URL changes.
+          const picUrl = typeof businessProfile?.profilePictureUrl === 'string'
+            ? businessProfile.profilePictureUrl : '';
+          const knownCfg = ((existing as { config?: Record<string, unknown> } | null)?.config ?? {}) as Record<string, unknown>;
+          let avatarPath = typeof knownCfg.avatar_path === 'string' ? knownCfg.avatar_path : null;
+          if (picUrl && knownCfg.avatar_source !== picUrl) {
+            const img = await fetchImageGuardedOrNull(picUrl);
+            if (img) {
+              const path = `inbox/channel/${accountId}/${crypto.randomUUID()}.jpg`;
+              const { error: upErr } = await supabaseClient.storage
+                .from('generation-images')
+                .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
+              if (upErr) console.warn('[messaging-api] business avatar upload failed:', upErr.message);
+              else avatarPath = path;
+            }
+          }
+          const profileCfg = businessProfile
+            ? {
+              business_profile: businessProfile,
+              avatar_source: picUrl || null,
+              avatar_bucket: avatarPath ? 'generation-images' : null,
+              avatar_path: avatarPath,
+            }
+            : {};
 
           if (existing) {
             // Zernio flags an account whose token Meta has invalidated. It still LISTS, so
@@ -1769,7 +1881,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               sender_id: senderId,
               display_name: acc.displayName || senderId,
               is_active: acc.isActive !== false && !needsReconnect,
-              config: { ...(acc.metadata ?? {}), zernio_account_id: accountId, display_phone_number: senderId, needs_reconnection: needsReconnect },
+              config: { ...knownCfg, ...(acc.metadata ?? {}), ...profileCfg, zernio_account_id: accountId, display_phone_number: senderId, needs_reconnection: needsReconnect },
               updated_at: new Date().toISOString(),
             }).eq('id', existing.id);
             synced.push({ action: needsReconnect ? 'needs_reconnection' : 'updated', senderId });
@@ -1791,7 +1903,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               is_default: (count || 0) === 0,
               daily_quota: 10000,
               max_send_rate: 100,
-              config: { zernio_account_id: accountId, display_phone_number: senderId, needs_reconnection: acc.needsReconnection === true },
+              config: { ...profileCfg, zernio_account_id: accountId, display_phone_number: senderId, needs_reconnection: acc.needsReconnection === true },
             });
             if (chanErr) {
               console.error(`[messaging-api] could not create the channel for ${senderId}`, chanErr);
