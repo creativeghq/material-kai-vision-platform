@@ -17,6 +17,7 @@
 import PostalMime from 'postal-mime';
 import type { DbClient } from './supabase-client.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from './flow-events.ts';
+import { inboxAutopilotSettings } from './inbox-autopilot.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
@@ -625,12 +626,11 @@ export async function deliverToInbox(
   let customerParticipantId: string | null = null;
 
   if (!threadId) {
-    // Auto-engage the assistant only when the workspace has not opted out AND the message is
-    // not itself automated — the same rule the WhatsApp path applies.
-    const { data: wsRow } = await db.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
-    const agentCfg = (((wsRow as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>)
-      .inbox_agent as Record<string, unknown> | undefined;
-    const autoRespond = agentCfg?.auto_respond !== false && args.autoReplyAllowed;
+    // Auto-engage the assistant only when the workspace has explicitly turned it ON and the
+    // message is not itself automated — the same rule, from the same place, the WhatsApp path
+    // applies. This was `auto_respond !== false`: unset meant yes. See _shared/inbox-autopilot.ts.
+    const { autoRespond: workspaceWantsAutopilot } = await inboxAutopilotSettings(db, workspaceId);
+    const autoRespond = workspaceWantsAutopilot && args.autoReplyAllowed;
 
     const { data: thread, error } = await db
       .from('inbox_threads')

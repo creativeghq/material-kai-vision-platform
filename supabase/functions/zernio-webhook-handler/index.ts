@@ -31,6 +31,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { ensureZernioSecrets, zernioWebhookSecret } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -235,11 +236,40 @@ export interface InboundOutcome {
   reason?: string;
 }
 
+/**
+ * A remote `sentAt`, accepted only if it is a real past instant.
+ *
+ * Returns null for anything unparseable, absurdly old (pre-2000 — the shape an epoch-in-seconds
+ * value takes when read as milliseconds) or in the future. A bad timestamp used as `created_at`
+ * does not fail: it silently files the message at the wrong end of the thread, and a message
+ * dated 1970 or 2087 sorts above or below every real one forever.
+ */
+export function parseSentAt(raw: unknown): string | null {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  const d = new Date(raw);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return null;
+  if (t < Date.UTC(2000, 0, 1)) return null;
+  // A minute of slack for clock skew between Meta and us; beyond that it is not a past event.
+  if (t > Date.now() + 60_000) return null;
+  return d.toISOString();
+}
+
 async function handleInboundMessage(supabase: any, payload: any): Promise<InboundOutcome> {
   const msg = payload.message || {};
   if (msg.direction && msg.direction !== 'incoming') {
     return { outcome: 'dropped', reason: 'not an incoming message' };
   }
+
+  // Is this a live message, or history being replayed by the back-fill?
+  //
+  // The back-fill posts through this same handler ON PURPOSE — one importer, so "works live but
+  // not on replay" cannot be built. The cost of that choice is that a replayed message is
+  // indistinguishable from a customer writing in, and on 2026-08-24 the assistant answered 22 of
+  // them across 8 conversations that had finished weeks earlier. This flag is what makes the two
+  // distinguishable, and it only ever REMOVES behaviour (no auto-engage, no agent reply, no
+  // "you were assigned" notification) — so even a forged one cannot cause an action.
+  const historical = payload.backfill === true;
 
   // Zernio's inbox covers Instagram, Facebook, X, Bluesky, Reddit and Telegram DMs as well as
   // WhatsApp. Everything that was not WhatsApp used to hit `return` on the line below and be
@@ -257,6 +287,17 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   if (!phone) {
     console.warn('[zernio-webhook] inbound message without resolvable phone');
     return { outcome: 'dropped', reason: 'no resolvable phone on the sender' };
+  }
+
+  // Already have it? Then this is a re-import, and a re-import must be a no-op.
+  //
+  // This is what makes "run the back-fill again" a safe, ordinary thing to do — which it has to
+  // be, because Meta hands coexistence history over asynchronously (19% done when the first
+  // import ran, which is why it found 8 conversations and not the whole address book). Without
+  // this, catching up on what has since arrived also files a second copy of everything that
+  // already had. Cheap: one indexed lookup against inbox_messages_wamid_unique.
+  if (await findInboxMessageByProviderId(supabase, msg)) {
+    return { outcome: 'dropped', reason: 'already imported' };
   }
 
   // STOP / START keyword compliance (independent of thread resolution).
@@ -304,13 +345,12 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   let customerParticipantId: string | null = null;
 
   if (!threadId) {
-    // Auto-engage the AI assistant on new inbound WhatsApp threads unless the workspace opted out
-    // (settings.inbox_agent.auto_respond === false). The internal_agent_reply call below only acts
-    // when agent_state='active', so this is what makes the agent reply first to support questions.
-    const { data: wsRow } = await supabase.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
-    const agentCfg = (((wsRow as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>)
-      .inbox_agent as Record<string, unknown> | undefined;
-    const autoRespond = agentCfg?.auto_respond !== false;
+    // Hand the thread to the AI only if a PERSON asked for that — `settings.inbox_agent
+    // .auto_respond` explicitly on, and never on replayed history. See _shared/inbox-autopilot.ts;
+    // this used to read `auto_respond !== false`, so a workspace that had never heard of the
+    // setting got an assistant answering its customers. The internal_agent_reply call below only
+    // acts when agent_state='active', so this line is what does or does not start it.
+    const autoRespond = await shouldAutoEngageAgent(supabase, workspaceId, { historical });
 
     // New thread + customer participant + owner member participant (assign-on-reply).
     const { data: thread, error: threadErr } = await supabase.from('inbox_threads').insert({
@@ -353,11 +393,15 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
       if (ownerErr) {
         throw new Error(`inbox_participants (owner) insert failed: ${ownerErr.message}`);
       }
-      await emitFlowEvent('inbox.thread_assigned', {
-        user_id: owner, type: 'inbox_assigned',
-        title: 'You were assigned a WhatsApp conversation',
-        body: contactName || phone, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
-      }).catch(() => {});
+      // Not on an import: back-filling 8 conversations would post 8 "you were assigned" cards for
+      // chats the operator has been reading on their phone for months.
+      if (!historical) {
+        await emitFlowEvent('inbox.thread_assigned', {
+          user_id: owner, type: 'inbox_assigned',
+          title: 'You were assigned a WhatsApp conversation',
+          body: contactName || phone, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
+        }).catch(() => {});
+      }
     }
   } else {
     // Existing thread: refresh channel binding + assign an owner if none yet.
@@ -381,17 +425,46 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   }
 
   const preview = (msg.text || '[attachment]').substring(0, 200);
+  // Imported history keeps the time it was actually sent. Left to `now()`, a back-fill stamps
+  // every message of every conversation with the minute the import ran — the first one filed 8
+  // conversations spanning weeks as if all 47 messages had arrived inside three minutes, which
+  // destroys the reading order within a thread and makes the transcript a lie. Live messages keep
+  // `now()`: `sentAt` there is the same instant, and trusting a remote clock for ordering on the
+  // live path buys nothing while a skewed or future one would sort a reply above its question.
+  const originalSentAt = historical ? parseSentAt(msg.sentAt) : null;
   const { error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: customerParticipantId,
     body: msg.text ?? null,
     attachments: msg.attachments ?? [],
     message_type: 'text',
-    metadata: { channel: 'whatsapp', wamid: msg.platformMessageId || msg.id || null, direction: 'incoming' },
+    ...(originalSentAt ? { created_at: originalSentAt } : {}),
+    metadata: {
+      channel: 'whatsapp',
+      wamid: msg.platformMessageId || msg.id || null,
+      direction: 'incoming',
+      // Kept whether or not it was usable as `created_at`, so "why is this message stamped
+      // today" is answerable from the row rather than from a guess.
+      ...(historical ? { imported: true, sent_at: msg.sentAt ?? null } : {}),
+    },
   });
   if (msgErr) {
+    // 23505 on inbox_messages_wamid_unique means another delivery of the SAME message won the
+    // race between the pre-check above and this insert. That is the index doing its job, not a
+    // fault: the message is filed, just not by us. Retrying would only lose the race again.
+    if ((msgErr as { code?: string }).code === '23505') {
+      return { outcome: 'dropped', reason: 'already imported' };
+    }
     // The reply body itself failed to persist — throw so Zernio retries.
     throw new Error(`inbox_messages insert failed: ${msgErr.message}`);
+  }
+
+  // Everything below this line REACTS to the message, and history must not be reacted to. A
+  // back-fill of 500 messages would otherwise fire 500 "new WhatsApp message" notifications for
+  // conversations the operator had already read on their phone, run order intake over months of
+  // old chat, and — the one that actually reached customers — hand each thread to the assistant.
+  if (historical) {
+    return { outcome: 'filed', reason: 'imported (no notification, no agent reply)' };
   }
 
   // Notify every member participant via the unified inbox event.
@@ -664,10 +737,10 @@ async function handleSocialDirectMessage(supabase: any, payload: any): Promise<v
   const at = msg.sentAt || new Date().toISOString();
   const plat = msg.platform ?? platform ?? 'social';
 
-  const { data: wsRow } = await supabase.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
-  const agentCfg = (((wsRow as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>)
-    .inbox_agent as Record<string, unknown> | undefined;
-  const autoRespond = agentCfg?.auto_respond !== false;
+  // Same rule as WhatsApp, same one place: opt-IN only, never on replayed history.
+  const autoRespond = await shouldAutoEngageAgent(supabase, workspaceId, {
+    historical: payload.backfill === true,
+  });
 
   const threadId = await findOrCreateSocialThread(supabase, {
     allowAgent: autoRespond,

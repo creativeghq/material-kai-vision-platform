@@ -301,7 +301,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'purchase-phone-number', 'release-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
-      'bill-channels-monthly', 'set-channel-seats', 'set-channel-read-receipts',
+      'bill-channels-monthly', 'set-channel-read-receipts',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -849,6 +849,64 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
+      // Read receipts, per number.
+      //
+      // Whether the customer sees a blue tick is a business decision and it differs by desk: a
+      // sales team usually wants it, a support desk triaging overnight usually does not, because
+      // "read, no reply" lands worse than silence. Stored on the channel rather than globally —
+      // one workspace can run both kinds of number.
+      // ─────────────────────────────────────────────────────────────
+      case 'set-channel-read-receipts': {
+        const channelId = String(requestBody.channelId || '').trim();
+        const enabled = requestBody.enabled !== false;
+        if (!channelId) throw new HttpError(400, 'channelId is required');
+
+        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+
+        // The channel id comes from the client, so it is bound to the caller's workspace before
+        // anything is written — otherwise one tenant could silence another tenant's receipts.
+        const { data: ch } = await supabaseClient
+          .from('messaging_channels').select('id, config, workspace_id')
+          .eq('id', channelId).maybeSingle();
+        if (!ch || ch.workspace_id !== wsId) throw new HttpError(404, 'No such channel on this workspace');
+
+        const { error } = await supabaseClient.from('messaging_channels')
+          .update({
+            config: { ...((ch.config || {}) as Record<string, unknown>), send_read_receipts: enabled },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', channelId);
+        if (error) throw new HttpError(500, `Could not save the setting: ${error.message}`);
+
+        return jsonResponse({ success: true, channel_id: channelId, send_read_receipts: enabled });
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Charge the month's recurring channel lines.
+      //
+      // Seats and rented numbers were metered and never billed: a workspace could hold four
+      // connected accounts and a Greek number, cost the platform $15/month, and pay nothing.
+      // Idempotent on (workspace, type, month) — running this twice bills nobody twice.
+      // ─────────────────────────────────────────────────────────────
+      case 'bill-channels-monthly': {
+        const { month, lines } = await billChannelsForMonth(supabaseClient, new Date());
+        const charged = lines.filter((l) => l.status === 'charged');
+        const failed = lines.filter((l) => l.status === 'failed');
+        return jsonResponse({
+          // False when anything failed: a partial billing run reported as success is a month of
+          // revenue nobody goes looking for.
+          success: failed.length === 0,
+          month,
+          charged: charged.length,
+          credits_charged: Math.round(charged.reduce((n, l) => n + l.credits, 0) * 100) / 100,
+          failed: failed.length,
+          skipped: lines.filter((l) => l.status === 'skipped').length,
+          lines,
+        });
+      }
+
+      // ─────────────────────────────────────────────────────────────
       // Grant paid channel seats to a workspace.
       //
       // Self-serve seat purchase needs a Stripe price that does not exist yet. This is the half
@@ -1192,8 +1250,28 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // webhook Zernio auto-disabled after 10 failures, and a deploy window. Idempotent, so
       // running it twice is safe.
       // ─────────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────
+      // backfill-inbox — pull conversations Zernio holds into the unified inbox.
+      //
+      // Re-running this is NORMAL, not a repair. A coexistence number's history arrives from Meta
+      // asynchronously over hours: the first run on 2026-08-24 found 8 conversations because the
+      // sync was 19% complete, and the rest only became fetchable later. So the action is
+      // idempotent by construction — the webhook handler skips any message whose provider id is
+      // already filed (inbox_messages_wamid_unique) — and running it a second time picks up what
+      // has since landed without filing a duplicate of anything.
+      //
+      // `phone` / `conversationId` narrow it to ONE conversation, which is how you chase a
+      // specific chat that has not shown up. That is deliberately a FILTER on the same loop
+      // rather than a second importer: the one thing worse than a missing conversation is two
+      // import paths that disagree about how a message becomes a thread.
+      // ─────────────────────────────────────────────────────────────
       case 'backfill-inbox': {
-        const { workspaceId, limit } = requestBody;
+        const { workspaceId, limit, phone: onlyPhone, conversationId: onlyConversationId } = requestBody;
+        // Compare digits only: Zernio hands back `306948408542`, a person types `+30 694 840 8542`,
+        // and a substring match either way round is what makes both work without a parser.
+        const wantDigits = String(onlyPhone ?? '').replace(/\D/g, '');
+        const wantConversation = String(onlyConversationId ?? '').trim();
+        const targeted = !!(wantDigits || wantConversation);
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
@@ -1229,6 +1307,11 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         let accepted = 0;
         let scanned = 0;
+        // Only meaningful when targeted, and it is the whole verdict there: 0 means Zernio does
+        // not have that conversation yet (Meta is still syncing it, or it never flowed through
+        // the API), which is a completely different problem from "we imported it and it was
+        // empty". Reporting only `imported` would collapse the two into the same 0.
+        let matched = 0;
         const errors: string[] = [];
         // Why the handler declined, tallied. "Nothing arrived" is not a diagnosis; "47 messages
         // had no workspace bound to Zernio account X" is one, and it names the fix.
@@ -1261,6 +1344,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           }
 
           for (const conv of convs) {
+            if (targeted) {
+              const convDigits = [conv.participantPhone, conv.participantId, conv.contactId]
+                .map((v) => String(v ?? '').replace(/\D/g, '')).filter(Boolean);
+              const phoneHit = wantDigits
+                && convDigits.some((d) => d.endsWith(wantDigits) || wantDigits.endsWith(d));
+              const idHit = wantConversation && String(conv.id) === wantConversation;
+              if (!phoneHit && !idHit) continue;
+              matched++;
+            }
             scanned++;
             let messages: Array<Record<string, any>> = [];
             try {
@@ -1287,6 +1379,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               // exactly how "it works live but not on replay" gets built.
               const replayBody = JSON.stringify({
                   event: 'message.received',
+                  // THE flag that separates "a customer just wrote to us" from "we are filing
+                  // paperwork". The handler replays history through the live path on purpose —
+                  // one importer, so replay and live cannot diverge — and the price of that is
+                  // that without this marker an import IS N new inbound messages: N assistant
+                  // takeovers, N auto-replies, N notifications, order intake over months of old
+                  // chat. On 2026-08-24 that shipped 22 AI replies into 8 real conversations.
+                  backfill: true,
                   account: { accountId, platform: conv.platform },
                   message: {
                     id: m.id,
@@ -1352,15 +1451,25 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // resolution problem, not a transport one — and that is invisible if only one is shown.
           accepted,
           dropped_silently: Math.max(accepted - imported, 0),
+          // Targeted runs only. Distinguishes "we could not find that chat" from "we found it and
+          // it had nothing new", which are the same `imported: 0` and need opposite responses.
+          matched: targeted ? matched : undefined,
           // The handler's own words, counted. No log-diving to find out why an inbox is empty.
           drop_reasons: Object.keys(dropReasons).length ? dropReasons : undefined,
-          message: accepted > 0 && imported === 0
-            ? 'Every message was accepted and none was filed — see drop_reasons for why.'
-            : scanned === 0
-              ? 'Zernio returned no conversations for these accounts. A number connected in '
-                + 'coexistence mode keeps its existing chats on the phone; only messages that '
-                + 'flow through Zernio after connecting are its to hand back.'
-              : undefined,
+          message: targeted && matched === 0
+            ? 'WhatsApp has not handed that conversation over yet. On a coexistence number Meta '
+              + 'syncs history in the background over several hours — the chat stays on the phone '
+              + 'and only becomes importable once that sync reaches it. Try again later.'
+            : targeted && imported === 0
+              ? 'That conversation was found and every message in it is already in the inbox.'
+              : accepted > 0 && imported === 0
+                ? 'Every message was accepted and none was filed — see drop_reasons for why. '
+                  + '("already imported" here just means it was pulled in by an earlier run.)'
+                : scanned === 0
+                  ? 'Zernio returned no conversations for these accounts. A number connected in '
+                    + 'coexistence mode keeps its existing chats on the phone; only messages that '
+                    + 'flow through Zernio after connecting are its to hand back.'
+                  : undefined,
           // Never a silent partial: a truncated backfill that reports plain success is
           // indistinguishable from one that found nothing.
           errors: errors.slice(0, 20),

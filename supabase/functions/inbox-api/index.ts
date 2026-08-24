@@ -19,6 +19,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
+import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
 import {
   sendWhatsAppReply, sendWhatsAppMessage,
   sendSocialCommentReply, sendSocialDirectMessage,
@@ -242,13 +243,12 @@ type InboxAgentSettings = { autoRespond: boolean; allowAccountData: boolean };
  * questions. A workspace opts out by setting either to `false`.
  */
 async function inboxAgentSettings(db: DbClient, workspaceId: string): Promise<InboxAgentSettings> {
-  const { data } = await db.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
-  const root = ((data as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>;
-  const cfg = (root.inbox_agent || {}) as Record<string, unknown>;
-  return {
-    autoRespond: cfg.auto_respond !== false,
-    allowAccountData: cfg.allow_account_data !== false,
-  };
+  // Delegated, not restated. This was the fourth hand-written copy of `auto_respond !== false`
+  // and they have to agree: the WhatsApp webhook decides whether a thread is BORN handed to the
+  // assistant, and this decides the same for a thread created through the API. One saying yes
+  // where the other says no is a workspace where autopilot depends on which door the customer
+  // came through. See _shared/inbox-autopilot.ts for what the default is and why.
+  return await inboxAutopilotSettings(db, workspaceId);
 }
 
 /** The customer this thread is about: the active customer participant's CRM contact + their company. */
