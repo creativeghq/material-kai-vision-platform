@@ -167,3 +167,76 @@ export async function storeParticipantPicture(
     return false;
   }
 }
+
+
+/**
+ * OUR OWN number's WhatsApp Business photo — the one customers see beside our messages.
+ *
+ * Separate from `storeParticipantPicture` because it is a different question with a different
+ * endpoint: a business profile, not a conversation participant. Confusing the two is what made me
+ * tell the operator their photo was unavailable — a counterparty's genuinely is withheld by Meta
+ * unless the contact allows it, ours never was.
+ *
+ * Shared because BOTH `sync-channels` (which runs on connect) and `sync-avatars` need it, and one
+ * copy of "download the profile photo into storage" is the rule the media path already learned.
+ *
+ * Returns the config fragment to merge, so the caller decides how it is written — `sync-channels`
+ * folds it into the larger channel update it is already making, `sync-avatars` writes it alone.
+ * `profile: null` means the lookup failed; a profile with `avatar_path: null` means the number
+ * simply has no photo set, which is a different answer and only one of them is ours to fix.
+ */
+export async function fetchOwnBusinessAvatar(
+  supabase: any,
+  accountId: string,
+  knownCfg: Record<string, unknown>,
+  zernioApiFn: (method: string, path: string) => Promise<any>,
+): Promise<{
+  profile: Record<string, unknown> | null;
+  fragment: Record<string, unknown>;
+  error: string | null;
+}> {
+  let profile: Record<string, unknown> | null = null;
+  try {
+    const bp = await zernioApiFn('GET', `/whatsapp/business-profile?accountId=${encodeURIComponent(accountId)}`);
+    profile = (bp?.businessProfile ?? bp?.data ?? null) as Record<string, unknown> | null;
+  } catch (err) {
+    // Enrichment. A transient failure must never fail the sync that keeps the channel connected.
+    return { profile: null, fragment: {}, error: err instanceof Error ? err.message : String(err) };
+  }
+  if (!profile) return { profile: null, fragment: {}, error: 'no business profile returned' };
+
+  const picUrl = typeof profile.profilePictureUrl === 'string' ? profile.profilePictureUrl : '';
+  let avatarPath = typeof knownCfg.avatar_path === 'string' ? knownCfg.avatar_path : null;
+  let error: string | null = null;
+
+  // Meta's CDN link expires, so the BYTES are held rather than the url — the same rule as inbox
+  // media. Re-downloaded only when the url changes, since the image at a given url is immutable.
+  if (picUrl && (knownCfg.avatar_source !== picUrl || !avatarPath)) {
+    const img = await fetchImageGuardedOrNull(picUrl);
+    if (img) {
+      const path = `inbox/channel/${accountId}/${crypto.randomUUID()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from(INBOX_ATTACHMENT_BUCKET)
+        .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
+      if (upErr) error = upErr.message;
+      else avatarPath = path;
+    } else {
+      error = 'the profile photo could not be downloaded';
+    }
+  } else if (!picUrl) {
+    error = 'no profile picture is set on this WhatsApp Business number';
+  }
+
+  return {
+    profile,
+    fragment: {
+      business_profile: profile,
+      // Only recorded next to real bytes: a source with no path would read as "already done" and
+      // the retry would never happen.
+      avatar_source: avatarPath ? picUrl : null,
+      avatar_bucket: avatarPath ? INBOX_ATTACHMENT_BUCKET : null,
+      avatar_path: avatarPath,
+    },
+    error,
+  };
+}

@@ -16,7 +16,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
-import { materialiseInlineAttachments, storeParticipantPicture } from '../_shared/inbox-media.ts';
+import {
+  materialiseInlineAttachments,
+  storeParticipantPicture,
+  fetchOwnBusinessAvatar,
+} from '../_shared/inbox-media.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -1498,47 +1502,21 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           const accountId = chan.zernio_account_id;
 
           // ── our own number's photo (a business profile, not a conversation) ──
-          try {
-            const bp = await zernioApi('GET', `/whatsapp/business-profile?accountId=${encodeURIComponent(accountId)}`);
-            const profile = (bp?.businessProfile ?? bp?.data ?? null) as Record<string, unknown> | null;
-            const picUrl = typeof profile?.profilePictureUrl === 'string' ? profile.profilePictureUrl : '';
-            const knownCfg = (chan.config ?? {}) as Record<string, unknown>;
-            if (picUrl && knownCfg.avatar_source !== picUrl) {
-              const img = await fetchImageGuardedOrNull(picUrl);
-              if (img) {
-                const path = `inbox/channel/${accountId}/${crypto.randomUUID()}.jpg`;
-                const { error: upErr } = await supabaseClient.storage
-                  .from('generation-images')
-                  .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
-                if (upErr) errors.push(`own avatar: ${upErr.message}`);
-                else {
-                  // CHECKED: supabase-js RESOLVES on an RLS denial, so an unchecked write here
-                  // would report the photo as synced while the row still points at nothing —
-                  // and the operator would keep seeing initials with everything reporting fine.
-                  const { error: cfgErr } = await supabaseClient.from('messaging_channels').update({
-                    config: {
-                      ...knownCfg,
-                      business_profile: profile,
-                      avatar_source: picUrl,
-                      avatar_bucket: 'generation-images',
-                      avatar_path: path,
-                    },
-                    updated_at: new Date().toISOString(),
-                  }).eq('id', chan.id);
-                  if (cfgErr) errors.push(`own avatar: ${cfgErr.message}`);
-                  else ownAvatar = true;
-                }
-              }
-            } else if (picUrl) {
-              ownAvatar = true;            // already stored, and unchanged
-            } else if (profile) {
-              // The profile exists and simply has no photo on it. Said out loud rather than
-              // counted as a failure: "you have not set one" and "we could not fetch it" are
-              // different answers, and only one of them is ours to fix.
-              errors.push('own avatar: no profile picture is set on this WhatsApp Business number');
-            }
-          } catch (err) {
-            errors.push(`own avatar: ${err instanceof Error ? err.message : String(err)}`);
+          const knownCfg = (chan.config ?? {}) as Record<string, unknown>;
+          const own = await fetchOwnBusinessAvatar(supabaseClient, accountId, knownCfg, zernioApi);
+          // Said out loud rather than counted as a plain failure: "you have not set one" and "we
+          // could not fetch it" are different answers, and only one of them is ours to fix.
+          if (own.error) errors.push(`own avatar: ${own.error}`);
+          if (own.fragment.avatar_path) {
+            // CHECKED: supabase-js RESOLVES on an RLS denial, so an unchecked write here would
+            // report the photo as synced while the row still points at nothing — and the operator
+            // would keep seeing initials with every signal green.
+            const { error: cfgErr } = await supabaseClient.from('messaging_channels').update({
+              config: { ...knownCfg, ...own.fragment },
+              updated_at: new Date().toISOString(),
+            }).eq('id', chan.id);
+            if (cfgErr) errors.push(`own avatar: ${cfgErr.message}`);
+            else ownAvatar = true;
           }
 
           // ── every counterparty ──
@@ -2010,41 +1988,12 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // asked, so the operator's side of every thread rendered as initials while their real
           // avatar sat on WhatsApp. This is OUR profile: unlike a counterparty's, Meta does expose
           // it, and confusing the two is what made me tell the operator it was unavailable.
-          let businessProfile: Record<string, unknown> | null = null;
-          try {
-            const bp = await zernioApi('GET', `/whatsapp/business-profile?accountId=${encodeURIComponent(accountId)}`);
-            businessProfile = (bp?.businessProfile ?? bp?.data ?? null) as Record<string, unknown> | null;
-          } catch (err) {
-            // Enrichment. A number with no profile set, or a transient failure, must not fail the
-            // sync that keeps the channel connected.
-            console.warn(`[messaging-api] business profile unavailable for ${accountId}:`, err instanceof Error ? err.message : String(err));
-          }
-
-          // Meta's CDN link expires, so the bytes are held rather than the URL — same rule as
-          // inbox media. Re-downloaded only when the URL changes.
-          const picUrl = typeof businessProfile?.profilePictureUrl === 'string'
-            ? businessProfile.profilePictureUrl : '';
           const knownCfg = ((existing as { config?: Record<string, unknown> } | null)?.config ?? {}) as Record<string, unknown>;
-          let avatarPath = typeof knownCfg.avatar_path === 'string' ? knownCfg.avatar_path : null;
-          if (picUrl && knownCfg.avatar_source !== picUrl) {
-            const img = await fetchImageGuardedOrNull(picUrl);
-            if (img) {
-              const path = `inbox/channel/${accountId}/${crypto.randomUUID()}.jpg`;
-              const { error: upErr } = await supabaseClient.storage
-                .from('generation-images')
-                .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
-              if (upErr) console.warn('[messaging-api] business avatar upload failed:', upErr.message);
-              else avatarPath = path;
-            }
+          const own = await fetchOwnBusinessAvatar(supabaseClient, accountId, knownCfg, zernioApi);
+          if (own.error) {
+            console.warn(`[messaging-api] business profile for ${accountId}: ${own.error}`);
           }
-          const profileCfg = businessProfile
-            ? {
-              business_profile: businessProfile,
-              avatar_source: picUrl || null,
-              avatar_bucket: avatarPath ? 'generation-images' : null,
-              avatar_path: avatarPath,
-            }
-            : {};
+          const profileCfg = own.profile ? own.fragment : {};
 
           if (existing) {
             // Zernio flags an account whose token Meta has invalidated. It still LISTS, so

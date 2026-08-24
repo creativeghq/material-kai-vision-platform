@@ -327,7 +327,20 @@ describe('the WhatsApp profile is fetched and shown', () => {
     expect(stripComments(inboxPage)).toMatch(/prof\?\.avatar_url \?\? channelAvatarUrl/);
     // And it is the STORED object, not the provider link, for the same expiry reason as any
     // other avatar here.
-    expect(stripComments(messagingApi)).toMatch(/avatar_path: path/);
+    expect(stripComments(inboxMedia)).toMatch(/avatar_path: avatarPath/);
+  });
+
+  it('downloads our own business photo in exactly ONE place', () => {
+    // It is needed by sync-channels (on connect) and sync-avatars (on demand). Two copies of
+    // "download the profile photo into storage" is the drift this file already caught once, on
+    // the media path, which is why that download lives in _shared at all.
+    const api = stripComments(messagingApi);
+    expect(api).toMatch(/fetchOwnBusinessAvatar\(/);
+    expect(
+      (api.match(/business-profile\?accountId=/g) ?? []).length,
+      'the business-profile fetch is inlined again — call fetchOwnBusinessAvatar',
+    ).toBe(0);
+    expect(stripComments(inboxMedia)).toMatch(/business-profile\?accountId=/);
   });
 
   it('stores the logo as an object, never as the provider url', () => {
