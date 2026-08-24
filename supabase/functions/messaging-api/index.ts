@@ -26,7 +26,7 @@ import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { checkChannelSeat } from '../_shared/channel-seats.ts';
 import { reconcileWaba } from '../_shared/whatsapp-cost-reconcile.ts';
-import { billChannelsForMonth } from '../_shared/channel-recurring-billing.ts';
+import { billChannelsForMonth, retryFailedCharges } from '../_shared/channel-recurring-billing.ts';
 import {
   zernioApi,
   zernioKey,
@@ -298,10 +298,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
       // actions. Searching availability and listing what a workspace already has are reads.
-      'purchase-phone-number', 'release-phone-number',
+      // 'release-phone-number' is deliberately absent. A tenant may retire their own number
+      // (decided 2026-08-24): the only way out of a recurring charge was to contact support,
+      // which is not a way out. BUYING still puts a charge on the platform's Zernio account, so
+      // that stays operator-only — giving one up costs the tenant money and saves us ours.
+      'purchase-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
-      'bill-channels-monthly', 'set-channel-read-receipts',
+      'bill-channels-monthly', 'retry-failed-charges', 'set-channel-read-receipts',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -831,6 +835,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // connected accounts and a Greek number, cost the platform $15/month, and pay nothing.
       // Idempotent on (workspace, type, month) — running this twice bills nobody twice.
       // ─────────────────────────────────────────────────────────────
+      // Re-attempt unpaid months and lift the hold once a workspace is fully settled. Nightly,
+      // not monthly: a customer who tops up on the 3rd should not sit on hold until the 1st.
+      case 'retry-failed-charges': {
+        const result = await retryFailedCharges(supabaseClient);
+        return jsonResponse({ success: true, ...result });
+      }
+
       case 'bill-channels-monthly': {
         const { month, lines } = await billChannelsForMonth(supabaseClient, new Date());
         const charged = lines.filter((l) => l.status === 'charged');
@@ -880,30 +891,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (error) throw new HttpError(500, `Could not save the setting: ${error.message}`);
 
         return jsonResponse({ success: true, channel_id: channelId, send_read_receipts: enabled });
-      }
-
-      // ─────────────────────────────────────────────────────────────
-      // Charge the month's recurring channel lines.
-      //
-      // Seats and rented numbers were metered and never billed: a workspace could hold four
-      // connected accounts and a Greek number, cost the platform $15/month, and pay nothing.
-      // Idempotent on (workspace, type, month) — running this twice bills nobody twice.
-      // ─────────────────────────────────────────────────────────────
-      case 'bill-channels-monthly': {
-        const { month, lines } = await billChannelsForMonth(supabaseClient, new Date());
-        const charged = lines.filter((l) => l.status === 'charged');
-        const failed = lines.filter((l) => l.status === 'failed');
-        return jsonResponse({
-          // False when anything failed: a partial billing run reported as success is a month of
-          // revenue nobody goes looking for.
-          success: failed.length === 0,
-          month,
-          charged: charged.length,
-          credits_charged: Math.round(charged.reduce((n, l) => n + l.credits, 0) * 100) / 100,
-          failed: failed.length,
-          skipped: lines.filter((l) => l.status === 'skipped').length,
-          lines,
-        });
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -1163,7 +1150,19 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!phoneNumberId) throw new HttpError(400, 'phoneNumberId is required');
         const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
-        { const gate = await requireMessaging(wsId); if (gate) return gate; }
+        if (!(await isWorkspaceEntitled(supabaseClient, wsId, 'messaging'))) return notEntitledResponse('messaging');
+
+        // Open to the tenant now, but only to someone who runs the workspace. Releasing is
+        // irreversible and takes the number away from everyone using it — not a thing an ordinary
+        // member should be able to do on the workspace's behalf.
+        if (!isAdminAccess(auth)) {
+          const { data: role } = await supabaseClient
+            .from('workspace_members').select('role')
+            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
+          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
+            throw new HttpError(403, 'Only a workspace owner or admin can give up a number');
+          }
+        }
 
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
         await assertOwnProfile(supabaseClient, wsId, profileId);

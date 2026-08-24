@@ -133,6 +133,125 @@ async function chargeOne(
 }
 
 /**
+ * Put a workspace's rented numbers ON HOLD.
+ *
+ * No grace period, by decision (2026-08-24): the first failed charge stops the service. Held, not
+ * released — the number stays with the carrier and the channel is deactivated so sends fail fast
+ * instead of silently costing money. Paying restores the same line, which is the entire reason
+ * this is a status and not a delete.
+ */
+async function holdNumbers(
+  supabase: SupabaseLike,
+  workspaceId: string,
+  reason: string,
+): Promise<{ held: number; error?: string }> {
+  const { data: held, error } = await supabase
+    .from('workspace_phone_numbers')
+    .update({ status: 'on_hold', held_at: new Date().toISOString(), held_reason: reason })
+    .eq('workspace_id', workspaceId)
+    .is('released_at', null)
+    .eq('status', 'active')
+    .select('phone_number');
+
+  if (error) return { held: 0, error: String(error.message ?? error) };
+
+  // Stop the sends too. A number on hold whose channel still answers would keep accepting work
+  // we are paying for and not being paid for — the hold has to reach the thing that spends.
+  const numbers = ((held ?? []) as Array<{ phone_number: string }>).map((n) => n.phone_number);
+  if (numbers.length) {
+    const { error: chErr } = await supabase
+      .from('messaging_channels')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .in('sender_id', numbers);
+    if (chErr) return { held: numbers.length, error: `channels not deactivated: ${chErr.message}` };
+  }
+  return { held: numbers.length };
+}
+
+/** Take them off hold once a month settles. Mirrors holdNumbers exactly, in both tables. */
+async function releaseHold(supabase: SupabaseLike, workspaceId: string): Promise<number> {
+  const { data: back } = await supabase
+    .from('workspace_phone_numbers')
+    .update({ status: 'active', held_at: null, held_reason: null })
+    .eq('workspace_id', workspaceId)
+    .is('released_at', null)
+    .eq('status', 'on_hold')
+    .select('phone_number');
+
+  const numbers = ((back ?? []) as Array<{ phone_number: string }>).map((n) => n.phone_number);
+  if (numbers.length) {
+    await supabase
+      .from('messaging_channels')
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .in('sender_id', numbers);
+  }
+  return numbers.length;
+}
+
+/**
+ * Re-attempt months that failed.
+ *
+ * Runs nightly, not monthly: a workspace that tops up on the 3rd should settle without anyone
+ * intervening, and waiting for the next 1st would leave a paying customer on hold for four weeks.
+ * The UNIQUE (workspace, type, month) key makes this safe — the row is updated in place, never
+ * duplicated.
+ */
+export async function retryFailedCharges(
+  supabase: SupabaseLike,
+): Promise<{ settled: number; stillFailing: number; restored: number }> {
+  const { data: failed } = await supabase
+    .from('channel_recurring_charges')
+    .select('id, workspace_id, charge_type, period_month, quantity, unit_cost_usd, credits_charged, attempts, detail')
+    .eq('status', 'failed')
+    .order('period_month');
+
+  let settled = 0, stillFailing = 0, restored = 0;
+  const settledWorkspaces = new Set<string>();
+
+  for (const row of ((failed ?? []) as Array<Record<string, string | number | null>>)) {
+    const workspaceId = String(row.workspace_id);
+    const { data: member } = await supabase
+      .from('workspace_members').select('user_id')
+      .eq('workspace_id', workspaceId).eq('status', 'active')
+      .in('role', ['owner', 'admin']).order('role').limit(1).maybeSingle();
+    if (!member?.user_id) { stillFailing++; continue; }
+
+    const credits = Number(row.credits_charged) || 0;
+    const { data, error } = await supabase.rpc('debit_credits', {
+      p_user_id: member.user_id,
+      p_amount: credits,
+      p_operation_type: 'phone_number_monthly',
+      p_description: `${row.quantity} phone number(s) — ${row.period_month} (retry)`,
+      p_metadata: { period_month: row.period_month, retry: true },
+      p_workspace_id: workspaceId,
+    });
+    const ok = !error && (data === null || data === undefined || (data as { success?: boolean })?.success !== false);
+
+    await supabase.from('channel_recurring_charges').update({
+      status: ok ? 'charged' : 'failed',
+      attempts: (Number(row.attempts) || 1) + 1,
+      last_attempt_at: new Date().toISOString(),
+    }).eq('id', String(row.id));
+
+    if (ok) { settled++; settledWorkspaces.add(workspaceId); } else { stillFailing++; }
+  }
+
+  // Only lift the hold when the workspace has NO failed month left. Restoring on one settled
+  // month while an older one is still owed would hand back the service for a partial payment.
+  for (const workspaceId of settledWorkspaces) {
+    const { count } = await supabase
+      .from('channel_recurring_charges')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('status', 'failed');
+    if ((count ?? 0) === 0) restored += await releaseHold(supabase, workspaceId);
+  }
+
+  return { settled, stillFailing, restored };
+}
+
+/**
  * Bill every workspace for the month.
  *
  * Numbers only. Each is priced from its own captured `monthly_cents` rather than a blended rate,
@@ -201,6 +320,13 @@ export async function billChannelsForMonth(
         error: `${unpriced} number(s) have no monthly_cents — run reconcile-phone-numbers`,
       });
     }
+  }
+
+  // No grace period. Any workspace whose charge failed this run loses the service now.
+  for (const workspaceId of new Set(lines.filter((l) => l.status === 'failed').map((l) => l.workspaceId))) {
+    const { held, error } = await holdNumbers(supabase, workspaceId, `unpaid ${month}`);
+    if (error) console.error('[channel-billing] hold failed for', workspaceId, error);
+    if (held) console.warn(`[channel-billing] ${held} number(s) ON HOLD for ${workspaceId} — unpaid ${month}`);
   }
 
   return { month, lines };
