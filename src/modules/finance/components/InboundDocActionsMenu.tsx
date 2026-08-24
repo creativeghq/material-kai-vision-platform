@@ -29,6 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { companiesAPI } from '@/services/crm.service';
 import { researchCompany, greekAfm, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
+import { isPayrollDocument } from '@/modules/finance/utils/inboundProvenance';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
 interface Props {
@@ -76,7 +77,14 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // became are the same arrival counted from two rows — nothing links them, so doing both added
   // the stock twice. Once the order exists it owns the receipt (it knows the catalog products,
   // the per-line delivered quantities and the customer allocations waiting on them).
-  const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder;
+  // Payroll (17.x) rides in on the same RequestTransmittedDocs call as the foreign purchases —
+  // it is here to be VISIBLE, not to be actioned. It belongs to the HR module, so booking it as
+  // a supplier bill would double-count it against payroll already recorded there (three
+  // documents, EUR 92,539.09 in this workspace). `_inbound_doc_to_supplier_bill_core` refuses it
+  // outright; this stops the offer being made rather than letting the click fail.
+  const isPayroll = isPayrollDocument(doc.doc_type);
+  // And nothing was delivered, so there is nothing to receive either.
+  const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll;
   const canDismiss = doc.status === 'new';
   // Paying settles an expense that EXISTS. A document that hasn't been booked yet is settled by
   // booking it — "Add to Expenses" carries a "Mark as paid" tick — so there is one way in and it
@@ -226,8 +234,13 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               to be two items ("Add to Expenses — not paid" wrote a bare bill; "Create the order
               for this" wrote order + bill), and the bill-only one produced a payable with nothing
               to match it against, which is precisely what 3-way match exists to prevent. */}
-          <DropdownMenuItem onClick={onCreateOrder} disabled={hasOrder || doc.status === 'dismissed' || !onCreateOrder}>
-            <ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
+          <DropdownMenuItem
+            onClick={onCreateOrder}
+            disabled={hasOrder || isPayroll || doc.status === 'dismissed' || !onCreateOrder}
+            title={isPayroll ? 'Payroll is recorded in HR, never as a supplier bill — this document is here for visibility.' : undefined}
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            {isPayroll ? 'Payroll — recorded in HR' : hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
             <Wallet className="h-4 w-4 mr-2" /> Record payment

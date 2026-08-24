@@ -52,10 +52,30 @@ export interface IssuerProfile {
   city: string | null;
 }
 
+/** Which inlet delivered the document. The axis is the CHANNEL, never the country. */
+export type InboundSource = 'mydata' | 'mydata_self' | 'email' | 'upload' | 'peppol' | 'api';
+
+/** Where the line detail came from — a different fact from where the money record came from. */
+export type InboundLinesSource = 'mydata' | 'user' | 'document' | 'none';
+
 export interface InboundDocument {
   id: string;
   workspace_id: string;
   mark: string;
+  /**
+   * `mydata` — the supplier filed it against us (myDATA `RequestDocs`).
+   * `mydata_self` — WE transmitted it, typed into myAADE. Every foreign purchase is one of these:
+   * a Bulgarian supplier is not a myDATA obligor, so nobody files it for us. Also rent (16.1) and
+   * payroll (17.x), which follow the identical pattern.
+   */
+  source: InboundSource;
+  /** `none` = value-only lines, nothing nameable. Gates the line editor and warehouse receive. */
+  lines_source: InboundLinesSource;
+  lines_reconciled: boolean;
+  /** The MARK under which WE registered this in myDATA. NULL when the supplier filed it. */
+  mydata_mark: string | null;
+  /** Derived in SQL from `mydata_mark` — never stored twice. */
+  reported_to_mydata: boolean;
   issuer_vat: string | null;
   issuer_name: string | null;
   issue_date: string | null;
@@ -111,7 +131,9 @@ export const inboundService = {
    * bypassed. They are fetched by `getFull()` when a row is actually opened.
    */
   LIST_COLUMNS: [
-    'id', 'workspace_id', 'mark', 'issuer_vat', 'issuer_name', 'issue_date', 'dispatch_date',
+    'id', 'workspace_id', 'mark', 'source', 'lines_source', 'lines_reconciled', 'mydata_mark',
+    'reported_to_mydata',
+    'issuer_vat', 'issuer_name', 'issue_date', 'dispatch_date',
     'vehicle_number', 'doc_type', 'series', 'aa', 'uid', 'authentication_code', 'download_url',
     'issuer_country', 'issuer_branch', 'counterpart_vat', 'counterpart_name', 'is_delivery_note',
     'move_purpose', 'vat_payment_suspension', 'total_withheld', 'total_fees', 'total_stamp_duty',

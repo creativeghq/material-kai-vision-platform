@@ -11,6 +11,7 @@ import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
 import { inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
+import { inboundDetailLabel, inboundSourceLabel } from '@/modules/finance/utils/inboundProvenance';
 import { humanizeLabel } from '@/utils/humanize';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -230,6 +231,24 @@ export function buildDocumentFilters(
               key: 'doc_type', type: 'multi', label: 'Document type',
               options: mydataTypeOptions(rows, (r) => r.doc_type, mydataTypes),
               accessor: (r) => r.doc_type,
+            },
+            {
+              // The split between what suppliers filed against us and what WE typed into myAADE
+              // (every foreign purchase, plus rent and payroll). Deliberately a FILTER and not a
+              // second tab: once a 14.x has lines it is the same object as a 1.1 to everything
+              // downstream, and a provenance tab would partition the work queue by the wrong axis
+              // — the operator's question is "what still needs me", not "who transmitted this".
+              key: 'source', type: 'multi', label: 'Source',
+              options: optionsFromRows(rows, (r) => r.source ?? 'mydata', inboundSourceLabel),
+              accessor: (r) => r.source ?? 'mydata',
+            },
+            {
+              // The actionable one. A document with no nameable lines cannot be received to
+              // warehouse or extracted into products, and 1,161 of the 1,769 rows here are in
+              // that state — thin 2.x service billing as much as foreign purchases.
+              key: 'lines_source', type: 'multi', label: 'Detail',
+              options: optionsFromRows(rows, (r) => r.lines_source ?? 'none', inboundDetailLabel),
+              accessor: (r) => r.lines_source ?? 'none',
             },
           ],
         },

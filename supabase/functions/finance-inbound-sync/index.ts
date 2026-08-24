@@ -1,9 +1,20 @@
 /**
- * Inbound myDATA poller. Pulls documents OTHER businesses issued to us via the
- * myDATA `RequestDocs` REST endpoint (per-tenant AADE creds: aade-user-id +
- * Ocp-Apim-Subscription-Key), upserts them into `inbound_documents`, and advances the
- * per-workspace MARK watermark. No-ops cleanly when creds aren't configured yet, so it
- * can be scheduled now and "switches on" the moment the operator pastes credentials.
+ * Inbound myDATA poller. Reads BOTH of myDATA's retrieval endpoints (per-tenant AADE creds:
+ * aade-user-id + Ocp-Apim-Subscription-Key), upserts what they return into `inbound_documents`,
+ * and advances a separate per-workspace MARK watermark for each. No-ops cleanly when creds
+ * aren't configured yet, so it can be scheduled now and "switches on" the moment the operator
+ * pastes credentials.
+ *
+ *   RequestDocs             documents OTHER businesses issued to us      source='mydata'
+ *   RequestTransmittedDocs  documents WE transmitted                     source='mydata_self'
+ *
+ * The second one is issue #377. Foreign supplier invoices are not filed against us by anybody —
+ * a Bulgarian supplier is not a myDATA obligor — so the finance team types them into myAADE as
+ * `14.x`, which makes US the transmitter. They therefore land on RequestTransmittedDocs and are
+ * permanently invisible to RequestDocs. This platform polled only RequestDocs for two years:
+ * EUR 45,413.93 of foreign purchases across 12 suppliers, plus EUR 104,750.07 of self-reported
+ * rent and payroll, were sitting one endpoint away the whole time. Nothing had failed — the
+ * question was wrong, and "0 foreign invoices" read as a fact about the business.
  *
  * Cron: invoke with header `x-cron-secret: <CRON_SECRET>`.
  *
@@ -44,6 +55,92 @@ function toAadeDate(iso: unknown): string | null {
   const dt = new Date(`${y}-${mo}-${d}T00:00:00Z`);
   if (Number.isNaN(dt.getTime())) return null;
   return `${d}/${mo}/${y}`;
+}
+
+/** myDATA `invoiceType` family, i.e. the part before the dot. `'14.1'` -> `'14'`. */
+const family = (docType: string | null) => String(docType ?? '').split('.')[0];
+
+/**
+ * The families on RequestTransmittedDocs that are EXPENSES we self-reported.
+ *
+ *   13.x  foreign services / expenses           reverse charge
+ *   14.x  foreign purchases                     reverse charge
+ *   16.1  rent                                  a real payable, to a landlord
+ *   17.x  payroll and accounting adjustments    HR's, never a supplier bill
+ *
+ * Everything else that endpoint returns is a SALE we issued, which already lives in `invoices` —
+ * ingesting one would invent a supplier bill for our own revenue. The filter is applied HERE
+ * rather than as an `invType` query param because the param takes a single value per call, and
+ * asking eight times per workspace per night to avoid parsing a few hundred KB is the wrong
+ * trade. Skipped documents are counted and reported, never silently dropped.
+ */
+const SELF_TRANSMITTED_EXPENSE_FAMILIES = new Set(['13', '14', '16', '17']);
+
+/** Hard stop on the continuation loop: 40 pages is ~4,000 documents in one run, far past any real
+ *  window. Hitting it is REPORTED, never silent — a partial list is indistinguishable from a
+ *  complete one, which is the whole bug this loop exists to fix. */
+const MAX_PAGES = 40;
+
+interface DocFetch {
+  ok: boolean;
+  status: number;
+  /** Every `<invoice>` block across every page. */
+  blocks: string[];
+  pages: number;
+  /** True when MAX_PAGES stopped us with a continuation token still outstanding. */
+  capped: boolean;
+  error?: string;
+}
+
+/**
+ * Fetch EVERY page of a myDATA retrieval call.
+ *
+ * Both endpoints truncate at roughly 100 documents and hand back a `<continuationToken>` holding
+ * the partition/row key to resume from. Nothing in this platform ever read it. The cron survived
+ * by accident — its watermark advanced to page one's last MARK, so it caught up one page per
+ * night — but the manual dated pull asks from `mark=0` bounded by dates and deliberately ignores
+ * the watermark, so it returned page one and called it the year. Measured live: the 2025 window
+ * returns 103 documents and a token, and page two holds 50 more. Page one carries no marker
+ * distinguishing it from a complete result.
+ */
+async function fetchAllDocPages(
+  baseUrl: string,
+  endpoint: 'RequestDocs' | 'RequestTransmittedDocs',
+  creds: { aade_user_id: string; subscription_key: string },
+  params: URLSearchParams,
+): Promise<DocFetch> {
+  const blocks: string[] = [];
+  let next: { pk: string; rk: string } | null = null;
+  let pages = 0;
+
+  while (pages < MAX_PAGES) {
+    const q = new URLSearchParams(params);
+    if (next) { q.set('nextPartitionKey', next.pk); q.set('nextRowKey', next.rk); }
+
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/${endpoint}?${q.toString()}`, {
+        headers: { 'aade-user-id': creds.aade_user_id, 'Ocp-Apim-Subscription-Key': creds.subscription_key },
+      });
+    } catch (err) {
+      return { ok: false, status: 0, blocks, pages, capped: false, error: String(err) };
+    }
+    const xml = await res.text();
+    if (!res.ok) {
+      return { ok: false, status: res.status, blocks, pages, capped: false, error: `${endpoint} ${res.status}` };
+    }
+    pages++;
+    for (const b of pickAllTagBlocks(xml, 'invoice')) blocks.push(b);
+
+    // `pickAllTagBlocks` and not `pickTag`: the token holds child elements, and pickTag decodes
+    // entities across the whole inner block, which would corrupt nested XML.
+    const token = pickAllTagBlocks(xml, 'continuationToken')[0];
+    const pk = token ? pickTag(token, 'nextPartitionKey') : null;
+    const rk = token ? pickTag(token, 'nextRowKey') : null;
+    if (!pk || !rk) return { ok: true, status: res.status, blocks, pages, capped: false };
+    next = { pk, rk };
+  }
+  return { ok: true, status: 200, blocks, pages, capped: true };
 }
 
 Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
@@ -136,8 +233,13 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     }
 
     const { data: fs } = await supabase.from('finance_settings')
-      .select('inbound_last_mark, resolve_issuer_names_via_aade').eq('workspace_id', workspaceId).maybeSingle();
+      .select('inbound_last_mark, inbound_last_transmitted_mark, resolve_issuer_names_via_aade')
+      .eq('workspace_id', workspaceId).maybeSingle();
     const watermark = fs?.inbound_last_mark || '0';
+    // Its own watermark, deliberately. MARKs come from one global AADE sequence, so sharing the
+    // received-docs watermark would let whichever branch ran first drag the other past documents
+    // it had never seen — and a watermark that is too high just returns fewer rows.
+    const transmittedWatermark = (fs as any)?.inbound_last_transmitted_mark || '0';
 
     // Default landing category for synced expenses: the workspace's locked "myAADE" system
     // category (auto-seeded into every workspace). New docs are stamped with it so they
@@ -157,20 +259,22 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       (issuerDefaults ?? []).map((r: any) => [r.issuer_vat, r.category_id]),
     );
 
-    let xml: string;
-    try {
-      // A dated pull asks from mark 0 and lets the date window do the bounding — the stored
-      // watermark may already be past the requested window's start, which would return nothing.
-      const params = new URLSearchParams({ mark: dated ? '0' : watermark });
+    // A dated pull asks from mark 0 and lets the date window do the bounding — the stored
+    // watermark may already be past the requested window's start, which would return nothing.
+    const windowed = (mark: string) => {
+      const params = new URLSearchParams({ mark: dated ? '0' : mark });
       if (dated) { params.set('dateFrom', dateFrom!); params.set('dateTo', dateTo!); }
-      const res = await fetch(`${baseUrl}/RequestDocs?${params.toString()}`, {
-        headers: { 'aade-user-id': c.aade_user_id, 'Ocp-Apim-Subscription-Key': c.subscription_key },
-      });
-      xml = await res.text();
-      if (!res.ok) { summary.push({ workspaceId, error: `RequestDocs ${res.status}` }); continue; }
-    } catch (err) {
-      summary.push({ workspaceId, error: String(err) });
-      continue;
+      return params;
+    };
+
+    const received = await fetchAllDocPages(baseUrl, 'RequestDocs', c, windowed(watermark));
+    if (!received.ok) { summary.push({ workspaceId, error: received.error ?? 'RequestDocs failed' }); continue; }
+
+    // The documents WE transmitted. A failure here must not lose the received-docs pull that has
+    // already succeeded, so it is reported and the run carries on with what it has.
+    const transmitted = await fetchAllDocPages(baseUrl, 'RequestTransmittedDocs', c, windowed(transmittedWatermark));
+    if (!transmitted.ok) {
+      console.error('[inbound-sync] RequestTransmittedDocs failed', workspaceId, transmitted.error);
     }
 
     // The pull succeeded — now charge (automated path only).
@@ -188,119 +292,176 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       }
     }
 
-    const blocks = pickAllTagBlocks(xml, 'invoice');
-    let maxMark = watermark;
     /** Documents INSERTED by this run — the only ones auto-convert is allowed to touch. */
     const freshDocIds: string[] = [];
-    let upserted = 0;
-    for (const b of blocks) {
-      const mark = pickTag(b, 'mark');
-      if (!mark) continue;
-      const issuerBlock = pickTag(b, 'issuer') ?? '';
-      const counterpartBlock = pickTag(b, 'counterpart') ?? '';
-      const headerB = pickTag(b, 'invoiceHeader') ?? b;
-      const summaryB = pickTag(b, 'invoiceSummary') ?? b;
-      const deliveryB = pickTag(headerB, 'otherDeliveryNoteHeader') ?? '';
 
-      // Per-line detail. `itemCode` and `measurementUnit` are AUTHORITATIVE — AADE states the
-      // supplier's article code and the unit of measure outright (code 5 = square metres), so
-      // nothing downstream may infer them from the description text when they are present.
-      const lines = pickAllTagBlocks(b, 'invoiceDetails').map((lb) => ({
-        line_number: num(pickTag(lb, 'lineNumber')),
-        item_code: pickTag(lb, 'itemCode'),
-        item_description: pickTag(lb, 'itemDescr') ?? pickTag(lb, 'productDescription') ?? null,
-        quantity: num(pickTag(lb, 'quantity')),
-        measurement_unit: num(pickTag(lb, 'measurementUnit')),
-        net_value: num(pickTag(lb, 'netValue')),
-        vat_category: num(pickTag(lb, 'vatCategory')),
-        vat_amount: num(pickTag(lb, 'vatAmount')),
-        comments: pickTag(lb, 'lineComments') || null,
-      }));
+    /**
+     * Parse and upsert one endpoint's documents.
+     *
+     * Both endpoints return the identical `RequestedDoc` -> `invoicesDoc` -> `invoice[]` shape, and
+     * on a `14.x` the `<issuer>` block is the FOREIGN SUPPLIER (verified across all 32 of them:
+     * name and full address present, which is better than a Greek document, where only the ΑΦΜ
+     * arrives and ΓΕΜΗ has to be asked). So the parsing carries over unchanged and the only thing
+     * that differs is provenance.
+     */
+    const ingest = async (blocks: string[], source: 'mydata' | 'mydata_self', fromMark: string) => {
+      let maxMark = fromMark;
+      let upserted = 0;
+      /** Counted, not silently dropped: on the transmitted endpoint most documents are our own
+       *  sales and skipping them is correct, but the number has to be visible. */
+      const skippedByFamily: Record<string, number> = {};
 
-      const paymentMethods = pickAllTagBlocks(b, 'paymentMethodDetails').map((pb) => ({
-        type: num(pickTag(pb, 'type')),
-        amount: num(pickTag(pb, 'amount')),
-        info: pickTag(pb, 'paymentMethodInfo') || null,
-      }));
-      const addressOf = (block: string) => {
-        const a = pickTag(block, 'address');
-        if (!a) return null;
-        return {
-          street: pickTag(a, 'street'), number: pickTag(a, 'number'),
-          postal_code: pickTag(a, 'postalCode'), city: pickTag(a, 'city'),
+      for (const b of blocks) {
+        const mark = pickTag(b, 'mark');
+        if (!mark) continue;
+        const docType = pickTag(pickTag(b, 'invoiceHeader') ?? b, 'invoiceType');
+        if (source === 'mydata_self' && !SELF_TRANSMITTED_EXPENSE_FAMILIES.has(family(docType))) {
+          // A sale we issued. Advance the watermark past it anyway — we are deliberately not
+          // taking it, and leaving the watermark behind would re-read it every night forever.
+          const key = family(docType) || 'unknown';
+          skippedByFamily[key] = (skippedByFamily[key] ?? 0) + 1;
+          if (Number(mark) > Number(maxMark)) maxMark = mark;
+          continue;
+        }
+        const issuerBlock = pickTag(b, 'issuer') ?? '';
+        const counterpartBlock = pickTag(b, 'counterpart') ?? '';
+        const headerB = pickTag(b, 'invoiceHeader') ?? b;
+        const summaryB = pickTag(b, 'invoiceSummary') ?? b;
+        const deliveryB = pickTag(headerB, 'otherDeliveryNoteHeader') ?? '';
+
+        // Per-line detail. `itemCode` and `measurementUnit` are AUTHORITATIVE — AADE states the
+        // supplier's article code and the unit of measure outright (code 5 = square metres), so
+        // nothing downstream may infer them from the description text when they are present.
+        const lines = pickAllTagBlocks(b, 'invoiceDetails').map((lb) => ({
+          line_number: num(pickTag(lb, 'lineNumber')),
+          item_code: pickTag(lb, 'itemCode'),
+          item_description: pickTag(lb, 'itemDescr') ?? pickTag(lb, 'productDescription') ?? null,
+          quantity: num(pickTag(lb, 'quantity')),
+          measurement_unit: num(pickTag(lb, 'measurementUnit')),
+          net_value: num(pickTag(lb, 'netValue')),
+          vat_category: num(pickTag(lb, 'vatCategory')),
+          vat_amount: num(pickTag(lb, 'vatAmount')),
+          comments: pickTag(lb, 'lineComments') || null,
+        }));
+
+        const paymentMethods = pickAllTagBlocks(b, 'paymentMethodDetails').map((pb) => ({
+          type: num(pickTag(pb, 'type')),
+          amount: num(pickTag(pb, 'amount')),
+          info: pickTag(pb, 'paymentMethodInfo') || null,
+        }));
+        const addressOf = (block: string) => {
+          const a = pickTag(block, 'address');
+          if (!a) return null;
+          return {
+            street: pickTag(a, 'street'), number: pickTag(a, 'number'),
+            postal_code: pickTag(a, 'postalCode'), city: pickTag(a, 'city'),
+          };
         };
-      };
-      const namedAddress = (block: string, tag: string) => {
-        const a = pickTag(block, tag);
-        if (!a) return null;
-        return {
-          street: pickTag(a, 'street'), number: pickTag(a, 'number'),
-          postal_code: pickTag(a, 'postalCode'), city: pickTag(a, 'city'),
+        const namedAddress = (block: string, tag: string) => {
+          const a = pickTag(block, tag);
+          if (!a) return null;
+          return {
+            street: pickTag(a, 'street'), number: pickTag(a, 'number'),
+            postal_code: pickTag(a, 'postalCode'), city: pickTag(a, 'city'),
+          };
         };
-      };
 
-      const issuerVat = pickTag(issuerBlock, 'vatNumber');
-      // Learned supplier default wins over the generic myAADE fallback.
-      const defaultCategoryId = (issuerVat && issuerCatMap.get(issuerVat)) || myaadeCategoryId;
-      const row = {
-        workspace_id: workspaceId,
-        mark,
-        uid: pickTag(b, 'uid'),
-        authentication_code: pickTag(b, 'authenticationCode'),
-        qr_code_url: pickTag(b, 'qrCodeUrl'),
-        download_url: pickTag(b, 'downloadingInvoiceUrl'),
-        issuer_vat: issuerVat,
-        issuer_name: pickTag(issuerBlock, 'name'),
-        issuer_country: pickTag(issuerBlock, 'country'),
-        issuer_branch: pickTag(issuerBlock, 'branch'),
-        issuer_address: addressOf(issuerBlock),
-        counterpart_vat: pickTag(counterpartBlock, 'vatNumber'),
-        counterpart_name: pickTag(counterpartBlock, 'name'),
-        counterpart_address: addressOf(counterpartBlock),
-        issue_date: pickTag(headerB, 'issueDate'),
-        // When the goods actually left, and on what truck. Distinct from issueDate and the only
-        // dispatch evidence a ΤΔΑ carries.
-        dispatch_date: pickTag(headerB, 'dispatchDate') || null,
-        vehicle_number: pickTag(headerB, 'vehicleNumber') || null,
-        // The column defaults to EUR; read the header rather than assume it, so a
-        // foreign-currency document isn't silently relabelled.
-        currency: pickTag(headerB, 'currency') || 'EUR',
-        doc_type: pickTag(headerB, 'invoiceType'),
-        // The issuer's own document number — what's printed on the paper copy.
-        series: pickTag(headerB, 'series'),
-        aa: pickTag(headerB, 'aa'),
-        is_delivery_note: pickTag(headerB, 'isDeliveryNote') === 'true',
-        move_purpose: pickTag(headerB, 'movePurpose'),
-        vat_payment_suspension: pickTag(headerB, 'vatPaymentSuspension') === 'true',
-        delivery_addresses: deliveryB
-          ? { loading: namedAddress(deliveryB, 'loadingAddress'), delivery: namedAddress(deliveryB, 'deliveryAddress') }
-          : null,
-        payment_methods: paymentMethods.length > 0 ? paymentMethods : null,
-        total_net: num(pickTag(summaryB, 'totalNetValue')),
-        total_vat: num(pickTag(summaryB, 'totalVatAmount')),
-        total_gross: num(pickTag(summaryB, 'totalGrossValue')),
-        total_withheld: num(pickTag(summaryB, 'totalWithheldAmount')),
-        total_fees: num(pickTag(summaryB, 'totalFeesAmount')),
-        total_stamp_duty: num(pickTag(summaryB, 'totalStampDutyAmount')),
-        total_other_taxes: num(pickTag(summaryB, 'totalOtherTaxesAmount')),
-        total_deductions: num(pickTag(summaryB, 'totalDeductionsAmount')),
-        lines,
-        category_id: defaultCategoryId,
-        raw: { xml: b.slice(0, 20000) },
-      };
-      // `.select()` on an ignoreDuplicates upsert returns ONLY the rows actually inserted, which
-      // is exactly the set auto-convert may touch: documents polled now, never the backlog.
-      const { data: ins, error } = await supabase
-        .from('inbound_documents')
-        .upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true })
-        .select('id');
-      if (!error) upserted++;
-      const newId = (ins as Array<{ id: string }> | null)?.[0]?.id;
-      if (newId) freshDocIds.push(newId);
-      if (Number(mark) > Number(maxMark)) maxMark = mark;
+        const issuerVat = pickTag(issuerBlock, 'vatNumber');
+        // Learned supplier default wins over the generic myAADE fallback.
+        const defaultCategoryId = (issuerVat && issuerCatMap.get(issuerVat)) || myaadeCategoryId;
+        // How this inlet names the document. `mark`/`uid`/`authentication_code`/`qr_code_url` are
+        // GENERATED columns reading out of here, so this is the single writable home — a document
+        // with no MARK is representable, which is what post-2030 ViDA documents will be.
+        const sourceRef: Record<string, string> = { mark };
+        const uid = pickTag(b, 'uid');
+        const authCode = pickTag(b, 'authenticationCode');
+        const qrUrl = pickTag(b, 'qrCodeUrl');
+        if (uid) sourceRef.uid = uid;
+        if (authCode) sourceRef.authentication_code = authCode;
+        if (qrUrl) sourceRef.qr_code_url = qrUrl;
+
+        const row = {
+          workspace_id: workspaceId,
+          source,
+          source_ref: sourceRef,
+          // For this inlet the identifier IS our myDATA registration — one value read from one
+          // variable, so the two roles cannot drift apart. NULL on `mydata`: the supplier filed
+          // that one, not us.
+          mydata_mark: source === 'mydata_self' ? mark : null,
+          download_url: pickTag(b, 'downloadingInvoiceUrl'),
+          issuer_vat: issuerVat,
+          issuer_name: pickTag(issuerBlock, 'name'),
+          issuer_country: pickTag(issuerBlock, 'country'),
+          issuer_branch: pickTag(issuerBlock, 'branch'),
+          issuer_address: addressOf(issuerBlock),
+          counterpart_vat: pickTag(counterpartBlock, 'vatNumber'),
+          counterpart_name: pickTag(counterpartBlock, 'name'),
+          counterpart_address: addressOf(counterpartBlock),
+          issue_date: pickTag(headerB, 'issueDate'),
+          // When the goods actually left, and on what truck. Distinct from issueDate and the only
+          // dispatch evidence a ΤΔΑ carries.
+          dispatch_date: pickTag(headerB, 'dispatchDate') || null,
+          vehicle_number: pickTag(headerB, 'vehicleNumber') || null,
+          // The column defaults to EUR; read the header rather than assume it, so a
+          // foreign-currency document isn't silently relabelled.
+          currency: pickTag(headerB, 'currency') || 'EUR',
+          doc_type: pickTag(headerB, 'invoiceType'),
+          // The issuer's own document number — what's printed on the paper copy.
+          series: pickTag(headerB, 'series'),
+          aa: pickTag(headerB, 'aa'),
+          is_delivery_note: pickTag(headerB, 'isDeliveryNote') === 'true',
+          move_purpose: pickTag(headerB, 'movePurpose'),
+          vat_payment_suspension: pickTag(headerB, 'vatPaymentSuspension') === 'true',
+          delivery_addresses: deliveryB
+            ? { loading: namedAddress(deliveryB, 'loadingAddress'), delivery: namedAddress(deliveryB, 'deliveryAddress') }
+            : null,
+          payment_methods: paymentMethods.length > 0 ? paymentMethods : null,
+          total_net: num(pickTag(summaryB, 'totalNetValue')),
+          total_vat: num(pickTag(summaryB, 'totalVatAmount')),
+          total_gross: num(pickTag(summaryB, 'totalGrossValue')),
+          total_withheld: num(pickTag(summaryB, 'totalWithheldAmount')),
+          total_fees: num(pickTag(summaryB, 'totalFeesAmount')),
+          total_stamp_duty: num(pickTag(summaryB, 'totalStampDutyAmount')),
+          total_other_taxes: num(pickTag(summaryB, 'totalOtherTaxesAmount')),
+          total_deductions: num(pickTag(summaryB, 'totalDeductionsAmount')),
+          lines,
+          // Whether the document actually NAMES anything, which is a different fact from where the
+          // money record came from. A 14.x carries exactly one line with a net value and no
+          // itemDescr, itemCode, quantity or unit (verified on all 32 of them) — and so does most
+          // 2.x Greek service billing. `none` is what gates the line editor, and what keeps AI
+          // product extraction off documents where it could only invent something.
+          lines_source: lines.some((l) => String(l.item_description ?? '').trim()) ? 'mydata' : 'none',
+          category_id: defaultCategoryId,
+          raw: { xml: b.slice(0, 20000) },
+        };
+        // `.select()` on an ignoreDuplicates upsert returns ONLY the rows actually inserted, which
+        // is exactly the set auto-convert may touch: documents polled now, never the backlog.
+        const { data: ins, error } = await supabase
+          .from('inbound_documents')
+          .upsert(row, { onConflict: 'workspace_id,source,mark', ignoreDuplicates: true })
+          .select('id');
+        if (error) console.error('[inbound-sync] upsert failed', source, mark, error.message);
+        else upserted++;
+        const newId = (ins as Array<{ id: string }> | null)?.[0]?.id;
+        if (newId) freshDocIds.push(newId);
+        if (Number(mark) > Number(maxMark)) maxMark = mark;
+      }
+
+      return { found: blocks.length, upserted, maxMark, skippedByFamily };
+    };
+
+    const receivedResult = await ingest(received.blocks, 'mydata', watermark);
+    const transmittedResult = transmitted.ok
+      ? await ingest(transmitted.blocks, 'mydata_self', transmittedWatermark)
+      : null;
+
+    const marks: Record<string, string> = {};
+    if (receivedResult.maxMark !== watermark) marks.inbound_last_mark = receivedResult.maxMark;
+    if (transmittedResult && transmittedResult.maxMark !== transmittedWatermark) {
+      marks.inbound_last_transmitted_mark = transmittedResult.maxMark;
     }
-    if (maxMark !== watermark) {
-      await supabase.from('finance_settings').update({ inbound_last_mark: maxMark }).eq('workspace_id', workspaceId);
+    if (Object.keys(marks).length > 0) {
+      await supabase.from('finance_settings').update(marks).eq('workspace_id', workspaceId);
     }
 
     // ── Auto-convert to expenses (opt-in per workspace) ──
@@ -348,6 +509,14 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       const autosyncMode = (wsFin as any)?.warehouse_autosync_mode ?? 'suggest';
       const r2 = (n: number) => Math.round(n * 100) / 100;
       // `off` means don't read supplier lines at all: no AI call, no credits, no queue.
+      //
+      // `lines_source='none'` documents are excluded here BY CONSTRUCTION, not by a second test:
+      // `inbound_docs_needing_extraction` requires at least one line with a non-empty
+      // `item_description`, and that is precisely the condition `lines_source` records. Every
+      // 14.x carries one value-only line, so the model would have nothing to read and would
+      // either return nothing or invent something — and those two are indistinguishable from
+      // "this supplier sells nothing we stock".
+      //
       // The batch comes from documents that still NEED extraction. The "already extracted?"
       // test MUST be in the query, not the loop: `.order(created_at desc).limit(30)` with the
       // skip applied afterwards fixes the window BEFORE the skip, so once the 30 newest are
@@ -495,9 +664,30 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
 
     summary.push({
-      workspaceId, found: blocks.length, upserted, auto_billed: autoBilled,
+      workspaceId,
+      // `found` and `upserted` stay top-level and mean what they always meant: every document
+      // this run saw, from both endpoints.
+      found: receivedResult.found + (transmittedResult?.found ?? 0),
+      upserted: receivedResult.upserted + (transmittedResult?.upserted ?? 0),
+      received: {
+        found: receivedResult.found, upserted: receivedResult.upserted,
+        pages: received.pages, new_watermark: receivedResult.maxMark,
+        // Never silent. A capped list looks exactly like a complete one.
+        ...(received.capped ? { truncated_at_pages: MAX_PAGES } : {}),
+      },
+      transmitted: transmitted.ok
+        ? {
+            found: transmittedResult!.found, upserted: transmittedResult!.upserted,
+            pages: transmitted.pages, new_watermark: transmittedResult!.maxMark,
+            // Our own sales, deliberately not ingested — reported so "0 upserted" is never
+            // mistaken for "the endpoint returned nothing".
+            skipped_own_sales: transmittedResult!.skippedByFamily,
+            ...(transmitted.capped ? { truncated_at_pages: MAX_PAGES } : {}),
+          }
+        : { error: transmitted.error ?? 'RequestTransmittedDocs failed' },
+      auto_billed: autoBilled,
       extraction_batch: extractionBatch, extracted, auto_stocked: autoStocked,
-      new_watermark: maxMark, issuers,
+      issuers,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
   }

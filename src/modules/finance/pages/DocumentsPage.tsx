@@ -40,6 +40,10 @@ import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog'
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
+import {
+  INBOUND_SOURCE_CHIP, inboundDocumentNumber, isReverseCharged, needsLineDetail,
+} from '@/modules/finance/utils/inboundProvenance';
+import type { InboundSource } from '@/modules/finance/services/inboundService';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -1187,8 +1191,10 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     return (
       <div className="space-y-2 p-8 text-center text-sm text-muted-foreground">
         <p>
-          No received documents yet. Documents other businesses issue to you on myDATA appear here once the
-          inbound poller has your AADE received-docs credentials — then you can turn each into a supplier bill or warehouse intake.
+          No documents yet. Two kinds land here once the inbound poller has your AADE credentials:
+          what other businesses issue to you on myDATA, and what <strong>you</strong> entered in myAADE
+          yourself — foreign supplier invoices, rent, payroll. Then you can turn each into a supplier
+          bill or a warehouse intake.
         </p>
         {/* This tab lists inbound_documents ONLY, but its "Add expense" button creates a
             supplier_bills row — so an expense recorded here does not appear here. A workspace with
@@ -1218,6 +1224,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               showed its whole amount under "Payable" forever. What is still owed lives on the
               bill (its derived amount_due), reachable from the expense this row opens. */}
           <th className="px-4 py-2 text-right">Gross</th>
+          <th className="px-4 py-2 text-center">Detail</th>
           <th className="px-4 py-2 text-center">Handled</th>
           <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
         </tr>
@@ -1226,12 +1233,29 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
         {rows.map((d) => {
           const cat = d.id in localCat ? localCat[d.id] : (d.category_id ?? null);
           const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
+          // Reverse charge: the VAT on a 13.x/14.x is self-accounted and reclaimed in the same
+          // return, so it is not owed to this supplier and gross is not what we pay. SQL decides
+          // the payable (`_inbound_doc_to_supplier_bill_core`); this only stops the table
+          // asserting otherwise.
+          const reverseCharged = isReverseCharged(d.doc_type);
+          const docNumber = inboundDocumentNumber(d);
           return (
           <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
             <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
             <td className="px-4 py-2">
-              <div className="text-xs font-medium">{d.series ?? '—'}{d.aa ? ` ${d.aa}` : ''}</div>
-              <div className="text-[10px] text-muted-foreground font-mono" title={`MARK ${d.mark}`}>{d.mark}</div>
+              {/* A self-transmitted document has no supplier invoice number: `series` is OUR ΑΦΜ
+                  and `aa` a counter we assigned. Printing them gives the operator a number to
+                  chase that matches nothing on the supplier's statement. */}
+              <div className="text-xs font-medium">{docNumber ?? '—'}</div>
+              {d.mark
+                ? <div className="text-[10px] text-muted-foreground font-mono" title={`MARK ${d.mark}`}>{d.mark}</div>
+                : null}
+              {INBOUND_SOURCE_CHIP[(d.source ?? 'mydata') as InboundSource] && (
+                <div className="mt-0.5 text-[10px] text-violet-800 dark:text-violet-300"
+                     title="The totals and the supplier come from AADE and are not editable; the lines are ours.">
+                  {INBOUND_SOURCE_CHIP[(d.source ?? 'mydata') as InboundSource]}
+                </div>
+              )}
             </td>
             <td className="px-4 py-2">
               <IssuerCell doc={d} crmCompanyId={d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined} />
@@ -1242,9 +1266,28 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                 ? <span className="text-xs text-muted-foreground">{categoryName(cat)}</span>
                 : <CategoryCell value={cat} options={categories} onChange={(v) => setCategory(d.id, v)} />}
             </td>
-            <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_net ?? 0, d.currency)}</td>
-            <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_vat ?? 0, d.currency)}</td>
-            <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
+            {/* On a reverse-charged document the NET is what is owed, so it carries the weight
+                the Gross column normally has and Gross is the one that steps back. */}
+            <td className={`px-4 py-2 text-right ${reverseCharged ? 'font-medium' : 'text-muted-foreground'}`}>
+              {formatMoney(d.total_net ?? 0, d.currency)}
+            </td>
+            <td className="px-4 py-2 text-right text-muted-foreground">
+              {formatMoney(d.total_vat ?? 0, d.currency)}
+              {reverseCharged && (d.total_vat ?? 0) !== 0 && (
+                <div className="text-[10px] text-muted-foreground/70"
+                     title="Intra-EU acquisition: zero-rated at source. We declare this VAT and reclaim it in the same return, so it nets to zero and is never paid to the supplier.">
+                  reverse charge
+                </div>
+              )}
+            </td>
+            <td className={`px-4 py-2 text-right ${reverseCharged ? 'text-muted-foreground' : 'font-medium'}`}>
+              {formatMoney(d.total_gross ?? 0, d.currency)}
+            </td>
+            <td className="px-4 py-2 text-center">
+              {needsLineDetail(d)
+                ? <span className="text-[10px] text-amber-800 dark:text-amber-300" title="Value-only lines — nothing here can be received to the warehouse or turned into a product until someone says what was on it.">Needs detail</span>
+                : <span className="text-[10px] text-muted-foreground/50">—</span>}
+            </td>
             <td className="px-4 py-2 text-center">
               {outcomes.length > 0
                 ? <span className="text-[10px]">
