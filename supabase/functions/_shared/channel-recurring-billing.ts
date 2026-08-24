@@ -200,12 +200,20 @@ async function releaseHold(supabase: SupabaseLike, workspaceId: string): Promise
  */
 export async function retryFailedCharges(
   supabase: SupabaseLike,
+  /**
+   * Scope to ONE workspace. The nightly cron passes nothing and sweeps everybody; a tenant
+   * clicking "retry now" on their own hold passes theirs, and the caller is responsible for
+   * proving they run it. Without this parameter the only way to offer that button would be to
+   * let a tenant trigger a debit against every other workspace on the platform.
+   */
+  workspaceId?: string,
 ): Promise<{ settled: number; stillFailing: number; restored: number }> {
-  const { data: failed } = await supabase
+  let query = supabase
     .from('channel_recurring_charges')
     .select('id, workspace_id, charge_type, period_month, quantity, unit_cost_usd, credits_charged, attempts, detail')
-    .eq('status', 'failed')
-    .order('period_month');
+    .eq('status', 'failed');
+  if (workspaceId) query = query.eq('workspace_id', workspaceId);
+  const { data: failed } = await query.order('period_month');
 
   let settled = 0, stillFailing = 0, restored = 0;
   const settledWorkspaces = new Set<string>();

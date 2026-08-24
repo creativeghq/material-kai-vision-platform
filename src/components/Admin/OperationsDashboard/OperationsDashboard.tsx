@@ -76,6 +76,7 @@ import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboar
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
 import { ChannelsCostPanel } from './ChannelsCostPanel';
+import { ChannelsBillingDetail } from './ChannelsBillingDetail';
 
 import type {
   UsageAnalytics,
@@ -1085,6 +1086,10 @@ const OperationsDashboardInner: React.FC = () => {
             {/* The per-workspace view first: the table below prices services, this says who is
                 actually costing and earning what. */}
             <ChannelsCostPanel />
+
+            {/* Then the ledgers behind that summary — what Meta charged, what we billed, and who
+                is on hold. All three were written on a schedule and rendered nowhere. */}
+            <ChannelsBillingDetail />
 
             <SectionHeader
               title="3rd Party Services"

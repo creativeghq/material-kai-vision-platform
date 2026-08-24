@@ -305,7 +305,10 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'purchase-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
-      'bill-channels-monthly', 'retry-failed-charges', 'set-channel-read-receipts',
+      // 'retry-failed-charges' is deliberately absent for the same reason as release: a
+      // workspace put on hold by a failed debit had no way to get itself back other than
+      // waiting for the nightly sweep. It is scoped to the caller's own workspace below.
+      'bill-channels-monthly', 'set-channel-read-receipts',
     ]);
     if (OPERATOR_ACTIONS.has(action) && !isAdminAccess(auth)) {
       const op = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -838,7 +841,23 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Re-attempt unpaid months and lift the hold once a workspace is fully settled. Nightly,
       // not monthly: a customer who tops up on the 3rd should not sit on hold until the 1st.
       case 'retry-failed-charges': {
-        const result = await retryFailedCharges(supabaseClient);
+        // The operator sweeps everybody (this is the nightly cron's call). Anyone else is
+        // clamped to the one workspace they run — the scope is derived from the JWT and the
+        // membership row, never from the body, so a tenant cannot spend another tenant's
+        // credits by naming their workspace here.
+        let scope: string | undefined;
+        if (!isAdminAccess(auth)) {
+          const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+          if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+          const { data: role } = await supabaseClient
+            .from('workspace_members').select('role')
+            .eq('workspace_id', wsId).eq('user_id', auth.userId).eq('status', 'active').maybeSingle();
+          if (!['owner', 'admin'].includes(String(role?.role ?? ''))) {
+            throw new HttpError(403, 'Only a workspace owner or admin can retry a failed charge');
+          }
+          scope = wsId;
+        }
+        const result = await retryFailedCharges(supabaseClient, scope);
         return jsonResponse({ success: true, ...result });
       }
 

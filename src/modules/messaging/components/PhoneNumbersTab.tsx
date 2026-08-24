@@ -12,7 +12,7 @@
  *    owns its lifecycle. Showing it beside a bought one with a blank price implies "free".
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Phone, Search, Loader2, ExternalLink, ShieldCheck, Trash2, AlertTriangle } from 'lucide-react';
+import { Phone, Search, Loader2, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Receipt, PauseCircle, RotateCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -26,7 +26,9 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
+import { supabase } from '@/integrations/supabase/client';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import { messagingService } from '../services/messagingService';
 import type { AvailablePhoneNumber, OwnedPhoneNumber } from '../services/types';
@@ -45,6 +47,31 @@ const NUMBER_TYPES = [
 const money = (cents: number | null) =>
   cents == null ? '—' : `${formatMoney(cents / 100, 'USD')}/mo`;
 
+/**
+ * Our OWN record of a number, which is not the same thing as Zernio's.
+ *
+ * A hold is deliberately invisible at the carrier — we stop the sending and keep paying for the
+ * line, so the number survives and comes back on payment. That means Zernio keeps reporting the
+ * number as `active`, and any hold check against the listed status silently matches nothing.
+ */
+interface LocalNumberRow {
+  zernio_number_id: string | null;
+  phone_number: string;
+  status: string | null;
+  held_at: string | null;
+  held_reason: string | null;
+}
+
+interface ChargeRow {
+  id: string;
+  period_month: string;
+  quantity: number;
+  credits_charged: number;
+  status: string;
+  attempts: number;
+  charged_at: string | null;
+}
+
 const statusVariant = (s: string | null) =>
   s === 'active' ? 'success'
     : s === 'connected' ? 'info'
@@ -53,7 +80,14 @@ const statusVariant = (s: string | null) =>
 
 export const PhoneNumbersTab: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
-  const { isOperator } = usePermissions();
+  // Not `isOperator`. Giving up a number and settling a failed month are the tenant's own
+  // business now — the edge function gates both on workspace owner/admin, and a UI that still
+  // asked for operator would hide the button from everyone it was opened to.
+  // Two different gates, and they are not the same person. BUYING spends the platform's money
+  // on the platform's Zernio account, so it stays with the operator; GIVING ONE UP and settling
+  // a failed month are the tenant's own business (decided 2026-08-24) and belong to whoever
+  // runs the workspace. The edge function enforces exactly this split.
+  const { isOperator, isWorkspaceManager } = usePermissions();
   const { toast } = useToast();
 
   const [countries, setCountries] = useState<VocabularyTerm[]>([]);
@@ -68,6 +102,9 @@ export const PhoneNumbersTab: React.FC = () => {
   const [buying, setBuying] = useState(false);
   const [releasing, setReleasing] = useState<string | null>(null);
   const [pending, setPending] = useState<{ kind: 'checkout' | 'kyc'; url: string } | null>(null);
+  const [charges, setCharges] = useState<ChargeRow[]>([]);
+  const [localRows, setLocalRows] = useState<LocalNumberRow[]>([]);
+  const [retrying, setRetrying] = useState(false);
 
   /**
    * One intent id per (workspace, country, type, area code). Regenerating it on every click would
@@ -83,7 +120,25 @@ export const PhoneNumbersTab: React.FC = () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
     setLoading(true);
     try {
-      setOwned(await messagingService.listPhoneNumbers(activeWorkspaceId));
+      // Charges are read directly: `channel_recurring_charges` carries a workspace-member SELECT
+      // policy and no write policy, so RLS is the boundary and no edge round-trip earns its keep.
+      const [numbers, charged, local] = await Promise.all([
+        messagingService.listPhoneNumbers(activeWorkspaceId),
+        supabase
+          .from('channel_recurring_charges')
+          .select('id, period_month, quantity, credits_charged, status, attempts, charged_at')
+          .eq('workspace_id', activeWorkspaceId)
+          .order('period_month', { ascending: false })
+          .limit(24),
+        supabase
+          .from('workspace_phone_numbers')
+          .select('zernio_number_id, phone_number, status, held_at, held_reason')
+          .eq('workspace_id', activeWorkspaceId)
+          .is('released_at', null),
+      ]);
+      setOwned(numbers);
+      setCharges((charged.data ?? []) as ChargeRow[]);
+      setLocalRows((local.data ?? []) as LocalNumberRow[]);
     } catch (err) {
       toast({
         title: 'Could not read your numbers',
@@ -168,6 +223,36 @@ export const PhoneNumbersTab: React.FC = () => {
     }
   };
 
+  const retry = async () => {
+    if (!activeWorkspaceId) return;
+    setRetrying(true);
+    try {
+      const r = await messagingService.retryFailedCharges(activeWorkspaceId);
+      // Three outcomes, and they need different words. "Settled but still on hold" is the one
+      // that would otherwise look like a broken button: an older month is still owed.
+      if (r.restored > 0) {
+        toast({ title: 'Back on', description: `Settled and your number${r.restored === 1 ? '' : 's'} came back.` });
+      } else if (r.settled > 0) {
+        toast({ title: `${r.settled} month(s) settled`, description: 'An earlier month is still outstanding, so the hold stays until it clears.' });
+      } else {
+        toast({
+          title: 'Still unpaid',
+          description: 'The charge could not be taken — top up your credits and try again.',
+          variant: 'destructive',
+        });
+      }
+      await load();
+    } catch (err) {
+      toast({
+        title: 'Retry failed',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   const release = async (n: OwnedPhoneNumber) => {
     if (!activeWorkspaceId) return;
     // Irreversible, it cancels a subscription line, and it disconnects the WhatsApp account on the
@@ -193,8 +278,50 @@ export const PhoneNumbersTab: React.FC = () => {
     }
   };
 
+  // Matched on either key: `zernio_number_id` is the reliable one, but a row written before the
+  // id was known still has the E.164 number, and a hold that fails to match renders as no hold.
+  const holdOf = (n: OwnedPhoneNumber): LocalNumberRow | undefined =>
+    localRows.find((r) => r.status === 'on_hold'
+      && (r.zernio_number_id === n.id || r.phone_number === n.phoneNumber));
+  const held = owned.filter((n) => holdOf(n));
+  const failedCharges = charges.filter((c) => c.status === 'failed');
+
   return (
     <div className="space-y-6">
+      {/* On hold, first and loud. This is a state the customer is FEELING — their WhatsApp has
+          stopped — and before this screen its only trace was a console warning on the server. */}
+      {held.length > 0 && (
+        <Card className="border-[hsl(var(--error))]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-[hsl(var(--error))]">
+              <PauseCircle className="h-4 w-4" />
+              {held.length === 1 ? 'Your number is on hold' : `${held.length} of your numbers are on hold`}
+            </CardTitle>
+            <CardDescription>
+              A monthly charge could not be taken, so sending is paused. Nothing has been given
+              up &mdash; the number is still yours and comes straight back once the balance
+              clears. Top up your credits, then retry.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-3">
+            {isWorkspaceManager ? (
+              <Button onClick={() => void retry()} disabled={retrying}>
+                {retrying
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Retrying</>
+                  : <><RotateCw className="mr-2 h-4 w-4" /> Retry the charge</>}
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                An owner or admin of this workspace can settle it.
+              </p>
+            )}
+            <span className="text-xs text-muted-foreground">
+              Retried automatically each night, so this only saves you the wait.
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -245,15 +372,20 @@ export const PhoneNumbersTab: React.FC = () => {
                       </TableCell>
                       <TableCell className="text-sm">{n.country ?? '—'}</TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(n.status)} className="capitalize">
-                          {(n.status ?? 'unknown').replace(/_/g, ' ')}
+                        {/* Our hold wins over Zernio's status: the carrier still calls it
+                            active, because that is exactly what we are paying it to do. */}
+                        <Badge
+                          variant={holdOf(n) ? 'error' : statusVariant(n.status)}
+                          className="capitalize"
+                        >
+                          {holdOf(n) ? 'on hold' : (n.status ?? 'unknown').replace(/_/g, ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm">
                         {n.broughtYourOwn ? 'Not billed here' : money(n.monthlyCents)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {!n.broughtYourOwn && isOperator && (
+                        {!n.broughtYourOwn && isWorkspaceManager && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -274,6 +406,60 @@ export const PhoneNumbersTab: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* What they have actually been charged. A recurring charge a customer cannot see is a
+          support ticket waiting to be raised. Only rendered once there is history — an empty
+          billing table on a workspace that has never bought a number says nothing. */}
+      {charges.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" /> Monthly charges
+            </CardTitle>
+            <CardDescription>
+              Your number rental, billed in credits at the start of each month.
+              {failedCharges.length > 0 && ' Anything marked failed is still owed.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead className="text-right">Numbers</TableHead>
+                    <TableHead className="text-right">Credits</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Charged</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {charges.map((c) => (
+                    <TableRow key={c.id}>
+                      {/* `period_month` is a date of record; parsed bare it is UTC midnight and
+                          renders as the previous month west of Greenwich. */}
+                      <TableCell className="text-sm">{formatDate(`${c.period_month}T00:00:00`)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.quantity}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(c.credits_charged)}</TableCell>
+                      <TableCell>
+                        <Badge variant={c.status === 'charged' ? 'success' : c.status === 'failed' ? 'error' : 'neutral'}>
+                          {c.status}
+                        </Badge>
+                        {c.status === 'failed' && c.attempts > 1 && (
+                          <span className="ml-2 text-xs text-muted-foreground">{c.attempts} tries</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {c.charged_at ? formatDate(c.charged_at) : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

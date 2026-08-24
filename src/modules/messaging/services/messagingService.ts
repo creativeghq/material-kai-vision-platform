@@ -513,6 +513,22 @@ export class MessagingService {
   }
 
   /**
+   * Settle the failed months on THIS workspace and, if none is left outstanding, lift the hold.
+   *
+   * The tenant's own way off hold. Topping up credits does nothing on its own — the charge row
+   * stays `failed` until something retries it, and before this the only retry was a nightly
+   * cron, so paying at 09:00 bought you a day of silence.
+   */
+  async retryFailedCharges(workspaceId: string): Promise<{ settled: number; stillFailing: number; restored: number }> {
+    const { data, error } = await supabase.functions.invoke('messaging-api', {
+      body: { action: 'retry-failed-charges', workspaceId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Retry failed'));
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  /**
    * Turn the customer-visible read tick on or off for ONE number.
    *
    * Per channel, not per workspace: one business can run a sales line that wants blue ticks and a
