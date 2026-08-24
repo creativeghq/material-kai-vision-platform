@@ -29,7 +29,7 @@ import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import {
-  ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment, fetchWhatsAppProfile,
+  ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment,
   fetchZernioMediaUrl,
 } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
@@ -353,81 +353,52 @@ async function fetchAndStoreInboundAttachments(
   return out;
 }
 
+// `refreshWhatsAppProfile` lived here. It tried three endpoints for a profile photo that
+// arrives in every webhook as `conversation.participantPicture`, and settled for a Zernio CRM
+// row whose `name` was the phone number. Deleted rather than left unused: a second profile
+// path is how the guessing comes back. See storeParticipantPicture below.
+
 /**
- * Fetch the counterparty's WhatsApp profile onto the thread, once.
+ * Store the counterparty's WhatsApp/social profile picture on the thread.
  *
- * The operator can see a logo, a trading name, "Metal fabricator", a Kyiv address, an email and a
- * website on their own phone. None of it was anywhere in the platform, because nothing had ever
- * asked Zernio for it — not because WhatsApp withholds it.
- *
- * The avatar is DOWNLOADED, not linked: a provider's image URL expires, and a contact card whose
- * photo turns into a broken square in a month is worse than one that never had a photo. Same rule
- * as attachments (storage convention #7).
- *
- * Best-effort throughout. A profile is enrichment, and no part of it is worth failing a customer's
- * message over.
+ * The URL is the platform's own CDN link from `conversation.participantPicture`. Guarded (invariant
+ * 7) because it is a value from an external payload; downloaded rather than linked because those
+ * links expire.
  */
-async function refreshWhatsAppProfile(
+async function storeParticipantPicture(
   supabase: any,
-  params: { threadId: string; phone: string; accountId?: string; conversationId?: string },
+  threadId: string,
+  pictureUrl: string,
+  name: string,
 ): Promise<void> {
   try {
-    const profile = await fetchWhatsAppProfile({
-      phone: params.phone,
-      accountId: params.accountId,
-      conversationId: params.conversationId,
-    });
-    if (!profile) {
-      // Recorded, so "we looked and WhatsApp had nothing" is distinguishable from "we never
-      // looked" — the distinction that made this invisible for as long as it was.
-      await supabase.rpc('inbox_thread_merge_metadata', {
-        p_thread_id: params.threadId,
-        p_patch: { wa_profile_checked_at: new Date().toISOString(), wa_profile_found: false },
-      });
-      return;
-    }
-
-    // SSRF (invariant 7): `avatarUrl` arrives in a WhatsApp/Zernio API response, so this runtime
-    // did not choose it. A bare fetch() follows redirects into link-local space — 169.254.169.254
-    // included — and arrayBuffer() reads an unbounded body into a 256 MB isolate. The guarded
-    // helper resolves DNS and rejects private ranges, pins `redirect: 'error'`, caps the size and
-    // requires an image content-type. `OrNull` keeps the existing best-effort behaviour: a blocked
-    // or broken avatar means no avatar, never a failed profile sync.
+    const img = await fetchImageGuardedOrNull(pictureUrl);
     let avatarPath: string | null = null;
-    if (profile.avatarUrl) {
-      const img = await fetchImageGuardedOrNull(profile.avatarUrl);
-      if (img) {
-        const path = `inbox/${params.threadId}/profile/${crypto.randomUUID()}${extensionFor(img.mimeType) || '.jpg'}`;
-        const { error } = await supabase.storage
-          .from(INBOX_ATTACHMENT_BUCKET)
-          .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
-        if (error) console.warn('[zernio-webhook] profile avatar upload failed:', error.message);
-        else avatarPath = path;
-      }
+    if (img) {
+      const path = `inbox/${threadId}/profile/${crypto.randomUUID()}${extensionFor(img.mimeType) || '.jpg'}`;
+      const { error } = await supabase.storage
+        .from(INBOX_ATTACHMENT_BUCKET)
+        .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
+      if (error) console.warn('[zernio-webhook] participant picture upload failed:', error.message);
+      else avatarPath = path;
     }
-
     await supabase.rpc('inbox_thread_merge_metadata', {
-      p_thread_id: params.threadId,
+      p_thread_id: threadId,
       p_patch: {
-        wa_profile_checked_at: new Date().toISOString(),
-        wa_profile_found: true,
         wa_profile: {
-          name: profile.name ?? null,
-          about: profile.about ?? null,
-          is_business: profile.isBusiness ?? null,
-          description: profile.description ?? null,
-          category: profile.category ?? null,
-          address: profile.address ?? null,
-          email: profile.email ?? null,
-          websites: profile.websites ?? null,
-          hours: profile.hours ?? null,
+          name: name || null,
+          // The source URL is kept so the next message can tell "same picture" from "they changed
+          // it" without downloading anything.
+          avatar_source: pictureUrl,
           avatar_bucket: avatarPath ? INBOX_ATTACHMENT_BUCKET : null,
           avatar_path: avatarPath,
         },
+        wa_profile_checked_at: new Date().toISOString(),
+        wa_profile_found: true,
       },
     });
   } catch (err) {
-    console.warn('[zernio-webhook] profile refresh failed:', err instanceof Error ? err.message : String(err));
+    console.warn('[zernio-webhook] participant picture failed:', err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -541,6 +512,21 @@ export function parseSentAt(raw: unknown): string | null {
 async function handleInboundMessage(supabase: any, payload: any): Promise<InboundOutcome> {
   const msg = payload.message || {};
 
+  // The CONVERSATION object, which we never once read.
+  //
+  // Every inbox webhook carries `conversation` beside `message`, and per Zernio's OpenAPI spec it
+  // holds `participantId`, `participantName`, `participantPicture` and `contactId`. That is the
+  // counterparty's identity and their profile photo, in every single payload, all along — while
+  // this handler was inferring the first from `msg.sender` (which is the BUSINESS on an outgoing
+  // message) and chasing the second through three lookup endpoints that do not return it.
+  //
+  // `participantId` is the counterparty on BOTH directions, which is exactly what an echo needs:
+  // there is no `recipient` field on the message object at all.
+  const conv = payload.conversation || {};
+  const convParticipantId = typeof conv.participantId === 'string' ? conv.participantId : '';
+  const convParticipantName = typeof conv.participantName === 'string' ? conv.participantName : '';
+  const convParticipantPicture = typeof conv.participantPicture === 'string' ? conv.participantPicture : '';
+
   // A message the OPERATOR sent, echoed back to us. It is filed, not dropped.
   //
   // This used to `return` here, and on a coexistence number that means the Inbox shows half a
@@ -585,15 +571,17 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // On an inbound message that is the sender. On an echo of our own it is the RECIPIENT — the
   // sender there is our own WABA number, and resolving on it would open a thread with ourselves
   // and mint a CRM contact for the company's own line.
-  let counterparty = isOutgoingEcho
-    ? (contactPhoneOf(msg.recipient) ?? contactPhoneOf(msg.to) ?? contactPhoneOf(msg.participant)
-       ?? contactPhoneOf({ id: msg.conversationParticipantId }))
-    : contactPhoneOf(msg.sender);
+  // `conversation.participantId` FIRST, on both directions.
+  //
+  // Per the spec it is the counterparty's platform identifier — for WhatsApp, the phone number
+  // without a leading `+`. It is correct for an echo, where `msg.sender` is our own business
+  // number, and it is correct for an inbound message too, so there is one rule rather than a
+  // direction-dependent guess. `msg.recipient` / `msg.to`, which the previous version reached
+  // for, are not fields that exist on this payload at all.
+  let counterparty = contactPhoneOf({ id: convParticipantId })
+    ?? (isOutgoingEcho ? undefined : contactPhoneOf(msg.sender));
 
-  // An echo often names no recipient at all — a `message.sent` payload is about the message, not
-  // about who it went to. The conversation id is always there, and the thread it belongs to
-  // already knows the number. Without this the operator's own replies are dropped for "no
-  // resolvable recipient", which is the same silence in a different costume.
+  // Last resort: the thread this conversation already belongs to knows the number.
   if (!counterparty && isOutgoingEcho && msg.conversationId) {
     const { data: byConv } = await supabase
       .from('inbox_threads').select('metadata')
@@ -694,7 +682,16 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   }
 
   const owner = (await resolveCampaignOwner(supabase, phone)) || (await resolveWorkspaceOwner(supabase, workspaceId));
-  const contactName = msg.sender?.name ?? null;
+  // The name of the PERSON WE ARE TALKING TO, which is not the sender on our own message.
+  //
+  // `msg.sender.name` on a `message.sent` echo is the BUSINESS — so filing an echo renamed the
+  // thread to the operator: a conversation with Drosopoulos was relabelled "Basilis Kanonidis",
+  // the name of the person answering it. `conversation.participantName` is the counterparty on
+  // both directions, which is the whole reason to prefer it. The sender fallback is kept for an
+  // inbound message on a payload that carries no conversation block, and is refused outright on
+  // an echo — there is no circumstance where our own name is the thread's name.
+  const contactName = convParticipantName
+    || (isOutgoingEcho ? null : (msg.sender?.name ?? null));
 
   const meta = {
     zernio_account_id: accountId,
@@ -754,18 +751,27 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // file is older than a week — a business changes its address or its hours, and a card that is
   // right once and then frozen is a card nobody trusts. Never on an import: back-filling 8
   // conversations would fire 8 profile lookups for chats already on the operator's phone.
-  if (!historical) {
+  // The counterparty's photo and display name come from the WEBHOOK, not from a lookup.
+  //
+  // `conversation.participantPicture` is in every payload. The previous version tried three
+  // endpoints for it — `/whatsapp/number-info`, `/inbox/conversations/{id}`, `/contacts` — none of
+  // which returns it, and settled for `/contacts`' CRM row whose `name` was the phone number. All
+  // of that was solving a problem that did not exist.
+  //
+  // Still downloaded rather than linked: a provider image URL expires, and a card whose photo
+  // becomes a broken square is worse than one that never had a photo.
+  if (!historical && (convParticipantPicture || convParticipantName)) {
     const threadMeta = (await supabase.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle())
       .data?.metadata as Record<string, unknown> | undefined;
-    const checkedAt = typeof threadMeta?.wa_profile_checked_at === 'string'
-      ? Date.parse(threadMeta.wa_profile_checked_at) : NaN;
-    const stale = !Number.isFinite(checkedAt) || (Date.now() - checkedAt) > 7 * 24 * 3600 * 1000;
-    if (stale) {
-      await refreshWhatsAppProfile(supabase, {
-        threadId,
-        phone,
-        accountId,
-        conversationId: String(msg.conversationId ?? ''),
+    const known = (threadMeta?.wa_profile ?? {}) as Record<string, unknown>;
+    // Re-fetch only when the picture URL actually changed — the image is immutable for a given
+    // URL, so a per-message download would be one wasted round trip per message.
+    if (convParticipantPicture && known.avatar_source !== convParticipantPicture) {
+      await storeParticipantPicture(supabase, threadId, convParticipantPicture, convParticipantName);
+    } else if (convParticipantName && known.name !== convParticipantName) {
+      await supabase.rpc('inbox_thread_merge_metadata', {
+        p_thread_id: threadId,
+        p_patch: { wa_profile: { ...known, name: convParticipantName } },
       });
     }
   }
@@ -1422,7 +1428,14 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
       // first connected number reported FAILED and not one carried a reason, which is why "we
       // are not sending to WhatsApp" could not be told apart from "Meta is refusing them".
       p_error_code: payload.error?.code != null ? String(payload.error.code) : null,
-      p_error_message: payload.error?.message ?? null,
+      // `explanation` FIRST — per the spec it is the plain-language translation of the code
+      // ("the recipient has likely opted out of marketing messages while utility templates are
+      // unaffected"), and it is the only one of these an operator can act on. `message` is Meta's
+      // wording and `title` its label; explanation is null for unmapped codes, hence the chain.
+      p_error_message: payload.error?.explanation
+        ?? payload.error?.message
+        ?? payload.error?.title
+        ?? null,
     });
     receiptErr = r.error;
     receiptRows = r.data;

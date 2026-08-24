@@ -198,10 +198,27 @@ describe('a coexistence number shows the WHOLE conversation', () => {
     ).toBe(false);
   });
 
-  it('identifies the conversation by the RECIPIENT on an echo', () => {
-    // The sender on our own message is our own WABA number. Resolving on it would open a thread
-    // with ourselves and mint a CRM contact for the company's own line.
-    expect(hook).toMatch(/isOutgoingEcho\s*\?\s*\(contactPhoneOf\(msg\.recipient\)/);
+  it('identifies the counterparty from conversation.participantId', () => {
+    // Per Zernio's OpenAPI spec there is NO `recipient` field on the message object — the earlier
+    // version reached for `msg.recipient` / `msg.to`, neither of which exists. The counterparty is
+    // `conversation.participantId`, and it is correct on BOTH directions, so there is one rule
+    // rather than a direction-dependent guess. The sender on our own message is our own WABA
+    // number; resolving on it opens a thread with ourselves.
+    expect(hook).toMatch(/contactPhoneOf\(\{ id: convParticipantId \}\)/);
+    expect(
+      /contactPhoneOf\(msg\.recipient\)/.test(stripComments(hook)),
+      'reaching for msg.recipient again — that field does not exist on the payload',
+    ).toBe(false);
+  });
+
+  it('never renames the thread to the OPERATOR', () => {
+    // `msg.sender.name` on a message.sent echo is the BUSINESS, and the resolver takes the name it
+    // is handed — so filing an echo relabelled a conversation with Drosopoulos as "Basilis
+    // Kanonidis", the person answering it. `conversation.participantName` is the counterparty on
+    // both directions; the sender fallback is refused outright on an echo, because there is no
+    // circumstance in which our own name is the thread's name.
+    expect(hook).toMatch(/const contactName = convParticipantName/);
+    expect(hook).toMatch(/isOutgoingEcho \? null : \(msg\.sender\?\.name/);
   });
 
   it('never reads STOP out of our own words', () => {
@@ -262,13 +279,17 @@ describe('the CRM is not filled in behind your back', () => {
 });
 
 describe('the WhatsApp profile is fetched and shown', () => {
-  it('asks WhatsApp who they are', () => {
-    // A business account publishes a trading name, category, description, address, email, site,
-    // hours and a logo. None of it reached the platform because nothing had ever asked for it —
-    // which is not the same as WhatsApp withholding it.
-    expect(zernioClient).toMatch(/export async function fetchWhatsAppProfile/);
-    expect(zernioClient).toMatch(/number-info/);
-    expect(hook).toMatch(/refreshWhatsAppProfile/);
+  it('reads the profile off the WEBHOOK, not out of a lookup endpoint', () => {
+    // `conversation.participantPicture` and `participantName` are in EVERY inbox webhook, per
+    // Zernio's OpenAPI spec. The previous version hunted three endpoints for them — none of which
+    // returns a counterparty profile — and settled for a Zernio CRM row whose `name` was the phone
+    // number. The hunt is deleted rather than unused, so it cannot be picked back up.
+    expect(hook).toMatch(/convParticipantPicture/);
+    expect(hook).toMatch(/storeParticipantPicture/);
+    expect(
+      /fetchWhatsAppProfile|number-info/.test(stripComments(hook) + stripComments(zernioClient)),
+      'the profile lookup hunt is back — the answer is already in the webhook payload',
+    ).toBe(false);
   });
 
   it('stores the logo as an object, never as the provider url', () => {
@@ -287,8 +308,8 @@ describe('the WhatsApp profile is fetched and shown', () => {
     // invariant 7. A bare fetch() there follows redirects into link-local space and reads an
     // unbounded body. Semgrep caught this one on main (`no-unguarded-download-of-user-url`);
     // the rule only fires on the raw-fetch shape, so this pins the fix from the other direction.
-    expect(hook).toMatch(/fetchImageGuardedOrNull\(profile\.avatarUrl\)/);
-    expect(hook).not.toMatch(/await fetch\(profile\.avatarUrl\)/);
+    expect(hook).toMatch(/fetchImageGuardedOrNull\(pictureUrl\)/);
+    expect(hook).not.toMatch(/await fetch\(pictureUrl\)/);
   });
 
   it('merges thread metadata instead of overwriting it', () => {
@@ -375,27 +396,9 @@ describe('message.sent is how the operator’s reply reaches us', () => {
   });
 });
 
-describe('the profile lookup asks the right endpoint, the right way', () => {
-  it('sends accountId to the conversation endpoint', () => {
-    // Without it: 400 {"code":"missing_required_field","param":"accountId"} on every lookup —
-    // the same omission that made the back-fill read zero messages from five conversations.
-    expect(zernioClient).toMatch(/missing_required_field/);
-    expect(zernioClient).toMatch(/\/inbox\/conversations\/\$\{encodeURIComponent\(params\.conversationId\)\}/);
-  });
-
-  it('refuses a "name" that is just the phone number', () => {
-    // /contacts answered with Zernio's own CRM row — `{ name: "+306955948979" }` and nothing else
-    // — and the old check accepted it because `name` was truthy, stopping the search at the least
-    // informative source and recording wa_profile_found: true over one phone number.
-    expect(zernioClient).toMatch(/nameIsJustTheNumber/);
-    expect(zernioClient).toMatch(/profile\.name = undefined/);
-  });
-
-  it('tries the WhatsApp endpoint before Zernio’s own contact list', () => {
-    const numberInfo = zernioClient.indexOf('/whatsapp/number-info?phoneNumber=');
-    const contacts = zernioClient.indexOf('/contacts?search=');
-    expect(numberInfo).toBeGreaterThan(-1);
-    expect(contacts).toBeGreaterThan(-1);
-    expect(numberInfo < contacts, 'the least informative source is tried first again').toBe(true);
-  });
-});
+// The "profile lookup asks the right endpoint" block lived here. It pinned the ordering and
+// argument handling of a three-endpoint hunt for a counterparty profile. Zernio's OpenAPI spec
+// says the profile is in every inbox webhook (`conversation.participantPicture` /
+// `participantName`), so the hunt is gone — and a guard describing how to do it correctly
+// would only keep the idea alive. The "reads the profile off the WEBHOOK" case above fails
+// if any of it comes back.
