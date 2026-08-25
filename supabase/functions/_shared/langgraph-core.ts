@@ -464,11 +464,34 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
       + 'retrieved, then what is still outstanding. Mark anything unverified as unverified, never '
       + 'present a partial list as complete, and never fill a gap from your own knowledge.',
     );
+
+    /**
+     * The wrap-up reads a TRIMMED transcript, and that is what makes it reachable at all.
+     *
+     * `web_fetch` returns up to 30 000 characters per call by design — the whole point of the
+     * tool. Twelve of them is ~360 000 characters, roughly 90k tokens, and a model turn that size
+     * cannot land in the seconds left when the deadline fires. Measured: run 8127fc3e fell
+     * through to the deterministic listing for exactly this reason.
+     *
+     * Trimming loses detail the wrap-up would not have used anyway — it is writing a summary, not
+     * re-reading the pages — and the untruncated results are still returned in `toolResults`, so
+     * nothing is actually discarded. Only the model's view is narrowed.
+     */
+    const WRAP_UP_MSG_CHARS = 2_000;
+    const trimmed = transcript.map((m: any) => {
+      const text = typeof m.content === 'string' ? m.content : null;
+      if (text === null || text.length <= WRAP_UP_MSG_CHARS) return m;
+      const clone = Object.create(Object.getPrototypeOf(m));
+      Object.assign(clone, m);
+      clone.content = `${text.slice(0, WRAP_UP_MSG_CHARS)}\n…[trimmed ${text.length - WRAP_UP_MSG_CHARS} chars for the summary]`;
+      return clone;
+    });
+
     // Whatever is left of the window, minus a margin to return the response.
     const left = Math.max(5_000, HARD_DEADLINE_MS + 25_000 - (Date.now() - startedAt));
     try {
       const response: any = await Promise.race([
-        llm.invoke([new SystemMessage(systemPrompt), ...transcript, wrapUp]),
+        llm.invoke([new SystemMessage(systemPrompt), ...trimmed, wrapUp]),
         new Promise((resolve) => setTimeout(() => resolve(null), left)),
       ]);
       if (!response) throw new Error('wrap-up turn did not finish inside the remaining window');
