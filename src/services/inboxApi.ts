@@ -98,6 +98,13 @@ export interface WhatsAppWindow {
   open: boolean;
   last_inbound_at: string | null;
   expires_at: string | null;
+  /**
+   * How the verdict was reached. `local` read our own inbound messages; `provider` asked Zernio
+   * because we hold none; `unknown` means neither could answer. All three can report a closed
+   * window and they are not the same statement, so the banner says which one it is rather than
+   * asserting a customer went quiet when what actually happened is that we could not look.
+   */
+  source?: 'local' | 'provider' | 'unknown';
 }
 
 export interface InboxContactContext {

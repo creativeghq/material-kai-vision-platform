@@ -1326,8 +1326,33 @@ const InboxPage: React.FC = () => {
 
                 {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
                   <div className="text-xs bg-[hsl(var(--warning-bg))] border border-warning/25 text-warning rounded-sm px-3 py-2">
-                    WhatsApp 24-hour reply window has closed. Freeform replies are blocked by Meta — an approved
-                    template is required to re-open the conversation. (Internal notes are still allowed.)
+                    {/* SAY WHAT THIS IS BASED ON.
+                        The old copy asserted "the 24-hour reply window has closed" and stopped
+                        there. An operator looking at a message they sent twenty minutes earlier
+                        reads that as simply wrong — and cannot tell it is about the CUSTOMER's
+                        last message, because their own does not open the window and the thread
+                        may not even hold the customer's. Each branch below names the fact the
+                        verdict rests on, so it can be checked instead of believed. */}
+                    {waWindow.last_inbound_at ? (
+                      <>
+                        WhatsApp 24-hour reply window has closed — this customer last wrote on{' '}
+                        {formatDate(waWindow.last_inbound_at)} at {formatTime(waWindow.last_inbound_at)},
+                        and your own replies do not re-open it.
+                      </>
+                    ) : waWindow.source === 'unknown' ? (
+                      <>
+                        We could not check when this customer last wrote, so freeform replies are
+                        blocked until we can. Try again in a moment.
+                      </>
+                    ) : (
+                      <>
+                        This customer has never written to us on WhatsApp, so no 24-hour reply
+                        window has opened.
+                      </>
+                    )}{' '}
+                    Freeform replies are blocked by Meta — an approved template is required to
+                    {waWindow.last_inbound_at ? ' re-open' : ' open'} the conversation. (Internal
+                    notes are still allowed.)
                   </div>
                 )}
                 {isMember && (

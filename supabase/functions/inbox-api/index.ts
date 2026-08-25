@@ -26,7 +26,7 @@ import {
   sendWhatsAppReply, sendWhatsAppMessage, setMessageReaction,
   sendSocialCommentReply, sendSocialDirectMessage,
   sendCommentPrivateReply, setCommentHidden, markConversationRead,
-  ensureZernioSecrets,
+  ensureZernioSecrets, fetchLastInboundAt,
 } from '../_shared/zernio.ts';
 import {
   allocateUserEmailAddress,
@@ -196,11 +196,35 @@ async function ensureMemberParticipant(
 /**
  * Meta's 24h service window: outside 24h since the customer's last inbound WhatsApp message,
  * only an approved template may be sent. Inbound messages carry metadata.direction='incoming'.
+ *
+ * `inbox_messages` answers this for any thread whose inbound messages we hold, which is almost
+ * all of them — the live webhook files every one. It does NOT answer it for a thread we hold no
+ * inbound message for, and those exist: a thread born from a `message.sent` echo (the operator
+ * writes from their handset under coexistence) is created around an OUTBOUND message with none of
+ * the conversation's history behind it. There, "no incoming row" is a fact about our table and not
+ * about the customer, and treating the two as one produced a banner the operator could see was
+ * absurd — thread c7e4f75a showed a single message sent twenty minutes earlier under "the 24-hour
+ * reply window has closed", while the customer's actual last message sat in Zernio dated 18 days
+ * back. Both readings said "closed"; only one of them was an answer.
+ *
+ * So: local first, and ask Zernio only when local has nothing to say. That keeps the common path
+ * to one indexed read, and it is self-limiting — the moment a real inbound message arrives the
+ * local answer takes over for good.
+ *
+ * The verdict still FAILS CLOSED. `source` says how it was reached so the caller can tell a
+ * measured "closed" from an unknown one, and `open` is false for both: Meta would reject the send
+ * anyway, and a stored message the customer never receives is worse than a blocked composer.
  */
 async function whatsappWindow(
   db: DbClient,
   threadId: string,
-): Promise<{ open: boolean; last_inbound_at: string | null; expires_at: string | null }> {
+  thread?: Record<string, unknown>,
+): Promise<{
+  open: boolean;
+  last_inbound_at: string | null;
+  expires_at: string | null;
+  source: 'local' | 'provider' | 'unknown';
+}> {
   const { data } = await db
     .from('inbox_messages')
     .select('created_at')
@@ -209,10 +233,30 @@ async function whatsappWindow(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  const last = (data as { created_at?: string } | null)?.created_at ?? null;
-  if (!last) return { open: false, last_inbound_at: null, expires_at: null };
+  let last = (data as { created_at?: string } | null)?.created_at ?? null;
+  let source: 'local' | 'provider' | 'unknown' = 'local';
+
+  if (!last) {
+    // Our mirror is silent. Ask the system that owns the conversation before calling it shut.
+    const t = thread ?? await db.from('inbox_threads').select('metadata').eq('id', threadId)
+      .maybeSingle().then((r) => (r.data as Record<string, unknown> | null) ?? undefined);
+    const meta = ((t?.metadata as Record<string, unknown> | undefined) ?? {});
+    const fromProvider = await fetchLastInboundAt({
+      accountId: String(meta.zernio_account_id ?? ''),
+      conversationId: String(meta.zernio_conversation_id ?? ''),
+    });
+    if (fromProvider === undefined) {
+      // Could not find out. Say so rather than reporting a conversation that has never been
+      // written to — the operator reads the difference, and the composer blocks either way.
+      return { open: false, last_inbound_at: null, expires_at: null, source: 'unknown' };
+    }
+    last = fromProvider;
+    source = 'provider';
+  }
+
+  if (!last) return { open: false, last_inbound_at: null, expires_at: null, source };
   const expires = new Date(new Date(last).getTime() + 24 * 3600 * 1000);
-  return { open: expires > new Date(), last_inbound_at: last, expires_at: expires.toISOString() };
+  return { open: expires > new Date(), last_inbound_at: last, expires_at: expires.toISOString(), source };
 }
 
 async function getThreadOrThrow(db: DbClient, threadId: string) {
@@ -1322,7 +1366,7 @@ async function sendOrderConfirmation(
       const phone = meta.contact_phone as string | undefined;
       if (!accountId) return { channel: 'none', status: 'unavailable', at, detail: 'no WhatsApp binding' };
 
-      const win = await whatsappWindow(db, String(thread.id));
+      const win = await whatsappWindow(db, String(thread.id), thread);
       if (win?.open && conversationId) {
         // Both Zernio helpers RESOLVE with { success:false } instead of throwing, so a bare
         // `await` reads as success on every failure. Checking the result is the whole point of
@@ -1662,9 +1706,18 @@ async function handleJwtAction(
       if (!body && attachments.length === 0) throw new HttpError(400, 'message body or attachment required');
       // WhatsApp: freeform replies only inside Meta's 24h service window. Notes (internal) exempt.
       if (thread.channel === 'whatsapp' && messageType !== 'note') {
-        const w = await whatsappWindow(db, threadId);
+        const w = await whatsappWindow(db, threadId, thread);
         if (!w.open) {
-          throw new HttpError(409, 'WhatsApp 24h service window is closed — an approved template is required to message this customer again.');
+          // Name the reason. "The window is closed" with no anchor is unfalsifiable to the person
+          // reading it, and the operator who reported this was looking at a message they had sent
+          // twenty minutes earlier — an outbound message does not open the window, but nothing on
+          // screen said so.
+          const why = w.last_inbound_at
+            ? `the customer last wrote on ${w.last_inbound_at}`
+            : w.source === 'unknown'
+              ? 'we could not reach WhatsApp to check when the customer last wrote'
+              : 'this customer has never written to us, so no window has opened';
+          throw new HttpError(409, `WhatsApp 24h service window is closed (${why}) — an approved template is required to message this customer again.`);
         }
       }
       // A member replying to a shared workspace thread they hadn't joined becomes a participant.
@@ -2174,7 +2227,7 @@ async function handleJwtAction(
           if (sendReceipt) await markConversationRead(convId);
         }
       }
-      const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId) : null;
+      const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId, thread) : null;
       return json({ thread, participants: participants || [], messages: messages || [], whatsapp_window: wa });
     }
 

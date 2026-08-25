@@ -780,6 +780,57 @@ export async function setCommentHidden(params: {
 }
 
 /**
+ * When did the counterparty last write to us, according to ZERNIO?
+ *
+ * Meta's 24h service window opens on the CUSTOMER's inbound message, so answering "may we send a
+ * freeform reply?" means knowing when that was. We normally read it out of `inbox_messages`,
+ * which is cheap and correct — for a thread whose inbound messages we actually hold.
+ *
+ * A thread can exist without them. One is born from a `message.sent` echo: the operator types on
+ * their handset under coexistence, Zernio echoes it, and the thread is created around an OUTBOUND
+ * message with no history behind it. Zernio has the conversation's whole history; we have one
+ * message. Reading our own table there does not answer "the customer has not written in 24h" — it
+ * answers "we hold no inbound message", which is the silent-zero shape: an absence of rows read as
+ * a fact about the world. Thread c7e4f75a on 2026-08-25 was exactly that — the customer's last
+ * message sat in Zernio dated 2026-08-07 and the inbox held none of it, so the operator saw a
+ * message sent twenty minutes earlier under a banner saying the window had closed, with no
+ * evidence on screen either way.
+ *
+ * Returns the ISO timestamp of the newest inbound message, `null` for a conversation that
+ * genuinely has none, and `undefined` when we could not find out (network, revoked key, unknown
+ * conversation) — a distinction the caller needs, because "no customer message ever" and "we do
+ * not know" must not both render as a confident verdict.
+ */
+export async function fetchLastInboundAt(params: {
+  accountId: string;
+  conversationId: string;
+}): Promise<string | null | undefined> {
+  if (!params.accountId || !params.conversationId) return undefined;
+  try {
+    // `accountId` is REQUIRED — the key spans every tenant, and Zernio answers 400
+    // `missing_required_field` without it (the same 400 that once made `backfill-inbox` import
+    // nothing from every conversation it found and still report success).
+    const qs = new URLSearchParams({ accountId: params.accountId, limit: '50' });
+    const data = await zernioApi(
+      'GET',
+      `/inbox/conversations/${encodeURIComponent(params.conversationId)}/messages?${qs.toString()}`,
+    );
+    const messages = (data?.data ?? data?.messages ?? []) as Array<Record<string, unknown>>;
+    let newest: string | null = null;
+    for (const m of messages) {
+      if (String(m.direction ?? '') !== 'incoming') continue;
+      const at = String(m.sentAt ?? m.createdAt ?? '');
+      if (!at || Number.isNaN(new Date(at).getTime())) continue;
+      if (!newest || new Date(at) > new Date(newest)) newest = at;
+    }
+    return newest;
+  } catch (err) {
+    console.warn(`[zernio] last-inbound lookup failed for ${params.conversationId}:`, err);
+    return undefined;
+  }
+}
+
+/**
  * Tell the platform a conversation has been read.
  *
  * We track read state locally and never told Zernio, so the customer's "seen" indicator never
