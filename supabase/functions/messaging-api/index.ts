@@ -1974,31 +1974,47 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         // Why the handler declined, tallied. "Nothing arrived" is not a diagnosis; "47 messages
         // had no workspace bound to Zernio account X" is one, and it names the fix.
         const dropReasons: Record<string, number> = {};
+        // A named conversation is searched for across accounts; only a total miss is an error.
+        let namedRead = false;
+        const namedErrors: string[] = [];
 
         for (const accountId of accountIds) {
           let convs: Array<Record<string, any>> = [];
-          try {
-            // PAGE through them. This read one page and stopped, so `limit` was not "how many to
-            // import" but "how many exist as far as we are concerned" — a number with hundreds of
-            // conversations back-filled the first fifty and reported success. Walk until a short
-            // page comes back, capped so a large account cannot run the function out of time.
-            const pageSize = 50;
-            for (let page = 1; page <= 20 && convs.length < cap; page++) {
-              const qs = new URLSearchParams({
-                accountId,
-                limit: String(Math.min(pageSize, cap - convs.length)),
-                page: String(page),
-              });
-              const data = await zernioApi('GET', `/inbox/conversations?${qs.toString()}`);
-              const batch = (data.data ?? data.conversations ?? []) as Array<Record<string, any>>;
-              convs.push(...batch);
-              if (batch.length < pageSize) break;
+          // A NAMED conversation is fetched, not searched for.
+          //
+          // The listing is how you discover conversations; it is not how you reach one you can
+          // already name. It does not return everything — thread 7538b29e's conversation answered
+          // `/inbox/conversations/{id}/messages` with 50 messages while appearing on no page of
+          // the list — so scanning for an id we were handed found nothing and the caller was told
+          // "WhatsApp has not handed that conversation over yet. Try again later." That is a
+          // diagnosis, it names a cause, and it was false: the conversation was there and
+          // readable the whole time. Waiting was the one thing that could not fix it.
+          if (wantConversation) {
+            convs = [{ id: wantConversation }];
+          } else {
+            try {
+              // PAGE through them. This read one page and stopped, so `limit` was not "how many to
+              // import" but "how many exist as far as we are concerned" — a number with hundreds of
+              // conversations back-filled the first fifty and reported success. Walk until a short
+              // page comes back, capped so a large account cannot run the function out of time.
+              const pageSize = 50;
+              for (let page = 1; page <= 20 && convs.length < cap; page++) {
+                const qs = new URLSearchParams({
+                  accountId,
+                  limit: String(Math.min(pageSize, cap - convs.length)),
+                  page: String(page),
+                });
+                const data = await zernioApi('GET', `/inbox/conversations?${qs.toString()}`);
+                const batch = (data.data ?? data.conversations ?? []) as Array<Record<string, any>>;
+                convs.push(...batch);
+                if (batch.length < pageSize) break;
+              }
+            } catch (err) {
+              // One account's failure must not abandon the others — a revoked token on a single
+              // number would otherwise silently truncate the whole backfill.
+              errors.push(`${accountId}: ${String(err)}`);
+              continue;
             }
-          } catch (err) {
-            // One account's failure must not abandon the others — a revoked token on a single
-            // number would otherwise silently truncate the whole backfill.
-            errors.push(`${accountId}: ${String(err)}`);
-            continue;
           }
 
           for (const conv of convs) {
@@ -2027,9 +2043,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               );
               messages = (md.data ?? md.messages ?? []) as Array<Record<string, any>>;
             } catch (err) {
-              errors.push(`${conv.id}: ${String(err)}`);
+              // A NAMED conversation is tried against every connected account, because the caller
+              // gives us an id and not the account that owns it — so the accounts that do not own
+              // it answer 400/404 and that is the search working, not a fault. Held back and only
+              // surfaced if NO account could read it; reported per-account it would put a scary
+              // error next to a backfill that had just succeeded.
+              if (wantConversation) namedErrors.push(`${accountId}: ${String(err)}`);
+              else errors.push(`${conv.id}: ${String(err)}`);
               continue;
             }
+            if (wantConversation) namedRead = true;
 
             for (const m of messages) {
               // Replay each one through the webhook handler's own path so the backfill and the
@@ -2132,20 +2155,25 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             ? 'WhatsApp has not handed that conversation over yet. On a coexistence number Meta '
               + 'syncs history in the background over several hours — the chat stays on the phone '
               + 'and only becomes importable once that sync reaches it. Try again later.'
-            : targeted && imported === 0
-              ? 'That conversation was found and every message in it is already in the inbox.'
-              : accepted > 0 && imported === 0
-                ? 'Every message was accepted and none was filed — see drop_reasons for why. '
-                  + '("already imported" here just means it was pulled in by an earlier run.)'
-                : scanned === 0
-                  ? 'Zernio returned no conversations for these accounts. A number connected in '
-                    + 'coexistence mode keeps its existing chats on the phone; only messages that '
-                    + 'flow through Zernio after connecting are its to hand back.'
-                  : undefined,
+            : wantConversation && !namedRead
+              ? 'No connected account could read that conversation — check the id. This is NOT '
+                + 'the coexistence sync lagging: the id was fetched directly, so a failure here '
+                + 'means the conversation does not exist on any account we hold, and waiting '
+                + 'will not change it. See errors.'
+              : targeted && imported === 0
+                ? 'That conversation was found and every message in it is already in the inbox.'
+                : accepted > 0 && imported === 0
+                  ? 'Every message was accepted and none was filed — see drop_reasons for why. '
+                    + '("already imported" here just means it was pulled in by an earlier run.)'
+                  : scanned === 0
+                    ? 'Zernio returned no conversations for these accounts. A number connected in '
+                      + 'coexistence mode keeps its existing chats on the phone; only messages that '
+                      + 'flow through Zernio after connecting are its to hand back.'
+                    : undefined,
           // Never a silent partial: a truncated backfill that reports plain success is
           // indistinguishable from one that found nothing.
-          errors: errors.slice(0, 20),
-          truncated: errors.length > 20,
+          errors: (namedRead ? errors : [...errors, ...namedErrors]).slice(0, 20),
+          truncated: (namedRead ? errors : [...errors, ...namedErrors]).length > 20,
         });
       }
 
