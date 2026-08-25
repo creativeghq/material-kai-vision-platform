@@ -56,8 +56,19 @@ const SEARCH_MODEL = 'claude-opus-5';
 /** Per-search-use surcharge Anthropic charges for the server-side web_search tool. */
 const WEB_SEARCH_USE_USD = 0.01;
 
-/** Reserve ceiling for one web_search turn, in credits (1 credit = $0.01 billed). */
-const SEARCH_CEILING = 40;
+/**
+ * Reserve ceiling for one web_search turn, in credits (1 credit = $0.01 billed).
+ *
+ * MEASURED, not guessed: a real 4-search sourcing question ("who distributes Del Conca in
+ * Greece?") pulled 42,203 input / 1,248 output tokens and settled at 42.33 credits — because a
+ * server-side search turn carries every fetched result back through the context. The first value
+ * here was 40, which the very first live call exceeded. `settleCredits` charges the overage, so
+ * an under-set ceiling is not a lost charge; it is a gate that lets through a caller who cannot
+ * actually afford the call, which is the thing the gate exists to stop.
+ *
+ * 80 covers the measured case at the default budget with room for a 15-search sweep.
+ */
+const SEARCH_CEILING = 80;
 
 /**
  * How much of a fetched document goes back to the model in one call.
