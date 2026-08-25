@@ -3,12 +3,16 @@ import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Playful character avatars for the agent roster — chibi robot mascots
- * (public/avatars/agents/*.webp, generated 2026-08-06 with the platform's
- * Gemini image pipeline in one consistent sticker style: JARVIS the butler,
- * Edith with her chart-glasses, Hermes with the winged helmet, Estate with a
- * roof hat, and so on). Each is a 256px square on a flat pastel field, masked
- * round here — regenerate in the same style if the roster grows.
+ * Character avatars for the agent roster (public/avatars/agents/*.webp).
+ *
+ * Regenerated 2026-08-25 in the SAME 3D style as the contact avatars, replacing the chibi robot
+ * stickers: one visual language across the platform means a person in the inbox and an agent in
+ * the hub no longer look like they came from two different products. Each is drawn to its role —
+ * JARVIS the concierge, Vision with swatches, Trinity precise in charcoal, Hermes in headphones.
+ *
+ * Rendered by `messaging-api generate-avatar-cast` with an overridden prompt, then converted to a
+ * 256px webp. Regenerate through that action if the roster grows — it takes a `variations` array,
+ * so a new agent is one entry, not a new pipeline.
  *
  * The hand-drawn SVG faces below are the FALLBACK — they render for unknown
  * agent ids and when an image fails to load, so the picker never shows a
