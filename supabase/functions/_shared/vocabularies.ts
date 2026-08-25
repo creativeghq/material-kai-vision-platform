@@ -111,6 +111,62 @@ export function allValues(terms: VocabularyTerm[]): string[] {
 }
 
 /**
+ * Fold a country string to a comparison key — lowercase, unaccented, punctuation-free, no leading
+ * article. `Türkiye`, `TURKIYE` and `türkiye ` are one country, and so are `U.K.` and `uk`.
+ *
+ * Letters of ANY script survive, not just `a-z`: an ASCII-only class folds `Ελλάδα` and `Україна`
+ * to the empty string, and an empty key does not mean "no match" — it means every unwritable name
+ * collides with every other one, so a country resolves to whichever row the loop reached first.
+ */
+function marketKey(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip the combining marks NFD just split off
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/^the /, '')
+    .replace(/ /g, '');
+}
+
+/**
+ * The market row a country STRING refers to, or null when it is not one of ours.
+ *
+ * `country` is deliberately a free string on the search tool — any country is searchable, not only
+ * the markets we sweep — so what arrives is whatever the model typed. Matching it against `value`
+ * alone meant `Czechia` matched NOTHING: the search still ran, still said "in Czechia", and
+ * silently dropped the native-language clause that is the entire reason the row carries a
+ * language. A country that resolves to no row looks exactly like one that genuinely has no
+ * language, so nothing raised — the silent-zero shape, one layer down from the list itself.
+ *
+ * The alternative names are DATA (`metadata.aliases`), never a constant here, for the same reason
+ * the markets are: a table of country names in a source file is another copy of the country list,
+ * which is the thing tests/unit/vocabularyRegistry.test.ts exists to stop. An admin adding a
+ * market adds its exonyms and ISO codes on the same row, with no deploy.
+ *
+ * Canonical names are matched in full BEFORE any alias, so one market's alias can never shadow
+ * another market's real name.
+ */
+export function resolveMarket(
+  terms: VocabularyTerm[],
+  country: string | null | undefined,
+): VocabularyTerm | null {
+  const needle = country ? marketKey(country) : '';
+  if (!needle) return null;
+
+  for (const t of terms) {
+    if (marketKey(t.value) === needle || marketKey(t.label) === needle) return t;
+  }
+  for (const t of terms) {
+    const aliases = (t.metadata as { aliases?: unknown } | null | undefined)?.aliases;
+    if (Array.isArray(aliases) && aliases.some((a) => typeof a === 'string' && marketKey(a) === needle)) {
+      return t;
+    }
+  }
+  return null;
+}
+
+/**
  * The geographic scope clause for a manufacturer-search query — ONE derivation, two readers
  * (`_shared/tools/b2b-tools.ts` and `flow-engine`).
  *
@@ -125,7 +181,10 @@ export function buildMarketScope(
   terms: VocabularyTerm[],
   sel: { country?: string | null; region?: string | null },
 ): string {
-  if (sel.country) return `in ${sel.country}`;
+  // Canonicalised where we know the market, verbatim where we do not — `country` is a free string
+  // precisely so a market we do not list stays searchable, and rewriting it would silently narrow
+  // the search to somewhere the caller did not ask for.
+  if (sel.country) return `in ${resolveMarket(terms, sel.country)?.value ?? sel.country}`;
   if (sel.region) {
     const rows = termsInGroup(terms, sel.region.toLowerCase());
     if (rows.length) {

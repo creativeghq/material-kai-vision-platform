@@ -40,7 +40,7 @@ import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '.
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
-import { allValues, buildMarketScope, describeGroups, groupKeys, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
+import { allValues, buildMarketScope, describeGroups, groupKeys, resolveMarket, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
 import { escapeLike, foldForSearch } from '../searchFold.ts';
 import { domainFromUrl } from '../seo-website.ts';
 import { transliterateToLatin } from '../transliterate.ts';
@@ -222,8 +222,11 @@ function nativeLanguageClause(
   markets: VocabularyTerm[],
   sel: { country?: string | null; region?: string | null },
 ): string {
+  // Through resolveMarket, not an exact name match: `Czechia`, `Türkiye` and `UK` are the markets
+  // we sweep under another name, and matching on `value` alone dropped this clause for every one
+  // of them — the search ran, English-only, with nothing to say it had.
   const inScope = sel.country
-    ? markets.filter((m) => m.value.toLowerCase() === sel.country!.toLowerCase())
+    ? [resolveMarket(markets, sel.country)].filter((m): m is VocabularyTerm => m !== null)
     : sel.region
       ? termsInGroup(markets, sel.region.toLowerCase())
       : markets;
@@ -329,6 +332,17 @@ export const createB2BManufacturerSearchTool = (
       const MAX_PER_CALL = 8;
       const requestedLimit = limit;
       if (limit > MAX_PER_CALL) limit = MAX_PER_CALL;
+
+      // ONE resolution of what the country string means, at the boundary, so the scope clause, the
+      // native-language clause, the progress line, the workflow card and the usage row all name the
+      // same market. `country` is a free string by design — the model types whatever it has, and
+      // `Czechia` / `Türkiye` / `UK` are ours under another name. An unresolved one is NOT an
+      // error (any country is searchable), but it is worth a line in the log, because the visible
+      // symptom of getting this wrong is nothing at all: the search runs and quietly loses the
+      // local-language half of its query.
+      const market = resolveMarket(markets, country);
+      if (market) country = market.value;
+      else if (country) console.warn(`[b2b_manufacturer_search] "${country}" is not a defined sourcing market — searching it in English only`);
 
       const runId = _workflow_run_id || crypto.randomUUID();
       const emitter = createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: runId });

@@ -23,6 +23,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { stripComments as sharedStripComments } from '../helpers/stripComments';
+import {
+  buildMarketScope,
+  resolveMarket,
+  type VocabularyTerm,
+} from '../../supabase/functions/_shared/vocabularies.ts';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
@@ -165,5 +170,122 @@ describe('country vocabularies are data, not constants', () => {
       'b2b_manufacturer_search.region must be z.enum(groupKeys(markets)) — as a bare string, an ' +
         'unrecognised value produced "in the <garbage> region" and searched nothing, silently.',
     ).toBe(true);
+  });
+});
+
+/**
+ * A country string means a MARKET ROW, and the row is what carries the language.
+ *
+ * `country` is a free string on b2b_manufacturer_search on purpose — any country is searchable,
+ * not only the ones we sweep — so what arrives is whatever the model typed. It used to be matched
+ * against `value` with a `===`, so `Czechia` matched nothing: the search ran, said "in Czechia",
+ * and silently dropped the Czech native-language clause that is the entire reason the row carries
+ * a language at all. Unresolved and language-less look identical from the outside, so nothing
+ * raised — the same shape as the invented country list one layer up.
+ *
+ * The alternative names are DATA (`metadata.aliases`, seeded by the sourcing_market_aliases
+ * migration) rather than a map in a source file, because a map of country names in a source file
+ * is another copy of the country list, which is what the scans above exist to stop.
+ */
+describe('resolveMarket — a country string resolves to the market row it means', () => {
+  const term = (
+    value: string,
+    aliases: string[],
+    language_name?: string,
+  ): VocabularyTerm => ({
+    value,
+    label: value,
+    group_key: 'cee',
+    group_label: 'Central & Eastern Europe',
+    sort_order: 10,
+    metadata: { aliases, ...(language_name ? { language_name } : {}) },
+  });
+
+  // Shaped exactly like the seeded rows, values included — the point of the fixture is that the
+  // reported case ("Czechia" for our "Czech Republic") resolves.
+  const MARKETS: VocabularyTerm[] = [
+    term('Czech Republic', ['CZ', 'CZE', 'Czechia', 'Czech Rep.', 'Czech', 'Česká republika'], 'Czech'),
+    term('Turkey', ['TR', 'TUR', 'Türkiye'], 'Turkish'),
+    term('United Kingdom', ['GB', 'UK', 'GBR', 'Great Britain', 'Britain'], 'English'),
+    term('Netherlands', ['NL', 'NLD', 'Holland', 'Nederland'], 'Dutch'),
+    term('Greece', ['GR', 'GRC', 'EL', 'Hellas', 'Ελλάδα'], 'Greek'),
+    term('Ukraine', ['UA', 'UKR', 'Україна'], 'Ukrainian'),
+  ];
+
+  const resolved = (s: string) => resolveMarket(MARKETS, s)?.value ?? null;
+
+  it('resolves the canonical name whatever the case or spacing', () => {
+    expect(resolved('Czech Republic')).toBe('Czech Republic');
+    expect(resolved('czech republic')).toBe('Czech Republic');
+    expect(resolved('  CZECH REPUBLIC ')).toBe('Czech Republic');
+  });
+
+  it('resolves the name the model actually typed — this is the reported bug', () => {
+    // Every one of these searched English-only before, with nothing anywhere to say so.
+    for (const written of ['Czechia', 'czechia', 'CZ', 'CZE', 'Czech Rep.', 'Česká republika']) {
+      expect(resolved(written), `${written} must resolve to our market`).toBe('Czech Republic');
+    }
+  });
+
+  it('folds accents, punctuation and a leading article', () => {
+    expect(resolved('Türkiye')).toBe('Turkey');
+    expect(resolved('turkiye')).toBe('Turkey');
+    expect(resolved('U.K.')).toBe('United Kingdom');
+    expect(resolved('Great-Britain')).toBe('United Kingdom');
+    expect(resolved('The Netherlands')).toBe('Netherlands');
+  });
+
+  it('resolves a non-Latin name instead of colliding with every other one', () => {
+    // An ASCII-only fold turns both of these into '', which is not "no match" — it is "matches
+    // whichever row the loop reached first", so Ukraine would have answered for Greece.
+    expect(resolved('Ελλάδα')).toBe('Greece');
+    expect(resolved('Україна')).toBe('Ukraine');
+  });
+
+  it('a canonical name always wins over another market alias', () => {
+    // 'Czech' is an alias of Czech Republic; a market literally called Czech would still win.
+    const withDecoy = [...MARKETS, term('Czech', [], 'Czech')];
+    expect(resolveMarket(withDecoy, 'Czech')?.value).toBe('Czech');
+    expect(resolveMarket(withDecoy, 'Czechia')?.value).toBe('Czech Republic');
+  });
+
+  it('a country we do not source from resolves to null and is NOT rewritten', () => {
+    expect(resolved('Vietnam')).toBeNull();
+    expect(resolved('')).toBeNull();
+    expect(resolveMarket(MARKETS, null)).toBeNull();
+    expect(resolveMarket(MARKETS, undefined)).toBeNull();
+    // Narrowing an unlisted country to a listed one would search somewhere nobody asked about.
+    expect(buildMarketScope(MARKETS, { country: 'Vietnam' })).toBe('in Vietnam');
+  });
+
+  it('the scope clause names the market, not the spelling it arrived in', () => {
+    expect(buildMarketScope(MARKETS, { country: 'Czechia' })).toBe('in Czech Republic');
+    expect(buildMarketScope(MARKETS, { country: 'Türkiye' })).toBe('in Turkey');
+  });
+
+  it('the aliases are read off the row — no source file carries a second list of them', () => {
+    const edge = sharedStripComments(read(join(ROOT, 'supabase/functions/_shared/vocabularies.ts')));
+    const app = sharedStripComments(read(join(ROOT, 'src/services/vocabularies.ts')));
+    expect(/aliases/.test(edge), 'the edge resolver must read metadata.aliases').toBe(true);
+    for (const [name, src] of [['edge', edge], ['frontend', app]] as const) {
+      expect(
+        /Czechia|Turkiye|Türkiye|Holland|Great Britain/.test(src),
+        `${name} resolver hard-codes country aliases — they belong on the vocabulary row, ` +
+          'editable without a deploy, like the markets themselves',
+      ).toBe(false);
+    }
+  });
+
+  it('the b2b search resolves its country instead of matching the name exactly', () => {
+    const b2b = sharedStripComments(read(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts')));
+    expect(
+      b2b.includes('resolveMarket('),
+      'b2b-tools must resolve `country` through resolveMarket — an exact match on `value` dropped ' +
+        'the native-language clause for every market written under another name.',
+    ).toBe(true);
+    expect(
+      /m\.value\.toLowerCase\(\)\s*===\s*sel\.country/.test(b2b),
+      'the exact-name filter is back in nativeLanguageClause',
+    ).toBe(false);
   });
 });
