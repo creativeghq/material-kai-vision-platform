@@ -192,6 +192,10 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     const inputTokens  = usage?.input_tokens  || 0;
     const outputTokens = usage?.output_tokens || 0;
 
+    // Mirror into the out-of-graph transcript so a deadline that fires INSIDE a node still has
+    // something to report. Pushed before returning, because the return may never be observed.
+    transcript.push(response);
+
     if (!(response as any).tool_calls?.length) {
       return {
         messages:      [response],
@@ -259,6 +263,8 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
       }
     }
 
+    transcript.push(...toolMsgs);
+    toolResultsSoFar.push(...results);
     return { messages: toolMsgs, toolResults: results };
   }
 
@@ -288,6 +294,16 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
   //
   // The wrap-up turn is a model call over the whole transcript, so it needs real room: 95s of tool
   // loop leaves 55-85s to write the answer inside the observed window.
+  /**
+   * A running copy of what the graph has produced, kept OUTSIDE the graph.
+   *
+   * `graph.invoke()` resolves with the final state or not at all, so when the hard deadline fires
+   * inside a node there is no way to ask the graph what it had. These two are that answer, and
+   * they are the difference between "out of time" costing a summary and costing everything.
+   */
+  const transcript: BaseMessageT[] = [];
+  const toolResultsSoFar: any[] = [];
+
   const LOOP_DEADLINE_MS = 95 * 1000;
   const startedAt = Date.now();
   const outOfTime = () => Date.now() - startedAt > LOOP_DEADLINE_MS;
@@ -359,30 +375,47 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     .compile();
 
   const initialMessages: BaseMessageT[] = [new HumanMessage(userMessage)];
+  // The wrap-up needs to know what was ASKED, not only what came back.
+  transcript.push(...initialMessages);
 
-  // Backstop only, and it fires INSIDE the gateway's ~150s window so it can actually be reached.
-  // `LOOP_DEADLINE_MS` above is what normally governs the run and it exits gracefully; this race
-  // covers the one case a router deadline cannot — a single model or tool call that hangs, so
-  // control never returns to the router to notice the time. The old value was 5 minutes, i.e.
-  // past the point the isolate is killed, so it had never fired once.
-  //
-  // Capture the timer id so we can clear it once the graph resolves first — otherwise the
-  // (rejecting) timeout keeps the Deno isolate alive past the request lifetime, which on hot
-  // agents shows up as leaked handles + a background "Unhandled rejection" log.
-  const TIMEOUT_MS = 140 * 1000;
+  /**
+   * Hard deadline. Unlike the router's, this one CANNOT be missed by a node that is already
+   * running — and that distinction is the whole point.
+   *
+   * A router deadline only gets a turn between nodes. Measured on run 8cf5f7b4: twelve web
+   * fetches finished at 73s (inside the 95s router deadline, so the loop legitimately continued),
+   * then the next model call ran from 73s to past 140s. The router was never consulted again, the
+   * rejecting backstop won, and twelve pages of retrieved data were thrown away — the third time
+   * the same run lost its work to a deadline that could not reach it.
+   *
+   * So the timer RESOLVES with a sentinel instead of rejecting, and we write the report from the
+   * transcript accumulated so far. `graph.invoke` gives no access to intermediate state, so the
+   * nodes append to `transcript` as they go; that is the copy this path reads.
+   */
+  const HARD_DEADLINE_MS = 105 * 1000;
+  const DEADLINE = Symbol('deadline');
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`runLangGraphAgent timed out after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS);
+  const deadlinePromise = new Promise<typeof DEADLINE>((resolve) => {
+    timeoutId = setTimeout(() => resolve(DEADLINE), HARD_DEADLINE_MS);
   });
 
   let finalState: any;
   try {
     finalState = await Promise.race([
       graph.invoke({ messages: initialMessages }),
-      timeoutPromise,
+      deadlinePromise,
     ]);
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId);
+  }
+
+  if (finalState === DEADLINE) {
+    onLog?.('warn', 'Hard deadline reached mid-node — writing the report from what was retrieved', {
+      elapsed_ms: Date.now() - startedAt,
+      messages: transcript.length,
+      tool_results: toolResultsSoFar.length,
+    });
+    return await reportWhatWeHave();
   }
 
   return {
@@ -394,4 +427,62 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     iterations:    finalState.iteration,
     toolResults:   finalState.toolResults,
   };
+
+  /**
+   * Salvage the run when the hard deadline fires inside a node.
+   *
+   * Tries a short, tool-less model turn first; if that does not land in the remaining window, it
+   * falls back to a DETERMINISTIC listing built from the tool results with no model call at all.
+   * That fallback is the actual safety net: it cannot time out, so the retrieved data is never
+   * lost no matter how little time is left.
+   */
+  async function reportWhatWeHave(): Promise<LangGraphRunOutput> {
+    const deterministic = () => {
+      const lines = toolResultsSoFar.map((r, i) => {
+        let body: string;
+        try { body = typeof r.result === 'string' ? r.result : JSON.stringify(r.result); }
+        catch { body = String(r.result); }
+        return `${i + 1}. ${r.tool}(${JSON.stringify(r.args)}) → ${body.slice(0, 1500)}`;
+      });
+      return [
+        'This task ran out of time before it could be summarised, so here is the raw material it '
+        + 'retrieved. NOTHING below has been checked or cross-referenced — treat every line as an '
+        + 'unverified tool result, and re-run with a narrower scope to get a written answer.',
+        '',
+        `${toolResultsSoFar.length} tool result(s):`,
+        ...lines,
+      ].join('\n');
+    };
+
+    if (transcript.length === 0) {
+      return { finalResponse: deterministic(), inputTokens: 0, outputTokens: 0, iterations: 0, toolResults: toolResultsSoFar };
+    }
+
+    const wrapUp = new HumanMessage(
+      'You are out of time and cannot call any more tools. Write up ONLY what the tool results in '
+      + 'this conversation actually established: every concrete name, URL and number you '
+      + 'retrieved, then what is still outstanding. Mark anything unverified as unverified, never '
+      + 'present a partial list as complete, and never fill a gap from your own knowledge.',
+    );
+    // Whatever is left of the window, minus a margin to return the response.
+    const left = Math.max(5_000, HARD_DEADLINE_MS + 25_000 - (Date.now() - startedAt));
+    try {
+      const response: any = await Promise.race([
+        llm.invoke([new SystemMessage(systemPrompt), ...transcript, wrapUp]),
+        new Promise((resolve) => setTimeout(() => resolve(null), left)),
+      ]);
+      if (!response) throw new Error('wrap-up turn did not finish inside the remaining window');
+      const usage = response.response_metadata?.usage;
+      return {
+        finalResponse: extractTextContent(response.content) || deterministic(),
+        inputTokens:  usage?.input_tokens || 0,
+        outputTokens: usage?.output_tokens || 0,
+        iterations:   0,
+        toolResults:  toolResultsSoFar,
+      };
+    } catch (err) {
+      onLog?.('error', `Wrap-up turn failed, returning the raw tool results: ${(err as Error).message}`);
+      return { finalResponse: deterministic(), inputTokens: 0, outputTokens: 0, iterations: 0, toolResults: toolResultsSoFar };
+    }
+  }
 }
