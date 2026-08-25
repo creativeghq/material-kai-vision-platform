@@ -1351,6 +1351,50 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    // alwaysOn, and deliberately so. "Look it up" is not a specialist capability — it is the
+    // thing every other capability turns out to need, the way `knowledge_base_search` is for the
+    // workspace's own documents. Leaving it behind a cluster the user has to remember to switch
+    // on reproduces the state this was built to fix: on 2026-08-25 an agent was asked to list a
+    // competitor's brands, had no tool that could read a web page, and burned its whole
+    // iteration budget inventing workarounds (Wayback CDX, the WordPress REST API, `site:`
+    // queries) for tools it did not have.
+    //
+    // Both halves are here on purpose. web_search finds a URL; web_fetch reads it. An agent with
+    // only the first can learn that a page exists and cannot open it.
+    id: 'web-research',
+    name: 'Web Research',
+    description: 'Search the open web and read any page in full. Use for competitor and brand questions, distributor / "where to buy" lookups, sitemaps and product indexes — anything the workspace database does not already know.',
+    icon: 'Globe',
+    alwaysOn: true,
+    tool_ids: ['web_search', 'web_fetch'],
+    quick_starts: [
+      {
+        label: 'Search the web', description: 'Answer a question from the open web, with sources', icon: 'Search',
+        prompt: 'Who distributes Del Conca tiles in Greece?',
+        done: 'Here is what I found, with the sources.',
+        // The template has to READ as a request: this string lands in the user's own chat bubble,
+        // and a bare `{{query}}` renders as whatever fragment they typed with nothing around it.
+        promptTemplate: 'Search the web and answer: {{query}}',
+        run: { tool: 'web_search', argMap: { query: 'query' } },
+        autoFields: true,
+        form: [
+          { key: 'query', label: 'What do you want to know?', kind: 'text', required: true, placeholder: 'Who distributes Del Conca tiles in Greece?' },
+        ],
+      },
+      {
+        label: 'Read a page', description: 'Fetch a URL in full — no summary', icon: 'FileText',
+        prompt: 'Fetch this page and show me what it says.',
+        done: 'Here is what that page contains.',
+        promptTemplate: 'Fetch {{url}} and show me what it says.',
+        run: { tool: 'web_fetch' },
+        autoFields: true,
+        form: [
+          { key: 'url', label: 'Page URL', kind: 'text', required: true, placeholder: 'https://www.example.com/brands/' },
+        ],
+      },
+    ],
+  },
+  {
     // alwaysOn, because that is what these two already were: agent-chat carried a
     // hardcoded CORE_ALWAYS_TOOLS list to re-add them after the toolkit filter,
     // precisely because they belonged to no cluster. Giving them one expresses the
@@ -3268,6 +3312,10 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   // Sales
   quotes: 'sales', 'knowledge-graph': 'sales', b2b: 'sales', crm: 'sales', appointments: 'sales',
   'real-estate': 'sales', sourcing: 'sales', calculators: 'sales',
+  // Web Research sits beside B2B rather than under Marketing: the questions it answers here are
+  // sourcing and competitor ones — who makes this, who already represents it in our market — and
+  // b2b_manufacturer_search is the tool people reach for it alongside.
+  'web-research': 'sales',
   // Finance
   stock: 'finance', finance: 'finance', contracts: 'finance',
   'trip-expenses': 'finance', expenses: 'finance', 'company-assets': 'finance',

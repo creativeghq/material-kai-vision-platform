@@ -23,6 +23,10 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     alwaysOn: true,
     tool_ids: ['find_records', 'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'],
   },
+  'web-research': {
+    alwaysOn: true,
+    tool_ids: ['web_search', 'web_fetch'],
+  },
   'calculators': {
     alwaysOn: true,
     tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],

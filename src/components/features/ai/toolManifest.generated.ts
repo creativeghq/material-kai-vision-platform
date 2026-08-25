@@ -2210,6 +2210,29 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'aspect', type: 'enum', enum: ['color', 'texture', 'style', 'material'], optional: true, description: 'Match ONE aspect of the image instead of its overall look — set this when the user asks for a similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Costs a vision analysis of the image, so omit it for a general "find similar" request.' },
     ],
   },
+  {
+    name: 'web_fetch',
+    file: 'supabase/functions/_shared/tools/web-research-tools.ts',
+    factory: 'createWebFetchTool',
+    description: 'Fetch one URL and return its text, unsummarised.',
+    params: [
+      { name: 'url', type: 'string', optional: false, description: 'The https URL to fetch.' },
+      { name: 'format', type: 'enum', enum: ['text', 'html'], optional: true, description: 'text (default) converts the page to readable markdown. html returns the document as served — use it for XML sitemaps, JSON endpoints and robots.txt.' },
+      { name: 'offset', type: 'number', optional: true, description: 'Character offset to resume from, when a previous call came back truncated. Use the next_offset it gave you.' },
+    ],
+  },
+  {
+    name: 'web_search',
+    file: 'supabase/functions/_shared/tools/web-research-tools.ts',
+    factory: 'createWebSearchTool',
+    description: 'Search the open web and get an answer with its sources.',
+    params: [
+      { name: 'query', type: 'string', optional: false, description: 'What to search for. A full question works better than keywords.' },
+      { name: 'max_searches', type: 'number', optional: true, description: 'How many searches the assistant may run, 3-15. Default 6. Raise it for a broad sweep.' },
+      { name: 'allowed_domains', type: 'array', optional: true, description: 'Restrict the search to these domains, e.g. ["statusdesign.gr"]. Cannot be combined with blocked_domains.' },
+      { name: 'blocked_domains', type: 'array', optional: true, description: 'Exclude these domains from the search. Cannot be combined with allowed_domains.' },
+    ],
+  },
 ];
 
 export const TOOL_MANIFEST_BY_NAME: Record<string, ToolManifestEntry> =

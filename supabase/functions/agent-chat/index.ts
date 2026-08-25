@@ -157,9 +157,12 @@ async function initRuntime() {
   // judgement — see the A/B recorded on shouldRouteToHaiku below. It only became reachable
   // through ChatAnthropic when the LangChain pin moved off 1.3.10 (support landed in
   // @langchain/anthropic 1.5.2), and until then nothing in the platform called it.
+  // No `temperature`. It said `temperature: 1` and worked only because 1 IS the Anthropic
+  // default, so langchain's compatibility check let it through — a coincidence, not a design.
+  // Sampling parameters are removed on this model tier; the six sites that had picked a
+  // different value were all throwing on every call.
   modelOpus = new ChatAnthropic({
     model: MAIN_MODEL,
-    temperature: 1,
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
   });
@@ -677,6 +680,102 @@ function createAgentGraph(
     };
   }
 
+  /**
+   * Last turn of a run that ran out of budget: report what was actually found.
+   *
+   * Reaching the iteration ceiling used to route straight to END, and END with no
+   * `finalResponse` produces the fixed string "I reached the maximum number of processing
+   * steps." Everything the run had learned was in `state.messages` and none of it was ever
+   * looked at again — the transcript is not persisted, so the next turn starts from nothing and
+   * re-pays for every tool call.
+   *
+   * On 2026-08-25 a research turn hit this holding 29 of a competitor's ~100 brand slugs, the
+   * URL pattern for the rest, and a correct diagnosis of which tool was failing. The user got
+   * the apology and a "next step" button offering to continue "from the data you already
+   * scraped" — data that had just been thrown away.
+   *
+   * So: one more model call, with NO tools bound (nothing can start new work at the ceiling) and
+   * an instruction to write up the partial result honestly. A partial answer that says it is
+   * partial is worth many times a clean failure, and it costs one turn.
+   */
+  async function finalizeNode(state: AgentState): Promise<Partial<AgentState>> {
+    try {
+      onChunk?.({
+        type: 'iteration',
+        iteration: state.iteration,
+        maxIterations,
+        message: 'Wrapping up with what I found...',
+      });
+    } catch { /* onChunk is best-effort */ }
+
+    const wrapUp = new HumanMessage(
+      'You have reached this turn\'s step limit, so you cannot call any more tools. Do NOT '
+      + 'apologise and do NOT ask a question. Write up what you actually established, using the '
+      + 'tool results already in this conversation:\n'
+      + '1. The findings themselves — the concrete names, URLs, numbers and records you got. '
+      + 'Include ALL of them, not a sample.\n'
+      + '2. What is still missing, specifically, and how far you got (e.g. "brands A-E of an '
+      + 'estimated 100; the rest are at <url pattern>").\n'
+      + '3. Any tool that failed and what it said, so the next attempt does not repeat it.\n'
+      + 'If a tool result contradicted what you expected, say so. Never present a partial list '
+      + 'as if it were complete.',
+    );
+
+    try {
+      // STREAMED, for the same reason agentNode streams: this is the turn's visible answer, and
+      // it is being written at the point where the user has already waited the longest. No tools
+      // are bound — at the ceiling there is nothing left to call, and binding them only invites a
+      // tool_use block that can never be executed.
+      const stream = await model.stream([
+        new SystemMessage(state.systemPrompt),
+        ...state.messages,
+        wrapUp,
+      ]);
+      let response: any = null;
+      for await (const part of stream) {
+        response = response === null ? part : response.concat(part);
+        const delta = extractTextContent(part.content);
+        if (delta) {
+          try { onChunk?.({ type: 'text_delta', delta, iteration: state.iteration }); } catch { /* best-effort */ }
+        }
+      }
+      if (response === null) throw new Error('Finalize stream produced no chunks');
+
+      // Closes the streaming bubble on the client. `hasToolCalls: false` is not a guess here —
+      // no tools were bound, so the text just streamed IS the answer.
+      try {
+        onChunk?.({
+          type: 'assistant_thinking',
+          content: extractTextContent(response.content),
+          hasToolCalls: false,
+          streamed: true,
+          iteration: state.iteration,
+        });
+      } catch { /* best-effort */ }
+
+      // Same streamed-shape token accounting as agentNode: on the stream `usage_metadata`
+      // .input_tokens is the TOTAL and already includes the cached prefix, so the cache terms
+      // are subtracted out rather than added on top.
+      const um = response.usage_metadata;
+      const cacheRead = um?.input_token_details?.cache_read ?? 0;
+      const cacheWrite = um?.input_token_details?.cache_creation ?? 0;
+      return {
+        messages: [response],
+        turnCount: 1,
+        inputTokens: um?.input_tokens != null ? Math.max(0, um.input_tokens - cacheRead - cacheWrite) : 0,
+        outputTokens: um?.output_tokens ?? 0,
+        cacheReadTokens: cacheRead,
+        cacheWriteTokens: cacheWrite,
+        finalResponse: extractTextContent(response.content),
+      };
+    } catch (err) {
+      // The wrap-up itself failing must not take the turn down — fall back to the fixed message
+      // by leaving finalResponse null, which is exactly the old behaviour.
+      console.error('[agent-chat] finalize turn failed:', err);
+      return {};
+    }
+  }
+
   // Routing function: decide next node
   function shouldContinue(state: AgentState): string {
     // Check if we have a final response
@@ -684,10 +783,10 @@ function createAgentGraph(
       return END;
     }
 
-    // Check max iterations
+    // Out of steps — go and report the partial result rather than discarding it.
     if (state.iteration >= maxIterations) {
-      console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
-      return END;
+      console.warn(`⚠️ Agent reached max iterations (${maxIterations}) — finalizing with partial findings`);
+      return 'finalize';
     }
 
     // Check if last message has tool calls
@@ -709,15 +808,23 @@ function createAgentGraph(
   // Kept under the ceiling with room for the response to be written.
   const AGENT_NODE_TIMEOUT_MS = 115_000;
   const TOOLS_NODE_TIMEOUT_MS = 105_000;
+  // The wrap-up writes prose over an existing transcript and calls nothing, so it is fast — but
+  // it runs when the turn is ALREADY long, which is precisely when there is least room left.
+  const FINALIZE_NODE_TIMEOUT_MS = 45_000;
   const graph = new StateGraph(AgentStateAnnotation)
     .addNode('agent', agentNode, { timeout: AGENT_NODE_TIMEOUT_MS })
     .addNode('tools', toolsNode, { timeout: TOOLS_NODE_TIMEOUT_MS })
+    .addNode('finalize', finalizeNode, { timeout: FINALIZE_NODE_TIMEOUT_MS })
     .addEdge(START, 'agent')
     .addConditionalEdges('agent', shouldContinue, {
       tools: 'tools',
+      finalize: 'finalize',
       [END]: END,
     })
-    .addEdge('tools', 'agent');
+    .addEdge('tools', 'agent')
+    // finalize is terminal by construction: it binds no tools and always sets finalResponse (or
+    // returns nothing and lets the old fixed message stand), so it must never loop back to agent.
+    .addEdge('finalize', END);
 
   return graph.compile();
 }
@@ -805,9 +912,12 @@ function getModelByName(name: string): ChatAnthropicModel {
   let m = _modelByName.get(name);
   if (!m) {
     m = new ChatAnthropic({
+      // No sampling parameter, which is also what makes the A/B honest: `name` is chosen at
+      // runtime from the allowlist above, and that list spans model generations. A tuned
+      // temperature would throw on the newer half and quietly compare one model against
+      // nothing. The default is the same on every tier, so leaving it out is the setting that
+      // actually holds sampling constant.
       model: name,
-      // Matches the Opus tier's settings so an A/B compares MODELS, not sampling parameters.
-      temperature: 1,
       maxTokens: 4096,
       apiKey: ANTHROPIC_API_KEY,
     });
@@ -1035,6 +1145,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
       'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
       'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
+      // The open web (all users; metered per call — search settles on real tokens + the search
+      // surcharge, fetch is one Firecrawl unit). JARVIS is the agent people actually reach, and
+      // it had no way to look anything up outside the workspace: the platform's only web reach
+      // was sealed inside b2b_manufacturer_search, which returns manufacturers or nothing.
+      'web_search', 'web_fetch',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
@@ -1150,6 +1265,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup',
       'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
+      // The open web. Pepper is the agent people bring competitor, brand and distribution
+      // questions to, and until 2026-08-25 it could reach a URL only through the company
+      // profiler — so "list this competitor's brands and say who represents each in Greece"
+      // had no path through the tool set at all.
+      'web_search', 'web_fetch',
       'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
       'related_products', 'find_products_by_spec', 'products_in_project', 'projects_using_product',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
@@ -1183,6 +1303,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       'research_analysis', 'analytics_analysis',
+      // The open web. Every SEO tool here answers about a domain from an index; none of them can
+      // read the page. A competitor content question needs both.
+      'web_search', 'web_fetch',
       // Email marketing — compose drafts + confirm-gated send (Edith is the marketing agent)
       'manage_email_campaign',
     ],
@@ -1865,6 +1988,7 @@ async function executeAgent(
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
+  const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   // SEO agent toolkit (conversational research surface — separate from the article pipeline)
   const SEO_AGENT_TOOL_NAMES = [
@@ -1924,7 +2048,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -1932,6 +2056,7 @@ async function executeAgent(
     needsSub          ? import('../_shared/tools/sub-agent-tools.ts') : null,
     needsB2b          ? import('../_shared/tools/b2b-tools.ts') : null,
     needsMatScrape    ? import('../_shared/tools/material-scrape-tools.ts') : null,
+    needsWebResearch  ? import('../_shared/tools/web-research-tools.ts') : null,
     needsSeo          ? import('../_shared/tools/seo-tools.ts') : null,
     needsSeoAgent     ? import('../_shared/tools/seo-agent-tools.ts') : null,
     needsBg           ? import('../_shared/tools/background-tools.ts') : null,
@@ -1987,6 +2112,8 @@ async function executeAgent(
   const createCompanyWebsiteScrapeTool = b2bMod?.createCompanyWebsiteScrapeTool;
   const createMaterialScrapeTool = matScrapeMod?.createMaterialScrapeTool;
   const createFieldSuggestTool = matScrapeMod?.createFieldSuggestTool;
+  const createWebSearchTool = webResearchMod?.createWebSearchTool;
+  const createWebFetchTool = webResearchMod?.createWebFetchTool;
   const createCompanyEnrichmentTool = b2bMod?.createCompanyEnrichmentTool;
   const createCompanyRegistryLookupTool = b2bMod?.createCompanyRegistryLookupTool;
   const createIndustrialFacilitySearchTool = b2bMod?.createIndustrialFacilitySearchTool;
@@ -2715,6 +2842,15 @@ async function executeAgent(
     if (config.tools.includes('scrape_materials_from_url')) {
       tools.push(createMaterialScrapeTool(userId, workspaceId ?? null, sendProgress));
     }
+    // The open web. Both halves matter and neither substitutes for the other: web_search finds a
+    // URL, web_fetch reads it. Binding only the first leaves the agent able to learn that a page
+    // exists and unable to open it, which is the state the platform was in until 2026-08-25.
+    if (config.tools.includes('web_search')) {
+      tools.push(createWebSearchTool(userId, workspaceId ?? null, sendProgress));
+    }
+    if (config.tools.includes('web_fetch')) {
+      tools.push(createWebFetchTool(userId, workspaceId ?? null, sendProgress));
+    }
     if (config.tools.includes('suggest_extraction_fields')) {
       tools.push(createFieldSuggestTool(userId, workspaceId ?? null, sendProgress));
     }
@@ -3008,7 +3144,30 @@ async function executeAgent(
 
   // Create the agent graph — force tool use for interior-designer (prevents JARVIS text-first responses)
   const forceToolCall = agentId === 'interior-designer' && tools.length > 0;
-  const agentGraph = createAgentGraph(selectedModel, tools, onChunk, forceToolCall, 10, {
+
+  /**
+   * Step budget for this turn.
+   *
+   * 10 was the flat number for every turn, and for the overwhelming majority — "what's our
+   * stock", "make me a quote" — it is generous. It is not generous for RESEARCH, where each
+   * finding costs one call and the shape of the work is "keep going until the list stops
+   * growing": enumerate a competitor's brands, then check each one's distribution. A turn like
+   * that spends its first few steps just discovering where the data lives.
+   *
+   * So the budget follows the tools actually bound rather than being raised for everyone: a turn
+   * that cannot reach the web cannot use the extra steps anyway, and a bigger ceiling on a
+   * DB-only turn only buys a longer wait before the same answer.
+   *
+   * 20 rather than something larger because the real ceiling is wall-clock, not steps — the edge
+   * isolate is killed around 150s and the node timeouts sit just under it. This raises the step
+   * budget to where TIME becomes the binding constraint, and `finalize` is what makes hitting
+   * either one produce an answer instead of an apology.
+   */
+  const RESEARCH_TOOLS = ['web_search', 'web_fetch', 'b2b_manufacturer_search', 'company_website_scrape', 'scrape_materials_from_url'];
+  const hasResearchTools = tools.some((t: any) => RESEARCH_TOOLS.includes(t?.name));
+  const stepBudget = hasResearchTools ? 20 : 10;
+
+  const agentGraph = createAgentGraph(selectedModel, tools, onChunk, forceToolCall, stepBudget, {
     userId,
     workspaceId,
     conversationId: conversation_id || undefined,
@@ -3186,8 +3345,15 @@ async function executeAgent(
     // Log final usage stats
 
     // Return results
+    // `stepBudget`, not a literal 10 — this comparison was hardcoded while the budget above was a
+    // parameter, so raising the budget for research turns would have left the apology firing at
+    // step 10 of 20. The `finalize` node now writes a real answer in this case, so reaching this
+    // fallback at all means the wrap-up turn itself failed.
     let finalText = result.finalResponse ||
-      (result.iteration >= 10 ? 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.' : '');
+      (result.iteration >= stepBudget
+        ? 'I ran out of processing steps on this turn and could not write up what I found. '
+          + 'Ask me to continue and I will pick up from a narrower scope.'
+        : '');
 
     // ── A question in prose is converted into a form. Mechanically. ───────────
     //

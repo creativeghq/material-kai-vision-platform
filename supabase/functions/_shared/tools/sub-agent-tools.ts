@@ -32,15 +32,15 @@ import { resolveTokenPrice } from '../ai-logger.ts';
 
 /** The model these sub-agents run on. Named once so the price lookup and the usage row
  *  cannot drift apart — they were two literals before, and one of them was wrong. */
-const SUB_AGENT_MODEL = 'claude-opus-4-8';
+const SUB_AGENT_MODEL = 'claude-opus-5';
 
-// Reserve ceiling for one Opus 4.8 sub-agent pass (~$0.40; credits = billed_usd * 100).
+// Reserve ceiling for one Opus sub-agent pass (~$0.40; credits = billed_usd * 100).
 // The exact usage is settled back after the call.
 const SUB_AGENT_CEILING = 40;
 
 /**
- * Log Anthropic Opus 4.7 usage to ai_usage_logs for cost attribution + debit credits.
- * Sub-agent tools (research/analytics/business/product) all run an Opus 4.7
+ * Log Anthropic Opus usage to ai_usage_logs for cost attribution + debit credits.
+ * Sub-agent tools (research/analytics/business/product) all run one Opus
  * inference; without this each call silently absorbs $0.05-0.30 of platform cost.
  */
 async function logSubAgentUsage(opName: string, response: any, userId: string | undefined, workspaceId: string | undefined, reservedCredits: number, extra: Record<string, unknown> = {}): Promise<void> {
@@ -152,7 +152,6 @@ export const createResearchAnalysisTool = (workspaceId: string, userId?: string)
         // Create a mini-agent execution with research context
         const researchModel = new ChatAnthropic({
           model: SUB_AGENT_MODEL,
-          temperature: 0.7,
           maxTokens: 2048,
         });
 
@@ -229,7 +228,6 @@ export const createAnalyticsAnalysisTool = (userId?: string, workspaceId?: strin
 
         const analyticsModel = new ChatAnthropic({
           model: SUB_AGENT_MODEL,
-          temperature: 0.5,
           maxTokens: 2048,
         });
 
@@ -303,7 +301,6 @@ export const createBusinessAnalysisTool = (workspaceId: string, userId?: string)
 
         const businessModel = new ChatAnthropic({
           model: SUB_AGENT_MODEL,
-          temperature: 0.7,
           maxTokens: 2048,
         });
 
@@ -379,7 +376,6 @@ export const createProductAnalysisTool = (workspaceId: string, userId?: string) 
 
         const productModel = new ChatAnthropic({
           model: SUB_AGENT_MODEL,
-          temperature: 0.7,
           maxTokens: 2048,
         });
 

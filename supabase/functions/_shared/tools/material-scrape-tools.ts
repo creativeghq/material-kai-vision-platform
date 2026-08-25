@@ -23,7 +23,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { debitOrRefuse } from '../credit-utils.ts';
-import { reserveCredits, refundCredits } from '../credit-reserve.ts';
+import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
+import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
 import { assertSafeUrl } from '../ssrf-guard.ts';
 
@@ -48,11 +49,22 @@ const { z } = await import('npm:zod@3');
 const SCRAPE_TIMEOUT_MS = 30_000;
 const MAX_CONTENT_CHARS = 15_000;
 
+/** The model the extraction pass runs on. One name, so the price lookup and the usage row
+ *  cannot come to different answers. */
+const EXTRACTION_MODEL = 'claude-opus-5';
+
+/**
+ * Reserve ceiling for one extraction pass, in credits (1 credit = $0.01 of billed cost).
+ * MAX_CONTENT_CHARS in (~4k tokens) + 4096 out, at Opus rates x1.5 markup, is ~18 credits.
+ * The reservation is settled against actual tokens afterwards, so this is a ceiling, not a price.
+ */
+const EXTRACTION_CEILING = 20;
+
 /** Reserve then release the tool's ceiling, so a caller with no credits is stopped up front. */
-async function affordabilityGate(userId: string, ceiling: number, opType: string) {
-  const gate = await reserveCredits(supabase, userId, undefined, ceiling, opType);
+async function affordabilityGate(userId: string, workspaceId: string | null, ceiling: number, opType: string) {
+  const gate = await reserveCredits(supabase, userId, workspaceId ?? undefined, ceiling, opType);
   if (!gate.ok) return gate.message;
-  await refundCredits(supabase, userId, undefined, ceiling, opType);
+  await refundCredits(supabase, userId, workspaceId ?? undefined, ceiling, opType);
   return null;
 }
 
@@ -80,6 +92,7 @@ function asUntrustedData(content: string): string {
 async function scrapeToMarkdown(
   url: string,
   userId: string,
+  workspaceId: string | null,
   opType: string,
 ): Promise<{ markdown: string; title: string } | { error: string }> {
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
@@ -88,7 +101,7 @@ async function scrapeToMarkdown(
   }
 
   // Invariant 10: debit before the paid call, never after.
-  const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', opType, 1, { url });
+  const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', opType, 1, { url }, workspaceId);
   if (refusal) return { error: refusal };
 
   const controller = new AbortController();
@@ -119,23 +132,49 @@ async function scrapeToMarkdown(
   }
 }
 
-/** Run the model over fenced page content with a DB-loaded system + task prompt. */
+/**
+ * Run the model over fenced page content with a DB-loaded system + task prompt.
+ *
+ * Money is RESERVED before the call and SETTLED against real tokens after it — invariant 10 is
+ * satisfied by the reservation (an exhausted workspace is stopped before we spend anything), and
+ * the charge is then derived from what the call actually cost rather than from a number somebody
+ * picked.
+ *
+ * It used to be a flat `debitOrRefuse(..., 'anthropic-extraction', ...)`, and there has never been
+ * an `anthropic-extraction` row in `ai_model_pricing`. An unpriced key is a hard refusal by
+ * design (see credit-utils), so BOTH tools in this file — `scrape_materials_from_url` and
+ * `suggest_extraction_fields` — have failed on every call they have ever received, with
+ * `Unknown service: anthropic-extraction`. Adding the missing row would have fixed the symptom
+ * and left a per-call price nobody derived; this derives it.
+ */
 async function analysePage(
   systemPrompt: string,
   taskPrompt: string,
   markdown: string,
   userId: string,
+  workspaceId: string | null,
   opType: string,
 ): Promise<{ text: string } | { error: string }> {
-  // Invariant 10 again: the model pass is the expensive half, so it is debited before it runs.
-  const refusal = await debitOrRefuse(supabase, userId, 'anthropic-extraction', opType, 1, {});
-  if (refusal) return { error: refusal };
+  const reserve = await reserveCredits(supabase, userId, workspaceId ?? undefined, EXTRACTION_CEILING, opType);
+  if (!reserve.ok) return { error: reserve.message ?? 'Insufficient credits for the extraction pass.' };
 
-  const model = new ChatAnthropic({ model: 'claude-opus-4-8', temperature: 0.2, maxTokens: 4096 });
-  const response = await model.invoke([
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: `${taskPrompt}\n\n${asUntrustedData(markdown)}` },
-  ]);
+  // No `temperature`. It was 0.2; sampling parameters are REMOVED on Opus 4.7+ and Sonnet 5, and
+  // langchain-anthropic throws on a non-default value before the request is sent.
+  const model = new ChatAnthropic({ model: EXTRACTION_MODEL, maxTokens: 4096 });
+
+  let response;
+  try {
+    response = await model.invoke([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `${taskPrompt}\n\n${asUntrustedData(markdown)}` },
+    ]);
+  } catch (err) {
+    await refundCredits(supabase, userId, workspaceId ?? undefined, EXTRACTION_CEILING, opType, { reason: 'model_call_failed' });
+    return { error: JSON.stringify({ success: false, error: `Extraction model call failed: ${(err as Error).message}` }) };
+  }
+
+  await settleExtractionCost(response, userId, workspaceId, opType);
+
   const text = typeof response.content === 'string'
     ? response.content
     : (response.content as Array<{ type: string; text?: string }>)
@@ -143,6 +182,61 @@ async function analysePage(
         .map((b) => b.text ?? '')
         .join('\n');
   return { text };
+}
+
+/**
+ * Settle the extraction reservation against the tokens the call actually used, and log the spend.
+ *
+ * A missing `ai_model_pricing` row means the cost is UNKNOWN, so the reservation is released
+ * rather than settled against a guess — same rule as the sub-agent tools.
+ */
+async function settleExtractionCost(response: any, userId: string, workspaceId: string | null, opType: string): Promise<void> {
+  try {
+    const usage = response?.usage_metadata ?? response?.response_metadata?.usage ?? {};
+    const inputTokens = usage.input_tokens ?? usage.inputTokens ?? 0;
+    const outputTokens = usage.output_tokens ?? usage.outputTokens ?? 0;
+    if (inputTokens === 0 && outputTokens === 0) {
+      await refundCredits(supabase, userId, workspaceId ?? undefined, EXTRACTION_CEILING, opType, { reason: 'no_usage' });
+      return;
+    }
+
+    const price = await resolveTokenPrice(supabase, EXTRACTION_MODEL);
+    if (!price) {
+      console.warn(`[material-scrape] no ai_model_pricing row for ${EXTRACTION_MODEL} — releasing the reservation unsettled`);
+      await refundCredits(supabase, userId, workspaceId ?? undefined, EXTRACTION_CEILING, opType, { reason: 'unpriced_model' });
+      return;
+    }
+
+    const inputCost = (inputTokens / 1_000_000) * price.input;
+    const outputCost = (outputTokens / 1_000_000) * price.output;
+    const rawCost = inputCost + outputCost;
+    const billedCost = rawCost * price.markup;
+    const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
+
+    await settleCredits(supabase, userId, workspaceId ?? undefined, EXTRACTION_CEILING, creditsToDebit, opType, { workspace_id: workspaceId });
+    const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+      user_id: userId,
+      workspace_id: workspaceId,
+      operation_type: opType,
+      model_name: EXTRACTION_MODEL,
+      api_provider: 'anthropic',
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      input_cost_usd: inputCost,
+      output_cost_usd: outputCost,
+      raw_cost_usd: rawCost,
+      markup_multiplier: price.markup,
+      billed_cost_usd: billedCost,
+      credits_debited: creditsToDebit,
+      metadata: { feature: 'material_scrape', sub_feature: opType, workspace_id: workspaceId },
+      created_at: new Date().toISOString(),
+    });
+    // supabase-js RESOLVES on an RLS denial, so an undestructured insert reports success on a row
+    // that was never written — the spend would then exist nowhere but this function's own stack.
+    if (usageErr) console.warn(`[${opType}] ai_usage_logs insert failed:`, usageErr.message);
+  } catch (logErr) {
+    console.warn(`[${opType}] extraction cost settle failed:`, logErr);
+  }
 }
 
 /** Parse a model reply that should be JSON, tolerating a ```json fence. */
@@ -167,12 +261,12 @@ function parseJsonReply(raw: string): unknown | null {
  */
 export const createMaterialScrapeTool = (
   userId: string,
-  _workspaceId: string | null,
+  workspaceId: string | null,
   onProgress?: (status: string) => void,
 ) => {
   return tool(
     async ({ url, detail }: { url: string; detail?: 'quick' | 'full' }) => {
-      const blocked = await affordabilityGate(userId, 20, 'scrape_materials_from_url');
+      const blocked = await affordabilityGate(userId, workspaceId, EXTRACTION_CEILING, 'scrape_materials_from_url');
       if (blocked) return blocked;
 
       let safeUrl: string;
@@ -183,7 +277,7 @@ export const createMaterialScrapeTool = (
       }
 
       onProgress?.(`Scraping ${safeUrl}...`);
-      const scraped = await scrapeToMarkdown(safeUrl, userId, 'scrape_materials_from_url');
+      const scraped = await scrapeToMarkdown(safeUrl, userId, workspaceId, 'scrape_materials_from_url');
       if ('error' in scraped) return scraped.error;
 
       if (!scraped.markdown || scraped.markdown.length < 100) {
@@ -200,7 +294,7 @@ export const createMaterialScrapeTool = (
       ]);
 
       const analysed = await analysePage(
-        systemPrompt, taskPrompt, scraped.markdown, userId, 'scrape_materials_from_url',
+        systemPrompt, taskPrompt, scraped.markdown, userId, workspaceId, 'scrape_materials_from_url',
       );
       if ('error' in analysed) return analysed.error;
 
@@ -245,12 +339,12 @@ export const createMaterialScrapeTool = (
  */
 export const createFieldSuggestTool = (
   userId: string,
-  _workspaceId: string | null,
+  workspaceId: string | null,
   onProgress?: (status: string) => void,
 ) => {
   return tool(
     async ({ url }: { url: string }) => {
-      const blocked = await affordabilityGate(userId, 20, 'suggest_extraction_fields');
+      const blocked = await affordabilityGate(userId, workspaceId, EXTRACTION_CEILING, 'suggest_extraction_fields');
       if (blocked) return blocked;
 
       let safeUrl: string;
@@ -261,7 +355,7 @@ export const createFieldSuggestTool = (
       }
 
       onProgress?.(`Scraping ${safeUrl}...`);
-      const scraped = await scrapeToMarkdown(safeUrl, userId, 'suggest_extraction_fields');
+      const scraped = await scrapeToMarkdown(safeUrl, userId, workspaceId, 'suggest_extraction_fields');
       if ('error' in scraped) return scraped.error;
 
       if (!scraped.markdown || scraped.markdown.length < 100) {
@@ -278,7 +372,7 @@ export const createFieldSuggestTool = (
       ]);
 
       const analysed = await analysePage(
-        systemPrompt, taskPrompt, scraped.markdown, userId, 'suggest_extraction_fields',
+        systemPrompt, taskPrompt, scraped.markdown, userId, workspaceId, 'suggest_extraction_fields',
       );
       if ('error' in analysed) return analysed.error;
 

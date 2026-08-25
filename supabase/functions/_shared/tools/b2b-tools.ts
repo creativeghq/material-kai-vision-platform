@@ -147,7 +147,7 @@ export async function validateEmailWithZeroBounce(
 const SEARCH_MODEL = 'claude-opus-5';
 /** The model the website-analysis pass runs on. Named so the price lookup and the usage row
  *  cannot name two different models, which is exactly what they did. */
-const ANALYSIS_MODEL = 'claude-opus-4-8';
+const ANALYSIS_MODEL = 'claude-opus-5';
 
 /**
  * Apollo circuit breaker.
@@ -707,10 +707,18 @@ export const createCompanyWebsiteScrapeTool = (
         onProgress?.(`Analyzing website content...`);
 
         let companyData;
+        let analysisFailure: string | null = null;
         try {
+          // The model name comes from ANALYSIS_MODEL, not a literal. This constructor carried its
+          // own `'claude-opus-4-8'` string while the cost log below read ANALYSIS_MODEL — the very
+          // drift the constant was introduced to stop, reintroduced one scope down.
+          //
+          // NO `temperature`. It was 0.3 here, and sampling parameters are REMOVED on Opus 4.7+
+          // and Sonnet 5: langchain-anthropic's validateInvocationParamCompatibility throws before
+          // the request is sent. So this pass threw on EVERY call and the catch below quietly
+          // handed back a 2 000-character preview instead — see the comment there.
           const analysisModel = new ChatAnthropic({
-            model: 'claude-opus-4-8',
-            temperature: 0.3,
+            model: ANALYSIS_MODEL,
             maxTokens: 2048,
           });
 
@@ -800,12 +808,21 @@ ${markdown.substring(0, 15000)}`;
             companyData = { raw_analysis: analysisText };
           }
         } catch (analysisError) {
+          // A FAILED ANALYSIS IS A FAILED CALL. Say so at the top level.
+          //
+          // This used to set `company_data.error` and a `raw_markdown_preview` of the first 2 000
+          // characters, and the response still said `success: true`. The model reading it could
+          // not tell a short page from a truncated one, so on 2026-08-25 an agent asked to
+          // enumerate a competitor's brands from `pwb-brand-sitemap.xml` received the first ~29
+          // slugs of ~100, concluded "the scraper truncates at ~2000 chars", and spent its whole
+          // iteration budget inventing workarounds for a bug that was in this catch block. Eight
+          // paid Firecrawl fetches, one useful answer between them.
+          //
+          // No preview: a partial page shaped like a whole one is worse than no page. The agent
+          // is told which tool actually returns page text instead.
+          analysisFailure = analysisError instanceof Error ? analysisError.message : String(analysisError);
           console.error('Claude analysis error:', analysisError);
-          // Return scraped data even if analysis fails
-          companyData = {
-            error: 'Analysis failed but website was scraped',
-            raw_markdown_preview: markdown.substring(0, 2000)
-          };
+          companyData = null;
         }
 
         // Deterministic contact extraction, beside the model rather than through it. A regex that
@@ -816,6 +833,27 @@ ${markdown.substring(0, 15000)}`;
         const contacts = extractContactDetails(markdown, data.data?.links, country);
 
         const totalElapsed = Date.now() - startTime;
+
+        // The contact extraction above is deterministic and still ran, so a failed analysis pass
+        // does not make the call worthless — but it does make it UNSUCCESSFUL, and the caller has
+        // to be able to tell. `success: false` plus whatever we do have, never a plausible stub.
+        if (analysisFailure) {
+          return JSON.stringify({
+            success: false,
+            url: url,
+            error: `Page fetched, but the analysis pass failed: ${analysisFailure}`,
+            analysis_failed: true,
+            contact_details: contacts,
+            page_title: metadata.title || '',
+            page_description: metadata.description || '',
+            page_chars: markdown.length,
+            next_step: 'The contact details above are read straight off the page and are reliable. '
+              + 'For the page TEXT itself (a sitemap, a brand index, a product list), call web_fetch '
+              + 'on this URL — it returns the document rather than a profile of the company.',
+            elapsed_ms: totalElapsed,
+          });
+        }
+
         return JSON.stringify({
           success: true,
           url: url,

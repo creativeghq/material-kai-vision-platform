@@ -81,25 +81,35 @@ export interface LangGraphRunOutput {
  * `langchainVersionPins` scans this tree for unpinned `@langchain` specifiers and a
  * comment quoting one reads to it exactly like an import.)
  */
+/**
+ * NEVER write to `process.env` here — on Supabase edge it is not a shim you can merge into.
+ *
+ * This used to do `procEnv.ANTHROPIC_API_KEY = anthropicApiKey` on the theory that
+ * `globalThis.process.env` is a plain object it could top up. Under Deno's node-compat layer
+ * `process.env` is a live proxy backed by `Deno.env`, and `Deno.env.set` is unavailable on this
+ * runtime — so the assignment threw `NotSupported: The operation is not supported` and took
+ * `buildLLM` with it. EVERY background agent died in ~490 ms, before a single token was spent:
+ * `dispatch_background_task` returned `refused_500`, and the chat agent that dispatched it was
+ * told (correctly) that nothing was running. `secrets-bootstrap` logs this same constraint on
+ * every cold start; this file was the one place that had not read the message.
+ *
+ * The writes were redundant on top of being fatal: both constructors below take the key as an
+ * explicit argument, so nothing ever read the env var they were setting.
+ */
 export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
   const { model, anthropicApiKey, googleApiKey } = opts;
 
-  // Merge into the existing process.env shim rather than replacing it wholesale.
-  // Replacing the entire object would wipe keys set by other concurrent agents.
-  const procEnv: Record<string, string> = (globalThis as any).process?.env ?? {};
-  if (!(globalThis as any).process) {
-    (globalThis as any).process = { env: procEnv };
-  }
-
   if (model.startsWith('gemini-')) {
     const { ChatGoogleGenerativeAI } = await import('npm:@langchain/google-genai@2.3.0');
-    procEnv.GOOGLE_API_KEY = googleApiKey ?? '';
     return new ChatGoogleGenerativeAI({ model, apiKey: googleApiKey, maxOutputTokens: 4096 });
   }
 
-  // Default: Anthropic (claude-*)
+  // Default: Anthropic (claude-*).
+  //
+  // No `temperature` — and do not add one. Sampling parameters were REMOVED on Opus 4.7+ and
+  // Sonnet 5; the API returns 400 and langchain-anthropic rejects it client-side before the
+  // request is even sent. See `assertNoSamplingParams` in the guard test.
   const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.5.6');
-  procEnv.ANTHROPIC_API_KEY = anthropicApiKey;
   return new ChatAnthropic({ model, anthropicApiKey, maxTokens: 4096 });
 }
 
