@@ -1447,7 +1447,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // profile rather than a conversation participant.
       // ─────────────────────────────────────────────────────────────
       case 'sync-avatars': {
-        const { workspaceId, threadId: onlyThreadId, force } = requestBody;
+        const { workspaceId, threadId: onlyThreadId, force, debug } = requestBody;
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
@@ -1533,6 +1533,21 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (phone) byPhone.set(phone, target);
         }
 
+        /**
+         * What the provider ACTUALLY sends, in field names.
+         *
+         * This exists because the photo question was answered twice from the SPEC and both
+         * answers were wrong — confidently enough that "participantPicture is in every payload"
+         * went into a comment as fact and a working lookup was deleted on the strength of it. A
+         * schema says what a field MAY hold; only a response says what it does. `avatarUrl` is
+         * declared on both the contacts LIST and the contacts DETAIL, and the docs do not say
+         * what fills either, so both get asked and both get reported.
+         *
+         * Key names only, never values: the question is which fields carry something, and the
+         * values are someone's private conversation.
+         */
+        const shapes: Record<string, unknown> = {};
+
         let conversations = 0;
         let withPicture = 0;
         let stored = 0;
@@ -1580,6 +1595,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             }
 
             const items = (page?.data ?? page?.conversations ?? []) as Array<Record<string, any>>;
+            if (debug && !shapes.conversation && items.length) {
+              shapes.conversation_keys = Object.keys(items[0]).sort();
+              // PRESENT-and-null is a different fact from ABSENT: the first says Zernio has the
+              // field and Meta handed it nothing, the second says we may be asking wrongly.
+              shapes.participantPicture_present = 'participantPicture' in items[0];
+              shapes.participantPicture_type = items[0].participantPicture === null
+                ? 'null' : typeof items[0].participantPicture;
+              shapes.conversation = true;
+            }
             for (const conv of items) {
               conversations++;
               const convId = typeof conv.id === 'string' ? conv.id : '';
@@ -1626,6 +1650,35 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               }
               const cItems = (cres?.contacts ?? cres?.data ?? []) as Array<Record<string, any>>;
               if (!cItems.length) break;
+              if (debug && !shapes.contact && cItems.length) {
+                shapes.contact_list_keys = Object.keys(cItems[0]).sort();
+                shapes.list_avatarUrl_present = 'avatarUrl' in cItems[0];
+                shapes.list_avatarUrl_type = cItems[0].avatarUrl === null ? 'null' : typeof cItems[0].avatarUrl;
+                // How many of the WHOLE page carry one, not just the first — a single sample
+                // would say nothing about a field that is populated for some people and not others.
+                shapes.list_with_avatar = cItems.filter((c) => typeof c.avatarUrl === 'string' && c.avatarUrl).length;
+                shapes.list_page_size = cItems.length;
+
+                // The DETAIL endpoint is a SEPARATE read and may fill fields the list omits.
+                // Assuming otherwise is the exact shape of this whole bug, so it gets asked.
+                if (cItems[0].id) {
+                  try {
+                    const one = await zernioApi('GET', `/contacts/${encodeURIComponent(String(cItems[0].id))}`);
+                    const c1 = (one?.contact ?? one?.data ?? null) as Record<string, any> | null;
+                    if (c1) {
+                      shapes.contact_detail_keys = Object.keys(c1).sort();
+                      shapes.detail_avatarUrl_present = 'avatarUrl' in c1;
+                      shapes.detail_avatarUrl_type = c1.avatarUrl === null ? 'null' : typeof c1.avatarUrl;
+                      shapes.detail_avatarUrl_filled = typeof c1.avatarUrl === 'string' && !!c1.avatarUrl;
+                      shapes.detail_channel_keys = Array.isArray(c1.channels) && c1.channels.length
+                        ? Object.keys(c1.channels[0]).sort() : [];
+                    }
+                  } catch (err) {
+                    shapes.contact_detail_error = err instanceof Error ? err.message : String(err);
+                  }
+                }
+                shapes.contact = true;
+              }
               for (const c of cItems) {
                 contactsScanned++;
                 const avatar = typeof c.avatarUrl === 'string' ? c.avatarUrl : '';
@@ -1675,6 +1728,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           from_contacts: fromContacts,
           stored,
           own_avatar: ownAvatar,
+          ...(debug ? { provider_shape: shapes } : {}),
           // Every count is a different diagnosis, and one "synced N" would hide all of them: no
           // conversations = the listing failed; conversations but no pictures = the platform
           // withholds them; pictures but nothing stored = we already hold them, or those threads
