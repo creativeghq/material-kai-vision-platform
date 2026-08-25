@@ -171,6 +171,15 @@ A foreign supplier is not a myDATA obligor, so nobody files their invoice agains
 - **In the UI these are FILTERS, not a second tab** — Source and Detail on the Expenses inbox. Once a `14.x` has lines it is indistinguishable from a `1.1` to warehouse, catalog, payables and P&L, so a provenance tab would partition the work queue by the wrong axis.
 - **Downstream**: `inbound_doc_to_supplier_bill(p_doc_id)` creates a `supplier_bills` row; `inbound_doc_receive_to_warehouse(p_doc_id, p_mappings)` records stock-in (see [warehouse doc](warehouse-and-billing.md)).
 
+### Reverse charge in the reports
+
+An intra-EU acquisition is booked at NET in payables — no VAT is owed to the supplier — but that is a different question from the VAT return, where the self-assessed VAT is emphatically not zero.
+
+- **`finance_vat_report` emits `reverse_charge_output` and `reverse_charge_input`** — the VAT declared and the identical amount reclaimed in the same filing. They cancel in the payable, and **both are compulsory**; omitting them is an incomplete return, not a conservative one. AADE names the box itself: every one of these documents carries `expensesClassification` `VAT_364`. Keyed on `issue_date` (the tax point is the acquisition, not the day we booked it), and bills raised from a `13.x`/`14.x` are excluded from the `input` section so their net is not counted twice.
+- Before this, the VAT figure sat only on `inbound_documents.total_vat`, the bill correctly said 0, and **no report read either** — €10,899.35 appeared nowhere at all, which is the silent-zero shape landing on a statutory filing.
+- **`get_intrastat_lines('arrival')` counts them as unfileable rather than omitting them.** They are real arrivals (€45,413.93 from BG/IT/ES/PL/PT) but a myDATA document carries no commodity code or weight, so they land in `unclassified_lines` / `unclassified_value` and the UI banner states the amount. The return used to come back looking complete. Excluded once the document became a purchase order, or the arrival counts twice.
+- **Not affected:** P&L, MYF and AP aging read `supplier_bills`, which now carries the net. What is missing from those is a *disposition* problem — the documents have to be booked first.
+
 ### Complete-the-document (`inbound_doc_set_lines`)
 
 A `14.x` carries one value-only line; so does most `2.x` Greek service billing — **1,161 of 1,769** received documents name nothing at all. Every downstream consumer keys on `lines[].item_description`, so those documents are correctly skipped by warehouse receive and AI extraction, and the purchase never reaches stock. The document has no lines; the transaction did.

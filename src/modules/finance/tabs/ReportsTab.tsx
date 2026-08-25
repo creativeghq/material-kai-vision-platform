@@ -176,7 +176,9 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           // no weight is one the declaration would silently omit.
           setIntrastatWarning(
             res.unclassified > 0 || res.unweighed > 0
-              ? `${res.unclassified} line(s) in scope have no commodity code and ${res.unweighed} have no weight — they are NOT in this return.`
+              ? `${res.unclassified} line(s) in scope have no commodity code`
+                + (res.unclassifiedValue > 0 ? ` (${formatMoney(res.unclassifiedValue)})` : '')
+                + ` and ${res.unweighed} have no weight — they are NOT in this return.`
               : null,
           );
           break;
@@ -477,12 +479,22 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
     }
     case 'vat_return': {
       const sum = (pred: (r: any) => boolean, key: string) => rows.filter(pred).reduce((s, r) => s + Number(r[key] || 0), 0);
-      const outputVat = sum((r) => r.section === 'output' || r.section === 'output_credit', 'vat');
-      const inputVat = sum((r) => r.section === 'input' || r.section === 'input_credit', 'vat');
+      // Reverse charge sits on BOTH sides: self-assessed as output, reclaimed as input. Leaving
+      // it out of either would misstate that side even though the two cancel in the payable.
+      const outputVat = sum((r) => r.section === 'output' || r.section === 'output_credit'
+        || r.section === 'reverse_charge_output', 'vat');
+      const inputVat = sum((r) => r.section === 'input' || r.section === 'input_credit'
+        || r.section === 'reverse_charge_input', 'vat');
+      const reverseCharge = sum((r) => r.section === 'reverse_charge_output', 'vat');
       const payable = Math.round((outputVat - inputVat) * 100) / 100;
       return [
         { label: 'Output VAT (sales)', value: formatMoney(outputVat) },
         { label: 'Input VAT (purchases)', value: formatMoney(inputVat) },
+        ...(reverseCharge > 0
+          // Stated in its own right, not merely folded into the two above: it is the one figure
+          // on this report that is declared and reclaimed in the same breath.
+          ? [{ label: 'of which reverse charge (nets to zero)', value: formatMoney(reverseCharge) }]
+          : []),
         { label: payable >= 0 ? 'VAT payable' : 'VAT credit', value: formatMoney(Math.abs(payable)) },
       ];
     }
@@ -595,12 +607,18 @@ function renderReport(
     const outputCredit = rows.find((r: any) => r.section === 'output_credit');
     const input = rows.find((r: any) => r.section === 'input');
     const inputCredit = rows.find((r: any) => r.section === 'input_credit');
+    const rcOutput = rows.find((r: any) => r.section === 'reverse_charge_output');
+    const rcInput = rows.find((r: any) => r.section === 'reverse_charge_input');
     const line = (label: string, r: any) => [label, formatMoney(Number(r?.net || 0)), formatMoney(Number(r?.vat || 0)), String(r?.doc_count ?? 0)];
     const body: string[][] = [];
     for (const o of outputs) body.push([`Sales @ ${fmtRate(o.vat_rate)}`, formatMoney(Number(o.net || 0)), formatMoney(Number(o.vat || 0)), String(o.doc_count ?? 0)]);
     if (outputCredit) body.push(line('Less: customer credit notes', outputCredit));
     if (input) body.push(line('Purchases (supplier bills)', input));
     if (inputCredit) body.push(line('Less: supplier credit notes', inputCredit));
+    // Two lines, because it really is two entries. The supplier charged nothing; we declare the
+    // VAT and reclaim it in the same filing, so the pair cancels and both halves must be shown.
+    if (rcOutput) body.push(line('Intra-EU acquisitions — VAT self-assessed', rcOutput));
+    if (rcInput) body.push(line('Intra-EU acquisitions — VAT reclaimed', rcInput));
     return <Table headers={['Line', 'Net', 'VAT', 'Docs']} totals={totals} rows={body} />;
   }
   if (report === 'vat_by_code') {

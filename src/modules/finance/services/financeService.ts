@@ -3130,7 +3130,17 @@ export interface SalesPerDayRow { period: string; invoice_count: number; revenue
 export interface CashflowPerDayRow { period: string; receipts: number; payments: number; difference: number; payment_count: number }
 /** P&L per finance category (Oxygen "Αναφορά ανά Επ. Κατηγορία"). */
 export interface PnlPerCategoryRow { category_id: string | null; category_name: string; income: number; customer_credits: number; expenses: number; supplier_credits: number; net: number; vat_income: number; vat_expense: number }
-export interface VatReportRow { section: 'output' | 'output_credit' | 'input' | 'input_credit'; vat_rate: number | null; net: number; vat: number; doc_count: number }
+/**
+ * `reverse_charge_*` are the two legs of an intra-EU acquisition (myDATA 13.x/14.x): the VAT we
+ * self-assess and the identical amount we reclaim in the same filing. They net to zero, and BOTH
+ * are compulsory on the return — omitting them is not conservative, it is an incomplete filing.
+ * `net` is carried on the output leg only, so it is stated once.
+ */
+export interface VatReportRow {
+  section: 'output' | 'output_credit' | 'input' | 'input_credit'
+    | 'reverse_charge_output' | 'reverse_charge_input';
+  vat_rate: number | null; net: number; vat: number; doc_count: number;
+}
 export interface VatByCodeRow { vat_category: number | null; vat_rate: number | null; income_classification_type: string; income_classification_category: string; net: number; vat: number; line_count: number }
 export interface PartyLedgerRow {
   entry_date: string | null; doc_kind: string; doc_number: string | null;
@@ -3522,7 +3532,7 @@ const _financeServiceV2 = {
    */
   async reportIntrastat(
     workspaceId: string, from: string, to: string, direction: 'dispatch' | 'arrival',
-  ): Promise<{ rows: IntrastatRow[]; unclassified: number; unweighed: number }> {
+  ): Promise<{ rows: IntrastatRow[]; unclassified: number; unclassifiedValue: number; unweighed: number }> {
     const { data, error } = await supabase.rpc('get_intrastat_lines', {
       p_workspace_id: workspaceId, p_from: from, p_to: to, p_direction: direction,
     });
@@ -3531,6 +3541,9 @@ const _financeServiceV2 = {
     return {
       rows: (r.rows ?? []) as IntrastatRow[],
       unclassified: Number(r.unclassified_lines ?? 0),
+      // What the omission is WORTH. A line count reads as housekeeping; the value is the size of
+      // the hole in a statutory declaration.
+      unclassifiedValue: Number(r.unclassified_value ?? 0),
       unweighed: Number(r.unweighed_lines ?? 0),
     };
   },
