@@ -304,7 +304,6 @@ const InboxPage: React.FC = () => {
       setSearchParams(p, { replace: true });
     }
   }, [activeWorkspaceId, searchParams, setSearchParams]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   /** True while a send is in flight. See `send` — a ref, because the state read is stale there. */
   const sendInFlight = useRef(false);
   const isMobile = useIsMobile();
@@ -528,7 +527,60 @@ const InboxPage: React.FC = () => {
     return () => { supabase.removeChannel(ch); };
   }, [loadThreads]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  /**
+   * Opening a conversation lands at the BOTTOM. Every time, without animating there.
+   *
+   * This was one `scrollIntoView({behavior:'smooth'})` keyed on `messages`, which fails a thread
+   * three separate ways:
+   *
+   *   - smooth ANIMATES from the top of the history, so opening a long chat scrolls visibly
+   *     through months of it, and any wheel touch during the animation cancels it half way;
+   *   - it fires when `messages` changes, which is BEFORE images, PDFs and video have laid out.
+   *     The target is computed against a short document, then the attachments load, the document
+   *     grows underneath, and you are left in the middle;
+   *   - `scrollIntoView` walks every scrollable ancestor, so it can move the page as well as
+   *     the message pane.
+   *
+   * So: set `scrollTop` on the pane itself, instantly, on open — and keep re-pinning while the
+   * content is still growing, which is what a ResizeObserver is for.
+   */
+  const listRef = useRef<HTMLDivElement>(null);
+  /** False once the reader scrolls up deliberately — see the handler below. */
+  const stickToBottom = useRef(true);
+
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  // Opening a thread: jump, and hold the bottom while attachments finish laying out. An image
+  // that decodes 300ms later would otherwise push the last message back off screen.
+  useEffect(() => {
+    if (!activeId || loadingThread) return;
+    stickToBottom.current = true;
+    scrollToBottom(false);
+    // Twice more across paint, for content that sizes after the first frame.
+    const r1 = requestAnimationFrame(() => scrollToBottom(false));
+    const t1 = setTimeout(() => scrollToBottom(false), 120);
+
+    const el = listRef.current;
+    if (!el) return () => { cancelAnimationFrame(r1); clearTimeout(t1); };
+    // Media has no single "done" event we can await, and each attachment signs its URL
+    // separately, so the pane keeps growing for a while. Watch the box instead of guessing.
+    const ro = new ResizeObserver(() => { if (stickToBottom.current) scrollToBottom(false); });
+    ro.observe(el);
+    for (const child of Array.from(el.children)) ro.observe(child);
+    const stop = setTimeout(() => ro.disconnect(), 4000);
+    return () => { cancelAnimationFrame(r1); clearTimeout(t1); clearTimeout(stop); ro.disconnect(); };
+  }, [activeId, loadingThread, scrollToBottom]);
+
+  // A new message in an already-open thread: follow it, but only if the reader is still at the
+  // bottom. Yanking someone out of the history they are reading is worse than a missed message,
+  // and they can see there is a new one.
+  useEffect(() => {
+    if (stickToBottom.current) scrollToBottom(true);
+  }, [messages, scrollToBottom]);
 
   const send = useCallback(async () => {
     if (!activeId || (!draft.trim() && !attachment)) return;
@@ -1199,7 +1251,17 @@ const InboxPage: React.FC = () => {
                 </Button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div
+                ref={listRef}
+                className="flex-1 overflow-y-auto p-4 space-y-3"
+                onScroll={(e) => {
+                  // "Near enough" rather than exact: a fractional scrollHeight (any zoom level,
+                  // any sub-pixel row height) never satisfies an equality check, so an exact
+                  // test would decide the reader had scrolled up while they sat at the bottom.
+                  const el = e.currentTarget;
+                  stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                }}
+              >
                 {loadingThread ? (
                   <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 animate-spin" /></div>
                 ) : messages.map((m) => (
@@ -1222,7 +1284,6 @@ const InboxPage: React.FC = () => {
                     onToggleHidden={isCommentThread && isMember ? handleToggleHidden : undefined}
                   />
                 ))}
-                <div ref={messagesEndRef} />
               </div>
 
               {/* Composer */}

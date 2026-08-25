@@ -330,6 +330,24 @@ describe('the WhatsApp profile is fetched and shown', () => {
     expect(stripComments(inboxMedia)).toMatch(/avatar_path: avatarPath/);
   });
 
+  it('opens a conversation at the bottom, and stays there while media lays out', () => {
+    const page = stripComments(inboxPage);
+    // Instant on open. `smooth` ANIMATES from the top of the history, so a long chat scrolls
+    // visibly through months of itself and any wheel touch cancels it half way.
+    expect(page).toMatch(/scrollToBottom\(false\)/);
+    // Keyed on the THREAD opening, not only on `messages` — the message array arrives before
+    // the attachments in it have laid out.
+    expect(page).toMatch(/\[activeId, loadingThread, scrollToBottom\]/);
+    // Media has no single "done" event and every attachment signs its URL separately, so the
+    // pane keeps growing after first paint. Watch the box rather than guess a delay.
+    expect(page).toMatch(/new ResizeObserver/);
+    // Scrolls the PANE, never scrollIntoView — that walks every scrollable ancestor and moves
+    // the page along with the message list.
+    expect(page).not.toMatch(/scrollIntoView/);
+    // A reader who scrolled up to read history is not yanked back down by an arriving message.
+    expect(page).toMatch(/stickToBottom/);
+  });
+
   it('puts the hover actions on the message you REPLY to, not on top of its avatar', () => {
     const page = stripComments(inboxPage);
     // Every non-system message gets the bar — reply/react/copy are for the OTHER person's
