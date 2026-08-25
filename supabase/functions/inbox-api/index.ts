@@ -3578,7 +3578,13 @@ async function readConversationSentiment(
   const WINDOW = 20;
   const { data: msgs, error: msgErr } = await db
     .from('inbox_messages')
-    .select('id, body, message_type, direction, created_at')
+    // `direction` is NOT a column — it lives in `metadata`, the way every other reader in this
+    // file takes it (`.eq('metadata->>direction', …)`). PostgREST rejects the whole select on an
+    // unknown column, so asking for it here did not mislabel a speaker: it 500ed every sentiment
+    // read on every thread, from the moment the feature shipped, behind
+    // "Could not read the conversation". `sender_participant_id` comes along because the older
+    // outbound rows predate the direction stamp (42 of them) and their participant still knows.
+    .select('id, body, message_type, metadata, sender_participant_id, created_at')
     .eq('thread_id', threadId)
     .neq('message_type', 'system')
     .order('created_at', { ascending: false })
@@ -3605,8 +3611,30 @@ async function readConversationSentiment(
   // The INDEX is in the markup because the model is asked to key `message_moods` on it. Message
   // ids are opaque uuids: a model asked to echo one back gets a character wrong often enough to
   // matter, and a mood keyed to an id that matches nothing renders as no border at all.
+  // WHO SPOKE, from the two places that actually know.
+  //
+  // `metadata.direction` is the live stamp and covers everything the webhook has filed. It is
+  // absent on the outbound rows that predate it, and there an unstamped message reads as the
+  // CUSTOMER's — which hands the model our own words as theirs and asks how the customer feels
+  // about them. The participant type is the fallback, and it is the same answer `buildTranscript`
+  // reaches for a few hundred lines up.
+  const { data: sentimentParts } = await db.from('inbox_participants')
+    .select('id, participant_type').eq('thread_id', threadId);
+  const sentimentTypeById = new Map<string, string>(
+    ((sentimentParts || []) as Array<{ id: string; participant_type: string }>)
+      .map((p) => [p.id, p.participant_type]),
+  );
+  const isOurs = (m: Record<string, unknown>): boolean => {
+    if (m.message_type === 'agent') return true;
+    const dir = ((m.metadata ?? {}) as Record<string, unknown>).direction;
+    if (dir === 'outgoing') return true;
+    if (dir === 'incoming') return false;
+    const t = m.sender_participant_id ? sentimentTypeById.get(String(m.sender_participant_id)) : undefined;
+    return t === 'member' || t === 'agent';
+  };
+
   const transcript = withText.map((m, i) => {
-    const who = m.direction === 'outgoing' ? 'us' : 'customer';
+    const who = isOurs(m) ? 'us' : 'customer';
     return `<message index="${i}" from="${who}">\n${String(m.body).slice(0, 1200)}\n</message>`;
   }).join('\n');
 
