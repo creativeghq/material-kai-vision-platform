@@ -213,6 +213,22 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     const results:  any[] = [];
 
     for (const tc of toolCalls) {
+      // The deadline is checked HERE as well as in the router, because the router only gets a say
+      // BETWEEN nodes. A model turn can request many tools at once and this loop runs them one by
+      // one: a 21-call batch of web fetches held the node for minutes, so the run sailed past the
+      // 95s router deadline without the router ever being consulted, and the rejecting backstop
+      // won the race — losing the graceful wrap-up the deadline exists to reach. Measured, not
+      // theoretical: that is exactly what run 517ed569 did.
+      //
+      // The remaining calls get a ToolMessage saying why they did not run, so the wrap-up turn can
+      // report them as outstanding rather than as failures.
+      if (outOfTime()) {
+        toolMsgs.push(new ToolMessage({
+          tool_call_id: tc.id,
+          content: 'Not executed: this run is out of time. Do not retry it — summarise what you have.',
+        }));
+        continue;
+      }
       onLog?.('info', `Calling tool: ${tc.name}`, { args: tc.args });
       const toolFn = tools.find((t: any) => t.name === tc.name);
       if (!toolFn) {
