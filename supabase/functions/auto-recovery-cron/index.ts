@@ -80,6 +80,29 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
       console.warn('[AutoRecoveryCron] fail_exhausted_pdf_jobs threw:', e);
     }
 
+    // Reap agent_runs orphaned by an isolate kill.
+    //
+    // `background-agent-runner` runs the whole agent loop inside ONE edge invocation, so when the
+    // platform terminates that isolate none of our code writes the terminal state — the row stays
+    // 'processing' and the user, told "results will post back to this thread", waits forever.
+    // This database held a 'pending' run from 2026-07-31 that nothing had ever touched.
+    //
+    // Deliberately separate from detectAllStuckJobs: that covers `background_jobs`, which is a
+    // different table with a different recovery story (re-dispatch). An orphaned agent_run is not
+    // re-dispatchable — its credits were already reserved and settled — so the honest outcome is
+    // to mark it failed and let the user see that, not to silently retry paid work.
+    let orphanedAgentRuns = 0;
+    try {
+      const { data, error } = await supabase.rpc('reap_orphaned_agent_runs', { p_stuck_minutes: 15 });
+      if (error) throw error;
+      orphanedAgentRuns = (data as number) ?? 0;
+      if (orphanedAgentRuns > 0) {
+        console.warn(`[AutoRecoveryCron] Reaped ${orphanedAgentRuns} orphaned agent_run(s)`);
+      }
+    } catch (e) {
+      console.warn('[AutoRecoveryCron] reap_orphaned_agent_runs threw:', e);
+    }
+
     // Detect stuck jobs
     const stuckJobs = await detectAllStuckJobs(supabase);
     console.log(`[AutoRecoveryCron] Found ${stuckJobs.length} stuck jobs`);
@@ -90,6 +113,7 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
           success: true,
           message: 'No stuck jobs found',
           exhausted_failed: exhaustedFailed,
+          orphaned_agent_runs_reaped: orphanedAgentRuns,
           timestamp: new Date().toISOString(),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -105,6 +129,7 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
       timestamp: new Date().toISOString(),
       totalStuck: stuckJobs.length,
       exhausted_failed: exhaustedFailed,
+      orphaned_agent_runs_reaped: orphanedAgentRuns,
       recovered: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length,
       results,

@@ -246,10 +246,76 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     return { messages: toolMsgs, toolResults: results };
   }
 
+  /**
+   * Wall-clock deadline for the TOOL LOOP, leaving room to write the answer.
+   *
+   * The loop used to be bounded only by `maxIterations`, with a 5-minute REJECTING race around
+   * the whole thing. Both are the wrong shape for real research work:
+   *
+   *  - A rejection throws away everything the run learned. The run is marked failed and the
+   *    tool results — which cost real money and minutes — are gone.
+   *  - The rejection frequently never fires at all, because the platform kills the isolate
+   *    first. Then nothing marks the run terminal and it sits in `processing` forever. There is
+   *    a `pending` run in this database from 2026-07-31 that nothing has ever reaped.
+   *
+   * So the deadline is checked in the router instead, and crossing it routes to a wrap-up turn
+   * that reports what was actually found. Same reasoning as agent-chat's `finalize` node, for
+   * the same reason: a partial answer that says it is partial beats a clean failure.
+   */
+  const LOOP_DEADLINE_MS = 3.5 * 60 * 1000;
+  const startedAt = Date.now();
+  const outOfTime = () => Date.now() - startedAt > LOOP_DEADLINE_MS;
+
+  /**
+   * Last turn of a run that ran out of iterations or time: write up the partial result.
+   * No tools bound — there is nothing left to call, and binding them invites a tool_use block
+   * that can never be executed.
+   */
+  async function finalizeNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
+    onLog?.('info', 'Wrapping up with partial findings', {
+      iterations: state.iteration,
+      elapsed_ms: Date.now() - startedAt,
+      tool_results: state.toolResults.length,
+    });
+    const wrapUp = new HumanMessage(
+      'You are out of time for this task, so you cannot call any more tools. Do NOT apologise '
+      + 'and do NOT ask a question. Write up what you actually established from the tool results '
+      + 'in this conversation:\n'
+      + '1. The findings themselves — every concrete name, URL, number and record you retrieved.\n'
+      + '2. What is still outstanding, specifically, and how far you got.\n'
+      + '3. Any tool that failed and what it returned.\n'
+      + 'Mark anything you could not verify as unverified. Never present a partial list as '
+      + 'complete, and never fill a gap from your own knowledge.',
+    );
+    try {
+      const response = await llm.invoke([new SystemMessage(systemPrompt), ...state.messages, wrapUp]);
+      const usage = (response as any).response_metadata?.usage;
+      return {
+        messages: [response],
+        inputTokens: usage?.input_tokens || 0,
+        outputTokens: usage?.output_tokens || 0,
+        finalResponse: extractTextContent(response.content),
+      };
+    } catch (err) {
+      // The wrap-up failing must not take the run down — report what we know without it.
+      onLog?.('error', `Finalize turn failed: ${(err as Error).message}`);
+      return {
+        finalResponse:
+          `The task ran out of time after ${state.iteration} iterations and `
+          + `${state.toolResults.length} tool call(s), and the summary turn also failed. `
+          + 'Nothing here is a verified result — re-run with a narrower scope.',
+      };
+    }
+  }
+
   // Router
-  function shouldContinue(state: AgentStateType): 'tools' | typeof END {
+  function shouldContinue(state: AgentStateType): 'tools' | 'finalize' | typeof END {
     if (state.finalResponse !== null) return END;
-    if (state.iteration >= maxIterations) return END;
+    // Out of budget — go and report the partial result rather than discarding it. Only worth a
+    // wrap-up when there is something to report; with no tool results there is nothing to save.
+    if (state.iteration >= maxIterations || outOfTime()) {
+      return state.toolResults.length > 0 ? 'finalize' : END;
+    }
     const last = state.messages[state.messages.length - 1] as any;
     if (last?.tool_calls?.length > 0) return 'tools';
     return END;
@@ -258,19 +324,24 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
   const graph = new StateGraph(AgentState)
     .addNode('agent', agentNode)
     .addNode('tools', toolsNode)
+    .addNode('finalize', finalizeNode)
     .addEdge(START, 'agent')
-    .addConditionalEdges('agent', shouldContinue, { tools: 'tools', [END]: END })
+    .addConditionalEdges('agent', shouldContinue, { tools: 'tools', finalize: 'finalize', [END]: END })
     .addEdge('tools', 'agent')
+    // Terminal by construction: finalize binds no tools and always sets finalResponse.
+    .addEdge('finalize', END)
     .compile();
 
   const initialMessages: BaseMessageT[] = [new HumanMessage(userMessage)];
 
-  // Guard against agents that get stuck in a tool loop or hit a slow model.
-  // 5 minutes is generous for background agents; adjust via maxIterations if needed.
-  // Capture the timer id so we can clear it once the graph resolves first —
-  // otherwise the (rejecting) timeout keeps the Deno isolate alive past the
-  // request lifetime, which on hot agents shows up as leaked handles + a
-  // background "Unhandled rejection" log every 5 minutes.
+  // Backstop only. `LOOP_DEADLINE_MS` above is the deadline that actually governs the run and it
+  // exits GRACEFULLY, so this race should never win — it exists for the case the deadline cannot
+  // catch: a single model or tool call that hangs past it inside one node. Kept above the loop
+  // deadline plus a wrap-up turn so it does not pre-empt the graceful path.
+  //
+  // Capture the timer id so we can clear it once the graph resolves first — otherwise the
+  // (rejecting) timeout keeps the Deno isolate alive past the request lifetime, which on hot
+  // agents shows up as leaked handles + a background "Unhandled rejection" log.
   const TIMEOUT_MS = 5 * 60 * 1000;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
