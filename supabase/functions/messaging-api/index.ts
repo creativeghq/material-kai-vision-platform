@@ -1990,7 +1990,33 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // diagnosis, it names a cause, and it was false: the conversation was there and
           // readable the whole time. Waiting was the one thing that could not fix it.
           if (wantConversation) {
-            convs = [{ id: wantConversation }];
+            // FETCH THE CONVERSATION, not just its id.
+            //
+            // The replay below builds the sender out of `conv.participantPhone` /
+            // `participantId` / `participantName`, because those are what the listing row
+            // carries. Handing it a bare `{ id }` leaves every one of them undefined, and the
+            // webhook handler then resolves the counterparty for an OUTGOING echo (it falls back
+            // to the thread that already owns the conversation) and drops every INCOMING one with
+            // "no resolvable phone on the sender". Measured: 11 outbound filed, 31 inbound
+            // dropped, on a conversation the repair had just successfully reached — the exact
+            // half that was missing, missing again, with `success: true` on top.
+            //
+            // The detail endpoint answers with `platform`, `participantId` and
+            // `participantUsername`, which is what the listing row would have given us.
+            try {
+              const det = await zernioApi(
+                'GET',
+                `/inbox/conversations/${encodeURIComponent(wantConversation)}`
+                + `?accountId=${encodeURIComponent(accountId)}`,
+              );
+              const conv = (det?.data ?? det) as Record<string, any>;
+              convs = [{ ...conv, id: conv?.id ?? wantConversation }];
+            } catch (err) {
+              // Every account is tried, so the ones that do not own this conversation answer
+              // 400/404 — that is the search working. Held back; surfaced only on a total miss.
+              namedErrors.push(`${accountId}: ${String(err)}`);
+              continue;
+            }
           } else {
             try {
               // PAGE through them. This read one page and stopped, so `limit` was not "how many to
