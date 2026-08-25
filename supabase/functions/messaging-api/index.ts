@@ -300,7 +300,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
-      'open-whatsapp-thread', 'sync-avatars',
+      'open-whatsapp-thread', 'sync-avatars', 'zernio-probe',
       // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
@@ -1446,6 +1446,65 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Also refreshes OUR OWN number's photo — a different endpoint, because that is a business
       // profile rather than a conversation participant.
       // ─────────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────
+      // zernio-probe — ask Zernio a question without shipping a release.
+      //
+      // The API key lives only in the edge runtime, so "what does this endpoint actually
+      // return?" could not be answered from a terminal. Every such question therefore cost a
+      // full deploy, and each deploy answered exactly one narrowly-guessed question. Two days of
+      // the profile-photo hunt went that way: reading the spec, guessing, shipping, learning one
+      // fact, guessing again. The spec says what a field MAY hold; only a response says what it
+      // does, and there was no way to look.
+      //
+      // GET only, and the path is appended to the pinned Zernio base by `zernioApi` — so no
+      // caller-supplied host (invariant 7 cannot be reached from here) and nothing that mutates.
+      // Admin only, because a raw read of the provider crosses every workspace on the key.
+      // ─────────────────────────────────────────────────────────────
+      case 'zernio-probe': {
+        if (!isAdminAccess(auth)) throw new HttpError(404, 'Not found');
+
+        const rawPath = typeof requestBody.path === 'string' ? requestBody.path.trim() : '';
+        if (!rawPath.startsWith('/')) {
+          throw new HttpError(400, 'path is required and must start with "/" (e.g. /inbox/conversations?limit=1)');
+        }
+        // No scheme, no host, no traversal — the base URL is `zernioApi`'s and stays that way.
+        if (/^\/\//.test(rawPath) || rawPath.includes('..') || /https?:/i.test(rawPath)) {
+          throw new HttpError(400, 'path must be a bare API path, not a URL');
+        }
+
+        try {
+          const data = await zernioApi('GET', rawPath);
+          // `keys_only` for a question about SHAPE — which is most of them — so a shape check
+          // never has to pull somebody's conversation text back through here to answer it.
+          if (requestBody.keys_only) {
+            const shapeOf = (v: unknown): unknown => {
+              if (Array.isArray(v)) return v.length ? [shapeOf(v[0]), `…${v.length} items`] : [];
+              if (v && typeof v === 'object') {
+                const out: Record<string, string> = {};
+                for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+                  out[k] = val === null ? 'null'
+                    : Array.isArray(val) ? `array(${val.length})`
+                    : typeof val === 'object' ? 'object'
+                    : `${typeof val}${typeof val === 'string' && val ? '' : '(empty)'}`;
+                }
+                return out;
+              }
+              return typeof v;
+            };
+            return jsonResponse({ success: true, path: rawPath, shape: shapeOf(data) });
+          }
+          return jsonResponse({ success: true, path: rawPath, data });
+        } catch (err) {
+          // Returned, not thrown: the STATUS is usually the answer (404 says the route does not
+          // exist, 401 says the key lacks that resource group), and a 500 here would hide it.
+          return jsonResponse({
+            success: false,
+            path: rawPath,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       case 'sync-avatars': {
         const { workspaceId, threadId: onlyThreadId, force, debug } = requestBody;
         const wsId = await resolveTargetWorkspaceId(workspaceId);
@@ -1627,11 +1686,24 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
           // ── second source: Zernio's own contact records ──
           //
-          // The conversations list is the documented place for a participant photo and it is the
-          // one Meta feeds, so it comes first. But this number runs in COEXISTENCE mode, where the
-          // phone's own address book is synced across, and `/v1/contacts` carries an `avatarUrl`
-          // that the conversation shape has no field for. Two different origins, so checking only
-          // one and concluding "no photos exist" would be the same mistake that started this.
+          // MEASURED 2026-08-25 against the live number, and the answer is that neither source
+          // has a photo to give:
+          //
+          //   /inbox/conversations  100 results. `participantPicture` PRESENT on every one,
+          //                         value `null`. Zernio has the field; Meta fills nothing.
+          //   /contacts             516 results. `avatarUrl` NOT PRESENT AT ALL — not on the
+          //                         list, not on `/contacts/{id}`. It is declared in Zernio's
+          //                         OpenAPI schema and on docs.zernio.com and the live API does
+          //                         not return it. (`channels` on the detail response is the
+          //                         same: documented, absent.)
+          //
+          // Kept rather than deleted, because the two are different origins — Meta feeds the
+          // conversation, the handset's address book feeds the contact under coexistence — and a
+          // field Zernio ships later would be picked up here for free. Throttled to once a day,
+          // so the cost of asking is three requests per day, not three per page load.
+          //
+          // Do NOT re-derive this from the spec. Both wrong answers in this file's history came
+          // from reading a schema and believing it; use `zernio-probe` and look.
           //
           // Only for threads still without a photo, and matched on the digits of the number
           // because contacts are keyed by `platformIdentifier` rather than by conversation id.
