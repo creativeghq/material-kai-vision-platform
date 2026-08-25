@@ -304,7 +304,14 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
   const transcript: BaseMessageT[] = [];
   const toolResultsSoFar: any[] = [];
 
-  const LOOP_DEADLINE_MS = 95 * 1000;
+  //
+  // MUST stay below HARD_DEADLINE_MS. These are two deadlines for two different failures and the
+  // order between them is the contract: this one stops the loop cleanly BETWEEN nodes and lets
+  // the in-graph `finalize` write the answer with the whole remaining window; the hard one exists
+  // only for a node that is already running and cannot be asked to stop. Set above it — as it
+  // briefly was at 95s against a 75s hard deadline — and the graceful path can never win, so
+  // every run takes the salvage route instead of the good one.
+  const LOOP_DEADLINE_MS = 60 * 1000;
   const startedAt = Date.now();
   const outOfTime = () => Date.now() - startedAt > LOOP_DEADLINE_MS;
 
@@ -392,7 +399,19 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
    * transcript accumulated so far. `graph.invoke` gives no access to intermediate state, so the
    * nodes append to `transcript` as they go; that is the copy this path reads.
    */
-  const HARD_DEADLINE_MS = 105 * 1000;
+  //
+  // 75s, not 105s, and the wrap-up's budget is derived from the WALL rather than from this
+  // number. The first version computed the remaining window as `HARD_DEADLINE_MS + 25_000 -
+  // elapsed`, and since elapsed IS the deadline when this fires, that arithmetic always produced
+  // 25 seconds no matter what the deadline was — moving the deadline could never have bought the
+  // wrap-up any more room. 25s is not enough to generate a summary over a 20-tool transcript, so
+  // it fell to the raw listing every time (run 224dca7c).
+  //
+  // Trading 30s of tool loop for a written answer is the right way round: the loop's results are
+  // preserved either way, but only the wrap-up turns them into something a person can read.
+  const HARD_DEADLINE_MS = 75 * 1000;
+  /** The gateway kills the request at ~150s; stay inside it with room to write the response. */
+  const WALL_MS = 145 * 1000;
   const DEADLINE = Symbol('deadline');
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const deadlinePromise = new Promise<typeof DEADLINE>((resolve) => {
@@ -518,8 +537,9 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
       return clone;
     });
 
-    // Whatever is left of the window, minus a margin to return the response.
-    const left = Math.max(5_000, HARD_DEADLINE_MS + 25_000 - (Date.now() - startedAt));
+    // Whatever is left before the WALL, minus a margin to return the response. Derived from the
+    // wall rather than from the deadline, so lowering the deadline actually buys time here.
+    const left = Math.max(10_000, WALL_MS - (Date.now() - startedAt) - 8_000);
     try {
       const response: any = await Promise.race([
         llm.invoke([new SystemMessage(systemPrompt), ...trimmed, wrapUp]),
