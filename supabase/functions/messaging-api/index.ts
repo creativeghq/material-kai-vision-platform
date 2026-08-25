@@ -1975,6 +1975,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         // had no workspace bound to Zernio account X" is one, and it names the fix.
         const dropReasons: Record<string, number> = {};
         // A named conversation is searched for across accounts; only a total miss is an error.
+        // Set when the per-trace nested-invocation budget runs out. The run stops cleanly and
+        // SAYS it stopped, rather than throwing away the report of what it had already filed.
+        let budgetHit = false;
         let namedRead = false;
         const namedErrors: string[] = [];
 
@@ -2135,14 +2138,57 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               // Signed with the real webhook secret rather than let in through a service-role
               // bypass: invariant 6 is verify-before-process and fail closed, and a second door
               // added "only for replay" is the one that ends up reachable.
-              const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/zernio-webhook-handler`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Zernio-Signature': await signZernioBody(replayBody),
-                },
-                body: replayBody,
-              });
+              //
+              // PACED, and the failure is caught.
+              //
+              // Every replay in one backfill is a nested edge-function call, and Supabase budgets
+              // those PER TRACE — all of them share the parent invocation's trace id, so the
+              // budget is separate from (and far smaller than) the project's capacity. 40
+              // unrelated calls to this function all return 200; ~30 nested ones from a single
+              // run exhaust it. The throw then escaped this loop entirely, so a run that had
+              // already filed 30 messages returned HTTP 500 and `{"error":"Rate limit exceeded
+              // for trace …"}` — the import was real and the report of it was lost, which read as
+              // total failure and invited a re-run that hit the same wall in the same place.
+              // https://supabase.com/docs/guides/troubleshooting/edge-function-error-rate-limit-exceeded-for-trace-1094d3
+              let res: Response | null = null;
+              try {
+                res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/zernio-webhook-handler`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Zernio-Signature': await signZernioBody(replayBody),
+                  },
+                  body: replayBody,
+                });
+              } catch (err) {
+                // Honour the budget's own number once — it tells us exactly how long to wait —
+                // then give up on the rest of this conversation rather than burn the remaining
+                // wall clock failing. The run is idempotent, so the report says to re-run and
+                // the next one resumes where this stopped.
+                const msg = err instanceof Error ? err.message : String(err);
+                const retryMs = Number(
+                  (err as { retryAfterMs?: number })?.retryAfterMs
+                  ?? msg.match(/Retry after (\d+)ms/)?.[1] ?? 0,
+                );
+                if (retryMs > 0 && retryMs <= 45_000 && !budgetHit) {
+                  await new Promise((r) => setTimeout(r, retryMs + 250));
+                  try {
+                    res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/zernio-webhook-handler`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-Zernio-Signature': await signZernioBody(replayBody),
+                      },
+                      body: replayBody,
+                    });
+                  } catch { res = null; }
+                }
+                if (!res) {
+                  budgetHit = true;
+                  errors.push(`replay ${m.id}: ${msg}`);
+                  break;
+                }
+              }
               if (res.ok) {
                 accepted++;
                 const body = await res.json().catch(() => ({}));
@@ -2153,8 +2199,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               } else {
                 errors.push(`replay ${m.id}: ${res.status}`);
               }
+              // Pace the next one. The docs' own remedy is "a delay of hundreds of milliseconds";
+              // a replay already costs ~800ms, so this is a small tax on a repair that is not on
+              // anyone's critical path, and it is what keeps a 50-message conversation inside one
+              // run instead of three.
+              await new Promise((r) => setTimeout(r, 120));
             }
+            if (budgetHit) break;
           }
+          if (budgetHit) break;
         }
 
         const { count: messagesAfter } = await supabaseClient
@@ -2177,7 +2230,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           matched: targeted ? matched : undefined,
           // The handler's own words, counted. No log-diving to find out why an inbox is empty.
           drop_reasons: Object.keys(dropReasons).length ? dropReasons : undefined,
-          message: targeted && matched === 0
+          // A run that stopped early is NOT a success and NOT a failure — it is a partial, and
+          // it is idempotent, so the one thing the caller needs to be told is "run it again".
+          stopped_early: budgetHit || undefined,
+          message: budgetHit
+            ? `Imported ${imported} message(s), then Supabase's per-trace budget for nested `
+              + 'function calls ran out. That is OUR platform limit — not WhatsApp, not Zernio — '
+              + 'and nothing was lost: re-run this exact call to continue from here.'
+            : targeted && matched === 0
             ? 'WhatsApp has not handed that conversation over yet. On a coexistence number Meta '
               + 'syncs history in the background over several hours — the chat stays on the phone '
               + 'and only becomes importable once that sync reaches it. Try again later.'
