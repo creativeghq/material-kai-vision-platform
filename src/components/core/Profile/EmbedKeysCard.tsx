@@ -67,19 +67,47 @@ function scopeLabel(key: EmbedKey): string {
 }
 
 /**
- * The snippet a tenant copies into their own site. ONE tag (#341 entry point 2).
+ * The snippet a tenant copies into their own site.
  *
- * `<materialkai-builder>` is the entry and naming a product is a MODE of it, not a second
- * component — the builder already mounts `<materialkai-product>` internally, both on a match and
- * on the deep-link path. The platform used to hand out two snippets, which made a merchant choose
- * between them before they understood either, and the one that captures demand for things the
- * catalogue cannot satisfy was the one nothing offered.
+ * ONE tag for the catalogue (#341 entry point 2): `<materialkai-builder>` is the entry and naming
+ * a product is a MODE of it, not a second component — the builder already mounts
+ * `<materialkai-product>` internally, both on a match and on the deep-link path. The platform used
+ * to hand out two snippets, which made a merchant choose between them before they understood
+ * either, and the one that captures demand for things the catalogue cannot satisfy was the one
+ * nothing offered. `<materialkai-product>` is still exported and still works for anyone using it.
  *
- * `<materialkai-product>` is still exported and still works for anyone already using it.
+ * BUT THE SNIPPET HAS TO MATCH THE KEY IT IS COPIED FROM. Three kinds of key now exist and the
+ * builder tag serves exactly one of them: a `tools` key serves NO catalogue, so a builder tag on
+ * it renders nothing at all, and a key scoped to configurators sees no products for the same
+ * reason. Handing all three the same snippet meant two of them copied something that could only
+ * fail — silently, on their own site, with nothing in the platform saying why (#382 shipped
+ * `<materialkai-configurator>` and `<materialkai-assistant>`; this did not follow them).
+ *
+ * A blueprint-scoped key pastes with a REAL id when it is scoped to exactly one, because that is
+ * the difference between a snippet that works and a snippet with a placeholder to go and look up.
  */
-function usageSnippet(apiKey: string): string {
+function usageSnippet(key: EmbedKey): string {
   const base = window.location.origin;
-  return `<script src="${base}/embed/materialkai-product.js" defer></script>
+  const tag = `<script src="${base}/embed/materialkai-product.js" defer></script>`;
+  const apiKey = key.api_key;
+
+  if (key.key_kind === 'tools') {
+    return `${tag}
+
+<!-- The calculators, as buttons. Serves none of your catalogue; every
+     enquiry they produce lands in this workspace. -->
+<materialkai-assistant api-key="${apiKey}"></materialkai-assistant>`;
+  }
+
+  if (key.scope_type === 'blueprints') {
+    const only = key.scope_values?.length === 1 ? key.scope_values[0] : 'BLUEPRINT_ID';
+    return `${tag}
+
+<!-- Lets a visitor build something you don't stock, and prices it live. -->
+<materialkai-configurator api-key="${apiKey}" blueprint="${only}"></materialkai-configurator>`;
+  }
+
+  return `${tag}
 
 <!-- Asks the visitor what they are after, prices it if you stock it,
      and captures the request if you don't. -->
@@ -442,7 +470,7 @@ export const EmbedKeysCard: React.FC = () => {
                       <Copy className="h-3.5 w-3.5 mr-1" />Copy
                     </Button>
                     <Button size="sm" variant="outline" className="shrink-0"
-                      onClick={() => copy(usageSnippet(key.api_key), 'Embed snippet')}>
+                      onClick={() => copy(usageSnippet(key), 'Embed snippet')}>
                       Embed code
                     </Button>
                     <Button size="sm" variant="ghost" className="shrink-0"
@@ -494,6 +522,29 @@ export const EmbedKeysCard: React.FC = () => {
                 </div>
               );
             })
+          )}
+
+          {/* Where the copied code actually goes. "Embed code" hands over a snippet and then the
+              platform stops talking, which is fine for a hand-written page and not fine for the
+              two places most people are: Shopify and WordPress both need it pasted somewhere
+              non-obvious, and Shopify additionally needs the .myshopify.com preview domain on the
+              key or it works live and looks broken the whole time you are setting it up. */}
+          {keys.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Paste the snippet anywhere in your site's HTML. On <strong>Shopify</strong>, use{' '}
+              <span className="text-foreground">Theme → Customise → Add section → Custom Liquid</span>{' '}
+              — and add your <code className="font-mono">.myshopify.com</code> address to the key's
+              websites as well as your live domain, or it will look broken in the theme editor.{' '}
+              <a
+                href="/documentation/api-embed.html#shopify"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                Full instructions
+              </a>
+              .
+            </p>
           )}
         </CardContent>
       </Card>

@@ -17,8 +17,21 @@
 
   <div class="callout"><p><strong>See it running:</strong> <a href="embed-demo.html">a live demo page</a> — a real product, a real 3D model, real prices, and a compatibility rule you can trigger.</p></div>
 
+  <h2>Four tags, one script</h2>
+  <p>One <code>&lt;script&gt;</code> registers all four. Which one you place is a decision about <em>your page</em>, not an installation step — you never load a second file, and you can put more than one on a site.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tag</th><th>The question it answers</th><th>Needs</th></tr></thead>
+    <tbody>
+      <tr><td><code>&lt;materialkai-builder&gt;</code></td><td>“Show me this product” — or, with no <code>product-id</code>, “what have you got like this?”</td><td>A catalogue key</td></tr>
+      <tr><td><code>&lt;materialkai-configurator&gt;</code></td><td>“Let me build something that isn't in your catalogue yet.”</td><td>A catalogue key + a published configurator</td></tr>
+      <tr><td><code>&lt;materialkai-assistant&gt;</code></td><td>“Work something out for me” — a sizer, a cost comparison, a search.</td><td>A tools key</td></tr>
+      <tr><td><code>&lt;materialkai-product&gt;</code></td><td>The 3D viewer on its own. The builder mounts this internally.</td><td>A catalogue key</td></tr>
+    </tbody>
+  </table></div>
+
   <h2>The two-line version</h2>
-  <p>There is <strong>one tag</strong>. Give it a <code>product-id</code> for a page that is already about one product; leave it off and it asks the visitor what they're after instead.</p>
+  <p>For your catalogue there is <strong>one tag</strong>. Give it a <code>product-id</code> for a page that is already about one product; leave it off and it asks the visitor what they're after instead.</p>
   <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
 
 &lt;materialkai-builder
@@ -53,6 +66,73 @@
   <p>It is a hosted page rather than part of the widget on purpose: the planner is a full 3D application, and loading it into every product page would cost every visitor for a feature few open. Nothing is saved — the arrangement lives in the visitor's browser and comes to you attached to their enquiry.</p>
   <div class="callout"><p><strong>Only products with a model get the button.</strong> Without one the planner has no measured size to work from and would place a 60 × 60 cm placeholder — inviting somebody to check whether it fits, at a size nobody measured.</p></div>
 
+  <h2>Letting a visitor build something you don't stock</h2>
+  <p>The builder matches a visitor's description against products you already have. <code>&lt;materialkai-configurator&gt;</code> is for the case where there is nothing to match: a fitted kitchen, a wardrobe run, anything you <em>make</em> rather than pick off a shelf. The visitor lays out zones, sets module widths and counts, chooses finishes and appliances, and watches a real price move as they do.</p>
+
+  <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-configurator
+  api-key="mk_embed_…"
+  blueprint="YOUR-BLUEPRINT-ID"&gt;
+&lt;/materialkai-configurator&gt;</code></pre>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Attribute</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>api-key</code></td><td><strong>Required.</strong> A catalogue key.</td></tr>
+      <tr><td><code>blueprint</code></td><td><strong>Required.</strong> Which configurator to open. Without it the widget says so rather than guessing.</td></tr>
+      <tr><td><code>api-base</code></td><td>Point at a different environment. Rarely needed.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The price is <strong>the same derivation that records the money</strong> when the configuration becomes a plan — not a second one written for the widget. What an anonymous visitor is shown on your page is what the quote will say.</p>
+
+  <div class="callout"><p><strong>Your costs stay on our side.</strong> Every line's cost basis is folded to a single price <em>before it leaves the server</em>, so material cost, labour rate and margin are never in the page — even though someone reading your source can see everything the widget received. The arithmetic in the browser runs on the folded figures and lands on the same total.</p></div>
+
+  <p>The hardware and service schedule — hinges, legs, sockets, ducting — is derived alongside the price and shown as <strong>counts, never money</strong>. The plan counts; the quote prices.</p>
+
+  <h3>How it ends</h3>
+  <p>There is no cart here, because nobody adds a fitted kitchen to a basket. The visitor finishes on <strong>Request a quote</strong> — name, email, a note, and a bot challenge — and it arrives as a <a href="quotes-requests.html">quote request</a> with the full configuration attached. Your page can also listen for it:</p>
+
+  <pre><code>document.addEventListener('materialkai:quote-request', (event) =&gt; {
+  const { blueprint_id, title, composition, estimated_total, currency } = event.detail;
+});</code></pre>
+  <p>The contact details aren't in that payload on purpose — they've already been delivered to your workspace, and putting an email address into an event any script on the page can read would be handing it to every tag you've installed.</p>
+
+  <p>As with the cart handoff, the same payload goes to the parent window via <code>postMessage</code> when the widget sits in an iframe.</p>
+
+  <div class="callout"><p><strong>Scope a key to specific configurators.</strong> When you create a key you can restrict it to <strong>configurators</strong> instead of products — useful when a partner's site should be able to open your kitchen planner and nothing else. A key scoped to products or categories sees <em>no</em> configurators at all: it's a key about products.</p></div>
+
+  <div class="callout warn"><p><strong>A configurator has to be published for embedding</strong> — separately from being active internally, and for the same reason products have an online-store switch. An unpublished one returns the same “not found” as an id that never existed, so nobody can discover what you're still working on by guessing.</p></div>
+
+  <h2>The tools, as buttons</h2>
+  <p><code>&lt;materialkai-assistant&gt;</code> puts the calculators on your page: size a heat pump, compare heating costs, estimate a kitchen, price a spec, search materials. It needs a <strong>tools key</strong> (chosen when you create one) and serves <em>none</em> of your catalogue — but every enquiry it produces lands in your workspace.</p>
+
+  <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-assistant api-key="mk_embed_…"&gt;&lt;/materialkai-assistant&gt;</code></pre>
+
+  <div class="callout"><p><strong>It opens as buttons, not a chat box — and that is deliberate.</strong> Most visitors don't know what to type at a blinking cursor, and every keystroke at one would bill you for a model turn. Pressing a button runs a single calculation directly: <strong>no AI, no tokens, nothing to pay</strong>. A visitor's first useful answer costs you nothing.</p></div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Button</th><th>What it works out</th><th>Costs you</th></tr></thead>
+    <tbody>
+      <tr><td>Size a heat pump</td><td>The output a room or building needs.</td><td>Nothing</td></tr>
+      <tr><td>Compare heating costs</td><td>Running costs across fuels.</td><td>Nothing</td></tr>
+      <tr><td>Estimate a kitchen</td><td>A ballpark from size and finish level.</td><td>Nothing</td></tr>
+      <tr><td>What would this cost</td><td>Prices a written spec against your catalogue.</td><td>Nothing</td></tr>
+      <tr><td>Request a quote</td><td>Hands you the enquiry.</td><td>Nothing</td></tr>
+      <tr><td>Show me what works with this</td><td>Searches your materials by description.</td><td>A fraction of a cent — <strong>off by default</strong></td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The form under each button is built from what that calculation actually accepts, so the options offered are always the options it takes. Nothing is typed in by hand on our side and then left to drift.</p>
+
+  <h3>The one place AI is involved</h3>
+  <p>After a result, a visitor can ask for it to be <strong>explained</strong> — two sentences, in plain language. That single turn is the only model call on this surface, and it <em>cannot</em> search, price, or write anything: it only reads the answer the button already produced. A public text box is safe here because there is nothing behind it to reach.</p>
+
+  <div class="callout warn"><p><strong>Explanations are capped in money, not in turns.</strong> Each key has a <strong>daily spend limit</strong> you set. A cap counted in questions would be meaningless — a real turn ranges from under half a cent to several euro, so “twenty a day” is a budget somewhere between four cents and ninety euro. When the day's limit is reached the buttons keep working; only the explanations pause.</p></div>
+
   <h2>Your key is meant to be public</h2>
   <p>The embed key ships in your page's source. That's what it's for — like a Stripe publishable key or a Google Maps key. It is <strong>not</strong> a secret, and it is not what protects your catalog. Three things do:</p>
 
@@ -68,7 +148,7 @@
   <div class="callout warn"><p><strong>Add your domain before you go live.</strong> Include any staging or <code>*.myshopify.com</code> preview domain you test on. Miss it and the widget says <em>“This website is not allowed to use this embed key”</em> — which is the message doing its job, and a one-line fix in Profile → Keys.</p></div>
 
   <h3>Limiting what a key can show</h3>
-  <p>When you create a key you choose its reach: <strong>everything published</strong>, <strong>only certain categories</strong>, or <strong>only specific products</strong>. Because the key is public, this is the only control that genuinely constrains what an embed can pull — anything the request could ask for, anyone reading your page source could ask for too. Hand a partner a key scoped to one range and that's all it will ever return.</p>
+  <p>When you create a key you choose its reach: <strong>everything published</strong>, <strong>only certain categories</strong>, <strong>only specific products</strong>, or <strong>only certain configurators</strong>. Because the key is public, this is the only control that genuinely constrains what an embed can pull — anything the request could ask for, anyone reading your page source could ask for too. Hand a partner a key scoped to one range and that's all it will ever return.</p>
 
   <p>Only products you've <strong>published to your online store</strong> are served at all. Unpublish one and it disappears from every embed immediately.</p>
 
@@ -83,7 +163,50 @@
 
   <p>If the widget sits inside an iframe the same payload is also sent via <code>postMessage</code> to the parent window, so you can listen either way.</p>
 
-  <div class="callout"><p><strong>On Shopify</strong> there's a theme block that does this wiring for you — it adds the selected variant and records the chosen finishes on the line item, so the person picking the order can see them. Ask us about it.</p></div>
+  <div class="callout"><p><strong>On Shopify</strong> this wiring is already written — see <a href="#shopify">Putting this on Shopify</a> below.</p></div>
+
+  <h2 id="shopify">Putting this on Shopify</h2>
+  <p>Nothing special is needed: the widget is a plain script tag and a custom element, so it goes onto a Shopify storefront the same way it goes onto any other site. You don't have to edit theme code, and you don't have to install anything.</p>
+
+  <ol class="feat">
+    <li><strong>Theme → Customise</strong>, open the page you want it on, and <strong>Add section → Custom Liquid</strong> (on a product page, <strong>Add block → Custom Liquid</strong>).</li>
+    <li>Paste the snippet from <strong>Profile → Keys → Website Embed</strong> into it.</li>
+    <li>Add <strong>both</strong> your live domain <em>and</em> your <code>your-store.myshopify.com</code> address to the key's allowed websites — the theme editor previews on the <code>myshopify.com</code> one, so leaving it out means it works live and looks broken while you're setting it up.</li>
+    <li>Save, and view the page as a shopper. The theme editor's preview frame is a fair test; the section list is not.</li>
+  </ol>
+
+  <h3>Sending a configured product to Shopify's cart</h3>
+  <p>On a product page, add this below the widget in the same Custom Liquid block. It adds the variant the shopper currently has selected and records their chosen finishes on the line item, so whoever picks the order can read them:</p>
+
+  <pre><code>&lt;script&gt;
+  document.addEventListener('materialkai:add-to-cart', function (event) {
+    var detail = event.detail || {};
+    var variantId = {{ product.selected_or_first_available_variant.id | json }};
+    if (!variantId) return;
+
+    var properties = Object.assign({}, detail.options);
+    properties['_materialkai_product_id'] = detail.product_id;
+
+    fetch(window.Shopify.routes.root + 'cart/add.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [{ id: variantId, quantity: detail.quantity || 1, properties: properties }]
+      })
+    }).then(function () {
+      document.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+      document.dispatchEvent(new CustomEvent('cart:build', { bubbles: true }));
+    });
+  });
+&lt;/script&gt;</code></pre>
+
+  <p>Properties starting with an underscore are hidden from the shopper but stay on the order, so the exact configuration can be reconstructed later. The ones without stay visible — those are what the cart, the order confirmation and the person packing it read.</p>
+
+  <p>Those last two <code>dispatchEvent</code> lines are what make most themes refresh their cart drawer. Without them the item is genuinely added and the shopper sees nothing happen.</p>
+
+  <div class="callout warn"><p><strong>Shopify charges Shopify's price.</strong> On a Shopify product page the money is theirs — price, stock and tax all come from the variant. Treat the widget's figure as a guide there, and keep your finish options priced as Shopify variants if a choice is meant to change what's charged. A configurator that tried to own price on someone else's checkout would be wrong about all three.</p></div>
+
+  <div class="callout"><p><strong>A one-click version exists.</strong> We've built a Shopify <em>theme app extension</em> — the widget as a drag-in block with its own settings, and product matching by metafield so every product carries its own id instead of you pasting one per page. It needs publishing to the Shopify app store before you can install it, so for now: <strong>ask us</strong>, and use the Custom Liquid route above in the meantime. It produces the same result.</p></div>
 
   <h2>The JSON API</h2>
   <p>If you'd rather render it yourself. Send the key as <code>?key=</code> or in an <code>x-embed-key</code> header — the query string avoids a CORS preflight, so it's one request instead of two.</p>
@@ -94,6 +217,8 @@
       <tr><td><code>?action=list</code></td><td>Your published products. <code>&amp;only_3d=true</code> for just the ones with a model; <code>limit</code> and <code>offset</code> to page.</td></tr>
       <tr><td><code>?action=product&amp;product_id=…</code></td><td>One product: images, price, its glb/gltf/usdz models with real-world dimensions, and its configurable options.</td></tr>
       <tr><td><code>?action=configure&amp;product_id=…&amp;option_value_ids=a,b</code></td><td>What that combination costs — and whether it's allowed.</td></tr>
+      <tr><td><code>?action=blueprints</code></td><td>Your published configurators — enough to choose one, not enough to price anything.</td></tr>
+      <tr><td><code>?action=blueprint&amp;blueprint_id=…</code></td><td>One configurator: its zones, options and rates, with every cost basis already folded to a price.</td></tr>
       <tr><td><code>?action=event</code></td><td>Records a view, an AR launch or a cart handoff. The widget does this for you.</td></tr>
     </tbody>
   </table></div>
@@ -129,6 +254,12 @@
     <li><strong>Options</strong> on the product, if you want configurable finishes.</li>
   </ul>
   <p>Without a model the widget falls back to the product's photo, so it's still worth embedding before your 3D work is finished.</p>
+
+  <p>For the other two tags:</p>
+  <ul class="feat">
+    <li><code>&lt;materialkai-configurator&gt;</code> needs a <strong>blueprint published for embedding</strong> — no products, no 3D models. It prices what you'd build, not what you stock.</li>
+    <li><code>&lt;materialkai-assistant&gt;</code> needs a key created as <strong>the free tools</strong> rather than <em>my catalogue</em>. Nothing else — it serves none of your catalogue, so there is nothing to publish first.</li>
+  </ul>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -98,3 +98,51 @@ describe('4. scene settings reach the embed', () => {
     expect(widget).not.toMatch(/rig\.hdri|RGBELoader|\.hdr['"`]/);
   });
 });
+
+/**
+ * 5. The copyable snippet has to name a tag the KEY can actually serve.
+ *
+ * Same shape as the four above, one layer out: #382 shipped `<materialkai-configurator>` and
+ * `<materialkai-assistant>`, and the one place the platform hands a merchant something to paste
+ * kept emitting the builder tag for every key. A `tools` key serves no catalogue and a
+ * blueprint-scoped key sees no products, so two of the three kinds copied a snippet that could
+ * only render nothing — on their own site, with nothing here saying why.
+ */
+describe('5. the embed snippet matches the key it was copied from', () => {
+  const card = read('src/components/core/Profile/EmbedKeysCard.tsx');
+  const snippet = card.slice(card.indexOf('function usageSnippet'), card.indexOf('function apiSnippet'));
+
+  it('takes the key, not just its secret — it cannot branch on what it never receives', () => {
+    expect(snippet).toMatch(/function usageSnippet\(key: EmbedKey\)/);
+    expect(card).toContain('usageSnippet(key)');
+  });
+
+  it('a tools key gets the assistant, which is the only tag it can serve', () => {
+    expect(snippet).toMatch(/key\.key_kind === 'tools'/);
+    expect(snippet).toContain('<materialkai-assistant');
+  });
+
+  it('a blueprint-scoped key gets the configurator', () => {
+    expect(snippet).toMatch(/key\.scope_type === 'blueprints'/);
+    expect(snippet).toContain('<materialkai-configurator');
+  });
+
+  it('and pastes a real blueprint id when the key names exactly one', () => {
+    // A placeholder here is a second trip to go and look the id up, for a key that already knows it.
+    expect(snippet).toMatch(/scope_values\?\.length === 1/);
+  });
+
+  it('every other key still gets the builder', () => {
+    expect(snippet).toContain('<materialkai-builder');
+  });
+
+  it('the key row type carries key_kind, so the branch is a union rather than a cast', () => {
+    // `EmbedKey` is the generated row type, and the generator has not run since these columns
+    // landed. Without the widening the branch above is a type error, and the tempting fix is
+    // `(key as any).key_kind` — which compiles, and silently accepts any string forever.
+    const service = read('src/services/embedKeysService.ts');
+    expect(service).toMatch(/export type EmbedKey = Tables<'material_kai_keys'> & \{/);
+    expect(service).toMatch(/key_kind: EmbedKeyKind/);
+    expect(card).not.toMatch(/key as any|as unknown as EmbedKey/);
+  });
+});

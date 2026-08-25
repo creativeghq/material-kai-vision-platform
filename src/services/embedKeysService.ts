@@ -20,7 +20,31 @@ import type { Tables } from '@/integrations/supabase/types';
 // module with no client import — see the header of src/utils/embedOrigins.ts.
 export { normalizeOriginList, isWildcardOriginList } from '@/utils/embedOrigins';
 
-export type EmbedKey = Tables<'material_kai_keys'>;
+/**
+ * A key row.
+ *
+ * Widened past the generated types on purpose. `types:generate` needs a Supabase access token
+ * nobody has locally and CI never regenerates the file, so `Tables<'material_kai_keys'>` is
+ * frozen at the schema of whenever it was last produced by hand — it is missing every column
+ * added since, including the seven below, which are all live and NOT NULL in the database.
+ *
+ * The failure mode this prevents is the quiet one: without the widening, `key.key_kind` is a type
+ * error at best, and at worst a caller writes `(key as any).key_kind` and loses the union — so a
+ * `tools` key gets handed a catalogue snippet with nothing to say it is wrong. Hand-editing
+ * `types.ts` is not the fix (it is generated, and the next real regeneration silently drops the
+ * edit); stating the delta here, next to the union it needs, is.
+ *
+ * Delete a line from this intersection when the generated file genuinely carries that column.
+ */
+export type EmbedKey = Tables<'material_kai_keys'> & {
+  key_kind: EmbedKeyKind;
+  tools_enabled: boolean;
+  paid_tools_enabled: boolean;
+  chat_enabled: boolean;
+  daily_usd_cap: number;
+  spend_usd: number;
+  spend_day: string | null;
+};
 
 /**
  * Which slice of the published catalog a key may read.
