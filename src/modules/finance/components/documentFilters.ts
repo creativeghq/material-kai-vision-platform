@@ -11,7 +11,7 @@ import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
 import { inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
-import { inboundDetailLabel, inboundSourceLabel } from '@/modules/finance/utils/inboundProvenance';
+import { inboundDetailLabel, inboundSourceLabel, invoicedTotal } from '@/modules/finance/utils/inboundProvenance';
 import { humanizeLabel } from '@/utils/humanize';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -209,7 +209,9 @@ export function buildDocumentFilters(
     }
 
     case 'expenses': {
-      const total = amountBounds(rows, (r) => r.total_gross);
+      // The same total the table prints: on a reverse-charged purchase that is the net, so a
+      // filter of "up to 1,200" finds the KEROS document instead of missing it at 1,396.51.
+      const total = amountBounds(rows, (r) => invoicedTotal(r));
       return [
         {
           key: 'general', label: 'General', icon: FileText,
@@ -265,7 +267,7 @@ export function buildDocumentFilters(
         },
         {
           key: 'amounts', label: 'Amounts', icon: Coins,
-          fields: [{ key: 'total_gross', type: 'range', label: 'Total', min: total.min, max: total.max, accessor: (r) => r.total_gross }],
+          fields: [{ key: 'total_gross', type: 'range', label: 'Total', min: total.min, max: total.max, accessor: (r) => invoicedTotal(r) }],
         },
         {
           key: 'dates', label: 'Dates', icon: CalendarDays,

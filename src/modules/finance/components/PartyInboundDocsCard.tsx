@@ -27,6 +27,7 @@ import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inbou
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
+import { inboundDocumentNumber, invoicedTotal, isReverseCharged, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
 
 export const PartyInboundDocsCard: React.FC<{
   workspaceId: string;
@@ -126,13 +127,21 @@ export const PartyInboundDocsCard: React.FC<{
                       <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
                         <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
                         <td className="px-4 py-2">
-                          <div className="text-xs font-medium">{d.series ?? '—'}{d.aa ? ` ${d.aa}` : ''}</div>
-                          <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div>
+                          {/* Our own ΑΦΜ is not the supplier's invoice number — see
+                              `inboundDocumentNumber`. */}
+                          <div className="text-xs font-medium">{inboundDocumentNumber(d) ?? '—'}</div>
+                          {d.mark ? <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div> : null}
                         </td>
                         <td className="px-4 py-2"><MydataTypeLabel code={d.doc_type} /></td>
                         <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_net ?? 0, d.currency)}</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_vat ?? 0, d.currency)}</td>
-                        <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
+                        {/* Reverse charge: the supplier charged no VAT, so none is shown and the
+                            total is what they actually invoiced. */}
+                        <td className="px-4 py-2 text-right text-muted-foreground">
+                          {isReverseCharged(d.doc_type)
+                            ? <span title={`Reverse charge — ${formatMoney(selfAccountedVat(d) ?? 0, d.currency)} self-assessed and reclaimed in the same return.`}>—</span>
+                            : formatMoney(d.total_vat ?? 0, d.currency)}
+                        </td>
+                        <td className="px-4 py-2 text-right font-medium">{formatMoney(invoicedTotal(d), d.currency)}</td>
                         <td className="px-4 py-2 text-center">
                           {outcomes.length > 0
                             ? <span className="text-[10px]">

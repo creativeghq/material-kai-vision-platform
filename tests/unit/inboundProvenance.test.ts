@@ -16,9 +16,11 @@ import {
   inboundDetailLabel,
   inboundDocumentNumber,
   inboundSourceLabel,
+  invoicedTotal,
   isPayrollDocument,
   isReverseCharged,
   needsLineDetail,
+  selfAccountedVat,
 } from '@/modules/finance/utils/inboundProvenance';
 
 /** The real KEROS CERAMICA document, MARK 400014425265085, 2026-06-22. */
@@ -75,6 +77,39 @@ describe('reverse charge is never a payable', () => {
     expect(isReverseCharged(KEROS.doc_type)).toBe(true);
     // What the table must NOT present as owed. 1396.51 - 1126.22 = 270.29 of VAT that never moves.
     expect(KEROS.total_gross - KEROS.total_net).toBeCloseTo(KEROS.total_vat, 2);
+  });
+});
+
+describe('what a human is shown as the cost', () => {
+  it('shows the net on a reverse-charged purchase, never AADE gross', () => {
+    // KEROS billed 1,126.22 and their paper says 1,126.22. myDATA's totalGrossValue is 1,396.51
+    // because it adds the 270.29 of Greek VAT WE self-assess — an artefact of our own accounting
+    // entry, not a figure on anything the supplier sent, and not money that will ever move.
+    // Printing it is the display-layer twin of booking gross into payables.
+    expect(invoicedTotal(KEROS)).toBe(1126.22);
+    expect(invoicedTotal(KEROS)).not.toBe(KEROS.total_gross);
+  });
+
+  it('shows the gross on an ordinary domestic document, where the VAT really is owed', () => {
+    const domestic = { doc_type: '1.1', total_net: 1000, total_gross: 1240 };
+    expect(invoicedTotal(domestic)).toBe(1240);
+  });
+
+  it('does not invent a total when the document states none', () => {
+    expect(invoicedTotal({ doc_type: '14.1', total_net: null, total_gross: 999 })).toBe(0);
+    expect(invoicedTotal({ doc_type: '1.1', total_net: 100, total_gross: null })).toBe(0);
+  });
+
+  it('keeps the self-assessed VAT reachable rather than deleting it', () => {
+    // It belongs on the VAT return — it is withheld from the COST, not from the record.
+    expect(selfAccountedVat(KEROS)).toBe(270.29);
+    // On an ordinary document there is no such thing: null means "this VAT is genuinely owed".
+    expect(selfAccountedVat({ doc_type: '1.1', total_vat: 240 })).toBeNull();
+  });
+
+  it('rent and payroll keep their gross — neither is reverse-charged', () => {
+    expect(invoicedTotal({ doc_type: '16.1', total_net: 400, total_gross: 400 })).toBe(400);
+    expect(invoicedTotal({ doc_type: '17.1', total_net: 30846, total_gross: 30846 })).toBe(30846);
   });
 });
 

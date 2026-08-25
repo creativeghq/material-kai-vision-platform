@@ -16,6 +16,7 @@ import { findCompetitors, type CompetitorOrg } from '@/services/companyEnrichSer
 import { marketCheck, trackProduct, untrackProduct, type MarketStats } from '@/services/priceMonitoringApi';
 import { productDetailService } from '@/services/productDetailService';
 import { BrandAmbassadorsPanel } from '@/components/features/profile/BrandAmbassadorsPanel';
+import { invoicedTotal } from '@/modules/finance/utils/inboundProvenance';
 
 /** The seed identity the Market tab reads off the company row. */
 export interface CompanyMarketSeed {
@@ -391,14 +392,16 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
         const vatForms = Array.from(new Set([company.vat_number, vatDigits].filter(Boolean))) as string[];
         let q = supabase
           .from('inbound_documents')
-          .select('total_gross', { count: 'exact' })
+          // doc_type and total_net come too: on a reverse-charged purchase the amount owed is
+          // the net, and summing AADE's gross overstated every foreign supplier by their VAT.
+          .select('total_gross, total_net, doc_type', { count: 'exact' })
           .in('issuer_vat', vatForms)
           .is('created_supplier_bill_id', null)
           .neq('status', 'dismissed');
         if (workspaceId) q = q.eq('workspace_id', workspaceId);
         const { data, count, error } = await q;
         if (!error) {
-          const total = (data ?? []).reduce((s: number, r: any) => s + (Number(r.total_gross) || 0), 0);
+          const total = (data ?? []).reduce((s: number, r: any) => s + invoicedTotal(r), 0);
           unb = { count: count ?? (data?.length ?? 0), total };
         }
       }

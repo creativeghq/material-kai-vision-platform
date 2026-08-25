@@ -14,6 +14,7 @@ import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { inboundService, type InboundAddress, type InboundDocument, type IssuerProfile } from '@/modules/finance/services/inboundService';
 import { unitSuffix, unitFromMydataCode } from '@/lib/units';
 import { formatDate } from '@/utils/datetime';
+import { invoicedTotal, isReverseCharged, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
 
 /** AADE VAT-category code → rate. Codes 1-8 per the myDATA reference table. */
 const VAT_RATE: Record<number, string> = {
@@ -287,14 +288,23 @@ export const InboundDocPreviewDialog: React.FC<{
 
           <div className="text-xs">
             <Row label="Net value">{formatMoney(doc.total_net ?? 0, doc.currency)}</Row>
-            <Row label="VAT">{formatMoney(doc.total_vat ?? 0, doc.currency)}</Row>
+            {isReverseCharged(doc.doc_type)
+              ? <Row label="VAT">
+                  <span title="Intra-EU acquisition: zero-rated at source, so the supplier charged nothing. We declare this VAT and reclaim it in the same return.">
+                    — <span className="text-muted-foreground">(reverse charge, {formatMoney(selfAccountedVat(doc) ?? 0, doc.currency)} self-assessed)</span>
+                  </span>
+                </Row>
+              : <Row label="VAT">{formatMoney(doc.total_vat ?? 0, doc.currency)}</Row>}
             {!!doc.total_withheld && <Row label="Withheld">{formatMoney(doc.total_withheld, doc.currency)}</Row>}
             {!!doc.total_fees && <Row label="Fees">{formatMoney(doc.total_fees, doc.currency)}</Row>}
             {!!doc.total_stamp_duty && <Row label="Stamp duty">{formatMoney(doc.total_stamp_duty, doc.currency)}</Row>}
             {!!doc.total_other_taxes && <Row label="Other taxes">{formatMoney(doc.total_other_taxes, doc.currency)}</Row>}
             {!!doc.total_deductions && <Row label="Deductions">{formatMoney(doc.total_deductions, doc.currency)}</Row>}
+            {/* PAYABLE, and it says so — which is exactly why it must not be AADE's
+                totalGrossValue on a 13.x/14.x. That figure adds VAT we self-assess and reclaim;
+                nobody will ever be paid it. */}
             <Row label="Total payable">
-              <span className="text-sm">{formatMoney(doc.total_gross ?? 0, doc.currency)}</span>
+              <span className="text-sm">{formatMoney(invoicedTotal(doc), doc.currency)}</span>
             </Row>
           </div>
         </div>

@@ -78,6 +78,42 @@ export const isReverseCharged = (docType: string | null | undefined): boolean =>
   docFamily(docType) === '13' || docFamily(docType) === '14';
 
 /**
+ * What the supplier actually invoiced — the only total a reader should ever be shown as "what
+ * this cost".
+ *
+ * On a `13.x`/`14.x` the supplier charged NO VAT: the purchase is zero-rated at source, so the
+ * gross of their invoice IS the net. KEROS CERAMICA billed EUR 1,126.22 and their paper says
+ * 1,126.22. myDATA's `totalGrossValue` on that document is 1,396.51 because it adds the EUR 270.29
+ * of Greek VAT we self-assess — an artefact of OUR accounting entry, not a figure on anything the
+ * supplier sent, and not money that will ever move in either direction.
+ *
+ * Showing 1,396.51 as the document's total is the display-layer twin of booking gross into
+ * payables: a valid number, arrived at by correct arithmetic, describing a payment nobody will
+ * ever make. It was on screen in five separate places before this existed.
+ *
+ * The AADE figures stay untouched in `total_vat` / `total_gross` — they are bronze, and the VAT
+ * return genuinely needs them. This decides what a HUMAN is shown.
+ */
+export function invoicedTotal(doc: {
+  doc_type?: string | null; total_net?: number | null; total_gross?: number | null;
+}): number {
+  if (isReverseCharged(doc.doc_type)) return doc.total_net ?? 0;
+  return doc.total_gross ?? 0;
+}
+
+/**
+ * The VAT we self-assess and reclaim on a reverse-charged purchase, or null when the document is
+ * an ordinary one whose VAT is really owed. Never presented as part of a cost — it exists so the
+ * figure stays reachable (it belongs on the VAT return) rather than silently disappearing.
+ */
+export function selfAccountedVat(doc: {
+  doc_type?: string | null; total_vat?: number | null;
+}): number | null {
+  if (!isReverseCharged(doc.doc_type)) return null;
+  return doc.total_vat ?? 0;
+}
+
+/**
  * Payroll is never a supplier bill. 17.x arrives on the same RequestTransmittedDocs call as the
  * foreign purchases and is visible for the same reason, but it belongs to the HR module — booking
  * it in payables would double-count it against payroll already recorded there. Enforced in SQL by

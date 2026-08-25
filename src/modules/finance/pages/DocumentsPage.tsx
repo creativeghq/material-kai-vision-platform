@@ -42,7 +42,8 @@ import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesDialog';
 import {
-  INBOUND_SOURCE_CHIP, inboundDocumentNumber, isReverseCharged, needsLineDetail,
+  INBOUND_SOURCE_CHIP, inboundDocumentNumber, invoicedTotal, isReverseCharged, needsLineDetail,
+  selfAccountedVat,
 } from '@/modules/finance/utils/inboundProvenance';
 import type { InboundSource } from '@/modules/finance/services/inboundService';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
@@ -1235,9 +1236,10 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           <th className="px-4 py-2 text-left">Category</th>
           <th className="px-4 py-2 text-right">Net</th>
           <th className="px-4 py-2 text-right">VAT</th>
-          {/* "Gross", not "Payable". This renders total_gross — the document's amount as AADE
-              sent it, a BRONZE fact that never changes. It is not reduced by anything paid on
-              the supplier_bills row the document became, so a fully-settled inbound document
+          {/* "Gross", not "Payable". This renders what the SUPPLIER invoiced (`invoicedTotal`),
+              which on a reverse-charged purchase is the net — AADE's totalGrossValue there adds
+              VAT we self-assess and is a total nobody will ever pay. It is not reduced by
+              anything paid on the supplier_bills row the document became, so a settled document
               showed its whole amount under "Payable" forever. What is still owed lives on the
               bill (its derived amount_due), reachable from the expense this row opens. */}
           <th className="px-4 py-2 text-right">Gross</th>
@@ -1288,17 +1290,22 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
             <td className={`px-4 py-2 text-right ${reverseCharged ? 'font-medium' : 'text-muted-foreground'}`}>
               {formatMoney(d.total_net ?? 0, d.currency)}
             </td>
+            {/* No VAT was charged on this purchase, so no VAT is shown. The self-assessed figure
+                is named in the tooltip rather than printed as a column value — it belongs to the
+                VAT return, where it is declared and reclaimed in the same breath, and printing it
+                next to a total is how it gets read as part of the cost. */}
             <td className="px-4 py-2 text-right text-muted-foreground">
-              {formatMoney(d.total_vat ?? 0, d.currency)}
-              {reverseCharged && (d.total_vat ?? 0) !== 0 && (
-                <div className="text-[10px] text-muted-foreground/70"
-                     title="Intra-EU acquisition: zero-rated at source. We declare this VAT and reclaim it in the same return, so it nets to zero and is never paid to the supplier.">
-                  reverse charge
-                </div>
-              )}
+              {reverseCharged ? (
+                <span
+                  className="cursor-help border-b border-dotted border-muted-foreground/40"
+                  title={`Reverse charge — the supplier charged no VAT. ${formatMoney(selfAccountedVat(d) ?? 0, d.currency)} of Greek VAT is self-assessed and reclaimed in the same return, so it nets to zero and never moves.`}
+                >
+                  —
+                </span>
+              ) : formatMoney(d.total_vat ?? 0, d.currency)}
             </td>
             <td className={`px-4 py-2 text-right ${reverseCharged ? 'text-muted-foreground' : 'font-medium'}`}>
-              {formatMoney(d.total_gross ?? 0, d.currency)}
+              {formatMoney(invoicedTotal(d), d.currency)}
             </td>
             <td className="px-4 py-2 text-center">
               {needsLineDetail(d)
