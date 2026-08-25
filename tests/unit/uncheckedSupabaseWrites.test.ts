@@ -50,9 +50,18 @@ const ROOT = process.cwd();
 const ROOTS = ['src', 'supabase/functions', 'api'];
 const SKIP = ['node_modules', 'integrations/supabase/types.ts', '_generated', '.deno'];
 
-/** Ratchet down as sites are fixed. NEVER raise these to make a build pass. */
-const BASELINE_TOTAL = 291;
-const BASELINE_CLAIMS_SUCCESS = 7;
+/**
+ * Ratchet down as sites are fixed. NEVER raise these to make a build pass.
+ *
+ * 291 → 242 and 7 → 1 on 2026-08-25, with no site changed: the scanner was reading the FIRST
+ * `const { ... } = await` in the four lines above a write instead of the write's own, so any
+ * read sitting above a properly-checked write shadowed it. 49 of the 291 were correct code, and
+ * six of the seven "lies to the user" were not lying at all. Both numbers were measured with the
+ * strict rule (nearest destructure) and are identical under the permissive one, which is what
+ * says these were false positives rather than newly-excused writes.
+ */
+const BASELINE_TOTAL = 242;
+const BASELINE_CLAIMS_SUCCESS = 1;
 
 const WRITE = /\.(insert|update|upsert|delete)\s*\(/;
 /** The code goes on to tell someone it worked. */
@@ -97,10 +106,21 @@ function scan(): Finding[] {
 
         const head = lines.slice(Math.max(0, i - 4), i + 1).join('\n');
         const after = lines.slice(end, end + 14).join('\n');
-        const destructured = /const\s*\{([^}]*)\}\s*=\s*await/.exec(head);
+        // EVERY destructure in the window, not just the first. A single `.exec` returned the
+        // EARLIEST one, so an unrelated read sitting above the write — `const { data: fresh } =
+        // await supabase...` on the line before a properly-checked update — shadowed the real
+        // destructure, found no `err` name in it, and reported the checked write as unchecked.
+        // A guard that cries wolf on correct code teaches people to work around the guard, which
+        // costs more than the bug it catches.
+        const destructures = [...head.matchAll(/const\s*\{([^}]*)\}\s*=\s*await/g)];
 
-        if (destructured) {
-          const names = destructured[1].split(',').map((n) => n.trim().split(':').pop()!.trim());
+        if (destructures.length) {
+          // The LAST one, which is the destructure this write is actually part of — a write is
+          // written `const { error } = await supabase...`, so its own is the closest above it.
+          // Deliberately not `.some()`: any-of would let a checked write two lines up excuse an
+          // unchecked one below it, and a false NEGATIVE here is worse than the noise being fixed.
+          const own = destructures[destructures.length - 1];
+          const names = own[1].split(',').map((n) => n.trim().split(':').pop()!.trim());
           const errName = names.find((n) => n.toLowerCase().includes('err'));
           // Destructured AND referenced afterwards = handled.
           if (errName && new RegExp(`\\b${errName}\\b`).test(after)) continue;

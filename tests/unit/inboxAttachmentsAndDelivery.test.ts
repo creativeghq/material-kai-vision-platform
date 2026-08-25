@@ -330,6 +330,22 @@ describe('the WhatsApp profile is fetched and shown', () => {
     expect(stripComments(inboxMedia)).toMatch(/avatar_path: avatarPath/);
   });
 
+  it('does not re-ask Zernio on every page load for an answer that will not change', () => {
+    // Measured live 2026-08-24: 100 conversations and 516 contact records, zero photos in either.
+    // WhatsApp does not give a business a customer's picture, so "a thread with no photo" is the
+    // permanent state — and the inbox's auto-sync fires on exactly that condition. Without a
+    // throttle it is four Zernio calls per page load, forever, to re-learn the same nothing.
+    const api = stripComments(messagingApi);
+    expect(api).toMatch(/avatars_checked_at/);
+    expect(api).toMatch(/THROTTLE_MS/);
+    // Stamped whatever the outcome. Stamping only on success would mean the empty case — the
+    // common one — never throttles at all, which is the whole problem left in place.
+    expect(api).toMatch(/force/);
+    // And the stamp RE-READS config: the own-avatar write lands earlier in the same run, so
+    // spreading the pre-write copy would erase the one photo that does exist.
+    expect(api).toMatch(/const \{ data: fresh \} = await supabaseClient/);
+  });
+
   it('downloads our own business photo in exactly ONE place', () => {
     // It is needed by sync-channels (on connect) and sync-avatars (on demand). Two copies of
     // "download the profile photo into storage" is the drift this file already caught once, on

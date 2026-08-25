@@ -1447,7 +1447,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // profile rather than a conversation participant.
       // ─────────────────────────────────────────────────────────────
       case 'sync-avatars': {
-        const { workspaceId, threadId: onlyThreadId } = requestBody;
+        const { workspaceId, threadId: onlyThreadId, force } = requestBody;
         const wsId = await resolveTargetWorkspaceId(workspaceId);
         if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
@@ -1465,6 +1465,39 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             success: true, conversations: 0, with_picture: 0, stored: 0, own_avatar: false,
             message: 'No connected WhatsApp number in this workspace.',
           });
+        }
+
+        /**
+         * Once a day, not once a page load.
+         *
+         * The inbox calls this whenever a thread has no photo, and on WhatsApp that is now the
+         * permanent state — measured 2026-08-24 against the live number: 100 conversations and
+         * 516 contact records, zero photos in either, no errors. Meta does not give a business a
+         * customer's profile picture unless that contact has published it.
+         *
+         * So the honest cost of the auto-sync is four Zernio calls on every single page load,
+         * forever, to re-learn the same nothing. The stamp is on the CHANNEL rather than in the
+         * browser because it is a fact about the number, not about one person's tab — otherwise
+         * every teammate and every device pays it separately.
+         *
+         * `force` is the way past it, for the case where someone HAS just changed their photo.
+         * Only the throttle is skipped, never the work.
+         */
+        const THROTTLE_MS = 24 * 60 * 60 * 1000;
+        if (!force && !onlyThreadId) {
+          const stamps = chans
+            .map((c) => (c.config ?? {}).avatars_checked_at)
+            .filter((v): v is string => typeof v === 'string');
+          const freshest = stamps.length ? Math.max(...stamps.map((v) => Date.parse(v) || 0)) : 0;
+          if (freshest && Date.now() - freshest < THROTTLE_MS) {
+            return jsonResponse({
+              success: true,
+              skipped: true,
+              conversations: 0, with_picture: 0, stored: 0, own_avatar: false,
+              checked_at: new Date(freshest).toISOString(),
+              message: 'Profile photos were already checked in the last 24 hours. Re-run with force to check again.',
+            });
+          }
         }
 
         // Our threads for this workspace, keyed by the Zernio conversation each one mirrors.
@@ -1612,6 +1645,25 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               skip += 200;
             }
           }
+        }
+
+        // Stamped whatever the outcome: "we asked and there were none" is exactly the answer the
+        // throttle exists to avoid re-buying, and only stamping on success would mean the empty
+        // case — the common one — never throttles at all.
+        for (const chan of chans) {
+          // RE-READ before merging. `fetchOwnBusinessAvatar` may have written this same config
+          // earlier in this run, and `chan.config` is the value from before that write — spreading
+          // the stale copy would erase the avatar path we just stored, on the one channel whose
+          // photo actually exists.
+          const { data: fresh } = await supabaseClient
+            .from('messaging_channels').select('config').eq('id', chan.id).maybeSingle();
+          const cfg = ((fresh as { config?: Record<string, unknown> } | null)?.config
+            ?? chan.config ?? {}) as Record<string, unknown>;
+          const { error: stampErr } = await supabaseClient.from('messaging_channels').update({
+            config: { ...cfg, avatars_checked_at: new Date().toISOString() },
+            updated_at: new Date().toISOString(),
+          }).eq('id', chan.id);
+          if (stampErr) errors.push(`stamp: ${stampErr.message}`);
         }
 
         return jsonResponse({
