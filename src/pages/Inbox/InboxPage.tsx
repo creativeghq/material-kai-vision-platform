@@ -1326,18 +1326,22 @@ const InboxPage: React.FC = () => {
 
                 {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
                   <div className="text-xs bg-[hsl(var(--warning-bg))] border border-warning/25 text-warning rounded-sm px-3 py-2">
-                    {/* SAY WHAT THIS IS BASED ON.
+                    {/* SAY WHAT THIS IS BASED ON, AND WHAT STILL WORKS.
                         The old copy asserted "the 24-hour reply window has closed" and stopped
-                        there. An operator looking at a message they sent twenty minutes earlier
-                        reads that as simply wrong — and cannot tell it is about the CUSTOMER's
-                        last message, because their own does not open the window and the thread
-                        may not even hold the customer's. Each branch below names the fact the
-                        verdict rests on, so it can be checked instead of believed. */}
+                        there. The operator who reported this had sent a message from their
+                        handset twenty minutes earlier and watched it get read, so the banner read
+                        as flatly false — and the reason it is not is an asymmetry nothing on
+                        screen mentioned. Meta: "Messages sent from the WhatsApp Business app are
+                        not subject to the customer service window and do not create, extend, or
+                        affect Cloud API conversation windows." The phone can always write. This
+                        composer goes through the API and cannot. Both halves have to be said, or
+                        the true one looks like a lie. */}
                     {waWindow.last_inbound_at ? (
                       <>
                         WhatsApp 24-hour reply window has closed — this customer last wrote on{' '}
-                        {formatDate(waWindow.last_inbound_at)} at {formatTime(waWindow.last_inbound_at)},
-                        and your own replies do not re-open it.
+                        {formatDate(waWindow.last_inbound_at)} at {formatTime(waWindow.last_inbound_at)}.
+                        Only a message from THEM re-opens it: your own replies do not, including
+                        the ones you send from your phone.
                       </>
                     ) : waWindow.source === 'unknown' ? (
                       <>
@@ -1350,9 +1354,11 @@ const InboxPage: React.FC = () => {
                         window has opened.
                       </>
                     )}{' '}
-                    Freeform replies are blocked by Meta — an approved template is required to
-                    {waWindow.last_inbound_at ? ' re-open' : ' open'} the conversation. (Internal
-                    notes are still allowed.)
+                    Meta blocks freeform replies sent from here — an approved template is required
+                    to {waWindow.last_inbound_at ? 're-open' : 'open'} the conversation.{' '}
+                    <strong>You can still message them from the WhatsApp Business app on your
+                    phone</strong>, which is not subject to this window; it will sync back into
+                    this thread. (Internal notes are still allowed.)
                   </div>
                 )}
                 {isMember && (
