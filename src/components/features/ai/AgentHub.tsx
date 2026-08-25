@@ -6123,7 +6123,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                 {step.type === 'thinking' && '💭'}
                                 {step.type === 'iteration' && '→'}
                               </span>
-                              <span>{step.message}</span>
+                              {/* min-w-0 is load-bearing, not defensive. This is a flex item in a
+                                  ROW container, so its min-width resolves to min-content — the
+                                  longest run with no break opportunity in it. Tool progress lines
+                                  carry raw URLs, and a query string has none: `?s=x&post_type=y`
+                                  gives the browser nowhere to wrap. Measured at a 420px panel, one
+                                  spilled 155px past the bubble's own border and took the page's
+                                  horizontal scrollbar with it. A hyphenated URL wraps fine, which
+                                  is why this survived: it depended on which site the agent read. */}
+                              <span className="min-w-0 break-words">{step.message}</span>
                             </li>
                           ))
                         )}
