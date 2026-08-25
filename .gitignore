@@ -76,3 +76,8 @@ edge-prompt-inventory.json
 # and churned on every build — a compiler cache is a local artifact, never a repo fact.
 *.tsbuildinfo
 tsc.log
+
+# Output of `node scripts/sweep-agent-tools.mjs` — a point-in-time probe of which tools are
+# healthy, not a repo fact. It names the workspace it ran against and goes stale the moment
+# anything is deployed.
+sweep-report.json
