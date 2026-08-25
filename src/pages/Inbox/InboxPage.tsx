@@ -17,6 +17,7 @@ import { marketplaceService } from '@/services/marketplaceService';
 import { messagingService } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { castObjectFor } from '@/utils/characterAvatar';
+import { moodStyle, urgencyLabel, urgencyIsLoud } from '@/utils/conversationMood';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -41,7 +42,7 @@ import {
   channelForSource, inboxRequestedServices, inboxSourceKey, inboxSourceMeta, inboxThreadSource,
   SOURCE_FILTER_ORDER, type InboxSource, type InboxSourceKey,
 } from './inboxSource';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, formatTime } from '@/utils/datetime';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -51,6 +52,7 @@ import {
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
   type IntakeConfirmation, type IntakeMatchMethod, type UserEmailAddress,
+  type ConversationSentiment,
 } from '@/services/inboxApi';
 
 interface WorkspaceMemberOption { user_id: string; label: string; }
@@ -1120,7 +1122,7 @@ const InboxPage: React.FC = () => {
                       className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 border-b border-hairline transition-colors ${active ? 'bg-surface-hover border-l-primary' : 'border-l-transparent hover:bg-surface-hover'}`}
                     >
                       <div className="relative shrink-0 mt-0.5">
-                        <ThreadAvatar thread={t} name={name} className="h-9 w-9" />
+                        <ThreadAvatar thread={t} name={name} className="h-9 w-9" showMood />
                         {/* Solid, not tinted: at 16px a 15% wash reads as grey in every theme,
                             and the glyph inside it needs a ground to sit on. */}
                         <span
@@ -1209,6 +1211,7 @@ const InboxPage: React.FC = () => {
                     name={threadDisplayName(activeThread)}
                     className="h-10 w-10"
                     fallbackClassName={`text-sm ${avatarTint(threadDisplayName(activeThread))}`}
+                    showMood
                   />
                 </button>
                 <div className="flex-1 min-w-0">
@@ -1564,7 +1567,9 @@ const ThreadAvatar: React.FC<{
   name: string;
   className?: string;
   fallbackClassName?: string;
-}> = ({ thread, name, className, fallbackClassName }) => {
+  /** Show the read mood as a ring + face. Off by default — see the comment on the wrapper. */
+  showMood?: boolean;
+}> = ({ thread, name, className, fallbackClassName, showMood }) => {
   const wa = ((thread?.metadata as Record<string, unknown> | undefined)?.wa_profile ?? null) as
     Record<string, unknown> | null;
   const bucket = typeof wa?.avatar_bucket === 'string' ? wa.avatar_bucket : null;
@@ -1591,14 +1596,48 @@ const ThreadAvatar: React.FC<{
    */
   const generated = useMemo(() => castAvatarSrc(thread?.id ?? name), [thread?.id, name]);
 
-  return (
+  /*
+   * The mood the conversation was last read as, worn by the face.
+   *
+   * A ring plus a small face, NOT a different character: the cast is 24 rendered people and
+   * swapping someone's face when they get annoyed would read as a different person replying.
+   * The ring is the state; the character is the identity, and those must not be the same channel.
+   *
+   * Only rendered where it was asked for. On every avatar at once — the list, the header, the
+   * drawer, each message row — a thread would carry six copies of the same fact and the signal
+   * stops meaning anything.
+   */
+  const mood = showMood
+    ? (((thread?.metadata as Record<string, unknown> | undefined)?.sentiment ?? null) as
+        Record<string, unknown> | null)
+    : null;
+  const style = mood?.mood ? moodStyle(String(mood.mood)) : null;
+
+  const avatar = (
     <Avatar className={className}>
       <AvatarImage src={url ?? generated} alt={name} className="object-cover" />
-      {/* Only reached if the data URI itself fails to decode — initials remain the floor. */}
+      {/* Only reached if the image itself fails to load — initials remain the floor. */}
       <AvatarFallback className={fallbackClassName ?? `text-xs ${avatarTint(name)}`}>
         {initials(name)}
       </AvatarFallback>
     </Avatar>
+  );
+
+  if (!style) return avatar;
+  return (
+    <div className="relative shrink-0" title={`${style.label} — read from the conversation`}>
+      <div className={`rounded-full ring-2 ring-offset-1 ring-offset-background ${style.ring}`}>
+        {avatar}
+      </div>
+      <span
+        aria-hidden
+        className="absolute -bottom-1 -right-1 text-[11px] leading-none bg-card border border-hairline
+                   rounded-full w-[18px] h-[18px] grid place-items-center"
+      >
+        {style.face}
+      </span>
+      <span className="sr-only">{style.label}</span>
+    </div>
   );
 };
 
@@ -2766,6 +2805,148 @@ const OrderIntakePanel: React.FC<{
  * gives us nothing the panel says so rather than rendering an empty field — an empty field reads
  * as "this person has no company", not as "Meta does not tell us".
  */
+/**
+ * What the conversation reads like right now, and what to say back.
+ *
+ * On demand, not on open. Reading a thread costs a model call, most threads are opened to look
+ * something up rather than to reply, and a panel that bills every glance is one people learn to
+ * avoid. The answer is cached against the last message id, so re-opening is free until the
+ * customer actually says something new.
+ *
+ * The SAME verdict is handed to the assistant before it drafts a reply — see `analyze_sentiment`
+ * in inbox-api. Two reads would let the screen say "frustrated" while the assistant answers as
+ * though nothing were wrong, and the operator would trust whichever agreed with them.
+ */
+const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: boolean }> = ({ thread, isMember }) => {
+  const { toast } = useToast();
+  const cached = ((thread.metadata as Record<string, unknown> | undefined)?.sentiment ?? null) as
+    ConversationSentiment | null;
+  const [sentiment, setSentiment] = useState<ConversationSentiment | null>(cached);
+  const [busy, setBusy] = useState(false);
+  const [empty, setEmpty] = useState<string | null>(null);
+
+  // A different thread is a different conversation — without this the panel keeps showing the
+  // previous customer's mood, which is the most confidently wrong a screen can be.
+  useEffect(() => { setSentiment(cached); setEmpty(null); }, [thread.id, cached]);
+
+  const run = async (force: boolean) => {
+    setBusy(true);
+    try {
+      const r = await inboxApi.analyzeSentiment(thread.id, force);
+      if (!r.analysed) { setEmpty(r.message || 'There is not enough here to read yet.'); setSentiment(null); }
+      else { setSentiment(r.sentiment ?? null); setEmpty(null); }
+    } catch (e) {
+      toast({ title: 'Could not read the conversation', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!isMember) {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
+        Only people on this conversation can analyse it.
+      </div>
+    );
+  }
+
+  const style = sentiment ? moodStyle(sentiment.mood) : null;
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="p-4 space-y-4">
+        {!sentiment && !empty && (
+          <div className="text-center py-6 space-y-3">
+            <Sparkles className="w-7 h-7 mx-auto text-muted-foreground" />
+            <div className="text-sm font-medium">Read this conversation</div>
+            <p className="text-xs text-muted-foreground max-w-[34ch] mx-auto">
+              Looks at the last 20 messages and reports how the customer feels, what they are
+              waiting for, and how to answer. The assistant uses the same reading.
+            </p>
+            <Button size="sm" onClick={() => run(false)} disabled={busy}>
+              {busy ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Reading…</> : 'Analyse conversation'}
+            </Button>
+          </div>
+        )}
+
+        {empty && (
+          <div className="text-center py-6 space-y-3">
+            <p className="text-sm text-muted-foreground">{empty}</p>
+          </div>
+        )}
+
+        {sentiment && style && (
+          <>
+            <div className="flex items-start gap-3">
+              <div className="text-3xl leading-none" aria-hidden>{style.face}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-xs ${style.chip}`}>
+                    {style.label}
+                  </span>
+                  {/* Only the loud ones get a second badge. A flag on every conversation is a
+                      flag nobody reads. */}
+                  {urgencyIsLoud(sentiment.urgency) && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-xs bg-red-500/15 text-red-800 dark:text-red-300">
+                      {urgencyLabel(sentiment.urgency)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm mt-1.5">{sentiment.summary}</p>
+              </div>
+            </div>
+
+            {sentiment.open_question && (
+              <div className="border-l-2 border-amber pl-3 py-1">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">
+                  Still unanswered
+                </div>
+                <p className="text-sm italic">“{sentiment.open_question}”</p>
+              </div>
+            )}
+
+            {sentiment.reply_guidance?.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  How to reply
+                </div>
+                <ul className="space-y-1.5">
+                  {sentiment.reply_guidance.map((g, i) => (
+                    <li key={i} className="text-sm flex gap-2">
+                      <span className="text-muted-foreground shrink-0">·</span>
+                      <span>{g}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {sentiment.suggested_tone && (
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Tone:</span> {sentiment.suggested_tone}
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-hairline flex items-center justify-between gap-2">
+              {/* Says WHEN and over how much. A stale reading presented as current is how someone
+                  replies warmly to a customer who has since walked. */}
+              <span className="text-[11px] text-muted-foreground">
+                {/* The platform's formatters, not `toLocaleString()`: that renders through the
+                    BROWSER's locale, so the same instant reads differently per machine and the
+                    two halves of a date disagree across the app (#329). */}
+                Read {sentiment.message_count} message(s) · {formatDate(sentiment.analysed_at)} {formatTime(sentiment.analysed_at)}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => run(true)} disabled={busy}>
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Re-read'}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ChannelIdentityPanel: React.FC<{
   thread: InboxThread;
   context: InboxThreadContext | null;
@@ -3035,7 +3216,7 @@ const DetailsRail: React.FC<{
   // A channel tab only where there IS a channel identity distinct from the CRM one. An internal
   // or email thread has nothing to put in it, and an empty tab is worse than no tab.
   const hasChannelIdentity = thread.channel === 'whatsapp' || thread.channel === 'social';
-  const [tab, setTab] = useState<'profile' | 'channel'>('profile');
+  const [tab, setTab] = useState<'profile' | 'channel' | 'mood'>('profile');
   const contact = context?.contact ?? null;
   const company = context?.company ?? null;
   const quotes = context?.quotes ?? [];
@@ -3061,18 +3242,21 @@ const DetailsRail: React.FC<{
       </div>
       {/* Underline tabs, per the design system — a filled pill here would carry the silhouette of
           a primary button on a panel whose only real action lives further down. */}
-      {hasChannelIdentity && (
-        <div className="px-4 border-b border-hairline shrink-0">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'profile' | 'channel')}>
-            <TabsList className="h-auto bg-transparent p-0 gap-4">
-              <TabsTrigger value="profile" className="px-0 text-xs">Profile</TabsTrigger>
+      {/* Mood is offered on EVERY thread, not just the channel ones — an email or an internal
+          thread has a temperature too, and the reader is the same person. */}
+      <div className="px-4 border-b border-hairline shrink-0">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'profile' | 'channel' | 'mood')}>
+          <TabsList className="h-auto bg-transparent p-0 gap-4">
+            <TabsTrigger value="profile" className="px-0 text-xs">Profile</TabsTrigger>
+            {hasChannelIdentity && (
               <TabsTrigger value="channel" className="px-0 text-xs">
                 {thread.channel === 'whatsapp' ? 'WhatsApp' : 'Social'}
               </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
+            )}
+            <TabsTrigger value="mood" className="px-0 text-xs">Mood</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
       {hasChannelIdentity && tab === 'channel' && (
         <ChannelIdentityPanel
           thread={thread} context={context} messages={messages} isMember={isMember}
@@ -3081,7 +3265,8 @@ const DetailsRail: React.FC<{
           onContactLinked={() => onIntakeChanged?.()}
         />
       )}
-      {(!hasChannelIdentity || tab === 'profile') && (
+      {tab === 'mood' && <ConversationMoodPanel thread={thread} isMember={isMember} />}
+      {tab === 'profile' && (
     <div className="flex-1 overflow-y-auto">
       {/*
         Identity block. It used to open with a gradient cover banner and a gradient avatar

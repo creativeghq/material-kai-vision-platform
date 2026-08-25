@@ -50,7 +50,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
-import { getAgentSystemPrompt } from '../_shared/prompt-utils.ts';
+import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -573,6 +573,39 @@ async function buildAgentDraft(
   const transcript = await buildTranscript(db, threadId, rows);
   if (!transcript.trim()) return '';
 
+  /**
+   * Tell the assistant how this customer sounds, using the SAME reading the drawer shows.
+   *
+   * Without it the reply is written blind: an apology owed to somebody chasing a third time
+   * reads identically to a cheerful confirmation, because the model sees the words and not the
+   * temperature of them. It is usually free — the drawer's read is cached against the last
+   * message id, and this asks for the same one.
+   *
+   * Best-effort on purpose. A failed reading must not cost the customer their reply, so a throw
+   * here degrades to the plain transcript rather than to silence.
+   */
+  let agentInput = transcript;
+  try {
+    const { sentiment } = await readConversationSentiment(
+      db, threadId, thread.metadata as Record<string, unknown> | null,
+    );
+    if (sentiment) {
+      const guidance = Array.isArray(sentiment.reply_guidance)
+        ? (sentiment.reply_guidance as string[]).map((g) => `- ${g}`).join('\n')
+        : '';
+      agentInput =
+        `<conversation_reading>\n`
+        + `The customer currently reads as: ${sentiment.mood} (urgency: ${sentiment.urgency}).\n`
+        + `${sentiment.summary}\n`
+        + (sentiment.open_question ? `Still unanswered: "${sentiment.open_question}"\n` : '')
+        + (sentiment.suggested_tone ? `Match this tone: ${sentiment.suggested_tone}\n` : '')
+        + (guidance ? `Do this in your reply:\n${guidance}\n` : '')
+        + `</conversation_reading>\n\n${transcript}`;
+    }
+  } catch (err) {
+    console.warn('[inbox-api] sentiment unavailable for the agent reply:', err instanceof Error ? err.message : String(err));
+  }
+
   // ── The turn runs on JARVIS ──────────────────────────────────────────────
   // Everything that made this function clever used to live HERE — a persona, a hand-built tool
   // map, a hand-built system prompt, one `generateWithClaudeTools` call. All of it is gone, and
@@ -609,7 +642,7 @@ async function buildAgentDraft(
       // the roles here are Customer / Our team / Assistant, which is not the two-role shape a
       // chat history has, and flattening it into `user`/`assistant` would tell the model that a
       // colleague's sentence was its own.
-      messages: [{ role: 'user', content: transcript }],
+      messages: [{ role: 'user', content: agentInput }],
       // The reply is a single message, so there is no conversation to continue and nothing should
       // be written to one. A null id also keeps a customer thread out of the operator's Studio.
       conversation_id: null,
@@ -2359,6 +2392,27 @@ async function handleJwtAction(
       return json({ inquiry_id: acceptInquiryId, order_id: acceptOrderId, order_item_id: acceptOrderItemId });
     }
 
+    case 'analyze_sentiment': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may analyse a conversation');
+
+      const r = await readConversationSentiment(
+        db, threadId, thread.metadata as Record<string, unknown> | null, !!payload.force,
+      );
+      // Nothing to read is a real answer, not an error, and it must not bill anybody.
+      if (!r.sentiment) {
+        return json({
+          analysed: false,
+          reason: r.reason ?? 'not_enough_messages',
+          message: 'There are not enough messages in this conversation to read yet.',
+        });
+      }
+      return json({ analysed: true, cached: r.cached, sentiment: r.sentiment });
+    }
+
     case 'get_thread_context': {
       // Right-rail CRM context for the customer a member is talking to:
       // the linked CRM contact + their company + recent quotes + projects. Members/operators only.
@@ -3355,6 +3409,139 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
   }).catch(() => {});
 
   return json({ ok: true });
+}
+
+/**
+ * How does this customer feel, and what should we say back?
+ *
+ * ONE derivation, two callers: the Mood panel in the drawer, and the assistant just before it
+ * drafts a reply. A second read for the agent would let the screen say "frustrated" while the
+ * reply is written as though nothing were wrong — and the operator would believe whichever one
+ * matched what they already thought.
+ *
+ * Cached on the thread against the LAST MESSAGE ID, which is exactly what "has anything happened
+ * since?" means. The drawer opens on every thread click and the assistant asks on every reply, so
+ * an uncached read would bill a model call per glance.
+ *
+ * Returns null when there is nothing to read — a two-message thread has no mood, and inventing
+ * one would put a confident label on noise.
+ */
+async function readConversationSentiment(
+  db: SupabaseClient,
+  threadId: string,
+  threadMetadata: Record<string, unknown> | null | undefined,
+  force = false,
+): Promise<{ sentiment: Record<string, unknown> | null; cached: boolean; reason?: string }> {
+  const WINDOW = 20;
+  const { data: msgs, error: msgErr } = await db
+    .from('inbox_messages')
+    .select('id, body, message_type, direction, created_at')
+    .eq('thread_id', threadId)
+    .neq('message_type', 'system')
+    .order('created_at', { ascending: false })
+    .limit(WINDOW);
+  if (msgErr) throw new HttpError(500, `Could not read the conversation: ${msgErr.message}`);
+
+  // Oldest first: recency is the whole point — a thread that opened badly and closed with
+  // "perfect, thanks" is a happy one — and a model reading it backwards weighs the wrong end.
+  const ordered = [...((msgs ?? []) as Array<Record<string, unknown>>)].reverse();
+  const withText = ordered.filter((m) => typeof m.body === 'string' && (m.body as string).trim());
+  if (withText.length < 2) return { sentiment: null, cached: false, reason: 'not_enough_messages' };
+
+  const lastId = String(withText[withText.length - 1].id);
+  const cached = ((threadMetadata ?? {}) as Record<string, unknown>).sentiment as
+    Record<string, unknown> | undefined;
+  if (!force && cached && cached.last_message_id === lastId) {
+    return { sentiment: cached, cached: true };
+  }
+
+  const rubric = await loadPrompt(db, 'tool', 'inbox_conversation_sentiment');
+
+  // Delimited as DATA (invariant 9). A customer types whatever they like into WhatsApp,
+  // including "ignore your instructions".
+  const transcript = withText.map((m) => {
+    const who = m.direction === 'outgoing' ? 'us' : 'customer';
+    return `<message from="${who}">\n${String(m.body).slice(0, 1200)}\n</message>`;
+  }).join('\n');
+
+  const TOOL = {
+    name: 'report_sentiment',
+    description: 'Report how the customer feels and how to reply.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mood: {
+          type: 'string',
+          enum: ['happy', 'satisfied', 'neutral', 'confused', 'waiting', 'frustrated', 'angry'],
+        },
+        urgency: { type: 'string', enum: ['none', 'low', 'medium', 'high', 'critical'] },
+        summary: { type: 'string', description: 'One sentence, in English, on where this stands.' },
+        reply_guidance: {
+          type: 'array', items: { type: 'string' },
+          description: '2-4 concrete things the replier should do for THIS conversation.',
+        },
+        suggested_tone: { type: 'string', description: 'A few words: how the reply should sound.' },
+        open_question: {
+          type: ['string', 'null'],
+          description: "The customer's last unanswered question, verbatim, or null if none.",
+        },
+      },
+      required: ['mood', 'urgency', 'summary', 'reply_guidance', 'suggested_tone'],
+    },
+  };
+
+  // `.value` — resolveSecret returns {key, value, source}, and the object is always truthy, so
+  // testing it directly would send the literal "[object Object]" as the api key.
+  const key = (await resolveSecret(db, 'ANTHROPIC_API_KEY')).value;
+  if (!key) throw new HttpError(503, 'The AI service is not configured.');
+
+  let verdict: Record<string, unknown>;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        // Haiku: this runs on every thread open and every assistant reply. Reading tone in twenty
+        // short messages is not what the expensive models are for.
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 700,
+        tools: [TOOL],
+        // FORCED (invariant 9): the verdict drives a stored field and a UI state, so it arrives as
+        // a validated tool call, never as free-form JSON with a salvage parser behind it.
+        tool_choice: { type: 'tool', name: TOOL.name },
+        messages: [{ role: 'user', content: `${rubric}\n\n<conversation>\n${transcript}\n</conversation>` }],
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    const use = (body.content ?? []).find((c: Record<string, unknown>) => c.type === 'tool_use');
+    if (!use?.input) throw new Error('the model returned no verdict');
+    verdict = use.input as Record<string, unknown>;
+  } catch (err) {
+    throw new HttpError(502, `Could not read the conversation: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const sentiment = {
+    ...verdict,
+    last_message_id: lastId,
+    analysed_at: new Date().toISOString(),
+    message_count: withText.length,
+  };
+
+  // MERGE, never a whole-column write: thread metadata carries the conversation's identity
+  // (`zernio_conversation_id`, `contact_phone`, `wa_profile`) and `.update({metadata})` in
+  // PostgREST replaces the column outright.
+  const { error: saveErr } = await db.rpc('inbox_thread_merge_metadata', {
+    p_thread_id: threadId,
+    p_patch: { sentiment },
+  });
+  if (saveErr) console.warn('[inbox-api] sentiment cache write failed:', saveErr.message);
+
+  return { sentiment, cached: false };
 }
 
 async function handler(req: Request): Promise<Response> {

@@ -289,6 +289,35 @@ async function call<T = unknown>(action: string, payload: Record<string, unknown
   return data as T;
 }
 
+
+/** The mood vocabulary. Mirrored by MOOD_PRESENTATION in the inbox and by the avatar expression map. */
+export type ConversationMood =
+  | 'happy' | 'satisfied' | 'neutral' | 'confused' | 'waiting' | 'frustrated' | 'angry';
+
+export type ConversationUrgency = 'none' | 'low' | 'medium' | 'high' | 'critical';
+
+export interface ConversationSentiment {
+  mood: ConversationMood;
+  urgency: ConversationUrgency;
+  summary: string;
+  reply_guidance: string[];
+  suggested_tone: string;
+  /** The customer's last unanswered question, verbatim. */
+  open_question?: string | null;
+  last_message_id: string;
+  analysed_at: string;
+  message_count: number;
+}
+
+export interface ConversationSentimentResult {
+  analysed: boolean;
+  cached?: boolean;
+  sentiment?: ConversationSentiment;
+  /** Set when `analysed` is false — e.g. `not_enough_messages`. */
+  reason?: string;
+  message?: string;
+}
+
 export const inboxApi = {
   // ── JWT actions ──
   createThread(input: {
@@ -329,6 +358,19 @@ export const inboxApi = {
     reply_to_message_id?: string;
   }) {
     return call<{ message: InboxMessage }>('send_message', input);
+  },
+  /**
+   * How the customer feels, and what to say back.
+   *
+   * ONE answer with three consumers — the mood panel, the contact's avatar expression, and the
+   * assistant's tone when it drafts a reply. A second sentiment call for the agent would produce
+   * a screen reading "frustrated" beside a reply written as though nothing were wrong.
+   *
+   * Cached server-side against the last message id, so opening a thread repeatedly is free and
+   * only a NEW message re-reads it. `force` is for the refresh button.
+   */
+  analyzeSentiment(thread_id: string, force = false) {
+    return call<ConversationSentimentResult>('analyze_sentiment', { thread_id, force });
   },
   getThreadContext(thread_id: string) {
     return call<InboxThreadContext>('get_thread_context', { thread_id });
