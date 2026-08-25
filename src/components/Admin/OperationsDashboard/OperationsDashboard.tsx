@@ -1084,9 +1084,6 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* Services & Billing Tab — 3rd Party API Services */}
           <TabsContent value="services-billing" className="space-y-4">
-            {/* A cost switch, so it sits with the other spend rather than under a feature menu —
-                the person who comes looking for it is looking at a bill. */}
-            <InboxAIPanel />
             {/* The per-workspace view first: the table below prices services, this says who is
                 actually costing and earning what. */}
             <ChannelsCostPanel />
@@ -1094,6 +1091,11 @@ const OperationsDashboardInner: React.FC = () => {
             {/* Then the ledgers behind that summary — what Meta charged, what we billed, and who
                 is on hold. All three were written on a schedule and rendered nowhere. */}
             <ChannelsBillingDetail />
+
+            {/* Directly under Channels, because it reads the conversations those channels bring
+                in — the operator sees what the channels cost, then what reading them costs, in
+                the order the money is actually spent. */}
+            <InboxAIPanel />
 
             <SectionHeader
               title="3rd Party Services"

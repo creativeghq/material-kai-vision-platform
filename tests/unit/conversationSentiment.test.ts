@@ -117,7 +117,7 @@ describe('conversation sentiment', () => {
     // An "off" that still reads the messages and calls the model and throws the answer away is
     // not off. The master check sits ahead of both.
     const api = stripComments(API);
-    expect(api).toMatch(/sentimentSettings\(db\)/);
+    expect(api).toMatch(/sentimentSettings\(db, workspaceId\)/);
     expect(api).toMatch(/if \(!settings\.enabled\) return \{ sentiment: null[^}]*'disabled'/);
     const gate = api.indexOf("reason: 'disabled'");
     const call = api.indexOf('api.anthropic.com');
@@ -131,9 +131,9 @@ describe('conversation sentiment', () => {
     // shape, and a surprise bill is louder and more recoverable than a feature that quietly
     // stopped weeks ago.
     const api = stripComments(API);
-    expect(api).toMatch(/enabled: v\.enabled !== false/);
-    expect(api).toMatch(/autoOnAgentReply: v\.auto_on_agent_reply !== false/);
-    expect(api).toMatch(/perMessageMood: v\.per_message_mood !== false/);
+    expect(api).toMatch(/const globalOn = v\.enabled !== false/);
+    expect(api).toMatch(/v\.auto_on_agent_reply !== false/);
+    expect(api).toMatch(/v\.per_message_mood !== false/);
   });
 
   it('BOOKS the spend, or the cost panel is a permanent zero', () => {
@@ -179,5 +179,44 @@ describe('conversation sentiment', () => {
       expect(bar, `${m} bar needs a dark: pair`).toMatch(/dark:/);
       expect(bar, `${m} bar must be solid, not a tint`).not.toMatch(/\//);
     }
+  });
+
+  it('gates on global OR module, never AND', () => {
+    // The platform switch turns it on for everyone; when it is off, a workspace paying for the
+    // `inbox-ai` add-on still gets it. An AND would turn the operator's COST control into a kill
+    // switch for paying tenants, which is a different thing and not what it is labelled as.
+    const api = stripComments(API);
+    expect(api).toMatch(/isWorkspaceEntitled\(db, workspaceId, 'inbox-ai'\)/);
+    expect(api).toMatch(/const globalOn = v\.enabled !== false/);
+    // Consulted ONLY when the global is off — while it is on everybody has it and an
+    // entitlement round-trip per analysis buys nothing.
+    expect(api).toMatch(/if \(!globalOn && workspaceId\)/);
+  });
+
+  it('gives an add-on workspace the WHOLE feature', () => {
+    // The sub-switches are the platform's shape for its own spend. Selling someone a module and
+    // then withholding half of it from a screen they cannot see would be indefensible.
+    const api = stripComments(API);
+    expect(api).toMatch(/via === 'module' \? true : v\.auto_on_agent_reply !== false/);
+    expect(api).toMatch(/via === 'module' \? true : v\.per_message_mood !== false/);
+  });
+
+  it('names the add-on when it is off, so the fix is findable', () => {
+    // Three different fixes hide behind one blank panel: turn the platform switch on, buy the
+    // add-on, or wait for more messages. Only naming the module makes the second discoverable.
+    expect(stripComments(API)).toMatch(/add the Inbox AI module/);
+  });
+
+  it('reads the entitlement table that actually exists', () => {
+    // `workspace_modules` is not a table. PostgREST errors on it, and a `?? 0` would turn that
+    // into a confident "nobody holds this add-on" beside a switch about money.
+    const panel = stripComments(PANEL);
+    expect(panel).toMatch(/from\('workspace_module_entitlements'\)/);
+    expect(panel).not.toMatch(/from\('workspace_modules'\)/);
+  });
+
+  it('warns that switching off globally does not stop add-on spend', () => {
+    // Reading "off" as "no more spend" would be wrong about the operator's own bill.
+    expect(stripComments(PANEL)).toMatch(/hold the Inbox AI add-on/);
   });
 });

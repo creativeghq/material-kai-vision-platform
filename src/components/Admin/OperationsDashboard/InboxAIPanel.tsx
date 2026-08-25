@@ -42,9 +42,10 @@ const SWITCHES: Array<{
     key: 'enabled',
     title: 'Read conversations',
     detail:
-      'The master switch. Off, nothing analyses a conversation anywhere — no mood ring, no Mood '
-      + 'tab, no tone for the assistant.',
-    cost: 'Nothing runs when off',
+      'On, every workspace gets it. Off, only workspaces holding the Inbox AI add-on do — this is '
+      + 'a cost control, not a kill switch, so a tenant paying for the module keeps what they '
+      + 'bought.',
+    cost: 'Off = only paying add-on workspaces run it',
   },
   {
     key: 'auto_on_agent_reply',
@@ -70,6 +71,7 @@ export const InboxAIPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<keyof SentimentSettings | null>(null);
   const [spend, setSpend] = useState<{ calls: number; usd: number; since: string } | null>(null);
+  const [subscribers, setSubscribers] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -89,6 +91,27 @@ export const InboxAIPanel: React.FC = () => {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * How many workspaces hold the add-on.
+   *
+   * Switching the platform off does NOT switch those off — they are paying for it specifically,
+   * and the gate is global-OR-module. Without this number the operator would read "off" as "no
+   * more spend" and be wrong about their own bill.
+   */
+  useEffect(() => {
+    (async () => {
+      // `workspace_module_entitlements` is the table `is_workspace_entitled` actually reads —
+      // the first draft of this queried `workspace_modules`, which does not exist, and PostgREST
+      // would have returned an error that a `?? 0` turned into a confident "nobody has it".
+      const { count, error } = await supabase
+        .from('workspace_module_entitlements')
+        .select('workspace_id', { count: 'exact', head: true })
+        .eq('module_slug', 'inbox-ai')
+        .eq('enabled', true);
+      setSubscribers(error ? null : (count ?? 0));
+    })();
+  }, []);
 
   /**
    * What it has actually cost, from the usage ledger.
@@ -150,7 +173,8 @@ export const InboxAIPanel: React.FC = () => {
         <CardDescription>
           Reads the last 20 messages of a conversation for customer mood, urgency and reply
           guidance. The answer is cached against the last message, so re-opening a thread costs
-          nothing — it bills once per new customer message.
+          nothing — it bills once per new customer message. Also sold per workspace as the
+          <strong> Inbox AI</strong> add-on, which stays on when the platform switch is off.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
@@ -186,6 +210,16 @@ export const InboxAIPanel: React.FC = () => {
                 </div>
               );
             })}
+
+            {!settings.enabled && (
+              <div className="mt-3 text-xs border-l-2 border-amber pl-3 py-1.5">
+                {subscribers === null
+                  ? 'Switched off platform-wide. Workspaces holding the Inbox AI add-on keep it.'
+                  : subscribers === 0
+                    ? 'Switched off platform-wide, and no workspace holds the Inbox AI add-on — so nothing is reading conversations anywhere.'
+                    : `Switched off platform-wide, but ${subscribers} workspace(s) hold the Inbox AI add-on and keep the feature — and keep billing for it.`}
+              </div>
+            )}
 
             <div className="pt-3 text-xs text-muted-foreground">
               {spend === null

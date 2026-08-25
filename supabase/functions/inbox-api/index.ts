@@ -48,6 +48,7 @@ import { matchByText } from '../_shared/order-intake/match.ts';
 import { resolveLinePrice } from '../_shared/order-intake/price.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
+import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
@@ -633,7 +634,7 @@ async function buildAgentDraft(
     // The operator's switch for the RECURRING cost specifically. `enabled` still gates the read
     // itself; this one lets them keep the drawer button while the assistant stops paying for it
     // on every inbound message.
-    const { autoOnAgentReply } = await sentimentSettings(db);
+    const { autoOnAgentReply } = await sentimentSettings(db, workspaceId);
     if (!autoOnAgentReply) throw new Error('disabled by the operator');
     const { sentiment } = await readConversationSentiment(
       db, threadId, thread.metadata as Record<string, unknown> | null, false,
@@ -2471,8 +2472,12 @@ async function handleJwtAction(
         return json({
           analysed: false,
           reason: r.reason ?? 'not_enough_messages',
+          // Three different fixes hide behind one blank panel: turn the platform switch back
+          // on, buy the add-on for this workspace, or simply wait for more messages. Naming the
+          // add-on is what makes the second one findable at all.
           message: r.reason === 'disabled'
-            ? 'Conversation analysis is switched off for this platform (Admin → Operations → Inbox AI).'
+            ? 'Conversation analysis is off for this workspace. Enable it platform-wide in '
+              + 'Admin → Operations, or add the Inbox AI module to this workspace.'
             : 'There are not enough messages in this conversation to read yet.',
         });
       }
@@ -3502,10 +3507,15 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
  * the operator believes is running; that is the silent-zero shape, and a surprise bill is a
  * louder, more recoverable failure than a mood panel that quietly stopped working weeks ago.
  */
-async function sentimentSettings(db: SupabaseClient): Promise<{
+async function sentimentSettings(
+  db: SupabaseClient,
+  workspaceId?: string | null,
+): Promise<{
   enabled: boolean;
   autoOnAgentReply: boolean;
   perMessageMood: boolean;
+  /** How this workspace got it, for saying so on screen. */
+  via: 'platform' | 'module' | 'off';
 }> {
   const { data } = await db
     .from('system_settings')
@@ -3516,10 +3526,33 @@ async function sentimentSettings(db: SupabaseClient): Promise<{
     Record<string, unknown>;
   // `!== false`, not `=== true`: a row missing a key means "not configured", which is the
   // default (on), and only an explicit false turns something off.
+  const globalOn = v.enabled !== false;
+
+  /**
+   * Global OR module — never AND.
+   *
+   * The platform switch turns this on for everyone. When it is off, a workspace that has bought
+   * the `inbox-ai` add-on still gets it, because they are paying for it specifically. An AND
+   * would make the operator's cost control a kill switch for paying tenants, which is a
+   * different thing entirely and not what it is labelled as.
+   *
+   * The module is only consulted when the global is OFF: while it is on, everybody has the
+   * feature and an entitlement round-trip per analysis would buy nothing.
+   */
+  let via: 'platform' | 'module' | 'off' = globalOn ? 'platform' : 'off';
+  if (!globalOn && workspaceId) {
+    if (await isWorkspaceEntitled(db, workspaceId, 'inbox-ai')) via = 'module';
+  }
+  const enabled = via !== 'off';
+
   return {
-    enabled: v.enabled !== false,
-    autoOnAgentReply: v.auto_on_agent_reply !== false,
-    perMessageMood: v.per_message_mood !== false,
+    enabled,
+    // The sub-switches are the PLATFORM's shape for its own spend. A workspace paying for the
+    // module gets the whole feature — selling someone an add-on and then withholding half of it
+    // from a screen they cannot see would be indefensible.
+    autoOnAgentReply: via === 'module' ? true : v.auto_on_agent_reply !== false,
+    perMessageMood: via === 'module' ? true : v.per_message_mood !== false,
+    via,
   };
 }
 
@@ -3528,13 +3561,16 @@ async function readConversationSentiment(
   threadId: string,
   threadMetadata: Record<string, unknown> | null | undefined,
   force = false,
-  // For cost attribution. `ai_usage_logs.workspace_id` AND `user_id` being NULL is what broke
-  // every per-tenant cost view once already (and the is_workspace_admin RLS branch with it), so
-  // both are passed rather than looked up and forgotten.
+  /**
+   * For cost attribution AND for the module gate. `ai_usage_logs.workspace_id` and `user_id`
+   * being NULL is what broke every per-tenant cost view once already (and the is_workspace_admin
+   * RLS branch with it), so both are passed rather than looked up and forgotten — and the same
+   * workspace decides whether the `inbox-ai` add-on turns this on when the platform switch is off.
+   */
   workspaceId?: string | null,
   actorUserId?: string | null,
 ): Promise<{ sentiment: Record<string, unknown> | null; cached: boolean; reason?: string }> {
-  const settings = await sentimentSettings(db);
+  const settings = await sentimentSettings(db, workspaceId);
   // The master switch, checked BEFORE the message read and long before the model call — an
   // "off" that still does the work and throws the answer away is not off.
   if (!settings.enabled) return { sentiment: null, cached: false, reason: 'disabled' };
