@@ -27,8 +27,10 @@
  * `text-amber-700`, which measures 4.43:1 on cream — plausible-looking, and under AA. Only the
  * measurement found that.
  *
- * Scope is these three palettes. They are the ones a new source, label colour or avatar tint
- * gets copy-pasted from, which is how one dark-only shade becomes eight.
+ * Scope is the palettes registered in PALETTES below. Three are the Inbox ones a new source,
+ * label colour or avatar tint gets copy-pasted from, which is how one dark-only shade becomes
+ * eight. The fourth is the agent's reasoning trace, added when the same defect surfaced there
+ * on 2026-08-25. Point this at a new palette rather than eyeballing one.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -167,6 +169,17 @@ const PALETTES: Array<{ what: string; strings: string[] }> = [
   {
     what: 'avatar tints (src/pages/Inbox/InboxPage.tsx → avatarTint)',
     strings: classStrings(block('src/pages/Inbox/InboxPage.tsx', 'function avatarTint', '\n}')),
+  },
+  {
+    // Not an Inbox chip, but the same defect wearing the same hat: one set of `-600`/`-400`
+    // classes per step kind, picked against plum-black. On cream the italic thinking line
+    // measured 2.63:1 and the user reported it as an orange smudge. The trace sits on
+    // `bg-primary/5` over the PAGE rather than on a card — a slightly darker ground than the
+    // one measured below, so card is the lenient reading and clearing it is the floor.
+    what: 'agent reasoning trace (src/components/features/ai/AgentHub.tsx → REASONING_STEP_TONE)',
+    strings: classStrings(
+      block('src/components/features/ai/AgentHub.tsx', 'const REASONING_STEP_TONE', '\n};'),
+    ),
   },
 ];
 

@@ -271,6 +271,29 @@ const AGENTS: AgentDefinition[] = [
   },
 ];
 
+/**
+ * Tone for each kind of reasoning step, as light/dark PAIRS.
+ *
+ * The first version was one set of classes per kind — `text-amber-600 dark:text-amber-400`,
+ * `text-green-600 dark:text-green-400`, `text-blue-600 dark:text-blue-400` — chosen while
+ * looking at the dark theme, where they measure 7-11:1. The trace does not sit on a card: it
+ * sits on `bg-primary/5` over the page, and on the light themes' cream that ground is
+ * rgb(232,234,225). Against it the italic thinking line measured **2.63:1** — the orange
+ * smudge the user reported — the tool results 2.72:1 and the tool calls 4.27:1, all under AA.
+ * A wrong colour is a valid class, so nothing failed: it emits CSS perfectly well.
+ *
+ * The `-600` shades are pale by design. Light needs one to two steps further down the ramp
+ * (amber and green need -800 where blue clears at -700), and `iteration` dropped its `/80`
+ * because muted-foreground is already the dimmest AA-safe token there is — thinning it to 80%
+ * took it to 3.27:1. Measured, not eyeballed; guarded by tests/unit/inboxChipContrast.test.ts.
+ */
+const REASONING_STEP_TONE: Record<'thinking' | 'tool_call' | 'tool_result' | 'iteration', string> = {
+  thinking: 'text-amber-800 dark:text-amber-400 italic',
+  tool_call: 'text-blue-700 dark:text-blue-400',
+  tool_result: 'text-green-800 dark:text-green-400',
+  iteration: 'text-muted-foreground',
+};
+
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
@@ -6081,7 +6104,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <ul className="space-y-2 text-sm border-l-2 border-primary/20 pl-4 ml-1">
                         {reasoningSteps.length === 0 ? (
                           // Initial message while waiting for first step
-                          <li className="animate-fade-in text-muted-foreground/80 italic">
+                          <li className="animate-fade-in text-muted-foreground italic">
                             Standing by. Processing your request...
                           </li>
                         ) : (
@@ -6091,10 +6114,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               key={`${step.timestamp}-${idx}`}
                               className={cn(
                                 'animate-fade-in flex items-start gap-2',
-                                step.type === 'tool_call' && 'text-blue-600 dark:text-blue-400',
-                                step.type === 'tool_result' && 'text-green-600 dark:text-green-400',
-                                step.type === 'thinking' && 'text-amber-600 dark:text-amber-400 italic',
-                                step.type === 'iteration' && 'text-muted-foreground/80',
+                                REASONING_STEP_TONE[step.type],
                               )}
                             >
                               <span className="flex-shrink-0 mt-0.5">
