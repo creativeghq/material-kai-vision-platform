@@ -330,6 +330,22 @@ describe('the WhatsApp profile is fetched and shown', () => {
     expect(stripComments(inboxMedia)).toMatch(/avatar_path: avatarPath/);
   });
 
+  it('puts the hover actions on the message you REPLY to, not on top of its avatar', () => {
+    const page = stripComments(inboxPage);
+    // Every non-system message gets the bar — reply/react/copy are for the OTHER person's
+    // message far more often than your own, so gating it on `ours` would remove it from the
+    // only case that matters.
+    expect(page).toMatch(/<MessageActions/);
+    expect(page).not.toMatch(/ours && \(\s*<MessageActions/);
+    // Anchored AWAY from the avatar. The row is flex-row-reverse for our own messages, so the
+    // avatar is on the right there and on the left otherwise; pinning the bar to the same side
+    // as the avatar covers the sender's face and name, which is what made the actions read as
+    // "ours only" — on our side they happened to land over blank gutter.
+    expect(page).toMatch(/ours \? 'left-2' : 'right-2'/);
+    // The emoji popover is mirrored WITH the anchor, or it opens off the edge of the pane.
+    expect(page).toMatch(/align=\{ours \? 'start' : 'end'\}/);
+  });
+
   it('does not re-ask Zernio on every page load for an answer that will not change', () => {
     // Measured live 2026-08-24: 100 conversations and 516 contact records, zero photos in either.
     // WhatsApp does not give a business a customer's picture, so "a thread with no photo" is the

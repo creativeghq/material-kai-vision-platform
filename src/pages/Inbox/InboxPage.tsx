@@ -1585,7 +1585,18 @@ const MessageActions: React.FC<{
   const [pickingEmoji, setPickingEmoji] = useState(false);
   return (
     <div
-      className={`absolute -top-3 ${ours ? 'right-2' : 'left-2'} z-20 hidden group-hover/msg:flex
+      /*
+       * Anchored on the side AWAY from the avatar, which is the opposite of where it started.
+       * The row is `flex-row-reverse` for our own messages, so the avatar is on the RIGHT there
+       * and on the LEFT for everyone else's — and the bar was pinned to `right` / `left`
+       * respectively, i.e. on top of the avatar in both cases. On an incoming message that put
+       * three 14px buttons over the sender's face and their name, which is why the actions read
+       * as "ours only": on our side they landed over blank gutter and looked deliberate.
+       *
+       * A message you REPLY to or REACT to is almost always the other person's, so that is the
+       * side that had to be right.
+       */
+      className={`absolute -top-3 ${ours ? 'left-2' : 'right-2'} z-20 hidden group-hover/msg:flex
                   group-focus-within/msg:flex items-center gap-0.5 rounded-full border border-hairline
                   bg-card px-1 py-0.5 shadow-overlay`}
     >
@@ -1596,7 +1607,9 @@ const MessageActions: React.FC<{
               <Smile className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-1.5" align={ours ? 'end' : 'start'}>
+          {/* Opens back over the bubble rather than off the edge of the pane — mirrored with
+              the anchor above, so flipping one without the other cannot push it out of view. */}
+          <PopoverContent className="w-auto p-1.5" align={ours ? 'start' : 'end'}>
             <div className="flex gap-0.5">
               {QUICK_REACTIONS.map((e) => (
                 <button
