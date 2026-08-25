@@ -16,6 +16,7 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
 import { messagingService } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { castObjectFor } from '@/utils/characterAvatar';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -1546,8 +1547,20 @@ const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) =>
  * One component, so a sixth site cannot be added without it, and so "does this thread have a
  * picture" is answered in one place rather than five.
  */
+/**
+ * The public URL of the character assigned to `seed`.
+ *
+ * PUBLIC, not signed: `generation-images` is public-read and this face renders on every message
+ * row in the thread. A signed URL would need re-minting constantly and would break mid-scroll the
+ * moment one expired.
+ */
+function castAvatarSrc(seed: string | null | undefined): string {
+  const { storage_bucket, storage_object_path } = castObjectFor(seed);
+  return supabase.storage.from(storage_bucket).getPublicUrl(storage_object_path).data.publicUrl;
+}
+
 const ThreadAvatar: React.FC<{
-  thread?: Pick<InboxThread, 'metadata'> | null;
+  thread?: Pick<InboxThread, 'id' | 'metadata'> | null;
   name: string;
   className?: string;
   fallbackClassName?: string;
@@ -1566,9 +1579,22 @@ const ThreadAvatar: React.FC<{
     return () => { alive = false; };
   }, [bucket, path]);
 
+  /*
+   * No stored photo means there will never be one: WhatsApp hands a business no customer
+   * profile picture on any endpoint that declares the field (measured 0/100 conversations,
+   * 0/516 contacts). So this is not a placeholder waiting for something better — it is the
+   * avatar, and it should look like it was designed rather than like a missing image.
+   *
+   * Seeded on the THREAD ID, never the name. A name gets corrected, re-capitalised, or arrives
+   * one way from WhatsApp and another from the CRM, and seeding on it would recolour someone
+   * every time their record is tidied.
+   */
+  const generated = useMemo(() => castAvatarSrc(thread?.id ?? name), [thread?.id, name]);
+
   return (
     <Avatar className={className}>
-      {url && <AvatarImage src={url} alt={name} className="object-cover" />}
+      <AvatarImage src={url ?? generated} alt={name} className="object-cover" />
+      {/* Only reached if the data URI itself fails to decode — initials remain the floor. */}
       <AvatarFallback className={fallbackClassName ?? `text-xs ${avatarTint(name)}`}>
         {initials(name)}
       </AvatarFallback>
@@ -1996,10 +2022,21 @@ const MessageBubble: React.FC<{
         />
       )}
       <Avatar className="h-7 w-7 mt-5 shrink-0">
-        {/* A member's own photo, which was never selected from user_profiles — so every operator
-            in every thread rendered as initials no matter what they had uploaded. */}
-        {!isAgent && info?.avatarUrl && (
-          <AvatarImage src={info.avatarUrl} alt={displayLabel ?? ''} className="object-cover" />
+        {/*
+          A member's own photo, which was never selected from user_profiles — so every operator
+          in every thread rendered as initials no matter what they had uploaded. Failing that, a
+          generated mark: the customer's real photo is not obtainable from WhatsApp at all, so a
+          row of grey initials is the permanent state rather than a brief one.
+
+          The agent keeps its glyph — it is not a person and should not be given a person's mark.
+          Seeded on the participant id so one sender is one mark for the whole thread.
+        */}
+        {!isAgent && (
+          <AvatarImage
+            src={info?.avatarUrl || castAvatarSrc(m.sender_participant_id ?? displayLabel)}
+            alt={displayLabel ?? ''}
+            className="object-cover"
+          />
         )}
         <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(displayLabel)}`}>
           {isAgent ? <Bot className="w-3.5 h-3.5" /> : initials(displayLabel)}
