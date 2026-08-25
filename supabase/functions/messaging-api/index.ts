@@ -16,6 +16,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
+import { generateImageWithGemini } from '../_shared/ai-client.ts';
 import {
   materialiseInlineAttachments,
   storeParticipantPicture,
@@ -300,7 +301,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       'send', 'send-bulk', 'connect-whatsapp', 'connect-whatsapp-oauth',
       'connect-whatsapp-callback', 'sync-channels', 'update-settings',
       'register-webhook', 'create-whatsapp-template', 'backfill-inbox', 'repair-attachments',
-      'open-whatsapp-thread', 'sync-avatars', 'zernio-probe',
+      'open-whatsapp-thread', 'sync-avatars', 'zernio-probe', 'generate-avatar-cast',
       // Buying a number puts a recurring charge on the OPERATOR's Zernio/Stripe subscription and
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
@@ -1503,6 +1504,109 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             error: err instanceof Error ? err.message : String(err),
           });
         }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // generate-avatar-cast — render the cast of character avatars, once.
+      //
+      // WhatsApp gives a business no customer profile picture (measured: 0 of 100 conversations,
+      // 0 of 516 contact records), so every contact needs a stand-in and it should look drawn
+      // rather than like a missing image.
+      //
+      // A CAST, not one render per contact. 516 contacts would be 516 generations to bill, store
+      // and wait for, and the style would drift between calls; a few dozen characters assigned by
+      // a hash of the contact id costs a couple of dollars once, is instant from then on, and
+      // every contact keeps the same face forever.
+      //
+      // `prompt` and `variations` are overridable so the look can be iterated from a terminal.
+      // The alternative is a deploy per attempt, which is how the profile-photo hunt burned two
+      // days — see `zernio-probe` for the same lesson.
+      // ─────────────────────────────────────────────────────────────
+      case 'generate-avatar-cast': {
+        if (!isAdminAccess(auth)) throw new HttpError(404, 'Not found');
+
+        const count = Math.min(Math.max(Number(requestBody.count) || 12, 1), 48);
+        const startIndex = Math.max(Number(requestBody.startIndex) || 0, 0);
+        const basePrompt = typeof requestBody.prompt === 'string' && requestBody.prompt.trim()
+          ? requestBody.prompt.trim()
+          : 'A friendly 3D cartoon avatar of a single human head and shoulders, rendered in a '
+            + 'glossy soft-plastic style with smooth rounded forms, large expressive eyes, warm '
+            + 'subsurface skin shading and soft studio lighting. Head centred and facing forward, '
+            + 'gentle smile, clean flat pure-white background, no text, no watermark, no border.';
+
+        // Diversity is spread across the CAST deliberately — it is a set of characters, and a set
+        // that is all one age or one hair length just looks broken. Nothing here is derived from
+        // any real contact; assignment to a person happens later, by hash of their id.
+        const DEFAULT_VARIATIONS = [
+          'young woman, long dark wavy hair, warm brown skin, small gold earrings',
+          'older man, short grey hair, neat grey beard, glasses with dark rectangular frames, light skin',
+          'young man, short black textured hair, deep brown skin, wide friendly smile',
+          'woman in her thirties, blonde shoulder-length bob, fair skin, light freckles',
+          'man in his forties, brown hair swept to one side, olive skin, clean shaven',
+          'young woman, black hair in a high bun, East Asian features, round thin-rimmed glasses',
+          'man with a shaved head, dark brown skin, short full beard, broad smile',
+          'woman with curly auburn hair, pale skin, green eyes, small silver nose stud',
+          'older woman, silver hair in a short crop, light skin, warm smile, pearl earrings',
+          'young man, red hair, freckled fair skin, big grin, no facial hair',
+          'woman wearing a deep purple headscarf, brown skin, dark eyes, subtle smile',
+          'man with long black hair tied back, tan skin, thin moustache',
+          'young woman, straight black hair with a blunt fringe, light tan skin, red lipstick',
+          'man in his fifties, receding light brown hair, ruddy skin, thick eyebrows',
+          'woman with tightly coiled black hair worn full, dark skin, round tortoiseshell glasses',
+          'young man, dark blonde undercut, fair skin, small stud earring',
+          'woman with straight brown hair past the shoulders, medium skin, hazel eyes',
+          'man with a turban, dark full beard, brown skin, calm expression',
+          'young woman, pink-dyed short hair, pale skin, cat-eye glasses',
+          'older man, bald on top with grey at the sides, light skin, moustache',
+          'woman with box braids gathered back, deep brown skin, bright smile',
+          'man with wavy dark hair, Mediterranean skin, light stubble',
+          'young woman, ash-brown ponytail, fair skin, dimples',
+          'man with short salt-and-pepper hair, medium skin, rectangular glasses',
+        ];
+        const variations: string[] = Array.isArray(requestBody.variations) && requestBody.variations.length
+          ? requestBody.variations.map((v: unknown) => String(v))
+          : DEFAULT_VARIATIONS;
+
+        const made: Array<{ slot: number; path: string }> = [];
+        const errors: string[] = [];
+
+        for (let i = 0; i < count; i++) {
+          const slot = startIndex + i;
+          const variation = variations[slot % variations.length];
+          const prompt = `${basePrompt} The character is a ${variation}.`;
+          try {
+            const img = await generateImageWithGemini(prompt, {
+              aspectRatio: '1:1',
+              task: 'inbox_avatar_cast',
+            });
+            const bytes = Uint8Array.from(atob(img.base64), (c) => c.charCodeAt(0));
+            // A FIXED path per slot, so re-running replaces a character rather than growing the
+            // cast — otherwise every iteration on the prompt leaves the rejects behind and the
+            // assignment picks them up.
+            const path = `avatars/cast/${String(slot).padStart(3, '0')}.png`;
+            const { error: upErr } = await supabaseClient.storage
+              .from('generation-images')
+              .upload(path, bytes, { contentType: img.mimeType || 'image/png', upsert: true });
+            if (upErr) { errors.push(`${slot}: ${upErr.message}`); continue; }
+            made.push({ slot, path });
+          } catch (err) {
+            errors.push(`${slot}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          generated: made.length,
+          requested: count,
+          cast: made,
+          bucket: 'generation-images',
+          // Said plainly: a partial run is the normal failure here (a safety refusal on one
+          // prompt, a rate limit) and "generated 9 of 12" must not read as a full cast.
+          message: made.length === count
+            ? `${made.length} character(s) rendered into avatars/cast/.`
+            : `${made.length} of ${count} rendered — the rest failed, see errors.`,
+          errors: errors.slice(0, 10),
+        });
       }
 
       case 'sync-avatars': {
