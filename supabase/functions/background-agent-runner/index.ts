@@ -288,12 +288,45 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     ((run.input_data as Record<string, unknown> | null)?.dispatched_by as string | undefined) ??
     null;
 
+  // The workspace the RUN belongs to, which is not always the agent's.
+  //
+  // `agentConfig.workspace_id` is NULL for the shared system agents (KAI Background Tasks is
+  // `00000000-…-0001`), so every dispatched task ran with no tenant: MIVAA types `workspace_id`
+  // as a required string and answered 422 `Input should be a valid string` on every knowledge-base
+  // search this runner made. `dispatch_background_task` has always stamped the chat turn's
+  // workspace onto the run row — agent-chat derived it from the verified JWT — it just never
+  // reached the runner.
+  //
+  // TENANCY (invariant 1): using the run's workspace WIDENS what the run can read, so a JWT
+  // caller must be checked against the effective workspace and not only the agent's. The check at
+  // the top of this handler validated `agentConfig.workspace_id`; with a NULL there it passed
+  // vacuously for a system agent while `run.workspace_id` pointed anywhere. Service-role callers
+  // (cron / chain / agent-chat) are exempt exactly as they are above.
+  const effectiveWorkspaceId: string | null =
+    (run.workspace_id as string | null) ?? agentConfig.workspace_id ?? null;
+
+  if (!isServiceRole && effectiveWorkspaceId && effectiveWorkspaceId !== agentConfig.workspace_id) {
+    const { data: runMembership } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', effectiveWorkspaceId)
+      .eq('user_id', authedUserId)
+      .eq('status', 'active')
+      .maybeSingle();
+    // 404, not 403 — a mismatch must not confirm that this run id exists (invariant 1).
+    if (!runMembership) {
+      return new Response(JSON.stringify({ error: 'Run not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   const ctx: AgentRunContext = {
     supabase,
     agentConfig:     agentConfig as BackgroundAgentRecord,
     run,
     input:           effectiveInput,
-    workspaceId:     agentConfig.workspace_id,
+    workspaceId:     effectiveWorkspaceId,
     actingUserId,
     mivaaGatewayUrl: MIVAA_GATEWAY_URL,
     mivaaApiKey:     MIVAA_API_KEY,
