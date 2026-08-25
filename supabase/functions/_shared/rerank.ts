@@ -137,23 +137,38 @@ export async function rerankResults<T>(
 ): Promise<RerankOutcome<T>> {
   const trimmed = (query ?? '').trim();
 
+  /**
+   * Degraded exit that still honours the caller's contract.
+   *
+   * `maxResults` used to be applied ONLY on the success path, so all nine "reranked: false"
+   * returns below handed back the whole candidate list — a caller asking for 2 got 3. Degrading
+   * the ORDER is the documented, acceptable outcome here (no API key, kill switch, a model blip);
+   * degrading the CONTRACT is not, and it fails OPEN: more rows than were asked for, silently,
+   * exactly when something else has already gone wrong.
+   */
+  const degraded = (reason: string): RerankOutcome<T> => ({
+    items: opts.maxResults ? items.slice(0, opts.maxResults) : items,
+    reranked: false,
+    reason,
+  });
+
   // Nothing to order. Not an error — this is the normal state of a search with no matches, and
   // of every search on this platform until the catalog pipeline produces products.
   if (items.length < 2) {
-    return { items, reranked: false, reason: 'fewer than 2 candidates' };
+    return degraded('fewer than 2 candidates');
   }
   if (!trimmed) {
-    return { items, reranked: false, reason: 'no query text to rank against' };
+    return degraded('no query text to rank against');
   }
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
-    return { items, reranked: false, reason: 'ANTHROPIC_API_KEY not configured' };
+    return degraded('ANTHROPIC_API_KEY not configured');
   }
   // Kill switch. Reranking adds one model call to every search that has something to rank, so
   // there needs to be a way to turn it off that is faster than a deploy. Read at call time, never
   // captured at module load — the secrets bootstrap populates env at handler entry, so a
   // module-load capture reads undefined.
   if (Deno.env.get('SEARCH_RERANK_ENABLED') === 'false') {
-    return { items, reranked: false, reason: 'reranking disabled by SEARCH_RERANK_ENABLED=false' };
+    return degraded('reranking disabled by SEARCH_RERANK_ENABLED=false');
   }
 
   const considered = items.slice(0, MAX_CANDIDATES);
@@ -165,7 +180,7 @@ export async function rerankResults<T>(
   // than silently merging two results that happen to share one.
   const ids = candidates.map((c, i) => (c.id && c.id.length > 0 ? c.id : `idx-${i}`));
   if (new Set(ids).size !== ids.length) {
-    return { items, reranked: false, reason: 'candidate ids are not unique' };
+    return degraded('candidate ids are not unique');
   }
 
   const clip = (s: string | undefined) =>
@@ -201,14 +216,14 @@ export async function rerankResults<T>(
   // Without the prompt we DECLINE to rerank rather than invent one. Returning the source order
   // is a documented outcome of this function; a rerank driven by a guessed prompt is not.
   if (!opts.supabase) {
-    return { items, reranked: false, reason: 'no supabase client to load the rerank prompt' };
+    return degraded('no supabase client to load the rerank prompt');
   }
   let systemPrompt: string;
   try {
     systemPrompt = await loadPrompt(opts.supabase, 'tool', 'ai_rerank');
   } catch (err) {
     console.error('rerank: could not load tool/ai_rerank —', (err as Error).message);
-    return { items, reranked: false, reason: 'rerank prompt unavailable' };
+    return degraded('rerank prompt unavailable');
   }
 
   const prompt = [
@@ -246,7 +261,7 @@ export async function rerankResults<T>(
 
     const ranked = result.output?.ranked;
     if (!Array.isArray(ranked) || ranked.length === 0) {
-      return { items, reranked: false, reason: 'model returned no ranking' };
+      return degraded('model returned no ranking');
     }
 
     const byId = new Map<string, T>();
@@ -281,10 +296,6 @@ export async function rerankResults<T>(
     // reranker is visible in the function logs instead of looking like "the model just agrees
     // with the vector order every time".
     console.error('rerank failed, returning source order:', err);
-    return {
-      items,
-      reranked: false,
-      reason: err instanceof Error ? err.message : 'rerank failed',
-    };
+    return degraded(err instanceof Error ? err.message : 'rerank failed');
   }
 }
