@@ -262,7 +262,17 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
    * that reports what was actually found. Same reasoning as agent-chat's `finalize` node, for
    * the same reason: a partial answer that says it is partial beats a clean failure.
    */
-  const LOOP_DEADLINE_MS = 3.5 * 60 * 1000;
+  //
+  // 95 SECONDS, and the number is measured, not chosen. The first version of this was 3.5 minutes,
+  // reasoning from the "400s limit" quoted elsewhere in this repo. That limit is not what governs
+  // here: `background-agent-runner` runs the loop SYNCHRONOUSLY inside the request, and the
+  // Supabase gateway kills the request at ~150s. Two runs on 2026-08-25 died at 165s and 177s of
+  // wall time having never reached a 210s deadline — a graceful exit that cannot be reached is
+  // the same as no graceful exit, and both runs orphaned exactly as before.
+  //
+  // The wrap-up turn is a model call over the whole transcript, so it needs real room: 95s of tool
+  // loop leaves 55-85s to write the answer inside the observed window.
+  const LOOP_DEADLINE_MS = 95 * 1000;
   const startedAt = Date.now();
   const outOfTime = () => Date.now() - startedAt > LOOP_DEADLINE_MS;
 
@@ -334,15 +344,16 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
 
   const initialMessages: BaseMessageT[] = [new HumanMessage(userMessage)];
 
-  // Backstop only. `LOOP_DEADLINE_MS` above is the deadline that actually governs the run and it
-  // exits GRACEFULLY, so this race should never win — it exists for the case the deadline cannot
-  // catch: a single model or tool call that hangs past it inside one node. Kept above the loop
-  // deadline plus a wrap-up turn so it does not pre-empt the graceful path.
+  // Backstop only, and it fires INSIDE the gateway's ~150s window so it can actually be reached.
+  // `LOOP_DEADLINE_MS` above is what normally governs the run and it exits gracefully; this race
+  // covers the one case a router deadline cannot — a single model or tool call that hangs, so
+  // control never returns to the router to notice the time. The old value was 5 minutes, i.e.
+  // past the point the isolate is killed, so it had never fired once.
   //
   // Capture the timer id so we can clear it once the graph resolves first — otherwise the
   // (rejecting) timeout keeps the Deno isolate alive past the request lifetime, which on hot
   // agents shows up as leaked handles + a background "Unhandled rejection" log.
-  const TIMEOUT_MS = 5 * 60 * 1000;
+  const TIMEOUT_MS = 140 * 1000;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`runLangGraphAgent timed out after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS);
