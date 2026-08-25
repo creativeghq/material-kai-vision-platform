@@ -21,7 +21,12 @@ export class ProductEnrichmentAgent implements AgentRunner {
   readonly agentType    = 'product-enrichment';
   readonly name         = 'Product Enrichment';
   readonly description  = 'Auto-generates AI descriptions, keywords, and category tags for products';
-  readonly defaultTools = ['material_search', 'knowledge_base_search'];
+  // EMPTY, and it must stay in step with what `run` actually builds — this passes `tools: []`
+  // (see the call below: one prompt, one turn, no lookups). It declared material_search and
+  // knowledge_base_search, neither of which was ever constructed. Harmless here only because
+  // nothing reads the list; the identical lie in kai-task-agent, where the model DID read it,
+  // is how a research task with no working tools produced a fabricated report.
+  readonly defaultTools: string[] = [];
   readonly defaultModel = 'claude-haiku-4-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
