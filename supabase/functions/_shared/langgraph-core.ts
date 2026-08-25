@@ -477,8 +477,39 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
      * re-reading the pages — and the untruncated results are still returned in `toolResults`, so
      * nothing is actually discarded. Only the model's view is narrowed.
      */
+    /**
+     * Close any tool call the deadline interrupted, or the wrap-up cannot be sent at all.
+     *
+     * The deadline fires mid-node by design, so the transcript routinely ends with an assistant
+     * `tool_use` whose `tool_result` was never appended. Anthropic rejects that outright —
+     * `400 messages.N: tool_use ids were found without tool_result blocks immediately after` —
+     * which is what made the model summary unreachable on runs 8127fc3e and 7107f31d even after
+     * the transcript was trimmed to fit.
+     *
+     * Answering them with an explicit "did not finish" beats dropping the assistant turn: the
+     * model then knows what it had asked for and can report those as outstanding.
+     */
+    const answered = new Set(
+      transcript.filter((m: any) => m.tool_call_id).map((m: any) => m.tool_call_id),
+    );
+    const closed: BaseMessageT[] = [];
+    for (const m of transcript) {
+      closed.push(m);
+      const calls = (m as any).tool_calls;
+      if (!Array.isArray(calls) || calls.length === 0) continue;
+      for (const c of calls) {
+        if (c?.id && !answered.has(c.id)) {
+          closed.push(new ToolMessage({
+            tool_call_id: c.id,
+            content: 'Did not finish: the run reached its time limit before this call returned.',
+          }));
+          answered.add(c.id);
+        }
+      }
+    }
+
     const WRAP_UP_MSG_CHARS = 2_000;
-    const trimmed = transcript.map((m: any) => {
+    const trimmed = closed.map((m: any) => {
       const text = typeof m.content === 'string' ? m.content : null;
       if (text === null || text.length <= WRAP_UP_MSG_CHARS) return m;
       const clone = Object.create(Object.getPrototypeOf(m));
