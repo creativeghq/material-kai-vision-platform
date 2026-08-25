@@ -75,6 +75,7 @@ import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
+import { InboxAIPanel } from './InboxAIPanel';
 import { ChannelsCostPanel } from './ChannelsCostPanel';
 import { ChannelsBillingDetail } from './ChannelsBillingDetail';
 
@@ -1083,6 +1084,9 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* Services & Billing Tab — 3rd Party API Services */}
           <TabsContent value="services-billing" className="space-y-4">
+            {/* A cost switch, so it sits with the other spend rather than under a feature menu —
+                the person who comes looking for it is looking at a bill. */}
+            <InboxAIPanel />
             {/* The per-workspace view first: the table below prices services, this says who is
                 actually costing and earning what. */}
             <ChannelsCostPanel />

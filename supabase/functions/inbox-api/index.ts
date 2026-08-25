@@ -586,8 +586,14 @@ async function buildAgentDraft(
    */
   let agentInput = transcript;
   try {
+    // The operator's switch for the RECURRING cost specifically. `enabled` still gates the read
+    // itself; this one lets them keep the drawer button while the assistant stops paying for it
+    // on every inbound message.
+    const { autoOnAgentReply } = await sentimentSettings(db);
+    if (!autoOnAgentReply) throw new Error('disabled by the operator');
     const { sentiment } = await readConversationSentiment(
-      db, threadId, thread.metadata as Record<string, unknown> | null,
+      db, threadId, thread.metadata as Record<string, unknown> | null, false,
+      workspaceId, billedTo.userId ?? null,
     );
     if (sentiment) {
       const guidance = Array.isArray(sentiment.reply_guidance)
@@ -603,6 +609,8 @@ async function buildAgentDraft(
         + `</conversation_reading>\n\n${transcript}`;
     }
   } catch (err) {
+    // Includes the operator having switched it off, which is not a fault — the reply simply goes
+    // out without the tone hint, exactly as it did before this feature existed.
     console.warn('[inbox-api] sentiment unavailable for the agent reply:', err instanceof Error ? err.message : String(err));
   }
 
@@ -2401,13 +2409,18 @@ async function handleJwtAction(
 
       const r = await readConversationSentiment(
         db, threadId, thread.metadata as Record<string, unknown> | null, !!payload.force,
+        thread.workspace_id as string | null, userId,
       );
       // Nothing to read is a real answer, not an error, and it must not bill anybody.
       if (!r.sentiment) {
+        // "Switched off" and "nothing to read" look identical on screen unless they are said
+        // apart — and one of them is fixed in the admin, not by waiting for more messages.
         return json({
           analysed: false,
           reason: r.reason ?? 'not_enough_messages',
-          message: 'There are not enough messages in this conversation to read yet.',
+          message: r.reason === 'disabled'
+            ? 'Conversation analysis is switched off for this platform (Admin → Operations → Inbox AI).'
+            : 'There are not enough messages in this conversation to read yet.',
         });
       }
       return json({ analysed: true, cached: r.cached, sentiment: r.sentiment });
@@ -3426,12 +3439,53 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
  * Returns null when there is nothing to read — a two-message thread has no mood, and inventing
  * one would put a confident label on noise.
  */
+/**
+ * The operator's switches for conversation reading (Admin → Operations → Inbox AI).
+ *
+ * Read from the DB rather than an env var so it can be turned off DURING an incident — the point
+ * of the switch is the bill, and a redeploy is the wrong tool for "stop spending, now".
+ *
+ * Fails CLOSED to enabled=true. An unreadable settings row must not silently disable a feature
+ * the operator believes is running; that is the silent-zero shape, and a surprise bill is a
+ * louder, more recoverable failure than a mood panel that quietly stopped working weeks ago.
+ */
+async function sentimentSettings(db: SupabaseClient): Promise<{
+  enabled: boolean;
+  autoOnAgentReply: boolean;
+  perMessageMood: boolean;
+}> {
+  const { data } = await db
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', 'inbox_sentiment_analysis')
+    .maybeSingle();
+  const v = ((data as { setting_value?: Record<string, unknown> } | null)?.setting_value ?? {}) as
+    Record<string, unknown>;
+  // `!== false`, not `=== true`: a row missing a key means "not configured", which is the
+  // default (on), and only an explicit false turns something off.
+  return {
+    enabled: v.enabled !== false,
+    autoOnAgentReply: v.auto_on_agent_reply !== false,
+    perMessageMood: v.per_message_mood !== false,
+  };
+}
+
 async function readConversationSentiment(
   db: SupabaseClient,
   threadId: string,
   threadMetadata: Record<string, unknown> | null | undefined,
   force = false,
+  // For cost attribution. `ai_usage_logs.workspace_id` AND `user_id` being NULL is what broke
+  // every per-tenant cost view once already (and the is_workspace_admin RLS branch with it), so
+  // both are passed rather than looked up and forgotten.
+  workspaceId?: string | null,
+  actorUserId?: string | null,
 ): Promise<{ sentiment: Record<string, unknown> | null; cached: boolean; reason?: string }> {
+  const settings = await sentimentSettings(db);
+  // The master switch, checked BEFORE the message read and long before the model call — an
+  // "off" that still does the work and throws the answer away is not off.
+  if (!settings.enabled) return { sentiment: null, cached: false, reason: 'disabled' };
+
   const WINDOW = 20;
   const { data: msgs, error: msgErr } = await db
     .from('inbox_messages')
@@ -3459,9 +3513,12 @@ async function readConversationSentiment(
 
   // Delimited as DATA (invariant 9). A customer types whatever they like into WhatsApp,
   // including "ignore your instructions".
-  const transcript = withText.map((m) => {
+  // The INDEX is in the markup because the model is asked to key `message_moods` on it. Message
+  // ids are opaque uuids: a model asked to echo one back gets a character wrong often enough to
+  // matter, and a mood keyed to an id that matches nothing renders as no border at all.
+  const transcript = withText.map((m, i) => {
     const who = m.direction === 'outgoing' ? 'us' : 'customer';
-    return `<message from="${who}">\n${String(m.body).slice(0, 1200)}\n</message>`;
+    return `<message index="${i}" from="${who}">\n${String(m.body).slice(0, 1200)}\n</message>`;
   }).join('\n');
 
   const TOOL = {
@@ -3485,6 +3542,28 @@ async function readConversationSentiment(
           type: ['string', 'null'],
           description: "The customer's last unanswered question, verbatim, or null if none.",
         },
+        ...(settings.perMessageMood
+          ? {
+            message_moods: {
+              type: 'array',
+              description:
+                'The mood of EACH message, in the order given. One entry per message, using the '
+                + 'same index shown in the transcript. Judge that message in the context of the '
+                + 'ones before it.',
+              items: {
+                type: 'object',
+                properties: {
+                  index: { type: 'integer' },
+                  mood: {
+                    type: 'string',
+                    enum: ['happy', 'satisfied', 'neutral', 'confused', 'waiting', 'frustrated', 'angry'],
+                  },
+                },
+                required: ['index', 'mood'],
+              },
+            },
+          }
+          : {}),
       },
       required: ['mood', 'urgency', 'summary', 'reply_guidance', 'suggested_tone'],
     },
@@ -3521,12 +3600,69 @@ async function readConversationSentiment(
     const use = (body.content ?? []).find((c: Record<string, unknown>) => c.type === 'tool_use');
     if (!use?.input) throw new Error('the model returned no verdict');
     verdict = use.input as Record<string, unknown>;
+
+    /*
+     * Book the spend.
+     *
+     * This is a raw fetch to Anthropic rather than a call through `_shared/ai-client.ts`, which
+     * means nothing logs it for us — and an unlogged call is invisible to every cost view, which
+     * is the silent-zero shape exactly. The operator's switch for this feature sits next to a
+     * figure read from this table; without the insert that figure is a permanent, convincing $0
+     * and the switch looks free.
+     *
+     * Haiku 4.5 rates, per million tokens.
+     */
+    const inTok = Number(body?.usage?.input_tokens ?? 0);
+    const outTok = Number(body?.usage?.output_tokens ?? 0);
+    const rawUsd = (inTok / 1e6) * 1.0 + (outTok / 1e6) * 5.0;
+    // CHECKED: supabase-js RESOLVES on an RLS denial, so an unchecked insert would leave the
+    // operator's cost panel reading zero while every conversation billed.
+    const { error: logErr } = await db.from('ai_usage_logs').insert({
+        user_id: actorUserId ?? null,
+        workspace_id: workspaceId ?? null,
+        module_slug: 'inbox',
+        operation_type: 'inbox_conversation_sentiment',
+        model_name: 'claude-haiku-4-5-20251001',
+        api_provider: 'anthropic',
+        input_tokens: inTok,
+        output_tokens: outTok,
+        raw_cost_usd: rawUsd,
+        billed_cost_usd: rawUsd,
+        // Not debited: this is the operator's own overhead on their own inbox, not a customer
+        // action, and a credit charge here would bill a tenant for a background read they never
+        // asked for. `success` is what ops.silent_zero_provider reads.
+        credits_debited: 0,
+        unbilled_reason: 'platform_overhead',
+        metadata: { success: true, thread_id: threadId, message_count: withText.length },
+    });
+    if (logErr) console.warn('[inbox-api] sentiment usage log failed:', logErr.message);
   } catch (err) {
     throw new HttpError(502, `Could not read the conversation: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  /**
+   * Indices back to real message ids, HERE rather than in the browser.
+   *
+   * The client renders from `message_moods` keyed by id; leaving it as indices would mean every
+   * consumer re-deriving the same mapping against a list it may have paged differently, and an
+   * off-by-one there paints the wrong bubble — which looks like a working feature giving a wrong
+   * answer, the hardest kind to notice.
+   */
+  const rawMoods = Array.isArray(verdict.message_moods)
+    ? verdict.message_moods as Array<{ index?: number; mood?: string }>
+    : [];
+  const messageMoods: Record<string, string> = {};
+  for (const entry of rawMoods) {
+    const i = Number(entry?.index);
+    // Bounds-checked: a hallucinated index must drop, never wrap around onto another message.
+    if (!Number.isInteger(i) || i < 0 || i >= withText.length) continue;
+    if (typeof entry?.mood !== 'string') continue;
+    messageMoods[String(withText[i].id)] = entry.mood;
+  }
+
   const sentiment = {
     ...verdict,
+    message_moods: messageMoods,
     last_message_id: lastId,
     analysed_at: new Date().toISOString(),
     message_count: withText.length,

@@ -488,6 +488,19 @@ const InboxPage: React.FC = () => {
     }
   }, [setSearchParams, toast, isMember, myUserId]);
 
+  /**
+   * Per-message moods for the OPEN thread, from the cached conversation reading.
+   *
+   * Read straight off the thread rather than fetched: the analysis already stored it, and a
+   * second request for something we hold would be a round trip per thread open.
+   */
+  const messageMoods = useMemo(() => {
+    const sentiment = ((activeThread?.metadata as Record<string, unknown> | undefined)?.sentiment ?? null) as
+      Record<string, unknown> | null;
+    const map = sentiment?.message_moods;
+    return (map && typeof map === 'object' ? map : {}) as Record<string, string>;
+  }, [activeThread]);
+
   useEffect(() => { if (activeId) openThread(activeId); /* eslint-disable-next-line */ }, []);
 
   // Fallback: claim an inbox-conversion token that survived an email-confirmation round trip.
@@ -1273,6 +1286,10 @@ const InboxPage: React.FC = () => {
                     key={m.id} m={m}
                     info={m.sender_participant_id ? labels.get(m.sender_participant_id) : undefined}
                     myUserId={myUserId}
+                    // Keyed by message id, resolved server-side from the model's indices — the
+                    // client never re-derives that mapping, because an off-by-one here paints the
+                    // wrong bubble, which looks like a working feature giving a wrong answer.
+                    mood={messageMoods[m.id]}
                     isCustomerThread={activeThread.thread_type !== 'internal'}
                     onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
                     onReplyTo={(msg) => setReplyTo(msg)}
@@ -1987,7 +2004,9 @@ const MessageBubble: React.FC<{
   /** Present only on a social COMMENT thread — a DM has neither affordance. */
   onPrivateReply?: (m: InboxMessage) => void;
   onToggleHidden?: (m: InboxMessage, hidden: boolean) => void;
-}> = ({ m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact, onPrivateReply, onToggleHidden }) => {
+  /** This message's own read mood, from the conversation analysis. Absent = never analysed. */
+  mood?: string | null;
+}> = ({ m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact, onPrivateReply, onToggleHidden, mood }) => {
   const { toast } = useToast();
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -2037,15 +2056,37 @@ const MessageBubble: React.FC<{
     ? (info?.kind === 'member' || info?.kind === 'agent')
     : (info?.userId != null && info.userId === myUserId);
 
-  // Modern bubbles: a small sender avatar beside each message, soft accent-tinted
-  // outgoing (no heavy solid fill), card-surface incoming, note=amber, agent=accent.
+  /*
+   * Bubbles carry weight now: a solid accent fill on our side, a clean raised card on theirs.
+   *
+   * The previous pair were both 10% tints of the same accent, which made "us" and "them" nearly
+   * the same object — the one thing a transcript has to answer at a glance is who said what, and
+   * a 10% wash against a 10% wash does not answer it. Chat is also the one surface in the
+   * platform where a large radius and a soft shadow are right: these are speech, they float over
+   * the page, and the design system reserves shadow for exactly that.
+   *
+   * The accent is spent HERE and nowhere else in the thread, which is why the composer, the
+   * toolbar and the hover actions stay quiet.
+   */
   const bubbleClass = isNote
-    ? 'bg-amber-bg/60 border border-amber/30 rounded-tl-sm'
+    ? 'bg-amber-bg/60 border border-amber/30 rounded-2xl rounded-tl-md'
     : isAgent
-      ? 'bg-primary/10 border border-primary/25 rounded-tl-sm'
+      ? 'bg-primary/10 border border-primary/25 rounded-2xl rounded-tl-md'
       : ours
-        ? 'bg-primary/10 border border-primary/25 rounded-tr-sm text-foreground'
-        : 'bg-card border border-border rounded-tl-sm';
+        ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md shadow-overlay'
+        : 'bg-card border border-hairline rounded-2xl rounded-bl-md shadow-overlay';
+
+  /*
+   * The message's own mood, as a bar UNDER the bubble.
+   *
+   * A border on all four sides fights the fill and turns every message into a boxed alert. A
+   * single 3px bar along the bottom edge reads as an underline on the sentence — present when it
+   * matters, invisible when the mood is neutral.
+   *
+   * Deliberately NOT shown on our own messages: it is the CUSTOMER's temperature being reported,
+   * and colouring our replies with it would suggest we were the ones who sounded angry.
+   */
+  const moodStyleForMessage = (!ours && mood && mood !== 'neutral') ? moodStyle(mood) : null;
 
   return (
     <div className={`group/msg relative flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
@@ -2060,7 +2101,14 @@ const MessageBubble: React.FC<{
           } : undefined}
         />
       )}
-      <Avatar className="h-7 w-7 mt-5 shrink-0">
+      {/*
+        Avatar column: the face, with the timestamp beneath it.
+        In the reference layout the time lives under the avatar rather than trailing the text —
+        it keeps the bubble to just the words, and it gives every row the same left edge whatever
+        length the message is.
+      */}
+      <div className="flex flex-col items-center gap-1 shrink-0 mt-5">
+      <Avatar className="h-9 w-9 shrink-0 ring-1 ring-hairline">
         {/*
           A member's own photo, which was never selected from user_profiles — so every operator
           in every thread rendered as initials no matter what they had uploaded. Failing that, a
@@ -2078,10 +2126,14 @@ const MessageBubble: React.FC<{
           />
         )}
         <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(displayLabel)}`}>
-          {isAgent ? <Bot className="w-3.5 h-3.5" /> : initials(displayLabel)}
+          {isAgent ? <Bot className="w-4 h-4" /> : initials(displayLabel)}
         </AvatarFallback>
       </Avatar>
-      <div className={`flex flex-col min-w-0 ${ours ? 'items-end' : 'items-start'}`}>
+        <span className="text-[10px] text-muted-foreground tabular-nums leading-none">
+          {formatTime(m.created_at)}
+        </span>
+      </div>
+      <div className={`flex flex-col min-w-0 gap-1 ${ours ? 'items-end' : 'items-start'}`}>
         {displayLabel && !isNote && (
           <div className="text-[10px] text-muted-foreground mb-1 px-1 flex items-center gap-1.5">
             <span>{displayLabel}</span>
@@ -2093,7 +2145,19 @@ const MessageBubble: React.FC<{
             )}
           </div>
         )}
-        <div className={`rounded-2xl px-3.5 py-2 text-left ${bubbleClass}`}>
+        <div className={`relative overflow-hidden px-4 py-2.5 text-left ${bubbleClass}`}>
+          {/*
+            The mood, as a bar along the bottom INSIDE the bubble.
+            Inside rather than under, so it reads as part of the message rather than a separate
+            element, and `overflow-hidden` lets it follow the bubble's own rounding instead of
+            poking out square at the corners.
+          */}
+          {moodStyleForMessage && (
+            <span
+              aria-hidden
+              className={`absolute inset-x-0 bottom-0 h-[3px] ${moodStyleForMessage.bar}`}
+            />
+          )}
           {isNote && <div className="flex items-center gap-1 text-[10px] text-amber-foreground mb-1"><Lock className="w-3 h-3" /> Private note</div>}
           {isAgent && <div className="flex items-center gap-1 text-[10px] text-primary mb-1"><Bot className="w-3 h-3" /> KAI assistant</div>}
           {/* `[Unsupported message]` is the CHANNEL's placeholder for media, not something the
@@ -2162,11 +2226,23 @@ const MessageBubble: React.FC<{
             ))}
           </div>
         )}
-        <div className="text-[10px] mt-1 px-1 text-muted-foreground flex items-center gap-1.5">
-          <span>{formatDate(m.created_at, { withTime: true })}</span>
+        {/*
+          The clock time now sits under the avatar, so this row carries only what that cannot:
+          the DATE (a thread spans months and "09:00" alone is ambiguous), the delivery state,
+          and the message's read mood in words for anyone who cannot use the colour.
+        */}
+        <div className="text-[10px] px-1 text-muted-foreground flex items-center gap-1.5 flex-wrap">
+          <span>{formatDate(m.created_at)}</span>
           {/* Only on OUR side, and only on a channel that reports back. An incoming message has
               no delivery state of ours to show, and an internal note never leaves the building. */}
           {ours && !isNote && <DeliveryState meta={meta} />}
+          {moodStyleForMessage && (
+            <span className="inline-flex items-center gap-1">
+              <span aria-hidden>·</span>
+              <span aria-hidden>{moodStyleForMessage.face}</span>
+              <span>{moodStyleForMessage.label}</span>
+            </span>
+          )}
         </div>
       </div>
     </div>

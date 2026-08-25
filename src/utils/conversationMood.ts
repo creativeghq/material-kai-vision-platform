@@ -24,6 +24,12 @@ export interface MoodStyle {
   ring: string;
   /** Tinted chip, matching the platform's status-tag treatment — never a saturated fill. */
   chip: string;
+  /**
+   * Solid bar under a message bubble. SATURATED on purpose, unlike the chip: it is 3px tall and
+   * sits on top of a filled bubble, where a 15% tint disappears entirely. Same light/dark pair
+   * rule — written out, never assembled, because Tailwind's scanner reads source text.
+   */
+  bar: string;
   /** True for the moods that mean somebody should look at this today. */
   needsAttention: boolean;
 }
@@ -33,42 +39,49 @@ const STYLES: Record<ConversationMood, MoodStyle> = {
     label: 'Happy', face: '😄',
     ring: 'ring-emerald-600 dark:ring-emerald-400',
     chip: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+    bar: 'bg-emerald-500 dark:bg-emerald-400',
     needsAttention: false,
   },
   satisfied: {
     label: 'Satisfied', face: '🙂',
     ring: 'ring-teal-600 dark:ring-teal-400',
     chip: 'bg-teal-500/15 text-teal-800 dark:text-teal-300',
+    bar: 'bg-teal-500 dark:bg-teal-400',
     needsAttention: false,
   },
   neutral: {
     label: 'Neutral', face: '😐',
     ring: 'ring-slate-500 dark:ring-slate-400',
     chip: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+    bar: 'bg-slate-500 dark:bg-slate-400',
     needsAttention: false,
   },
   confused: {
     label: 'Confused', face: '😕',
     ring: 'ring-sky-600 dark:ring-sky-400',
     chip: 'bg-sky-500/15 text-sky-800 dark:text-sky-300',
+    bar: 'bg-sky-500 dark:bg-sky-400',
     needsAttention: true,
   },
   waiting: {
     label: 'Waiting on us', face: '⏳',
     ring: 'ring-amber-600 dark:ring-amber-400',
     chip: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
+    bar: 'bg-amber-500 dark:bg-amber-400',
     needsAttention: true,
   },
   frustrated: {
     label: 'Frustrated', face: '😠',
     ring: 'ring-orange-600 dark:ring-orange-400',
     chip: 'bg-orange-500/15 text-orange-800 dark:text-orange-300',
+    bar: 'bg-orange-500 dark:bg-orange-400',
     needsAttention: true,
   },
   angry: {
     label: 'Angry', face: '😡',
     ring: 'ring-red-600 dark:ring-red-400',
     chip: 'bg-red-500/15 text-red-800 dark:text-red-300',
+    bar: 'bg-red-500 dark:bg-red-400',
     needsAttention: true,
   },
 };
