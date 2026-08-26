@@ -82,15 +82,34 @@ function iconMapKeys(relPath: string): Set<string> {
 // Genuinely not user-facing: runtime meta-tools the agent drives itself.
 // `submit_findings` used to be listed here purely to silence the old regex's
 // phantom; the AST parser never emits it, so it is gone.
+/**
+ * Tools that reach an agent WITHOUT a cluster, because agent-chat binds them directly.
+ *
+ * Every entry must have a real binding path in `agent-chat/index.ts`:
+ *   - `load_toolkit`, `request_input` — `META_TOOLS`, bound every non-customer turn;
+ *   - `load_skill` — injected on its own whenever the agent has at least one skill.
+ *
+ * FOUR tools used to sit here on an intent that the mechanism could not honour:
+ * `check_generation_status` plus the three ops diagnostics, exempted as "bound only by an
+ * explicit agent config, never by a toolkit". The startup filter keeps
+ * `config.tools.filter((t) => toolkitToolIds.has(t))` for every non-curated agent, so an
+ * unclustered tool is stripped even when an agent lists it — and no agent listed them anyway.
+ * They were unreachable twice over, and this exemption is what let that pass: an entry here
+ * skips the cluster check, and the "listed by an agent" check below only walks CLUSTERED tools,
+ * so nothing looked at them at all.
+ *
+ * The test below now closes that: membership here is not a licence to be unreachable.
+ */
 const INTERNAL_TOOLS = new Set([
-  // Meta-tools. Bound for every agent from META_TOOLS, homed in no cluster on purpose:
-  // `request_input` is how the agent asks a structured question, and an agent that has to opt
-  // into asking falls back to prose — the failure it exists to fix (#370, Class D).
-  'load_toolkit', 'load_skill', 'request_input', 'check_generation_status',
-  // Ops/diagnostic tools bound only by an explicit agent config (`config.tools`),
-  // never by a toolkit. Not picker material — they read raw DB/Sentry/infra state.
-  'queryDatabase', 'querySentry', 'checkServerHealth',
+  'load_toolkit', 'load_skill', 'request_input',
 ]);
+
+/** The binding each internal tool must actually have, so the exemption stays honest. */
+const INTERNAL_TOOL_BINDINGS: Record<string, RegExp> = {
+  load_toolkit: /META_TOOLS\s*=\s*\[[^\]]*'load_toolkit'/,
+  request_input: /META_TOOLS\s*=\s*\[[^\]]*'request_input'/,
+  load_skill: /load_skill tool|register.*load_skill|'load_skill'/,
+};
 
 // COVERAGE DEBT: none. `KNOWN_UNCLUSTERED` and `KNOWN_UNBOUND` are gone — every
 // implemented tool is now either in a cluster or in INTERNAL_TOOLS above, and every
@@ -270,6 +289,31 @@ describe('toolkit coverage', () => {
         `${orphans.join(', ')}. Add each to a cluster's tool_ids in agentToolsCatalog.ts, ` +
         `or (if truly internal) to INTERNAL_TOOLS in this test.`,
     ).toEqual([]);
+  });
+
+  it('INTERNAL_TOOLS is not a licence to be unreachable — each has a real binding', () => {
+    // The hole this closes: an entry in INTERNAL_TOOLS skips the cluster check above, and the
+    // "listed by at least one agent" check below only walks CLUSTERED tools. So a tool parked
+    // here was checked by NOTHING. Four sat there unreachable — no cluster, no agent listing,
+    // no meta-binding — until a live sweep called them and got "not available for this agent
+    // or your role" as an admin.
+    const agentChat = readFileSync(AGENT_CHAT, 'utf8');
+    const unbound = [...INTERNAL_TOOLS].filter((t) => {
+      const re = INTERNAL_TOOL_BINDINGS[t];
+      return !re || !re.test(agentChat);
+    });
+    expect(
+      unbound,
+      'These are exempt from the cluster requirement but have no binding path in agent-chat, '
+      + 'so nothing can reach them: ' + unbound.join(', ') + '. Either give the tool a cluster '
+      + '(and list it on an agent), or add its real binding to INTERNAL_TOOL_BINDINGS. Do not '
+      + 'leave it exempt — that is how four tools stayed unreachable while every check passed.',
+    ).toEqual([]);
+
+    // And the reverse: an entry with a declared binding that is no longer in INTERNAL_TOOLS is
+    // just dead config.
+    const stale = Object.keys(INTERNAL_TOOL_BINDINGS).filter((t) => !INTERNAL_TOOLS.has(t));
+    expect(stale, `Prune from INTERNAL_TOOL_BINDINGS: ${stale.join(', ')}`).toEqual([]);
   });
 
   it('every implemented tool is actually instantiated somewhere (no unreachable tools)', () => {

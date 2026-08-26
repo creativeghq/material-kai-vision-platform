@@ -1161,6 +1161,15 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // in registerTools; listing them here is what makes the toolkit filter and
       // load_toolkit agree with what the agent can actually call.
       'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset', 'generate_vr_world',
+      // The read half of the generation kit. Unlisted and unclustered until 2026-08-26, so an
+      // agent could start a render and had no way to report whether it had finished.
+      'check_generation_status',
+      // Ops diagnostics — service health, Sentry errors for a job, raw job/chunk/product counts.
+      // `needsOps` / `needsDb` gate on this list AND on isAdmin at injection, so a non-admin
+      // never receives them. Listed by NO agent before now, which is why the comment beside
+      // `needsOps` says the branch was "dead in both directions": the module never loaded and
+      // the tools were never bound.
+      'checkServerHealth', 'querySentry', 'queryDatabase',
       // generate_video's push site says it "was never pushed onto any agent, so it was
       // unreachable" — but the fix stopped at the push and never listed it here, and BOTH
       // binding paths read this list, so it stayed exactly as unreachable as before. The

@@ -119,7 +119,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['generate_presentation_sheet'],
   },
   'generation': {
-    tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging'],
+    tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status'],
   },
   'seo-research': {
     tool_ids: ['seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps', 'seo_gsc_striking_distance', 'seo_gsc_top_movers', 'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview'],
@@ -152,6 +152,6 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'],
   },
   'admin-misc': {
-    tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call'],
+    tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call', 'checkServerHealth', 'querySentry', 'queryDatabase'],
   },
 };

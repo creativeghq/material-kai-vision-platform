@@ -2561,6 +2561,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // the staging wizard) — they were simply never listed, so the picker undercounted
       // the kit and load_toolkit could not bind them.
       'generate_gemini', 'virtual_staging',
+      // "Check the status and progress of a 3D generation job" — the read half of everything
+      // above, and it belonged to no cluster and no agent, so it was unreachable. A generation
+      // kit that can start a job and cannot say whether it finished is half a kit.
+      'check_generation_status',
     ],
     quick_starts: [
       // Every image-required interior flow captures its inputs (photo first, then
@@ -3266,10 +3270,23 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'admin-misc',
     name: 'Admin Utilities',
-    description: 'Background task dispatch, price lookup, DataForSEO escape hatch.',
+    description: 'Background task dispatch, price lookup, DataForSEO escape hatch, and the three ops diagnostics — service health, Sentry errors for a job, and raw job/chunk/product counts.',
     icon: 'Wrench',
     adminOnly: true,
-    tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call'],
+    // The three ops tools were homed in NO cluster, on the stated intent that they are "bound
+    // only by an explicit agent config, never by a toolkit". That intent cannot hold: the
+    // startup filter keeps `config.tools.filter((t) => toolkitToolIds.has(t))` for every
+    // non-curated agent, so an unclustered tool is stripped even when an agent lists it. They
+    // were also listed by no agent, so they were unreachable twice over — the 2026-08-26 sweep
+    // got "not available for this agent or your role" for all three as an ADMIN.
+    //
+    // `admin-misc` is the right home precisely because it is `adminOnly`: they stay invisible to
+    // everyone who should not see raw DB/Sentry/infra state, which is what the original intent
+    // was actually protecting.
+    tool_ids: [
+      'dispatch_background_task', 'price_lookup', 'seo_dataforseo_call',
+      'checkServerHealth', 'querySentry', 'queryDatabase',
+    ],
     quick_starts: [
       {
         label: 'Pricing KB lookup', description: 'Admin-curated price data', icon: 'Wrench',
