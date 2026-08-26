@@ -27,6 +27,7 @@
 
 import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
 import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
+import { describeUpstreamError } from '../tool-result-shape.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -94,7 +95,7 @@ async function callDataForSEO(
     try { parsed = JSON.parse(text); } catch { parsed = text; }
     if (!resp.ok) {
       await gate.settle(0);
-      return { ok: false, error: `${resp.status}: ${String(parsed).slice(0, 200)}` };
+      return { ok: false, error: describeUpstreamError(resp.status, parsed) };
     }
     const data = parsed?.data;
     await gate.settle(data?.cost_usd);
@@ -131,7 +132,7 @@ async function callSEOAgentRoute(
     try { parsed = JSON.parse(text); } catch { parsed = text; }
     if (!resp.ok) {
       await gate.settle(0);
-      return { ok: false, error: `${resp.status}: ${String(parsed).slice(0, 200)}` };
+      return { ok: false, error: describeUpstreamError(resp.status, parsed) };
     }
     const data = parsed?.data;
     // Composite routes report cost per section; the call's cost is their sum.
@@ -196,7 +197,7 @@ async function callOpportunitiesStateless(
     try { parsed = JSON.parse(text); } catch { parsed = text; }
     if (!resp.ok) {
       await gate.settle(0);
-      return { ok: false, error: `backend ${resp.status}: ${String(parsed).slice(0, 200)}` };
+      return { ok: false, error: `backend ${describeUpstreamError(resp.status, parsed)}` };
     }
     await gate.settle(parsed?.data?.cost_usd);
     return { ok: true, data: parsed?.data };

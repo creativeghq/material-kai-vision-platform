@@ -18,6 +18,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
+import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_GATEWAY_URL = () => Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
@@ -83,7 +84,7 @@ async function dfs(kind: string, params: Record<string, unknown>): Promise<any[]
   });
   const text = await resp.text();
   let parsed: any = null; try { parsed = JSON.parse(text); } catch { parsed = text; }
-  if (!resp.ok) throw new Error(`${kind} ${resp.status}: ${String(parsed).slice(0, 160)}`);
+  if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed, 160)}`);
   return parsed?.data?.items || [];
 }
 

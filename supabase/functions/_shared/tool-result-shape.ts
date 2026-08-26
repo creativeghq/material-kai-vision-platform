@@ -126,3 +126,43 @@ export function turnProducedWork(
     return shape.ok && !shape.zeroResult;
   });
 }
+
+/**
+ * Turn an upstream API's error body into something a reader can act on.
+ *
+ * Nine tool files each carried `String(parsed).slice(0, 200)`, where `parsed` is the JSON-PARSED
+ * response body — so `String({error: 'Thread not found'})` produced the literal string
+ * `[object Object]`. That was the entire error the agent received, and the entire error the user
+ * saw: no status, no message, nothing to act on. The 2026-08-26 tool sweep found it live on
+ * `manage_inbox`, `manage_contracts`, `manage_job_sites`, `list_my_job_searches`,
+ * `get_price_summary`, `seo_domain_intersection` and `seo_onpage_issues` — seven tools whose
+ * every failure was indistinguishable from every other failure.
+ *
+ * A wrong error message is worse than a missing one: it looks like the tool reported something.
+ *
+ * Prefers the fields upstreams actually use, falls back to compact JSON, and never returns the
+ * default `Object.prototype.toString` rendering.
+ */
+export function describeUpstreamError(status: number, parsed: unknown, max = 300): string {
+  const prefix = status ? `${status}: ` : '';
+  if (parsed == null) return `${prefix}no response body`;
+  if (typeof parsed === 'string') return `${prefix}${parsed.slice(0, max)}`;
+  if (typeof parsed !== 'object') return `${prefix}${String(parsed).slice(0, max)}`;
+
+  const o = parsed as Record<string, unknown>;
+  // The shapes real upstreams send, in the order they are worth reading.
+  for (const key of ['error', 'message', 'detail', 'error_description', 'msg', 'hint']) {
+    const v = o[key];
+    if (typeof v === 'string' && v.trim()) return `${prefix}${v.slice(0, max)}`;
+    // PostgREST nests: { error: { message } }
+    if (v && typeof v === 'object') {
+      const nested = (v as Record<string, unknown>).message;
+      if (typeof nested === 'string' && nested.trim()) return `${prefix}${nested.slice(0, max)}`;
+    }
+  }
+  try {
+    return `${prefix}${JSON.stringify(o).slice(0, max)}`;
+  } catch {
+    return `${prefix}unreadable error body`;
+  }
+}

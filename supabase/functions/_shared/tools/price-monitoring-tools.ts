@@ -41,6 +41,7 @@ const MODULE_SLUG = 'price-monitoring';
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { describeUpstreamError } from '../tool-result-shape.ts';
 async function isModuleEnabled(): Promise<boolean> {
   try {
     const sb = svcClient();
@@ -76,7 +77,7 @@ async function callMivaa(
     const text = await resp.text();
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : String(parsed)?.slice(0, 200) };
+    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : describeUpstreamError(resp.status, parsed) };
   } catch (e) {
     return { ok: false, status: 0, error: e instanceof Error ? e.message : 'network error' };
   }

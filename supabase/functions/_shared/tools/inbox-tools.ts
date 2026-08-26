@@ -35,6 +35,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODULE_SLUG = 'inbox';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { describeUpstreamError } from '../tool-result-shape.ts';
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const sb = svcClient();
@@ -59,7 +60,7 @@ async function callInbox(action: string, payload: Record<string, unknown>, jwt: 
     });
     const text = await resp.text();
     let parsed: any = null; try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : String(parsed)?.slice(0, 200) };
+    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : describeUpstreamError(resp.status, parsed) };
   } catch (e) {
     return { ok: false, status: 0, error: e instanceof Error ? e.message : 'network error' };
   }

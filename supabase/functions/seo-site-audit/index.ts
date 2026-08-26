@@ -18,6 +18,7 @@ import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shar
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -61,7 +62,7 @@ async function quickPage(url: string, userId: string | null): Promise<any> {
   const text = await resp.text();
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { parsed = text; }
-  if (!resp.ok) throw new Error(`quick-page ${resp.status}: ${String(parsed).slice(0, 200)}`);
+  if (!resp.ok) throw new Error(`quick-page ${describeUpstreamError(resp.status, parsed)}`);
   return parsed?.data ?? parsed;
 }
 

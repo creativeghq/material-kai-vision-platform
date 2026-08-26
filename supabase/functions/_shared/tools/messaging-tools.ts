@@ -34,6 +34,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODULE_SLUG = 'messaging';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { describeUpstreamError } from '../tool-result-shape.ts';
 function userClient(jwt: string | undefined) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
@@ -104,7 +105,10 @@ export const createManageMessagingTool = (
         });
         const text = await resp.text();
         let data: any = null; try { data = JSON.parse(text); } catch { data = text; }
-        if (!resp.ok) return JSON.stringify({ success: false, error: (data?.error || String(data))?.slice?.(0, 200) || `messaging-api ${resp.status}` });
+        // `data?.error || String(data)` was a partial guard: it read `error` and fell back to
+        // `[object Object]` for every other shape, including the `message` / `detail` bodies this
+        // upstream actually sends. One helper, all the shapes.
+        if (!resp.ok) return JSON.stringify({ success: false, error: describeUpstreamError(resp.status, data) });
         onChunk?.({ type: 'messaging_sent', to, message_id: data?.messageId, timestamp: Date.now() });
         return JSON.stringify({ success: true, sent: true, to, message_id: data?.messageId });
       }
