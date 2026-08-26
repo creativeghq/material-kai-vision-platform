@@ -84,6 +84,28 @@ function loadManifest() {
   return eval(src.slice(open, end + 1));
 }
 
+/**
+ * tool → owning toolkit, inverted from the generated cluster map.
+ *
+ * Without this the sweep is worthless and LOOKS informative: agent-chat binds only the alwaysOn
+ * clusters unless `selected_toolkits` names more, so a call with none comes back
+ * `tool_not_available`. The first real run reported that for 108 of 115 tools — a perfect score
+ * for "everything is broken" that was entirely the harness's own fault. A sweep that cannot tell
+ * an unbound tool from a broken one is the same silent-failure shape it exists to hunt.
+ */
+function loadClusters() {
+  const src = readFileSync(join(ROOT, 'supabase/functions/_shared/toolkitClusters.generated.ts'), 'utf8');
+  const owner = new Map();
+  for (const m of src.matchAll(/'([a-z0-9-]+)':\s*\{[^}]*?tool_ids:\s*\[([^\]]*)\]/g)) {
+    const cluster = m[1];
+    for (const t of m[2].matchAll(/'([a-z0-9_]+)'/g)) {
+      if (!owner.has(t[1])) owner.set(t[1], cluster);
+    }
+  }
+  return owner;
+}
+const TOOL_OWNER = loadClusters();
+
 // ── Classification ───────────────────────────────────────────────────────────
 
 /**
@@ -205,6 +227,8 @@ function triage(status, body) {
 // ── Run ──────────────────────────────────────────────────────────────────────
 
 async function callTool(name, input) {
+  // The owning cluster must be selected or agent-chat never binds the tool.
+  const toolkits = [TOOL_OWNER.get(name)].filter(Boolean);
   const res = await fetch(`${SUPABASE_URL}/functions/v1/agent-chat`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
@@ -213,6 +237,7 @@ async function callTool(name, input) {
       agentId: 'kai',
       user_id: USER_ID,
       workspace_id: WORKSPACE_ID,
+      selected_toolkits: toolkits,
       mode: 'direct_tool',
       direct_tool: { name, input },
     }),
@@ -247,7 +272,7 @@ for (const t of targets) {
   n++;
 
   const input = buildArgs(t, cls);
-  if (DRY_RUN) { results.push({ name: t.name, file: t.file, input, verdict: 'DRY', detail: 'not called' }); continue; }
+  if (DRY_RUN) { results.push({ name: t.name, file: t.file, input, toolkit: TOOL_OWNER.get(t.name) ?? null, verdict: 'DRY', detail: 'not called' }); continue; }
   process.stdout.write(`[${n}] ${t.name} … `);
   try {
     const { status, body } = await callTool(t.name, input);
