@@ -97,6 +97,37 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
       );
     }
 
+    // Presence is not shape — the same lesson analyze.ts and write.ts already carry, and this
+    // handler was the one that had not learned it. `buildPlanningUserPrompt` dereferences
+    // `research.contentGapOpportunities.slice(...)` and eight other fields directly, so a
+    // `keyword_research` that is a string (the tool's zod schema is `z.any()`, so anything the
+    // model sends arrives intact) threw `Cannot read properties of undefined (reading 'slice')`
+    // and surfaced as a 500 on a request that was merely malformed — AFTER the credits were
+    // debited, so a bad request was billed for.
+    const research = body.keyword_research;
+    if (typeof research !== 'object' || research === null || Array.isArray(research)) {
+      return jsonResponse(
+        {
+          success: false,
+          error: 'keyword_research must be the object returned by seo_keyword_research — run that '
+            + 'tool first and pass its result through, not a keyword string.',
+        },
+        400,
+      );
+    }
+    const REQUIRED_ARRAYS = ['clusters', 'contentGapOpportunities', 'paaQuestions', 'recommendedSecondaries'];
+    const missing = REQUIRED_ARRAYS.filter((f) => !Array.isArray((research as Record<string, unknown>)[f]));
+    if (missing.length > 0) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `keyword_research is missing or has the wrong type for: ${missing.join(', ')}. `
+            + 'Pass the whole result of seo_keyword_research rather than a subset.',
+        },
+        400,
+      );
+    }
+
     // Paid module — refuse before the debit and the LLM call (#212 + invariant 10).
     const { response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
     if (entResponse) return entResponse;
@@ -121,7 +152,6 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
     console.log(`[seo-plan] Planning article for "${body.target_keyword}" (user: ${userId})`);
 
-    const research = body.keyword_research;
     const brief = body.content_brief;
 
     // Load base system prompt from DB, then append dynamic context
