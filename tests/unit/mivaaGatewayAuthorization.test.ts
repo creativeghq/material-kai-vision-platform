@@ -76,8 +76,29 @@ describe('the admin gate reads the resolved path, not the template', () => {
         'gets sent are different strings the moment a parameter is substituted — that gap IS EG-1.',
     ).not.toMatch(/MIVAA_ENDPOINTS\[action\]\.path\.startsWith\('\/api\/admin'\)/);
 
+    // The gate is `isAdminAction(action, finalPath)`: privileged by explicit action NAME, or by
+    // the RESOLVED path. Both halves are pinned.
+    //
+    // The name list exists only so a privileged route that does NOT live under /api/admin can
+    // still be gated — `admin_system_health` and `admin_system_metrics`, whose real MIVAA paths
+    // are `/api/system/...` because that router is mounted at `prefix="/api"`. Before that was
+    // corrected they pointed at `/api/admin/system/...`, which 404'd; fixing the path without
+    // the name list would have un-gated host CPU, memory and disk for any authenticated user.
+    //
+    // Delete the path half and EG-1 comes straight back, so it is asserted separately.
     expect(src, 'the admin gate no longer consults the resolved path')
-      .toMatch(/isAdminPath\(finalPath\)/);
+      .toMatch(/isAdminAction\(action, finalPath\)/);
+    expect(src, 'isAdminAction no longer falls back to the resolved path — EG-1 returns')
+      .toMatch(/isAdminPath\(path\)/);
+  });
+
+  it('the explicitly-gated actions are still privileged', () => {
+    // A path outside /api/admin is invisible to isAdminPath, so these two are gated ONLY by
+    // name. Losing an entry here silently exposes host metrics.
+    for (const action of ['admin_system_health', 'admin_system_metrics']) {
+      expect(src, `${action} must stay in ADMIN_ONLY_ACTIONS — its path is not under /api/admin`)
+        .toMatch(new RegExp(`ADMIN_ONLY_ACTIONS[\\s\\S]{0,400}'${action}'`));
+    }
   });
 
   it('normalises . and .. before deciding, so the check sees what the router will', () => {
@@ -89,7 +110,7 @@ describe('the admin gate reads the resolved path, not the template', () => {
 
   it('resolves the path before the credit debit, so a refused request is never charged', () => {
     const substituteAt = src.indexOf('substitutePathParams(endpoint.path');
-    const gateAt = src.indexOf('isAdminPath(finalPath)');
+    const gateAt = src.indexOf('isAdminAction(action, finalPath)');
     const debitAt = src.indexOf("rpc('debit_credits'");
     expect(substituteAt, 'substitution site not found').toBeGreaterThan(-1);
     expect(gateAt, 'admin gate not found').toBeGreaterThan(-1);

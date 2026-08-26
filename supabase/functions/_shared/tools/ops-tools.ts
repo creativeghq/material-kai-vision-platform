@@ -33,29 +33,52 @@ export const createCheckServerHealthTool = () => {
 
         const MIVAA_API_URL = Deno.env.get('MIVAA_GATEWAY_URL') || Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
 
+        // `/api/system/...`, not `/api/admin/system/...`. The admin router's prefix is `/api`
+        // and the route is `/system/health`, so the extra `admin` segment was a 404. Both of
+        // this tool's endpoints carried it.
         let endpoint = '';
         switch (checkType) {
           case 'service_status':
-            endpoint = '/api/admin/system/health';
+            endpoint = '/api/system/health';
             break;
           case 'disk_space':
           case 'memory':
           case 'processes':
-            endpoint = '/api/admin/system/metrics';
+            endpoint = '/api/system/metrics';
             break;
           default:
             throw new Error(`Unknown check type: ${checkType}`);
         }
 
+        // AUTHENTICATE. This sent `Content-Type` and nothing else, so MIVAA answered 401
+        // "Missing authentication token" — the routes are behind `verify_internal_access`.
+        // Two independent faults in one call, and neither was ever observed because no agent
+        // could reach this tool at all until 2026-08-26.
+        const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
+        const cronSecret = Deno.env.get('CRON_SECRET') || '';
+        if (!mivaaKey && !cronSecret) {
+          throw new Error(
+            'No MIVAA credential available (MIVAA_API_KEY / MATERIAL_KAI_API_KEY / CRON_SECRET all unset) '
+            + '— the health endpoints require one.',
+          );
+        }
         const response = await fetch(`${MIVAA_API_URL}${endpoint}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            ...(mivaaKey ? { Authorization: `Bearer ${mivaaKey}` } : {}),
+            ...(cronSecret ? { 'x-cron-secret': cronSecret } : {}),
           },
         });
 
         if (!response.ok) {
-          throw new Error(`Health check failed: ${response.statusText}`);
+          // `statusText` alone is "Unauthorized" / "Not Found" with no hint of WHICH url —
+          // which is exactly how a wrong path read as a credentials problem here.
+          const body = await response.text().catch(() => '');
+          throw new Error(
+            `Health check failed: ${response.status} ${response.statusText} at ${endpoint}`
+            + (body ? ` — ${body.slice(0, 160)}` : ''),
+          );
         }
 
         const health = await response.json();

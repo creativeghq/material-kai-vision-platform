@@ -70,8 +70,8 @@ const MIVAA_ENDPOINTS = {
   'admin_get_job': { path: '/api/admin/jobs/{job_id}', method: 'GET' },  // Get job details
   'admin_get_job_status': { path: '/api/admin/jobs/{job_id}/status', method: 'GET' },  // Get job status
   'admin_delete_job': { path: '/api/admin/jobs/{job_id}', method: 'DELETE' },  // Cancel/delete job
-  'admin_system_health': { path: '/api/admin/system/health', method: 'GET' },  // System health
-  'admin_system_metrics': { path: '/api/admin/system/metrics', method: 'GET' },  // System metrics
+  'admin_system_health': { path: '/api/system/health', method: 'GET' },  // System health (admin router is mounted at /api, so the route is /api/system/health — gated by ADMIN_ONLY_ACTIONS)
+  'admin_system_metrics': { path: '/api/system/metrics', method: 'GET' },  // System metrics (see admin_system_health)
   'admin_cleanup_data': { path: '/api/admin/data/cleanup', method: 'DELETE' },  // Cleanup old data
   'admin_backup_data': { path: '/api/admin/data/backup', method: 'POST' },  // Create backup
   'admin_export_data': { path: '/api/admin/data/export', method: 'GET' },  // Export data
@@ -231,9 +231,32 @@ function normalizePath(path: string): string {
   return '/' + out.join('/');
 }
 
+/**
+ * Actions that are privileged even though their PATH is not under `/api/admin`.
+ *
+ * The gate below derives "is this admin" from the resolved path, which works only while every
+ * privileged route lives under that prefix. These two do not: MIVAA's admin router is mounted at
+ * `prefix="/api"` and declares `/system/health` + `/system/metrics`, so the real paths are
+ * `/api/system/...`. The action map here said `/api/admin/system/...`, which 404'd — broken, but
+ * safely broken, since the wrong path also happened to satisfy the admin check.
+ *
+ * Correcting the path alone would therefore have un-gated host CPU, memory and disk figures for
+ * any authenticated user. The gate is explicit for these two instead, so the path can be right
+ * and the privilege can stay.
+ */
+const ADMIN_ONLY_ACTIONS = new Set([
+  'admin_system_health',
+  'admin_system_metrics',
+]);
+
 /** True when the RESOLVED path lands anywhere under MIVAA's admin subtree. */
 function isAdminPath(path: string): boolean {
   return normalizePath(path).startsWith('/api/admin');
+}
+
+/** True when this action is privileged — by path, or by explicit name. */
+function isAdminAction(action: string, path: string): boolean {
+  return ADMIN_ONLY_ACTIONS.has(action) || isAdminPath(path);
 }
 
 /**
@@ -624,7 +647,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     // admin_backup_data / admin_prompts_update etc. under the gateway's trusted
     // MIVAA identity. Admin-secret (trusted backend) callers are exempt; everyone else
     // is re-checked for the role and 403'd if they lack it.
-    if (!isAdmin && isAdminPath(finalPath)) {
+    if (!isAdmin && isAdminAction(action, finalPath)) {
       const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin'] });
       if (!adminAuth.success) {
         return new Response(
