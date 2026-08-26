@@ -149,6 +149,20 @@ const HINTS = {
   workspace_id: () => WORKSPACE_ID, user_id: () => USER_ID,
 };
 
+/**
+ * A REAL uuid, not a word.
+ *
+ * The first sweep sent `"tile"` for every string param, including ids. Postgres answered
+ * `22P02 invalid input syntax for type uuid` and the route turned that into a 500 — so the
+ * report read "server error" for what was a malformed request from the sweep itself. A probe
+ * that cannot tell those apart manufactures the very ambiguity it exists to remove.
+ *
+ * The all-zero uuid is deliberate: valid in shape, guaranteed to match nothing, so a tool that
+ * reaches its query answers "not found" rather than touching a real record.
+ */
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+const ID_PARAM = /(^|_)(id|ids|uuid)$/i;
+
 function valueFor(p) {
   if (p.type === 'enum' && p.enum?.length) {
     const read = p.enum.find((v) => READ_ACTION.test(v));
@@ -156,10 +170,17 @@ function valueFor(p) {
   }
   const hint = HINTS[p.name];
   if (hint !== undefined) return typeof hint === 'function' ? hint() : hint;
+
+  // Anything that names an id gets a well-formed one.
+  if (ID_PARAM.test(p.name)) return p.type === 'array' ? [NIL_UUID] : NIL_UUID;
+
   switch (p.type) {
     case 'number': return 1;
     case 'boolean': return false;
-    case 'array': return [];
+    // A REQUIRED array is required to be non-empty in every schema that declares one, so `[]`
+    // just bounces off zod — nine tools returned "Array must contain at least 1 element(s)"
+    // and were scored as failures without ever running.
+    case 'array': return ['porcelain tile'];
     case 'object': return {};
     default: return 'tile';
   }
@@ -200,6 +221,20 @@ function buildArgs(t, cls) {
 // ── Result triage ────────────────────────────────────────────────────────────
 
 /** Failures that mean the tool is MISCONFIGURED, not that the data is absent. */
+/**
+ * The sweep sends MINIMAL, synthetic arguments, so a tool that refuses them is usually working
+ * correctly — 'Need product_id or a resolvable sku' is a good error, not a defect. Scoring those
+ * as failures is what buried the four real faults in the first run among thirty-five lines of
+ * noise.
+ */
+const BAD_REQUEST = [
+  /did not match expected schema/i, /must contain at least/i, /invalid uuid/i,
+  /is required/i, /provide (at least|a )/i, /needs? (a|at least|either)/i,
+  /give (either|at least)/i, /name a /i, /describe what you are after/i,
+  /not found by label/i, /unknown toolkit/i, /not found. available/i,
+  /must be the object returned by/i, /must be a UUID/i, /wrong type for/i,
+];
+
 const CONFIG_ERROR = [
   /unknown service/i, /not configured/i, /permission denied/i, /does not exist/i,
   /\b(4\d\d|5\d\d)\b/, /invalid api key/i, /unauthor/i, /forbidden/i, /is not supported/i,
@@ -213,6 +248,9 @@ function triage(status, body) {
   let payload = body;
   if (payload?.success === false || payload?.error) {
     const msg = String(payload.error ?? payload.message ?? 'unknown');
+    if (BAD_REQUEST.some((re) => re.test(msg))) {
+      return { verdict: 'REFUSED_INPUT', detail: msg.slice(0, 220) };
+    }
     const config = CONFIG_ERROR.some((re) => re.test(msg));
     return { verdict: config ? 'CONFIG_ERROR' : 'TOOL_ERROR', detail: msg.slice(0, 220) };
   }
@@ -289,7 +327,7 @@ for (const t of targets) {
 const byVerdict = {};
 for (const r of results) (byVerdict[r.verdict] ??= []).push(r);
 
-const order = ['THREW', 'HTTP_ERROR', 'CONFIG_ERROR', 'TOOL_ERROR', 'EMPTY', 'OK'];
+const order = ['THREW', 'HTTP_ERROR', 'CONFIG_ERROR', 'TOOL_ERROR', 'REFUSED_INPUT', 'EMPTY', 'OK'];
 console.log('\n─── SWEEP SUMMARY ───');
 console.log(`called ${results.length}, skipped ${skipped.length}, of ${manifest.length} tools in the manifest`);
 for (const v of order) if (byVerdict[v]) console.log(`  ${v.padEnd(12)} ${byVerdict[v].length}`);
