@@ -443,6 +443,16 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
         .from('background_agents')
         .update({ last_run_at: new Date().toISOString(), last_run_status: 'cancelled' })
         .eq('id', agent_id);
+      const cancelledConversationId = (run.input_data as any)?.conversation_id as string | null;
+      if (cancelledConversationId) {
+        await postTerminalStateToChat(
+          cancelledConversationId,
+          run.id,
+          (run.input_data as any)?.task_prompt ?? 'background task',
+          'Background task cancelled',
+          'An admin cancelled this run before it finished.',
+        );
+      }
       return new Response(JSON.stringify({
         success:     false,
         run_id:      run.id,
@@ -498,6 +508,18 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
         last_run_status: 'failed',
       })
       .eq('id', agent_id);
+
+    // Tell the conversation that was promised a result. See postTerminalStateToChat.
+    const failedConversationId = (run.input_data as any)?.conversation_id as string | null;
+    if (failedConversationId) {
+      await postTerminalStateToChat(
+        failedConversationId,
+        run.id,
+        (run.input_data as any)?.task_prompt ?? 'background task',
+        'Background task failed',
+        errMsg,
+      );
+    }
 
     // Notify workspace owner/admin that agent run failed
     if (agentConfig.workspace_id) {
@@ -568,6 +590,37 @@ async function postResultToChat(
     console.log(`[postResultToChat] Result posted to conversation ${conversationId}`);
   } catch (err) {
     console.error('[postResultToChat] Failed to post result to chat:', err);
+  }
+}
+
+/**
+ * A failure is a result, and it belongs in the same place the success would have gone.
+ *
+ * `dispatch_background_task` tells the user "I'll post the results back here in this
+ * conversation". Until now only the SUCCESS path posted: a failed run wrote `error_message` to
+ * `agent_runs`, and the workspace-owner alert below never fires for a chat dispatch (the KAI
+ * system agent has `workspace_id` NULL by design, so the `if (agentConfig.workspace_id)` guard is
+ * always false). The completion trigger only fired on 'completed'. So the thread the user was
+ * watching simply went quiet, forever, with nothing anywhere saying why — run
+ * fa735825 died on a 500 in 491ms and produced zero notifications and zero messages.
+ */
+async function postTerminalStateToChat(
+  conversationId: string,
+  runId:          string,
+  taskPrompt:     string,
+  headline:       string,
+  detail:         string,
+): Promise<void> {
+  try {
+    const taskPreview = taskPrompt.length > 100 ? taskPrompt.slice(0, 100) + '…' : taskPrompt;
+    await emitBackgroundResult(supabase, {
+      conversationId,
+      content: `**${headline}** — *${taskPreview}*\n\n${detail}`,
+      runId,
+      taskPreview,
+    });
+  } catch (err) {
+    console.error('[postTerminalStateToChat] Failed to post to chat:', err);
   }
 }
 

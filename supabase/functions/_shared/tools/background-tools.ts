@@ -38,10 +38,61 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
  */
 const KAI_SYSTEM_AGENT_ID = '00000000-0000-0000-0000-000000000001';
 
-export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: string, conversationId: string | null) => {
+/**
+ * The conversation the finished report comes back to.
+ *
+ * `input_data.conversation_id` is not bookkeeping — it is the ONLY thing that decides whether the
+ * user ever sees the work. The runner calls `postResultToChat` when it is set and skips the post
+ * entirely when it is not, and the completion notification links to that chat. A run dispatched
+ * without one produces a full report that exists only in `agent_runs.output_data`, behind the
+ * admin monitoring list, while this tool has already told the user "I'll post the results back
+ * here in this conversation".
+ *
+ * A chat dispatch that arrives without a conversation therefore gets one, rather than being
+ * quietly downgraded to the admin page. Callers that already have a conversation are untouched.
+ * If this insert fails we dispatch anyway — losing the destination is better than losing the work,
+ * and the run is still reachable in the admin list.
+ */
+async function ensureResultConversation(
+  userId: string,
+  agentKey: string,
+  taskPrompt: string,
+): Promise<string | null> {
+  try {
+    const title = taskPrompt.length > 50 ? `${taskPrompt.slice(0, 50)}…` : taskPrompt;
+    const { data, error } = await supabase
+      .from('agent_chat_conversations')
+      .insert({
+        user_id:  userId,
+        agent_id: agentKey,
+        title:    `Background task — ${title}`,
+      })
+      .select('id')
+      .single();
+    if (error || !data) {
+      console.warn('[dispatch_background_task] could not open a result conversation:', error?.message);
+      return null;
+    }
+    return data.id as string;
+  } catch (e) {
+    console.warn('[dispatch_background_task] could not open a result conversation:', (e as Error)?.message);
+    return null;
+  }
+}
+
+export const createDispatchBackgroundTaskTool = (
+  userId: string,
+  workspaceId: string,
+  conversationId: string | null,
+  agentKey = 'kai',
+) => {
   return tool(
     async ({ task_prompt, model_override, context_snippet, reason }) => {
       try {
+        // Where the report lands. Almost always the conversation this turn belongs to; opened
+        // here only for a dispatch that arrived without one (a direct API call, a probe).
+        const resultConversationId =
+          conversationId ?? await ensureResultConversation(userId, agentKey, task_prompt);
 
         // 1. Create an agent_runs row in pending state
         const { data: run, error: runError } = await supabase
@@ -55,7 +106,7 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
               context_snippet: context_snippet ?? '',
               model_override:  model_override ?? null,
               dispatched_by:   userId,
-              conversation_id: conversationId,   // used to post result back to chat
+              conversation_id: resultConversationId,   // used to post result back to chat
             },
             workspace_id: workspaceId,
           })
@@ -142,7 +193,11 @@ export const createDispatchBackgroundTaskTool = (userId: string, workspaceId: st
         return JSON.stringify({
           success:    true,
           run_id:     runId,
-          message:    `Background task started. I'll post the results back here in this conversation once complete${conversationId ? '' : ' (check Admin → Background Tasks to monitor progress)'}.`,
+          message:    resultConversationId
+            ? (conversationId
+              ? "Background task started. I'll post the results back here in this conversation once complete."
+              : "Background task started. This turn had no conversation, so I opened one for it — the results will be posted there, and the bell notification will open it.")
+            : "Background task started, but I could not open a conversation for the results — they will only be visible in Admin → Background Tasks.",
           task_preview: task_prompt.slice(0, 120),
           reason,
         });

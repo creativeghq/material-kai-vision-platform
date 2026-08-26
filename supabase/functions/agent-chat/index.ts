@@ -2902,7 +2902,9 @@ async function executeAgent(
 
     // Background task dispatch
     if (config.tools.includes('dispatch_background_task')) {
-      tools.push(createDispatchBackgroundTaskTool(userId, workspaceId, conversation_id));
+      // agentId so a conversation opened for the results lands under the agent the user is
+      // actually talking to, not a hardcoded one.
+      tools.push(createDispatchBackgroundTaskTool(userId, workspaceId, conversation_id ?? null, agentId));
     }
 
     // Price lookup from the Pricing KB category (admin-gated)
