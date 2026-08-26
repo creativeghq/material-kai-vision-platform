@@ -141,7 +141,7 @@ function BrandSidebar({ slug, name }: { slug: string; name: string }) {
   return (
     <div className="mt-8 pt-6 border-t">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Brand</p>
-      <Link to={`/brand/${slug}`} className="block rounded-xl border bg-white overflow-hidden hover:border-primary hover:shadow-sm transition group">
+      <Link to={`/brand/${slug}`} className="block rounded-xl border bg-card overflow-hidden hover:border-primary hover:shadow-sm transition group">
         {info?.hero_image && (
           <img src={info.hero_image} alt={name} loading="lazy" className="w-full h-20 object-cover bg-muted"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
@@ -355,6 +355,12 @@ export const PublicKnowledgeBasePage: React.FC = () => {
     [allDocs],
   );
 
+  // Whether the public knowledge base has anything in it at all. `categories` is
+  // already filtered to public categories that hold at least one published+public
+  // article, so an empty list means an empty site — not a slow load, which
+  // `loadingCats` covers separately above.
+  const hasPublicArticles = categories.length > 0;
+
   const scrollToId = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -482,7 +488,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           type="article"
           jsonLd={jsonLd}
         />
-        <header className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-sm">
+        <header className="sticky top-0 z-50 border-b bg-card/90 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto flex items-center gap-3 px-3 sm:px-6 h-14">
             <Link
               to="/knowledge-base"
@@ -552,7 +558,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             {faqItems.length > 0 && (
               <section className="mt-12" aria-labelledby="faq-heading">
                 <h2 id="faq-heading" className="text-xl font-medium tracking-tight mb-4">Frequently asked questions</h2>
-                <div className="border rounded-2xl px-5 bg-white divide-y">
+                <div className="border rounded-2xl px-5 bg-card divide-y">
                   {faqItems.map((f, i) => (
                     <details key={i} className="group py-4">
                       <summary className="flex items-center justify-between gap-4 cursor-pointer list-none text-sm font-medium hover:text-primary transition-colors">
@@ -744,7 +750,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             {searchResults.length === 0 ? (
               <p className="text-muted-foreground text-sm">No articles found.</p>
             ) : (
-              <div className="border rounded-2xl overflow-hidden bg-white divide-y">
+              <div className="border rounded-2xl overflow-hidden bg-card divide-y">
                 {searchResults.map((doc) => {
                   const cat = categories.find((c) => c.id === doc.category_id);
                   return (
@@ -781,7 +787,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             {catLandingDocs.length === 0 ? (
               <p className="text-muted-foreground text-sm mt-6">No articles in this topic yet.</p>
             ) : (
-              <div className="mt-6 border rounded-2xl overflow-hidden bg-white divide-y">
+              <div className="mt-6 border rounded-2xl overflow-hidden bg-card divide-y">
                 {catLandingDocs.map((doc) => (
                   <Link
                     key={doc.id}
@@ -797,11 +803,22 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           </section>
         ) : (
           <>
-            {/* Entry cards — the three ways to get an answer */}
-            <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 -mt-20 relative z-10">
+            {/* Entry cards — the three ways to get an answer.
+                "Browse Articles" and "Most Popular" scroll to sections that are
+                themselves conditional on there being public articles, so they are
+                rendered only when their target exists. Left unconditional they were
+                dead buttons: a click that smooth-scrolls to `getElementById(...) ??
+                undefined` does nothing at all, silently, which is exactly what the
+                whole page did while every public category held zero articles. */}
+            <section
+              className={`grid grid-cols-1 gap-4 -mt-20 relative z-10 ${
+                hasPublicArticles ? 'sm:grid-cols-3' : 'sm:grid-cols-1 sm:max-w-md sm:mx-auto'
+              }`}
+            >
+              {hasPublicArticles && (
               <button
                 onClick={() => scrollToId('browse-by-topic')}
-                className="text-left rounded-2xl border bg-white p-6 hover:shadow-lg transition-all group"
+                className="text-left rounded-2xl border bg-card p-6 hover:shadow-lg transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                   <FileText className="h-5 w-5 text-primary" />
@@ -810,10 +827,11 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Guides, manuals, and how-tos organized by topic.</p>
                 <span className="inline-flex items-center gap-1 text-primary text-xs font-medium mt-3">Explore <ChevronRight className="h-3 w-3" /></span>
               </button>
+              )}
 
               <button
                 onClick={() => navigate('/agent-hub')}
-                className="text-left rounded-2xl border bg-white p-6 hover:shadow-lg transition-all group"
+                className="text-left rounded-2xl border bg-card p-6 hover:shadow-lg transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                   <Bot className="h-5 w-5 text-primary" />
@@ -823,9 +841,10 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 <span className="inline-flex items-center gap-1 text-primary text-xs font-medium mt-3">Start chat <ChevronRight className="h-3 w-3" /></span>
               </button>
 
+              {popularDocs.length > 0 && (
               <button
                 onClick={() => scrollToId('popular-articles')}
-                className="text-left rounded-2xl border bg-white p-6 hover:shadow-lg transition-all group"
+                className="text-left rounded-2xl border bg-card p-6 hover:shadow-lg transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                   <TrendingUp className="h-5 w-5 text-primary" />
@@ -834,7 +853,35 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">The articles other people are reading right now.</p>
                 <span className="inline-flex items-center gap-1 text-primary text-xs font-medium mt-3">See top reads <ChevronRight className="h-3 w-3" /></span>
               </button>
+              )}
             </section>
+
+            {/* Nothing published yet. Without this the page rendered a hero over
+                blank space — the two browse sections below are both gated on there
+                being articles, so an empty knowledge base looked like a broken one.
+                A public visitor cannot "add an article", so unlike an in-app empty
+                state this offers the ways out that DO exist for them: ask the
+                assistant, or browse brands. */}
+            {!hasPublicArticles && (
+              <section className="rounded-2xl border bg-card p-10 text-center">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <p className="font-medium">No published articles yet</p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                  Our guides and manuals are on their way. In the meantime the AI assistant can
+                  answer from everything we know.
+                </p>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                  <Button onClick={() => navigate('/agent-hub')} className="gap-1.5">
+                    <Bot className="h-4 w-4" /> Ask the assistant
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate('/brands')} className="gap-1.5">
+                    <Tag className="h-4 w-4" /> Browse by brand
+                  </Button>
+                </div>
+              </section>
+            )}
 
             {/* Browse by Topic — category grid */}
             {categories.length > 0 && (
@@ -848,7 +895,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                     <button
                       key={cat.id}
                       onClick={() => navigate(`/knowledge-base?cat=${cat.id}`)}
-                      className="text-left rounded-2xl border bg-white p-5 hover:shadow-md transition-all group flex items-start gap-3"
+                      className="text-left rounded-2xl border bg-card p-5 hover:shadow-md transition-all group flex items-start gap-3"
                     >
                       <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl shrink-0">
                         {cat.icon}
@@ -878,7 +925,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
                       <Link
                         key={doc.id}
                         to={docHref(doc)}
-                        className="rounded-2xl border bg-white px-5 py-4 hover:shadow-md transition-all group flex items-center justify-between gap-4"
+                        className="rounded-2xl border bg-card px-5 py-4 hover:shadow-md transition-all group flex items-center justify-between gap-4"
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-sm group-hover:text-primary transition-colors truncate">{doc.title}</p>

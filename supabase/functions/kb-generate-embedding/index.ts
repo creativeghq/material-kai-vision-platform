@@ -199,7 +199,15 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
   } catch (err) {
     console.error('kb-generate-embedding error:', err);
 
-    // Mark document as failed
+    // Mark document as failed — but NEVER downgrade a document that already holds
+    // a usable vector. The insert trigger and the backfill can both target the same
+    // row, so a duplicate attempt that 500s used to overwrite `success` with
+    // `failed` on a doc that had embedded perfectly well moments earlier. The vector
+    // survived (nothing clears it), so the row stayed searchable while reporting
+    // failure forever: the backfill skips it (it selects on `text_embedding IS
+    // NULL`), so nothing ever corrected the label. 33 of 145 rows landed in that
+    // state on the 2026-08-26 re-import. `.is('text_embedding', null)` makes the
+    // write conditional on the row genuinely having nothing.
     if (doc_id) {
       try {
         const { error: markError } = await supabaseAdmin
@@ -208,7 +216,8 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
             embedding_status: 'failed',
             embedding_error_message: err instanceof Error ? err.message : String(err),
           })
-          .eq('id', doc_id);
+          .eq('id', doc_id)
+          .is('text_embedding', null);
         // If this status write is lost the doc is stuck in its previous state forever — it never
         // reads 'failed', so nothing retries it and nothing reports it. That is a worse outcome
         // than the embedding failure this handler is here to record.

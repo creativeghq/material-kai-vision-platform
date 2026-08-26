@@ -99,10 +99,15 @@ async function embedOne(doc: DocRow): Promise<{ ok: true; dims: number } | { ok:
     return { ok: true, dims: embedding.length };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Only record the failure if the row still has no vector — see the matching
+    // note in kb-generate-embedding. A concurrent attempt may have succeeded
+    // between this batch being selected and this write, and marking that row
+    // 'failed' would leave a perfectly searchable doc permanently mislabelled.
     await supabaseAdmin
       .from('kb_docs')
       .update({ embedding_status: 'failed', embedding_error_message: msg })
-      .eq('id', doc.id);
+      .eq('id', doc.id)
+      .is('text_embedding', null);
     return { ok: false, error: msg };
   }
 }
