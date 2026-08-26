@@ -389,7 +389,9 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
           type: 'agent_run_done',
           title: `Agent "${agentConfig.name}" completed`,
           body: 'Background agent run finished successfully.',
-          action_url: '/admin/background-agents',
+          // The run's own row, not the list: `/admin/background-agents` is a <Navigate>
+          // redirect that DROPS query params, so the run id has to be on the real route.
+          action_url: `/admin/ai-configs?tab=background-agents&run=${run.id}`,
           agent_id,
           run_id: run.id,
         }).catch(() => {});
@@ -513,7 +515,9 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
           type: 'agent_run_failed',
           title: `Agent "${agentConfig.name}" failed`,
           body: errMsg,
-          action_url: '/admin/background-agents',
+          // The run's own row, not the list: `/admin/background-agents` is a <Navigate>
+          // redirect that DROPS query params, so the run id has to be on the real route.
+          action_url: `/admin/ai-configs?tab=background-agents&run=${run.id}`,
           agent_id,
           run_id: run.id,
         }).catch(() => {});

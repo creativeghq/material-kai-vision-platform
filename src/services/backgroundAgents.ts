@@ -106,6 +106,24 @@ export async function listAllRuns(limit = 100): Promise<AgentRun[]> {
 }
 
 /**
+ * One run by id, for the `?run=` deep link a completion notification carries.
+ *
+ * The list this page renders is capped (`listAllRuns(150)`) and the platform produces ~120 runs a
+ * day, so the run a notification names is usually already outside it. `null` means the row is
+ * gone — completed runs are deleted after 7 days by `cleanup_old_import_jobs` — which the caller
+ * must say out loud rather than silently showing an unrelated list.
+ */
+export async function getRun(runId: string): Promise<AgentRun | null> {
+  const { data, error } = await supabase
+    .from('agent_runs')
+    .select('*')
+    .eq('id', runId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as AgentRun | null;
+}
+
+/**
  * A run is "stuck" when it's still processing but hasn't heartbeat in STUCK_MS.
  * The auto-recovery-cron uses the same threshold before re-dispatching.
  */

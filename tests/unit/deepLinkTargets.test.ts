@@ -423,6 +423,48 @@ describe('notification action_url', () => {
     }
     expect(offenders, `action_urls that land on no route:\n${offenders.join('\n')}`).toEqual([]);
   });
+
+  /**
+   * The check above matches `action_url: '/…'` — a literal that ALREADY looks like a path. An
+   * absolute URL therefore matched nothing and was silently vouched for, which is the failure
+   * mode this whole file was written to refuse.
+   *
+   * That hole is not theoretical. `_build_action_url` in MIVAA stamped
+   * `https://app.materialshub.gr/agent-hub?…` onto every job-research digest, and
+   * `projectRequestsService` wrote `${appUrl()}/projects/…` at four sites. The bell hands
+   * `action_url` to react-router's `navigate()`, which reads ANY string as a PATH — so the stored
+   * URL became the path `/https://app.materialshub.gr/agent-hub`, matched no route, and landed on
+   * the 404 catch-all. 19 digests shipped that way before anyone clicked one.
+   *
+   * A literal is all that can be judged from source: `action_url: url` is an identifier and could
+   * legitimately hold either (moodboard dormancy points at a `/functions/v1/…` endpoint that is
+   * genuinely not a route here). Those are caught at read time instead, by
+   * `resolveNotificationTarget` — see src/utils/notificationLink.ts.
+   */
+  it('no action_url literal is written as an absolute URL', () => {
+    const offenders: string[] = [];
+    // Any `action_url:` followed by a string/template literal that does NOT open with `/`.
+    for (const [value, sites] of scan(/action_url:\s*[`'"]([^`'"/][^`'"]*)[`'"]/g)) {
+      offenders.push(`${value} — ${show(sites)}`);
+    }
+    expect(
+      offenders,
+      'An action_url is fed to navigate(), which treats it as a path — an absolute URL 404s.\n' +
+      'Write the app-relative path. If the same value is also an email CTA, build the absolute\n' +
+      'form separately for the email and keep the path on the notification:\n' +
+      offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  /**
+   * The read-time half. Producers are four runtimes wide and rows outlive every one of them, so
+   * the bell must never hand `action_url` straight to `navigate()` again.
+   */
+  it('the bell resolves action_url instead of navigating to it raw', () => {
+    const bell = read(join(ROOT, 'src/modules/notifications/components/NotificationsPanel.tsx'));
+    expect(sharedStripComments(bell)).not.toMatch(/navigate\(\s*n\.action_url\s*\)/);
+    expect(bell).toContain('resolveNotificationTarget');
+  });
 });
 
 describe('?tab= deep links', () => {

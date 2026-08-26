@@ -5,7 +5,8 @@
  * Admins can inspect run details, stream live logs, and cancel stuck runs.
  */
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Bot, RefreshCw, CheckCircle, XCircle, Clock, Loader2,
   ChevronDown, ChevronRight, XCircle as CancelIcon, Eye,
@@ -20,7 +21,7 @@ import { AgentRunHistoryDrawer } from './AgentRunHistoryDrawer';
 import { ChatActivityTab }     from './ChatActivityTab';
 import { buildAgentRunFilters } from './backgroundAgentFilters';
 import {
-  listAgents, listAllRuns, cancelRun,
+  listAgents, listAllRuns, getRun, cancelRun,
   formatDuration, isStuck,
 } from '@/services/backgroundAgents';
 import type { AgentRun, BackgroundAgent } from '@/services/backgroundAgents';
@@ -79,6 +80,76 @@ export function BackgroundAgentsPage() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  /**
+   * `?run=<id>` — the destination of the "task finished" bell notification.
+   *
+   * Until this existed the notification's `action_url` was a bare `/agent-hub`, which from any
+   * other page opens an empty new chat and from `/agent-hub` itself is a literal no-op: the user
+   * clicks "finished", nothing moves, and the report the run produced is reachable only by
+   * scrolling this admin list. The run's own output is rendered in its expanded row, so the link
+   * points here and opens that row.
+   *
+   * The list is capped and this platform produces ~120 runs a day, so the named run is usually
+   * NOT in it — fetch it and prepend. A run that is genuinely gone (7-day retention) has to say so;
+   * silently showing the unfiltered list would read as "here it is".
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkRunId = searchParams.get('run');
+  const deepLinkedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!deepLinkRunId || loading) return;
+    if (deepLinkedRef.current === deepLinkRunId) return;
+    deepLinkedRef.current = deepLinkRunId;
+
+    let cancelled = false;
+    (async () => {
+      if (!runs.some(r => r.id === deepLinkRunId)) {
+        let fetched: AgentRun | null = null;
+        try {
+          fetched = await getRun(deepLinkRunId);
+        } catch (err: any) {
+          toast({ title: 'Could not open that task', description: err.message, variant: 'destructive' });
+          return;
+        }
+        if (cancelled) return;
+        if (!fetched) {
+          toast({
+            title: 'That task is no longer available',
+            description: 'Completed runs are kept for 7 days, then deleted.',
+          });
+          return;
+        }
+        setRuns(prev => (prev.some(r => r.id === fetched!.id) ? prev : [fetched!, ...prev]));
+      }
+      if (cancelled) return;
+      // A status tab (or a saved filter) can exclude the very run we were sent to open.
+      setStatusFilter('all');
+      setExpanded(deepLinkRunId);
+      // The row mounts on the next paint; scroll once it is there.
+      requestAnimationFrame(() => {
+        document.getElementById(`agent-run-${deepLinkRunId}`)
+          ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [deepLinkRunId, loading, runs, toast]);
+
+  /** Collapsing the deep-linked run drops `?run=` so a refresh doesn't re-open it. */
+  const toggleExpanded = useCallback((runId: string) => {
+    setExpanded(prev => {
+      const next = prev === runId ? null : runId;
+      if (next === null && runId === deepLinkRunId) {
+        setSearchParams(sp => {
+          const copy = new URLSearchParams(sp);
+          copy.delete('run');
+          return copy;
+        }, { replace: true });
+      }
+      return next;
+    });
+  }, [deepLinkRunId, setSearchParams]);
 
   const handleCancel = async (runId: string) => {
     try {
@@ -328,13 +399,13 @@ export function BackgroundAgentsPage() {
             const stuck      = isStuck(run);
 
             return (
-              <div key={run.id} className={`border rounded-lg overflow-hidden ${stuck ? 'border-yellow-500/60' : ''}`}>
+              <div id={`agent-run-${run.id}`} key={run.id} className={`border rounded-lg overflow-hidden ${stuck ? 'border-yellow-500/60' : ''}`}>
                 <div
                   role="button"
                   tabIndex={0}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/40 text-left cursor-pointer"
-                  onClick={() => setExpanded(isExpanded ? null : run.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(isExpanded ? null : run.id); } }}
+                  onClick={() => toggleExpanded(run.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpanded(run.id); } }}
                 >
                   {isExpanded
                     ? <ChevronDown  className="h-4 w-4 text-muted-foreground shrink-0" />

@@ -64,9 +64,6 @@ export interface NewRequest {
   assignee_id?: string | null;
 }
 
-const appUrl = () =>
-  (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
-
 export const projectRequestsService = {
   async list(projectId: string): Promise<ProjectRequestWithMessages[]> {
     const { data, error } = await (supabase as any)
@@ -115,7 +112,7 @@ export const projectRequestsService = {
       title: `New request on ${project?.name || 'a project'}`,
       body: `${raiserName || 'Someone'}: ${row.title}`,
       type: 'project_request',
-      action_url: `${appUrl()}/projects/${input.project_id}?tab=requests&request=${row.id}`,
+      action_url: `/projects/${input.project_id}?tab=requests&request=${row.id}`,
       request_id: row.id,
       project_id: input.project_id,
       project_name: project?.name ?? null,
@@ -149,7 +146,7 @@ export const projectRequestsService = {
         title: 'Your request has a reply',
         body: `${authorName || 'The team'}: ${body.slice(0, 160)}`,
         type: 'project_request',
-        action_url: `${appUrl()}/projects/${request.project_id}?tab=requests&request=${request.id}`,
+        action_url: `/projects/${request.project_id}?tab=requests&request=${request.id}`,
         request_id: request.id,
         project_id: request.project_id,
       });
@@ -169,7 +166,7 @@ export const projectRequestsService = {
         title: status === 'resolved' ? 'Your request was resolved' : 'Your request was closed',
         body: request.title,
         type: 'project_request',
-        action_url: `${appUrl()}/projects/${request.project_id}?tab=requests&request=${request.id}`,
+        action_url: `/projects/${request.project_id}?tab=requests&request=${request.id}`,
         request_id: request.id,
         project_id: request.project_id,
       });
@@ -193,7 +190,7 @@ export const projectRequestsService = {
         title: decision === 'approved' ? 'Your approval request was approved' : 'Your approval request was declined',
         body: request.title,
         type: 'project_request',
-        action_url: `${appUrl()}/projects/${request.project_id}?tab=requests&request=${request.id}`,
+        action_url: `/projects/${request.project_id}?tab=requests&request=${request.id}`,
         request_id: request.id,
         project_id: request.project_id,
       });

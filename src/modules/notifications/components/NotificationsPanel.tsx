@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { timeAgo } from '@/utils/datetime';
+import { resolveNotificationTarget } from '@/utils/notificationLink';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -156,7 +157,11 @@ export const NotificationsPanel: React.FC = () => {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
     setOpen(false);
-    if (n.action_url) navigate(n.action_url);
+    // NEVER `navigate(n.action_url)` — `action_url` is a free string written by four runtimes and
+    // navigate() reads any string as a path, so an absolute URL 404s. See utils/notificationLink.
+    const target = resolveNotificationTarget(n.action_url);
+    if (target.kind === 'route') navigate(target.to);
+    else if (target.kind === 'external') window.open(target.href, '_blank', 'noopener,noreferrer');
   };
 
   const dismissOne = async (e: React.MouseEvent, id: string) => {
