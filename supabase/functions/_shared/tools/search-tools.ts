@@ -784,6 +784,28 @@ export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = fal
   return tool(
     async ({ docId, chunkIndex, before = 1, after = 2, query = '', maxTokens = 6000, source = 'kb', productId }) => {
       try {
+        // `docId` is a UUID column on the backend, and a model can hand this tool anything —
+        // a title, a slug, a word. A non-UUID reaches Postgres as `22P02 invalid input syntax
+        // for type uuid` and comes back as an HTTP 500, which is the wrong class entirely: the
+        // request was malformed, nothing failed on the server. The agent then read
+        // "Read section API error: 500" and had no way to know it had simply passed the wrong
+        // thing. Reject it here, and say what a valid id looks like and where to get one.
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!docId || !UUID_RE.test(String(docId))) {
+          return JSON.stringify({
+            found: false,
+            error: `"${docId}" is not a document id. This tool needs the UUID that `
+              + 'knowledge_base_search returned for the hit you want to read around — run that '
+              + 'first and pass its docId and chunkIndex.',
+          });
+        }
+        if (productId && !UUID_RE.test(String(productId))) {
+          return JSON.stringify({
+            found: false,
+            error: `"${productId}" is not a product id. Omit productId, or pass the UUID from a search result.`,
+          });
+        }
+
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
         const TIMEOUT_MS = 30000; // pure SQL — should answer in well under a second
 
