@@ -527,6 +527,34 @@ admin page rendered a clean empty state.
 - **Proven to fire:** 2026-08-23 — the pre-fix shape restored across three files (dashboard linking a product, tab taking a bare `productId`, one reader renamed back to `getProduct…`); 3 of 8 failed, naming each. Restored byte-identically; 8/8 green after.
 - **Blind spot:** it knows about this one API. The same shape is available to any service with two id families — and `priceMonitoringApi` has exactly that structure.
 
+### 17. A link that is a STRING, addressed from a runtime that cannot see the router
+
+`user_notifications.action_url` is written by four runtimes — edge functions, MIVAA (Python),
+frontend services, and a plpgsql trigger — and read by one line in the bell:
+`navigate(n.action_url)`. `navigate()` treats ANY string as a PATH. So MIVAA's
+`https://app.materialshub.gr/agent-hub?…`, correct as the CTA of the email carrying the same
+digest, became the path `/https://app.materialshub.gr/agent-hub` and landed on the 404 catch-all.
+Nineteen job digests stored that way; `projectRequestsService` wrote `${appUrl()}/…` at four more
+sites.
+
+The other half of the same click: `fn_notify_agent_completed` wrote a bare `/agent-hub` when the
+finished run had no conversation to return to. From another page that opens an empty new chat;
+from `/agent-hub` itself `navigate('/agent-hub')` is a **literal no-op** — the user clicks
+"finished" and nothing moves, while the report sits in `agent_runs.output_data` with nothing
+linking to it. A destination that exists is not the same as a destination that shows the thing.
+
+Nothing could see either. The row is well-formed, the URL is valid, it is the right notification
+sent to the right person at the right moment. TypeScript sees a string; an integrity probe sees a
+populated column. Both were found by a person clicking the bell.
+
+- **Why the existing guard missed it.** [deepLinkTargets.test.ts](../tests/unit/deepLinkTargets.test.ts) was written for exactly this class, and its scan was `action_url:\s*['"](/[^'"]*)['"]` — it matched only literals that ALREADY looked like a path. An absolute URL matched nothing and was therefore silently vouched for, which is the failure the file's own header says it must refuse. A guard that skips what it cannot parse reports clean on the defect it was written for.
+- **The tell:** a destination addressed by string from outside the module that owns the destination, where the SAME string is also consumed by a second channel with a different contract (a bell path vs an email URL). One of the two is always wrong and neither runtime can tell.
+- **Guarded by:** producer side — a new case in `deepLinkTargets.test.ts` failing any non-path `action_url` literal, plus [test_bell_action_url_is_a_path.py](../mivaa-pdf-extractor/tests/unit/test_bell_action_url_is_a_path.py) (AST, stdlib-only) for the Python half. Read side — `resolveNotificationTarget` ([src/utils/notificationLink.ts](../src/utils/notificationLink.ts), [tests](../tests/unit/notificationLink.test.ts)), because a producer fix cannot reach rows written months ago.
+- **Proven to fire:** 2026-08-26 — a planted `src/__tmp_absurl_probe.ts` holding one absolute `action_url` failed the new case, naming the file and line; removed after. Both trigger branches were then live-fired against the real database inside a rolled-back `DO` block.
+- **Blind spot:** `action_url: url` is an identifier, and source cannot judge it — the moodboard dormancy warning legitimately points at a `/functions/v1/…` endpoint that is not a route here. Those are only caught at read time. And nothing checks that a link which *resolves* actually **shows the thing**: `/agent-hub` was a real route the whole time.
+
+---
+
 ---
 
 ## Mechanism inventory
