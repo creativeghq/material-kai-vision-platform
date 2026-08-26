@@ -17,11 +17,30 @@ import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import type { SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-types.ts';
 import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities-client.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
+import { resolveSecret } from '../../_shared/secrets.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const dataforseoLogin = () => Deno.env.get('DATAFORSEO_LOGIN') || '';
-const dataforseoPassword = () => Deno.env.get('DATAFORSEO_PASSWORD') || '';
+/**
+ * DataForSEO credentials, resolved the way this platform resolves every admin-editable secret:
+ * `resolveSecret` reads env FIRST and falls back to `platform_secrets`. Never `Deno.env.get`
+ * alone.
+ *
+ * This handler is the ONLY DataForSEO caller that runs inside an edge function — its ~30 sibling
+ * SEO tools proxy to MIVAA, which holds the credentials in its own host env. So when this read
+ * `Deno.env.get('DATAFORSEO_LOGIN')` it got nothing, and `seo_keyword_research` answered
+ * "DataForSEO credentials not configured" while every other SEO tool worked. The credentials were
+ * configured the whole time — just not anywhere this function could see, and the
+ * `secrets-bootstrap` that would have put them in env is a no-op on this runtime because
+ * `Deno.env.set` throws here.
+ */
+async function dataforseoCredentials(supabase: { from: (t: string) => any }): Promise<{ login: string; password: string }> {
+  const [login, password] = await Promise.all([
+    resolveSecret(supabase, 'DATAFORSEO_LOGIN'),
+    resolveSecret(supabase, 'DATAFORSEO_PASSWORD'),
+  ]);
+  return { login: login.value ?? '', password: password.value ?? '' };
+}
 
 const CREDIT_COST = 18;
 
@@ -75,9 +94,19 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       );
     }
 
-    if (!dataforseoLogin() || !dataforseoPassword()) {
+    const dfs = await dataforseoCredentials(supabase);
+    if (!dfs.login || !dfs.password) {
+      // Say WHERE to put them. The old message was true and useless: the credentials WERE
+      // configured, on the MIVAA host, and no reader of this error could have known that this
+      // particular function looks somewhere else.
       return jsonResponse(
-        { success: false, error: 'DataForSEO credentials not configured' },
+        {
+          success: false,
+          error: 'DataForSEO credentials not configured for the edge runtime. Set '
+            + 'DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD in Admin → Platform Secrets — the rows '
+            + 'exist but hold no value — or in this function\'s own environment. Note the MIVAA '
+            + 'host having them is not enough: this handler calls DataForSEO directly.',
+        },
         500,
       );
     }
@@ -123,7 +152,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     // ~3-5s latency in the worst case but runs concurrently with the main
     // research, so total wall-clock cost is unchanged. The stateless
     // endpoint authenticates via x-cron-secret — no extra user credits.
-    const client = new DataForSEOClient(dataforseoLogin(), dataforseoPassword());
+    const client = new DataForSEOClient(dfs.login, dfs.password);
     const countryCode = dfsLocationToCountry(locationCode);
     const [research, serpSignals] = await Promise.all([
       client.researchKeyword(

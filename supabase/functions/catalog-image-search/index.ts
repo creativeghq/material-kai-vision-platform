@@ -10,6 +10,7 @@
  * an approval grid; the user clicks ✓ to attach one to the material.
  */
 import { createClient } from '@supabase/supabase-js';
+import { resolveSecret } from '../_shared/secrets.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
@@ -21,9 +22,6 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 // Lazy reads so platform_secrets bootstrap (run at handler entry) is honored.
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
-const DATAFORSEO_BASE64 = () => Deno.env.get('DATAFORSEO_BASE64') || '';
-const DATAFORSEO_LOGIN = () => Deno.env.get('DATAFORSEO_LOGIN') || '';
-const DATAFORSEO_PASSWORD = () => Deno.env.get('DATAFORSEO_PASSWORD') || '';
 
 interface SearchRequest {
   query: string;
@@ -105,7 +103,7 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
         }
         webCharged = true;
       }
-      const webResults = await searchWebImages(body.query, webNeeded);
+      const webResults = await searchWebImages(supabase, body.query, webNeeded);
       webHits = webResults.length;
       candidates.push(...webResults);
       // DataForSEO returned nothing (or not configured) → refund the debit.
@@ -197,13 +195,29 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
   }
 }
 
-async function searchWebImages(query: string, limit: number): Promise<ImageCandidate[]> {
-  const b64 = DATAFORSEO_BASE64();
-  const login = DATAFORSEO_LOGIN();
-  const password = DATAFORSEO_PASSWORD();
+/**
+ * The same defect `seo-api/handlers/research.ts` had: `Deno.env.get` alone cannot see a secret
+ * that lives in `platform_secrets`, and on this runtime the bootstrap that would copy it into env
+ * is a no-op (`Deno.env.set` throws). This one degrades quietly rather than erroring — it logs a
+ * warning and returns no images — so it would have gone on silently skipping the web fallback for
+ * as long as nobody read the function logs.
+ */
+async function searchWebImages(
+  supabase: { from: (t: string) => any },
+  query: string,
+  limit: number,
+): Promise<ImageCandidate[]> {
+  const [b64r, loginR, passR] = await Promise.all([
+    resolveSecret(supabase, 'DATAFORSEO_BASE64'),
+    resolveSecret(supabase, 'DATAFORSEO_LOGIN'),
+    resolveSecret(supabase, 'DATAFORSEO_PASSWORD'),
+  ]);
+  const b64 = b64r.value ?? '';
+  const login = loginR.value ?? '';
+  const password = passR.value ?? '';
   const auth = b64 || (login && password ? btoa(`${login}:${password}`) : null);
   if (!auth) {
-    console.warn('[catalog-image-search] DataForSEO not configured; skipping web fallback');
+    console.warn('[catalog-image-search] DataForSEO not configured (checked env AND platform_secrets); skipping web fallback');
     return [];
   }
 
