@@ -550,6 +550,9 @@ Complete documentation for Material Kai Vision Platform.
 **[units-and-quantity-pricing.md](units-and-quantity-pricing.md)** - UOM ladder & price breaks ✨ NEW (2026-08)
 - m²/piece/box/pallet conversion derived in SQL; quantity discounts inside the one price resolver; the "missing factor is not 1:1" rule
 
+**[ontology-layer.md](ontology-layer.md)** - Typed concepts & governed term bindings ✨ NEW (2026-08)
+- Source term → enterprise concept with epistemic status, confidence, evidence and provenance; one home for confirmed vocabulary and one for everything still in question; AI proposes, a human confirms
+
 **[taric-customs-classification.md](taric-customs-classification.md)** - EU commodity codes ✨ NEW (2026-08)
 - TARIC nomenclature import, code picker + validation, supplier-code/LLM classification; the July 2026 €3-per-sub-heading rule
 
