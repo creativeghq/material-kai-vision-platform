@@ -28,6 +28,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { captureException } from '../_shared/sentry.ts';
 import {
   ensureZernioSecrets, zernioWebhookSecret, fetchZernioAttachment,
   fetchZernioMediaUrl,
@@ -1943,6 +1944,16 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
 
   } catch (err) {
     console.error(`[zernio-webhook] Error handling ${event}:`, err);
+    // The cause has to be REPORTED, not just logged. `withApiLogging` reports what the
+    // handler THROWS, and this handler deliberately returns a Response instead — so for
+    // 36 inbound WhatsApp messages over one day Sentry held only the string below and
+    // the real error existed solely in an edge log nobody was reading. Fingerprinted by
+    // event so one bad event type does not bury the others in a single group.
+    void captureException(err instanceof Error ? err : new Error(String(err)), {
+      tags: { function: 'zernio-webhook-handler', webhook_event: String(event) },
+      extra: { event },
+      fingerprint: ['zernio-webhook', String(event)],
+    });
     // Inbound WhatsApp replies must NOT be silently dropped on a transient DB fault.
     // Return 5xx so Zernio retries the delivery; the upsert/find-or-create logic above
     // is idempotent enough for a retry to converge. Status-sync events (post.*, account.*,

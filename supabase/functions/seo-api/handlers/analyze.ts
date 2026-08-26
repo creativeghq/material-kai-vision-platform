@@ -13,6 +13,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
+import { missingArticlePlanFields, ANALYZE_PLAN_FIELDS } from './article-plan-guard.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
 import type {
@@ -72,6 +73,17 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     if (!body.content_markdown || !body.article_plan) {
       return jsonResponse(
         { success: false, error: 'Missing required fields: content_markdown, article_plan' },
+        400,
+      );
+    }
+
+    // Presence is not shape. `analyzeContent` dereferences the plan's fields directly, so a
+    // half-built plan used to reach it and throw — surfacing as a 500 on a request that was
+    // simply malformed. Checked BEFORE the debit so a bad request is never billed for.
+    const planGaps = missingArticlePlanFields(body.article_plan, ANALYZE_PLAN_FIELDS);
+    if (planGaps.length > 0) {
+      return jsonResponse(
+        { success: false, error: `article_plan is missing or has the wrong type for: ${planGaps.join(', ')}` },
         400,
       );
     }

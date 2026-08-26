@@ -15,6 +15,7 @@ import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
+import { missingArticlePlanFields, WRITE_PLAN_FIELDS } from './article-plan-guard.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../../_shared/ai-client.ts';
 import type {
@@ -59,6 +60,17 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     if (!body.article_plan) {
       return jsonResponse(
         { success: false, error: 'Missing required field: article_plan' },
+        400,
+      );
+    }
+
+    // Presence is not shape — the writer prompts dereference these fields directly, so a
+    // half-built plan throws deep inside prompt assembly and reads as a 500 on what is
+    // really a malformed request. Checked BEFORE the debit so a bad request is never billed.
+    const planGaps = missingArticlePlanFields(body.article_plan, WRITE_PLAN_FIELDS);
+    if (planGaps.length > 0) {
+      return jsonResponse(
+        { success: false, error: `article_plan is missing or has the wrong type for: ${planGaps.join(', ')}` },
         400,
       );
     }

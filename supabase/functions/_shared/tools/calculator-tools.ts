@@ -160,12 +160,19 @@ export const createHeatPumpSizingTool = (onChunk: ChunkSink) => {
         ceiling_height_m: z.number().positive().optional().describe('Clear ceiling height in metres (default 2.7).'),
         insulation_level: z
           .enum(['none', 'medium', 'modern', 'passive'])
-          .describe('none = pre-1980 no insulation; medium = post-1980 partial; modern = KENAK well-insulated; passive = passive house / nZEB.'),
+          // Spelling out the everyday synonyms because the model reaches for them: it sent
+          // "average" and the call was rejected by zod before the calculator ever ran.
+          .describe('One of exactly: none | medium | modern | passive. none = pre-1980 no insulation; medium = post-1980 partial (use this for "average", "typical", "standard", "some insulation"); modern = KENAK well-insulated; passive = passive house / nZEB.'),
         climate_zone: z.enum(['A', 'B', 'C', 'D']).optional().describe('Greek climate zone: A south/islands (warmest) … D mountainous (coldest). Default C.'),
         design_outdoor_temp_c: z.number().optional().describe('Advanced override: exact winter design outdoor temperature in °C. Supersedes climate_zone when given.'),
         emitter: z
           .enum(['underfloor', 'fan_coil', 'low_temp_radiator', 'high_temp_radiator'])
-          .describe('Heat-emission system — drives required flow temperature and COP context.'),
+          // "radiators" on its own is NOT mappable and must not be guessed: low-temp runs at
+          // ~50 °C and high-temp at ~70 °C, which changes the flow temperature, the COP and the
+          // recommended unit. Guessing here produces a confident number for the wrong system —
+          // so the model is told to ask instead. (It sent bare "radiators" and zod rejected it,
+          // which is the correct outcome; this makes the next attempt land.)
+          .describe('One of exactly: underfloor | fan_coil | low_temp_radiator | high_temp_radiator. Drives required flow temperature and COP context. "Underfloor heating" → underfloor; "fan coils" → fan_coil. If the user just says "radiators", ASK whether they are sized for low-temperature (~50 °C) or conventional high-temperature (~70 °C) operation — do not pick one.'),
         glazing_exposure: z.enum(['low', 'normal', 'high']).optional().describe('low = compact/few windows; normal; high = large glazing / many exposed walls. Default normal.'),
         include_dhw: z.boolean().optional().describe('Include a domestic-hot-water allowance in the combined sizing.'),
         occupants: z.number().int().positive().optional().describe('Occupant count — only used when include_dhw is true.'),

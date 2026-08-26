@@ -208,10 +208,10 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'floor_area_m2', type: 'number', optional: false, description: 'Heated floor area in square metres.' },
       { name: 'ceiling_height_m', type: 'number', optional: true, description: 'Clear ceiling height in metres (default 2.7).' },
-      { name: 'insulation_level', type: 'enum', enum: ['none', 'medium', 'modern', 'passive'], optional: false, description: 'none = pre-1980 no insulation; medium = post-1980 partial; modern = KENAK well-insulated; passive = passive house / nZEB.' },
+      { name: 'insulation_level', type: 'enum', enum: ['none', 'medium', 'modern', 'passive'], optional: false, description: 'One of exactly: none | medium | modern | passive. none = pre-1980 no insulation; medium = post-1980 partial (use this for "average", "typical", "standard", "some insulation"); modern = KENAK well-insulated; passive = passive house / nZEB.' },
       { name: 'climate_zone', type: 'enum', enum: ['A', 'B', 'C', 'D'], optional: true, description: 'Greek climate zone: A south/islands (warmest) … D mountainous (coldest). Default C.' },
       { name: 'design_outdoor_temp_c', type: 'number', optional: true, description: 'Advanced override: exact winter design outdoor temperature in °C. Supersedes climate_zone when given.' },
-      { name: 'emitter', type: 'enum', enum: ['underfloor', 'fan_coil', 'low_temp_radiator', 'high_temp_radiator'], optional: false, description: 'Heat-emission system — drives required flow temperature and COP context.' },
+      { name: 'emitter', type: 'enum', enum: ['underfloor', 'fan_coil', 'low_temp_radiator', 'high_temp_radiator'], optional: false, description: 'One of exactly: underfloor | fan_coil | low_temp_radiator | high_temp_radiator. Drives required flow temperature and COP context. "Underfloor heating" → underfloor; "fan coils" → fan_coil. If the user just says "radiators", ASK whether they are sized for low-temperature (~50 °C) or conventional high-temperature (~70 °C) operation — do not pick one.' },
       { name: 'glazing_exposure', type: 'enum', enum: ['low', 'normal', 'high'], optional: true, description: 'low = compact/few windows; normal; high = large glazing / many exposed walls. Default normal.' },
       { name: 'include_dhw', type: 'boolean', optional: true, description: 'Include a domestic-hot-water allowance in the combined sizing.' },
       { name: 'occupants', type: 'number', optional: true, description: 'Occupant count — only used when include_dhw is true.' },
