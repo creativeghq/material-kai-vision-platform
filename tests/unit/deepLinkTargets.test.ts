@@ -457,6 +457,44 @@ describe('notification action_url', () => {
   });
 
   /**
+   * A seeded prompt becomes the USER'S OWN MESSAGE.
+   *
+   * `?q=` / `?prompt=` on `/agent-hub` is the app-wide handoff for "open the agent already
+   * asking this" — AgentHub renders the value as a chat bubble from the user. So whatever is in
+   * it is text we are putting in someone's mouth, and an internal identifier has no business
+   * there. The job digest seeded
+   * `Show me today's findings for tracked_job_id ff62d59f-b8b9-4d70-9c4a-0a13359b7788`, so
+   * clicking the bell showed the owner a raw uuid attributed to themselves — and cost a full
+   * agent turn re-fetching findings the digest already had.
+   *
+   * This checks the literal shape only (a hand-written `…_id ${x}` in a seed). The runtime half —
+   * an id interpolated from a variable — is answered by not seeding at all: the digest now opens
+   * a conversation and posts the findings card into it, so the link opens the ANSWER.
+   */
+  it('no agent-hub seed prompt hands the user an internal identifier', () => {
+    const offenders: string[] = [];
+    // Apostrophes are ORDINARY here ("today's findings"), so the terminator set must not include
+    // `'` — excluding it truncated every seed at the first one and the guard passed on its own
+    // motivating case.
+    const seed = /[?&](?:q|prompt)=([^"`&\n]*)/g;
+    for (const file of sourceFiles) {
+      blankComments(read(file)).split('\n').forEach((line, i) => {
+        for (const m of line.matchAll(seed)) {
+          // `<something>_id <value>` — naming an id column in text a person will read.
+          if (/\b\w*_id\b\s*[:=]?\s*(\$\{|[0-9a-f]{8}-)/.test(m[1]) || /\b(tracked_job_id|workspace_id|conversation_id|run_id)\b/.test(m[1])) {
+            offenders.push(`${m[1].slice(0, 80)} — ${rel(file)}:${i + 1}`);
+          }
+        }
+      });
+    }
+    expect(
+      offenders,
+      'A ?q=/?prompt= seed is rendered as the USER\'S message. Name the thing the way the user\n' +
+      'named it, or link to a surface that already shows the answer:\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  /**
    * The read-time half. Producers are four runtimes wide and rows outlive every one of them, so
    * the bell must never hand `action_url` straight to `navigate()` again.
    */
