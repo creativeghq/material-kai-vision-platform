@@ -33,6 +33,7 @@ import {
   Radar,
   ScanLine,
   Store,
+  Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -262,6 +263,22 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     icon: Layers,
     surface: 'app',
     description: 'Reusable starting points for invoices, quotes, projects and moodboards.',
+  },
+  // SEO Module — the workspace's connected WEBSITES and each site's own SEO dashboard
+  // (articles, keyword research, toolkit runs, domain audits). That surface lives on the profile
+  // (Profile → Websites), so it had no launcher presence at all: the only way in was the profile
+  // menu. Deliberately NO `hub` — it is the management/setup half of SEO, not the agent tile that
+  // already sits in Marketing ('seo'), so it belongs in the catch-all "More" group beside Templates
+  // and Blueprints. No moduleSlug and no capability either: the tab itself is ungated (any signed-in
+  // member can connect a site), and gating the tile on `seo-toolkit` would hide a surface the page
+  // still lets them open — and list it as an add-on to buy for something already free.
+  {
+    id: 'seo-websites',
+    label: 'SEO Module',
+    path: '/profile?tab=websites',
+    icon: Globe,
+    surface: 'app',
+    description: 'Connect a website and open its SEO dashboard — articles, keywords, audits and Search Console.',
   },
   // Supplier portal lives under Finance → Payables /
   // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the
