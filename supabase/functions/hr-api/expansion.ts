@@ -1,3 +1,9 @@
+// The HR value-sets come from the generated mirror of `src/modules/hr/hrVocabulary.ts`
+// (#391). They were declared inline here and in nine other files; the DB CHECK
+// constraints are the enforcer and the source equals them exactly. Do not re-declare —
+// `npm run vocab:mirror` regenerates the mirror and vocabularyMirrors.test.ts fails the
+// build on drift.
+import { isEmploymentType, isLocationType, isAbsenceType } from '../_shared/hrVocabulary.generated.ts';
 // deno-lint-ignore-file no-explicit-any
 // HR expansion — org, recruitment/ATS (+ AI job descriptions), onboarding, documents,
 // payroll (+ Finance link via planned_payments), analytics. Dispatched from index.ts AFTER the
@@ -31,9 +37,7 @@ function pick(body: any, cols: readonly string[]): Record<string, unknown> {
   for (const c of cols) if (body?.[c] !== undefined) out[c] = body[c];
   return out;
 }
-const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contractor'];
 const POSTING_STATUS = ['draft', 'open', 'closed'];
-const LOCATION_TYPES = ['onsite', 'hybrid', 'remote'];
 /** Columns a manager may set on a posting. `published_at` is derived, never body-supplied. */
 const JOB_POSTING_COLS = [
   'title', 'slug', 'department_id', 'employment_type', 'location', 'location_type', 'remote', 'level',
@@ -47,9 +51,9 @@ const APPLY_CONFIG_KEYS = ['require_resume', 'ask_phone', 'ask_location', 'ask_l
  * page, so we rebuild them key-by-key rather than storing whatever the client sent.
  */
 function normalizeJobPostingFields(fields: Record<string, unknown>): string | null {
-  if (fields.employment_type && !EMPLOYMENT_TYPES.includes(String(fields.employment_type))) return 'invalid employment_type';
+  if (fields.employment_type && !isEmploymentType(String(fields.employment_type))) return 'invalid employment_type';
   if (fields.status && !POSTING_STATUS.includes(String(fields.status))) return 'invalid status';
-  if (fields.location_type != null && fields.location_type !== '' && !LOCATION_TYPES.includes(String(fields.location_type))) return 'invalid location_type';
+  if (fields.location_type != null && fields.location_type !== '' && !isLocationType(String(fields.location_type))) return 'invalid location_type';
   if (fields.location_type === '') fields.location_type = null;
   if (typeof fields.slug === 'string') fields.slug = fields.slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 70) || null;
 
@@ -79,7 +83,6 @@ function normalizeJobPostingFields(fields: Record<string, unknown>): string | nu
   return null;
 }
 const APP_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
-const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
 const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'];
 const HR_DOC_BUCKET = 'pdf-documents';
 
@@ -1176,7 +1179,7 @@ export async function handleSelfService(action: string, ctx: SelfCtx): Promise<R
     case 'self-request-timeoff': {
       const startDate = String(body?.start_date ?? ''), endDate = String(body?.end_date ?? ''), type = String(body?.absence_type ?? 'other');
       if (!startDate || !endDate) return json({ error: 'start_date and end_date are required' }, 400);
-      if (!ABSENCE_TYPES.includes(type)) return json({ error: 'invalid absence_type' }, 400);
+      if (!isAbsenceType(type)) return json({ error: 'invalid absence_type' }, 400);
       if (endDate < startDate) return json({ error: 'end_date must be on or after start_date' }, 400);
       const { data, error } = await supabase.from('hr_absences').insert({
         workspace_id: workspaceId, employee_id: employeeId, absence_type: type, start_date: startDate, end_date: endDate,

@@ -1,3 +1,9 @@
+// The HR value-sets come from the generated mirror of `src/modules/hr/hrVocabulary.ts`
+// (#391). They were declared inline here and in nine other files; the DB CHECK
+// constraints are the enforcer and the source equals them exactly. Do not re-declare —
+// `npm run vocab:mirror` regenerates the mirror and vocabularyMirrors.test.ts fails the
+// build on drift.
+import { ABSENCE_TYPES, isAbsenceType } from '../hrVocabulary.generated.ts';
 // Employee HR SELF-SERVICE agent toolkit. The sibling of hr-tools.ts, but for the `hr.self`
 // persona: an invited employee who has NEITHER hr.view NOR hr.manage and therefore cannot call
 // `manage_hr` at all (hr-api 403s them). This tool lets that employee ask about THEIR OWN record
@@ -41,7 +47,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 const MODULE_SLUG = 'hr';
-const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'] as const;
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 /** Call an hr-api `self-*` action AS the user, so hr-api's self-service scoping applies. */
@@ -165,7 +170,7 @@ export const createManageMyHrTool = (
           if (!start_date || !end_date) {
             return JSON.stringify({ success: false, error: 'Give me the first and last day of the leave (YYYY-MM-DD).' });
           }
-          const type = ABSENCE_TYPES.includes(absence_type) ? absence_type : 'vacation';
+          const type = isAbsenceType(absence_type) ? absence_type : 'vacation';
           const r = await callHrApi(jwt!, ws, 'self-request-timeoff', {
             absence_type: type, start_date, end_date, ...(note ? { note } : {}),
           });

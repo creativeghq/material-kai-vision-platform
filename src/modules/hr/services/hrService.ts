@@ -4,11 +4,26 @@ import { edgeError } from '@/utils/edgeError';
 // Client for the `hr-api` edge function. Every call passes the active workspace_id; the
 // edge function re-derives access from the caller (JWT) and enforces entitlement + hr.view/hr.manage.
 
-export type EmploymentType = 'full_time' | 'part_time' | 'contractor';
+// The closed value-sets come from `../hrVocabulary` (#391) and are re-exported here so
+// every existing `import { EmploymentType } from '.../hrService'` keeps working. They
+// were declared inline in this file and in nine others; the DB CHECK constraints are the
+// enforcer and the source now equals them exactly.
+export {
+  EMPLOYMENT_TYPES, EMPLOYEE_STATUSES, ABSENCE_TYPES,
+  POSTING_STATUSES, LOCATION_TYPES, SEPARATION_TYPES,
+} from '../hrVocabulary';
+export type {
+  EmploymentType, EmployeeStatus, AbsenceType,
+  PostingStatus, LocationType, SeparationType,
+} from '../hrVocabulary';
+
+// Also imported for use WITHIN this file — a re-export does not bind the names locally.
+import type {
+  EmploymentType, EmployeeStatus, AbsenceType,
+  PostingStatus, LocationType, SeparationType,
+} from '../hrVocabulary';
 export type PayBasis = 'monthly' | 'hourly';
 export const PAY_BASIS_LABELS: Record<PayBasis, string> = { monthly: 'Monthly salary', hourly: 'Hourly rate' };
-export type EmployeeStatus = 'active' | 'on_leave' | 'terminated';
-export type AbsenceType = 'vacation' | 'sick' | 'unpaid' | 'other';
 export type AbsenceStatus = 'pending' | 'approved' | 'rejected';
 
 export interface EmployeeContact {
@@ -145,8 +160,6 @@ export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
 
 // ── Expansion types (org, recruitment, onboarding, documents, payroll, analytics) ──
 export interface Department { id: string; name: string; description: string | null; head_contact_id: string | null; head: { id: string; name: string } | null; employee_count: number; }
-export type PostingStatus = 'draft' | 'open' | 'closed';
-export type LocationType = 'onsite' | 'hybrid' | 'remote';
 /** One region's pay band, rendered on the public job page's facts rail. */
 export interface CompensationBand {
   region: string; currency: string; min: number | null; max: number | null;
@@ -298,7 +311,6 @@ export type ErganiFiled = { ok: true; result: ErganiSubmitResult; filed?: number
 
 // ── Labour records behind the Ε-documents ──
 /** voluntary → Ε5, termination → Ε6, expiry → Ε7. The kind IS the Ergani document. */
-export type SeparationType = 'voluntary' | 'termination' | 'expiry';
 export type FilingStatus = 'draft' | 'submitted' | 'failed';
 export const SEPARATION_TYPE_LABELS: Record<SeparationType, string> = {
   voluntary: 'Voluntary departure (Ε5)',

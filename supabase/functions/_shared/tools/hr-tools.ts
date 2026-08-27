@@ -1,3 +1,9 @@
+// The HR value-sets come from the generated mirror of `src/modules/hr/hrVocabulary.ts`
+// (#391). They were declared inline here and in nine other files; the DB CHECK
+// constraints are the enforcer and the source equals them exactly. Do not re-declare —
+// `npm run vocab:mirror` regenerates the mirror and vocabularyMirrors.test.ts fails the
+// build on drift.
+import { ABSENCE_TYPES, EMPLOYMENT_TYPES, isAbsenceType } from '../hrVocabulary.generated.ts';
 // HR agent toolkit. Lets a workspace owner/admin ask the KAI agent natural-language HR
 // questions ("who's on leave this week?", "record a sick day for John", "add an employee",
 // "HR overview") from chat, instead of navigating the /hr module UI.
@@ -37,7 +43,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 const MODULE_SLUG = 'hr';
-const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'] as const;
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 /** Call an hr-api action AS the user (so all hr-api RBAC/entitlement applies). */
@@ -208,7 +213,7 @@ export const createManageHrTool = (
 
       // ── Write: record an absence (approval workflow → status 'pending') ─────
       if (action === 'record_absence') {
-        if (!absence_type || !ABSENCE_TYPES.includes(absence_type)) {
+        if (!absence_type || !isAbsenceType(absence_type)) {
           return JSON.stringify({ success: false, error: `absence_type must be one of ${ABSENCE_TYPES.join(', ')}` });
         }
         if (!start_date || !end_date) return JSON.stringify({ success: false, error: 'start_date and end_date (YYYY-MM-DD) are required.' });
@@ -307,7 +312,7 @@ export const createManageHrTool = (
         email: z.string().optional(),
         position: z.string().optional().describe('Job title (add_employee).'),
         department: z.string().optional(),
-        employment_type: z.enum(['full_time', 'part_time', 'contractor']).optional(),
+        employment_type: z.enum(EMPLOYMENT_TYPES).optional(),
       }),
     },
   );

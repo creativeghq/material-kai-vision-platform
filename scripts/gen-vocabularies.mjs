@@ -32,6 +32,12 @@ export const VOCABULARIES = [
     'src/services/flows/tenantVocabulary.ts',
     'supabase/functions/_shared/tools/tenantVocabulary.generated.ts',
   ],
+  [
+    // #391 — eight HR value-sets that were written across ten files, two to six copies
+    // each. The DB CHECK constraints are the enforcer; this source equals them exactly.
+    'src/modules/hr/hrVocabulary.ts',
+    'supabase/functions/_shared/hrVocabulary.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

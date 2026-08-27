@@ -1,3 +1,9 @@
+// The HR value-sets come from the generated mirror of `src/modules/hr/hrVocabulary.ts`
+// (#391). They were declared inline here and in nine other files; the DB CHECK
+// constraints are the enforcer and the source equals them exactly. Do not re-declare —
+// `npm run vocab:mirror` regenerates the mirror and vocabularyMirrors.test.ts fails the
+// build on drift.
+import { isAbsenceType, isEmployeeStatus, isEmploymentType } from '../_shared/hrVocabulary.generated.ts';
 // deno-lint-ignore-file no-explicit-any
 // HR module API. Employees are CRM contacts (crm_contacts) tagged with the global
 // "Employee" category, plus a companion hr_employees row for HR-only data. Absences live in
@@ -35,9 +41,6 @@ async function employeeName(supabase: any, workspaceId: string, employeeId: stri
   } catch { return 'Employee'; }
 }
 
-const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contractor'];
-const EMPLOYEE_STATUSES = ['active', 'on_leave', 'terminated'];
-const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'];
 
 /** Contact fields a client may write when creating/attaching an employee (mirrors crm-api's
  * CONTACT_WRITABLE_COLUMNS, HR-relevant subset). Identity/trust fields are never accepted here. */
@@ -210,9 +213,9 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
       case 'create-employee': {
         requireManage();
         const empFields = pick(body, EMPLOYEE_WRITABLE);
-        if (empFields.employment_type && !EMPLOYMENT_TYPES.includes(String(empFields.employment_type)))
+        if (empFields.employment_type && !isEmploymentType(String(empFields.employment_type)))
           return json({ error: 'invalid employment_type' }, 400);
-        if (empFields.status && !EMPLOYEE_STATUSES.includes(String(empFields.status)))
+        if (empFields.status && !isEmployeeStatus(String(empFields.status)))
           return json({ error: 'invalid status' }, 400);
         if (empFields.ergani_e3 !== undefined) empFields.ergani_e3 = normalizeErganiFields(empFields.ergani_e3);
 
@@ -273,9 +276,9 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         const id = String(body?.employee_id ?? '');
         if (!id) return json({ error: 'employee_id is required' }, 400);
         const empFields = pick(body, EMPLOYEE_WRITABLE);
-        if (empFields.employment_type && !EMPLOYMENT_TYPES.includes(String(empFields.employment_type)))
+        if (empFields.employment_type && !isEmploymentType(String(empFields.employment_type)))
           return json({ error: 'invalid employment_type' }, 400);
-        if (empFields.status && !EMPLOYEE_STATUSES.includes(String(empFields.status)))
+        if (empFields.status && !isEmployeeStatus(String(empFields.status)))
           return json({ error: 'invalid status' }, 400);
         if (empFields.ergani_e3 !== undefined) empFields.ergani_e3 = normalizeErganiFields(empFields.ergani_e3);
         if (empFields.manager_contact_id) {
@@ -329,7 +332,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
         const endDate = String(body?.end_date ?? '');
         const absenceType = String(body?.absence_type ?? 'other');
         if (!employeeId || !startDate || !endDate) return json({ error: 'employee_id, start_date and end_date are required' }, 400);
-        if (!ABSENCE_TYPES.includes(absenceType)) return json({ error: 'invalid absence_type' }, 400);
+        if (!isAbsenceType(absenceType)) return json({ error: 'invalid absence_type' }, 400);
         if (endDate < startDate) return json({ error: 'end_date must be on or after start_date' }, 400);
 
         // Employee must belong to this workspace.

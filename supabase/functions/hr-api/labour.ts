@@ -1,3 +1,12 @@
+// The HR value-sets come from the generated mirror of `src/modules/hr/hrVocabulary.ts`
+// (#391). They were declared inline here and in nine other files; the DB CHECK
+// constraints are the enforcer and the source equals them exactly. Do not re-declare —
+// `npm run vocab:mirror` regenerates the mirror and vocabularyMirrors.test.ts fails the
+// build on drift.
+export { SEPARATION_TYPES } from '../_shared/hrVocabulary.generated.ts';
+// Also imported: a re-export does not bind the name locally.
+import { SEPARATION_TYPES, isSeparationType } from '../_shared/hrVocabulary.generated.ts';
+import type { SeparationType } from '../_shared/hrVocabulary.generated.ts';
 // deno-lint-ignore-file no-explicit-any
 // Labour records that back the Ergani Ε-documents: separations (Ε5/Ε6/Ε7), overtime (Ε8) and
 // work schedules (Ε4). Plain CRUD only — the filing itself lives in ergani.ts, so a workspace with
@@ -11,7 +20,6 @@ import { HttpError } from '../_shared/api-logger.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import type { Ctx } from './expansion.ts';
 
-export const SEPARATION_TYPES = ['voluntary', 'termination', 'expiry'] as const;
 const SEPARATION_WRITABLE = [
   'separation_type', 'effective_date', 'notice_date', 'reason', 'severance_amount', 'note',
 ] as const;
@@ -95,7 +103,9 @@ function displayName(row: any): string {
 }
 
 /** voluntary → Ε5, termination → Ε6, expiry → Ε7. Carried on the event so a flow can branch on it. */
-const SEPARATION_CODES: Record<string, string> = { voluntary: 'E5', termination: 'E6', expiry: 'E7' };
+// Keyed by the vocabulary, not by `string` (#391): a new separation type then fails to
+    // compile here instead of silently producing an undefined Ergani document code.
+    const SEPARATION_CODES: Record<SeparationType, string> = { voluntary: 'E5', termination: 'E6', expiry: 'E7' };
 
 /** A submitted filing is the government's copy — editing or deleting our record would desync it. */
 function assertDraft(row: any, what: string): void {
@@ -128,7 +138,7 @@ export async function handleLabour(action: string, ctx: Ctx): Promise<Response |
       if (!employeeId) return json({ error: 'employee_id is required' }, 400);
       await assertEmployee(ctx, employeeId);
       const payload = pick(body, SEPARATION_WRITABLE);
-      if (!SEPARATION_TYPES.includes(String(payload.separation_type) as any)) {
+      if (!isSeparationType(String(payload.separation_type))) {
         return json({ error: `separation_type must be one of ${SEPARATION_TYPES.join(', ')}` }, 400);
       }
       payload.effective_date = assertDate(payload.effective_date, 'effective_date');
@@ -142,7 +152,11 @@ export async function handleLabour(action: string, ctx: Ctx): Promise<Response |
       // never block the write on notification delivery.
       try {
         const name = displayName(data);
-        const code = SEPARATION_CODES[String(data.separation_type)] ?? '';
+        // Narrowed through the guard rather than indexed with a bare string: the map is
+        // keyed by the vocabulary now, so an unknown value is answered here instead of
+        // yielding `undefined` and an empty Ergani code.
+        const sepType = String(data.separation_type);
+        const code = isSeparationType(sepType) ? SEPARATION_CODES[sepType] : '';
         await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.departure_recorded',
           (recipientUserId) => ({
             user_id: recipientUserId, workspace_id: workspaceId, type: 'hr.departure_recorded',
