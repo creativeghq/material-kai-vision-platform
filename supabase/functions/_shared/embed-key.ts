@@ -125,11 +125,15 @@ export async function authenticateEmbedKey(
   const key = readEmbedKey(req);
   if (!key) return { ok: false, response: readableRefusal(req, 'Missing embed key', 401) };
 
-  const { data: row, error } = await supabase
-    .from('material_kai_keys')
-    .select('id, workspace_id, is_active, expires_at, allowed_origins, rate_limit_per_minute, scope_type, scope_values')
-    .eq('api_key', key)
-    .maybeSingle();
+  // One verifier, in SQL (#390). `material_kai_keys.api_key` held the credential in
+  // directly usable form and this compared against it in plaintext. It is hashed now and
+  // the column is gone, so the comparison lives in `verify_embed_key` rather than being
+  // reimplemented in each of the three edge functions that do this.
+  //
+  // The RPC returns metadata only. is_active / expires_at / allowed_origins are still
+  // enforced below: it answers "which key is this", not "may it do that".
+  const { data: rows, error } = await supabase.rpc('verify_embed_key', { p_key: key });
+  const row = Array.isArray(rows) ? rows[0] : rows;
 
   // One indistinguishable answer for unknown / disabled / expired, so the endpoint cannot be used
   // to test which keys exist.

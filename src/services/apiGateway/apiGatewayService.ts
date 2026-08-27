@@ -4,7 +4,8 @@ export interface ApiKey {
   id: string;
   user_id?: string;
   key_name: string;
-  api_key: string;
+  /** First 12 characters, for display. The rest is not stored anywhere (#390). */
+  key_prefix?: string;
   is_active: boolean;
   rate_limit_override?: number;
   allowed_endpoints?: string[];
@@ -34,12 +35,23 @@ export interface ApiUsageLog {
  *  every request; no admin view needs more than this at once. */
 const DEFAULT_USAGE_LOG_LIMIT = 500;
 
+//: The columns a LIST needs. Deliberately not `select('*')` (#390): that returned
+//: `api_key`, which held the credential in directly usable form — so a global admin
+//: calling `getAllApiKeys()` dumped every partner's working key into a browser, and a
+//: user's own key came back on every list rather than once at creation.
+//:
+//: The column is hashed and `key_prefix` is what a human identifies a key by. Naming
+//: the columns is also what makes the next column added to this table a decision
+//: rather than an automatic disclosure.
+const API_KEY_LIST_COLUMNS =
+  'id, user_id, key_name, key_prefix, is_active, rate_limit_override, allowed_endpoints, expires_at, last_used_at, created_at, updated_at';
+
 class ApiGatewayService {
   // ============= API Keys Management =============
   async getUserApiKeys(userId: string): Promise<ApiKey[]> {
     const { data, error } = await supabase
       .from('api_keys')
-      .select('*')
+      .select(API_KEY_LIST_COLUMNS)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -50,7 +62,7 @@ class ApiGatewayService {
   async getAllApiKeys(): Promise<ApiKey[]> {
     const { data, error } = await supabase
       .from('api_keys')
-      .select('*')
+      .select(API_KEY_LIST_COLUMNS)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -66,23 +78,44 @@ class ApiGatewayService {
       expiresAt?: string;
     },
   ): Promise<ApiKey> {
-    const apiKey = `kai_${this.generateSecureKey(32)}`;
-
-    const { data, error } = await supabase
-      .from('api_keys')
-      .insert({
-        user_id: userId,
-        key_name: keyName,
-        api_key: apiKey,
-        rate_limit_override: options?.rateLimit,
-        allowed_endpoints: options?.allowedEndpoints,
-        expires_at: options?.expiresAt,
-      })
-      .select()
-      .single();
+    // Generated and hashed IN THE DATABASE (#390), so the plaintext exists in exactly
+    // one place for exactly one statement and is returned to the caller ONCE. It cannot
+    // be shown again, which is the property that makes hashing worth anything — a key
+    // that can be re-read on demand is a plaintext key with extra steps.
+    //
+    // `generateSecureKey` is gone with the client-side generation it served.
+    const { data, error } = await supabase.rpc('create_api_key', {
+      p_user_id: userId,
+      p_key_name: keyName,
+      p_allowed_endpoints: options?.allowedEndpoints ?? null,
+      p_expires_at: options?.expiresAt ?? null,
+    });
 
     if (error) throw error;
-    return data;
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { id: string; api_key: string; key_prefix: string }
+      | undefined;
+    if (!row) throw new Error('create_api_key returned no row');
+
+    // `rate_limit_override` is not part of the RPC's signature; set it separately when
+    // asked for, rather than widening a security-definer function for a tuning knob.
+    if (options?.rateLimit != null) {
+      await supabase
+        .from('api_keys')
+        .update({ rate_limit_override: options.rateLimit })
+        .eq('id', row.id);
+    }
+
+    return {
+      id: row.id,
+      key_name: keyName,
+      key_prefix: row.key_prefix,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      /** Present ONLY on the response that created it. Never returned by any list. */
+      plaintextOnce: row.api_key,
+    } as ApiKey & { plaintextOnce: string };
   }
 
   async revokeApiKey(id: string): Promise<void> {
@@ -149,16 +182,21 @@ class ApiGatewayService {
     return rows;
   }
 
-  // ============= Utility Functions =============
-  private generateSecureKey(length: number): string {
-    const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
+  // `generateSecureKey` was deleted here (#390), and it is worth saying why rather than
+  // just that it moved.
+  //
+  // It was named "secure" and built the key from `Math.random()`:
+  //
+  //     result += chars.charAt(Math.floor(Math.random() * chars.length));
+  //
+  // `Math.random()` is not a CSPRNG. V8 seeds it from a 128-bit xorshift state that an
+  // attacker who observes enough output can recover, and it was never intended to
+  // produce secrets. So the partner keys issued by this method are not merely stored in
+  // plaintext — they are PREDICTABLE, which is why hashing them is necessary but not
+  // sufficient and the live keys need rotating rather than just re-storing.
+  //
+  // Generation now happens in `create_api_key`, which uses `gen_random_bytes` — a real
+  // CSPRNG — and never lets the plaintext leave the one statement that returns it.
 }
 
 export const apiGatewayService = new ApiGatewayService();

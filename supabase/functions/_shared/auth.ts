@@ -352,11 +352,17 @@ async function validatePartnerApiKey(
   token: string,
 ): Promise<AuthResult> {
   try {
-    const { data: row, error } = await adminClient
-      .from('api_keys')
-      .select('id, user_id, is_active, expires_at, allowed_endpoints, rate_limit_override')
-      .eq('api_key', token)
-      .maybeSingle();
+    // One verifier, in SQL (#390). `api_keys.api_key` used to hold the credential in
+    // directly usable form and this compared against it in plaintext. It is hashed now,
+    // and the comparison lives in `verify_api_key` rather than being reimplemented in
+    // Python, in four edge functions and in the browser — five implementations of "hash
+    // it the same way" is five chances to disagree about encoding, and disagreeing here
+    // is a total auth failure, or worse a silent mismatch on one runtime only.
+    //
+    // The RPC returns metadata only. `is_active` / `expires_at` / `allowed_endpoints`
+    // are still checked HERE: it answers "which key is this", not "may it do that".
+    const { data: rows, error } = await adminClient.rpc('verify_api_key', { p_key: token });
+    const row = Array.isArray(rows) ? rows[0] : rows;
 
     if (error || !row || !row.is_active) {
       return {

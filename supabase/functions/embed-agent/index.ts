@@ -80,13 +80,15 @@ Deno.serve(withApiLogging((req) => {
         },
       });
     }
-    const { data } = await supabase
-      .from('material_kai_keys')
-      .select('allowed_origins')
-      .eq('api_key', key)
-      .eq('is_active', true)
-      .maybeSingle();
-    const cors = embedCorsHeaders(req, (data?.allowed_origins as string[] | null) ?? null);
+    // Resolved through the one verifier (#390); the plaintext column is gone.
+    const { data: originRows } = await supabase.rpc('verify_embed_key', { p_key: key });
+    const data = (Array.isArray(originRows) ? originRows[0] : originRows) as
+      | { allowed_origins: string[] | null; is_active: boolean }
+      | null;
+    const cors = embedCorsHeaders(
+      req,
+      data?.is_active ? ((data.allowed_origins as string[] | null) ?? null) : null,
+    );
     return new Response(null, { status: cors ? 200 : 403, headers: cors ?? { 'Vary': 'Origin' } });
   }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Eye, EyeOff, Copy, Shield, Trash2, Lock, Megaphone } from 'lucide-react';
+import { Crown, Check, ExternalLink, Loader2, Key, Plus, X, Copy, Shield, Trash2, Lock, Megaphone } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -39,7 +39,9 @@ export const SubscriptionTab: React.FC = () => {
   const [generatingKey, setGeneratingKey] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [showNewKeyForm, setShowNewKeyForm] = useState(false);
-  const [revealedKeyId, setRevealedKeyId] = useState<string | null>(null);
+  // The plaintext key, held ONLY for the render that follows its creation (#390). It is
+  // not stored anywhere and cannot be fetched again — the list returns a prefix.
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean } | null>(null);
@@ -99,7 +101,9 @@ export const SubscriptionTab: React.FC = () => {
       setApiKeys((prev) => [key, ...prev]);
       setNewKeyName('');
       setShowNewKeyForm(false);
-      setRevealedKeyId(key.id);
+      // The promise below used to be aspirational — the list returned the plaintext on
+      // every read, so the key was shown in full every time. It is true now (#390).
+      setNewlyCreatedKey((key as { plaintextOnce?: string }).plaintextOnce ?? null);
       toast({ title: 'API Key Created', description: 'Copy it now — it won\'t be shown in full again.' });
     } catch {
       toast({ title: 'Error', description: 'Failed to generate API key.', variant: 'destructive' });
@@ -118,29 +122,32 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
-  const copyApiKey = (key: ApiKey) => {
-    navigator.clipboard.writeText(key.api_key);
-    setCopiedKeyId(key.id);
-    setTimeout(() => setCopiedKeyId(null), 2000);
-  };
-
-  const maskKey = (k: string) => k.length <= 8 ? k : k.slice(0, 4) + '••••••••••••••••' + k.slice(-4);
 
   const testApiKey = async (key: ApiKey) => {
     setTestingKeyId(key.id);
     setTestResult(null);
     try {
+      // Looked up by `key.api_key` before (#390) — which required the list to return
+      // the plaintext credential, for a check that could only ever confirm what the
+      // caller already had in hand. The row's own `is_active` is the same answer.
+      //
+      // Verification against the real credential is deliberately NOT possible from the
+      // browser: `verify_api_key` takes a candidate key, so an anon- or
+      // authenticated-executable version would be an oracle confirming whether a
+      // guessed key exists. This reports STATUS, and the copy below says so.
       const { data, error } = await supabase
         .from('api_keys')
-        .select('id, is_active')
-        .eq('api_key', key.api_key)
-        .eq('is_active', true)
+        .select('id, is_active, expires_at')
+        .eq('id', key.id)
         .maybeSingle();
-      const ok = !error && !!data;
+      const notExpired = !data?.expires_at || new Date(data.expires_at) > new Date();
+      const ok = !error && !!data?.is_active && notExpired;
       setTestResult({ id: key.id, ok });
       toast({
-        title: ok ? 'Key Verified' : 'Key Invalid',
-        description: ok ? 'Your API key is active and valid.' : 'This key could not be verified.',
+        title: ok ? 'Key Active' : 'Key Inactive',
+        description: ok
+          ? 'This key is active and has not expired.'
+          : 'This key is revoked or expired.',
         variant: ok ? 'default' : 'destructive',
       });
       setTimeout(() => setTestResult(null), 5000);
@@ -350,6 +357,36 @@ export const SubscriptionTab: React.FC = () => {
             </div>
           ) : (
             <>
+              {newlyCreatedKey && (
+                <div className="p-3 border border-hairline rounded-sm bg-surface-sunken space-y-2">
+                  <p className="text-sm font-semibold">
+                    Copy this key now — it cannot be shown again
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs font-mono break-all">{newlyCreatedKey}</code>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newlyCreatedKey);
+                        setCopiedKeyId('new');
+                        setTimeout(() => setCopiedKeyId(null), 2000);
+                      }}
+                    >
+                      {copiedKeyId === 'new'
+                        ? <Check className="h-3.5 w-3.5" />
+                        : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setNewlyCreatedKey(null)}>
+                      Done
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Only a hash is stored. If it is lost, revoke this key and issue another.
+                  </p>
+                </div>
+              )}
+
               {showNewKeyForm && (
                 <div className="flex gap-2 pb-2">
                   <Input
@@ -388,9 +425,13 @@ export const SubscriptionTab: React.FC = () => {
                               <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Revoked</Badge>
                             )}
                           </div>
+                          {/* Hashed (#390) — `key_prefix` is what identifies a key to a
+                              human. The reveal and copy buttons went with the value they
+                              served: a key that can be re-read on demand is a plaintext
+                              key with extra steps. Shown in full once, at creation. */}
                           <p className="text-xs text-muted-foreground font-mono">
                             {key.is_active
-                              ? (revealedKeyId === key.id ? key.api_key : maskKey(key.api_key))
+                              ? `${key.key_prefix ?? 'kai_'}${'•'.repeat(24)}`
                               : '— revoked —'}
                           </p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -402,12 +443,6 @@ export const SubscriptionTab: React.FC = () => {
                       </div>
                       {key.is_active && (
                         <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
-                            {revealedKeyId === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => copyApiKey(key)}>
-                            {copiedKeyId === key.id ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"

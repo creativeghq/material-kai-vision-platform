@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus,
-  Eye,
-  EyeOff,
   Key,
   Activity,
   Copy,
-  Check,
   Settings,
   Loader2,
   Trash2,
@@ -76,8 +73,10 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyUserId, setNewKeyUserId] = useState('');
   const [generatingKey, setGeneratingKey] = useState(false);
-  const [revealedKeyId, setRevealedKeyId] = useState<string | null>(null);
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  // The plaintext key, held ONLY for the render that follows its creation (#390). It is
+  // not stored anywhere and cannot be fetched again — this is the single moment it
+  // exists outside the caller's clipboard.
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
 
   // Analytics
   const [analyticsData, setAnalyticsData] = useState<{
@@ -175,7 +174,9 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
       setNewKeyName('');
       setNewKeyUserId('');
       setShowGenerateForm(false);
-      setRevealedKeyId(key.id);
+      // This toast's promise used to be aspirational — the list returned the plaintext
+      // on every read, so the key was shown in full every time. It is true now (#390).
+      setNewlyCreatedKey((key as { plaintextOnce?: string }).plaintextOnce ?? null);
       toast.success('API key generated. Copy it now — it won\'t be shown in full again.');
     } catch {
       toast.error('Failed to generate API key');
@@ -194,13 +195,6 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
     }
   };
 
-  const handleCopyKey = (key: ApiKey) => {
-    navigator.clipboard.writeText(key.api_key);
-    setCopiedKeyId(key.id);
-    setTimeout(() => setCopiedKeyId(null), 2000);
-  };
-
-  const maskKey = (key: string) => key.length <= 8 ? key : key.slice(0, 4) + '••••••••••••••••' + key.slice(-4);
 
   if (loading) {
     return (
@@ -256,6 +250,33 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {newlyCreatedKey && (
+                  <div className="p-4 border border-hairline rounded-sm bg-surface-sunken space-y-2">
+                    <p className="text-sm font-semibold">
+                      Copy this key now — it cannot be shown again
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-sm font-mono break-all">{newlyCreatedKey}</code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(newlyCreatedKey);
+                          toast.success('Copied');
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" /> Copy
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setNewlyCreatedKey(null)}>
+                        Done
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Only a hash is stored. If it is lost, revoke this key and issue another.
+                    </p>
+                  </div>
+                )}
+
                 {showGenerateForm && (
                   <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -316,9 +337,14 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                               <Badge variant="outline" className="text-xs">{key.rate_limit_override} req/min</Badge>
                             )}
                           </div>
+                          {/* The key itself is no longer readable — it is hashed (#390). `key_prefix`
+                              is what a human identifies a key by; the reveal and copy
+                              buttons went with the value they served, because a key that
+                              can be re-read on demand is a plaintext key with extra
+                              steps. The full value is shown once, at creation. */}
                           <p className="text-sm font-mono text-muted-foreground">
                             {key.is_active
-                              ? (revealedKeyId === key.id ? key.api_key : maskKey(key.api_key))
+                              ? `${key.key_prefix ?? 'kai_'}${'•'.repeat(24)}`
                               : '— revoked —'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -329,16 +355,6 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                           </p>
                         </div>
                         <div className="flex items-center gap-1 ml-3 shrink-0">
-                          {key.is_active && (
-                            <>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRevealedKeyId(revealedKeyId === key.id ? null : key.id)}>
-                                {revealedKeyId === key.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyKey(key)}>
-                                {copiedKeyId === key.id ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                              </Button>
-                            </>
-                          )}
                           <Sheet>
                             <SheetTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedApiKey(key)}>
