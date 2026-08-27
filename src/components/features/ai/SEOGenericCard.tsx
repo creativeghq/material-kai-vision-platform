@@ -26,7 +26,20 @@
  *   - seo_llm_mentions_card
  *   - seo_youtube_card / seo_local_pack_card / seo_trends_card
  *   - seo_site_review_card / seo_brand_audit_card
+ *   - seo_gsc_striking_distance_card / seo_gsc_movers_card
+ *   - seo_onpage_issues_card
+ *   - seo_backlinks_timeseries_card / seo_backlinks_competitors_card
+ *   - seo_historical_rank_card / seo_keywords_for_site_card
+ *   - seo_keyword_ideas_card / seo_related_keywords_card / seo_search_volume_card
+ *   - seo_domain_intersection_card
+ *   - seo_ai_overview_card / seo_google_maps_card / seo_gbp_info_card
  *   - seo_dataforseo_raw_card (escape-hatch fallback)
+ *
+ * Every `seo_*_card` chunk AgentHub emits must have a branch here. There is no
+ * second dispatch table: AGENT_RESULT_TITLES is never consulted for these types,
+ * because the `seo_*_card` branch in AgentHub catches them first. A missing
+ * branch is therefore not a missing title — it is a raw JSON dump in the user's
+ * chat. Guarded by tests/unit/seoCardCoverage.test.ts.
  */
 
 import type { ReactNode } from 'react';
@@ -100,7 +113,9 @@ function Pill({ children, tone }: { children: React.ReactNode; tone?: 'green' | 
     : tone === 'red' ? `bg-red-500/10 border border-red-500/20 ${BAD}`
     : tone === 'blue' ? 'bg-primary/10 border border-primary/20 text-primary'
     : 'bg-muted border border-border text-muted-foreground';
-  return <span className={`text-[11px] rounded-full px-2 py-0.5 ${cls}`}>{children}</span>;
+  // `rounded-sm`, not `rounded-full`: a chip is not a status pip. The design
+  // system reserves the pill silhouette for avatars, dots and pips.
+  return <span className={`text-[11px] rounded-sm px-2 py-0.5 ${cls}`}>{children}</span>;
 }
 
 function ItemList({ rows, max = 8 }: { rows: Array<{ left: string; right?: string; sub?: string; href?: string }>; max?: number }) {
@@ -1009,6 +1024,463 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
               <Pill key={i}>{it.category_name || it.name}</Pill>
             ))}
           </div>
+        )}
+      </Card>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Wave 4 — the fourteen card types that had no renderer.
+  //
+  // All fourteen were listed in AGENT_RESULT_TITLES, which reads like coverage
+  // and is not: AgentHub routes EVERY `seo_*_card` chunk to this component
+  // before that map is ever consulted, so a type with no branch here fell
+  // through to the bottom-of-file fallback and the user got a raw
+  // `JSON.stringify(data)` dump in the chat. Among them were the most valuable
+  // tools in the toolkit — AI Overview, Search Console striking-distance,
+  // keyword ideas, search volume.
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── Search Console: striking distance ─────────────────
+  if (t === 'seo_gsc_striking_distance_card') {
+    const items: any[] = data.items || [];
+    return (
+      <Card>
+        <Header
+          icon="🎯"
+          title={`Striking distance — ${data.website}`}
+          subtitle={`${items.length} queries · last ${data.days ?? 28} days`}
+        />
+        <Primer>
+          Queries you already rank for at positions 8–20 that people are genuinely searching. These are the
+          cheapest wins available: Google already considers the page relevant, it just is not on page one yet.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>No queries sit in the 8–20 band right now — nothing is one nudge away from page one.</Empty>
+        ) : (
+          <ItemList
+            max={12}
+            rows={items.map((i: any) => ({
+              left: i.query,
+              right: i.position != null ? `#${Math.round(i.position)}` : undefined,
+              sub: `${fmtNum(i.impressions)} impressions · ${fmtPct(i.ctr)} CTR${i.clicks != null ? ` · ${fmtNum(i.clicks)} clicks` : ''}`,
+            }))}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Search Console: movers ────────────────────────────
+  if (t === 'seo_gsc_movers_card') {
+    const items: any[] = data.items || [];
+    const gains = items.filter((i: any) => Number(i.delta) > 0);
+    const drops = items.filter((i: any) => Number(i.delta) < 0);
+    const row = (i: any) => ({
+      left: i.query,
+      right: `${Number(i.delta) > 0 ? '+' : ''}${Number(i.delta).toFixed(1)}`,
+      sub: `now #${Math.round(i.position_now)}${i.position_before != null ? ` · was #${Math.round(i.position_before)}` : ''}`,
+    });
+    return (
+      <Card>
+        <Header icon="📈" title={`Rank movers — ${data.website}`} subtitle={`last ${data.days ?? 28} days vs the period before`} />
+        <Primer>
+          Average-position swings against the immediately-prior window. A positive number means the query moved
+          UP toward #1. Read the drops first — they are usually a page that changed, or a competitor that
+          published.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>Nothing moved materially in this window.</Empty>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <div className={`text-[11px] font-medium mb-1 ${GOOD}`}>Gained ({gains.length})</div>
+              {gains.length === 0 ? <Empty>None.</Empty> : <ItemList rows={gains.map(row)} max={6} />}
+            </div>
+            <div>
+              <div className={`text-[11px] font-medium mb-1 ${BAD}`}>Slipped ({drops.length})</div>
+              {drops.length === 0 ? <Empty>None.</Empty> : <ItemList rows={drops.map(row)} max={6} />}
+            </div>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  // ── On-page crawl issues ──────────────────────────────
+  if (t === 'seo_onpage_issues_card') {
+    const items: any[] = data.items || [];
+    const kind = String(data.issue_type || '').replace(/_/g, ' ');
+    return (
+      <Card>
+        <Header icon="🔧" title={`Site audit — ${kind}`} subtitle={`${items.length} affected pages`} />
+        <Primer>
+          Pages from the finished crawl matching this issue. Technical problems compound: one broken redirect
+          chain can hide a whole section of the site from Google.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>No pages hit this issue — that part of the crawl came back clean.</Empty>
+        ) : (
+          <ItemList
+            max={12}
+            rows={items.map((i: any) => ({
+              left: i.url || i.page_address || i.title || i.from_url || '(no URL)',
+              href: i.url || i.page_address || i.from_url,
+              right: i.status_code != null ? String(i.status_code) : undefined,
+              sub: i.title || i.meta?.title || i.location || i.to_url || undefined,
+            }))}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Backlinks over time ───────────────────────────────
+  if (t === 'seo_backlinks_timeseries_card') {
+    const items: any[] = data.items || [];
+    const first: any = items[0] || {};
+    const last: any = items[items.length - 1] || {};
+    const a = Number(first.referring_domains);
+    const b = Number(last.referring_domains);
+    const rdGrowth = Number.isFinite(a) && Number.isFinite(b) ? b - a : null;
+    return (
+      <Card>
+        <Header icon="🔗" title={`Backlink history — ${data.target}`} subtitle={`${items.length} monthly points`} />
+        <Primer>
+          How the link profile has grown or decayed month by month. Velocity matters more than the total: a site
+          adding domains steadily is trusted differently from one that spiked once and stalled.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>No history returned for this domain — usually means too few links to plot.</Empty>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="Referring domains" value={fmtNum(last.referring_domains)} />
+              <Stat label="Backlinks" value={fmtNum(last.backlinks)} />
+              <Stat
+                label="Domains gained"
+                value={rdGrowth == null ? '—' : <span className={rdGrowth >= 0 ? GOOD : BAD}>{rdGrowth >= 0 ? '+' : ''}{fmtNum(rdGrowth)}</span>}
+              />
+            </div>
+            <ItemList
+              max={6}
+              rows={items.slice(-6).reverse().map((i: any) => ({
+                left: i.date || `${i.year}-${String(i.month).padStart(2, '0')}`,
+                right: `${fmtNum(i.referring_domains)} domains`,
+                sub: `${fmtNum(i.backlinks)} backlinks${i.rank != null ? ` · rank ${i.rank}` : ''}`,
+              }))}
+            />
+          </>
+        )}
+      </Card>
+    );
+  }
+
+  // ── Backlink competitors ──────────────────────────────
+  if (t === 'seo_backlinks_competitors_card') {
+    const items: any[] = data.items || [];
+    return (
+      <Card>
+        <Header icon="⚔️" title={`Link competitors — ${data.target}`} subtitle={`${items.length} domains`} />
+        <Primer>
+          Domains sharing the most referring sites with you. These are the real link-building rivals — and every
+          domain linking to them but not to you is a warm prospect.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>No overlapping link profiles found.</Empty>
+        ) : (
+          <ItemList
+            max={10}
+            rows={items.map((i: any) => ({
+              left: i.target || i.domain,
+              right: i.intersections != null ? `${fmtNum(i.intersections)} shared` : undefined,
+              sub: `${fmtNum(i.backlinks)} backlinks${i.rank != null ? ` · rank ${i.rank}` : ''}`,
+            }))}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Historical rank overview ──────────────────────────
+  if (t === 'seo_historical_rank_card') {
+    const items: any[] = data.items || [];
+    const point = (i: any) => i?.metrics?.organic || i?.organic || i || {};
+    const last = point(items[items.length - 1]);
+    return (
+      <Card>
+        <Header icon="🕰" title={`Visibility history — ${data.domain}`} subtitle={`${items.length} monthly points`} />
+        <Primer>
+          Ranking keywords and estimated traffic month by month — the rank-tracker view Search Console cannot
+          give you, because it only reports queries you already earn impressions for.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>No historical data for this domain in the selected market.</Empty>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="Keywords" value={fmtNum(last.count)} />
+              <Stat label="Est. traffic" value={fmtNum(last.etv)} />
+              <Stat label="Traffic value" value={last.estimated_paid_traffic_cost != null ? `$${fmtNum(last.estimated_paid_traffic_cost)}` : '—'} />
+            </div>
+            <ItemList
+              max={6}
+              rows={items.slice(-6).reverse().map((i: any) => {
+                const m = point(i);
+                return {
+                  left: i.date || `${i.year}-${String(i.month).padStart(2, '0')}`,
+                  right: `${fmtNum(m.count)} keywords`,
+                  sub: `${fmtNum(m.etv)} est. visits`,
+                };
+              })}
+            />
+          </>
+        )}
+      </Card>
+    );
+  }
+
+  // ── Keyword universe for a site ───────────────────────
+  if (t === 'seo_keywords_for_site_card') {
+    const items: any[] = data.items || [];
+    const kw = (i: any) => i?.keyword_data?.keyword ?? i?.keyword ?? '';
+    const vol = (i: any) => i?.keyword_data?.keyword_info?.search_volume ?? i?.search_volume;
+    const pos = (i: any) => i?.ranked_serp_element?.serp_item?.rank_absolute ?? i?.rank_absolute ?? i?.position;
+    const totalVol = items.reduce((s: number, i: any) => s + (Number(vol(i)) || 0), 0);
+    return (
+      <Card>
+        <Header icon="🌐" title={`Keyword universe — ${data.domain}`} subtitle={`${items.length} keywords · ${fmtNum(totalVol)} monthly searches`} />
+        <Primer>
+          Everything the domain ranks for across positions 1–100, including the deep rankings Search Console
+          buries. This is the full organic footprint, not just the part already earning clicks.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>The domain does not rank in the top 100 for any keyword in this market yet.</Empty>
+        ) : (
+          <ItemList
+            max={12}
+            rows={items.map((i: any) => ({
+              left: kw(i),
+              right: pos(i) != null ? `#${pos(i)}` : undefined,
+              sub: `${fmtNum(vol(i))}/mo${i?.keyword_data?.keyword_info?.cpc != null ? ` · $${Number(i.keyword_data.keyword_info.cpc).toFixed(2)} CPC` : ''}`,
+            }))}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Keyword ideas / related keywords / search volume ──
+  if (t === 'seo_keyword_ideas_card' || t === 'seo_related_keywords_card' || t === 'seo_search_volume_card') {
+    const items: any[] = data.items || [];
+    const kw = (i: any) => i?.keyword_data?.keyword ?? i?.keyword ?? '';
+    const info = (i: any) => i?.keyword_data?.keyword_info ?? i?.keyword_info ?? i ?? {};
+    const kd = (i: any) =>
+      i?.keyword_data?.keyword_properties?.keyword_difficulty ?? i?.keyword_properties?.keyword_difficulty ?? i?.keyword_difficulty;
+    const intent = (i: any) =>
+      i?.keyword_data?.search_intent_info?.main_intent ?? i?.search_intent_info?.main_intent;
+    const totalVol = items.reduce((s: number, i: any) => s + (Number(info(i).search_volume) || 0), 0);
+
+    const heading =
+      t === 'seo_keyword_ideas_card'
+        ? { icon: '💡', title: `Keyword ideas — ${(data.seeds || []).join(', ')}` }
+        : t === 'seo_related_keywords_card'
+          ? { icon: '🔀', title: `Related to "${data.keyword}"` }
+          : { icon: '📊', title: 'Search volume & CPC' };
+
+    const primer =
+      t === 'seo_keyword_ideas_card'
+        ? 'Keywords Google associates with your seeds, ranked by demand. Volume is the size of the prize; difficulty is whether it is winnable.'
+        : t === 'seo_related_keywords_card'
+          ? 'Semantically related queries — the vocabulary real searchers use for this topic. Covering them on one strong page usually beats one page each.'
+          : 'Monthly demand and paid cost per keyword. A high CPC is a good sign: someone is paying for these clicks, which means they convert.';
+
+    return (
+      <Card>
+        <Header icon={heading.icon} title={heading.title} subtitle={`${items.length} keywords · ${fmtNum(totalVol)} monthly searches`} />
+        <Primer>{primer}</Primer>
+        {items.length === 0 ? (
+          <Empty>No keywords came back for this query in the selected market.</Empty>
+        ) : (
+          <ItemList
+            max={14}
+            rows={items.map((i: any) => {
+              const inf = info(i);
+              const bits = [
+                inf.search_volume != null ? `${fmtNum(inf.search_volume)}/mo` : null,
+                inf.cpc != null ? `$${Number(inf.cpc).toFixed(2)} CPC` : null,
+                kd(i) != null ? `KD ${kd(i)}` : null,
+                intent(i) || null,
+              ].filter(Boolean);
+              return {
+                left: kw(i),
+                right: inf.search_volume != null ? fmtNum(inf.search_volume) : undefined,
+                sub: bits.join(' · ') || undefined,
+              };
+            })}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Domain keyword intersection ───────────────────────
+  if (t === 'seo_domain_intersection_card') {
+    const items: any[] = data.items || [];
+    const rank = (el: any) => el?.rank_absolute ?? el?.rank_group;
+    return (
+      <Card>
+        <Header icon="🔎" title={`${data.target1} vs ${data.target2}`} subtitle={`${items.length} shared keywords`} />
+        <Primer>
+          Keywords BOTH domains rank for, with each position side by side. Where they beat you on a keyword you
+          already rank for, the page exists — it just needs to be better.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>These two domains do not compete on any keyword in this market.</Empty>
+        ) : (
+          <ItemList
+            max={12}
+            rows={items.map((i: any) => {
+              const a = rank(i.first_domain_serp_element);
+              const b = rank(i.second_domain_serp_element);
+              const lead = a != null && b != null ? (a < b ? data.target1 : a > b ? data.target2 : 'tied') : null;
+              return {
+                left: i?.keyword_data?.keyword ?? i?.keyword ?? '',
+                right: `${a != null ? `#${a}` : '—'} vs ${b != null ? `#${b}` : '—'}`,
+                sub:
+                  [
+                    i?.keyword_data?.keyword_info?.search_volume != null
+                      ? `${fmtNum(i.keyword_data.keyword_info.search_volume)}/mo`
+                      : null,
+                    lead && lead !== 'tied' ? `${lead} ahead` : lead,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || undefined,
+              };
+            })}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Google AI Overview ────────────────────────────────
+  if (t === 'seo_ai_overview_card') {
+    const items: any[] = data.items || [];
+    const block: any = items.find((i: any) => i?.type === 'ai_overview') || items[0] || {};
+    const refs: any[] = block.references || block.items || [];
+    const text: string =
+      block.text ||
+      (Array.isArray(block.items) ? block.items.map((x: any) => x?.text).filter(Boolean).join(' ') : '') ||
+      '';
+    const present = !!text || refs.length > 0;
+    return (
+      <Card>
+        <Header
+          icon="✨"
+          title={`AI Overview — "${data.keyword}"`}
+          subtitle={present ? `${refs.length} cited sources` : 'not shown for this query'}
+        />
+        <Primer>
+          When Google answers a query itself, ranking #1 stops guaranteeing the click. What matters instead is
+          being one of the sources it cites.
+        </Primer>
+        {!present ? (
+          <Empty>
+            Google is not generating an AI Overview for this keyword — a strong organic position still earns the
+            click here.
+          </Empty>
+        ) : (
+          <>
+            {text && (
+              <p className="text-xs leading-relaxed text-muted-foreground border-l-2 border-primary/40 pl-2">
+                {text.slice(0, 600)}
+                {text.length > 600 ? '…' : ''}
+              </p>
+            )}
+            {refs.length > 0 && (
+              <ItemList
+                max={8}
+                rows={refs.map((r: any) => ({
+                  left: r.title || r.url || r.source,
+                  href: r.url,
+                  sub: r.domain || undefined,
+                }))}
+              />
+            )}
+          </>
+        )}
+      </Card>
+    );
+  }
+
+  // ── Google Maps pack ──────────────────────────────────
+  if (t === 'seo_google_maps_card') {
+    const items: any[] = data.items || [];
+    return (
+      <Card>
+        <Header icon="📍" title={`Map results — "${data.keyword}"`} subtitle={`${items.length} listings`} />
+        <Primer>
+          The businesses Google shows on the map for this search. A national page cannot win these slots — they
+          are decided by proximity, reviews and Business Profile completeness.
+        </Primer>
+        {items.length === 0 ? (
+          <Empty>No map pack for this query — Google does not read it as a local search.</Empty>
+        ) : (
+          <ItemList
+            max={10}
+            rows={items.map((i: any) => ({
+              left: i.title || i.name || '(unnamed)',
+              href: i.url || (i.domain ? `https://${i.domain}` : undefined),
+              right: i.rating?.value != null ? `★ ${i.rating.value}` : undefined,
+              sub:
+                [
+                  i.address || i.address_info?.address,
+                  i.rating?.votes_count != null ? `${fmtNum(i.rating.votes_count)} reviews` : null,
+                  i.rank_absolute != null ? `#${i.rank_absolute}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || undefined,
+            }))}
+          />
+        )}
+      </Card>
+    );
+  }
+
+  // ── Google Business Profile ───────────────────────────
+  if (t === 'seo_gbp_info_card') {
+    const i: any = data.item || {};
+    const found = !!(i.title || i.address || i.phone);
+    return (
+      <Card>
+        <Header icon="🏢" title={`Business Profile — "${data.keyword}"`} subtitle={i.category || undefined} />
+        <Primer>
+          The public Business Profile Google holds. Gaps here — no hours, no category, few reviews — cost local
+          visibility directly, and every one of them is editable.
+        </Primer>
+        {!found ? (
+          <Empty>No Business Profile found for this query.</Empty>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Name" value={i.title} />
+              <Stat
+                label="Rating"
+                value={i.rating?.value != null ? `★ ${i.rating.value} (${fmtNum(i.rating.votes_count)})` : 'No reviews yet'}
+              />
+              <Stat label="Phone" value={i.phone || 'Not listed'} />
+              <Stat label="Category" value={i.category || 'Not set'} />
+            </div>
+            {(i.address || i.address_info?.address) && (
+              <p className="text-[11px] text-muted-foreground">{i.address || i.address_info?.address}</p>
+            )}
+            {i.url && (
+              <a href={i.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                {i.url}
+              </a>
+            )}
+          </>
         )}
       </Card>
     );

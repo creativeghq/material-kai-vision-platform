@@ -3,11 +3,15 @@ import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
+  LayoutDashboard, Sparkles,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
 import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
 import { WebsiteDomainIntelPanel } from '@/components/core/Profile/WebsiteDomainIntelPanel';
+import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOverviewPanel';
+import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
+import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -51,11 +55,12 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 
 export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void; initialTab?: string }> = ({ website, onBack, initialTab }) => {
   const { toast } = useToast();
-  const [tab, setTab] = useState(initialTab || 'articles');
+  const [tab, setTab] = useState(initialTab || 'overview');
   const [overview, setOverview] = useState<WebsiteSeoOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [recrawling, setRecrawling] = useState(false);
 
+  const [openResearchId, setOpenResearchId] = useState<string | null>(null);
   const [articles, setArticles] = useState<SeoArticleRow[]>([]);
   const [freshness, setFreshness] = useState<SeoArticleFreshnessRow[]>([]);
   const [reviewing, setReviewing] = useState<string | null>(null);
@@ -174,6 +179,8 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="bg-muted">
+          <TabsTrigger value="overview" className="gap-1"><LayoutDashboard className="w-3.5 h-3.5" /> Overview</TabsTrigger>
+          <TabsTrigger value="ai" className="gap-1"><Sparkles className="w-3.5 h-3.5" /> AI Visibility</TabsTrigger>
           <TabsTrigger value="articles" className="gap-1"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
           <TabsTrigger value="research" className="gap-1"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
           <TabsTrigger value="runs" className="gap-1"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
@@ -183,6 +190,22 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <TabsTrigger value="health" className="gap-1"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
           <TabsTrigger value="llms" className="gap-1"><Bot className="w-3.5 h-3.5" /> llms.txt</TabsTrigger>
         </TabsList>
+
+        {/*
+          Overview — the derived metric strip. Everything on it comes from
+          `get_website_seo_overview` / `seo_website_*_summary`, which decide both the
+          number AND whether the number can be trusted, so a tile can say "the
+          backlink source failed" instead of quietly not rendering. See
+          `seo/seoMetrics.ts`.
+        */}
+        <TabsContent value="overview">
+          <WebsiteSeoOverviewPanel website={website} onOpenTab={setTab} />
+        </TabsContent>
+
+        {/* AI Visibility — what assistants say about you (llm_mention_probes). */}
+        <TabsContent value="ai">
+          <WebsiteAiVisibilityPanel website={website} />
+        </TabsContent>
 
         {/* Articles */}
         <TabsContent value="articles" className="space-y-4">
@@ -325,7 +348,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <Card className="dashboard-card">
             <CardHeader>
               <CardTitle>Keyword Research</CardTitle>
-              <CardDescription>DataForSEO keyword-research passes filed under this website.</CardDescription>
+              <CardDescription>
+                Open a run to read the whole results page it captured — AI Overview citations, image and
+                local packs, People Also Ask, clusters and who ranks now.
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
@@ -345,7 +371,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                   </TableHeader>
                   <TableBody>
                     {research.map((r) => (
-                      <TableRow key={r.id}>
+                      <TableRow
+                        key={r.id}
+                        onClick={() => setOpenResearchId(r.id)}
+                        className="cursor-pointer"
+                      >
                         <TableCell className="font-medium max-w-[220px] truncate">{r.target_keyword}</TableCell>
                         <TableCell className="text-muted-foreground max-w-[220px] truncate">{r.topic}</TableCell>
                         <TableCell className="text-right">{formatNumber(r.total_keywords_found)}</TableCell>
@@ -464,6 +494,19 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <WebsiteLlmsTxtPanel website={website} />
         </TabsContent>
       </Tabs>
+
+      {/* Keyword-research reader — the full captured SERP, not the 5-column summary. */}
+      <Dialog open={!!openResearchId} onOpenChange={(o) => { if (!o) setOpenResearchId(null); }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Keyword research</DialogTitle>
+          {openResearchId && (
+            <KeywordResearchDetail
+              researchId={openResearchId}
+              siteDomain={website.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Article viewer */}
       <Dialog open={!!openArticleId} onOpenChange={(o) => { if (!o) setOpenArticleId(null); }}>

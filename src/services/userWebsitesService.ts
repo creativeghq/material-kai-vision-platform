@@ -183,6 +183,110 @@ export interface DomainIntel {
   top_keywords: DomainKeyword[];
 }
 
+/**
+ * The derived overview behind the Websites → Overview strip.
+ *
+ * Every field here is produced by `get_website_seo_overview` /
+ * `seo_website_health_summary` / `seo_website_gsc_summary` and is only FORMATTED
+ * on the client. In particular the `status` on each metric is the SQL's verdict
+ * on whether the number can be trusted — the UI never re-decides that, so a tile
+ * and a report reading the same RPC cannot disagree about whether a figure is
+ * real. See `components/core/Profile/seo/seoMetrics.ts`.
+ */
+export interface SeoOverview {
+  website: {
+    id: string;
+    url: string;
+    country_code: string | null;
+    language_code: string | null;
+    captured_at: string | null;
+    snapshot_count: number;
+    window_days: number;
+  };
+  metrics: Record<string, SeoMetricPayload>;
+  positions: {
+    status: string;
+    note: string | null;
+    total: number;
+    buckets: { key: string; label: string; value: number | null }[];
+    movement: { up: number | null; down: number | null; new: number | null; lost: number | null };
+  };
+}
+
+export interface SeoMetricPayload {
+  value: number | null;
+  previous: number | null;
+  delta: number | null;
+  delta_pct: number | null;
+  status: string;
+  note: string | null;
+  series: { date: string; v: number }[];
+}
+
+export interface SeoHealthSummary {
+  status: string;
+  note: string | null;
+  audited_at: string | null;
+  audit_count: number;
+  issue_count: number | null;
+  scores: Record<string, SeoMetricPayload>;
+}
+
+export interface SeoGscSummary {
+  status: string;
+  connected: boolean;
+  window_days: number;
+  note: string | null;
+  metrics: Record<string, SeoMetricPayload>;
+}
+
+export interface AiVisibilityModelRow {
+  model: string;
+  probes: number;
+  answered: number;
+  failed: number;
+  mentioned: number;
+  cited: number;
+  avg_position: number | null;
+  /** NULL when nothing answered — that is "unknown", never 0%. */
+  share_of_voice: number | null;
+  status: string;
+  note: string | null;
+}
+
+export interface AiVisibility {
+  status: string;
+  window_days: number;
+  subjects_tracked: number;
+  note: string | null;
+  totals: {
+    probes: number;
+    answered: number;
+    failed: number;
+    mentioned: number;
+    cited: number;
+    with_citations: number;
+    share_of_voice: number | null;
+    avg_position: number | null;
+    first_run_at: string | null;
+    last_run_at: string | null;
+    subjects_probed: number;
+  };
+  models: AiVisibilityModelRow[];
+  subjects: {
+    id: string; label: string; subject_type: string;
+    probes: number; answered: number; mentioned: number;
+    avg_position: number | null; share_of_voice: number | null; status: string;
+  }[];
+  competitors: { name: string; mentions: number }[];
+  prompts: {
+    template_key: string; prompt_text: string | null;
+    probes: number; answered: number; mentioned: number; share_of_voice: number | null;
+  }[];
+  trend: { date: string; v: number | null; answered: number }[];
+  sentiment: Record<string, number>;
+}
+
 export interface WebsiteHealth {
   id: number;
   url: string;
@@ -479,6 +583,49 @@ export const userWebsitesService = {
     const { data, error } = await supabase.rpc('get_website_domain_intel', { p_website_id: websiteId, p_days: days });
     if (error) throw error;
     return (data as DomainIntel) ?? null;
+  },
+
+  /**
+   * The derived overview strip. `as any` on the RPC name is deliberate and
+   * unavoidable: `types.ts` is generated from the remote schema and neither CI
+   * nor this checkout can regenerate it (no Supabase access token), so a
+   * freshly-applied RPC is absent from the generated union until someone with
+   * an access token refreshes it. Casting the NAME keeps the payload typed.
+   */
+  async seoOverview(websiteId: string, days = 180): Promise<SeoOverview | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_seo_overview' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as SeoOverview) ?? null;
+  },
+
+  async seoHealthSummary(websiteId: string): Promise<SeoHealthSummary | null> {
+    const { data, error } = await supabase.rpc(
+      'seo_website_health_summary' as any,
+      { p_website_id: websiteId } as any,
+    );
+    if (error) throw error;
+    return (data as SeoHealthSummary) ?? null;
+  },
+
+  async seoGscSummary(websiteId: string, days = 28): Promise<SeoGscSummary | null> {
+    const { data, error } = await supabase.rpc(
+      'seo_website_gsc_summary' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as SeoGscSummary) ?? null;
+  },
+
+  async aiVisibility(websiteId: string, days = 90): Promise<AiVisibility | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_ai_visibility' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as AiVisibility) ?? null;
   },
 
   async domainTrackRun(websiteId: string): Promise<void> {

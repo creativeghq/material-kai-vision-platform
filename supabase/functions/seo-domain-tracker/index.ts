@@ -134,11 +134,34 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // result. That mattered below, where a failed ranked-keywords call produced kws=[] and the
     // unconditional DELETE then wiped the stored set. `rankedFailed` keeps the two apart.
     let rankedFailed = false;
+    // Same class of bug on the OTHER two calls, and it ran for longer: a bare
+    // `.catch(() => [])` makes an upstream failure indistinguishable from an
+    // empty result, so a failed backlinks call wrote NULL backlinks/referring
+    // domains/domain rank — and the dashboard, unable to tell that apart from a
+    // site with no links, simply hid the row. Every stored snapshot for the one
+    // connected site is in exactly that state. Record WHICH source failed; the
+    // reader is then told "we could not fetch this" instead of being shown
+    // nothing at all. `source_errors` is what `get_website_seo_overview` reads
+    // to decide `collector_failed` vs `no_data`.
+    const sourceErrors: Record<string, string> = {};
+    const note = (key: string, e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      sourceErrors[key] = msg.slice(0, 300);
+      console.error(`[seo-domain-tracker] ${key} failed:`, msg);
+    };
     const [overview, backlinks, ranked] = await Promise.all([
-      dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }).catch(() => []),
-      dfs('backlinks_summary', { target: domain }).catch(() => []),
-      dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }).catch((e) => { rankedFailed = true; console.error('[seo-domain-tracker] labs_ranked_keywords failed:', e); return []; }),
+      dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }).catch((e) => { note('overview', e); return []; }),
+      dfs('backlinks_summary', { target: domain }).catch((e) => { note('backlinks', e); return []; }),
+      dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }).catch((e) => { rankedFailed = true; note('ranked', e); return []; }),
     ]);
+
+    // A call that SUCCEEDS but returns no row is also a fetch we cannot vouch
+    // for — `backlinks/summary/live` answers with a single inline result, so an
+    // empty array here means the shape was not what we expect, not that the
+    // domain has no links.
+    if (!sourceErrors.backlinks && (backlinks?.length ?? 0) === 0) {
+      sourceErrors.backlinks = 'The backlink source returned no summary row for this domain.';
+    }
 
     const org = overview?.[0]?.metrics?.organic || {};
     const bl = backlinks?.[0] || {};
@@ -152,6 +175,7 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
       pos_51_100: sum(org.pos_51_60, org.pos_61_70, org.pos_71_80, org.pos_81_90, org.pos_91_100),
       backlinks: n(bl.backlinks), referring_domains: n(bl.referring_domains), referring_main_domains: n(bl.referring_main_domains),
       domain_rank: n(bl.rank), spam_score: n(bl.backlinks_spam_score), broken_backlinks: n(bl.broken_backlinks),
+      source_errors: sourceErrors,
       error: null,
     };
     const { error: sErr } = await supabase.from('seo_domain_snapshots').upsert(snapshot, { onConflict: 'website_id,captured_at' });
