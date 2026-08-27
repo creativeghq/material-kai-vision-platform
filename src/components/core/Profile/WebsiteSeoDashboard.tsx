@@ -14,6 +14,7 @@ import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVis
 import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
+import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -482,9 +483,14 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           </Card>
         </TabsContent>
 
-        {/* Search Performance (Google Search Console) */}
-        <TabsContent value="gsc">
+        {/* Search Performance — both halves of the Google picture. Search Console
+            says what Google SHOWED people; Analytics says what those people then
+            DID. A page with rising impressions and flat sessions has a title
+            problem; rising sessions and no conversions is a page problem. Neither
+            is visible from one feed. */}
+        <TabsContent value="gsc" className="space-y-4">
           <WebsiteGscPanel website={website} />
+          <WebsiteAnalyticsPanel website={website} />
         </TabsContent>
 
         {/* Rankings & Links (DataForSEO domain intel) */}

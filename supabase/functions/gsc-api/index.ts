@@ -37,7 +37,13 @@ const APP_URL = () => (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialsh
 // Register THIS exact URL in the Google client. Override via GOOGLE_OAUTH_REDIRECT_URI only if needed.
 const GOOGLE_REDIRECT_URI = () => Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI') || `${SUPABASE_URL}/functions/v1/gsc-api`;
 
-const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly openid email';
+// Analytics rides the SAME Google grant. `include_granted_scopes=true` on the consent
+// URL means asking for this later MERGES it into the existing authorization rather than
+// replacing it, so widening the scope cannot break a working Search Console connection —
+// the user re-consents once and keeps both.
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly openid email';
+const GA_ADMIN_URL = 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries';
+const GA_DATA_URL = (prop: string) => `https://analyticsdata.googleapis.com/v1beta/${prop}:runReport`;
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const SITES_URL = 'https://www.googleapis.com/webmasters/v3/sites';
@@ -181,6 +187,92 @@ function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
 const GSC_ROW_LIMIT = 25000;
 
 /** Run a Search Analytics query for one property, paginating past the 25k row cap. */
+/** GA4 properties the connected Google account can read. */
+async function listGaProperties(token: string): Promise<Array<{ property: string; name: string; account: string }>> {
+  const resp = await fetch(`${GA_ADMIN_URL}?pageSize=200`, { headers: { Authorization: `Bearer ${token}` } });
+  const jsonBody = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    // 403 here is almost always the Analytics Admin API not being enabled on the
+    // Cloud project, which is a console setting no amount of retrying fixes. Say so.
+    const msg = jsonBody?.error?.message || `HTTP ${resp.status}`;
+    throw new Error(
+      resp.status === 403
+        ? `Google refused the Analytics request (${msg}). Enable the Google Analytics Admin API and Data API on the Cloud project behind these OAuth credentials.`
+        : `Analytics property list failed: ${msg}`,
+    );
+  }
+  const out: Array<{ property: string; name: string; account: string }> = [];
+  for (const acct of jsonBody.accountSummaries || []) {
+    for (const p of acct.propertySummaries || []) {
+      out.push({ property: p.property, name: p.displayName || p.property, account: acct.displayName || '' });
+    }
+  }
+  return out;
+}
+
+/**
+ * Pull daily GA4 rows for one property.
+ *
+ * Two reports rather than one: a totals report and a channel breakdown. Asking for
+ * date × channel alone and summing the channels client-side would be a SECOND
+ * derivation of the daily total, and the two disagree the moment Google applies
+ * thresholding to a sparse channel.
+ */
+async function gaRunReport(
+  token: string, property: string, startDate: string, endDate: string, withChannel: boolean,
+): Promise<any[]> {
+  const dimensions = withChannel
+    ? [{ name: 'date' }, { name: 'sessionDefaultChannelGroup' }]
+    : [{ name: 'date' }];
+  const resp = await fetch(GA_DATA_URL(property), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions,
+      metrics: [
+        { name: 'sessions' }, { name: 'activeUsers' }, { name: 'newUsers' },
+        { name: 'engagedSessions' }, { name: 'conversions' }, { name: 'totalRevenue' },
+        { name: 'bounceRate' }, { name: 'averageSessionDuration' },
+      ],
+      limit: 10000,
+    }),
+  });
+  const jsonBody = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(jsonBody?.error?.message || `Analytics report failed: HTTP ${resp.status}`);
+  return jsonBody.rows || [];
+}
+
+const gaNum = (v: any): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Map GA4 report rows onto ga_performance and upsert them. */
+async function storeGaRows(
+  supabase: any, websiteId: string, workspaceId: string, rows: any[], withChannel: boolean,
+): Promise<number> {
+  const out = rows.map((r) => {
+    const d = r.dimensionValues || [];
+    const m = r.metricValues || [];
+    const raw = String(d[0]?.value || '');
+    return {
+      website_id: websiteId, workspace_id: workspaceId,
+      // GA4 returns YYYYMMDD; the column is a date.
+      date: `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`,
+      channel: withChannel ? (d[1]?.value || 'unknown') : 'total',
+      sessions: gaNum(m[0]?.value), active_users: gaNum(m[1]?.value),
+      new_users: gaNum(m[2]?.value), engaged_sessions: gaNum(m[3]?.value),
+      conversions: gaNum(m[4]?.value), total_revenue: gaNum(m[5]?.value),
+      bounce_rate: gaNum(m[6]?.value), avg_session_secs: gaNum(m[7]?.value),
+    };
+  }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  if (!out.length) return 0;
+  const { error } = await supabase.from('ga_performance').upsert(out, { onConflict: 'website_id,date,channel' });
+  if (error) throw new Error(error.message);
+  return out.length;
+}
+
 async function gscQuery(token: string, property: string, body: Record<string, unknown>): Promise<any[]> {
   const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(property)}/searchAnalytics/query`;
   const all: any[] = [];
@@ -410,6 +502,72 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           .update({ property, last_sync_error: null, updated_at: new Date().toISOString() }).eq('website_id', websiteId);
         if (error) return json({ error: error.message }, 400);
         return json({ ok: true, property });
+      }
+
+      // ── Google Analytics 4, on the same Google grant ──
+      case 'ga_list_properties': {
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+        const props = await listGaProperties(await validAccessToken(supabase, conn));
+        return json({ ok: true, properties: props });
+      }
+
+      case 'ga_set_property': {
+        const prop = String(body?.ga_property_id || '');
+        // `properties/123` is the only form the Data API accepts; a bare id or a
+        // measurement id (G-XXXX) fails later with an opaque 400.
+        if (!/^properties\/\d+$/.test(prop)) {
+          return json({ error: 'Pick a property — it must look like properties/123456789.' }, 400);
+        }
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+
+        // Verify the connected account actually holds it before storing, same rule
+        // the Search Console property follows — storing an unverified id turns a
+        // permissions problem into a silent empty chart.
+        const props = await listGaProperties(await validAccessToken(supabase, conn));
+        const match = props.find((p) => p.property === prop);
+        if (!match) return json({ error: 'This Google account cannot read that Analytics property.' }, 403);
+
+        const { error } = await supabase.from('website_gsc_connections')
+          .update({ ga_property_id: prop, ga_property_name: match.name, ga_last_sync_error: null })
+          .eq('website_id', websiteId);
+        if (error) return json({ error: error.message }, 400);
+        return json({ ok: true, ga_property_id: prop, ga_property_name: match.name });
+      }
+
+      case 'ga_sync': {
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, workspace_id, ga_property_id, access_token, refresh_token, token_expires_at')
+          .eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ error: 'Connect Google first.' }, 400);
+        if (!conn.ga_property_id) return json({ error: 'No Analytics property selected for this site yet.' }, 400);
+        const days = Math.min(Math.max(Number(body?.days) || 28, 1), 365);
+        const end = ymd(new Date(Date.now() - 86400000));
+        const start = ymd(new Date(Date.now() - days * 86400000));
+        try {
+          const token = await validAccessToken(supabase, conn);
+          // Totals and channels are separate reports on purpose — summing channels
+          // to get the total would be a second derivation, and the two diverge as
+          // soon as Google thresholds a sparse channel.
+          const totals = await gaRunReport(token, conn.ga_property_id, start, end, false);
+          const byChannel = await gaRunReport(token, conn.ga_property_id, start, end, true);
+          const n = await storeGaRows(supabase, websiteId, website.workspace_id, totals, false)
+                  + await storeGaRows(supabase, websiteId, website.workspace_id, byChannel, true);
+          await supabase.from('website_gsc_connections')
+            .update({ ga_last_sync_at: new Date().toISOString(), ga_last_sync_error: null })
+            .eq('website_id', websiteId);
+          return json({ ok: true, rows: n, days });
+        } catch (e) {
+          const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
+          // Recorded, not swallowed: an Analytics panel that is empty because the
+          // sync failed must not look like an Analytics panel with no traffic.
+          await supabase.from('website_gsc_connections')
+            .update({ ga_last_sync_error: msg }).eq('website_id', websiteId);
+          return json({ ok: false, error: msg }, 502);
+        }
       }
 
       case 'sync': {

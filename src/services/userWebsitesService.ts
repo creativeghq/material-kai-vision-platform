@@ -266,6 +266,20 @@ export interface AiMonitoringState {
   diagnosis: string | null;
 }
 
+export interface GaSummary {
+  status: string;
+  note: string | null;
+  window_days: number;
+  property_id: string | null;
+  property_name: string | null;
+  last_sync_at: string | null;
+  last_sync_error: string | null;
+  metrics: Record<string, SeoMetricPayload>;
+  channels: { channel: string; sessions: number | null; conversions: number | null }[];
+}
+
+export interface GaProperty { property: string; name: string; account: string }
+
 export interface CrawlIssueGroup {
   issue_type: string;
   severity: 'error' | 'warning' | 'notice';
@@ -709,6 +723,40 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as SeoGscSummary) ?? null;
+  },
+
+  async gaSummary(websiteId: string, days = 28): Promise<GaSummary | null> {
+    const { data, error } = await supabase.rpc(
+      'seo_website_ga_summary' as any, { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as GaSummary) ?? null;
+  },
+
+  async gaListProperties(websiteId: string): Promise<GaProperty[]> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', {
+      body: { action: 'ga_list_properties', website_id: websiteId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not list Analytics properties'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not list Analytics properties');
+    return data.properties ?? [];
+  },
+
+  async gaSetProperty(websiteId: string, gaPropertyId: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', {
+      body: { action: 'ga_set_property', website_id: websiteId, ga_property_id: gaPropertyId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not select the property'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not select the property');
+  },
+
+  async gaSync(websiteId: string, days = 28): Promise<{ rows: number }> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', {
+      body: { action: 'ga_sync', website_id: websiteId, days },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Analytics sync failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Analytics sync failed');
+    return data;
   },
 
   async crawlReport(websiteId: string): Promise<CrawlReport | null> {
