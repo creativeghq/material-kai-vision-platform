@@ -13,7 +13,7 @@
  * and the old panel simply hid the row — so a broken collector and a site with no
  * links looked identical.
  *
- * The STATUS IS DERIVED IN SQL (`public.seo_metric`, `get_website_seo_overview`,
+ * The STATUS IS DERIVED IN SQL (`public.seo_metric`, `get_website_search_metrics`,
  * `get_website_ai_visibility`) and only formatted here. Nothing in this file
  * re-decides whether a number is real — a tile and a report reading the same RPC
  * cannot then disagree about it.

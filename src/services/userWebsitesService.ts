@@ -186,7 +186,7 @@ export interface DomainIntel {
 /**
  * The derived overview behind the Websites → Overview strip.
  *
- * Every field here is produced by `get_website_seo_overview` /
+ * Every field here is produced by `get_website_search_metrics` /
  * `seo_website_health_summary` / `seo_website_gsc_summary` and is only FORMATTED
  * on the client. In particular the `status` on each metric is the SQL's verdict
  * on whether the number can be trusted — the UI never re-decides that, so a tile
@@ -586,15 +586,25 @@ export const userWebsitesService = {
   },
 
   /**
-   * The derived overview strip. `as any` on the RPC name is deliberate and
-   * unavoidable: `types.ts` is generated from the remote schema and neither CI
-   * nor this checkout can regenerate it (no Supabase access token), so a
-   * freshly-applied RPC is absent from the generated union until someone with
-   * an access token refreshes it. Casting the NAME keeps the payload typed.
+   * The derived search-metric strip.
+   *
+   * Named `get_website_search_metrics`, NOT `get_website_seo_overview` — that
+   * name was already taken by `overview()` above, which returns aggregate record
+   * counts. Adding a `(uuid, integer DEFAULT 180)` overload to it did not merely
+   * read confusingly, it broke the original outright: a defaulted second argument
+   * makes the one-argument call match both candidates, and Postgres refuses with
+   * `42725 function ... is not unique` rather than picking. Keep the two names
+   * distinct.
+   *
+   * `as any` on the RPC name is deliberate and unavoidable: `types.ts` is
+   * generated from the remote schema and neither CI nor this checkout can
+   * regenerate it (no Supabase access token), so a freshly-applied RPC is absent
+   * from the generated union until someone with a token refreshes it. Casting the
+   * NAME keeps the payload typed.
    */
   async seoOverview(websiteId: string, days = 180): Promise<SeoOverview | null> {
     const { data, error } = await supabase.rpc(
-      'get_website_seo_overview' as any,
+      'get_website_search_metrics' as any,
       { p_website_id: websiteId, p_days: days } as any,
     );
     if (error) throw error;
