@@ -44,6 +44,17 @@ const SOURCES = [
     file: '01-product/356-thinking.md',
     tailFragments: [],
   },
+  {
+    // Four unrelated pieces under one heading — a reading list, an essay on
+    // running the company as a product, a description of what good PMs do, and a
+    // manifesto. Only four entries, so they stay in the Product category rather
+    // than earning one of their own; `categoryName: null` means "same as parent".
+    parentTitle: 'Product Managers',
+    parentSlug: 'product-product-managers',
+    categoryName: null,
+    file: '01-product/274-product-managers.md',
+    tailFragments: [],
+  },
 ];
 
 const strip = (s) => s.replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
