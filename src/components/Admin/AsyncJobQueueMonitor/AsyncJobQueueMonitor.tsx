@@ -1103,11 +1103,17 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       const jobIds = oldJobs.map(j => j.id);
 
-      // Delete product_processing_status for these jobs
-      await supabase
+      // Delete product_processing_status for these jobs.
+      //
+      // Checked (#389): supabase-js resolves on an RLS denial, so a refused delete here
+      // followed by a successful job delete below leaves ORPHANED status rows pointing
+      // at jobs that no longer exist — a reaper that silently stops clearing half the
+      // mess is the shape `ops.test_artifacts_accumulating` exists to catch.
+      const { error: statusDeleteError } = await supabase
         .from('product_processing_status')
         .delete()
         .in('job_id', jobIds);
+      if (statusDeleteError) throw statusDeleteError;
 
       // Stage history travels with background_jobs, no separate cleanup.
 

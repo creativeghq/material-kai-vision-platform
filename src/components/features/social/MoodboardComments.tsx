@@ -84,7 +84,14 @@ export const MoodboardComments: React.FC<MoodboardCommentsProps> = ({
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('moodboard_comments').delete().eq('id', id);
+    // Checked before the comment disappears from the list (#389): supabase-js resolves
+    // on an RLS denial, so a refused delete removed it from the UI and left it in the
+    // database — it came back on the next load with no indication why.
+    const { error } = await supabase.from('moodboard_comments').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: 'Could not delete comment.', variant: 'destructive' });
+      return;
+    }
     setComments((prev) => prev.filter((c) => c.id !== id));
   };
 

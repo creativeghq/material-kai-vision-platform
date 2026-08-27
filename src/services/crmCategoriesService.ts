@@ -53,6 +53,22 @@ export interface ResolvedRecipient {
   category_slugs: string[];
 }
 
+/**
+ * Every write here BINDS its error and throws (#389).
+ *
+ * `supabase-js` RESOLVES on an RLS denial rather than throwing, so an unbound write is
+ * completely silent — a surrounding try/catch does not catch it, because nothing threw,
+ * and the caller proceeds as though the write landed.
+ *
+ * It matters more in this file than in a generic one. The `role` and `employment`
+ * category lists are DERIVED from `workspace_members.role` and `hr_employees` by
+ * `crm_resync_auto_category_members`, so rows here legitimately appear and disappear on
+ * their own. A manual assignment that silently failed is invisible against that
+ * backdrop: there is no "it should still be there" to notice.
+ *
+ * Both halves of each reconciliation are checked. A successful add with a failed remove
+ * leaves membership wrong in a way that looks deliberate.
+ */
 class CrmCategoriesService {
   async list(): Promise<CrmCategorySummary[]> {
     const { data, error } = await supabase
@@ -246,16 +262,18 @@ class CrmCategoriesService {
     const toRemove = (existing || []).filter((r: any) => !wantIds.has(r.category_id));
     if (toAdd.length > 0) {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
+      const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
         category_id: cid,
         member_kind: 'platform_user' as CrmCategoryMemberKind,
         user_id: userId,
         source: 'manual',
         added_by: user?.id ?? null,
       })));
+      if (addError) throw addError;
     }
     if (toRemove.length > 0) {
-      await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      if (removeError) throw removeError;
     }
   }
 
@@ -271,16 +289,18 @@ class CrmCategoriesService {
     const toRemove = (existing || []).filter((r: any) => !wantIds.has(r.category_id));
     if (toAdd.length > 0) {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
+      const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
         category_id: cid,
         member_kind: 'crm_contact' as CrmCategoryMemberKind,
         crm_contact_id: contactId,
         source: 'manual',
         added_by: user?.id ?? null,
       })));
+      if (addError) throw addError;
     }
     if (toRemove.length > 0) {
-      await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      if (removeError) throw removeError;
     }
   }
 
@@ -296,16 +316,18 @@ class CrmCategoriesService {
     const toRemove = (existing || []).filter((r: any) => !wantIds.has(r.category_id));
     if (toAdd.length > 0) {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
+      const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
         category_id: cid,
         member_kind: 'crm_company' as CrmCategoryMemberKind,
         crm_company_id: companyId,
         source: 'manual',
         added_by: user?.id ?? null,
       })));
+      if (addError) throw addError;
     }
     if (toRemove.length > 0) {
-      await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      if (removeError) throw removeError;
     }
   }
 
@@ -342,16 +364,18 @@ class CrmCategoriesService {
     const toRemove = (existing || []).filter((r: any) => !want.has(r.category_id));
     if (toAdd.length > 0) {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
+      const { error: addError } = await supabase.from('crm_category_members').insert(toAdd.map((cid) => ({
         category_id: cid,
         member_kind: 'crm_company' as CrmCategoryMemberKind,
         crm_company_id: companyId,
         source: 'manual',
         added_by: user?.id ?? null,
       })));
+      if (addError) throw addError;
     }
     if (toRemove.length > 0) {
-      await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      const { error: removeError } = await supabase.from('crm_category_members').delete().in('id', toRemove.map((r: any) => r.id));
+      if (removeError) throw removeError;
     }
   }
 

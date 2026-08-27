@@ -157,12 +157,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocument
     if (!confirm(`Delete category "${category.name}"? Documents in this category will become uncategorized.`)) return;
 
     try {
-      // Null out category_id on any docs referencing this category (avoids FK violation)
-      await supabase
+      // Null out category_id on any docs referencing this category (avoids FK violation).
+      //
+      // Checked (#389): this exists to prevent the FK violation on the delete below, so
+      // if it silently fails the delete fails too — and the error the user sees is a
+      // foreign-key message about a constraint, rather than the permission problem that
+      // actually stopped them.
+      const { error: detachError } = await supabase
         .from('kb_docs')
         .update({ category_id: null })
         .eq('category_id', category.id)
         .eq('workspace_id', workspaceId);
+      if (detachError) throw detachError;
 
       const { error } = await supabase
         .from('kb_categories')

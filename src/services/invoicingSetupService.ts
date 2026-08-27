@@ -56,7 +56,13 @@ export const invoicingSetupService = {
   async ensureHeadquarters(workspaceId: string): Promise<FinanceBranch[]> {
     const existing = await this.listBranches(workspaceId);
     if (existing.length > 0) return existing;
-    await supabase.from('finance_branches').insert({ workspace_id: workspaceId, branch_code: 0, name: 'Headquarters' });
+    // supabase-js resolves on an RLS denial rather than throwing, so an unbound write
+    // is silent (#389). A silently-failed branch 0 leaves invoicing unconfigured while
+    // this returns as though it had just set it up.
+    const { error } = await supabase
+      .from('finance_branches')
+      .insert({ workspace_id: workspaceId, branch_code: 0, name: 'Headquarters' });
+    if (error) throw error;
     return this.listBranches(workspaceId);
   },
 

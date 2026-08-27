@@ -100,10 +100,13 @@ class ApiGatewayService {
     // `rate_limit_override` is not part of the RPC's signature; set it separately when
     // asked for, rather than widening a security-definer function for a tuning knob.
     if (options?.rateLimit != null) {
-      await supabase
+      const { error: rateLimitError } = await supabase
         .from('api_keys')
         .update({ rate_limit_override: options.rateLimit })
         .eq('id', row.id);
+      // Checked (#389): a silently-refused rate limit hands out a key the caller
+      // believes is throttled and is not.
+      if (rateLimitError) throw rateLimitError;
     }
 
     return {

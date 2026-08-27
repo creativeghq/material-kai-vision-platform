@@ -1611,7 +1611,13 @@ export const ordersService = {
     // Same rule as create(): a purchase order's lines belong to that order's supplier.
     const { data: own } = await supabase.from('orders').select('order_type, supplier_company_id').eq('id', orderId).maybeSingle();
     const defaultSupplier = own?.order_type === 'purchase' ? ((own.supplier_company_id as string | null) ?? null) : null;
-    await supabase.from('order_items').delete().eq('order_id', orderId);
+    // supabase-js resolves on an RLS denial rather than throwing, so an unbound write is
+    // silent (#389). And this one is not merely lost work: the
+    // insert below re-adds every line, so a delete that silently failed DUPLICATES the
+    // order's items — which then flow into the totals this module derives.
+    const { error: clearItemsError } = await supabase
+      .from('order_items').delete().eq('order_id', orderId);
+    if (clearItemsError) throw clearItemsError;
     if (lines.length) {
       const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
         order_id: orderId, workspace_id: workspaceId, product_id: l.it.product_id ?? null,
@@ -1850,7 +1856,16 @@ export const ordersService = {
     const { error } = await supabase.from('order_items').update({ supplier_company_id: supplierCompanyId }).eq('id', itemId);
     if (error) throw error;
     if (productId && supplierCompanyId) {
-      await supabase.from('products').update({ supplier_company_id: supplierCompanyId }).eq('id', productId).is('supplier_company_id', null);
+      // Best-effort backfill — but CHECKED, not unbound (#389). The `.is(..., null)`
+      // guard means "only if nobody has set one", so zero rows updated is a legitimate
+      // outcome and is NOT an error. A refused write is a different thing, and the
+      // difference is exactly what an unbound result throws away.
+      const { error: supplierBackfillError } = await supabase
+        .from('products')
+        .update({ supplier_company_id: supplierCompanyId })
+        .eq('id', productId)
+        .is('supplier_company_id', null);
+      if (supplierBackfillError) throw supplierBackfillError;
     }
   },
 

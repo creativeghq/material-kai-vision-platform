@@ -141,7 +141,13 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
 
   const handleDelete = async () => {
     if (!myReview) return;
-    await supabase.from('material_reviews').delete().eq('id', myReview.id);
+    // See #389: a refused delete used to clear the form and reload, so the review
+    // reappeared a moment later looking like it had failed to save.
+    const { error } = await supabase.from('material_reviews').delete().eq('id', myReview.id);
+    if (error) {
+      toast({ title: 'Error', description: 'Could not delete your review.', variant: 'destructive' });
+      return;
+    }
     setMyReview(null);
     setEditing(false);
     await loadReviews();

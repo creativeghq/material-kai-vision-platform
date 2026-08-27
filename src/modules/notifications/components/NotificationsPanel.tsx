@@ -135,11 +135,16 @@ export const NotificationsPanel: React.FC = () => {
 
   const markAllRead = async () => {
     if (!user) return;
-    await supabase
+    // Checked before the badge clears (#389). supabase-js resolves on an RLS denial
+    // rather than throwing, so a refused mark-as-read emptied the panel and the unread
+    // count came straight back on the next refresh — the classic user-visible form of
+    // this bug, on 361 live notifications.
+    const { error } = await supabase
       .from('user_notifications')
       .update({ is_read: true })
       .eq('user_id', user.id)
       .eq('is_read', false);
+    if (error) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
   };
@@ -147,10 +152,11 @@ export const NotificationsPanel: React.FC = () => {
   const handleClick = async (n: UserNotification) => {
     // Mark as read
     if (!n.is_read) {
-      await supabase
+      const { error } = await supabase
         .from('user_notifications')
         .update({ is_read: true })
         .eq('id', n.id);
+      if (error) return;
       setNotifications((prev) =>
         prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x),
       );
@@ -166,7 +172,9 @@ export const NotificationsPanel: React.FC = () => {
 
   const dismissOne = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await supabase.from('user_notifications').update({ is_read: true }).eq('id', id);
+    const { error } = await supabase
+      .from('user_notifications').update({ is_read: true }).eq('id', id);
+    if (error) return;
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
     setUnreadCount((prev) => Math.max(0, prev - 1));
   };

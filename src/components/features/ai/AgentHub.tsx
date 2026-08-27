@@ -1849,7 +1849,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         return;
       }
 
-      await supabase
+      // Checked before thanking the user (#389). supabase-js resolves on an RLS denial,
+      // so a refused write showed "Thanks for the feedback" for a rating that was never
+      // stored — and rating data is only worth collecting if it is actually collected.
+      const { error } = await supabase
         .from('agent_chat_messages')
         .update({
           metadata: {
@@ -1859,6 +1862,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           },
         })
         .eq('id', match.id);
+
+      if (error) {
+        toast({
+          title: 'Could not save rating',
+          description: 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       toast({
         title: newRating ? (newRating === 'up' ? '👍 Thanks!' : '👎 Thanks for the feedback') : 'Rating removed',

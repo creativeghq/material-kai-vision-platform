@@ -42,18 +42,32 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
       return;
     }
     setLoading(true);
+    // The optimistic update is applied only if the write LANDED (#389). supabase-js
+    // resolves on an RLS denial rather than throwing, so an unbound write is silent —
+    // the button flipped to "Following", the row was never written, and the state
+    // reverted on the next refresh with nothing to explain it.
     if (following) {
-      await supabase
+      const { error } = await supabase
         .from('user_follows')
         .delete()
         .eq('follower_id', currentUserId)
         .eq('following_id', targetUserId);
+      if (error) {
+        setLoading(false);
+        toast({ title: 'Could not unfollow', description: 'Please try again.', variant: 'destructive' });
+        return;
+      }
       setFollowing(false);
       onToggle?.(false);
     } else {
-      await supabase
+      const { error } = await supabase
         .from('user_follows')
         .insert({ follower_id: currentUserId, following_id: targetUserId });
+      if (error) {
+        setLoading(false);
+        toast({ title: 'Could not follow', description: 'Please try again.', variant: 'destructive' });
+        return;
+      }
       setFollowing(true);
       onToggle?.(true);
       // Recipient notification is delivered by the "Profile Followed" flow.

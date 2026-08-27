@@ -394,7 +394,9 @@ export const UserDetailPage: React.FC = () => {
 
       // Update credits if changed
       if (credits !== user.credits) {
-        await supabase
+        // Checked (#389). This is a CREDIT BALANCE: a silently-refused upsert showed the
+        // admin a success toast while the user's balance stayed where it was.
+        const { error: creditsError } = await supabase
           .from('user_credits')
           .upsert({
             user_id: id,
@@ -402,6 +404,7 @@ export const UserDetailPage: React.FC = () => {
           }, {
             onConflict: 'user_id',
           });
+        if (creditsError) throw creditsError;
       }
 
       toast({

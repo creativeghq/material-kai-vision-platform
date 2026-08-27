@@ -547,10 +547,14 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   // also clears cache rows that have null generation_id (direct/edited).
   const handleRegenerate = useCallback(async () => {
     if (!selectedImage) return;
-    await supabase
+    // Checked before the segments are cleared from the modal (#389) — otherwise a
+    // refused delete empties the view and the regenerate that follows races the rows it
+    // believes it removed.
+    const { error } = await supabase
       .from('generation_3d_segments')
       .delete()
       .eq('source_image_url', selectedImage.url);
+    if (error) return;
     setModalSegments([]);
     setModalSegmentError(null);
     setModalSegmentsLoaded(false);

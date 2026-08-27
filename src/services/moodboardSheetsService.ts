@@ -286,10 +286,14 @@ class MoodboardSheetsService {
   async retry(sheetId: string): Promise<{ pdf_url: string; page_count: number }> {
     await this.update(sheetId, { status: 'draft', data: undefined as any });
     // Service-side: blank error_message via direct UPDATE so the user sees a clean retry
-    await supabase
+    // supabase-js resolves on an RLS denial rather than throwing, so an unbound write
+    // is silent (#389). A retry that could not clear the previous error shows the OLD
+    // failure next to a fresh attempt.
+    const { error: clearError } = await supabase
       .from('moodboard_presentation_sheets')
       .update({ error_message: null })
       .eq('id', sheetId);
+    if (clearError) throw clearError;
     const result = await this.generatePdf(sheetId);
     return { pdf_url: result.pdf_url, page_count: result.page_count };
   }

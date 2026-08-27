@@ -121,8 +121,12 @@ function AppointmentDetailDrawer({
 
   const updateStatus = async (status: Appointment['status']) => {
     setSaving(true);
-    await supabase.from('appointments').update({ status }).eq('id', appt.id);
+    // Checked before the flow event fires below (#389): emitting
+    // `appointment_confirmed` for a status change that was refused notifies the
+    // customer about something that did not happen.
+    const { error } = await supabase.from('appointments').update({ status }).eq('id', appt.id);
     setSaving(false);
+    if (error) return;
     const eventType =
       status === 'confirmed' ? 'appointment_confirmed' :
       status === 'completed' ? 'appointment_completed' :

@@ -104,7 +104,10 @@ export const servicesService = {
 
   async _writePrice(workspaceId: string, productId: string, input: ServiceInput): Promise<void> {
     if (input.price == null) return;
-    await supabase.from('product_prices').upsert({
+    // supabase-js resolves on an RLS denial rather than throwing, so an unbound write is
+    // silent (#389). This is a PRICE: a silently-dropped upsert leaves the service
+    // quotable at whatever the previous number was, and a wrong price is a valid number.
+    const { error } = await supabase.from('product_prices').upsert({
       workspace_id: workspaceId,
       product_id: productId,
       // #374 — a SERVICE has no identity axes, so its price is the product-wide row by nature.
@@ -114,5 +117,6 @@ export const servicesService = {
       currency: input.currency || 'EUR',
       unit: input.unit || null,
     }, { onConflict: 'workspace_id,product_id,variant_key' });
+    if (error) throw error;
   },
 };

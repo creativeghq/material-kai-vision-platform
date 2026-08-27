@@ -1921,7 +1921,15 @@ const _financeServiceCore = {
     const existing = await this.listBankAccounts(input.workspaceId, { includeInactive: true });
     const makeDefault = input.isDefault ?? existing.length === 0;
     if (makeDefault && existing.some((a) => a.is_default)) {
-      await supabase.from('finance_bank_accounts').update({ is_default: false }).eq('workspace_id', input.workspaceId);
+      // supabase-js resolves on an RLS denial rather than throwing, so an unbound write
+      // is silent (#389). If this half fails and the insert below
+      // succeeds, the workspace has TWO default accounts — and the IBAN printed on an
+      // invoice as "pay here" becomes whichever one a query happens to return first.
+      const { error: clearDefaultError } = await supabase
+        .from('finance_bank_accounts')
+        .update({ is_default: false })
+        .eq('workspace_id', input.workspaceId);
+      if (clearDefaultError) throw clearDefaultError;
     }
     // mod-97 on the write path (#366 BU-9). A treasury account's IBAN is printed on invoices as
     // "pay here", so a typo misroutes money in the other direction from the CRM one.

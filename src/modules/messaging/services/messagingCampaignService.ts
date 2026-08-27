@@ -175,10 +175,14 @@ class MessagingCampaignService {
       .select('*', { count: 'exact', head: true })
       .eq('campaign_id', campaignId);
 
-    await supabase
+    // supabase-js resolves on an RLS denial rather than throwing, so an unbound write
+    // is silent (#389). A stale recipient_count is the silent-zero shape: the campaign
+    // reports an audience it will not actually send to.
+    const { error } = await supabase
       .from('campaigns')
       .update({ recipient_count: count || 0 })
       .eq('id', campaignId);
+    if (error) throw error;
   }
 
   /**
