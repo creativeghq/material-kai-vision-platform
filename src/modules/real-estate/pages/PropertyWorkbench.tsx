@@ -116,7 +116,7 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
 
 // Lazy: the Spark/Three splat renderer only loads when a listing actually shows a VR world.
 const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
-const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
+import { PROPERTY_TYPES } from '../realEstateVocabulary'; // one source (#391)
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
 const LISTING_STATUSES = ['draft', 'active', 'under_offer', 'sold', 'rented', 'withdrawn', 'archived'];
 const ENERGY_CLASSES = ['A+', 'A', 'B+', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -1451,7 +1451,10 @@ const FormSection: React.FC<{ title: string; icon?: LucideIcon; children: React.
 const F: React.FC<{ label: string; wide?: boolean; children: React.ReactNode }> = ({ label, wide, children }) => (
   <div className={wide ? 'sm:col-span-2 lg:col-span-3' : ''}><Label className="mb-1 block text-xs text-muted-foreground">{label}</Label>{children}</div>
 );
-const Sel: React.FC<{ value: any; opts: string[]; onChange: (v: string) => void }> = ({ value, opts, onChange }) => (
+// `readonly string[]`, because the vocabularies these options come from are declared
+// `as const` (#391 — one source per value set) and a mutable `string[]` parameter
+// rejects a readonly tuple. `Sel` only ever reads them.
+const Sel: React.FC<{ value: any; opts: readonly string[]; onChange: (v: string) => void }> = ({ value, opts, onChange }) => (
   <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
     {opts.map((o) => <option key={o} value={o}>{o === '' ? '—' : o.replace('_', ' ')}</option>)}
   </select>

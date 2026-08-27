@@ -1,3 +1,4 @@
+import { PROPERTY_TYPES as SHARED_PROPERTY_TYPES } from './realEstateVocabulary.generated.ts';
 // deno-lint-ignore-file no-explicit-any
 /**
  * Listing import — the onboarding path (#281).
@@ -45,7 +46,9 @@ const BOOLEAN = new Set([
 ]);
 const ARRAY_FIELD = new Set(['features', 'amenities']);
 
-const PROPERTY_TYPES = new Set(['residential', 'commercial', 'land', 'other']);
+// One source (#391) — the generated mirror. This was the fourth SHAPE of the same fact
+// (array, array, union, Set); the Set is rebuilt here from the shared list.
+const PROPERTY_TYPES = new Set<string>(SHARED_PROPERTY_TYPES);
 const TRANSACTION_TYPES = new Set(['sale', 'rent', 'short_let']);
 
 const truthy = new Set(['1', 'true', 'yes', 'y', 'ναι', 'on']);

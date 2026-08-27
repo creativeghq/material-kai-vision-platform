@@ -27,7 +27,8 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 
-const CONTEXTS = ['hr', 'finance', 'project', 'realestate'];
+// One source (#391) — the generated mirror. This was one of five hand-written copies.
+import { isContractContext } from '../_shared/contractVocabulary.generated.ts';
 // Fields a caller may write (no status / token / workspace / created_by — those are server-set).
 // The editable fields ARE the signed fields — one list, in _shared/contract-hash.ts. Keeping a
 // second copy here is how the hash would come to cover something a user can change without it
@@ -192,7 +193,7 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
 
   if (action === 'create') {
     const context = String(body?.context ?? '');
-    if (!CONTEXTS.includes(context)) return json({ error: 'context must be hr | finance | project | realestate' }, 400);
+    if (!isContractContext(context)) return json({ error: 'context must be hr | finance | project | realestate' }, 400);
     if (!String(body?.title ?? '').trim()) return json({ error: 'title is required' }, 400);
     const payload: Record<string, unknown> = {
       workspace_id: workspaceId,

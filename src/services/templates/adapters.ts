@@ -12,6 +12,7 @@ import { captureRecord, filterVisibleIds } from './capture';
 import { childRows, depositPct, num, oneOf, positiveQty, str } from './coerce';
 import { TEMPLATE_SCHEMAS } from './schema';
 import type { TemplateAdapter, TemplateApplyResult } from './types';
+import { CONTRACT_CONTEXTS } from '@/services/contracts/contractVocabulary';
 
 /**
  * Native template adapters (issue #322) — the executable half of the registry; the allowlists and
@@ -458,8 +459,8 @@ export interface ContractTemplatePayload {
   currency?: string | null;
 }
 
-/** `contracts_context_check`. */
-const contractContext = oneOf(['hr', 'finance', 'project', 'realestate'] as const);
+/** `contracts_context_check` — the set comes from the one source (#391). */
+const contractContext = oneOf(CONTRACT_CONTEXTS);
 const CONTEXT_LABEL: Record<string, string> = {
   hr: 'HR', finance: 'Finance', project: 'Project', realestate: 'Real estate',
 };

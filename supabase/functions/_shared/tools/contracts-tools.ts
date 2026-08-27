@@ -33,6 +33,7 @@ const MODULE_SLUG = 'contracts';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
+import { CONTRACT_CONTEXTS } from '../contractVocabulary.generated.ts';
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const sb = svcClient();
@@ -150,7 +151,7 @@ export const createManageContractsTool = (
       schema: z.object({
         action: z.enum(['list', 'get', 'create', 'void', 'send']).default('list'),
         status: z.string().optional().describe('list: filter by status (draft/sent/signed/…).'),
-        context: z.enum(['hr', 'finance', 'project', 'realestate']).optional().describe('list: filter by context. create: the contract context (required).'),
+        context: z.enum(CONTRACT_CONTEXTS).optional().describe('list: filter by context. create: the contract context (required).'),
         contract_id: z.string().optional().describe('get/void/send: the contract UUID.'),
         title: z.string().optional().describe('create: the contract title (required).'),
         counterparty_name: z.string().optional().describe('create: the other party\'s name.'),

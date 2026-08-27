@@ -44,6 +44,17 @@ export const VOCABULARIES = [
     'src/services/moodboards/sheetVocabulary.ts',
     'supabase/functions/_shared/sheetVocabulary.generated.ts',
   ],
+  [
+    // #391 — `ContractContext`, five copies. `contracts_context_check` is the enforcer.
+    'src/services/contracts/contractVocabulary.ts',
+    'supabase/functions/_shared/contractVocabulary.generated.ts',
+  ],
+  [
+    // #391 — `property_type`, four copies in four different SHAPES (array, array, union,
+    // Set). `properties_property_type_check` is the enforcer.
+    'src/modules/real-estate/realEstateVocabulary.ts',
+    'supabase/functions/_shared/realEstateVocabulary.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

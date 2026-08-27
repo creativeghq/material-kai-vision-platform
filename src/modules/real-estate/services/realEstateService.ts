@@ -7,7 +7,12 @@ import { edgeError } from '@/utils/edgeError';
 // so rows are loosely typed here (same safety level hrService uses for its post-types tables).
 
 export type ListingStatus = 'draft' | 'active' | 'under_offer' | 'sold' | 'rented' | 'withdrawn' | 'archived';
-export type PropertyType = 'residential' | 'commercial' | 'land' | 'other';
+// One source (#391). Re-exported so existing imports from this service keep working.
+export { PROPERTY_TYPES, isPropertyType } from '../realEstateVocabulary';
+export type { PropertyType } from '../realEstateVocabulary';
+
+// Also imported: a re-export does not bind the name locally.
+import type { PropertyType } from '../realEstateVocabulary';
 export type TransactionType = 'sale' | 'rent' | 'short_let' | 'business_transfer' | 'auction';
 
 export interface PropertyListItem {

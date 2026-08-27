@@ -14,7 +14,7 @@ import { realEstateService, type CmaReport } from '../services/realEstateService
 import { escapeHtml } from '@/utils/escapeHtml';
 import { formatDate } from '@/utils/datetime';
 
-const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
+import { PROPERTY_TYPES } from '../realEstateVocabulary'; // one source (#391)
 const money = (n: number | null | undefined, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 const perSqm = (n: number | null, ccy = 'EUR') => (n == null ? '—' : `${money(n, ccy)}/m²`);
 

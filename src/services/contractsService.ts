@@ -4,7 +4,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
 
-export type ContractContext = 'hr' | 'finance' | 'project' | 'realestate';
+// One source (#391). Re-exported so every existing import from this service keeps working.
+export { CONTRACT_CONTEXTS, isContractContext } from './contracts/contractVocabulary';
+export type { ContractContext } from './contracts/contractVocabulary';
+
+// Also imported: a re-export does not bind the name locally.
+import type { ContractContext } from './contracts/contractVocabulary';
 export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined' | 'void' | 'expired';
 
 export interface Contract {
