@@ -240,6 +240,32 @@ export interface SeoGscSummary {
   metrics: Record<string, SeoMetricPayload>;
 }
 
+/**
+ * Whether the thing that produces AI-visibility numbers is switched ON.
+ *
+ * Measured 2026-08-27: all 17 tracked subjects were `is_active = false`, so the
+ * daily `llm-mention-probe-daily` cron found nothing to do and recorded
+ * `succeeded` every night for 41 days — while the panel showed a confident 49.2%
+ * share of voice from July. A surface reporting on a feed has to report the feed's
+ * own health, or it presents stale numbers as current ones.
+ */
+export interface AiMonitoringState {
+  subjects_total: number;
+  subjects_active: number;
+  subjects_llm_on: number;
+  /** What the nightly cron will actually pick up. Zero = it runs and does nothing. */
+  subjects_due_eligible: number;
+  monitoring_on: boolean;
+  last_probe_at: string | null;
+  site_host: string;
+  /** Answers "why does it report for other brands but not for our own site". */
+  own_brand_tracked: boolean;
+  own_brand_subject_id: string | null;
+  own_brand_label: string | null;
+  own_brand_inactive: boolean;
+  diagnosis: string | null;
+}
+
 export interface AiVisibilityModelRow {
   model: string;
   probes: number;
@@ -627,6 +653,15 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as SeoGscSummary) ?? null;
+  },
+
+  async aiMonitoringState(websiteId: string): Promise<AiMonitoringState | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_ai_monitoring_state' as any,
+      { p_website_id: websiteId } as any,
+    );
+    if (error) throw error;
+    return (data as AiMonitoringState) ?? null;
   },
 
   async aiVisibility(websiteId: string, days = 90): Promise<AiVisibility | null> {

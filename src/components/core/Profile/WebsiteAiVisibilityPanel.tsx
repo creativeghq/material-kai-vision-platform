@@ -1,11 +1,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bot, Loader2, MessageSquareQuote, Users } from 'lucide-react';
+import { AlertTriangle, Bot, Loader2, MessageSquareQuote, Play, Power, Plus, Users } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
-import { userWebsitesService, type AiVisibility, type UserWebsite } from '@/services/userWebsitesService';
+import {
+  userWebsitesService,
+  type AiMonitoringState,
+  type AiVisibility,
+  type UserWebsite,
+} from '@/services/userWebsitesService';
+import {
+  createTrackedMention,
+  probeSubjectLlm,
+  updateTrackedMention,
+} from '@/services/mentionMonitoringApi';
+import { Button } from '@/components/core/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { Sparkline } from './seo/Sparkline';
 import { timeAgo } from '@/utils/datetime';
 import { compact } from './seo/seoMetrics';
@@ -56,20 +68,147 @@ function ShareCell({ share, note }: { share: number | null; note: string | null 
   );
 }
 
+/**
+ * The feed's own health, above its numbers.
+ *
+ * Without this the panel shows a confident share-of-voice figure computed from
+ * data that stopped arriving six weeks ago, because every subject is switched off
+ * and the nightly cron has been succeeding with nothing to do. A dashboard that
+ * cannot say "this stopped" is not reporting, it is decorating.
+ *
+ * Each diagnosis carries the ONE action that resolves it — a banner that explains
+ * a problem and leaves the reader to find the fix elsewhere is only half of it.
+ */
+function MonitoringBanner({
+  state, busy, onTrack, onTurnOn, onRun,
+}: {
+  state: AiMonitoringState;
+  busy: string | null;
+  onTrack: () => void;
+  onTurnOn: (id: string) => void;
+  onRun: (id: string) => void;
+}) {
+  if (!state.diagnosis) return null;
+  const canTurnOn = state.subjects_total > 0 && state.subjects_due_eligible === 0;
+  const needsOwnBrand = !state.own_brand_tracked && !state.own_brand_subject_id;
+
+  return (
+    <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 p-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-xs leading-snug text-amber-800 dark:text-amber-300">{state.diagnosis}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {state.subjects_active} of {state.subjects_total} subjects active ·{' '}
+            {state.subjects_due_eligible} eligible for tonight&rsquo;s run
+            {state.site_host ? <> · site is {state.site_host}</> : null}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {needsOwnBrand && (
+              <Button size="sm" variant="outline" disabled={!!busy} onClick={onTrack}>
+                {busy === 'track' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
+                Track this site&rsquo;s brand
+              </Button>
+            )}
+            {state.own_brand_subject_id && state.own_brand_inactive && (
+              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => onTurnOn(state.own_brand_subject_id!)}>
+                {busy === 'on' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Power className="mr-1 h-3.5 w-3.5" />}
+                Switch {state.own_brand_label} back on
+              </Button>
+            )}
+            {state.own_brand_subject_id && !state.own_brand_inactive && (
+              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => onRun(state.own_brand_subject_id!)}>
+                {busy === 'run' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Play className="mr-1 h-3.5 w-3.5" />}
+                Run probes now
+              </Button>
+            )}
+            {canTurnOn && !state.own_brand_subject_id && (
+              <span className="self-center text-[11px] text-muted-foreground">
+                Switch individual subjects on in Mention Monitoring.
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
+  const { toast } = useToast();
   const [data, setData] = useState<AiVisibility | null>(null);
+  const [state, setState] = useState<AiMonitoringState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await userWebsitesService.aiVisibility(website.id, 90));
-    } catch {
-      setData(null);
+      // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
+      // stale report, so it must still render when the report itself fails.
+      const [v, m] = await Promise.allSettled([
+        userWebsitesService.aiVisibility(website.id, 90),
+        userWebsitesService.aiMonitoringState(website.id),
+      ]);
+      setData(v.status === 'fulfilled' ? v.value : null);
+      setState(m.status === 'fulfilled' ? m.value : null);
     } finally {
       setLoading(false);
     }
   }, [website.id]);
+
+  /** Track this site's own brand — the thing whose absence the panel reports. */
+  const trackOwnBrand = async () => {
+    setBusy('track');
+    try {
+      const label = website.display_name?.trim() || (state?.site_host ?? '').split('.')[0];
+      await createTrackedMention({
+        subject_type: 'brand',
+        subject_label: label,
+        homepage_domain: state?.site_host,
+        // Switched ON at creation. Every existing subject in this workspace was
+        // created inactive and silently never probed; repeating that default here
+        // would reproduce the exact defect this panel exists to surface.
+        sources_enabled: { llm: true, news: true, blogs: true, rss: true, youtube: false },
+        run_first_refresh: false,
+      });
+      toast({ title: `Now tracking ${label}`, description: 'It joins tonight’s probe run.' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Could not track it', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const turnOn = async (id: string) => {
+    setBusy('on');
+    try {
+      await updateTrackedMention(id, {
+        is_active: true,
+        sources_enabled: { llm: true, news: true, blogs: true, rss: true, youtube: false },
+      });
+      toast({ title: 'Monitoring switched on' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Could not switch it on', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runNow = async (id: string) => {
+    setBusy('run');
+    try {
+      await probeSubjectLlm({ kind: 'subject', trackedMentionId: id });
+      toast({ title: 'Probe run finished', description: 'Figures below are refreshed.' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Probe run failed', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -97,7 +236,13 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             What AI assistants say about you when someone asks for a recommendation.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {state && (
+            <MonitoringBanner
+              state={state} busy={busy}
+              onTrack={trackOwnBrand} onTurnOn={turnOn} onRun={runNow}
+            />
+          )}
           <HubEmptyState
             variant="empty"
             title="Nothing is being probed yet"
@@ -130,6 +275,12 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {state && (
+            <MonitoringBanner
+              state={state} busy={busy}
+              onTrack={trackOwnBrand} onTurnOn={turnOn} onRun={runNow}
+            />
+          )}
           {failedShare >= 10 && (
             <div className="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
