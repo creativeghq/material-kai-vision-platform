@@ -130,6 +130,7 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
           const product = matchedProducts.find((p) => p.id === a.product_id);
           await emitFlowEvent('material_alert', {
             user_id:    ss.user_id,
+            workspace_id: ss.workspace_id ?? null,
             type:       'material_alert',
             title:      `New match: "${product?.name ?? 'Material'}"`,
             body:       `A new material matches your saved search "${ss.name}"`,

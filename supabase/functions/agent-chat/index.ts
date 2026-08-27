@@ -4184,6 +4184,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                   result_count: tr.result.results.length,
                   agent_id: agentId,
                   user_id: userId,
+                  workspace_id: workspaceId || null,
                 }).catch(() => {});
                 emitFlowEvent('search_executed', {
                   query: tr.args?.query || userInput,
@@ -4191,6 +4192,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                   search_type: 'agent',
                   agent_id: agentId,
                   user_id: userId,
+                  workspace_id: workspaceId || null,
                 }).catch(() => {});
               }
               if (tr.tool === 'generate_3d' && tr.result?.success) {
@@ -4200,6 +4202,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                   prompt: tr.args?.prompt,
                   agent_id: agentId,
                   user_id: userId,
+                  workspace_id: workspaceId || null,
                 }).catch(() => {});
               }
             }

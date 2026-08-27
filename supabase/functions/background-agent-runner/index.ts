@@ -386,6 +386,7 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
         // Delivered by the "Agent Run Completed" flow (Flows dashboard).
         emitFlowEvent('agent_search_completed', {
           user_id: ownerMember.user_id,
+          workspace_id: agentConfig.workspace_id ?? null,
           type: 'agent_run_done',
           title: `Agent "${agentConfig.name}" completed`,
           body: 'Background agent run finished successfully.',
@@ -534,6 +535,7 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
         // Delivered by the "Agent Run Failed" flow (Flows dashboard).
         emitFlowEvent('background_agent_failed', {
           user_id: ownerMember.user_id,
+          workspace_id: agentConfig.workspace_id ?? null,
           type: 'agent_run_failed',
           title: `Agent "${agentConfig.name}" failed`,
           body: errMsg,

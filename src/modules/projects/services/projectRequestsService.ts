@@ -64,6 +64,24 @@ export interface NewRequest {
   assignee_id?: string | null;
 }
 
+/**
+ * The workspace a project belongs to. `project_requests` stores only `project_id`, and an event
+ * without a workspace_id is invisible to `workspace_flow_preferences` — flow-engine reads the
+ * overlay only inside `if (workspaceId && …)`, so the tenant's off switch silently does nothing
+ * and a workspace-owned automation on this trigger can never match. Best-effort by design: losing
+ * the lookup must never cost the reply the user just posted.
+ */
+async function projectWorkspaceId(projectId: string | null | undefined): Promise<string | null> {
+  if (!projectId) return null;
+  try {
+    const { data } = await (supabase as any)
+      .from('projects').select('workspace_id').eq('id', projectId).single();
+    return (data as { workspace_id?: string } | null)?.workspace_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const projectRequestsService = {
   async list(projectId: string): Promise<ProjectRequestWithMessages[]> {
     const { data, error } = await (supabase as any)
@@ -105,10 +123,11 @@ export const projectRequestsService = {
 
     // Notify the project owner. Resolved here because the flow needs a concrete recipient.
     const { data: project } = await (supabase as any)
-      .from('projects').select('user_id, name').eq('id', input.project_id).single();
+      .from('projects').select('user_id, name, workspace_id').eq('id', input.project_id).single();
 
     flowEventService.emit('project_request_raised', {
       user_id: project?.user_id ?? null,
+      workspace_id: project?.workspace_id ?? null,
       title: `New request on ${project?.name || 'a project'}`,
       body: `${raiserName || 'Someone'}: ${row.title}`,
       type: 'project_request',
@@ -143,6 +162,7 @@ export const projectRequestsService = {
     if (!isFromClient && request.raised_by && request.raised_by !== user?.id) {
       flowEventService.emit('project_request_answered', {
         user_id: request.raised_by,
+        workspace_id: await projectWorkspaceId(request.project_id),
         title: 'Your request has a reply',
         body: `${authorName || 'The team'}: ${body.slice(0, 160)}`,
         type: 'project_request',
@@ -163,6 +183,7 @@ export const projectRequestsService = {
     if (REQUEST_CLOSED_STATUSES.includes(status) && request.raised_by) {
       flowEventService.emit('project_request_answered', {
         user_id: request.raised_by,
+        workspace_id: await projectWorkspaceId(request.project_id),
         title: status === 'resolved' ? 'Your request was resolved' : 'Your request was closed',
         body: request.title,
         type: 'project_request',

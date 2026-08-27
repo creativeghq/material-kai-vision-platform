@@ -451,6 +451,7 @@ export const tripExpenseService = {
         .eq('workspace_id', report.workspace_id).in('role', ['owner', 'admin']);
       flowEventService.emit('expense_card_submitted', {
         card_id: report.id,
+        workspace_id: report.workspace_id,
         reviewer_ids: (reviewers || []).map((m: any) => m.user_id),
         type: 'expense_card_submitted',
         title: `Expense card submitted: ${report.title}`,
@@ -474,6 +475,7 @@ export const tripExpenseService = {
           : report.status === 'rejected' ? 'rejected' : 'partially approved';
         flowEventService.emit('expense_card_reviewed', {
           card_id: report.id,
+          workspace_id: report.workspace_id,
           user_id: report.user_id,
           status: report.status,
           type: 'expense_card_reviewed',
@@ -497,6 +499,7 @@ export const tripExpenseService = {
     try {
       flowEventService.emit('expense_card_requested', {
         card_id: report.id,
+        workspace_id: report.workspace_id,
         user_id: report.user_id,
         type: 'expense_card_requested',
         title: `Please fill an expense card: ${report.title}`,

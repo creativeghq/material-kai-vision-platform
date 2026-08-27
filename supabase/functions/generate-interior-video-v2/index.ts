@@ -397,6 +397,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
       emitFlowEvent('video_generation_completed', {
         user_id: userId,
+        workspace_id,
         type: 'video_ready',
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
@@ -445,6 +446,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
       emitFlowEvent('video_generation_completed', {
         user_id: userId,
+        workspace_id,
         type: 'video_ready',
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
@@ -509,6 +511,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
         emitFlowEvent('video_generation_completed', {
           user_id: userId,
+          workspace_id,
           type: 'video_ready',
           title: 'Your video is ready!',
           body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
@@ -568,6 +571,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
     emitFlowEvent('video_generation_failed', {
       user_id: userId,
+      workspace_id,
       type: 'video_failed',
       title: 'Video generation failed',
       body: 'Something went wrong generating your video. Any credits used have been refunded.',

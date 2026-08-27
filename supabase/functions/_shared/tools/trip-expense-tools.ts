@@ -179,6 +179,7 @@ export const createSubmitTripCardTool = (userId: string, workspaceId: string, on
           .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']);
         await emitFlowEvent('expense_card_submitted', {
           card_id: card.id,
+          workspace_id: workspaceId,
           reviewer_ids: (reviewers || []).map((m: any) => m.user_id),
           type: 'expense_card_submitted',
           title: `Expense card submitted: ${card.title}`,

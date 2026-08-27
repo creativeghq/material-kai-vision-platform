@@ -284,6 +284,7 @@ async function handleRequest(
     // Delivered by the "Virtual Staging Done" flow (Flows dashboard).
     emitFlowEvent('virtual_staging_completed', {
       user_id: userId,
+      workspace_id: body.workspace_id ?? null,
       type: 'staging_ready',
       title: 'Virtual staging complete!',
       body: `Your ${room} has been virtually staged and is ready to view.`,

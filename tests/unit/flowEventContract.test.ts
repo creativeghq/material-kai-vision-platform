@@ -210,6 +210,7 @@ describe('tenant flow vocabulary', () => {
     'social_account_connected', 'social_account_disconnected',
     'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
     'seo.article_refresh_due', 'seo.site_health_changed',
+    'seo.ranking_movement', 'seo.backlink_movement',
     'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
   ];
   const RPC_ACTIONS = [
@@ -368,6 +369,8 @@ describe('tenant flow vocabulary', () => {
       upstream_order_created: "SQL: public._notify_upstream_order_created — data carries 'workspace_id', NEW.workspace_id",
       rfq_lines_requested:   "SQL: public._notify_rfq_lifecycle — v_data carries 'workspace_id', v_recipient_ws",
       rfq_lines_priced:      'same site as rfq_lines_requested (the other status branch)',
+      'seo.ranking_movement': "eventType parameter of maybeAlert(), supabase/functions/seo-domain-tracker — payload carries workspace_id: website.workspace_id",
+      'seo.backlink_movement': 'same maybeAlert() helper as seo.ranking_movement',
     };
 
     const offenders: string[] = [];

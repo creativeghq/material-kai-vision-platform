@@ -302,12 +302,13 @@ Deno.serve(withApiLogging('generate-quote-pdf', async (req) => {
     // Notify quote owner that PDF is ready
     const { data: quoteRecord } = await supabase
       .from('quotes')
-      .select('user_id')
+      .select('user_id, workspace_id')
       .eq('id', quoteId)
       .single();
     if (quoteRecord?.user_id) {
       emitFlowEvent('quote_pdf_generated', {
         user_id: quoteRecord.user_id,
+        workspace_id: quoteRecord.workspace_id ?? null,
         type: 'pdf_ready',
         title: 'Your quote PDF is ready',
         body: `Quote ${quoteData.quote_number || ''} PDF has been generated and is ready to download.`,

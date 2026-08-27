@@ -1556,6 +1556,7 @@ async function handleJwtAction(
         if (addedUser) {
           await emitFlowEvent('inbox.thread_assigned', {
             user_id: addedUser,
+            workspace_id: (thread as { workspace_id?: string }).workspace_id ?? null,
             type: 'inbox_assigned',
             title: 'You were added to a conversation',
             body: (thread as { subject?: string }).subject || 'New conversation',
@@ -1619,6 +1620,7 @@ async function handleJwtAction(
       if (target.user_id) {
         await emitFlowEvent('inbox.thread_assigned', {
           user_id: target.user_id,
+          workspace_id: (thread as { workspace_id?: string }).workspace_id ?? null,
           type: 'inbox_assigned',
           title: 'You were added to a conversation',
           body: (thread.subject as string) || 'New conversation',
@@ -3471,6 +3473,7 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
   // conversation itself instead of a screen that no longer exists.
   await emitFlowEvent('hire_me_received', {
     user_id: toUserId, to_user_id: toUserId, type: 'hire_me',
+    workspace_id: workspaceId,
     title: `New hire request from ${name}`,
     body: services.length ? `Interested in: ${services.join(', ')}` : message.slice(0, 100),
     action_url: `/inbox?thread=${threadId}`,

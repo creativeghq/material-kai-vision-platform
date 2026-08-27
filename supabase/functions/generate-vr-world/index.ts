@@ -309,6 +309,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     // The event carries the full notification payload so an admin can pause/edit it.
     emitFlowEvent('vr_world_created', {
       user_id: userId,
+      workspace_id: wsId,
       type: 'vr_world_ready',
       title: 'Your VR world is ready!',
       body: 'Your 3D environment has been generated and is ready to explore.',
@@ -357,6 +358,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       if (userId) {
         emitFlowEvent('vr_world_failed', {
           user_id: userId,
+          workspace_id: wsId,
           type: 'vr_world_failed',
           title: 'VR world generation failed',
           body: 'Something went wrong generating your 3D world. Any credits used have been refunded.',

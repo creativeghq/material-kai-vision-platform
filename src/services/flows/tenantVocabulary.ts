@@ -65,6 +65,7 @@ export const TENANT_TRIGGERS = [
   'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
   // SEO
   'seo.article_refresh_due', 'seo.site_health_changed',
+  'seo.ranking_movement', 'seo.backlink_movement',
   // Real estate
   'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
 ] as const;
