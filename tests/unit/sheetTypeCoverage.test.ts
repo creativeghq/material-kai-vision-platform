@@ -73,12 +73,18 @@ describe('presentation sheet type coverage', () => {
     expect([...ALL_TYPES].sort()).toEqual([...dbEnum].sort());
   });
 
-  it('the edge SheetType union matches the frontend union', () => {
-    // Scope to the SheetType declaration — the file holds other unions too.
-    const decl = /export type SheetType =([\s\S]*?);/.exec(EDGE_TYPES);
-    expect(decl, 'SheetType union not found in edge types.ts').toBeTruthy();
-    const edgeUnion = [...decl![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-    expect(edgeUnion.sort()).toEqual([...ALL_TYPES].sort());
+  it('the edge side has no union of its own to disagree with', () => {
+    // This case used to parse the edge `SheetType` union and compare it to the frontend
+    // one. That was the right check while there were two lists — and #391's point is
+    // that comparing copies detects drift only AFTER someone ships it. There is now one
+    // source and a generated mirror, so what is worth asserting is that the copy is
+    // gone, not that two copies still agree.
+    expect(
+      /export type SheetType =\s*\|/.test(EDGE_TYPES),
+      'edge types.ts declares its own SheetType union again — import the generated ' +
+        'mirror of src/services/moodboards/sheetVocabulary.ts instead',
+    ).toBe(false);
+    expect(EDGE_TYPES).toContain('sheetVocabulary.generated.ts');
   });
 
   it('frontend SHEET_TYPE_CREDITS and edge SHEET_CREDITS agree on every type and price', () => {
@@ -104,10 +110,27 @@ describe('presentation sheet type coverage', () => {
   });
 
   it('every sheet type is creatable by the agent tool', () => {
-    // Anchored on SHEET_TYPES, not the z.enum call: the tool declares its vocabulary ONCE and
-    // derives both the zod enum and its SheetType union from it, because those two had already
-    // drifted — the enum accepted electrical_plan and the union did not.
-    const toolEnum = arrayMembers(SHEET_TOOL, 'const SHEET_TYPES = ');
+    // Read from the generated MANIFEST rather than by parsing the tool's source (#391).
+    //
+    // It used to parse `const SHEET_TYPES = [...]` out of the tool file. That list is
+    // gone — the tool imports the single source now — so the old anchor would find
+    // nothing and the check would pass on an empty set, which is the way a guard stops
+    // guarding without failing.
+    //
+    // The manifest is the AST projection of what the tool's zod schema actually
+    // resolves to, which is a stronger statement than what its source text says: if the
+    // import ever stops resolving, the param degrades to `type: 'string'` and this finds
+    // no options at all.
+    const manifest = read('src/components/features/ai/toolManifest.generated.ts');
+    const block = /name: 'generate_presentation_sheet'[\s\S]*?\n {2}\},/.exec(manifest);
+    expect(block, 'generate_presentation_sheet is not in the tool manifest').toBeTruthy();
+    const enumLine = /name: 'sheet_type'[^}]*enum: \[([^\]]*)\]/.exec(block![0]);
+    expect(
+      enumLine,
+      "sheet_type is no longer an enum param — the z.enum stopped resolving through its " +
+        'import, which silently kills the autoFields select',
+    ).toBeTruthy();
+    const toolEnum = [...enumLine![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     const missing = ALL_TYPES.filter((t) => !toolEnum.includes(t));
     expect(missing, 'sheet types the agent cannot create').toEqual([]);
   });

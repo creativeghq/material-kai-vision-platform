@@ -38,22 +38,11 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
  * accepted it while this union did not, which is the same two-copies-of-one-vocabulary failure
  * CLAUDE.md documents for workspace roles.
  */
-const SHEET_TYPES = [
-  'material_board',
-  'color_palette',
-  'concept_board',
-  'lighting_plan',
-  'plumbing_plan',
-  'electrical_plan',
-  'annotated_render',
-  'elevation_render_pair',
-  'ffe_schedule',
-  'area_breakdown',
-  'scope_of_works',
-  'full_deck',
-] as const;
-
-type SheetType = (typeof SHEET_TYPES)[number];
+// One source (#391). This list and the union below it were a hand-written copy — the
+// comment above records that it had ALREADY drifted once against the tool's own schema,
+// which is the failure the single source removes rather than re-detects.
+import { SHEET_TYPES } from '../sheetVocabulary.generated.ts';
+import type { SheetType } from '../sheetVocabulary.generated.ts';
 
 export const createPresentationSheetTool = (
   userId: string,

@@ -624,7 +624,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Create a presentation sheet attached to a moodboard.',
     params: [
       { name: 'moodboard_id', type: 'string', optional: false, description: 'UUID of the moodboard the sheet attaches to' },
-      { name: 'sheet_type', type: 'enum', enum: ['material_board', 'color_palette', 'concept_board', 'lighting_plan', 'plumbing_plan', 'electrical_plan', 'annotated_render', 'elevation_render_pair', 'ffe_schedule', 'area_breakdown', 'scope_of_works', 'full_deck'], optional: false, description: 'Sheet type to generate' },
+      { name: 'sheet_type', type: 'enum', enum: ['material_board', 'color_palette', 'concept_board', 'lighting_plan', 'annotated_render', 'elevation_render_pair', 'ffe_schedule', 'full_deck', 'area_breakdown', 'plumbing_plan', 'electrical_plan', 'scope_of_works'], optional: false, description: 'Sheet type to generate' },
       { name: 'title', type: 'string', optional: false, description: 'Display title for the sheet, e.g. "Bathroom Wall Sheet"' },
       { name: 'initial_data', type: 'object', optional: true, description: 'Per-sheet-type payload. See description for required fields by sheet_type.' },
       { name: 'sheet_id', type: 'string', optional: true, description: 'Re-open an existing sheet for editing. When provided, all other parameters except moodboard_id are ignored — the saved data is loaded and the canvas opens. No credit charge.' },

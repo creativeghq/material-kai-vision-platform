@@ -1,21 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
-export type SheetType =
-  | 'material_board'
-  | 'color_palette'
-  | 'concept_board'
-  | 'lighting_plan'
-  | 'plumbing_plan'
-  | 'electrical_plan'
-  | 'annotated_render'
-  | 'elevation_render_pair'
-  | 'ffe_schedule'
-  | 'area_breakdown'
-  | 'scope_of_works'
-  | 'full_deck';
+// One source (#391). `SheetType` was declared here and in five other files; re-exported
+// so every existing `import { SheetType } from '.../moodboardSheetsService'` keeps working.
+export { SHEET_TYPES, SHEET_STATUSES, isSheetType, isSheetStatus } from './moodboards/sheetVocabulary';
+export type { SheetType, SheetStatus } from './moodboards/sheetVocabulary';
 
-export type SheetStatus = 'draft' | 'generating' | 'ready' | 'failed';
+// Also imported: a re-export does not bind the names locally.
+import type { SheetType, SheetStatus } from './moodboards/sheetVocabulary';
 
 export interface PresentationSheet {
   id: string;

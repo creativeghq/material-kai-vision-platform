@@ -15,19 +15,10 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 
-export type SheetType =
-  | 'material_board'
-  | 'color_palette'
-  | 'concept_board'
-  | 'lighting_plan'
-  | 'plumbing_plan'
-  | 'electrical_plan'
-  | 'annotated_render'
-  | 'elevation_render_pair'
-  | 'ffe_schedule'
-  | 'area_breakdown'
-  | 'scope_of_works'
-  | 'full_deck';
+// One source (#391) — the generated mirror of src/services/moodboards/sheetVocabulary.ts.
+export type { SheetType } from '../_shared/sheetVocabulary.generated.ts';
+// Also imported: a re-export does not bind the name locally.
+import type { SheetType } from '../_shared/sheetVocabulary.generated.ts';
 
 type SupabaseClient = DbClient;
 

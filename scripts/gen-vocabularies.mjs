@@ -38,6 +38,12 @@ export const VOCABULARIES = [
     'src/modules/hr/hrVocabulary.ts',
     'supabase/functions/_shared/hrVocabulary.generated.ts',
   ],
+  [
+    // #391 — `SheetType` was declared in SIX files with twelve values each, the largest
+    // duplication in the sweep. `moodboard_sheet_type` is a Postgres enum.
+    'src/services/moodboards/sheetVocabulary.ts',
+    'supabase/functions/_shared/sheetVocabulary.generated.ts',
+  ],
 ];
 
 const banner = (source) => [
