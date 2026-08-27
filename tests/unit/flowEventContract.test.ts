@@ -167,10 +167,14 @@ describe('flow event contract', () => {
 describe('tenant flow vocabulary', () => {
   const TOOL_FILE = 'supabase/functions/_shared/tools/flow-tools.ts';
 
+  // The ONE TypeScript source. flow-tools.ts imports the generated Deno mirror of it and
+  // paletteItems.ts imports it directly, so neither declares a list of its own any more.
+  const SOURCE = 'src/services/flows/tenantVocabulary.ts';
+
   const readConst = (name: string): string[] => {
-    const src = stripComments(readFileSync(TOOL_FILE, 'utf8'));
-    const start = src.indexOf(`const ${name} = [`);
-    expect(start, `could not find ${name} in ${TOOL_FILE}`).toBeGreaterThan(-1);
+    const src = stripComments(readFileSync(SOURCE, 'utf8'));
+    const start = src.indexOf(`export const ${name} = [`);
+    expect(start, `could not find ${name} in ${SOURCE}`).toBeGreaterThan(-1);
     const body = src.slice(start, src.indexOf(']', start));
     return [...body.matchAll(/'([a-zA-Z0-9_.]+)'/g)].map((m) => m[1]);
   };
@@ -215,6 +219,28 @@ describe('tenant flow vocabulary', () => {
     '(the TypeScript mirror) and tenant_flow_allowed_triggers() / tenant_flow_allowed_actions() ' +
     '(the ONE database list, read by create_simple_flow AND the enforce_tenant_flow_allowlist ' +
     'table trigger), applied via mcp__supabase__apply_migration. Do NOT add a fourth list.';
+
+  it('nothing re-declares the vocabulary — the consumers import it', () => {
+    // The whole point of the 2026-08-27 consolidation. Re-adding a local `const TENANT_TRIGGERS`
+    // to either consumer restores the exact shape that let the palette drift wider than the
+    // enforcer, and it would do so while every other assertion in this file still passed.
+    for (const f of [TOOL_FILE, 'src/components/Admin/FlowsManagement/utils/paletteItems.ts']) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const name of ['TENANT_TRIGGERS', 'TENANT_ACTIONS']) {
+        // Substring search, not a regex. A `\s` inside a TEMPLATE LITERAL is not an escape — JS
+        // drops the backslash — so `new RegExp(\`const\\s+${name}\`)` silently becomes /consts+/
+        // and matches nothing. That is a guard that passes by being broken, which is the exact
+        // genre of bug this file exists to catch; it is not worth reintroducing for a word boundary.
+        const declared = src.includes(`const ${name} = [`) || src.includes(`const ${name}: `);
+        expect(
+          declared,
+          `${f} declares its own ${name}. Import it from ${SOURCE} instead (edge code imports ` +
+          'the generated mirror, tenantVocabulary.generated.ts) — a second copy is what this ' +
+          'consolidation removed.',
+        ).toBe(false);
+      }
+    }
+  });
 
   it('the offered triggers are exactly the ones create_simple_flow allows', () => {
     expect([...readConst('TENANT_TRIGGERS')].sort(), SYNC_HINT).toEqual([...RPC_TRIGGERS].sort());

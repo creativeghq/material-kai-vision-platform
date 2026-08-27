@@ -1,6 +1,6 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
-  "entrypoints": 181,
+  "entrypoints": 182,
   "total": 52,
   "uncheckable": {},
   "files": {

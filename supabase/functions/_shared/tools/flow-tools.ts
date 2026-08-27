@@ -35,56 +35,11 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 const MODULE_SLUG = 'flows-toolkit';
 
-// Curated tenant-safe vocabulary — the TypeScript mirror of `tenant_flow_allowed_triggers()` /
-// `tenant_flow_allowed_actions()`, the ONE SQL source both create_simple_flow and the
-// enforce_tenant_flow_allowlist table trigger now read. It used to be three lists, not two: the
-// table trigger was never given `payment_sent`, so a "notify me when a payment goes out" flow
-// passed zod, passed the RPC, and then died on a raw 42501 from the trigger nobody had listed.
-// Only triggers with a real workspace-scoped emitter belong here. A trigger with no emitter,
-// or one emitted without a workspace_id, can never match a tenant flow: flow-engine matches a
-// non-global flow ONLY as `and(is_global.eq.false, workspace_id.eq.<ws>)`, so an unattributed
-// event falls back to global-only and the tenant's copy sits there matching nothing. Worse for a
-// FORK, which switches the platform default off in the same transaction — the owner ends up with
-// FEWER notifications and no error anywhere. Add a trigger only once a trusted server-side emitter
-// stamps workspace_id, and record where that was verified in the guard test's VERIFIED_ELSEWHERE.
-//
-// `appointment_booked` was here and could never have worked — `appointments` has no workspace_id
-// column and the emitter is a public booking by a visitor who need not be a member of anything.
-const TENANT_TRIGGERS = [
-  // Entry points: not events.
-  'manual', 'scheduled',
-  // Finance
-  'invoice_paid', 'payment_received', 'payment_sent', 'bank_payment_unmatched',
-  'card_spend_threshold', 'customer_credit_releasable', 'finance_follow_up',
-  // Quotes, orders, purchasing
-  'quote_approved', 'quote_rejected', 'quote_sent', 'order_created', 'order_status_changed',
-  'purchase_order.sent', 'purchase_order.received', 'supplier_po_received',
-  'upstream_order_created', 'rfq_lines_requested', 'rfq_lines_priced', 'inventory_low_stock',
-  'pricing_change_requested', 'pricing_change_decided',
-  // Inbox
-  'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
-  // CRM & contracts
-  'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
-  // HR
-  'hr.employee_added', 'hr.departure_recorded', 'hr.absence_requested', 'hr.absence_reviewed',
-  'hr.overtime_recorded', 'hr.applicant_stage_changed', 'hr_late_checkin',
-  // Installed base (#343)
-  'asset.service_due', 'asset.service_overdue',
-  // Marketing, catalog, content
-  'campaign_sent', 'catalog_sent_to_customers', 'client_view_feedback_received',
-  'document_published', 'doc_suggestion_submitted', 'page_watch_changed',
-  // Social & WhatsApp
-  'social_post_published', 'social_post_failed', 'social_comment_received',
-  'social_account_connected', 'social_account_disconnected',
-  'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
-  // SEO
-  'seo.article_refresh_due', 'seo.site_health_changed',
-  // Real estate
-  'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
-] as const;
-const TENANT_ACTIONS = [
-  'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
-] as const;
+// The tenant-safe vocabulary is NOT declared here. It is one source —
+// src/services/flows/tenantVocabulary.ts — byte-mirrored across the Vite/Deno boundary by
+// `npm run vocab:mirror` (part of gen:all). It used to be four hand-written lists agreeing only
+// by memory, and the palette copy had already drifted wider than the SQL enforcer.
+import { TENANT_TRIGGERS, TENANT_ACTIONS } from './tenantVocabulary.generated.ts';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 /**

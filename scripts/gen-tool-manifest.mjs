@@ -46,8 +46,8 @@
  *   --check   exit 1 if either committed file is stale (used by CI / the guard test)
  */
 import ts from 'typescript';
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join, relative, dirname } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -107,9 +107,19 @@ const isZodRoot = (n) =>
 /**
  * Module-level `const X = ['a','b'] as const` arrays, so `z.enum(RING_VALUES)`
  * resolves to its values instead of degrading to an option-less enum.
+ *
+ * IMPORTED arrays count too, and that is not a nicety. A vocabulary shared by both runtimes has
+ * to live in ONE module and be imported (or byte-mirrored) — that is the whole point of
+ * `npm run vocab:mirror`. Resolving only same-file consts silently punishes exactly that
+ * structure: `z.enum(TENANT_TRIGGERS)` degrades to `type: 'string'`, the manifest loses all 56
+ * options, `autoFields` renders a free-text box where a select belongs, and the toolkitCoverage
+ * assertion that a quick-start offers only values the enum accepts quietly has nothing to check.
+ * Every gate stays green while the form gets worse. Caught on 2026-08-27, when flow-tools.ts
+ * stopped declaring its own copy of the tenant vocabulary.
  */
-function constArrays(sourceFile) {
+function constArrays(sourceFile, depth = 0) {
   const out = new Map();
+
   for (const stmt of sourceFile.statements) {
     if (!ts.isVariableStatement(stmt)) continue;
     for (const d of stmt.declarationList.declarations) {
@@ -120,6 +130,39 @@ function constArrays(sourceFile) {
       if (!ts.isArrayLiteralExpression(init)) continue;
       const vals = init.elements.map(lit);
       if (vals.length && vals.every((v) => v !== null)) out.set(d.name.text, vals);
+    }
+  }
+
+  // Follow relative imports one hop (two total). Deep enough for a vocabulary module, shallow
+  // enough that a cycle cannot spin — and a miss degrades exactly as before rather than throwing.
+  if (depth >= 1) return out;
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    const spec = stmt.moduleSpecifier.text;
+    if (!spec.startsWith('.')) continue;
+    const names = stmt.importClause?.namedBindings;
+    if (!names || !ts.isNamedImports(names)) continue;
+
+    const base = dirname(sourceFile.fileName);
+    // Deno specifiers carry the extension; Vite ones do not.
+    const candidates = [spec, `${spec}.ts`, `${spec}.tsx`, `${spec}/index.ts`]
+      .map((s) => resolve(base, s));
+    const found = candidates.find((p) => { try { return statSync(p).isFile(); } catch { return false; } });
+    if (!found) continue;
+
+    let imported;
+    try {
+      imported = constArrays(
+        ts.createSourceFile(found, readFileSync(found, 'utf8'), ts.ScriptTarget.Latest, true),
+        depth + 1,
+      );
+    } catch { continue; }
+
+    for (const el of names.elements) {
+      // `import { A as B }` — look up the exported name, bind under the local one.
+      const exported = (el.propertyName ?? el.name).text;
+      const local = el.name.text;
+      if (!out.has(local) && imported.has(exported)) out.set(local, imported.get(exported));
     }
   }
   return out;
