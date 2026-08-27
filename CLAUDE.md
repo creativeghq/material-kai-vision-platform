@@ -202,7 +202,19 @@ disables the global there in the SAME transaction (both live = every notificatio
 `forked_flow_id` is `ON DELETE CASCADE` so deleting your copy restores the default instead of leaving the
 global silently off. The copy is a tenant flow and is therefore BILLED per run where the default was free —
 say so before the fork. Only the defaults whose trigger and actions are in the tenant vocabulary are forkable
-(4 of 86 today); the UI reads the server-derived `forkable` flag, never its own list of editable triggers.
+(52 of 87 today); the UI reads the server-derived `forkable` flag, never its own list of editable triggers.
+**`tenant_configurable` and `forkable` are different axes — do not reason about one from the other.** The
+first says an owner may GOVERN a default, which leaves it as the operator's global row and works for any
+trigger, because flow-engine matches `is_global.eq.true` for every workspace unconditionally. The second says
+a workspace may OWN a copy, and a copy is `is_global=false`, matched ONLY as
+`and(is_global.eq.false, workspace_id.eq.<ws>)`. So a trigger joins the vocabulary **only once its emitter
+stamps `workspace_id` in the payload** — verify the payload, not that an emitter exists. Without it the fork
+never fires AND `fork_workspace_flow_default` switches the default off in the same transaction, so the owner
+ends up with FEWER notifications and nothing raises. `appointment_booked` shipped in exactly that state
+(`appointments` has no `workspace_id` column). The vocabulary has FOUR copies, and the palette
+(`TENANT_ALLOWED_SUBTYPES`) is the one that had drifted wider — offering nodes the table trigger rejects with
+a raw `42501`. All four are pinned by [tests/unit/flowEventContract.test.ts](tests/unit/flowEventContract.test.ts),
+which reads the emit payload and knows both emit shapes (the role-fanout form takes the event name THIRD).
 Guarded by [tests/unit/workspaceFlowDefaults.test.ts](tests/unit/workspaceFlowDefaults.test.ts).
 **The tenant vocabulary is ONE list and it was THREE.** `tenant_flow_allowed_triggers()` /
 `tenant_flow_allowed_actions()` are the single SQL source, read by BOTH `create_simple_flow` and the
