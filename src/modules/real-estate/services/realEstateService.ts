@@ -9,10 +9,11 @@ import { edgeError } from '@/utils/edgeError';
 export type ListingStatus = 'draft' | 'active' | 'under_offer' | 'sold' | 'rented' | 'withdrawn' | 'archived';
 // One source (#391). Re-exported so existing imports from this service keep working.
 export { PROPERTY_TYPES, isPropertyType } from '../realEstateVocabulary';
-export type { PropertyType } from '../realEstateVocabulary';
+export { KYC_CHECK_TYPES, isKycCheckType } from '../realEstateVocabulary';
+export type { PropertyType, KycCheckType } from '../realEstateVocabulary';
 
 // Also imported: a re-export does not bind the name locally.
-import type { PropertyType } from '../realEstateVocabulary';
+import type { PropertyType, KycCheckType } from '../realEstateVocabulary';
 export type TransactionType = 'sale' | 'rent' | 'short_let' | 'business_transfer' | 'auction';
 
 export interface PropertyListItem {
@@ -200,7 +201,7 @@ export interface TenancyInspection {
  *  whose `expires_at` has gone by — a stale verdict does not clear the gate. */
 export interface KycStatus { required: boolean; satisfied: boolean; missing: string[] }
 export interface KycCheck {
-  id: string; contact_id: string; check_type: 'identity' | 'source_of_funds' | 'pep_sanctions';
+  id: string; contact_id: string; check_type: KycCheckType;
   status: 'pending' | 'passed' | 'failed' | 'waived';
   reference: string | null; notes: string | null; expires_at: string | null;
   verified_by: string | null; verified_at: string | null;

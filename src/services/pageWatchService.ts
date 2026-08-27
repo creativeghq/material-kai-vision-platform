@@ -20,7 +20,12 @@ export type PageWatchCategory =
   | 'competitor'
   | 'other';
 
-export type PageWatchChangeStatus = 'same' | 'new' | 'changed' | 'removed' | 'error';
+// One source (#391). Re-exported so existing imports keep working.
+export { PAGE_WATCH_STATUSES, JUDGE_CONFIDENCES, isPageWatchStatus, isJudgeConfidence } from './pageWatch/pageWatchVocabulary';
+export type { PageWatchChangeStatus, JudgeConfidence } from './pageWatch/pageWatchVocabulary';
+
+// Also imported: a re-export does not bind the name locally.
+import type { PageWatchChangeStatus } from './pageWatch/pageWatchVocabulary';
 
 export interface PageWatch {
   id: string;

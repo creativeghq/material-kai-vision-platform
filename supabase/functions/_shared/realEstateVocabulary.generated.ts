@@ -32,3 +32,18 @@ export type PropertyType = (typeof PROPERTY_TYPES)[number];
 export function isPropertyType(v: unknown): v is PropertyType {
   return typeof v === 'string' && (PROPERTY_TYPES as readonly string[]).includes(v);
 }
+
+/**
+ * `property_kyc_checks_check_type_check`.
+ *
+ * The three checks an anti-money-laundering file needs on a property transaction. Kept in
+ * this module's vocabulary rather than its own file: it was declared as an inline union
+ * in `realEstateService` and as an array in `real-estate-api`, which is the same two-copy
+ * shape as `property_type` above and belongs in the same place.
+ */
+export const KYC_CHECK_TYPES = ['identity', 'source_of_funds', 'pep_sanctions'] as const;
+export type KycCheckType = (typeof KYC_CHECK_TYPES)[number];
+
+export function isKycCheckType(v: unknown): v is KycCheckType {
+  return typeof v === 'string' && (KYC_CHECK_TYPES as readonly string[]).includes(v);
+}

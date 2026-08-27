@@ -28,13 +28,25 @@ export const TRIP_EXPENSE_CATEGORIES = [
 ] as const;
 export type TripExpenseCategory = (typeof TRIP_EXPENSE_CATEGORIES)[number];
 
-export type ExpenseCardType = 'trip' | 'monthly' | 'other';
+// One source for the VALUES (#391). The label list below keeps the name
+// `EXPENSE_CARD_TYPES` because that is what the UI already imports; the raw array lives
+// in `../tripExpenseVocabulary` as `CARD_TYPE_VALUES` and is what the guard pins.
+export { isExpenseCardType } from '../tripExpenseVocabulary';
+export type { ExpenseCardType } from '../tripExpenseVocabulary';
 
-export const EXPENSE_CARD_TYPES: { value: ExpenseCardType; label: string }[] = [
-  { value: 'trip', label: 'Trip' },
-  { value: 'monthly', label: 'Monthly expenses' },
-  { value: 'other', label: 'Other' },
-];
+import { EXPENSE_CARD_TYPES as CARD_TYPE_VALUES } from '../tripExpenseVocabulary';
+import type { ExpenseCardType } from '../tripExpenseVocabulary';
+
+/** Every card type with its label. Keyed by the vocabulary, so a new value is a compile
+ *  error here rather than an option that silently never appears in the picker. */
+const CARD_TYPE_LABELS: Record<ExpenseCardType, string> = {
+  trip: 'Trip',
+  monthly: 'Monthly expenses',
+  other: 'Other',
+};
+
+export const EXPENSE_CARD_TYPES: { value: ExpenseCardType; label: string }[] =
+  CARD_TYPE_VALUES.map((value) => ({ value, label: CARD_TYPE_LABELS[value] }));
 export const EXPENSE_CARD_TYPE_LABEL: Record<ExpenseCardType, string> = {
   trip: 'Trip', monthly: 'Monthly', other: 'Other',
 };

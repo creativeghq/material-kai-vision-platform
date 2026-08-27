@@ -10,7 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type AgentTriggerType = 'cron' | 'event' | 'manual' | 'chain';
+export { AGENT_TRIGGER_TYPES, isAgentTriggerType } from './agents/agentVocabulary';
+export type { AgentTriggerType } from './agents/agentVocabulary';
+import type { AgentTriggerType } from './agents/agentVocabulary';
 // One source (#391). Re-exported so existing imports keep working.
 export {
   AGENT_RUN_STATUSES, ACTIVE_AGENT_RUN_STATUSES, AGENT_LOG_LEVELS,

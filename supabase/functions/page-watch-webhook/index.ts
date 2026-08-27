@@ -29,6 +29,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { PAGE_WATCH_STATUSES } from '../_shared/pageWatchVocabulary.generated.ts';
 
 const WEBHOOK_SECRET_KEY = 'FIRECRAWL_WEBHOOK_SECRET';
 const SECRET_HEADER = 'x-firecrawl-webhook-secret';
@@ -110,7 +111,9 @@ interface WatchRow {
 }
 
 const CONFIDENCE = new Set(['high', 'medium', 'low']);
-const STATUSES = new Set(['same', 'new', 'changed', 'removed', 'error']);
+// One source (#391) — the generated mirror. This Set was the second SHAPE of the union
+// in `pageWatchService`; it is rebuilt from the shared list rather than retyped.
+const STATUSES = new Set<string>(PAGE_WATCH_STATUSES);
 
 /**
  * Resolve the watch that owns a Firecrawl monitor.

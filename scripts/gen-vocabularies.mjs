@@ -62,10 +62,26 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/assetVocabulary.generated.ts',
   ],
   [
-    // #391 — `AgentRunStatus` and `LogLevel`, the same two lines declared on both sides
+    // #391 — `AgentRunStatus`, `LogLevel` and `AgentTriggerType`, declared on both sides
     // of the Vite/Deno boundary.
     'src/services/agents/agentVocabulary.ts',
     'supabase/functions/_shared/agents/agentVocabulary.generated.ts',
+  ],
+  [
+    // #391 — page-watch change status (a union one side, a Set the other) and judge
+    // confidence.
+    'src/services/pageWatch/pageWatchVocabulary.ts',
+    'supabase/functions/_shared/pageWatchVocabulary.generated.ts',
+  ],
+  [
+    // #391 — snag severity, shared with the SEO findings handler deliberately.
+    'src/modules/projects/snagVocabulary.ts',
+    'supabase/functions/_shared/snagVocabulary.generated.ts',
+  ],
+  [
+    // #391 — trip-expense card type.
+    'src/modules/finance/tripExpenseVocabulary.ts',
+    'supabase/functions/_shared/tripExpenseVocabulary.generated.ts',
   ],
 ];
 

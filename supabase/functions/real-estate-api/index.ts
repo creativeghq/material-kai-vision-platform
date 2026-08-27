@@ -170,7 +170,8 @@ const DOC_TYPES = ['energy_certificate', 'building_id', 'title_deed', 'floor_pla
 /** Who a commission split can pay. Mirrors the CHECK on property_sale_commission_splits. */
 const COMMISSION_PARTY_TYPES = ['listing_agent', 'buyer_agent', 'house', 'referral', 'external'];
 /** AML/KYC vocabulary. Mirrors the CHECKs on property_kyc_checks. */
-const KYC_CHECK_TYPES = ['identity', 'source_of_funds', 'pep_sanctions'];
+// One source (#391) — the generated mirror.
+import { KYC_CHECK_TYPES, isKycCheckType } from '../_shared/realEstateVocabulary.generated.ts';
 const KYC_STATUSES = ['pending', 'passed', 'failed', 'waived'];
 /** Tenancy inspection points. Mirrors the CHECK on property_tenancy_inspections. */
 const INSPECTION_TYPES = ['check_in', 'routine', 'check_out'];
@@ -802,7 +803,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can record an AML/KYC verdict.' }, 403);
         const contactId = String(body.contact_id ?? '');
         const checkType = String(body.check_type ?? '');
-        if (!contactId || !KYC_CHECK_TYPES.includes(checkType)) {
+        if (!contactId || !isKycCheckType(checkType)) {
           return json({ error: `contact_id and a check_type of ${KYC_CHECK_TYPES.join(', ')} are required` }, 400);
         }
         const status = String(body.status ?? 'pending');
@@ -835,7 +836,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (body.kyc_required_for_offers !== undefined) patch.kyc_required_for_offers = body.kyc_required_for_offers === true;
         if (body.kyc_required_types !== undefined) {
           const types = (Array.isArray(body.kyc_required_types) ? body.kyc_required_types : [])
-            .map((t: unknown) => String(t)).filter((t: string) => KYC_CHECK_TYPES.includes(t));
+            .map((t: unknown) => String(t)).filter(isKycCheckType);
           if (!types.length) return json({ error: 'At least one check type is required.' }, 400);
           patch.kyc_required_types = types;
         }

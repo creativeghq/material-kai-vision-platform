@@ -25,10 +25,15 @@ const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 export type SnagStatus = 'open' | 'in_progress' | 'fixed' | 'verified' | 'wont_fix';
-export type SnagSeverity = 'low' | 'medium' | 'high' | 'critical';
+// One source (#391). Re-exported so existing imports keep working.
+export { SNAG_SEVERITIES, isSnagSeverity } from '../snagVocabulary';
+export type { SnagSeverity } from '../snagVocabulary';
+
+// Only the TYPE is used inside this file; `SNAG_SEVERITIES` is re-exported above for
+// consumers and does not need a local binding.
+import type { SnagSeverity } from '../snagVocabulary';
 
 export const SNAG_STATUSES: SnagStatus[] = ['open', 'in_progress', 'fixed', 'verified', 'wont_fix'];
-export const SNAG_SEVERITIES: SnagSeverity[] = ['low', 'medium', 'high', 'critical'];
 
 /** Statuses that mean the snag no longer needs work. Kept here so the UI cannot disagree with SQL. */
 export const SNAG_CLOSED_STATUSES: SnagStatus[] = ['fixed', 'verified', 'wont_fix'];

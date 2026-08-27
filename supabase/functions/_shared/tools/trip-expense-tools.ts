@@ -57,7 +57,8 @@ async function resolveCard(userId: string, workspaceId: string, cardId?: string,
 }
 
 // ───────────────────────────── create_trip_card ─────────────────────────────
-const CARD_TYPES = ['trip', 'monthly', 'other'];
+// One source (#391) — the generated mirror.
+import { isExpenseCardType } from '../tripExpenseVocabulary.generated.ts';
 
 export const createCreateTripCardTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
   tool(async ({ title, card_type, destination, purpose, trip_start, trip_end, currency }: {
@@ -65,7 +66,8 @@ export const createCreateTripCardTool = (userId: string, workspaceId: string, on
   }) => {
     if (!await moduleEnabled()) return disabledErr();
     try {
-      const ct = CARD_TYPES.includes((card_type || '').toLowerCase()) ? card_type!.toLowerCase() : 'trip';
+      const lowered = (card_type || '').toLowerCase();
+      const ct = isExpenseCardType(lowered) ? lowered : 'trip';
       const { data, error } = await svc().from('trip_expense_reports').insert({
         workspace_id: workspaceId, user_id: userId, card_type: ct, title,
         destination: ct === 'trip' ? (destination ?? null) : null, purpose: purpose ?? null,

@@ -51,3 +51,19 @@ export function isAgentRunStatus(v: unknown): v is AgentRunStatus {
 export function isAgentLogLevel(v: unknown): v is LogLevel {
   return typeof v === 'string' && (AGENT_LOG_LEVELS as readonly string[]).includes(v);
 }
+
+/**
+ * `background_agents_trigger_type_check`.
+ *
+ * NOT the same as `TriggerType` in `src/services/flows/types.ts`. That one is the flows
+ * vocabulary — 130 event names an automation can fire on. This is how a BACKGROUND AGENT
+ * is started. They share a column name and nothing else, and the flows union is two
+ * orders of magnitude larger; unifying them by name would be the signature-matching
+ * mistake #391 warns about.
+ */
+export const AGENT_TRIGGER_TYPES = ['cron', 'event', 'manual', 'chain'] as const;
+export type AgentTriggerType = (typeof AGENT_TRIGGER_TYPES)[number];
+
+export function isAgentTriggerType(v: unknown): v is AgentTriggerType {
+  return typeof v === 'string' && (AGENT_TRIGGER_TYPES as readonly string[]).includes(v);
+}
