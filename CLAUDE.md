@@ -97,6 +97,18 @@ swallowed); an endpoint 404-ing on 100% of calls for months; the Stripe webhook 
 - Probes are **hardcoded in the detect function on purpose** — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface. Adding a probe is a migration.
 - **Never rewrite `dic_detect__ops_silent_zero` with a whole-body `CREATE OR REPLACE` built from an older copy — append by surgery on `pg_get_functiondef`, with assertions.** The probes are inline and have accumulated across a dozen separate migrations, so a full replacement written from a stale source silently deletes the ones added since. That happened on 2026-08-10: three #342 probes landed at 12:16 and an unrelated migration erased them at 13:21; nobody noticed for ten days, because a detector with fewer probes just returns fewer rows. `ops.silent_zero_probe_missing` now holds the roster and fires when a name goes missing — **delete a probe deliberately and you must edit that roster too.**
 
+### 3. A metric is a VALUE or a stated REASON there is no value — never a hidden row, never a 0.
+The reader-facing half of rule 2. A silent zero is bad; a metric that quietly *vanishes* is worse, because
+the surface still looks complete. `WebsiteDomainIntelPanel` rendered four tiles when it had four numbers and
+eight when it had eight, so a backlink collector that had **never once succeeded** was pixel-identical to a
+site with no backlinks. `seo-domain-tracker` had wrapped all three DataForSEO calls in `.catch(() => [])`,
+which is why every stored snapshot's `backlinks`/`referring_domains`/`domain_rank` is NULL.
+- **SQL derives the number AND the verdict on it; TypeScript only formats.** `public.seo_metric` returns `{value, previous, delta, delta_pct, status, note, series}`; `get_website_seo_overview` / `seo_website_health_summary` / `seo_website_gsc_summary` / `get_website_ai_visibility` are the callers. A tile and a report reading the same RPC then cannot disagree about whether a figure is real.
+- **Statuses:** `ok` · `no_data` (source answered, genuinely nothing) · `collector_failed` (**unknown**, not zero) · `not_collected` (never run) · `not_connected` (needs a connection). An unrecognised status **fails closed** to "unknown" in `seoMetrics.ts` — never falls through to rendering the raw number as fact.
+- **A collector records WHICH source failed** — `seo_domain_snapshots.source_errors` — so the panel can say "we could not fetch this". A call that succeeds but returns no row is *unverified*, not zero.
+- **A rate is measured against attempts that SUCCEEDED.** All 212 `gpt-4o-mini` LLM probes returned HTTP 429; mentions ÷ probes-**sent** renders that as "0% AI visibility", which reads as "assistants never mention us". Divide by `answered`; report "No verdict" plus the upstream error when there is nothing to divide by.
+- Same rule for feature detection: an absent featured snippet or an image pack you are not in is a **finding**, so `serpFeatures.ts` renders an inventory with present/absent verdicts, not a list of hits.
+
 ## Data layering — the pipeline is Medallion; name the layers
 
 **Every cache/pipeline bug we have hit has been a layer violation.**
@@ -242,6 +254,14 @@ each logging its result to `console.debug` under a comment saying the agent's re
 handler is NOT enough: a branch that only logs is the bug. Now guarded — for every `run:` quick-start, against
 the chunks its tool actually emits for the action it pins — by the "direct-run quick-start renders its tool
 output" case in [tests/unit/toolkitCoverage.test.ts](tests/unit/toolkitCoverage.test.ts).
+
+**A `seo_*_card` chunk needs a branch in `SEOGenericCard.tsx`. `AGENT_RESULT_TITLES` does NOT render it.**
+AgentHub routes every chunk whose type starts `seo_` and ends `_card` to `SEOGenericCard` *before* that titles
+map is consulted, so an entry there has no effect on what the user sees. 14 of 51 SEO card types were listed in
+the map, had no branch, and reached the chat as `JSON.stringify(data)` — AI Overview, GSC striking-distance,
+keyword ideas, search volume among them. Two registries, and the complete-looking one was the decorative one.
+Guarded by [tests/unit/seoCardCoverage.test.ts](tests/unit/seoCardCoverage.test.ts), which deliberately ignores
+the titles map and also fails on a dead branch nothing emits.
 
 **Run `npm run tools:manifest` after touching any `tool(fn, {...})` definition or the `TOOLKITS` catalog.** It
 emits two committed files: `src/components/features/ai/toolManifest.generated.ts` (an AST projection of every
