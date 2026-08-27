@@ -11,8 +11,16 @@ import { supabase } from '@/integrations/supabase/client';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type AgentTriggerType = 'cron' | 'event' | 'manual' | 'chain';
-export type AgentRunStatus   = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-export type LogLevel         = 'debug' | 'info' | 'warn' | 'error';
+// One source (#391). Re-exported so existing imports keep working.
+export {
+  AGENT_RUN_STATUSES, ACTIVE_AGENT_RUN_STATUSES, AGENT_LOG_LEVELS,
+  isAgentRunStatus, isAgentLogLevel,
+} from './agents/agentVocabulary';
+export type { AgentRunStatus, LogLevel } from './agents/agentVocabulary';
+
+// Also imported: a re-export does not bind the names locally.
+import { ACTIVE_AGENT_RUN_STATUSES } from './agents/agentVocabulary';
+import type { AgentRunStatus, LogLevel } from './agents/agentVocabulary';
 
 export interface BackgroundAgent {
   id:                     string;
@@ -140,7 +148,7 @@ export async function cancelRun(runId: string): Promise<void> {
     .from('agent_runs')
     .update({ status: 'cancelled' })
     .eq('id', runId)
-    .in('status', ['pending', 'processing']);
+    .in('status', ACTIVE_AGENT_RUN_STATUSES);
   if (error) throw error;
 }
 

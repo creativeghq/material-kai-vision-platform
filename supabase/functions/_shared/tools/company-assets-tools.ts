@@ -30,8 +30,12 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function svc() { return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY); }
 
-const CATEGORIES = ['vehicle', 'phone', 'laptop', 'payment_card', 'equipment', 'other'] as const;
-const ACQ_TYPES = ['owned', 'leased', 'financed'] as const;
+// One source (#391) — the generated mirror. These were hand-written twins of the unions
+// in `assetsService`, and they feed the z.enums below.
+import {
+  ASSET_CATEGORIES as CATEGORIES,
+  ACQUISITION_TYPES as ACQ_TYPES,
+} from '../assetVocabulary.generated.ts';
 
 function contactName(c: any): string | null {
   if (!c) return null;

@@ -55,6 +55,18 @@ export const VOCABULARIES = [
     'src/modules/real-estate/realEstateVocabulary.ts',
     'supabase/functions/_shared/realEstateVocabulary.generated.ts',
   ],
+  [
+    // #391 — asset `category` and `acquisition_type`: a union pair in the service and an
+    // `as const` pair feeding a z.enum in the tool.
+    'src/services/assets/assetVocabulary.ts',
+    'supabase/functions/_shared/assetVocabulary.generated.ts',
+  ],
+  [
+    // #391 — `AgentRunStatus` and `LogLevel`, the same two lines declared on both sides
+    // of the Vite/Deno boundary.
+    'src/services/agents/agentVocabulary.ts',
+    'supabase/functions/_shared/agents/agentVocabulary.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

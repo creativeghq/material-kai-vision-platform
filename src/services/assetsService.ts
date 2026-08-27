@@ -9,9 +9,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 const sb = supabase as any;
 
-export type AssetCategory = 'vehicle' | 'phone' | 'laptop' | 'payment_card' | 'equipment' | 'other';
+// One source (#391). Re-exported so existing imports from this service keep working.
+export { ASSET_CATEGORIES, ACQUISITION_TYPES, isAssetCategory, isAcquisitionType } from './assets/assetVocabulary';
+export type { AssetCategory, AcquisitionType } from './assets/assetVocabulary';
+
+// Also imported: a re-export does not bind the names locally.
+import type { AssetCategory, AcquisitionType } from './assets/assetVocabulary';
 export type AssetStatus = 'active' | 'in_repair' | 'retired' | 'returned';
-export type AcquisitionType = 'owned' | 'leased' | 'financed';
 export type DepreciationMethod = 'none' | 'straight_line' | 'declining_balance';
 
 export const ASSET_CATEGORY_LABEL: Record<AssetCategory, string> = {

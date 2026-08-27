@@ -10,8 +10,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // ── DB row shapes ────────────────────────────────────────────────────────────
 
 export type AgentTriggerType = 'cron' | 'event' | 'manual' | 'chain';
-export type AgentRunStatus   = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-export type LogLevel         = 'debug' | 'info' | 'warn' | 'error';
+// One source (#391) — the generated mirror. These were byte-identical twins of the
+// declarations in `src/services/backgroundAgents.ts`.
+export type { AgentRunStatus, LogLevel } from './agentVocabulary.generated.ts';
+export {
+  AGENT_RUN_STATUSES, ACTIVE_AGENT_RUN_STATUSES, AGENT_LOG_LEVELS,
+  isAgentRunStatus, isAgentLogLevel,
+} from './agentVocabulary.generated.ts';
+
+// Also imported: a re-export does not bind the names locally.
+import type { AgentRunStatus, LogLevel } from './agentVocabulary.generated.ts';
 
 export interface BackgroundAgentRecord {
   id:                     string;
