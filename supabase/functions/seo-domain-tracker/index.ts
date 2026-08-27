@@ -76,8 +76,18 @@ async function resolveMarket(supabase: any, websiteId: string, domain: string): 
   return { country, language: A2_TO_LANG[country] || 'en' };
 }
 
-/** DataForSEO dispatcher via MIVAA's seo-agent route → returns the items array. */
-async function dfs(kind: string, params: Record<string, unknown>): Promise<any[]> {
+/**
+ * DataForSEO dispatcher via MIVAA's seo-agent route.
+ *
+ * Returns the items AND whether an empty result was a clean "we have nothing for
+ * this target". Those are different facts and the caller has to be able to tell
+ * them apart: /backlinks/summary/live answers `status_code: 20000, "Ok.",
+ * result_count: 0, result: null` for a domain the backlink index has never seen,
+ * which is a true answer — not a failure, and not zero backlinks either.
+ * Collapsing it into `[]` is what left every stored snapshot's backlink columns
+ * NULL with nothing anywhere recording why.
+ */
+async function dfs(kind: string, params: Record<string, unknown>): Promise<{ items: any[]; answered: boolean }> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
     body: JSON.stringify({ params, attribution: {} }),
@@ -85,7 +95,20 @@ async function dfs(kind: string, params: Record<string, unknown>): Promise<any[]
   const text = await resp.text();
   let parsed: any = null; try { parsed = JSON.parse(text); } catch { parsed = text; }
   if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed, 160)}`);
-  return parsed?.data?.items || [];
+
+  const items = parsed?.data?.items || [];
+  // DataForSEO reports failure INSIDE a 200 (its own 2xxxx status codes), so the
+  // envelope decides "answered", never the HTTP status.
+  const raw = parsed?.data?.raw;
+  const top = Number(raw?.status_code);
+  const task = raw?.tasks?.[0];
+  const taskCode = Number(task?.status_code);
+  const answered =
+    (!Number.isFinite(top) || top === 20000) &&
+    (!Number.isFinite(taskCode) || taskCode === 20000) &&
+    Number(raw?.tasks_error || 0) === 0;
+
+  return { items, answered };
 }
 
 const n = (v: any): number | null => (typeof v === 'number' ? v : null);
@@ -144,27 +167,40 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // nothing at all. `source_errors` is what `get_website_seo_overview` reads
     // to decide `collector_failed` vs `no_data`.
     const sourceErrors: Record<string, string> = {};
+    const sourceStatus: Record<string, string> = {};
     const note = (key: string, e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e);
       sourceErrors[key] = msg.slice(0, 300);
+      sourceStatus[key] = 'failed';
       console.error(`[seo-domain-tracker] ${key} failed:`, msg);
     };
+    const empty = { items: [] as any[], answered: false };
     const [overview, backlinks, ranked] = await Promise.all([
-      dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }).catch((e) => { note('overview', e); return []; }),
-      dfs('backlinks_summary', { target: domain }).catch((e) => { note('backlinks', e); return []; }),
-      dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }).catch((e) => { rankedFailed = true; note('ranked', e); return []; }),
+      dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }).catch((e) => { note('overview', e); return empty; }),
+      dfs('backlinks_summary', { target: domain }).catch((e) => { note('backlinks', e); return empty; }),
+      dfs('labs_ranked_keywords', { target: domain, country_code: country, language_code: language, limit: KEYWORD_LIMIT }).catch((e) => { rankedFailed = true; note('ranked', e); return empty; }),
     ]);
 
-    // A call that SUCCEEDS but returns no row is also a fetch we cannot vouch
-    // for — `backlinks/summary/live` answers with a single inline result, so an
-    // empty array here means the shape was not what we expect, not that the
-    // domain has no links.
-    if (!sourceErrors.backlinks && (backlinks?.length ?? 0) === 0) {
-      sourceErrors.backlinks = 'The backlink source returned no summary row for this domain.';
-    }
+    // Record a positive verdict per source. `no_data` is a REAL answer — the
+    // backlink index legitimately has no record of a new domain — and must not
+    // be dressed up as a failure any more than as a zero. A panel that cries
+    // wolf gets ignored the one time it matters.
+    const verdict = (key: string, r: { items: any[]; answered: boolean }) => {
+      if (sourceStatus[key] === 'failed') return;
+      if (!r.answered) {
+        sourceStatus[key] = 'failed';
+        sourceErrors[key] = 'The source reported an error inside a successful HTTP response.';
+        return;
+      }
+      sourceStatus[key] = r.items.length > 0 ? 'ok' : 'no_data';
+    };
+    verdict('overview', overview);
+    verdict('backlinks', backlinks);
+    verdict('ranked', ranked);
+    if (sourceStatus.ranked === 'failed') rankedFailed = true;
 
-    const org = overview?.[0]?.metrics?.organic || {};
-    const bl = backlinks?.[0] || {};
+    const org = overview.items?.[0]?.metrics?.organic || {};
+    const bl = backlinks.items?.[0] || {};
     const snapshot = {
       website_id: website.id, workspace_id: website.workspace_id,
       captured_at: new Date().toISOString().slice(0, 10), country_code: country, language_code: language,
@@ -176,13 +212,14 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
       backlinks: n(bl.backlinks), referring_domains: n(bl.referring_domains), referring_main_domains: n(bl.referring_main_domains),
       domain_rank: n(bl.rank), spam_score: n(bl.backlinks_spam_score), broken_backlinks: n(bl.broken_backlinks),
       source_errors: sourceErrors,
+      source_status: sourceStatus,
       error: null,
     };
     const { error: sErr } = await supabase.from('seo_domain_snapshots').upsert(snapshot, { onConflict: 'website_id,captured_at' });
     if (sErr) throw new Error(sErr.message);
 
     // Replace the current top-keywords set.
-    const kws = (ranked || []).map((it: any) => {
+    const kws = (ranked.items || []).map((it: any) => {
       const si = it?.ranked_serp_element?.serp_item || {};
       return {
         website_id: website.id, workspace_id: website.workspace_id,
