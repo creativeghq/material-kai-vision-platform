@@ -147,6 +147,37 @@ async function callSEOAgentRoute(
 }
 
 /**
+ * Say "the index has no record of this" in words the model cannot round to zero.
+ *
+ * A tool that answers `{ success: true, target: "x" }` with the numbers simply
+ * ABSENT has told the model nothing, and the model fills the gap the way a
+ * confident writer does — "0 backlinks", "no referring domains". Both are claims
+ * about the world, and both are wrong when the real answer is "this domain is not
+ * in the backlink index".
+ *
+ * Measured 2026-08-27: `/backlinks/summary/live` answers `status_code: 20000,
+ * "Ok.", result_count: 0, result: null` for materialshub.gr — a clean, truthful
+ * empty. So the distinction is not hypothetical, it is the live case.
+ *
+ * Same vocabulary the Websites dashboard uses (`seoMetrics.ts`): a metric is a
+ * value or a stated reason there is no value.
+ */
+function emptyResult(
+  subject: Record<string, unknown>,
+  what: string,
+  hint: string,
+): string {
+  return JSON.stringify({
+    success: true,
+    ...subject,
+    data_status: 'no_data',
+    // Spelled out because the model quotes this back to the user verbatim.
+    answer: `The provider returned no ${what} for this target. That means it is not in the index — NOT that the value is zero. Do not report it as 0.`,
+    hint,
+  });
+}
+
+/**
  * Total upstream cost of a composite response. Returns undefined — never 0 — when no section
  * reports one, so the gate keeps its reserve rather than settling a paid call to free.
  */
@@ -700,7 +731,14 @@ export const createSEODomainSnapshotTool = (
         type: 'seo_domain_snapshot_card',
         domain, country: country_code, items, timestamp: Date.now(),
       });
-      return JSON.stringify({ success: true, domain, items: items.slice(0, 1) });
+      if (items.length === 0) {
+        return emptyResult(
+          { domain, country: country_code ?? null },
+          'ranking data',
+          'Normal for a new or low-traffic domain, or for a market it does not rank in. Try another country_code before concluding anything.',
+        );
+      }
+      return JSON.stringify({ success: true, domain, data_status: 'ok', items: items.slice(0, 1) });
     },
     {
       name: 'seo_domain_snapshot',
@@ -880,13 +918,23 @@ export const createSEOBacklinksSummaryTool = (
       onChunk?.({ type: 'tool_progress', status: `Loading backlinks summary for ${target}...`, timestamp: Date.now() });
       const r = await callDataForSEO('backlinks_summary', { target }, { user_id: _userId });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error });
-      const item = (r.data?.items || [])[0] || {};
+      const rows = r.data?.items || [];
+      const item = rows[0] || {};
       onChunk?.({
         type: 'seo_backlinks_summary_card',
         target, summary: item, timestamp: Date.now(),
       });
+      // An empty row here is the LIVE case, not a theoretical one — the backlink
+      // index answers "Ok, result_count: 0" for any domain it has never crawled.
+      if (rows.length === 0 || item.backlinks == null) {
+        return emptyResult(
+          { target },
+          'backlink summary',
+          'The backlink index has no record of this domain — usual for a site with few or no inbound links. Say that, rather than reporting zero backlinks.',
+        );
+      }
       return JSON.stringify({
-        success: true, target,
+        success: true, target, data_status: 'ok',
         backlinks: item.backlinks, referring_domains: item.referring_domains,
         rank: item.rank, spam_score: item.spam_score,
       });
