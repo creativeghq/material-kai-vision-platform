@@ -123,6 +123,32 @@ describe('platform defaults — tenant surface', () => {
     ).toBe(false);
   });
 
+  it('renders the state the RPC stored, not the state it asked for', () => {
+    // "Every channel silenced == off" is derived in `set_workspace_flow_preference`, which RETURNS
+    // the resolved `{enabled, muted_actions}`. The client must apply that answer. Going back to an
+    // optimistic `setRows({ enabled, muted })` built from the local guess is a second copy of the
+    // rule, and it fails in the quietest possible way: mute the only channel of an in-app-only
+    // default and the row keeps its switch ON while the notification can no longer deliver
+    // anything. A wrong switch position is a valid switch position — nothing raises, and it looks
+    // correct again after a reload, which is how it stayed unnoticed the first time.
+    const src = readCode(SECTION);
+    const save = src.slice(src.indexOf('const save = async'), src.indexOf('const toggleChannel'));
+    expect(save.length, 'could not find the save() writer').toBeGreaterThan(0);
+    expect(
+      /const\s*\{\s*data\s*,\s*error\s*\}\s*=\s*await supabase\.rpc\('set_workspace_flow_preference'/.test(save),
+      'save() must read the RPC\'s returned state, not discard it',
+    ).toBe(true);
+    expect(
+      /applied\?\.enabled/.test(save) && /applied\?\.muted_actions/.test(save),
+      'save() must apply the returned enabled/muted_actions to the row',
+    ).toBe(true);
+    // The rule itself must NOT be restated client-side.
+    expect(
+      /cardinality|available_channels\.every|\.length === row\.available_channels\.length/.test(save),
+      `${SECTION} must not re-derive "all channels muted means off" — the RPC returns that answer`,
+    ).toBe(false);
+  });
+
   it('offers only channels the engine can actually mute', () => {
     // The chips are a promise: "turn Email off and you stop getting email". A key the engine has no
     // case for renders a switch that saves cleanly and changes nothing — a wrong preference is a

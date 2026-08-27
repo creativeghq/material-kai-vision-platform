@@ -104,7 +104,7 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
     const enabled = next.enabled ?? row.enabled;
     const muted = next.muted ?? row.muted_actions;
     setBusy(row.flow_id);
-    const { error } = await supabase.rpc('set_workspace_flow_preference' as never, {
+    const { data, error } = await supabase.rpc('set_workspace_flow_preference' as never, {
       p_workspace_id: activeWorkspaceId,
       p_flow_id: row.flow_id,
       p_enabled: enabled,
@@ -115,10 +115,17 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
       toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
       return;
     }
-    // Optimistic local update — the RPC returns void and a refetch of 86 rows to move one switch
-    // would make every toggle feel like a page load.
-    setRows((prev) => prev.map((r) =>
-      r.flow_id === row.flow_id ? { ...r, enabled, muted_actions: muted } : r));
+    // Apply the state the RPC ACTUALLY STORED, not the state we asked for — they differ by design.
+    // Silencing every channel a notification has IS switching it off, and that rule is derived once,
+    // in the writer. Restating it here to keep the local update "optimistic" would be a second copy
+    // of it, and the moment they disagreed the row would sit there claiming "on" while delivering
+    // nothing until someone reloaded the page. Still one round trip, so no refetch of 87 rows.
+    const applied = (data as unknown as { enabled: boolean; muted_actions: string[] }[] | null)?.[0];
+    setRows((prev) => prev.map((r) => (
+      r.flow_id === row.flow_id
+        ? { ...r, enabled: applied?.enabled ?? enabled, muted_actions: applied?.muted_actions ?? muted }
+        : r
+    )));
   };
 
   const toggleChannel = (row: FlowDefault, channel: string) => {
