@@ -266,6 +266,34 @@ export interface AiMonitoringState {
   diagnosis: string | null;
 }
 
+export interface CrawlIssueGroup {
+  issue_type: string;
+  severity: 'error' | 'warning' | 'notice';
+  count: number;
+  sample: { url: string | null; title: string | null }[];
+}
+
+export interface CrawlReport {
+  status: 'not_collected' | 'running' | 'finished' | 'collector_failed' | string;
+  crawl_id?: string;
+  crawl_count: number;
+  task_id?: string | null;
+  started_at?: string;
+  finished_at?: string | null;
+  pages_crawled?: number | null;
+  pages_with_issues?: number | null;
+  requested_pages?: number | null;
+  onpage_score?: number | null;
+  /** Per issue-class: ok | no_data | failed. A failed section is UNKNOWN, not zero. */
+  section_status?: Record<string, string>;
+  severity_counts?: Record<string, number>;
+  issue_groups?: CrawlIssueGroup[];
+  total_issues?: number;
+  previous_total_issues?: number | null;
+  error?: string | null;
+  note?: string | null;
+}
+
 export interface CompetitorLine {
   key: string;
   label: string;
@@ -681,6 +709,31 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as SeoGscSummary) ?? null;
+  },
+
+  async crawlReport(websiteId: string): Promise<CrawlReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_crawl_report' as any, { p_website_id: websiteId } as any,
+    );
+    if (error) throw error;
+    return (data as CrawlReport) ?? null;
+  },
+
+  async startCrawl(websiteId: string, maxPages = 100): Promise<{ crawl_id: string }> {
+    const { data, error } = await supabase.functions.invoke('seo-site-audit', {
+      body: { action: 'crawl-start', website_id: websiteId, max_pages: maxPages },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not start the crawl'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not start the crawl');
+    return data;
+  },
+
+  async syncCrawl(websiteId: string): Promise<{ status?: string; issues?: number }> {
+    const { data, error } = await supabase.functions.invoke('seo-site-audit', {
+      body: { action: 'crawl-sync', website_id: websiteId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not refresh the crawl'));
+    return data ?? {};
   },
 
   async competitorSeries(

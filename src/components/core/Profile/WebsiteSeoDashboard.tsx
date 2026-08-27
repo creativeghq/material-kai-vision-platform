@@ -13,6 +13,7 @@ import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOve
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
+import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -491,8 +492,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <WebsiteDomainIntelPanel website={website} />
         </TabsContent>
 
-        {/* Site Health (Lighthouse + on-page) */}
-        <TabsContent value="health">
+        {/* Site Health — the homepage audit AND the full crawl. They answer
+            different questions: one is "is my front door broken", the other is
+            "is my site broken", and only the second can see a redirect chain. */}
+        <TabsContent value="health" className="space-y-4">
+          <WebsiteCrawlPanel website={website} />
           <WebsiteHealthPanel website={website} />
         </TabsContent>
 

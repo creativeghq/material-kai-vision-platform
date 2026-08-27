@@ -1,11 +1,17 @@
 /**
  * seo-site-audit — Site Health for connected websites.
  *
- * Runs a SYNCHRONOUS homepage audit via MIVAA's onpage/quick-page route (DataForSEO
- * instant-page + Google Lighthouse) and stores it in website_health_audits. The full
- * multi-page OnPage crawl stays on-demand via the agent tools (seo_site_crawl_start).
+ * TWO audits, deliberately, because they answer different questions:
  *
- * Actions (user JWT): run — audit one website now.
+ *   run          a SYNCHRONOUS homepage audit (instant-page + Lighthouse) → website_health_audits.
+ *                Fast, cheap, one URL. Answers "is my front door broken".
+ *   crawl-start  an ASYNCHRONOUS multi-page OnPage crawl → website_crawls + website_crawl_issues.
+ *                Answers "is my SITE broken" — broken links, redirect chains, duplicate titles,
+ *                pages told not to index. None of those are visible one page at a time, which is
+ *                why the single-page audit always looked thin.
+ *   crawl-sync   poll a running crawl and ingest its issue classes when it finishes.
+ *
+ * Actions (user JWT): run, crawl-start, crawl-sync.
  * Action (x-cron-secret): cron-run — weekly audit of every active connected website + prune.
  *
  * verify_jwt is disabled at the gateway (see config.toml) so cron works; the user action
@@ -64,6 +70,127 @@ async function quickPage(url: string, userId: string | null): Promise<any> {
   try { parsed = JSON.parse(text); } catch { parsed = text; }
   if (!resp.ok) throw new Error(`quick-page ${describeUpstreamError(resp.status, parsed)}`);
   return parsed?.data ?? parsed;
+}
+
+// ── OnPage crawl (async) ────────────────────────────────────────────────────
+
+/** Call the DataForSEO dispatcher for one `kind`. Throws on transport failure. */
+async function dfs(kind: string, params: Record<string, unknown>, userId: string | null): Promise<any> {
+  const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
+    body: JSON.stringify({ params, attribution: { user_id: userId } }),
+  });
+  const text = await resp.text();
+  let parsed: any = null;
+  try { parsed = JSON.parse(text); } catch { parsed = text; }
+  if (!resp.ok) throw new Error(`${kind} ${describeUpstreamError(resp.status, parsed)}`);
+  return parsed?.data ?? {};
+}
+
+/**
+ * The issue classes worth pulling once a crawl finishes, and what each one MEANS.
+ *
+ * Severity is assigned here rather than taken from the provider because the
+ * provider does not rank them: it returns lists. A list that cannot be sorted by
+ * "what actually costs me traffic" is a list nobody works through.
+ */
+const ISSUE_SECTIONS: Array<{
+  kind: string;
+  issue_type: string;
+  severity: 'error' | 'warning' | 'notice';
+  label: string;
+  params?: Record<string, unknown>;
+}> = [
+  { kind: 'onpage_non_indexable',     issue_type: 'non_indexable',     severity: 'error',
+    label: 'Page cannot be indexed' },
+  { kind: 'onpage_redirect_chains',   issue_type: 'redirect_chain',    severity: 'warning',
+    label: 'Redirect chain' },
+  { kind: 'onpage_duplicate_tags',    issue_type: 'duplicate_tags',    severity: 'warning',
+    label: 'Duplicate title or description' },
+  { kind: 'onpage_duplicate_content', issue_type: 'duplicate_content', severity: 'warning',
+    label: 'Duplicate content' },
+  { kind: 'onpage_links',             issue_type: 'broken_link',       severity: 'error',
+    label: 'Broken link', params: { is_broken: true } },
+];
+
+/** Best-effort URL off whatever shape a given OnPage section returns. */
+function issueUrl(item: any): string | null {
+  return item?.url || item?.page_address || item?.from_url || item?.link_from || item?.address || null;
+}
+
+/**
+ * Poll one crawl; when the provider says it is done, pull each issue class and
+ * store it. Each section is recorded in `section_status` independently: a section
+ * that failed is UNKNOWN, and reporting "0 broken links" because the broken-links
+ * pull errored is the same defect as reporting 0 backlinks for a failed fetch.
+ */
+async function syncCrawl(supabase: any, crawl: any, userId: string | null): Promise<any> {
+  if (!crawl.task_id) return { ok: false, error: 'crawl has no task id' };
+  let summary: any;
+  try {
+    const r = await dfs('onpage_summary', { task_id: crawl.task_id }, userId);
+    summary = (r.items || [])[0] || {};
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e).slice(0, 400);
+    await supabase.from('website_crawls').update({ status: 'failed', error: msg, finished_at: new Date().toISOString() }).eq('id', crawl.id);
+    return { ok: false, error: msg };
+  }
+
+  const info = summary.crawl_status || {};
+  const done = Number(info.pages_in_queue ?? 0) === 0 && Number(info.pages_crawled ?? 0) > 0;
+  const patch: Record<string, unknown> = {
+    pages_crawled: info.pages_crawled ?? null,
+    onpage_score: typeof summary.onpage_score === 'number' ? summary.onpage_score : null,
+    pages_with_issues: summary.page_metrics?.pages_by_status_code
+      ? null
+      : (summary.page_metrics?.broken_links ?? null),
+    summary,
+  };
+
+  if (!done) {
+    await supabase.from('website_crawls').update(patch).eq('id', crawl.id);
+    return { ok: true, status: 'running', pages_crawled: info.pages_crawled ?? 0 };
+  }
+
+  // Finished — pull every issue class. Replace this crawl's rows wholesale so a
+  // re-sync cannot double-count.
+  await supabase.from('website_crawl_issues').delete().eq('crawl_id', crawl.id);
+  const sectionStatus: Record<string, string> = {};
+  const rows: any[] = [];
+
+  for (const section of ISSUE_SECTIONS) {
+    try {
+      const r = await dfs(section.kind, { task_id: crawl.task_id, limit: 200, ...(section.params || {}) }, userId);
+      const items: any[] = r.items || [];
+      sectionStatus[section.issue_type] = items.length ? 'ok' : 'no_data';
+      for (const it of items.slice(0, 200)) {
+        rows.push({
+          crawl_id: crawl.id, website_id: crawl.website_id, workspace_id: crawl.workspace_id,
+          issue_type: section.issue_type, severity: section.severity,
+          url: issueUrl(it), title: section.label,
+          detail: it,
+        });
+      }
+    } catch (e) {
+      // UNKNOWN, not clean. The report prints this rather than an implied zero.
+      sectionStatus[section.issue_type] = 'failed';
+      console.error(`[seo-site-audit] section ${section.kind} failed:`, e instanceof Error ? e.message : e);
+    }
+  }
+
+  if (rows.length) {
+    const { error: insErr } = await supabase.from('website_crawl_issues').insert(rows);
+    if (insErr) console.warn('[seo-site-audit] issue insert failed:', insErr.message);
+  }
+
+  await supabase.from('website_crawls').update({
+    ...patch, status: 'finished', section_status: sectionStatus,
+    pages_with_issues: rows.length ? new Set(rows.map((r) => r.url)).size : 0,
+    finished_at: new Date().toISOString(),
+  }).eq('id', crawl.id);
+
+  return { ok: true, status: 'finished', issues: rows.length, sections: sectionStatus };
 }
 
 /** Audit one website and persist the result. Returns the stored summary. */
@@ -160,6 +287,27 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
     return json({ ok: true, audited: ok, failed });
   }
 
+  // ── Cron: advance every running crawl ──
+  // A crawl left un-polled never finishes, and a `running` row that nothing ever
+  // moves is indistinguishable from one still working. This is what closes them.
+  if (action === 'cron-sync-crawls') {
+    if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
+    const { data: running } = await supabase.from('website_crawls')
+      .select('id, website_id, workspace_id, task_id')
+      .eq('status', 'running').limit(25);
+    let advanced = 0, finished = 0;
+    for (const c of running || []) {
+      const r = await syncCrawl(supabase, c, null);
+      if (r.ok) { advanced++; if (r.status === 'finished') finished++; }
+    }
+    // A crawl still 'running' after 24h is stuck, not slow. Left alone it stays a
+    // permanent spinner on the panel with nothing saying it died.
+    await supabase.from('website_crawls')
+      .update({ status: 'failed', error: 'The crawl did not finish within 24 hours and was abandoned.', finished_at: new Date().toISOString() })
+      .eq('status', 'running').lt('started_at', new Date(Date.now() - 86400000).toISOString());
+    return json({ ok: true, advanced, finished });
+  }
+
   // ── User: audit one website now ──
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
@@ -173,6 +321,51 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
   // Paid module — refuse before the MIVAA/Lighthouse audit (#212). Cron branch stays ungated.
   const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');
   if (!ent.ok) return ent.response;
+  // ── Start a multi-page crawl ──
+  if (action === 'crawl-start') {
+    const pages = Math.min(Math.max(Number(body?.max_pages) || 100, 10), 1000);
+    // One crawl at a time per site: a second concurrent crawl doubles the bill and
+    // produces two partial reports that disagree.
+    const { data: existing } = await supabase.from('website_crawls')
+      .select('id').eq('website_id', website.id).eq('status', 'running').limit(1).maybeSingle();
+    if (existing) return json({ ok: false, error: 'A crawl is already running for this site.' }, 409);
+
+    const { data: row, error: insErr } = await supabase.from('website_crawls').insert({
+      website_id: website.id, workspace_id: website.workspace_id, requested_pages: pages,
+    }).select('id, website_id, workspace_id').single();
+    if (insErr) return json({ ok: false, error: insErr.message }, 500);
+
+    try {
+      const target = website.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      const r = await dfs('onpage_task_post', {
+        target, max_crawl_pages: pages, load_resources: false,
+        enable_javascript: false, enable_browser_rendering: false,
+      }, auth.userId);
+      const taskId = (r.items || [])[0]?.id || r.task_id || null;
+      if (!taskId) throw new Error('The provider accepted the crawl but returned no task id.');
+      await supabase.from('website_crawls').update({ task_id: taskId }).eq('id', row.id);
+      return json({ ok: true, crawl_id: row.id, task_id: taskId, requested_pages: pages });
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e).slice(0, 400);
+      // The row STAYS, marked failed. A crawl that could not start is a fact worth
+      // showing; deleting the row would leave the panel saying "never crawled".
+      await supabase.from('website_crawls')
+        .update({ status: 'failed', error: msg, finished_at: new Date().toISOString() })
+        .eq('id', row.id);
+      return json({ ok: false, error: msg }, 502);
+    }
+  }
+
+  // ── Poll the newest crawl for this site ──
+  if (action === 'crawl-sync') {
+    const { data: crawl } = await supabase.from('website_crawls')
+      .select('id, website_id, workspace_id, task_id, status')
+      .eq('website_id', website.id).order('started_at', { ascending: false }).limit(1).maybeSingle();
+    if (!crawl) return json({ ok: false, error: 'No crawl to sync.' }, 404);
+    if (crawl.status !== 'running') return json({ ok: true, status: crawl.status });
+    return json(await syncCrawl(supabase, crawl, auth.userId));
+  }
+
   const result = await auditWebsite(supabase, website, auth.userId);
   return json(result, result.ok ? 200 : 400);
 }));
