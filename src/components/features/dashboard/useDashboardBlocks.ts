@@ -25,18 +25,21 @@ export const ORDER_BUCKETS = ['draft', 'confirmed', 'partially_fulfilled', 'fulf
 export const QUOTE_BUCKETS = ['draft', 'submitted', 'quoted', 'accepted'] as const;
 
 export interface PipelineCounts {
-  orders: Record<string, number>;
-  quotes: Record<string, number>;
-  /** Orders still owed to a customer — confirmed + partially fulfilled. */
-  ordersOpen: number;
+  /** null for a bucket whose query FAILED — never 0 (#385 FN-1). */
+  orders: Record<string, number | null>;
+  quotes: Record<string, number | null>;
+  /** Orders still owed to a customer — confirmed + partially fulfilled. Null if any
+   *  contributing bucket failed. */
+  ordersOpen: number | null;
   /** Quotes still in play — anything before accepted/rejected/expired. */
-  quotesActive: number;
+  quotesActive: number | null;
 }
 
 export interface CrmCounts {
-  total: number;
-  customers: number;
-  suppliers: number;
+  /** null when the query FAILED — never 0 (#385 FN-1). */
+  total: number | null;
+  customers: number | null;
+  suppliers: number | null;
 }
 
 const EMPTY_PIPELINE: PipelineCounts = {
@@ -46,23 +49,49 @@ const EMPTY_PIPELINE: PipelineCounts = {
   quotesActive: 0,
 };
 
+// Pre-resolution state, not a failure state — `loading` distinguishes them.
 const EMPTY_CRM: CrmCounts = { total: 0, customers: 0, suppliers: 0 };
 
-/** One exact COUNT, scoped to the workspace. Returns 0 rather than throwing —
- *  a dashboard tile must never take the page down with it. */
+/** One exact COUNT, scoped to the workspace. Returns NULL when the query failed.
+ *
+ *  It used to return 0, and the error was destructured first — so this was a decision,
+ *  not an oversight (#385 FN-1). The intent was right: a dashboard tile must never take
+ *  the page down. But 0 is not a safe default here, it is a WRONG ANSWER that looks like
+ *  a right one. An RLS change, a network blip or a permissions regression renders as
+ *  "you have no orders", on the first screen anyone looks at, and a workspace that
+ *  genuinely has none is indistinguishable from one whose query just failed.
+ *
+ *  null keeps the never-throw property and drops the false claim. `StatBlock` renders it
+ *  as "—", which is the platform's own convention for an absent value.
+ *
+ *  The derivation itself was always right and is untouched: `{ count: 'exact', head: true }`
+ *  is a real SQL count, not a client-side `.length` over a capped page, and it is
+ *  workspace-scoped. */
 async function countWhere(
   table: 'orders' | 'quotes' | 'crm_companies',
   workspaceId: string,
   apply?: (q: any) => any,
-): Promise<number> {
+): Promise<number | null> {
   let q = supabase
     .from(table)
     .select('id', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId);
   if (apply) q = apply(q);
   const { count, error } = await q;
-  if (error) return 0;
+  if (error) {
+    console.error(`[dashboard] count(${table}) failed:`, error);
+    return null;
+  }
   return count ?? 0;
+}
+
+/** Sum of the buckets that resolved, or null if ANY of them failed.
+ *
+ *  Null-propagating on purpose. A total assembled from three successful counts and one
+ *  failure is a smaller number presented with the same confidence as a real one — which
+ *  is the same defect as the 0, just harder to notice because it is not round. */
+function sumOrNull(values: (number | null)[]): number | null {
+  return values.some((v) => v == null) ? null : values.reduce((a, b) => a + (b ?? 0), 0);
 }
 
 export function usePipelineCounts() {
@@ -90,14 +119,16 @@ export function usePipelineCounts() {
       ]);
       if (!alive) return;
 
-      const orders = Object.fromEntries(ORDER_BUCKETS.map((s, i) => [s, orderCounts[i] ?? 0]));
-      const quotes = Object.fromEntries(QUOTE_BUCKETS.map((s, i) => [s, quoteCounts[i] ?? 0]));
+      // `?? null`, not `?? 0`: a bucket whose query failed stays unknown rather than
+      // becoming an assertion that there are none (#385 FN-1).
+      const orders = Object.fromEntries(ORDER_BUCKETS.map((s, i) => [s, orderCounts[i] ?? null]));
+      const quotes = Object.fromEntries(QUOTE_BUCKETS.map((s, i) => [s, quoteCounts[i] ?? null]));
 
       setCounts({
         orders,
         quotes,
-        ordersOpen: (orders.confirmed ?? 0) + (orders.partially_fulfilled ?? 0),
-        quotesActive: (quotes.draft ?? 0) + (quotes.submitted ?? 0) + (quotes.quoted ?? 0),
+        ordersOpen: sumOrNull([orders.confirmed, orders.partially_fulfilled]),
+        quotesActive: sumOrNull([quotes.draft, quotes.submitted, quotes.quoted]),
       });
       setLoading(false);
     })().catch(() => alive && setLoading(false));

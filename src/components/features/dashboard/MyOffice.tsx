@@ -175,7 +175,9 @@ const MyOfficeImpl: React.FC = () => {
         ar: summarizeAging(ledger.ar),
         ap: summarizeAging(ledger.ap),
         overlayFailed: ledger.overlayFailed,
-        projects: projRes.count ?? 0,
+        // `projRes.error` was never read, so a failed query read as "no projects"
+        // (#385 FN-1, second site). null means unknown and renders as `—`.
+        projects: projRes.error ? null : (projRes.count ?? 0),
       });
       setStatsLoading(false);
     })().catch(() => alive && setStatsLoading(false));
@@ -275,12 +277,12 @@ const MyOfficeImpl: React.FC = () => {
           icon={ShoppingCart}
           title="Orders"
           loading={pipelineLoading}
-          value={pipeline.ordersOpen}
+          value={countOrDash(pipeline.ordersOpen)}
           caption={pipeline.ordersOpen === 1 ? 'Open Order' : 'Open Orders'}
           rows={[
-            { label: 'Confirmed', value: pipeline.orders.confirmed ?? 0, to: ordersLink('confirmed') },
-            { label: 'Partly fulfilled', value: pipeline.orders.partially_fulfilled ?? 0, to: ordersLink('partially_fulfilled') },
-            { label: 'Draft', value: pipeline.orders.draft ?? 0, to: ordersLink('draft') },
+            { label: 'Confirmed', value: countOrDash(pipeline.orders.confirmed), to: ordersLink('confirmed') },
+            { label: 'Partly fulfilled', value: countOrDash(pipeline.orders.partially_fulfilled), to: ordersLink('partially_fulfilled') },
+            { label: 'Draft', value: countOrDash(pipeline.orders.draft), to: ordersLink('draft') },
           ]}
           linkTo={ordersLink()}
           linkLabel="All orders"
@@ -289,12 +291,12 @@ const MyOfficeImpl: React.FC = () => {
           icon={FileText}
           title="Quotes"
           loading={pipelineLoading}
-          value={pipeline.quotesActive}
+          value={countOrDash(pipeline.quotesActive)}
           caption="In Play"
           rows={[
-            { label: 'Draft', value: pipeline.quotes.draft ?? 0, to: quotesLink('draft') },
-            { label: 'Submitted', value: pipeline.quotes.submitted ?? 0, to: quotesLink('submitted') },
-            { label: 'Quoted', value: pipeline.quotes.quoted ?? 0, to: quotesLink('quoted') },
+            { label: 'Draft', value: countOrDash(pipeline.quotes.draft), to: quotesLink('draft') },
+            { label: 'Submitted', value: countOrDash(pipeline.quotes.submitted), to: quotesLink('submitted') },
+            { label: 'Quoted', value: countOrDash(pipeline.quotes.quoted), to: quotesLink('quoted') },
           ]}
           linkTo={quotesLink()}
           linkLabel="All quotes"
@@ -418,5 +420,11 @@ const MyOfficeImpl: React.FC = () => {
     </div>
   );
 };
+
+/** A count that may be UNKNOWN. `—` is the platform's convention for an absent value,
+ *  and the point of #385 FN-1 is that unknown must not render as `0`: an RLS change or a
+ *  network blip would otherwise say "you have no orders" on the first screen anyone
+ *  looks at, indistinguishable from a workspace that genuinely has none. */
+const countOrDash = (n: number | null | undefined): string | number => (n == null ? '—' : n);
 
 export const MyOffice = React.memo(MyOfficeImpl);

@@ -98,13 +98,31 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
   const valueIds = useMemo(() => selectionToValueIds(selection), [selection]);
 
   // Re-price on every change. One round trip, no arithmetic on this side.
+  //
+  // A FAILED resolver is tracked separately from a product that has no price (#385 FN-2).
+  // `.catch(() => setPrice(null))` collapsed the two, and `null` rendered as "Not priced"
+  // — so an RLS failure, a network error or a defect inside
+  // `get_configured_product_price` was indistinguishable from a legitimate absence, and
+  // *Add to quote* stayed enabled either way.
+  //
+  // This is FN-1 applied to money. The platform's own rule already draws this line
+  // elsewhere: `material_cost` null means NOT PRICED YET, never 0. The same distinction
+  // is needed between "not priced" and "pricing failed", because only one of them is
+  // safe to put in front of a customer.
+  const [pricingError, setPricingError] = useState(false);
   useEffect(() => {
     if (!activeWorkspaceId) return;
     let cancelled = false;
     setPricing(true);
+    setPricingError(false);
     productConfiguratorService.priceConfiguration(activeWorkspaceId, productId, valueIds)
-      .then((p) => { if (!cancelled) setPrice(p); })
-      .catch(() => { if (!cancelled) setPrice(null); })
+      .then((p) => { if (!cancelled) { setPrice(p); setPricingError(false); } })
+      .catch((e) => {
+        if (cancelled) return;
+        console.error('[configurator] pricing failed:', e);
+        setPrice(null);
+        setPricingError(true);
+      })
       .finally(() => { if (!cancelled) setPricing(false); });
     return () => { cancelled = true; };
   }, [activeWorkspaceId, productId, valueIds]);
@@ -317,10 +335,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
             <p className="text-xl font-semibold">
               {pricing
                 ? '…'
-                : price?.configured_price != null
-                  ? formatMoney(price.configured_price, price.currency)
-                  : 'Not priced'}
+                : pricingError
+                  ? '—'
+                  : price?.configured_price != null
+                    ? formatMoney(price.configured_price, price.currency)
+                    : 'Not priced'}
             </p>
+            {pricingError && (
+              <p className="text-xs text-destructive">
+                Could not price this configuration. Adding it to a quote is disabled until
+                it resolves.
+              </p>
+            )}
             {price && price.options_requested !== price.options_applied && (
               <p className="text-xs text-destructive">
                 {price.options_requested - price.options_applied} selected option(s) were not
@@ -333,11 +359,19 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
               // Disabled while a rule is violated. The database refuses the line anyway — the
               // handoff re-checks violations from the same call that prices it — so this is the
               // courtesy of not offering a button that cannot work, not the enforcement.
-              <Select value="" onValueChange={addToQuote} disabled={addingToQuote || price?.is_valid === false}>
+              // Also disabled when pricing FAILED (#385 FN-2). Pushing a configuration
+              // into a quote without a price the resolver actually returned is how an
+              // unpriced line reaches a customer-facing document.
+              <Select
+                value=""
+                onValueChange={addToQuote}
+                disabled={addingToQuote || pricingError || price?.is_valid === false}
+              >
                 <SelectTrigger className="w-[11rem] rounded-full">
                   <SelectValue placeholder={
-                    price?.is_valid === false ? 'Fix conflicts first'
-                      : addingToQuote ? 'Adding…' : 'Add to quote'
+                    pricingError ? 'Pricing unavailable'
+                      : price?.is_valid === false ? 'Fix conflicts first'
+                        : addingToQuote ? 'Adding…' : 'Add to quote'
                   } />
                 </SelectTrigger>
                 <SelectContent>

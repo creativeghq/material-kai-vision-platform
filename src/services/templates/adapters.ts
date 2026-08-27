@@ -497,17 +497,30 @@ export interface ExpenseTemplatePayload {
   notes?: string | null;
   category_id?: string | null;
   /**
-   * Synthetic keys — see SYNTHETIC_PAYLOAD_FIELDS. On a bill these are typed inputs rather than
-   * derivations, but a payload key literally called `subtotal_net` would be indistinguishable
-   * from the stored-total mistake tests/unit/templateRegistry.test.ts exists to catch.
+   * NO MONEY DEFAULT (#385 FN-4).
+   *
+   * This carried `default_amount` and `default_vat_amount`, populated by the adapter's
+   * own `.select('subtotal_net, vat_amount')`. BOTH of those columns are on
+   * FORBIDDEN_CAPTURE_FIELDS under "derived money — recomputed by the create path, never
+   * stored", and the synthetic names are what let them through: the guard checked the
+   * declared `captureFields` array, where neither key ever appeared, so it passed on 56
+   * tests while the adapter read the columns directly and prefilled them into the new
+   * expense form.
+   *
+   * The comment that used to sit here said the rename existed because a key called
+   * `subtotal_net` "would be indistinguishable from the stored-total mistake the test
+   * exists to catch". That is the finding written down: it was not indistinguishable
+   * from the mistake, it WAS the mistake, and the rename hid it from the check rather
+   * than from a reader.
+   *
+   * Nothing is lost that should be kept. An expense template returns `{kind:'prefill'}`,
+   * so the operator is looking at the actual bill when they fill the amount in — and
+   * last quarter's electricity is not this quarter's. What a template is for here is the
+   * category, the supplier and the notes, which are stable; the money is not.
    */
-  default_amount?: number | null;
-  default_vat_amount?: number | null;
 }
 
 export interface ExpensePrefill {
-  amount?: number;
-  vatAmount?: number;
   description?: string;
   categoryId?: string;
 }
@@ -517,19 +530,10 @@ export const expenseAdapter: TemplateAdapter<ExpenseTemplatePayload> = {
   icon: ArrowUpCircle,
   ...TEMPLATE_SCHEMAS.expense,
   async capture(sourceId) {
-    const base = await captureRecord<ExpenseTemplatePayload>(expenseAdapter, sourceId);
-    const { data, error } = await supabase
-      .from('supplier_bills')
-      .select('subtotal_net, vat_amount')
-      .eq('id', sourceId)
-      .maybeSingle();
-    if (error) throw error;
-    const row = (data ?? {}) as { subtotal_net?: number | null; vat_amount?: number | null };
-    return {
-      ...base,
-      default_amount: row.subtotal_net != null ? num(row.subtotal_net) : null,
-      default_vat_amount: row.vat_amount != null ? num(row.vat_amount) : null,
-    };
+    // No bespoke select. It read `subtotal_net` here and stored it under a synthetic
+    // name, which is how a forbidden column reached the payload without appearing in
+    // `captureFields` (#385 FN-4).
+    return captureRecord<ExpenseTemplatePayload>(expenseAdapter, sourceId);
   },
   async apply(_payload, ctx): Promise<TemplateApplyResult> {
     return {
@@ -540,8 +544,6 @@ export const expenseAdapter: TemplateAdapter<ExpenseTemplatePayload> = {
   },
   summary(payload) {
     const out: string[] = [];
-    if (payload.default_amount != null) out.push(`${payload.default_amount} net`);
-    if (payload.default_vat_amount != null) out.push(`${payload.default_vat_amount} VAT`);
     if (payload.currency) out.push(String(payload.currency));
     return out.length ? out : ['No default amount'];
   },
@@ -556,8 +558,6 @@ export async function buildExpensePrefill(payload: ExpenseTemplatePayload): Prom
     ? payload.category_id
     : undefined;
   return {
-    amount: payload.default_amount != null ? num(payload.default_amount) : undefined,
-    vatAmount: payload.default_vat_amount != null ? num(payload.default_vat_amount) : undefined,
     description: str(payload.notes) ?? undefined,
     categoryId,
   };

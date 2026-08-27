@@ -118,9 +118,26 @@ describe('capture allowlists carry no identity, fiscal or derived-money field', 
       // A synthetic key is how an adapter stores a value under a name that is NOT a column — the
       // expense adapter keeps a bill's amount as `default_amount` precisely so no payload key is
       // ever called `subtotal_net`. That only works while the two namespaces stay disjoint.
+      //
+      // The key is also checked with its prefix STRIPPED (#385 FN-4). `default_vat_amount`
+      // passed this test for months: the forbidden list holds `vat_amount`, the key was
+      // spelled `default_vat_amount`, and the adapter selected the real column and
+      // prefilled it into the expense form. The rename hid it from the check rather than
+      // from a reader — the file's own comment said as much — so the check has to see
+      // through the rename.
+      const SYNTHETIC_PREFIXES = ['default_', 'initial_', 'suggested_'];
       for (const f of SYNTHETIC_PAYLOAD_FIELDS[type] ?? []) {
         expect(schema.captureFields, `${type}: "${f.key}" is both synthetic and captured`).not.toContain(f.key);
         expect(forbidden.has(f.key), `${type}: synthetic key "${f.key}" is on the forbidden list`).toBe(false);
+        for (const prefix of SYNTHETIC_PREFIXES) {
+          if (!f.key.startsWith(prefix)) continue;
+          const bare = f.key.slice(prefix.length);
+          expect(
+            forbidden.has(bare),
+            `${type}: synthetic key "${f.key}" is "${bare}" with a prefix, and "${bare}" is ` +
+              'forbidden. Renaming a derived total does not make it capturable.',
+          ).toBe(false);
+        }
       }
     });
   }
@@ -135,6 +152,32 @@ describe('adapters never mass-assign a stored payload', () => {
     // value, including workspace_id or a price.
     const spreads = ADAPTERS.match(/\.insert\(\s*\{[^}]*\.\.\.\s*(payload|p)\b/g) ?? [];
     expect(spreads, `mass assignment of a template payload: ${spreads.join(' | ')}`).toEqual([]);
+  });
+
+  it('no adapter selects a forbidden column directly', () => {
+    // The declarative allowlist is not the only way a value reaches a payload (#385 FN-4).
+    // The expense adapter ran its own `.select('subtotal_net, vat_amount')` inside
+    // `capture()` and stored the result under synthetic names, so both the allowlist and
+    // any name-based check were bypassed — the guard was well-built for the path it
+    // inspected, and the code took a different one.
+    //
+    // This reads what the adapters actually ASK the database for.
+    // Scoped to `capture()` bodies. Selecting `id` elsewhere is ordinary — `filterVisibleIds`
+    // does it to check what the caller may see — and flagging that would make this a
+    // checker people mute rather than one they act on.
+    const offenders: string[] = [];
+    for (const m of ADAPTERS.matchAll(/async capture\s*\([\s\S]*?\n {2}\},/g)) {
+      for (const sel of [...m[0].matchAll(/\.select\(\s*'([^']+)'/g)].map((x) => x[1])) {
+        for (const col of sel.split(',').map((c) => c.trim())) {
+          if (FORBIDDEN_CAPTURE_FIELDS.includes(col as never)) offenders.push(col);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'an adapter selects a forbidden column directly, routing around captureFields: ' +
+        offenders.join(', '),
+    ).toEqual([]);
   });
 
   it('every live adapter is exported from adapters.ts', () => {

@@ -8,8 +8,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { entityTemplatesService, type EntityTemplate } from '@/services/entityTemplatesService';
 import { getAdapter } from '@/services/templates/registry';
 import type { TemplateEntityType } from '@/services/templates/types';
@@ -40,8 +39,14 @@ export const TemplatePickerDialog: React.FC<{
 }> = ({ entityType, open, onOpenChange, projectId, customer, title, hrEmployeeId, onSelect }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const workspaceId = getActiveWorkspaceId(user?.id);
+  // The LIVE workspace context, not `getActiveWorkspaceId(user?.id)` (#385 FN-5).
+  //
+  // That helper reads localStorage. RLS still blocks a non-member write, so this was
+  // never a tenancy hole — it is a WRONG-TENANT hazard: a stale or hand-edited value
+  // files a template, or a record created from one, into a workspace the user genuinely
+  // belongs to but is not currently looking at. Fourth instance of that class after
+  // CM-22, EX-3 and BU-10.
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const adapter = getAdapter(entityType);
 
   const [loading, setLoading] = useState(true);

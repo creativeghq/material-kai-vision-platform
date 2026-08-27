@@ -305,8 +305,12 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
  * editable even though no column is called that.
  */
 export const SYNTHETIC_PAYLOAD_FIELDS: Partial<Record<LiveTemplateEntityType, readonly TemplateEditableField[]>> = {
-  expense: [
-    { key: 'default_amount', label: 'Amount (net)', kind: 'number' },
-    { key: 'default_vat_amount', label: 'VAT amount', kind: 'number', hint: 'The tax on the net above — not folded into it.' },
-  ],
+  // `expense` had `default_amount` and `default_vat_amount` here and both are gone
+  // (#385 FN-4). Their columns — `subtotal_net` and `vat_amount` — are BOTH on
+  // FORBIDDEN_CAPTURE_FIELDS, and the synthetic names are what let them through: the
+  // guard read the declared `captureFields` array, where neither key ever appeared.
+  //
+  // The guard now also reads what the adapters actually SELECT, so a synthetic key can
+  // no longer be a way around the allowlist. That is the general lesson; the two fields
+  // are just where it showed up.
 };

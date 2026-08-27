@@ -29,9 +29,14 @@ import { occupiedAreaM2 } from './roomGeometry';
 import { PRESET_OPTIONS, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';
 import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 import {
+
   roomPlannerService, SURFACE_KEYS,
   type RoomLayout, type ResolvedLayoutItem, type LayoutSurface, type SurfaceKey,
 } from '@/services/roomPlannerService';
+
+/** Picker cap. Named so the limit and the "is it truncated" test read the same
+ *  number — two literals is how they stop agreeing (#385 FN-8). */
+const PICKER_LIMIT = 100;
 
 export const RoomPlannerPanel: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
@@ -218,12 +223,30 @@ export const RoomPlannerPanel: React.FC = () => {
   }, [pendingProduct, activeWorkspaceId, loading, layout]);
 
   // Products to place. Capped — this is a picker, not a catalog browser.
+  const [productsFailed, setProductsFailed] = useState(false);
+  const [productsTruncated, setProductsTruncated] = useState(false);
   useEffect(() => {
     if (!activeWorkspaceId) return;
     let cancelled = false;
     supabase.from('products').select('id, name').eq('workspace_id', activeWorkspaceId)
-      .order('name').limit(100)
-      .then(({ data }) => { if (!cancelled) setProducts((data ?? []) as { id: string; name: string }[]); });
+      .order('name').limit(PICKER_LIMIT)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        // The error was unread, so a failed load rendered as an EMPTY picker — the
+        // operator saw "no products" and could not tell it from a workspace with none
+        // (#385 FN-8). Same shape as the dashboard counts in FN-1.
+        if (error) {
+          console.error('[roomplanner] product picker failed:', error);
+          setProductsFailed(true);
+          return;
+        }
+        setProductsFailed(false);
+        setProducts((data ?? []) as { id: string; name: string }[]);
+        // The cap is silent otherwise: at exactly PICKER_LIMIT rows the operator has no
+        // way to know the list is truncated rather than complete, so a product they know
+        // exists simply is not there.
+        setProductsTruncated((data ?? []).length >= PICKER_LIMIT);
+      });
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
 
@@ -485,10 +508,25 @@ export const RoomPlannerPanel: React.FC = () => {
                 <Label className="text-xs">Add a product</Label>
                 <Select value="" onValueChange={addProduct}>
                   <SelectTrigger>
-                    <SelectValue placeholder={products.length ? 'Pick a product' : 'No products in this workspace'} />
+                    {/* "Could not load products" is a different statement from "there are
+                        none", and the operator can act on only one of them (#385 FN-8). */}
+                    <SelectValue
+                      placeholder={
+                        productsFailed
+                          ? 'Could not load products'
+                          : products.length
+                            ? 'Pick a product'
+                            : 'No products in this workspace'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {productsTruncated && (
+                      <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                        Showing the first {PICKER_LIMIT} — search the catalog for more.
+                      </p>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

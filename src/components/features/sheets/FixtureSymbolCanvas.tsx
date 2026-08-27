@@ -5,6 +5,7 @@ import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { supabase } from '@/integrations/supabase/client';
+import { todayLocalISO } from '@/utils/datetime';
 import {
   newRunId,
   runLengthMm,
@@ -183,7 +184,13 @@ export function FixtureSymbolCanvas({
     if (titleBlock.prepared_by && titleBlock.date_iso) return;
     void (async () => {
       const patch: SheetTitleBlock = {};
-      if (!titleBlock.date_iso) patch.date_iso = new Date().toISOString();
+      // The OPERATOR'S calendar day, not UTC (#385 FN-6). `new Date().toISOString()` is
+      // the UTC date, and Greek operators are UTC+2/+3 — so between local midnight and
+      // 02:00 it stamps YESTERDAY. Line ~554 slices this back to `YYYY-MM-DD` for the
+      // picker, so the operator was shown yesterday's date and the PDF the client
+      // receives carried it as the issue date. First site of this class that prints on a
+      // document somebody outside the company reads.
+      if (!titleBlock.date_iso) patch.date_iso = todayLocalISO();
       if (!titleBlock.prepared_by) {
         const { data: { user } } = await supabase.auth.getUser();
         const meta = user?.user_metadata as { full_name?: string; name?: string } | undefined;
@@ -555,7 +562,14 @@ export function FixtureSymbolCanvas({
                   onChange={(e) => setTitleBlock((tb) => ({
                     ...tb,
                     // Empty clears the stored date, falling back to render-time.
-                    date_iso: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                    //
+                    // Stored as the bare `YYYY-MM-DD` the input already gives us. It used
+                    // to be `new Date(value).toISOString()`, which round-tripped stably
+                    // through the `.slice(0, 10)` above and so was a smell rather than a
+                    // defect — but now that the auto-stamp writes a local date (#385
+                    // FN-6), two formats in one field is how the next reader picks the
+                    // wrong one.
+                    date_iso: e.target.value || undefined,
                   }))}
                   className="h-7 text-xs"
                 />
