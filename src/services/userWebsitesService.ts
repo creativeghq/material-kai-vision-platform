@@ -266,6 +266,34 @@ export interface AiMonitoringState {
   diagnosis: string | null;
 }
 
+export interface CompetitorLine {
+  key: string;
+  label: string;
+  domain?: string;
+  is_self: boolean;
+  source?: 'auto' | 'manual';
+  points: { date: string; v: number }[];
+  /** `not_collected` = tracked but never measured. Distinct from measured-and-empty. */
+  status?: string;
+}
+
+export interface CompetitorSeries {
+  metric: string;
+  window_days: number;
+  competitors_tracked: number;
+  self: CompetitorLine | null;
+  competitors: CompetitorLine[];
+  note: string | null;
+}
+
+export interface CompetitorRow {
+  id: string;
+  competitor_domain: string;
+  display_label: string | null;
+  source: 'auto' | 'manual';
+  is_active: boolean;
+}
+
 export interface AiVisibilityModelRow {
   model: string;
   probes: number;
@@ -653,6 +681,45 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as SeoGscSummary) ?? null;
+  },
+
+  async competitorSeries(
+    websiteId: string, days = 365, metric = 'organic_traffic',
+  ): Promise<CompetitorSeries | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_competitor_series' as any,
+      { p_website_id: websiteId, p_days: days, p_metric: metric } as any,
+    );
+    if (error) throw error;
+    return (data as CompetitorSeries) ?? null;
+  },
+
+  async listCompetitors(websiteId: string): Promise<CompetitorRow[]> {
+    const { data, error } = await supabase
+      .from('seo_competitors' as any)
+      .select('id, competitor_domain, display_label, source, is_active')
+      .eq('website_id', websiteId)
+      .order('competitor_domain');
+    if (error) throw error;
+    return (data as unknown as CompetitorRow[]) ?? [];
+  },
+
+  async addCompetitor(websiteId: string, workspaceId: string, domain: string): Promise<void> {
+    // Normalised the same way `domainOf` normalises in the tracker, so 'https://Flobali.GR/x'
+    // and 'flobali.gr' cannot become two rows tracking one company.
+    const clean = domain.trim().toLowerCase()
+      .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    if (!clean || !clean.includes('.')) throw new Error('Enter a domain, e.g. flobali.gr');
+    const { error } = await supabase.from('seo_competitors' as any).insert({
+      website_id: websiteId, workspace_id: workspaceId,
+      competitor_domain: clean, source: 'manual', is_active: true,
+    } as any);
+    if (error) throw error;
+  },
+
+  async removeCompetitor(id: string): Promise<void> {
+    const { error } = await supabase.from('seo_competitors' as any).delete().eq('id', id);
+    if (error) throw error;
   },
 
   async aiMonitoringState(websiteId: string): Promise<AiMonitoringState | null> {

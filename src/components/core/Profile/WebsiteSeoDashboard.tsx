@@ -3,7 +3,7 @@ import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles,
+  LayoutDashboard, Sparkles, Swords,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -12,6 +12,7 @@ import { WebsiteDomainIntelPanel } from '@/components/core/Profile/WebsiteDomain
 import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOverviewPanel';
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
+import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -181,6 +182,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         <TabsList className="bg-muted">
           <TabsTrigger value="overview" className="gap-1"><LayoutDashboard className="w-3.5 h-3.5" /> Overview</TabsTrigger>
           <TabsTrigger value="ai" className="gap-1"><Sparkles className="w-3.5 h-3.5" /> AI Visibility</TabsTrigger>
+          <TabsTrigger value="competitors" className="gap-1"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
           <TabsTrigger value="articles" className="gap-1"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
           <TabsTrigger value="research" className="gap-1"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
           <TabsTrigger value="runs" className="gap-1"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
@@ -205,6 +207,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* AI Visibility — what assistants say about you (llm_mention_probes). */}
         <TabsContent value="ai">
           <WebsiteAiVisibilityPanel website={website} />
+        </TabsContent>
+
+        {/* Competitors — your line beside theirs, same metric, same window. */}
+        <TabsContent value="competitors">
+          <WebsiteCompetitorsPanel website={website} />
         </TabsContent>
 
         {/* Articles */}

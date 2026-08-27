@@ -259,6 +259,11 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
       }
     } catch (e) { console.warn('[seo-domain-tracker] alert check failed:', e instanceof Error ? e.message : e); }
 
+    // Competitors ride the same weekly run, in the SAME market, so the lines on the
+    // comparison chart are actually comparable — a competitor measured in a different
+    // country is a different question wearing the same axis.
+    await trackCompetitors(supabase, website, country, language, snapshot.captured_at);
+
     return { ok: true };
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
@@ -267,6 +272,59 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
       captured_at: new Date().toISOString().slice(0, 10), country_code: country, language_code: language, error: msg,
     }, { onConflict: 'website_id,captured_at' });
     return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Snapshot every tracked competitor for one website.
+ *
+ * ONLY the rank-overview call, deliberately. A backlinks_summary per competitor
+ * would double the cost of every weekly run for a figure the comparison chart does
+ * not plot, and this loop scales with however many rivals an operator adds. The
+ * site's own snapshot still fetches backlinks.
+ *
+ * One competitor failing must not abort the rest, nor the run: each is caught,
+ * recorded with its own `source_status`, and the loop continues.
+ */
+async function trackCompetitors(
+  supabase: any,
+  website: { id: string; workspace_id: string },
+  country: string,
+  language: string,
+  capturedAt: string,
+): Promise<void> {
+  const { data: rivals, error } = await supabase.from('seo_competitors')
+    .select('id, competitor_domain')
+    .eq('website_id', website.id).eq('is_active', true)
+    .limit(25);
+  if (error) { console.warn('[seo-domain-tracker] competitor read failed:', error.message); return; }
+  if (!rivals?.length) return;
+
+  for (const rival of rivals) {
+    const status: Record<string, string> = {};
+    const errors: Record<string, string> = {};
+    let row: any = {};
+    try {
+      const r = await dfs('labs_domain_rank_overview', {
+        target: rival.competitor_domain, country_code: country, language_code: language,
+      });
+      status.overview = r.answered ? (r.items.length ? 'ok' : 'no_data') : 'failed';
+      if (!r.answered) errors.overview = 'The source reported an error inside a successful HTTP response.';
+      row = r.items?.[0]?.metrics?.organic || {};
+    } catch (e) {
+      status.overview = 'failed';
+      errors.overview = String(e instanceof Error ? e.message : e).slice(0, 300);
+      console.error(`[seo-domain-tracker] competitor ${rival.competitor_domain} failed:`, errors.overview);
+    }
+
+    const { error: upErr } = await supabase.from('seo_competitor_snapshots').upsert({
+      competitor_id: rival.id, website_id: website.id, workspace_id: website.workspace_id,
+      captured_at: capturedAt, country_code: country, language_code: language,
+      ranking_keywords: n(row.count), organic_traffic: n(row.etv),
+      organic_traffic_value: n(row.estimated_paid_traffic_cost),
+      source_status: status, source_errors: errors,
+    }, { onConflict: 'competitor_id,captured_at' });
+    if (upErr) console.warn('[seo-domain-tracker] competitor snapshot write failed:', upErr.message);
   }
 }
 
