@@ -176,9 +176,35 @@ describe('tenant flow vocabulary', () => {
   };
 
   // Must equal tenant_flow_allowed_triggers() / tenant_flow_allowed_actions(), verbatim.
+  //
+  // Widened 2026-08-27 from 8 entries to 56. It was 8 because `forkable` — offered on the
+  // Automations page as "Reuse" — is derived from this list, and only 4 of 87 tenant-governable
+  // platform defaults qualified. The narrowness was never about operator-vs-tenant (that is
+  // `tenant_configurable`, a separate flag): a FORK is `is_global=false`, and flow-engine matches
+  // such a row only as `and(is_global.eq.false, workspace_id.eq.<ws>)`, so the admission rule is
+  // "does this trigger's emitter stamp workspace_id". Every entry below was verified against the
+  // payload actually posted to flow-engine — see the emitter test at the bottom of this block.
+  // `appointment_booked` was REMOVED: `appointments` has no workspace_id column at all.
   const RPC_TRIGGERS = [
-    'manual', 'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
-    'inbox.message_received', 'appointment_booked',
+    'manual', 'scheduled',
+    'invoice_paid', 'payment_received', 'payment_sent', 'bank_payment_unmatched',
+    'card_spend_threshold', 'customer_credit_releasable', 'finance_follow_up',
+    'quote_approved', 'quote_rejected', 'quote_sent', 'order_created', 'order_status_changed',
+    'purchase_order.sent', 'purchase_order.received', 'supplier_po_received',
+    'upstream_order_created', 'rfq_lines_requested', 'rfq_lines_priced', 'inventory_low_stock',
+    'pricing_change_requested', 'pricing_change_decided',
+    'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
+    'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
+    'hr.employee_added', 'hr.departure_recorded', 'hr.absence_requested', 'hr.absence_reviewed',
+    'hr.overtime_recorded', 'hr.applicant_stage_changed', 'hr_late_checkin',
+    'asset.service_due', 'asset.service_overdue',
+    'campaign_sent', 'catalog_sent_to_customers', 'client_view_feedback_received',
+    'document_published', 'doc_suggestion_submitted', 'page_watch_changed',
+    'social_post_published', 'social_post_failed', 'social_comment_received',
+    'social_account_connected', 'social_account_disconnected',
+    'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
+    'seo.article_refresh_due', 'seo.site_health_changed',
+    'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
   ];
   const RPC_ACTIONS = [
     'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
@@ -210,26 +236,133 @@ describe('tenant flow vocabulary', () => {
    * stamps workspace_id." A tenant flow bound to an event nothing emits is the silent-zero shape
    * — it saves, it activates, it shows up in the list, and it never once fires.
    */
-  it('every tenant trigger has an emitter (or is an entry point)', () => {
+  it('every tenant trigger is emitted WITH a workspace_id (or is an entry point)', () => {
     // Entry points are STARTED, not emitted, so no emitter exists or should. 'scheduled' is
     // cron-driven (flow-engine wakes it); 'manual' is what createFlowForWorkspace stamps on every
     // empty automation the tenant builder creates, which is why the table guard must keep allowing
     // it — drop it and the New automation button starts raising 42501.
     const ENTRY_POINTS = new Set(['scheduled', 'manual']);
-    // collectEmits() only sees STRING-LITERAL event names, by deliberate design (see its comment).
-    // 'quote_approved' is emitted through a ternary — `const eventName = accepted ? 'quote_approved'
-    // : 'quote_rejected'; flowEventService.emit(eventName, { …, workspace_id })` in
-    // src/modules/quotes/services/QuotesService.ts:572 — so it is real, workspace-stamped, and
-    // invisible here. Exempted with its site named, not by loosening the scan into guesswork.
-    const EMITTED_VIA_VARIABLE = new Set(['quote_approved']);
-    const emitted = new Set(collectEmits().map((e) => e.event));
+
+    /**
+     * The admission rule, and it is stricter than "something emits it".
+     *
+     * flow-engine matches a tenant flow ONLY as `and(is_global.eq.false, workspace_id.eq.<ws>)`;
+     * an event it cannot attribute to a workspace falls back to `eq('is_global', true)`. So a
+     * trigger whose emitter omits workspace_id admits a tenant automation that saves, activates,
+     * appears in the list — and never once fires. Worse through Reuse, which switches the platform
+     * default OFF in the same transaction: the owner ends up with FEWER notifications than they
+     * started with, and no error is raised anywhere. `appointment_booked` shipped in exactly that
+     * state (the `appointments` table has no workspace_id column at all).
+     *
+     * Checking presence alone would have passed it, which is why this reads the payload.
+     */
+    // BOTH emit shapes, for the reason collectEmits documents: the role-fanout form takes the
+    // event name THIRD, and a scan that only knows the name-first form reported `order_created`
+    // — live since the orders module shipped — as unemitted. Here it would have been worse than a
+    // wrong report: it would have condemned 16 correctly-stamped triggers as unusable.
+    const EMIT_CALL =
+      /(?:emitFlowEventToWorkspaceRoles|flowEventService\.emitToWorkspaceRoles|emitFlowEvent|flowEventService\.emit)\(/g;
+
+    // Read the tree ONCE, not once per trigger — 56 triggers × a full walk of src/ and
+    // supabase/functions/ was 12s for a single assertion, and a slow guard is a deleted guard.
+    const sources = SCAN_ROOTS.flatMap((root) =>
+      walk(root).map((file) => stripComments(readFileSync(file, 'utf8'))));
+
+    const stampsWorkspace = (event: string): boolean => {
+      const literal = `'${event}'`;
+      {
+        for (const src of sources) {
+          for (const m of src.matchAll(EMIT_CALL)) {
+            // Balanced read of the whole ARGUMENT LIST. A fixed window would bleed into the next
+            // emit call and credit this one with that one's workspace_id.
+            const open = m.index! + m[0].length - 1;
+            let depth = 0, close = -1;
+            for (let j = open; j < src.length; j++) {
+              if (src[j] === '(') depth++;
+              else if (src[j] === ')' && --depth === 0) { close = j; break; }
+            }
+            if (close === -1) continue;
+            const args = src.slice(open, close + 1);
+            const at = args.indexOf(literal);
+            if (at === -1) continue;
+            // Only AFTER the event name. The fanout form's FIRST argument is routinely
+            // `order.workspace_id` — counting that would pass a call whose payload omits it,
+            // which is precisely the defect this test exists to catch.
+            if (/workspace_id/.test(args.slice(at + literal.length))) return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    /**
+     * Emitters this file structurally cannot see, each verified by hand against the payload that
+     * actually reaches flow-engine. Named individually rather than loosening the scan into
+     * guesswork — an exemption with a citation is auditable; a wider regex is not.
+     *
+     * Two shapes:
+     *  • a TypeScript emitter whose event name is a VARIABLE (collectEmits only reads string
+     *    literals, by deliberate design — see its comment).
+     *  • a SQL emitter in pg_proc, which no repo test can read at all.
+     */
+    const VERIFIED_ELSEWHERE: Record<string, string> = {
+      quote_approved:        "ternary eventName, src/modules/quotes/services/QuotesService.ts — payload carries workspace_id: quote.workspace_id",
+      quote_rejected:        'same site as quote_approved (the other arm of the ternary)',
+      'asset.service_due':   "ternary eventType, supabase/functions/asset-service-reminders-cron — `base` carries workspace_id: row.workspace_id",
+      'asset.service_overdue': 'same site as asset.service_due (the other arm of the ternary)',
+      inventory_low_stock:   "SQL: public._notify_low_stock — data carries 'workspace_id', NEW.workspace_id",
+      supplier_po_received:  "SQL: public.handoff_purchase_order_to_supplier — data carries 'workspace_id', v_sup_ws",
+      upstream_order_created: "SQL: public._notify_upstream_order_created — data carries 'workspace_id', NEW.workspace_id",
+      rfq_lines_requested:   "SQL: public._notify_rfq_lifecycle — v_data carries 'workspace_id', v_recipient_ws",
+      rfq_lines_priced:      'same site as rfq_lines_requested (the other status branch)',
+    };
+
+    const offenders: string[] = [];
     for (const t of readConst('TENANT_TRIGGERS')) {
-      if (ENTRY_POINTS.has(t) || EMITTED_VIA_VARIABLE.has(t)) continue;
-      expect(
-        emitted.has(t),
-        `'${t}' is offered to tenants but nothing in the repo emits it — a flow bound to it can ` +
-          `never fire, and nothing would ever report that.`,
-      ).toBe(true);
+      if (ENTRY_POINTS.has(t) || t in VERIFIED_ELSEWHERE) continue;
+      if (!stampsWorkspace(t)) offenders.push(t);
+    }
+    expect(
+      offenders,
+      'These are offered to tenants but no in-repo emitter puts a workspace_id in the payload. A ' +
+      'tenant flow bound to one can never match, and Reuse would switch the working platform ' +
+      'default off in exchange for a copy that never fires. Either stamp the workspace at the ' +
+      'emitter, or drop the trigger from the vocabulary (both halves — see SYNC_HINT). If the ' +
+      'emitter is SQL or uses a variable event name, add it to VERIFIED_ELSEWHERE with the site ' +
+      'and the field you verified.\n',
+    ).toEqual([]);
+  });
+
+  /**
+   * The palette is a FOURTH copy of this vocabulary, and it had already drifted — wider, which is
+   * the dangerous direction. `payment_reversed`, `asset.warranty_expiring` and `appointment_booked`
+   * were all offered as draggable nodes in the tenant builder and rejected by
+   * `enforce_tenant_flow_allowlist`, so the save died on a raw 42501 naming a constraint the user
+   * has never heard of. It carried no test of any kind until 2026-08-27.
+   */
+  it('the visual builder offers exactly the tenant vocabulary, no more', () => {
+    const PALETTE_FILE = 'src/components/Admin/FlowsManagement/utils/paletteItems.ts';
+    const src = stripComments(readFileSync(PALETTE_FILE, 'utf8'));
+    const start = src.indexOf('TENANT_ALLOWED_SUBTYPES');
+    expect(start, `could not find TENANT_ALLOWED_SUBTYPES in ${PALETTE_FILE}`).toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf(']', start));
+    const palette = new Set([...body.matchAll(/'([a-zA-Z0-9_.]+)'/g)].map((m) => m[1]));
+
+    // `send_sms` is the flow-engine alias for send_whatsapp — a palette label, not a fifth action.
+    const allowed = new Set([...readConst('TENANT_TRIGGERS'), ...readConst('TENANT_ACTIONS'), 'send_sms']);
+    const offered = [...palette].filter((s) => !allowed.has(s)).sort();
+    expect(
+      offered,
+      `${PALETTE_FILE} offers these in the tenant builder but the DB guard rejects them. The node ` +
+      'drags, the flow saves, and the write dies on a raw 42501. Remove them, or add them to the ' +
+      'vocabulary in both halves.\n',
+    ).toEqual([]);
+
+    // The other direction is only a missed opportunity, so report rather than fail: a trigger the
+    // enforcer allows but the palette hides is invisible in the builder, not broken.
+    const hidden = [...allowed].filter((s) => !palette.has(s)).sort();
+    if (hidden.length) {
+      console.log(`[flow-contract] allowed by the DB but absent from the builder palette: ${hidden.join(', ')}`);
     }
   });
 });

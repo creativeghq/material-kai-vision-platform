@@ -614,18 +614,53 @@ export const conditionPaletteItems = paletteItems.filter(i => i.category === 'co
 export const actionPaletteItems = paletteItems.filter(i => i.category === 'action');
 
 /**
- * The tenant-safe subset a workspace user may drop in the visual builder. MUST mirror the
- * DB `flows_tenant_allowlist_guard` trigger (which is the real enforcer; this only trims the UI).
+ * The tenant-safe subset a workspace user may drop in the visual builder. MUST mirror the DB
+ * `flows_tenant_allowlist_guard` trigger — `enforce_tenant_flow_allowlist`, which reads
+ * `tenant_flow_allowed_triggers()` / `tenant_flow_allowed_actions()`. That is the real enforcer;
+ * this only trims the UI, which is exactly why it is dangerous when it drifts WIDER: the builder
+ * offers a node, the save dies on a raw 42501 from a trigger the user has never heard of.
+ *
+ * It had drifted. `payment_reversed`, `asset.warranty_expiring` and `appointment_booked` were all
+ * offered here and rejected by the enforcer — none of the three has an emitter that stamps
+ * workspace_id, so a tenant flow on them could never have fired even if the insert had passed.
+ * Held to the vocabulary by tests/unit/flowEventContract.test.ts, which reads both lists.
+ *
  * Condition nodes are pure logic and always allowed — only trigger/action subtypes are listed.
  */
 export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
-  // triggers
-  'scheduled', 'quote_approved', 'invoice_paid', 'bank_payment_unmatched', 'card_spend_threshold', 'payment_received', 'payment_sent', 'payment_reversed',
-  'inbox.message_received', 'appointment_booked', 'contract_signed',
+  // ── triggers: mirrors tenant_flow_allowed_triggers() ──────────────────────────────────────
+  // Entry points
+  'manual', 'scheduled',
+  // Finance
+  'invoice_paid', 'payment_received', 'payment_sent', 'bank_payment_unmatched',
+  'card_spend_threshold', 'customer_credit_releasable', 'finance_follow_up',
+  // Quotes, orders, purchasing
+  'quote_approved', 'quote_rejected', 'quote_sent', 'order_created', 'order_status_changed',
+  'purchase_order.sent', 'purchase_order.received', 'supplier_po_received',
+  'upstream_order_created', 'rfq_lines_requested', 'rfq_lines_priced', 'inventory_low_stock',
+  'pricing_change_requested', 'pricing_change_decided',
+  // Inbox
+  'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
+  // CRM & contracts
+  'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
+  // HR
+  'hr.employee_added', 'hr.departure_recorded', 'hr.absence_requested', 'hr.absence_reviewed',
+  'hr.overtime_recorded', 'hr.applicant_stage_changed', 'hr_late_checkin',
   // Installed base (#343) — a tenant's own customers' equipment; nothing cross-workspace here.
-  'asset.service_due', 'asset.service_overdue', 'asset.warranty_expiring',
-  // actions (send_sms is the engine's WhatsApp alias)
-  'send_email', 'send_sms', 'create_notification', 'send_agent_message',
+  'asset.service_due', 'asset.service_overdue',
+  // Marketing, catalog, content
+  'campaign_sent', 'catalog_sent_to_customers', 'client_view_feedback_received',
+  'document_published', 'doc_suggestion_submitted', 'page_watch_changed',
+  // Social & WhatsApp
+  'social_post_published', 'social_post_failed', 'social_comment_received',
+  'social_account_connected', 'social_account_disconnected',
+  'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
+  // SEO
+  'seo.article_refresh_due', 'seo.site_health_changed',
+  // Real estate
+  'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
+  // ── actions: mirrors tenant_flow_allowed_actions() (send_sms is the engine's WhatsApp alias) ──
+  'send_email', 'send_sms', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
 ]);
 
 /** Is this palette item allowed for a tenant (workspace) builder? Conditions always pass. */
