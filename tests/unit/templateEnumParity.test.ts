@@ -25,6 +25,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { CONTRACT_CONTEXTS } from '@/services/contracts/contractVocabulary';
+
 const ADAPTERS = readFileSync(join(process.cwd(), 'src/services/templates/adapters.ts'), 'utf8')
   .replace(/\r\n/g, '\n');
 
@@ -53,12 +55,46 @@ const DB_ENUMS: Record<string, { constraint: string; values: string[] }> = {
   orderKind: { constraint: 'orders.order_type (app-level)', values: ['sales', 'purchase'] },
 };
 
-/** Every `const <name> = oneOf([...] as const)` declared in adapters.ts. */
+/**
+ * Vocabularies an adapter now takes from a shared source rather than spelling out (#391).
+ *
+ * `contractContext` was `oneOf(['hr','finance','project','realestate'] as const)` — one of
+ * FIVE copies of that list. It is `oneOf(CONTRACT_CONTEXTS)` now, so there is no literal
+ * for the regex below to find, and the values are imported here instead.
+ *
+ * Importing rather than re-typing them matters for this file in particular: finding 2 in
+ * the docstring above is `contracts_context_check` drifting from the app's copy of this
+ * very vocabulary, so re-typing it here would put a sixth copy inside the test written to
+ * catch the problem.
+ */
+const IMPORTED_ONE_OFS: Record<string, readonly string[]> = {
+  contractContext: CONTRACT_CONTEXTS,
+};
+
+/**
+ * Every `const <name> = oneOf(...)` in adapters.ts, whether it spells the list out or
+ * takes it from a shared source.
+ */
 function parseOneOfs(src: string): Record<string, string[]> {
   const out: Record<string, string[]> = {};
-  const re = /const\s+(\w+)\s*=\s*oneOf\(\[([^\]]*)\]\s*as const\)/g;
-  for (let m = re.exec(src); m; m = re.exec(src)) {
+  const literal = /const\s+(\w+)\s*=\s*oneOf\(\[([^\]]*)\]\s*as const\)/g;
+  for (let m = literal.exec(src); m; m = literal.exec(src)) {
     out[m[1]] = [...m[2].matchAll(/'([^']*)'/g)].map((v) => v[1]);
+  }
+  // `oneOf(SOME_CONSTANT)` — the shared-source form. The name must be one this file
+  // knows, so a NEW indirection fails here rather than silently dropping out of the
+  // parity check.
+  const imported = /const\s+(\w+)\s*=\s*oneOf\(\s*([A-Z][A-Z0-9_]*)\s*\)/g;
+  for (let m = imported.exec(src); m; m = imported.exec(src)) {
+    const values = IMPORTED_ONE_OFS[m[1]];
+    if (!values) {
+      throw new Error(
+        `adapters.ts declares \`${m[1]} = oneOf(${m[2]})\` but this test does not know ` +
+          `where ${m[2]} comes from. Add it to IMPORTED_ONE_OFS — importing the constant, ` +
+          'not re-typing its values.',
+      );
+    }
+    out[m[1]] = [...values];
   }
   return out;
 }

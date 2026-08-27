@@ -5,8 +5,24 @@ import { join } from 'path';
 import { stripComments } from '../helpers/stripComments';
 
 /**
- * Partner and embed API keys are stored hashed, verified in ONE place, and never read
- * back (#390).
+ * PARTNER API keys are stored hashed, verified in ONE place, and never read back (#390).
+ *
+ * EMBED KEYS ARE DELIBERATELY EXCLUDED, AND THAT IS A CORRECTION
+ * --------------------------------------------------------------
+ * The first version of this change hashed `material_kai_keys` too, on the grounds that it
+ * had "the identical design". It does not. An embed key is PUBLIC by construction: it
+ * ships in the merchant's page source as `<materialkai-builder api-key="mk_embed_…">` and
+ * is bounded by `allowed_origins`, not by secrecy — `embedKeysService.generateEmbedKey`
+ * says so in as many words.
+ *
+ * So hashing bought nothing there (the value is already on the page) and cost the
+ * read-back the product depends on: `productEmbedReadinessService` regenerates the
+ * install snippet from it, and a merchant who closes the tab must be able to get the key
+ * again. A show-once embed key is a key the merchant loses. It was reverted.
+ *
+ * The distinction is the point, and it is why this file now says `api_keys` everywhere it
+ * used to say "either key table": one of these is a Bearer credential nobody but its
+ * owner ever sees, and the other is published HTML.
  *
  * `api_keys.api_key` held the credential in directly usable form — 36 characters,
  * `kai_` prefix, not a digest. That is not one bug: it changes the severity of every
@@ -20,15 +36,11 @@ import { stripComments } from '../helpers/stripComments';
  *   * `generateSecureKey` built the key from `Math.random()`. It is named "secure" and
  *     is not a CSPRNG, so the live keys were PREDICTABLE as well as plaintext — which
  *     is why hashing them is necessary but not sufficient and they need rotating.
- *   * `material_kai_keys` (the embed key system) has the identical design and is read
- *     by three more edge functions. It holds zero rows, which is the argument for
- *     fixing it now rather than later.
- *
  * WHY VERIFICATION IS IN SQL
- * The comparison happens in Python (MIVAA), in four Deno edge functions and in the
- * browser. Five implementations of "hash the presented key the same way" is five
- * chances to disagree about encoding, and disagreeing here is a total auth failure —
- * or worse, a silent mismatch on one runtime only.
+ * The comparison happens in Python (MIVAA), in an edge function and in the browser.
+ * Several implementations of "hash the presented key the same way" is several chances to
+ * disagree about encoding, and disagreeing here is a total auth failure — or worse, a
+ * silent mismatch on one runtime only.
  */
 
 const ROOT = join(__dirname, '..', '..');
@@ -72,10 +84,13 @@ function sourceFiles(): string[] {
 }
 
 describe('#390 — API keys are hashed, not stored in usable form', () => {
-  it('nothing filters either key table by a plaintext key column', () => {
+  it('nothing filters the PARTNER key table by a plaintext key column', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles()) {
       const src = stripComments(readFileSync(file, 'utf8'));
+      // Only files that touch `api_keys`. `material_kai_keys` legitimately compares
+      // against its stored value — embed keys are public; see the note at the top.
+      if (!/['"]api_keys['"]/.test(src)) continue;
       // `.eq('api_key', <something>)` is the shape that only works against plaintext.
       if (/\.eq\(\s*['"]api_key['"]\s*,/.test(src)) {
         offenders.push(file.replace(ROOT, '').replace(/\\/g, '/'));
@@ -83,8 +98,8 @@ describe('#390 — API keys are hashed, not stored in usable form', () => {
     }
     expect(
       offenders,
-      `these compare a presented key against a stored column, which only works if the ` +
-        `column is plaintext (#390). Use the verify_api_key / verify_embed_key RPC:\n  ` +
+      `these compare a presented PARTNER key against a stored column, which only works ` +
+        `if the column is plaintext (#390). Use the verify_api_key RPC:\n  ` +
         offenders.join('\n  '),
     ).toEqual([]);
   });
@@ -145,9 +160,10 @@ describe('#390 — API keys are hashed, not stored in usable form', () => {
   });
 
   it('every runtime that authenticates a key uses the shared verifier', () => {
+    // `_shared/embed-key.ts` is deliberately absent: embed keys are public and are
+    // matched against the stored value. See the note at the top of this file.
     const checks: Array<[string, string]> = [
       ['supabase/functions/_shared/auth.ts', 'verify_api_key'],
-      ['supabase/functions/_shared/embed-key.ts', 'verify_embed_key'],
       ['mivaa-pdf-extractor/app/api/price_lookup_routes.py', 'verify_api_key'],
     ];
     for (const [rel, rpc] of checks) {

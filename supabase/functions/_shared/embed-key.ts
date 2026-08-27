@@ -125,15 +125,18 @@ export async function authenticateEmbedKey(
   const key = readEmbedKey(req);
   if (!key) return { ok: false, response: readableRefusal(req, 'Missing embed key', 401) };
 
-  // One verifier, in SQL (#390). `material_kai_keys.api_key` held the credential in
-  // directly usable form and this compared against it in plaintext. It is hashed now and
-  // the column is gone, so the comparison lives in `verify_embed_key` rather than being
-  // reimplemented in each of the three edge functions that do this.
+  // Compares the presented key against the stored value, and that is CORRECT here.
   //
-  // The RPC returns metadata only. is_active / expires_at / allowed_origins are still
-  // enforced below: it answers "which key is this", not "may it do that".
-  const { data: rows, error } = await supabase.rpc('verify_embed_key', { p_key: key });
-  const row = Array.isArray(rows) ? rows[0] : rows;
+  // #390 briefly hashed these and it was reverted: an embed key is public by construction
+  // — it ships in the merchant's page source as `api-key="mk_embed_…"` — and is bounded
+  // by `allowed_origins`, not by secrecy. Hashing costs the read-back the product needs
+  // and buys nothing, because the value is already on the page. The partner keys in
+  // `public.api_keys` are the opposite case and ARE hashed; see `verify_api_key`.
+  const { data: row, error } = await supabase
+    .from('material_kai_keys')
+    .select('id, workspace_id, is_active, expires_at, allowed_origins, rate_limit_per_minute, scope_type, scope_values')
+    .eq('api_key', key)
+    .maybeSingle();
 
   // One indistinguishable answer for unknown / disabled / expired, so the endpoint cannot be used
   // to test which keys exist.
