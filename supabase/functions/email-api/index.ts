@@ -173,12 +173,37 @@ async function hmacHex(message: string, secret: string): Promise<string> {
 
 /** Build the public one-click unsubscribe URL + List-Unsubscribe headers for a marketing send.
  *  The token is an HMAC of `workspace:lower(email)` under CRON_SECRET (verified by email-unsubscribe).
- *  Returns null when CRON_SECRET is unset (fail-open on the header, never block the send). */
+ *
+ *  THROWS when CRON_SECRET is unset. It used to return null — "fail-open on the header,
+ *  never block the send" (#387).
+ *
+ *  That reasoning is right for the wrong category of mail. For a TRANSACTIONAL email,
+ *  never blocking the send is correct: the recipient asked for it and a missing header
+ *  costs nothing. For a MARKETING send the safe failure is inverted — not sending is
+ *  recoverable, sending bulk mail without a working opt-out is not.
+ *
+ *  What was actually lost was quieter than "no unsubscribe link". The body link fell
+ *  back to a generic `${appBase}/unsubscribe`, so the email still LOOKED compliant; what
+ *  vanished was the `List-Unsubscribe` / `List-Unsubscribe-Post` header pair, and the
+ *  fallback link carried no workspace and no recipient token — so the page it opened
+ *  could not tell who had clicked, and could not honour the request without the person
+ *  re-entering their details. That is the exact friction one-click exists to remove.
+ *
+ *  RFC 8058 one-click unsubscribe has been a REQUIREMENT for bulk senders under the
+ *  Gmail and Yahoo rules since February 2024, so this cost deliverability as well as
+ *  compliance — and deliverability damage is not something a later fix undoes. */
 async function buildUnsubscribe(
   workspaceId: string, email: string, fromEmail: string, campaignId?: string | null,
-): Promise<{ url: string; headers: Record<string, string> } | null> {
+): Promise<{ url: string; headers: Record<string, string> }> {
   const secret = Deno.env.get('CRON_SECRET') || '';
-  if (!secret) return null;
+  if (!secret) {
+    throw new HttpError(
+      503,
+      'Cannot send marketing email: CRON_SECRET is unset, so the one-click unsubscribe ' +
+      'token cannot be signed. Refusing rather than sending bulk mail with no working ' +
+      'opt-out (RFC 8058).',
+    );
+  }
   const token = await hmacHex(`${workspaceId}:${email.toLowerCase()}`, secret);
   const base = `${Deno.env.get('SUPABASE_URL')}/functions/v1/email-unsubscribe`;
   const qs = `w=${encodeURIComponent(workspaceId)}&e=${encodeURIComponent(email)}&t=${token}` +
@@ -593,12 +618,30 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           }
           if (!primaryTo) throw new HttpError(400, 'No recipient for the marketing send.');
           const fromForUnsub = body.from || sender.fromEmail || '';
-          const built = fromForUnsub
-            ? await buildUnsubscribe(body.workspace_id, String(primaryTo), fromForUnsub, (body.tags?.campaign_id as string | undefined) ?? null)
-            : null;
+          if (!fromForUnsub) {
+            // The second silent path (#387), and it produced the identical outcome: no
+            // from-address meant `built` was null, so the headers vanished and the body
+            // link degraded to the anonymous fallback. `List-Unsubscribe` needs a
+            // mailto, so there is nothing to build — and a marketing send with no
+            // sender address should not be going out regardless.
+            throw new HttpError(
+              400,
+              'Cannot send marketing email without a from-address: the List-Unsubscribe ' +
+              'mailto cannot be built, and a bulk send needs a working opt-out.',
+            );
+          }
+          const built = await buildUnsubscribe(
+            body.workspace_id,
+            String(primaryTo),
+            fromForUnsub,
+            (body.tags?.campaign_id as string | undefined) ?? null,
+          );
           const appBase = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
           const sysVars: Record<string, string> = {
-            unsubscribeUrl: built?.url || `${appBase}/unsubscribe`,
+            // No `|| ${appBase}/unsubscribe` fallback any more. A link that carries
+            // neither workspace nor recipient token cannot identify who clicked, so it
+            // reads as compliance while being unable to honour the request.
+            unsubscribeUrl: built.url,
             companyName: sender.fromName || body.fromName || 'Materials Hub',
             currentYear: String(new Date().getFullYear()),
             platformUrl: appBase,
@@ -606,7 +649,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           // System-computed compliance placeholders WIN over caller-supplied variables — a stale/forged
           // caller unsubscribeUrl must never replace the real HMAC opt-out link (which the header also uses).
           body.variables = { ...(body.variables || {}), ...sysVars };
-          unsubHeaders = built?.headers;
+          unsubHeaders = built.headers;
         }
 
         let htmlBody = body.html;
