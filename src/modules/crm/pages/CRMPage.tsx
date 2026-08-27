@@ -252,6 +252,17 @@ export const CRMManagement: React.FC = () => {
         inactive: response.data?.filter((u) => u.status === 'inactive').length || 0,
       });
     } catch (error: any) {
+      // Not being allowed to list platform users is a PERMISSION STATE, not a failure. The Users
+      // tab is admin-only, but this page loads it unconditionally on mount, so every workspace
+      // member who is not a platform admin opened /crm and got a red destructive toast reading
+      // "Failed to load users: Access denied. Required roles: admin" — an internal role name,
+      // shown to someone with nothing to fix. Same shape as loadCompanyLookup above, which
+      // already refuses to block the page on data it merely wants.
+      if (error?.status === 401 || error?.status === 403) {
+        setUsers([]);
+        setUserStats({ total: 0, active: 0, inactive: 0 });
+        return;
+      }
       toast({ title: 'Error', description: `Failed to load users: ${error.message}`, variant: 'destructive' });
     } finally { setLoadingUsers(false); }
   };

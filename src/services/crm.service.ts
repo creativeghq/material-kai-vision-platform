@@ -39,8 +39,15 @@ export const usersAPI = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch users');
+      const error = await response.json().catch(() => ({} as { error?: string }));
+      // Carry the STATUS on the error. A caller has to tell "you may not see this" (401/403)
+      // from "this is broken" (5xx), and the message alone cannot say which — string-matching
+      // it is how a permission state ended up rendered as a red destructive toast reading
+      // "Access denied. Required roles: admin" on every /crm load for anyone who is not a
+      // platform admin.
+      const err = new Error(error.error || 'Failed to fetch users') as Error & { status?: number };
+      err.status = response.status;
+      throw err;
     }
 
     return response.json();
