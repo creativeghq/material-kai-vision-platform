@@ -191,17 +191,19 @@ describe('tenant flow vocabulary', () => {
   // `appointment_booked` was REMOVED: `appointments` has no workspace_id column at all.
   const RPC_TRIGGERS = [
     'manual', 'scheduled',
-    'invoice_paid', 'payment_received', 'payment_sent', 'bank_payment_unmatched',
-    'card_spend_threshold', 'customer_credit_releasable', 'finance_follow_up',
+    'invoice_paid', 'payment_received', 'payment_sent', 'payment_reversed',
+    'bank_payment_unmatched', 'card_spend_threshold', 'customer_credit_releasable',
+    'finance_follow_up',
     'quote_approved', 'quote_rejected', 'quote_sent', 'order_created', 'order_status_changed',
     'purchase_order.sent', 'purchase_order.received', 'supplier_po_received',
     'upstream_order_created', 'rfq_lines_requested', 'rfq_lines_priced', 'inventory_low_stock',
     'pricing_change_requested', 'pricing_change_decided',
     'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
     'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
+    'deal_won', 'deal_lost', 'deal_stage_changed',
     'hr.employee_added', 'hr.departure_recorded', 'hr.absence_requested', 'hr.absence_reviewed',
     'hr.overtime_recorded', 'hr.applicant_stage_changed', 'hr_late_checkin',
-    'asset.service_due', 'asset.service_overdue',
+    'asset.service_due', 'asset.service_overdue', 'asset.warranty_expiring',
     'campaign_sent', 'catalog_sent_to_customers', 'client_view_feedback_received',
     'document_published', 'doc_suggestion_submitted', 'page_watch_changed',
     'social_post_published', 'social_post_failed', 'social_comment_received',
@@ -294,28 +296,53 @@ describe('tenant flow vocabulary', () => {
     const sources = SCAN_ROOTS.flatMap((root) =>
       walk(root).map((file) => stripComments(readFileSync(file, 'utf8'))));
 
+    /** Balanced slice from the bracket at `i` — `(`, `{` or `[`. */
+    const balanced = (src: string, i: number): string => {
+      const open = src[i];
+      const close = open === '(' ? ')' : open === '{' ? '}' : ']';
+      let depth = 0;
+      for (let j = i; j < src.length; j++) {
+        if (src[j] === open) depth++;
+        else if (src[j] === close && --depth === 0) return src.slice(i, j + 1);
+      }
+      return '';
+    };
+
+    /** The initializer text of `const NAME = { … }` in this file, for resolving a named payload. */
+    const bindingText = (src: string, name: string): string => {
+      for (const m of src.matchAll(new RegExp(`(?:const|let|var)[ \\t]+${name}[ \\t]*(?::[^=\\n]*)?=[ \\t]*`, 'g'))) {
+        let i = m.index! + m[0].length;
+        while (i < src.length && /\s/.test(src[i])) i++;
+        if (src[i] === '{' || src[i] === '[' || src[i] === '(') return balanced(src, i);
+      }
+      return '';
+    };
+
     const stampsWorkspace = (event: string): boolean => {
       const literal = `'${event}'`;
-      {
-        for (const src of sources) {
-          for (const m of src.matchAll(EMIT_CALL)) {
-            // Balanced read of the whole ARGUMENT LIST. A fixed window would bleed into the next
-            // emit call and credit this one with that one's workspace_id.
-            const open = m.index! + m[0].length - 1;
-            let depth = 0, close = -1;
-            for (let j = open; j < src.length; j++) {
-              if (src[j] === '(') depth++;
-              else if (src[j] === ')' && --depth === 0) { close = j; break; }
-            }
-            if (close === -1) continue;
-            const args = src.slice(open, close + 1);
-            const at = args.indexOf(literal);
-            if (at === -1) continue;
-            // Only AFTER the event name. The fanout form's FIRST argument is routinely
-            // `order.workspace_id` — counting that would pass a call whose payload omits it,
-            // which is precisely the defect this test exists to catch.
-            if (/workspace_id/.test(args.slice(at + literal.length))) return true;
-          }
+      for (const src of sources) {
+        for (const m of src.matchAll(EMIT_CALL)) {
+          // Balanced read of the whole ARGUMENT LIST. A fixed window would bleed into the next
+          // emit call and credit this one with that one's workspace_id.
+          const args = balanced(src, m.index! + m[0].length - 1);
+          const at = args.indexOf(literal);
+          if (at === -1) continue;
+          // Only AFTER the event name. The fanout form's FIRST argument is routinely
+          // `order.workspace_id` — counting that would pass a call whose payload omits it,
+          // which is precisely the defect this test exists to catch.
+          let after = args.slice(at + literal.length);
+
+          // Resolve a payload passed by NAME, and a `{ ...base, … }` spread. Reading only inline
+          // object literals reports `emit('deal_won', payload)` as unstamped while
+          // `const payload = { workspace_id: deal.workspace_id, … }` sits ten lines above — which
+          // is not merely a wrong report: acting on it means "fixing" emitters already correct,
+          // and it wrongly excluded 5 qualifying triggers from the tenant vocabulary on 2026-08-27.
+          const ids = new Set<string>();
+          for (const x of after.matchAll(/[,(]\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*[,)]/g)) ids.add(x[1]);
+          for (const x of after.matchAll(/\.\.\.([A-Za-z_$][A-Za-z0-9_$]*)/g)) ids.add(x[1]);
+          for (const id of ids) after += `\n${bindingText(src, id)}`;
+
+          if (/workspace_id/.test(after)) return true;
         }
       }
       return false;

@@ -38,8 +38,9 @@ export const TENANT_TRIGGERS = [
   // createFlowForWorkspace, so dropping it breaks "New automation" with a 42501.
   'manual', 'scheduled',
   // Finance
-  'invoice_paid', 'payment_received', 'payment_sent', 'bank_payment_unmatched',
-  'card_spend_threshold', 'customer_credit_releasable', 'finance_follow_up',
+  'invoice_paid', 'payment_received', 'payment_sent', 'payment_reversed',
+  'bank_payment_unmatched', 'card_spend_threshold', 'customer_credit_releasable',
+  'finance_follow_up',
   // Quotes, orders, purchasing
   'quote_approved', 'quote_rejected', 'quote_sent', 'order_created', 'order_status_changed',
   'purchase_order.sent', 'purchase_order.received', 'supplier_po_received',
@@ -47,13 +48,14 @@ export const TENANT_TRIGGERS = [
   'pricing_change_requested', 'pricing_change_decided',
   // Inbox
   'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
-  // CRM & contracts
+  // CRM, deals & contracts
   'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
+  'deal_won', 'deal_lost', 'deal_stage_changed',
   // HR
   'hr.employee_added', 'hr.departure_recorded', 'hr.absence_requested', 'hr.absence_reviewed',
   'hr.overtime_recorded', 'hr.applicant_stage_changed', 'hr_late_checkin',
   // Installed base (#343) — a tenant's own customers' equipment.
-  'asset.service_due', 'asset.service_overdue',
+  'asset.service_due', 'asset.service_overdue', 'asset.warranty_expiring',
   // Marketing, catalog, content
   'campaign_sent', 'catalog_sent_to_customers', 'client_view_feedback_received',
   'document_published', 'doc_suggestion_submitted', 'page_watch_changed',
