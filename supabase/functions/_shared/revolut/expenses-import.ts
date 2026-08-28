@@ -150,11 +150,40 @@ export async function importRevolutExpenses(service: any, cfg: RevolutConfigRow)
       if (email) personByEmail.set(email, { employeeId: r.id, userId: r.user_id });
     }
 
+    /**
+     * A pre-read set is a HINT, not a claim (#359 CM-14).
+     *
+     * It saves work on the common case — an expense already imported never reaches the API calls
+     * below. It cannot prevent a repeat, because it is read once at the start of the run and the
+     * decisive moment is minutes later. The claim is the insert.
+     */
     const { data: seenRows } = await service
       .from('revolut_expenses')
-      .select('revolut_expense_id')
+      .select('revolut_expense_id, import_status, item_id')
       .eq('workspace_id', workspaceId);
     const seen = new Set((seenRows ?? []).map((r: any) => r.revolut_expense_id as string));
+
+    /**
+     * Heal rows a previous run claimed and never finished.
+     *
+     * `importing` with an `item_id` means the expense line WAS created and only the settle failed
+     * — so it is imported, and saying otherwise would create a second reimbursable line. With no
+     * item id, nothing was created: release the claim so this run can redo it.
+     */
+    for (const r of (seenRows ?? []) as any[]) {
+      if (r.import_status !== 'importing') continue;
+      if (r.item_id) {
+        await service.from('revolut_expenses')
+          .update({ import_status: 'imported' })
+          .eq('workspace_id', workspaceId).eq('revolut_expense_id', r.revolut_expense_id);
+      } else {
+        await service.from('revolut_expenses')
+          .delete()
+          .eq('workspace_id', workspaceId).eq('revolut_expense_id', r.revolut_expense_id)
+          .is('item_id', null);
+        seen.delete(r.revolut_expense_id);
+      }
+    }
 
     for (const exp of expenses ?? []) {
       if (!exp?.id || seen.has(exp.id)) continue;
@@ -181,6 +210,31 @@ export async function importRevolutExpenses(service: any, cfg: RevolutConfigRow)
       if (!person) {
         result.unmatchedPerson++;
         await service.from('revolut_expenses').insert({ ...ledger, import_status: 'unmatched_person' });
+        continue;
+      }
+
+      /**
+       * CLAIM IT FIRST (#359 CM-14).
+       *
+       * The unique constraint on `(workspace_id, revolut_expense_id)` was there all along — it
+       * just was not reached until after the expense line and the receipt had been written. A
+       * crash or a second overlapping run in that window imported the same Revolut expense again
+       * as a second reimbursable line, and the employee is paid twice.
+       *
+       * Inserting the marker BEFORE the work makes the database decide the race: whoever loses
+       * gets a duplicate-key error and skips.
+       */
+      const { error: claimErr } = await service.from('revolut_expenses').insert({
+        ...ledger,
+        matched_user_id: person.userId,
+        hr_employee_id: person.employeeId,
+        import_status: 'importing',
+      });
+      if (claimErr) {
+        // Not an error worth reporting: another run has it, or it is already imported.
+        if (!/duplicate|unique/i.test(claimErr.message ?? '')) {
+          result.errors.push(`${exp.id}: claim failed: ${claimErr.message}`);
+        }
         continue;
       }
 
@@ -228,17 +282,22 @@ export async function importRevolutExpenses(service: any, cfg: RevolutConfigRow)
           }
         }
 
-        await service.from('revolut_expenses').insert({
-          ...ledger,
-          matched_user_id: person.userId,
-          hr_employee_id: person.employeeId,
+        // Settle the claim. The item id lands here BEFORE the status, so a crash between the two
+        // leaves a row the heal above can read correctly.
+        await service.from('revolut_expenses').update({
           report_id: reportId,
           item_id: item.id,
           receipt_imported: receiptImported,
           import_status: 'imported',
-        });
+        }).eq('workspace_id', workspaceId).eq('revolut_expense_id', exp.id);
         result.imported++;
       } catch (err) {
+        // The claim outlived the work. Release it so the next run retries, rather than leaving an
+        // expense that can never be imported because a marker says it already was.
+        await service.from('revolut_expenses')
+          .delete()
+          .eq('workspace_id', workspaceId).eq('revolut_expense_id', exp.id)
+          .is('item_id', null);
         result.errors.push(`${exp.id}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }

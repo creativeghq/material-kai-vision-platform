@@ -116,6 +116,18 @@ export async function callRevolutApi<T = Record<string, unknown>>(
     }
     throw new Error(error.message);
   }
+  /**
+   * An APPLICATION failure inside a 200 is still a failure (#359 CM-23).
+   *
+   * `revolut-api` answers 200 with `{ ok: false, error }` on paths where the HTTP call itself
+   * worked and the operation did not — a sync that could not reach Revolut, a config that is not
+   * connected. `supabase.functions.invoke` reports no `error` for those, so every caller showed a
+   * success toast over a failed operation and the operator learned nothing.
+   */
+  const body = data as { ok?: boolean; success?: boolean; error?: string } | null;
+  if (body && (body.ok === false || body.success === false)) {
+    throw new Error(body.error || 'The request did not complete.');
+  }
   return data as T;
 }
 

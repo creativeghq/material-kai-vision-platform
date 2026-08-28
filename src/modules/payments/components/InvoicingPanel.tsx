@@ -132,7 +132,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
 
       const { data: settings } = await (supabase as any)
         .from('finance_settings')
-        .select('invoice_number_prefix, invoice_next_number, invoice_number_pad, default_payment_terms_days, default_vat_rate')
+        .select('invoice_number_prefix, invoice_next_number, invoice_number_pad, default_payment_terms_days, default_vat_rate, invoice_template_cover_path, invoice_template_footer_path')
         .eq('workspace_id', wsId)
         .maybeSingle();
 
@@ -163,9 +163,24 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
     if (!workspaceId) return;
     try {
       setSaving(true);
+      /**
+       * Save what this form EDITS, not everything it happens to hold (#359 CM-24).
+       *
+       * `...fields` spread the template paths too — and `load()` never read them, so they sat at
+       * their `DEFAULTS` value of null. Saving the numbering therefore wiped the uploaded cover
+       * and footer, silently, on a screen that says nothing about them. The paths are read now
+       * (so the upload buttons show the real state), and the write names its columns.
+       */
       const { error } = await (supabase as any)
         .from('finance_settings')
-        .upsert({ workspace_id: workspaceId, ...fields }, { onConflict: 'workspace_id' });
+        .upsert({
+          workspace_id: workspaceId,
+          invoice_number_prefix: fields.invoice_number_prefix,
+          invoice_next_number: fields.invoice_next_number,
+          invoice_number_pad: fields.invoice_number_pad,
+          default_payment_terms_days: fields.default_payment_terms_days,
+          default_vat_rate: fields.default_vat_rate,
+        }, { onConflict: 'workspace_id' });
       if (error) throw error;
       toast({ title: 'Invoice settings saved' });
     } catch (err: any) {

@@ -73,12 +73,27 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
 
   const currency = pockets.find((p) => p.id === pocketId)?.currency ?? 'EUR';
 
+  /**
+   * Synchronous latch (#359 CM-20). `busy` is React state, so a double-click enters `makeLink()`
+   * twice before the first render — and a payout link is money the recipient can claim, so two
+   * links is twice the money out with no way to un-issue the second.
+   */
+  const creatingLink = React.useRef(false);
+
   const makeLink = async () => {
     const amt = Number(linkAmount);
     if (!linkName.trim() || !pocketId || !(amt > 0)) {
       toast({ title: 'Payout links need a recipient name, a source account and an amount', variant: 'destructive' });
       return;
     }
+    // A payout link moves money to WHOEVER OPENS IT — there is no IBAN and no name check on the
+    // claim. Every other money-out path on this screen confirms; this one did not.
+    if (!window.confirm(
+      `Create a payout link for ${amt.toFixed(2)} ${currency} to ${linkName.trim()}?\n\n`
+      + 'Anyone who opens the link can claim it, so send it only to the person it is for.',
+    )) return;
+    if (creatingLink.current) return;
+    creatingLink.current = true;
     setBusy(true);
     try {
       const out = await callRevolutApi<{ url: string | null }>('create-payout-link', workspaceId, {
@@ -98,7 +113,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
       await load();
     } catch (e) {
       toast({ title: 'Could not create link', description: (e as Error).message, variant: 'destructive' });
-    } finally { setBusy(false); }
+    } finally { creatingLink.current = false; setBusy(false); }
   };
 
   if (!connected) return null;
