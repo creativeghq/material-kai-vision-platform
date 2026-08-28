@@ -21,6 +21,45 @@ const src = stripComments(
   readFileSync(join(ROOT, 'supabase/functions/campaign-processor/index.ts'), 'utf8').replace(/\r\n/g, '\n'),
 );
 
+describe('#357 AE-16 — a throttle is not a dead address', () => {
+  /**
+   * Only `workspace_email_quota_exceeded` was treated as retryable. Every OTHER 429 — a provider
+   * throttle, an upstream Resend limit — fell through to a throw, and the catch marked the
+   * recipient FAILED. Failed is terminal: it leaves the pending queue for good, so transient
+   * throttling permanently dropped people from a campaign, and the campaign then completed as
+   * `partial_failure` with a count that reads like bad addresses.
+   */
+  it('any 429 re-queues rather than failing the recipient', () => {
+    const block = src.slice(src.indexOf("emailResponse.status === 429 && result?.code"), src.indexOf('} catch (error)'));
+    // A second, code-less 429 branch must exist after the daily-cap one.
+    expect(block).toMatch(/else if \(emailResponse\.status === 429\)/);
+    const generic = block.slice(block.indexOf('else if (emailResponse.status === 429)'));
+    expect(generic).toContain("update({ status: 'pending' })");
+  });
+
+  it('a 5xx re-queues too — the upstream is unwell, not the address', () => {
+    const block = src.slice(src.indexOf("emailResponse.status === 429 && result?.code"), src.indexOf('} catch (error)'));
+    expect(block).toMatch(/else if \(emailResponse\.status >= 500\)/);
+  });
+
+  it('a non-throttle 4xx is still terminal', () => {
+    // A malformed address or a rejected payload IS about this recipient. Re-queueing those
+    // would spin the campaign forever on a row that can never succeed.
+    const block = src.slice(src.indexOf("emailResponse.status === 429 && result?.code"), src.indexOf('} catch (error)'));
+    expect(block).toMatch(/throw new Error\(result\?\.error/);
+  });
+
+  it('the throttle branch stops the batch, the 5xx branch does not', () => {
+    // Continuing to hammer something that just asked us to slow down is the wrong response to a
+    // 429; a single upstream blip should not stop a whole campaign.
+    const block = src.slice(src.indexOf("emailResponse.status === 429 && result?.code"), src.indexOf('} catch (error)'));
+    const throttle = block.slice(block.indexOf('else if (emailResponse.status === 429)'), block.indexOf('else if (emailResponse.status >= 500)'));
+    const upstream = block.slice(block.indexOf('else if (emailResponse.status >= 500)'));
+    expect(throttle).toContain('break;');
+    expect(upstream.slice(0, upstream.indexOf('} else'))).not.toContain('break;');
+  });
+});
+
 describe('#357 AE-4 — the send cannot happen twice', () => {
   it('the claim is conditional on the row still being pending', () => {
     // Without `.eq('status', 'pending')` the UPDATE always succeeds and claims nothing.

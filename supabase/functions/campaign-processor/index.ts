@@ -353,7 +353,37 @@ serve(withApiLogging('campaign-processor', async (req) => {
             await supabase.from('campaign_recipients').update({ status: 'pending' }).eq('id', recipient.id);
             console.log(`Campaign ${campaign.id} hit daily send cap; will resume when the cap resets.`);
             break;
+          } else if (emailResponse.status === 429) {
+            /**
+             * ANY other 429 — a provider throttle, an upstream Resend limit (#357 AE-16).
+             *
+             * Only the daily-cap code above was treated as retryable; every other 429 fell to
+             * the `throw` below and the catch marked the recipient FAILED. Failed is terminal:
+             * it drops out of the pending queue for good, so transient throttling permanently
+             * removed people from a campaign they were meant to receive — and the campaign then
+             * completed as `partial_failure` with a count that looks like bad addresses.
+             *
+             * Re-queued and the batch stops, rather than continuing to hammer something that
+             * has just asked us to slow down. The cron picks it up on the next tick.
+             */
+            await supabase.from('campaign_recipients').update({ status: 'pending' }).eq('id', recipient.id);
+            console.warn(
+              `[campaign-processor] campaign ${campaign.id} throttled (429 ${result?.code ?? 'no code'}) — `
+              + 'recipient re-queued, batch paused until the next tick.',
+            );
+            break;
+          } else if (emailResponse.status >= 500) {
+            // Upstream is unwell, not the address. Same reasoning as the 429: a 502 from the
+            // provider is not evidence that this recipient can never be mailed. Re-queue and move
+            // on — the batch is bounded by the send budget, so this cannot spin.
+            await supabase.from('campaign_recipients').update({ status: 'pending' }).eq('id', recipient.id);
+            console.warn(
+              `[campaign-processor] campaign ${campaign.id} upstream ${emailResponse.status} for `
+              + `recipient ${recipient.id} — re-queued.`,
+            );
           } else {
+            // A 4xx that is not a throttle IS about this recipient — a malformed address, a
+            // rejected payload. Terminal, and correctly so.
             throw new Error(result?.error || `Email API error: ${emailResponse.status}`);
           }
         } catch (error) {
