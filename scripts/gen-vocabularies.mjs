@@ -108,6 +108,14 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/agents/probeVocabulary.generated.ts',
   ],
   [
+    // #353 CRM-1 — the Greek→Latin search transliteration. Mirrored rather than re-typed for
+    // the usual reason, and one that bites harder here: the SAME mapping already has to exist
+    // in SQL (the searchable column is generated), so a hand-kept Deno copy would make it three.
+    // `scripts/gen-crm-translit-sql.mjs` emits the SQL half from this same source.
+    'src/services/crm/greekTransliteration.ts',
+    'supabase/functions/_shared/crm/greekTransliteration.generated.ts',
+  ],
+  [
     // #391 — the trackable-document registry. This source PREDATES the mirror script and
     // its own header called out "four copies ... held in step by the registry guard, not
     // by care"; generating the edge copy removes one of the four outright.

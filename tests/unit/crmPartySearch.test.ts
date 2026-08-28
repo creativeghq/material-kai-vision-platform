@@ -134,24 +134,37 @@ describe('CRM party search goes through search_fold', () => {
 describe('the folded column is only reached through the shared helper', () => {
   const OWNER = 'src/services/crmSearch.ts';
 
-  it('no file hard-codes the search_fold column name', () => {
+  it('no file hard-codes a party-search column name', () => {
+    // All of them, not just `search_fold`. #353 CRM-1 added `search_xscript` (folded text PLUS
+    // its Greek→Latin transliteration) and `name_xscript`, and a picker that hard-codes the OLD
+    // name is the worst possible failure: it still works, still folds case and accents, and
+    // silently cannot see across alphabets — which is the entire bug that was just fixed.
+    const COLUMNS = /['"](search_fold|search_xscript|name_fold|name_xscript)['"]/;
     const offenders = walk('src')
       .map((f) => f.split(sep).join('/'))
       .filter((f) => f !== OWNER)
-      .filter((f) => /['"]search_fold['"]/.test(readFileSync(f, 'utf8')));
+      .filter((f) => COLUMNS.test(readFileSync(f, 'utf8')));
     expect(
       offenders,
-      'Import CRM_SEARCH_COLUMN from @/services/crmSearch instead — a hand-typed column name is ' +
-        'how one picker gets left behind when the column is renamed.',
+      'Import CRM_SEARCH_COLUMN / CRM_NAME_COLUMN from @/services/crmSearch instead — a ' +
+        'hand-typed column name is how one picker gets left behind when the column is renamed, ' +
+        'and the stale name keeps working while quietly losing Greek↔Latin matching.',
     ).toEqual([]);
   });
 
   it('exports the pieces a picker needs', async () => {
     const mod = await import('../../src/services/crmSearch');
-    expect(mod.CRM_SEARCH_COLUMN).toBe('search_fold');
-    // The pattern must be folded AND wildcard-escaped: a user typing % must not widen their
-    // own search, and a Greek term must match however it is accented.
-    expect(mod.foldedLike('Κώστας')).toBe('%κωστασ%');
+    expect(mod.CRM_SEARCH_COLUMN).toBe('search_xscript');
+    expect(mod.CRM_NAME_COLUMN).toBe('name_xscript');
+    // The pattern must be folded, TRANSLITERATED and wildcard-escaped: a user typing % must not
+    // widen their own search, a Greek term must match however it is accented, and it must reach
+    // a party stored in the other alphabet (#353 CRM-1). `Κώστας` now lands on `kostas`, which
+    // is what `Kostas Alexiou` is stored under too.
+    expect(mod.foldedLike('Κώστας')).toBe('%kostas%');
+    expect(mod.foldedLike('Kostas')).toBe('%kostas%');
     expect(mod.foldedLike('100%')).toBe('%100\\%%');
+    // The dedupe key is the same value without the wildcards — an equality lookup, not a search.
+    expect(mod.foldedName('Καρέλης ΑΕ')).toBe('karelis ae');
+    expect(mod.foldedName('KARELIS AE')).toBe('karelis ae');
   });
 });

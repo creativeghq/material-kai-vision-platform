@@ -17,7 +17,6 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { foldForSearch } from '@/components/core/filters/types';
 import { companiesAPI, type CreateCompanyError } from '@/services/crm.service';
 import {
   CompanyIdentityLookup,
@@ -26,6 +25,8 @@ import {
   vatDedupeForms,
   type CompanyIdentityDraft,
 } from '@/components/business/crm/CompanyIdentityLookup';
+// Cross-alphabet dedupe key (#353 CRM-1).
+import { CRM_NAME_COLUMN, foldedName } from '@/services/crmSearch';
 
 export interface QuickCreatedCompany { id: string; name: string }
 
@@ -100,10 +101,14 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   //
   // The name half used to be `ilike('name', name)` — case-insensitive but NOT accent-insensitive,
   // so "Καρέλης ΑΕ" never found the stored "ΚΑΡΕΛΗΣ ΑΕ" and the probe missed exactly the case the
-  // platform built folding machinery for (#366 BU-3). `name_fold` is the generated
-  // `crm_fold(name)` column; `foldForSearch` is its client twin, held byte-equivalent to the SQL
-  // and Deno copies by tests/unit/searchFoldParity.test.ts. Still an EQUALITY match, not a
-  // substring one — this is a dedupe, not a search box.
+  // platform built folding machinery for (#366 BU-3).
+  //
+  // It now matches `name_xscript` (#353 CRM-1), which folds AND transliterates Greek to Latin,
+  // so the probe finally sees across ALPHABETS too: `Παπαδόπουλος` and `Papadopoulos` are one
+  // key. Folding alone could never do that, and a CRM that cannot see it holds the same party
+  // twice, once per script. `foldedName` is the client half, held identical to the Deno mirror
+  // and the SQL function by tests/unit/greekTransliterationParity.test.ts. Still an EQUALITY
+  // match, not a substring one — this is a dedupe, not a search box.
   useEffect(() => {
     if (!open) return;
     const vat = draft.vatNumber.trim();
@@ -115,7 +120,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
       try {
         const forms = vatDedupeForms(vat);
         let q = supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).limit(1);
-        q = forms.length ? q.in('vat_number', forms) : q.eq('name_fold', foldForSearch(name));
+        q = forms.length ? q.in('vat_number', forms) : q.eq(CRM_NAME_COLUMN, foldedName(name));
         const { data, error } = await q.maybeSingle();
         if (cancelled) return;
         if (error) throw error;

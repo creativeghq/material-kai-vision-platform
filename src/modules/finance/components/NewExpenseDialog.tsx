@@ -16,8 +16,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { foldForSearch } from '@/components/core/filters/types';
-import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
+import { CRM_SEARCH_COLUMN, CRM_NAME_COLUMN, foldedLike, foldedName } from '@/services/crmSearch';
 import {
   financeService, type PaymentMethod, type BankAccountBalance, type RecurringCadence,
 } from '@/modules/finance/services/financeService';
@@ -333,12 +332,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (name.length < 2) return;
     setCreatingContact(true);
     try {
-      // Matched on `name_fold` (the generated `crm_fold(name)`), not raw `ilike`: that was
+      // Matched on `name_xscript` (folded AND Greek→Latin transliterated, #353 CRM-1), not raw `ilike`: that was
       // case-insensitive but accent-BLIND, so "Κώστας Παπάς" never found the stored
       // "ΚΩΣΤΑΣ ΠΑΠΑΣ" and this monthly find-or-create spawned a fresh payee every month
       // (#366 BU-3). Still an EQUALITY match — a find-or-create, not a search box.
       const existing = await supabase.from('crm_contacts').select('id, name')
-        .eq('workspace_id', workspaceId).eq('name_fold', foldForSearch(name)).limit(1).maybeSingle();
+        .eq('workspace_id', workspaceId).eq(CRM_NAME_COLUMN, foldedName(name)).limit(1).maybeSingle();
       let id = existing.data?.id as string | undefined;
       if (!id) {
         const ins = await supabase.from('crm_contacts')

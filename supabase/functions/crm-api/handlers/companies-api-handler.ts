@@ -6,6 +6,8 @@ import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_
 import { pickContactFields, escapeLike, parseIdsParam } from './contacts-api-handler.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
+// Generated mirror of src/services/crm/greekTransliteration.ts (#353 CRM-1).
+import { transliterateGreek } from '../../_shared/crm/greekTransliteration.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -210,7 +212,12 @@ export async function handleCompanies(req: Request): Promise<Response> {
           .from('crm_companies')
           .select('id, name')
           .eq('workspace_id', targetWs)
-          .eq('name_fold', foldForSearch(body.name))
+          // `name_xscript`, not `name_fold` (#353 CRM-1). The old key folded case and accents
+          // but could not see across ALPHABETS: `Παπαδόπουλος` and `Papadopoulos` folded to
+          // different strings, so the same party could be created twice, once per script, and
+          // this guarantee said yes both times. The new key transliterates Greek to Latin on
+          // both the stored side and the probe.
+          .eq('name_xscript', transliterateGreek(foldForSearch(body.name)))
           .limit(1)
           .maybeSingle();
         // A failed lookup does NOT fall through to the insert. Creating a duplicate is cheap to
