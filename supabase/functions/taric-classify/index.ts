@@ -171,11 +171,19 @@ Deno.serve(withApiLogging('taric-classify', async (req) => {
       // One product's failure must not abandon the rest of the batch. Record the explicit
       // failure marker so a retry sweep can find it — an untouched 'pending' row is
       // indistinguishable from one that was never attempted.
-      await supabase.from('products').update({
-        taric_status: 'failed',
-        taric_classified_at: new Date().toISOString(),
-        taric_reasoning: (err as Error)?.message?.slice(0, 500) ?? 'classification failed',
-      }).eq('id', product.id);
+      //
+      // Best-effort ON PURPOSE, and the only write in this file that is: this IS the recovery
+      // path, so a throw here would abandon the batch to protect a marker. Loud, because a
+      // failure we could not even record is worse than the one that got us here.
+      try {
+        await writeClassification(supabase, product.id, {
+          taric_status: 'failed',
+          taric_classified_at: new Date().toISOString(),
+          taric_reasoning: (err as Error)?.message?.slice(0, 500) ?? 'classification failed',
+        });
+      } catch (markErr) {
+        console.error('[taric-classify] could not even record the failure for', product.id, markErr);
+      }
       results.push({ product_id: product.id, error: (err as Error)?.message ?? 'failed' });
     }
   }
@@ -189,6 +197,28 @@ const PRODUCT_COLUMNS =
 // ── Stage A: a code the supplier already declared ──────────────────────────────────────────
 
 /** Flatten nested jsonb into `a.b.c` → scalar so a code can be found however deep it sits. */
+/**
+ * Write a classification, and know whether it landed (#360 CB-17).
+ *
+ * Every write in this file was a bare `.update({...})` with the result
+ * discarded — and the function then RETURNED the status it had meant to store. A CHECK violation
+ * (`taric_source: 'category_rule'` was in no allowlist), an RLS refusal or a dropped connection
+ * all produced the same thing: a caller told the product was `confirmed`, and a product that was
+ * never classified. The silent-zero shape, on the one field that decides what gets declared to
+ * customs.
+ *
+ * Throws, so the per-product catch records it as `failed` instead of reporting a success.
+ */
+async function writeClassification(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  productId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await supabase.from('products').update(patch).eq('id', productId);
+  if (error) throw new Error(`classification not stored: ${error.message}`);
+}
+
 function flatten(value: unknown, prefix = '', out: Record<string, string> = {}, depth = 0): Record<string, string> {
   if (depth > 5 || value === null || value === undefined) return out;
   if (typeof value === 'object' && !Array.isArray(value)) {
@@ -245,7 +275,7 @@ async function classifyOne(
       .select('code, declarable, valid_to, description_en')
       .eq('code', declared).maybeSingle();
     if (row?.declarable && (!row.valid_to || row.valid_to >= now.slice(0, 10))) {
-      await supabase.from('products').update({
+      await writeClassification(supabase, product.id, {
         taric_code: row.code,
         taric_code_suggested: null,
         taric_confidence: 1,
@@ -253,7 +283,7 @@ async function classifyOne(
         taric_source: 'supplier',
         taric_reasoning: 'Declared by the supplier feed and present in the TARIC nomenclature.',
         taric_classified_at: now,
-      }).eq('id', product.id);
+      });
       return {
         product_id: product.id, stage: 'supplier', code: row.code, confidence: 1,
         status: 'confirmed', description: row.description_en,
@@ -281,7 +311,7 @@ async function classifyOne(
       .from('taric_codes').select('code, declarable, valid_to, description_en')
       .eq('code', rule.code).maybeSingle();
     if (row?.declarable && (!row.valid_to || row.valid_to >= now.slice(0, 10))) {
-      await supabase.from('products').update({
+      await writeClassification(supabase, product.id, {
         taric_code: row.code,
         taric_code_suggested: null,
         taric_confidence: 1,
@@ -289,7 +319,7 @@ async function classifyOne(
         taric_source: 'category_rule',
         taric_reasoning: rule.reason ?? null,
         taric_classified_at: now,
-      }).eq('id', product.id);
+      });
       return {
         product_id: product.id, stage: 'rule', code: row.code, confidence: 1,
         status: 'confirmed', description: row.description_en, reasoning: rule.reason,
@@ -300,14 +330,14 @@ async function classifyOne(
   if (rule.resolved && rule.code && !rule.confirmed) {
     // The rule reached a declarable code but nobody has signed the heading off yet. Propose it —
     // and do NOT spend a credit second-guessing a deterministic answer.
-    await supabase.from('products').update({
+    await writeClassification(supabase, product.id, {
       taric_code_suggested: rule.code,
       taric_confidence: 0.9,
       taric_status: 'suggested',
       taric_source: 'category_rule',
       taric_reasoning: `${rule.reason} (category rule not yet confirmed)`,
       taric_classified_at: now,
-    }).eq('id', product.id);
+    });
     return {
       product_id: product.id, stage: 'rule', code: rule.code, confidence: 0.9,
       status: 'suggested', reasoning: rule.reason, needs_rule_confirmation: true,
@@ -321,7 +351,7 @@ async function classifyOne(
   if (!allowLlm) {
     // Stamped, not status-changed, so the sweep does not re-read the same rows every hour
     // while an operator-initiated run can still find them at 'pending'.
-    await supabase.from('products').update({ taric_classified_at: now }).eq('id', product.id);
+    await writeClassification(supabase, product.id, { taric_classified_at: now });
     return { product_id: product.id, stage: 'supplier', status: 'pending', reason: 'no supplier-declared code' };
   }
 
@@ -354,7 +384,11 @@ async function classifyOne(
 
       if (Object.keys(attrs).length > 0 && facts.output.confidence >= 0.5) {
         patch.attributes = attrs;
-        await supabase.from('products').update(patch).eq('id', product.id);
+        // Checked like every other write here (#360 CB-17): the retry below re-classifies with
+        // this fact "in hand", so a silently dropped attribute write means the retry runs on the
+        // OLD product and loops back to the same unresolved rule — spending a second LLM call to
+        // reach the same answer.
+        await writeClassification(supabase, product.id, patch);
         // Re-resolve with the fact in hand. One retry only — the flag stops a loop if the
         // perceived fact still does not satisfy any rule.
         return await classifyOne(
@@ -393,11 +427,11 @@ async function classifyOne(
   if (searchErr) throw new Error(`Shortlist failed: ${searchErr.message}`);
 
   if (!candidates || candidates.length === 0) {
-    await supabase.from('products').update({
+    await writeClassification(supabase, product.id, {
       taric_status: 'failed',
       taric_reasoning: 'No TARIC candidate matched — is the reference table imported?',
       taric_classified_at: now,
-    }).eq('id', product.id);
+    });
     return { product_id: product.id, stage: 'shortlist', status: 'failed', reason: 'no candidates' };
   }
 
@@ -431,22 +465,22 @@ async function classifyOne(
   // dropped rather than written.
   const match = candidates.find((c: any) => c.code === chosen);
   if (!chosen || !match || verdict.confidence < 0.2) {
-    await supabase.from('products').update({
+    await writeClassification(supabase, product.id, {
       taric_status: 'failed',
       taric_reasoning: verdict.reasoning?.slice(0, 500) ?? 'No confident match among the candidates.',
       taric_classified_at: now,
-    }).eq('id', product.id);
+    });
     return { product_id: product.id, stage: 'llm', status: 'failed', reason: 'no confident match' };
   }
 
-  await supabase.from('products').update({
+  await writeClassification(supabase, product.id, {
     taric_code_suggested: match.code,
     taric_confidence: verdict.confidence,
     taric_status: 'suggested',
     taric_source: 'classifier',
     taric_reasoning: verdict.reasoning?.slice(0, 500) ?? null,
     taric_classified_at: now,
-  }).eq('id', product.id);
+  });
 
   return {
     product_id: product.id,

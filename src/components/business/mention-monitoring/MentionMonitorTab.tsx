@@ -18,7 +18,7 @@
  *   4. Footer: cadence + last refresh
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -252,7 +252,19 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
     }
   }, [subject, tracked?.id, toast]);
 
+  /**
+   * Synchronous latches on the two PAID actions (#360 CB-20).
+   *
+   * `refreshing` / `probing` are React state, so `disabled={...}` is one render behind a
+   * double-click. A refresh runs a live SERP sweep and an LLM probe queries several models —
+   * both spend credits, and both were reachable twice from one impatient click.
+   */
+  const refreshingNow = useRef(false);
+  const probingNow = useRef(false);
+
   const handleRefresh = useCallback(async () => {
+    if (refreshingNow.current) return;
+    refreshingNow.current = true;
     setRefreshing(true);
     try {
       const o = await refreshSubject(subject, { force: admin });
@@ -264,11 +276,14 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
     } catch (e: any) {
       toast({ title: 'Refresh failed', description: String(e?.message || e), variant: 'destructive' });
     } finally {
+      refreshingNow.current = false;
       setRefreshing(false);
     }
   }, [subject, admin, toast, load]);
 
   const handleProbeLlm = useCallback(async () => {
+    if (probingNow.current) return;
+    probingNow.current = true;
     setProbing(true);
     try {
       const r = await probeSubjectLlm(subject);
@@ -292,6 +307,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
     } catch (e: any) {
       toast({ title: 'Probe failed', description: String(e?.message || e), variant: 'destructive' });
     } finally {
+      probingNow.current = false;
       setProbing(false);
     }
   }, [subject, tracked?.id, toast]);

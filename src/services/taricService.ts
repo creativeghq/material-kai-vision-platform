@@ -95,7 +95,15 @@ export const taricService = {
     return data;
   },
 
-  /** Accept a suggestion: it becomes the product's code and the suggestion is cleared. */
+  /**
+   * Accept a suggestion: it becomes the product's code and the suggestion is cleared.
+   *
+   * `classifier_confirmed`, NOT `manual` (#360 CB-17). The code came from the classifier and a
+   * person approved it; that is a different fact from a person choosing the code themselves, and
+   * `taric_source` is what tells a later reader whether to re-run the classifier or leave a
+   * human's decision alone. Writing `manual` here made an approval indistinguishable from an
+   * authorship.
+   */
   async confirmSuggestion(productId: string, code: string): Promise<void> {
     const normalized = normalizeTaricInput(code);
     if (!normalized) throw new Error('Not a valid TARIC code');
@@ -103,7 +111,7 @@ export const taricService = {
       taric_code: normalized,
       taric_code_suggested: null,
       taric_status: 'confirmed',
-      taric_source: 'manual',
+      taric_source: 'classifier_confirmed',
     }).eq('id', productId);
     if (error) throw error;
   },

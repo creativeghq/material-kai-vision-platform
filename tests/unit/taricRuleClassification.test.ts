@@ -16,12 +16,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const CLASSIFIER = join(ROOT, 'supabase/functions/taric-classify/index.ts');
 const RULES_PANEL = join(ROOT, 'src/components/Admin/TaricRulesPanel.tsx');
 
-const classifier = readFileSync(CLASSIFIER, 'utf8');
+// Comments STRIPPED: a doc comment that QUOTES a source line satisfies a scan for that line, so
+// the file's own footnotes start passing (or failing) tests about the code. #360 CB-17 added a
+// comment naming `taric_source: 'category_rule'` and this test found the comment first.
+const classifier = stripComments(readFileSync(CLASSIFIER, 'utf8'));
 
 describe('the classifier asks the rules before it spends anything', () => {
   it('calls resolve_taric_for_product', () => {

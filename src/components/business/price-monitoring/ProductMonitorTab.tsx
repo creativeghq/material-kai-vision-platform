@@ -9,7 +9,7 @@
  *   4. Custom Monitoring section (user-pasted URLs tracked via Firecrawl)
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -306,6 +306,17 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     loadSources();
   }, [loadSources]);
 
+  /**
+   * Synchronous latch on the PAID actions (#360 CB-20).
+   *
+   * `isDiscovering` is React state, so `disabled={isDiscovering}` on the button is that state one
+   * render behind: a double-click enters the handler twice before the first `setIsDiscovering(true)`
+   * has rendered. This run spends real credits upstream (Perplexity discovery, Firecrawl
+   * verification), and the toast even reports how many — so a duplicate is money, not noise.
+   * Twelfth instance of this class platform-wide.
+   */
+  const discovering = useRef(false);
+
   // ─── Perplexity discovery ────────────────────────────────────────────────
   const runDiscovery = useCallback(
     async (forceRefresh: boolean) => {
@@ -313,6 +324,8 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         toast({ title: 'Demo mode', description: 'Discovery is disabled for demo products' });
         return;
       }
+      if (discovering.current) return;
+      discovering.current = true;
       try {
         setIsDiscovering(true);
         const outcome = await refreshProduct(productId, {
@@ -346,6 +359,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
       } catch (err: any) {
         toast({ title: 'Error', description: err?.message ?? 'Failed', variant: 'destructive' });
       } finally {
+        discovering.current = false;
         setIsDiscovering(false);
       }
     },
