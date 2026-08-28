@@ -192,6 +192,24 @@ serve(withApiLogging('campaign-processor', async (req) => {
       }
 
       if (!recipients || recipients.length === 0) {
+        /**
+         * A campaign is not finished while rows are still IN FLIGHT (#357 AE-4).
+         *
+         * "No pending recipients" was the whole completion test, and a row claimed by another
+         * worker is `sending`, not `pending` — so a second concurrent run saw an empty pending
+         * set, declared the campaign `sent`, and fired the `campaign_sent` flow while the first
+         * run was still delivering. The owner is told it finished, with a count that is short.
+         */
+        const { count: inFlight } = await supabase
+          .from('campaign_recipients')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id)
+          .eq('status', 'sending');
+        if ((inFlight ?? 0) > 0) {
+          console.log(`Campaign ${campaign.id}: ${inFlight} recipient(s) still sending — not completing yet.`);
+          continue;
+        }
+
         const { count: failedCount } = await supabase
           .from('campaign_recipients')
           .select('id', { count: 'exact', head: true })
@@ -243,7 +261,33 @@ serve(withApiLogging('campaign-processor', async (req) => {
 
       for (const recipient of recipients) {
         try {
-          await supabase.from('campaign_recipients').update({ status: 'sending' }).eq('id', recipient.id);
+          /**
+           * CLAIM THE ROW, do not merely mark it (#357 AE-4).
+           *
+           * This was an unconditional `update({status:'sending'}).eq('id', …)` after a plain
+           * SELECT of pending rows. Two concurrent runs — a retry, an overlapping cron tick,
+           * a manual trigger — both read the same pending set, both wrote 'sending', and both
+           * sent. The recipient gets the campaign twice, which for marketing mail is a
+           * compliance problem and not merely untidy.
+           *
+           * `.eq('status', 'pending')` makes the UPDATE itself the claim: Postgres applies it
+           * to at most one worker, and the loser gets no row back and skips. Same shape as
+           * `receive_order_into_warehouse` (#355), which makes a repeat receive a no-op by
+           * construction rather than by hoping the caller does not retry.
+           */
+          const { data: claimed, error: claimErr } = await supabase
+            .from('campaign_recipients')
+            .update({ status: 'sending' })
+            .eq('id', recipient.id)
+            .eq('status', 'pending')
+            .select('id')
+            .maybeSingle();
+          if (claimErr) {
+            console.error(`[campaign-processor] claim failed for recipient ${recipient.id}:`, claimErr.message);
+            continue;
+          }
+          // No row: another worker claimed it between our SELECT and this UPDATE.
+          if (!claimed) continue;
 
           // Merge recipient-level variables with the always-available identity tags the templates
           // reference ({{firstName}}, {{fullName}}, {{email}}). Recipient-supplied variables win.
