@@ -44,6 +44,12 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   { value: 'veo-2', label: 'Veo 2', description: 'Google Veo 2 — high quality', credits: 50 },
   { value: 'kling-v3.0', label: 'Kling 3.0', description: 'Kling 3.0 — cinematic + audio', credits: 20 },
   { value: 'runway-gen4-turbo', label: 'Runway Gen-4', description: 'Runway Gen-4 — premium output', credits: 40 },
+  // Wan is the only entry here that reaches 30 seconds and the only one that returns
+  // the clip with sound. Priced per tier because the provider rate differs 4x across
+  // them — one premium entry would have put every 30-second clip at 155 credits.
+  { value: 'wan-3.0-480p', label: 'Wan3.0 480p', description: 'Wan3.0 — 30s with audio, 480p', credits: 40 },
+  { value: 'wan-3.0-720p', label: 'Wan3.0 720p', description: 'Wan3.0 — 30s with audio, 720p', credits: 80 },
+  { value: 'wan-3.0-1080p', label: 'Wan3.0 1080p', description: 'Wan3.0 — 30s with audio, 1080p', credits: 155 },
 ];
 
 interface ModelResult {

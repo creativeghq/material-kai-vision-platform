@@ -7,8 +7,10 @@
  * Models:
  *   veo-2           → 50 credits (Google, cinematic walkthroughs)
  *   kling-v3.0      → 20 credits (native SDK, cinematic + audio)
- *   (budget tier vacant — wan2.1-i2v-720p was deleted upstream by Replicate; see issue #4)
  *   runway-gen4-turbo → 40 credits (Replicate, premium quality)
+ *   wan-3.0-480p/720p/1080p → 40/80/155 credits (Alibaba DashScope). The only models
+ *     here that reach 30 seconds, return the clip SCORED, and hold up to 20 references
+ *     consistent across it. Issue #394.
  *
  * Async handling: Replicate models can take 3-5 min. If polling times out
  * (55s), stores prediction_id in generation_videos and returns job_id for
@@ -18,7 +20,7 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-client.ts';
+import { generateVideoWithVeo, generateVideoWithKling, generateVideoWithWan } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -38,7 +40,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // Insufficient-credit state. It was user-selectable at 12 credits and always hard-failed.
 // The budget tier stays vacant until `wan-video/wan-2.2-i2v-fast` can be verified against a
 // funded account (issue #4 Phase 5) — an unverified replacement would repeat the same bug.
-type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo';
+type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
+  | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
@@ -52,6 +55,13 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 //   veo-2              8s x $0.35/s = $2.80 -> x1.5 = $4.20 -> >= 50 credits
 //   kling-v3.0        10s x $0.10/s = $1.00 -> x1.5 = $1.50 -> >= 18 credits (20 charged)
 //   runway-gen4-turbo 10s x $0.15/s = $1.50 -> x1.5 = $2.25 -> >= 27 credits (40 charged)
+//   wan-3.0-480p      30s x $0.068/s = $2.04 -> x1.5 = $3.06  -> >= 36 credits (40 charged)
+//   wan-3.0-720p      30s x $0.14/s  = $4.20 -> x1.5 = $6.30  -> >= 75 credits (80 charged)
+//   wan-3.0-1080p     30s x $0.28/s  = $8.40 -> x1.5 = $12.60 -> >= 149 credits (155 charged)
+//
+// Wan costs more per clip because a Wan clip is THREE TIMES LONGER and arrives scored. The
+// tiers are separate entries rather than one premium one so the 30-second option is reachable
+// at 40 credits, not only at 155.
 //
 // veo-2 was 30. A full 8-second clip cost $2.80 and earned about $2.70, so the platform paid
 // customers to use its most expensive model — and nothing surfaced it, because a flat fee is a
@@ -61,6 +71,9 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'veo-2':              50,
   'kling-v3.0':         20,
   'runway-gen4-turbo':  40,
+  'wan-3.0-480p':       40,
+  'wan-3.0-720p':       80,
+  'wan-3.0-1080p':      155,
 };
 
 // Longest clip each model will produce.
@@ -76,15 +89,29 @@ const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   'veo-2':              8,
   'kling-v3.0':         10,
   'runway-gen4-turbo':  10,
+  'wan-3.0-480p':       30,
+  'wan-3.0-720p':       30,
+  'wan-3.0-1080p':      30,
+};
+
+// Resolution tier per Wan model id. The id carries the tier because the RATE differs
+// 4x across them, so the tier has to be part of what gets priced, not a free parameter.
+const WAN_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P' | '1080P'>> = {
+  'wan-3.0-480p':  '480P',
+  'wan-3.0-720p':  '720P',
+  'wan-3.0-1080p': '1080P',
 };
 
 // Auto-select model by video type
+// An 8-second silent clip is not a walkthrough and a 10-second silent clip is not a
+// reel — the three types that were most misserved by the old roster now default to the
+// model that can actually produce them (30s, scored, multi-reference).
 const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
-  walkthrough:          'veo-2',
-  floorplan_flythrough: 'veo-2',
+  walkthrough:          'wan-3.0-720p',
+  floorplan_flythrough: 'wan-3.0-720p',
   product_spotlight:    'kling-v3.0',
-  before_after:         'kling-v3.0',
-  social_reel:          'kling-v3.0',
+  before_after:         'wan-3.0-720p',
+  social_reel:          'wan-3.0-720p',
 };
 
 // Replicate model identifiers (Kling now uses native SDK, not Replicate)
@@ -210,6 +237,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     duration_seconds = 8,
     workspace_id,
     before_image_url,
+    // Wan-only. Extra images held CONSISTENT across the clip — the product itself,
+    // its finish, the room it goes in — which is the whole reason a generated
+    // interior is usable as a sales asset rather than a plausible lookalike.
+    reference_image_urls,
+    last_frame_url,
+    generate_audio,
   } = body;
 
   // Invariant 1 (#364 EX-1). `workspace_id` comes from the body and then routes the debit,
@@ -224,6 +257,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
   }
 
+  // Capped at 19 so the first frame plus the references cannot exceed Wan's 20-reference
+  // ceiling. Truncating here rather than at the provider keeps the SSRF loop bounded too.
+  const referenceUrls: string[] = Array.isArray(reference_image_urls)
+    ? reference_image_urls.filter((u: unknown): u is string => typeof u === 'string' && !!u).slice(0, 19)
+    : [];
+
   // Invariant 7 (#364 EX-7). These URLs are handed to Replicate / Veo / Kling, which fetch them
   // from THEIR network — and the Veo and Kling branches also make us fetch them ourselves. A
   // provider fetching an internal address on our behalf is the same primitive as fetching it
@@ -231,6 +270,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   try {
     await assertSafeUrl(source_image_url, { allowSchemes: ['https:'] });
     if (before_image_url) await assertSafeUrl(before_image_url, { allowSchemes: ['https:'] });
+    if (last_frame_url) await assertSafeUrl(last_frame_url, { allowSchemes: ['https:'] });
+    // Every reference is a URL a caller chose and a provider will fetch, so each one
+    // needs the guard — the loop is the point, not a formality (invariant 7).
+    for (const refUrl of referenceUrls) {
+      await assertSafeUrl(refUrl, { allowSchemes: ['https:'] });
+    }
   } catch (e) {
     // Do not echo the URL or the upstream status — that makes the error a response oracle.
     return jsonResponse(
@@ -412,6 +457,62 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         model_used: resolvedModel,
         credits_used: creditCost,
         video_type,
+        status: 'completed',
+      });
+
+    } else if (WAN_RESOLUTION[resolvedModel]) {
+      // Wan3.0-Video-Prime — the only model here that can produce a 30-second clip
+      // and the only one that returns it scored. `reference_urls` are additional
+      // images held consistent across the clip, which is what keeps the ACTUAL
+      // product in frame instead of a plausible lookalike.
+      const wanPrompt = prompt
+        || 'Professional cinematic interior walkthrough, smooth continuous camera movement';
+
+      const wanResult = await generateVideoWithWan(wanPrompt, {
+        imageUrl: source_image_url,
+        lastFrameUrl: last_frame_url || undefined,
+        references: referenceUrls.map((url) => ({ kind: 'image' as const, url })),
+        durationSeconds,
+        resolution: WAN_RESOLUTION[resolvedModel],
+        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
+        generateAudio: generate_audio !== false,
+        task: 'interior_video_generation_v2',
+        userId,
+        workspaceId: workspace_id ?? undefined,
+      });
+
+      // Wan hands back a provider-hosted URL rather than bytes. `uploadVideoToStorage`
+      // already downloads a URL through `fetchBinaryGuarded` — SSRF guard, 200 MB cap,
+      // video/* content-type check — so pass the URL and let the one guarded path do it.
+      const videoUrl = await uploadVideoToStorage(supabase, wanResult.url, jobId, false, uploadCtx);
+      await logVideoUsage(wanResult.durationSeconds);
+
+      const { error: completeErr } = await supabase.from('generation_videos').update({
+        status: 'completed',
+        video_url: videoUrl,
+        completed_at: new Date().toISOString(),
+      }).eq('id', jobId);
+      if (completeErr) throw completeErr;
+
+      emitFlowEvent('video_generation_completed', {
+        user_id: userId,
+        workspace_id,
+        type: 'video_ready',
+        title: 'Your video is ready!',
+        body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
+        job_id: jobId,
+        video_type,
+      }).catch(() => {});
+
+      return jsonResponse({
+        success: true,
+        job_id: jobId,
+        video_url: videoUrl,
+        model_used: resolvedModel,
+        credits_used: creditCost,
+        video_type,
+        duration_seconds: wanResult.durationSeconds,
+        has_audio: wanResult.hasAudio,
         status: 'completed',
       });
 

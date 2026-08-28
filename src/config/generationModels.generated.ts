@@ -463,6 +463,81 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 190
   },
   {
+    "id": "wan-3.0-480p",
+    "display_name": "Wan3.0 Prime 480P",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "alibaba",
+    "slug": "wan3.0-video-prime",
+    "version": null,
+    "adapter": "dashscope",
+    "input_requirements": {
+      "needs_prompt": true,
+      "min_images": 1,
+      "max_images": 20,
+      "image_roles": [
+        "source",
+        "reference",
+        "last_frame"
+      ]
+    },
+    "pricing_key": "wan-3.0-480p",
+    "tier": "budget",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 190
+  },
+  {
+    "id": "wan-3.0-720p",
+    "display_name": "Wan3.0 Prime 720P",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "alibaba",
+    "slug": "wan3.0-video-prime",
+    "version": null,
+    "adapter": "dashscope",
+    "input_requirements": {
+      "needs_prompt": true,
+      "min_images": 1,
+      "max_images": 20,
+      "image_roles": [
+        "source",
+        "reference",
+        "last_frame"
+      ]
+    },
+    "pricing_key": "wan-3.0-720p",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 192
+  },
+  {
+    "id": "wan-3.0-1080p",
+    "display_name": "Wan3.0 Prime 1080P",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "alibaba",
+    "slug": "wan3.0-video-prime",
+    "version": null,
+    "adapter": "dashscope",
+    "input_requirements": {
+      "needs_prompt": true,
+      "min_images": 1,
+      "max_images": 20,
+      "image_roles": [
+        "source",
+        "reference",
+        "last_frame"
+      ]
+    },
+    "pricing_key": "wan-3.0-1080p",
+    "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 194
+  },
+  {
     "id": "veo-2",
     "display_name": "Veo 2",
     "capability": "video",
@@ -569,7 +644,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '066eb5d2ccbbe5e13d1a48de83fd53f7';
+export const PROJECTION_FINGERPRINT = 'b1f07b9577fae4e06b6180143419887e';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

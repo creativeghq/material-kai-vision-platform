@@ -41,6 +41,11 @@ const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   'veo-2': 0.35,
   'kling-v3.0': 0.10,
   'runway-gen4-turbo': 0.15,
+  // Wan3.0-Video-Prime, one row per resolution tier — the rate differs 4x across them,
+  // so a single averaged entry here would pass the floor for 1080p while underpricing it.
+  'wan-3.0-480p': 0.068,
+  'wan-3.0-720p': 0.14,
+  'wan-3.0-1080p': 0.28,
 };
 
 /** `_shared/pricing-constants.ts` → MARKUP_MULTIPLIER. */

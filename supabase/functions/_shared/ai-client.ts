@@ -1274,6 +1274,170 @@ export async function generateVideoWithKling(
   }
 }
 
+// ── Wan3.0-Video-Prime (Alibaba, via DashScope) ────────────────────────────
+//
+// Raw REST rather than the AI SDK: there is no `@ai-sdk/dashscope` provider, and
+// DashScope's video endpoint is asynchronous (submit a task, poll for it). It lives
+// HERE rather than in the calling edge function precisely because this module is the
+// chokepoint — the rule is that edge functions never reach a provider directly, not
+// that this file only ever uses the SDK.
+//
+// What Wan buys over the existing roster: 30 seconds against Veo's 8 and Kling's 10,
+// audio generated with the picture in the same pass (our video has always been
+// silent), and up to 20 references held consistent across the clip — which is the
+// one that matters for a materials platform, because a generated room that does not
+// preserve the ACTUAL product is not a sales asset.
+
+const WAN_TASK_URL =
+  'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis';
+const WAN_POLL_URL = 'https://dashscope-intl.aliyuncs.com/api/v1/tasks';
+
+export type WanResolution = '480P' | '720P' | '1080P';
+
+/** `ai_model_pricing.model_key` per tier — the rate differs 4x across them. */
+const WAN_PRICING_MODEL_ID: Record<WanResolution, string> = {
+  '480P': 'wan-3.0-480p',
+  '720P': 'wan-3.0-720p',
+  '1080P': 'wan-3.0-1080p',
+};
+
+export interface WanVideoResult {
+  /** Provider-hosted URL. Callers download it through the SSRF guard and re-host. */
+  url: string;
+  mimeType: string;
+  model: string;
+  durationSeconds: number;
+  resolution: WanResolution;
+  hasAudio: boolean;
+}
+
+export interface WanReference {
+  /** One of image | video | audio. Wan accepts up to 10 / 5 / 5 respectively. */
+  kind: 'image' | 'video' | 'audio';
+  url: string;
+}
+
+export async function generateVideoWithWan(
+  prompt: string,
+  config?: UnitBillingConfig & {
+    /** First frame. Wan can run text-only, but every caller here is image-to-video. */
+    imageUrl?: string;
+    /** Optional last-frame guidance. */
+    lastFrameUrl?: string;
+    /** Extra references held consistent across the clip (max 20 total with the above). */
+    references?: WanReference[];
+    /** 2-30. Clamped by the caller, which is where the credit price is decided. */
+    durationSeconds?: number;
+    resolution?: WanResolution;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    /** Wan scores the clip in the same pass. Default true — a silent reel is the bug. */
+    generateAudio?: boolean;
+    pollTimeoutMs?: number;
+  },
+): Promise<WanVideoResult> {
+  const _start = Date.now();
+  const resolution = config?.resolution ?? '720P';
+  const seconds = Math.max(2, Math.min(30, Math.round(config?.durationSeconds ?? 5)));
+  const modelKey = WAN_PRICING_MODEL_ID[resolution];
+  const withAudio = config?.generateAudio ?? true;
+
+  // Lazy, and via resolveSecret: `Deno.env.set` is a no-op on Supabase edge, so a
+  // module-load capture reads undefined and an admin-configured key is never seen.
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_API_KEY')).value
+    : Deno.env.get('DASHSCOPE_API_KEY');
+  if (!apiKey) {
+    throw new Error('DASHSCOPE_API_KEY is not configured — cannot generate with Wan3.0');
+  }
+
+  const refs = (config?.references ?? []).slice(0, 20);
+  const input: Record<string, unknown> = { prompt };
+  if (config?.imageUrl) input.img_url = config.imageUrl;
+  if (config?.lastFrameUrl) input.last_frame_url = config.lastFrameUrl;
+  if (refs.length) {
+    input.ref_images = refs.filter((r) => r.kind === 'image').map((r) => r.url);
+    input.ref_videos = refs.filter((r) => r.kind === 'video').map((r) => r.url);
+    input.ref_audios = refs.filter((r) => r.kind === 'audio').map((r) => r.url);
+  }
+
+  try {
+    const submit = await fetch(WAN_TASK_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        // Without this the call is synchronous and dies on the gateway timeout.
+        'X-DashScope-Async': 'enable',
+      },
+      body: JSON.stringify({
+        model: 'wan3.0-video-prime',
+        input,
+        parameters: {
+          duration: seconds,
+          resolution,
+          size: config?.aspectRatio ?? '16:9',
+          audio: withAudio,
+        },
+      }),
+    });
+    if (!submit.ok) {
+      throw new Error(`DashScope submit ${submit.status}: ${(await submit.text()).slice(0, 300)}`);
+    }
+    const taskId = (await submit.json())?.output?.task_id;
+    if (!taskId) throw new Error('DashScope returned no task_id');
+
+    const deadline = Date.now() + (config?.pollTimeoutMs ?? 600_000);
+    for (;;) {
+      if (Date.now() > deadline) throw new Error(`Wan3.0 task ${taskId} timed out`);
+      await new Promise((r) => setTimeout(r, 5_000));
+      const poll = await fetch(`${WAN_POLL_URL}/${taskId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!poll.ok) {
+        throw new Error(`DashScope poll ${poll.status}: ${(await poll.text()).slice(0, 300)}`);
+      }
+      const out = (await poll.json())?.output ?? {};
+      const status = out.task_status;
+      if (status === 'SUCCEEDED') {
+        const url = out.video_url || out.results?.[0]?.url;
+        if (!url) throw new Error('Wan3.0 succeeded but returned no video URL');
+        // Billed on the seconds we ASKED for. DashScope charges for the produced
+        // clip, and a partial result we then reject is still a clip they rendered.
+        void _logUnitCall({
+          task: config?.task ?? 'wan_video_generation',
+          modelKey,
+          units: seconds,
+          latencyMs: Date.now() - _start,
+          userId: config?.userId,
+          workspaceId: config?.workspaceId,
+        });
+        return {
+          url,
+          mimeType: 'video/mp4',
+          model: 'wan3.0-video-prime',
+          durationSeconds: seconds,
+          resolution,
+          hasAudio: withAudio,
+        };
+      }
+      if (status === 'FAILED' || status === 'CANCELED' || status === 'UNKNOWN') {
+        throw new Error(`Wan3.0 task ${taskId} ${status}: ${out.message ?? 'no detail'}`);
+      }
+    }
+  } catch (err) {
+    void _logUnitCall({
+      task: config?.task ?? 'wan_video_generation',
+      modelKey,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
+}
+
 // ── Grok (xAI Aurora): Image generation + editing ──────────────────────────
 
 // Current xAI image model (the older grok-2-image-1212 is legacy). Note: this

@@ -70,7 +70,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // 'kling-1.6-pro' removed 2026-08-12 (issue #4): `klingai/kling-1.6-pro` returns 404 from
 // GET /v1/models — a read that needs no credit, so it is deleted upstream, not a symptom of
 // our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
-type VideoModel = 'kling-3.0' | 'veo-2';
+type VideoModel = 'kling-3.0' | 'veo-2'
+  | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p';
 
 // `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
 // generate-interior-video-v2, which debits its own CREDIT_COSTS. This entry is only read by the
@@ -80,7 +81,20 @@ type VideoModel = 'kling-3.0' | 'veo-2';
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'kling-3.0':     20,
   'veo-2':         50,
+  // Delegated like veo-2, so these are preflight-message values only — but they must
+  // still equal generate-interior-video-v2's map, because a stale number here quotes
+  // the customer a price nobody charges. Pinned by tests/unit/videoCreditFloor.test.ts.
+  'wan-3.0-480p':  40,
+  'wan-3.0-720p':  80,
+  'wan-3.0-1080p': 155,
 };
+
+//: Models handed to generate-interior-video-v2 rather than run here. A reel is the case
+//: Wan exists for — 30 seconds with sound, against the 10 silent seconds this function
+//: could offer before.
+const DELEGATED_MODELS = new Set<string>([
+  'veo-2', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
+]);
 
 const REPLICATE_MODELS: Record<string, string> = {
   'kling-3.0':     'kwaivgi/kling-v3-video',
@@ -142,6 +156,9 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
   const {
     prompt,
     source_image_url,
+    // Wan-only, forwarded to the generator, which is where they are SSRF-checked —
+    // this function never fetches them itself.
+    reference_image_urls,
     model = 'kling-3.0' as VideoModel,
     aspect_ratio = '9:16',
     duration_seconds = 10,
@@ -217,8 +234,8 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     let predictionId: string;
     let replicateModel: string;
 
-    // For veo-2: delegate entirely to generate-interior-video-v2 (it handles credit debit itself)
-    if (model === 'veo-2') {
+    // Delegate entirely to generate-interior-video-v2 (it handles the credit debit itself)
+    if (DELEGATED_MODELS.has(model)) {
       const veoRes = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video-v2`, {
         method: 'POST',
         headers: {
@@ -230,9 +247,13 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
           source_image_url,
           prompt,
           aspect_ratio,
-          duration_seconds: Math.min(duration_seconds, 8),
+          // The generator clamps per model (8s for veo-2, 30s for Wan). Clamping to 8
+          // here as well would have silently capped every Wan reel at 8 seconds — the
+          // exact thing Wan was added to fix.
+          duration_seconds,
           video_type: 'social_reel',
-          model: 'veo-2',
+          model,
+          reference_image_urls,
           workspace_id,
         }),
       });
@@ -240,23 +261,23 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         // Surface the downstream failure instead of letting .json() throw opaquely
         // on a non-JSON error body.
         const errText = await veoRes.text().catch(() => '');
-        throw new Error(`Veo generation failed (${veoRes.status}): ${errText.substring(0, 300)}`);
+        throw new Error(`${model} generation failed (${veoRes.status}): ${errText.substring(0, 300)}`);
       }
       const veoResult = await veoRes.json();
       if (!veoResult.success) {
-        throw new Error(veoResult.error || 'Veo generation failed');
+        throw new Error(veoResult.error || `${model} generation failed`);
       }
       return jsonResponse({
         success: true,
         video_url: veoResult.video_url,
         job_id: veoResult.job_id,
-        model_used: 'veo-2',
+        model_used: model,
         credits_used: veoResult.credits_used,
         status: veoResult.status,
       });
     }
 
-    // ① Pre-flight check (kling only — veo-2 handled above)
+    // ① Pre-flight check (kling only — delegated models handled above)
     const { sufficient, balance } = await checkCreditBalance(supabase, userId, model, 1, workspace_id ?? null);
     // Was hardcoded 'kling-3.0' regardless of the model actually requested, so a user
     // with 15-19 credits passed the preflight and then got a 402 from the debit for a
