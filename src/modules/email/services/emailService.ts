@@ -14,6 +14,10 @@ export interface EmailDomain {
   id: string;
   domain: string;
   verification_status: 'pending' | 'verified' | 'failed';
+  /** Resend's own word, or `not_found` when Resend does not hold the domain. NULL = never asked. */
+  provider_status?: string | null;
+  /** When the provider was last asked. NULL renders as "not checked yet", never as a status. */
+  provider_checked_at?: string | null;
   verification_token?: string;
   dkim_tokens?: string[];
   is_default: boolean;
@@ -186,14 +190,28 @@ export class EmailService {
   }
 
   /**
-   * Mark a domain as verified after confirming in the Resend dashboard
+   * Ask RESEND what this domain's status is, and store the answer (#357 AE-11).
+   *
+   * This replaced `markDomainVerified`, which wrote `verified` because the operator said so. A
+   * self-asserted flag cannot make an unverified domain deliverable — Resend enforces that at send
+   * time — but it can make this screen claim Verified while every send fails upstream.
+   *
+   * Throws when the provider cannot be reached, and the stored row is left untouched: restating an
+   * unverified claim as a freshly confirmed one is worse than the stale claim it replaced.
    */
-  async markDomainVerified(domain: string): Promise<void> {
-    const { error } = await supabase.functions.invoke('email-api', {
-      body: { action: 'mark-domain-verified', domain },
+  async verifyDomainWithProvider(domain: string): Promise<{
+    verified: boolean;
+    verification_status: string;
+    provider_status: string;
+    message: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('email-api', {
+      body: { action: 'verify-domain', domain },
     });
 
     if (error) throw await edgeError(error);
+    if (!data?.success) throw new Error(data?.error || 'Failed to check the domain with Resend');
+    return data;
   }
 
   /**

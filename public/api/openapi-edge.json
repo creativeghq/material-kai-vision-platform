@@ -2338,16 +2338,16 @@
                       "action": {
                         "type": "string",
                         "enum": [
-                          "mark-domain-verified"
+                          "verify-domain"
                         ],
-                        "description": "Mark a domain as verified after DNS confirmation (admin only)."
+                        "description": "Ask Resend for this domain's status and store the answer (admin only). Never asserts; leaves the row untouched when the provider is unreachable."
                       },
                       "domain": {
                         "type": "string",
-                        "description": "Domain name to verify"
+                        "description": "Domain name to check with Resend"
                       }
                     },
-                    "description": "Returns: {success:true}"
+                    "description": "Returns: {success:true, verified:boolean, verification_status:string, provider_status:string, message:string}"
                   },
                   {
                     "type": "object",
@@ -3808,6 +3808,147 @@
         }
       }
     },
+    "/embed-agent": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Public agent surface for the website embed SDK — allowlisted tools, no model turn",
+        "operationId": "get_embed_agent",
+        "description": "Anonymous tool-running API for the <materialkai-assistant> embed (#382 Phase 2/3). Authenticated by a publishable embed key (material_kai_keys) via the x-embed-key header or ?key= query param; the key resolves the workspace and nothing here reads a workspace, user or owner from the request body. The reachable tool set is a HARDCODED allowlist in _shared/embed-agent-tools.ts — there is no dynamic binding, so a request, a prompt or a model cannot widen it. Every listed tool is deterministic: action=run invokes one tool directly with the caller's arguments and performs NO model turn, so a quick-start costs the merchant nothing. Exactly one tool writes (raise_quote_request, which mints a CRM contact and a quote request); it is gated on Cloudflare Turnstile before the tool is even constructed. The key's allowed_origins drives per-request CORS and its rate_limit_per_minute is consumed atomically per call, exactly as on products-3d-api.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Public agent surface for the website embed SDK — allowlisted tools, no model turn",
+        "operationId": "post_embed_agent",
+        "description": "Anonymous tool-running API for the <materialkai-assistant> embed (#382 Phase 2/3). Authenticated by a publishable embed key (material_kai_keys) via the x-embed-key header or ?key= query param; the key resolves the workspace and nothing here reads a workspace, user or owner from the request body. The reachable tool set is a HARDCODED allowlist in _shared/embed-agent-tools.ts — there is no dynamic binding, so a request, a prompt or a model cannot widen it. Every listed tool is deterministic: action=run invokes one tool directly with the caller's arguments and performs NO model turn, so a quick-start costs the merchant nothing. Exactly one tool writes (raise_quote_request, which mints a CRM contact and a quote request); it is gated on Cloudflare Turnstile before the tool is even constructed. The key's allowed_origins drives per-request CORS and its rate_limit_per_minute is consumed atomically per call, exactly as on products-3d-api.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "capabilities"
+                        ],
+                        "description": "Which quick-starts this key may run, plus the Turnstile site key for the quote form"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "tool"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "run"
+                        ],
+                        "description": "Run one allowlisted tool deterministically and return its result"
+                      },
+                      "tool": {
+                        "type": "string",
+                        "description": "Tool name. Must be on the public allowlist; an unknown name and a real-but-unexposed name give the same 400 so the endpoint cannot enumerate the platform."
+                      },
+                      "args": {
+                        "type": "object",
+                        "description": "Arguments passed straight to the tool. Capped at 8 kB; the tool validates its own shape."
+                      },
+                      "turnstile_token": {
+                        "type": "string",
+                        "description": "Required only for the writing tool (raise_quote_request). Verified before the tool is built; fails closed."
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flow-engine": {
       "post": {
         "tags": [
@@ -4834,6 +4975,103 @@
                       }
                     },
                     "description": "Returns: { ok, audited, failed }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seo-content-freshness": {
+      "post": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Content decay — raise generated articles that are past their own refresh cadence",
+        "operationId": "post_seo_content_freshness",
+        "description": "Weekly sweep over seo_article_freshness (the derived content-decay view). Emits a seo.article_refresh_due flow event per overdue article and stamps refresh_notified_at so one nudge lands per refresh cycle rather than per cron tick. Due-ness is derived in SQL by seo_article_refresh_due_at(); this function never re-adds an interval to a date. verify_jwt is disabled at the gateway and the only action self-authenticates with isCronAuthorized (x-cron-secret or service-role bearer).",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "cron-sweep"
+                        ],
+                        "description": "x-cron-secret only — notify the author of every article past its refresh due date."
+                      }
+                    },
+                    "description": "Returns: { ok, due_count, already_notified, emitted, failed, errors, truncated }"
                   }
                 ],
                 "discriminator": {
@@ -21014,6 +21252,170 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scan-receipt": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Read a photographed receipt into expense fields, and keep the image on the bill",
+        "operationId": "post_scan_receipt",
+        "description": "Turns a photo or PDF of a receipt into the fields an expense needs (#379). The reader is a forced Anthropic tool call over the image; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. It deliberately writes nothing: the caller creates the trip line or the supplier bill and confirms the figures, because a confident wrong reading is the failure mode of extraction. An unreadable date comes back null rather than defaulted — this function runs in UTC and the caller fills the operator's local day. `attach_bill` / `sign_bill` put the image on a supplier bill in the private bucket and mint a short-lived URL for it.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "content_type",
+                      "data_base64"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "scan"
+                        ],
+                        "description": "Extract vendor, date, currency and amounts from a receipt image or PDF"
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Checked against the caller's membership; never trusted from the body alone (string (uuid))"
+                      },
+                      "content_type": {
+                        "type": "string",
+                        "description": "image/jpeg|png|webp|heic|heif or application/pdf"
+                      },
+                      "data_base64": {
+                        "type": "string",
+                        "description": "Base64 receipt bytes, up to ~4 MB"
+                      }
+                    },
+                    "description": "Returns: {success, status: 'extracted'|'failed', unreadable, fields:{vendor, doc_date, currency, total_gross, vat_amount, net, document_number, category_hint, confidence, foots}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "bill_id",
+                      "data_base64"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "attach_bill"
+                        ],
+                        "description": "Store a receipt against a supplier bill (Finance expense)"
+                      },
+                      "bill_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "filename": {
+                        "type": "string"
+                      },
+                      "content_type": {
+                        "type": "string"
+                      },
+                      "data_base64": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {success, receipt_path, signed_url}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "bill_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "sign_bill"
+                        ],
+                        "description": "Mint a fresh signed URL for a receipt already on a bill"
+                      },
+                      "bill_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {success, signed_url}"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
                 }
               }
             }

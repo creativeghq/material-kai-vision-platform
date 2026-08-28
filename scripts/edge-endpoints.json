@@ -985,17 +985,17 @@
         "response": "{success:true, domain: Domain, message:string}"
       },
       {
-        "name": "mark-domain-verified",
-        "summary": "Mark a domain as verified after DNS confirmation (admin only).",
+        "name": "verify-domain",
+        "summary": "Ask Resend for this domain's status and store the answer (admin only). Never asserts; leaves the row untouched when the provider is unreachable.",
         "params": [
           {
             "name": "domain",
             "type": "string",
             "required": true,
-            "desc": "Domain name to verify"
+            "desc": "Domain name to check with Resend"
           }
         ],
-        "response": "{success:true}"
+        "response": "{success:true, verified:boolean, verification_status:string, provider_status:string, message:string}"
       },
       {
         "name": "logs",
@@ -1047,7 +1047,7 @@
         "name": "action",
         "type": "string",
         "required": true,
-        "desc": "One of: send, domains, add-domain, mark-domain-verified, logs, analytics, sync-domains"
+        "desc": "One of: send, domains, add-domain, verify-domain, logs, analytics, sync-domains"
       }
     ],
     "response": "{}"

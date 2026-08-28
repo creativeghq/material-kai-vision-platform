@@ -1126,13 +1126,28 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           JSON.stringify({
             success: true,
             domain: data,
-            message: 'Domain added. Verify it in your Resend dashboard at resend.com/domains, then mark it verified here.',
+            message: 'Domain added. Publish the DNS records shown at resend.com/domains, then use Check verification here — the status is read from Resend, never asserted.',
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      case 'mark-domain-verified': {
+      /**
+       * ASK RESEND. Never assert (#357 AE-11).
+       *
+       * This used to be `mark-domain-verified`: a button that wrote
+       * `verification_status: 'verified'` because the operator said they had done the DNS work in
+       * the Resend dashboard. Not a spoofing vector — Resend enforces verification at send time,
+       * so a self-asserted flag cannot make an unverified domain deliverable — but the two states
+       * diverge silently, and the screen then says Verified while every send fails upstream with
+       * an opaque error.
+       *
+       * FAIL CLOSED, in the specific sense that matters here: when the provider cannot be reached,
+       * the stored row is left EXACTLY as it was. Writing anything — 'pending', a fresh
+       * provider_checked_at — would restate an unverified claim as a freshly confirmed one, which
+       * is worse than the stale claim it replaced.
+       */
+      case 'verify-domain': {
         if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
         const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -1141,15 +1156,51 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const { domain } = requestBody;
         if (!domain) throw new HttpError(400, 'Domain is required');
 
+        const resendKey = Deno.env.get('RESEND_API_KEY') || '';
+        if (!resendKey) throw new HttpError(503, 'RESEND_API_KEY is not configured, so the domain status cannot be checked.');
+
+        const listRes = await fetch('https://api.resend.com/domains', {
+          headers: { 'Authorization': `Bearer ${resendKey}` },
+        });
+        const listJson = await listRes.json().catch(() => ({}));
+        if (!listRes.ok) {
+          throw new HttpError(502, listJson?.message || `Resend API error: ${listRes.status}`);
+        }
+
+        const known: Array<{ id: string; name: string; status: string }> = listJson?.data || [];
+        const match = known.find((d) => String(d.name).toLowerCase() === String(domain).toLowerCase());
+        // Resend not holding the domain at all is an ANSWER, not a failure: it means the DNS side
+        // was never started. It is recorded, so the screen can say that rather than "pending".
+        const providerStatus = match ? String(match.status) : 'not_found';
+        const verified = providerStatus === 'verified';
+        const localStatus = verified ? 'verified' : providerStatus === 'failure' ? 'failed' : 'pending';
+
         const { error } = await supabaseClient
           .from('email_domains')
-          .update({ verification_status: 'verified' })
+          .update({
+            verification_status: localStatus,
+            is_verified: verified,
+            verified_at: verified ? new Date().toISOString() : null,
+            provider_status: providerStatus,
+            provider_checked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq('domain', domain);
 
         if (error) throw new Error(`Failed to update domain: ${error.message}`);
 
         return new Response(
-          JSON.stringify({ success: true }),
+          JSON.stringify({
+            success: true,
+            verified,
+            verification_status: localStatus,
+            provider_status: providerStatus,
+            message: verified
+              ? `Resend reports ${domain} as verified.`
+              : providerStatus === 'not_found'
+                ? `Resend does not hold ${domain}. Add it at resend.com/domains and publish the DNS records it shows.`
+                : `Resend reports ${domain} as "${providerStatus}". Finish the DNS records at resend.com/domains, then check again.`,
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -1312,13 +1363,21 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
           if (existing) {
             // Update status if changed
-            if (existing.verification_status !== verificationStatus) {
-              await supabaseClient
-                .from('email_domains')
-                .update({ verification_status: verificationStatus })
-                .eq('id', existing.id);
-              updated++;
-            }
+            // Provenance is stamped on every pass, not only when the verdict changed: "Resend
+            // still says verified, asked a minute ago" and "nobody has asked since March" are
+            // different facts, and only one of them is reassuring.
+            const nowIso = new Date().toISOString();
+            await supabaseClient
+              .from('email_domains')
+              .update({
+                verification_status: verificationStatus,
+                is_verified: verificationStatus === 'verified',
+                provider_status: rd.status,
+                provider_checked_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq('id', existing.id);
+            if (existing.verification_status !== verificationStatus) updated++;
           } else {
             // Insert new domain
             await supabaseClient
@@ -1326,6 +1385,9 @@ Deno.serve(withApiLogging('email-api', async (req) => {
               .insert({
                 domain: rd.name,
                 verification_status: verificationStatus,
+                is_verified: verificationStatus === 'verified',
+                provider_status: rd.status,
+                provider_checked_at: new Date().toISOString(),
                 created_by: user?.id ?? null,
               });
             added++;

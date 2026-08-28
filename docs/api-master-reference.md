@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (128)
+## 1. Supabase Edge Functions (131)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -112,6 +112,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `revolut-api` | JWT | Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync |
 | `revolut-sync` | JWT / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
 | `revolut-webhooks` | revolutSignature | Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret |
+| `scan-receipt` | JWT | Read a photographed receipt into expense fields, and keep the image on the bill |
 | `supplier-orders-api` _(GET + POST)_ | kai_* | Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back |
 | `trip-expense-ops` | JWT | Sales trip-expense receipts: upload, sign, and render the expense PDF |
 
@@ -246,6 +247,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `gsc-api` _(GET + POST)_ | JWT / public | Google Search Console for connected websites (OAuth + performance sync) |
 | `seo-api` | JWT / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
+| `seo-content-freshness` | JWT | Content decay — raise generated articles that are past their own refresh cadence |
 | `seo-domain-tracker` | JWT | Weekly Rankings + Backlinks snapshots for a connected website |
 | `seo-site-audit` | JWT | Site Health — homepage Lighthouse + on-page audit for a connected website |
 
@@ -332,6 +334,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `embed-agent` _(GET + POST)_ | public | Public agent surface for the website embed SDK — allowlisted tools, no model turn |
 | `products-3d-api` _(GET + POST)_ | public | Public product + 3D model read for the website embed SDK |
 
 **Stock**
