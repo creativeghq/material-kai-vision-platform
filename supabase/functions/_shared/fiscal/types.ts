@@ -2,13 +2,11 @@
 // A FiscalConnector implements one or more capabilities; a workspace binds each
 // capability to a connector independently (workspace_fiscal_bindings).
 
-export type FiscalCapability =
-  | 'legal_invoice'
-  | 'pre_invoice_notice'
-  | 'pdf_render'
-  | 'tax_submission'
-  | 'numbering'
-  | 'payment_reconciliation';
+// One source (#391) — the generated mirror.
+export { FISCAL_CAPABILITIES, isFiscalCapability } from './fiscalVocabulary.generated.ts';
+export type { FiscalCapability } from './fiscalVocabulary.generated.ts';
+// Also imported: a re-export does not bind the name locally.
+import type { FiscalCapability } from './fiscalVocabulary.generated.ts';
 
 export interface FiscalAddress {
   street?: string;

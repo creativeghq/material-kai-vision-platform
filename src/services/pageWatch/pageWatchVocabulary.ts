@@ -41,3 +41,24 @@ export function isPageWatchStatus(v: unknown): v is PageWatchChangeStatus {
 export function isJudgeConfidence(v: unknown): v is JudgeConfidence {
   return typeof v === 'string' && (JUDGE_CONFIDENCES as readonly string[]).includes(v);
 }
+
+/**
+ * `page_watches_category_check` — what KIND of page is being watched.
+ *
+ * A different fact from the status above: this is on the WATCH, that is on a detected
+ * CHANGE. They live in one file because they are one feature's vocabulary, not because
+ * they are related sets.
+ *
+ * `supplier_terms` is first because it is the default the create form applies — a watch is
+ * overwhelmingly a supplier's price list or T&Cs page. The category drives nothing but
+ * grouping and the digest's wording today; it is a CHECK rather than a free-text tag so
+ * that stays true.
+ */
+export const PAGE_WATCH_CATEGORIES = [
+  'supplier_terms', 'regulatory', 'partner_docs', 'competitor', 'other',
+] as const;
+export type PageWatchCategory = (typeof PAGE_WATCH_CATEGORIES)[number];
+
+export function isPageWatchCategory(v: unknown): v is PageWatchCategory {
+  return typeof v === 'string' && (PAGE_WATCH_CATEGORIES as readonly string[]).includes(v);
+}

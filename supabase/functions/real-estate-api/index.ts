@@ -160,23 +160,24 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
 }
 
 
-const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
+// One source (#391) — the generated mirror.
+import {
+  INQUIRY_STATUSES, COMMISSION_PARTY_TYPES, BOOKING_CHANNELS, SYNCABLE_CHANNELS,
+  isInquiryStatus, isCommissionPartyType, isBookingChannel, isSyncableChannel,
+} from '../_shared/realEstateVocabulary.generated.ts';
 const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];
 /** Listing paperwork. The compliance types come first because they are the evidence behind the GR
  *  publish gate — `energy_class` and `electronic_building_id` are claims until the certificate is
  *  attached. Anything unrecognised is stored as 'other' rather than rejected. */
 const DOC_TYPES = ['energy_certificate', 'building_id', 'title_deed', 'floor_plan', 'topographic',
   'agency_agreement', 'permit', 'tax_clearance', 'other'];
-/** Who a commission split can pay. Mirrors the CHECK on property_sale_commission_splits. */
-const COMMISSION_PARTY_TYPES = ['listing_agent', 'buyer_agent', 'house', 'referral', 'external'];
 /** AML/KYC vocabulary. Mirrors the CHECKs on property_kyc_checks. */
 // One source (#391) — the generated mirror.
 import { KYC_CHECK_TYPES, isKycCheckType } from '../_shared/realEstateVocabulary.generated.ts';
 const KYC_STATUSES = ['pending', 'passed', 'failed', 'waived'];
 /** Tenancy inspection points. Mirrors the CHECK on property_tenancy_inspections. */
 const INSPECTION_TYPES = ['check_in', 'routine', 'check_out'];
-/** Short-let vocabulary. Mirrors the CHECKs on property_bookings. */
-const BOOKING_CHANNELS = ['direct', 'airbnb', 'booking_com', 'vrbo', 'other'];
+/** Short-let vocabulary. `BOOKING_CHANNELS` is imported above. */
 const BOOKING_STATUSES = ['tentative', 'confirmed', 'cancelled', 'completed', 'blocked'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
@@ -543,7 +544,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (body.currency !== undefined) patch.currency = String(body.currency).slice(0, 8);
         if (body.channel !== undefined) {
           const c = String(body.channel);
-          if (!BOOKING_CHANNELS.includes(c)) return json({ error: `channel must be one of ${BOOKING_CHANNELS.join(', ')}` }, 400);
+          if (!isBookingChannel(c)) return json({ error: `channel must be one of ${BOOKING_CHANNELS.join(', ')}` }, 400);
           patch.channel = c;
         }
         if (body.status !== undefined) {
@@ -637,7 +638,9 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const propertyId = String(body.property_id ?? '');
         const channel = String(body.channel ?? '');
-        if (!propertyId || !['airbnb', 'booking_com', 'vrbo', 'other'].includes(channel)) {
+        // `SYNCABLE_CHANNELS`, not `BOOKING_CHANNELS`: `direct` is a booking, never a feed to
+        // sync, and `property_channel_links` has its own four-value CHECK saying so.
+        if (!propertyId || !isSyncableChannel(channel)) {
           return json({ error: 'property_id and a valid channel are required' }, 400);
         }
         await loadEditable(propertyId);
@@ -879,7 +882,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const payload: Record<string, unknown> = {};
         if (body.party_type !== undefined) {
           const pt = String(body.party_type);
-          if (!COMMISSION_PARTY_TYPES.includes(pt)) return json({ error: `party_type must be one of ${COMMISSION_PARTY_TYPES.join(', ')}` }, 400);
+          if (!isCommissionPartyType(pt)) return json({ error: `party_type must be one of ${COMMISSION_PARTY_TYPES.join(', ')}` }, 400);
           payload.party_type = pt;
         }
         if (body.basis !== undefined) {
@@ -1389,7 +1392,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const patch: Record<string, unknown> = {};
         if (body.status !== undefined) {
           const status = String(body.status);
-          if (!INQUIRY_STATUSES.includes(status)) return json({ error: 'a valid status is required' }, 400);
+          if (!isInquiryStatus(status)) return json({ error: 'a valid status is required' }, 400);
           patch.status = status;
         }
         for (const k of ['name', 'email', 'phone', 'message']) {

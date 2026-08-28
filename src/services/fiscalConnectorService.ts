@@ -5,13 +5,12 @@ import { edgeError } from '@/utils/edgeError';
 // Master-key model: the Novus key is configured ONCE on the root (operator)
 // workspace; every tenant transmits through it with its own issuer VAT.
 
-export type FiscalCapability =
-  | 'legal_invoice'
-  | 'pre_invoice_notice'
-  | 'pdf_render'
-  | 'tax_submission'
-  | 'numbering'
-  | 'payment_reconciliation';
+// One source (#391). Re-exported so existing imports from this service keep working.
+export { FISCAL_CAPABILITIES, isFiscalCapability } from './fiscal/fiscalVocabulary';
+export type { FiscalCapability } from './fiscal/fiscalVocabulary';
+
+// Also imported: a re-export does not bind the name locally.
+import type { FiscalCapability } from './fiscal/fiscalVocabulary';
 
 export interface FiscalConnector {
   slug: string;

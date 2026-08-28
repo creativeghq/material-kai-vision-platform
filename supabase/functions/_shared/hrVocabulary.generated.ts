@@ -89,3 +89,47 @@ export function isLocationType(v: unknown): v is LocationType {
 export function isSeparationType(v: unknown): v is SeparationType {
   return typeof v === 'string' && (SEPARATION_TYPES as readonly string[]).includes(v);
 }
+
+/**
+ * `hr_applications_stage_check` — the recruitment funnel.
+ *
+ * ORDER IS MEANINGFUL HERE, unlike the sets above. `applied` is where every application
+ * starts (both `hr-careers` and `hr-api/expansion` insert it literally), and the run to
+ * `hired` is the pipeline the board renders left to right. `rejected` is the terminal
+ * off-ramp and sits last on purpose — it is not "after hired", it is outside the run.
+ * A UI that wants the funnel without the off-ramp slices it rather than keeping a second
+ * list; that is what `APP_STAGES_IN_FUNNEL` below is for.
+ */
+export const APP_STAGES = [
+  'applied', 'screening', 'interview', 'offer', 'hired', 'rejected',
+] as const;
+export type AppStage = (typeof APP_STAGES)[number];
+
+/** The funnel proper — every stage except the `rejected` off-ramp. Derived, not a second
+ *  vocabulary: written as a slice so a new stage joins it automatically. */
+export const APP_STAGES_IN_FUNNEL = APP_STAGES.filter((s) => s !== 'rejected');
+
+/**
+ * `hr_documents_doc_type_check` — what an employee's file can hold.
+ *
+ * NOT the same vocabulary as the real-estate `DOC_TYPES` in `real-estate-api`, which is
+ * listing paperwork (energy certificate, title deed, topographic). Same variable name in
+ * two edge functions, nine values against six, no overlap at all. #391 is explicit that
+ * unification is by MEANING and never by signature, and a shared name is even weaker than
+ * a shared signature.
+ *
+ * `payslip` is written by the payroll run rather than uploaded — `hr-api/payslip.ts` files
+ * the rendered A4 under this type so the employee sees it in /my-hr. It is a member for
+ * that reason, not because anyone picks it in the upload dialog.
+ */
+export const DOC_TYPES = [
+  'contract', 'id', 'certificate', 'payslip', 'review', 'other',
+] as const;
+export type DocType = (typeof DOC_TYPES)[number];
+
+export function isAppStage(v: unknown): v is AppStage {
+  return typeof v === 'string' && (APP_STAGES as readonly string[]).includes(v);
+}
+export function isHrDocType(v: unknown): v is DocType {
+  return typeof v === 'string' && (DOC_TYPES as readonly string[]).includes(v);
+}

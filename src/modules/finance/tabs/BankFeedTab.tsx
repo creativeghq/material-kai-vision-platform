@@ -25,6 +25,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { formatDate } from '@/utils/datetime';
+// One source (#391).
+import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
 
 interface FeedRow {
   id: string;
@@ -46,7 +48,9 @@ interface InvoiceLite { id: string; internal_number: string; amount_due: number;
 interface BillLite { id: string; supplier_bill_number: string | null; supplier_name: string | null; amount_due: number; currency: string }
 interface OrderLite { id: string; order_number: string | null }
 
-const PROVIDER_LABEL: Record<string, string> = { revolut: 'Revolut', stripe: 'Stripe', viva: 'Viva' };
+// One source (#391) — `Record<PaymentProviderSlug, …>`, so a fourth provider is a
+// typecheck failure here rather than a filter option nobody added.
+const PROVIDER_LABEL: Record<PaymentProviderSlug, string> = { revolut: 'Revolut', stripe: 'Stripe', viva: 'Viva' };
 
 const MatchWord: React.FC<{ row: FeedRow }> = ({ row }) => {
   if (row.provider !== 'revolut') {
@@ -238,9 +242,9 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             <SelectTrigger aria-label="Provider filter" className="h-9 w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All providers</SelectItem>
-              <SelectItem value="revolut">Revolut</SelectItem>
-              <SelectItem value="stripe">Stripe</SelectItem>
-              <SelectItem value="viva">Viva</SelectItem>
+              {PAYMENT_PROVIDER_SLUGS.map((p) => (
+                <SelectItem key={p} value={p}>{PROVIDER_LABEL[p]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={direction || 'all'} onValueChange={(v) => setDirection(v === 'all' ? '' : v)}>

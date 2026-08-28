@@ -11,12 +11,20 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+// One source (#391).
+import {
+  RING_VALUES, ringRank, isTechRadarRing, type TechRadarRing,
+} from '@/services/techRadar/techRadarVocabulary';
 
 export interface TechRadarFinding {
   id?: string;
   title: string;
   category?: string;
-  ring: 'adopt' | 'trial' | 'assess' | 'hold' | string;
+  /** The stored ring. Typed `string` on purpose: a finding reaches this card as tool-result
+   *  JSON before anything writes it to the `tech_radar_ring` enum column, so the model can
+   *  still hand us a value that is not in the vocabulary. `ringRank` and the `RING_META`
+   *  fallback are what make that harmless. */
+  ring: string;
   rationale?: string;
   recommendation?: string;
   effort?: string | null;
@@ -34,14 +42,17 @@ export interface TechRadarFindingsData {
   saved?: boolean;
 }
 
-const RING_META: Record<string, { label: string; cls: string; blurb: string; order: number }> = {
-  adopt:  { label: 'Adopt',  cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30', blurb: 'Proven — safe to put into production now.', order: 0 },
-  trial:  { label: 'Trial',  cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30',                 blurb: 'Promising — try it on a low-risk project first.', order: 1 },
-  assess: { label: 'Assess', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',        blurb: 'Worth a look — run a spike before committing.', order: 2 },
-  hold:   { label: 'Hold',   cls: 'bg-muted text-muted-foreground border-border',                                  blurb: 'Not now — avoid new use until things change.', order: 3 },
+// One source (#391) — the ORDER of `RING_VALUES` is the radar order, so the `order:` field
+// this map used to carry (and the separate `RING_ORDER` array below it) were both parallel
+// copies of that sequence. `ringRank` reads the vocabulary instead.
+const RING_META: Record<TechRadarRing, { label: string; cls: string; blurb: string }> = {
+  adopt:  { label: 'Adopt',  cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30', blurb: 'Proven — safe to put into production now.' },
+  trial:  { label: 'Trial',  cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30',                 blurb: 'Promising — try it on a low-risk project first.' },
+  assess: { label: 'Assess', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',        blurb: 'Worth a look — run a spike before committing.' },
+  hold:   { label: 'Hold',   cls: 'bg-muted text-muted-foreground border-border',                                  blurb: 'Not now — avoid new use until things change.' },
 };
 
-const RING_ORDER: Array<keyof typeof RING_META | string> = ['adopt', 'trial', 'assess', 'hold'];
+
 
 function levelDot(level?: string | null): string {
   if (level === 'high') return '●●●';
@@ -100,17 +111,17 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
   };
 
   const sorted = [...(data.findings || [])].sort(
-    (a, b) => (RING_META[a.ring]?.order ?? 9) - (RING_META[b.ring]?.order ?? 9),
+    (a, b) => ringRank(a.ring) - ringRank(b.ring),
   );
 
   // Which rings are actually present, in radar order — drives the legend.
-  const ringsPresent = RING_ORDER.filter((r) => sorted.some((f) => f.ring === r));
+  const ringsPresent = RING_VALUES.filter((r) => sorted.some((f) => f.ring === r));
 
   // "What to do next" — the most actionable findings (Adopt/Trial first) that
   // carry a concrete recommendation. Only render what's in the data.
   const actions = sorted
     .filter((f) => f.recommendation && f.recommendation.trim().length > 0)
-    .sort((a, b) => (RING_META[a.ring]?.order ?? 9) - (RING_META[b.ring]?.order ?? 9))
+    .sort((a, b) => ringRank(a.ring) - ringRank(b.ring))
     .slice(0, 4);
 
   return (
@@ -143,7 +154,7 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
       {ringsPresent.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {ringsPresent.map((r) => {
-            const meta = RING_META[r] || RING_META.assess;
+            const meta = RING_META[r];
             return (
               <span key={r} className={`text-[10px] px-2 py-0.5 rounded-full border ${meta.cls}`} title={meta.blurb}>
                 {meta.label}
@@ -175,7 +186,7 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
 
       <div className="space-y-2">
         {sorted.map((f, idx) => {
-          const ring = RING_META[f.ring] || RING_META.assess;
+          const ring = isTechRadarRing(f.ring) ? RING_META[f.ring] : RING_META.assess;
           const decided = (f.id ? statuses[f.id] : '') || f.status || '';
           return (
             <div

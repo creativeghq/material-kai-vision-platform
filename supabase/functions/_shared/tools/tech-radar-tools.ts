@@ -46,7 +46,8 @@ const RESEARCH_MODEL = 'claude-sonnet-4-6';   // tech judgement benefits from re
 // Credit ceiling reserved before the (2× Sonnet + web_search) review, settled to actual after.
 // Injected on kai/Pepper for ALL users, so it must be metered (previously credits_debited=0).
 const REVIEW_CREDIT_CEILING = 40;
-const RING_VALUES   = ['adopt', 'trial', 'assess', 'hold'] as const;
+// One source (#391) — the generated mirror.
+import { RING_VALUES } from '../techRadarVocabulary.generated.ts';
 const CATEGORY_VALUES = ['models', 'libraries', 'frameworks', 'infra', 'services', 'patterns', 'tooling', 'other'] as const;
 const LEVEL_VALUES  = ['low', 'medium', 'high'] as const;
 
@@ -641,7 +642,7 @@ export const createListTechRadarTool = (
       description: 'List tracked Tech Radar subjects, or (with subject_id) the findings for one. Filter by ring or only_new.',
       schema: z.object({
         subject_id: z.string().optional(),
-        ring:       z.enum(['adopt', 'trial', 'assess', 'hold']).optional(),
+        ring:       z.enum(RING_VALUES).optional(),
         only_new:   z.boolean().optional(),
       }),
     },

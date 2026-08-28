@@ -82,8 +82,10 @@ function normalizeJobPostingFields(fields: Record<string, unknown>): string | nu
   }
   return null;
 }
-const APP_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
-const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'];
+// One source (#391) — the generated mirror. `DOC_TYPES` keeps its local name: the
+// real-estate edge function has a variable of the same name holding listing paperwork,
+// and these are HR document types.
+import { isAppStage, isHrDocType } from '../_shared/hrVocabulary.generated.ts';
 const HR_DOC_BUCKET = 'pdf-documents';
 
 /**
@@ -480,7 +482,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const id = String(body?.application_id ?? '');
       if (!id) return json({ error: 'application_id is required' }, 400);
       const fields = pick(body, ['stage', 'rating', 'notes']);
-      if (fields.stage && !APP_STAGES.includes(String(fields.stage))) return json({ error: 'invalid stage' }, 400);
+      if (fields.stage && !isAppStage(fields.stage)) return json({ error: 'invalid stage' }, 400);
       const { data: prev } = await supabase.from('hr_applications').select('stage').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       const { data, error } = await supabase.from('hr_applications').update(fields).eq('id', id).eq('workspace_id', workspaceId).select('*').maybeSingle();
       if (error) throw new HttpError(400, error.message);
@@ -666,7 +668,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const name = String(body?.name ?? '').trim();
       const docType = String(body?.doc_type ?? 'other');
       if (!b64 || !name) return json({ error: 'name and content_base64 are required' }, 400);
-      if (!DOC_TYPES.includes(docType)) return json({ error: 'invalid doc_type' }, 400);
+      if (!isHrDocType(docType)) return json({ error: 'invalid doc_type' }, 400);
       const employeeId = body?.employee_id ? String(body.employee_id) : null;
       if (employeeId) {
         const { data: emp } = await supabase.from('hr_employees').select('id').eq('id', employeeId).eq('workspace_id', workspaceId).maybeSingle();

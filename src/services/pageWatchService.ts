@@ -13,19 +13,15 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export type PageWatchCategory =
-  | 'supplier_terms'
-  | 'regulatory'
-  | 'partner_docs'
-  | 'competitor'
-  | 'other';
-
 // One source (#391). Re-exported so existing imports keep working.
-export { PAGE_WATCH_STATUSES, JUDGE_CONFIDENCES, isPageWatchStatus, isJudgeConfidence } from './pageWatch/pageWatchVocabulary';
-export type { PageWatchChangeStatus, JudgeConfidence } from './pageWatch/pageWatchVocabulary';
+export {
+  PAGE_WATCH_STATUSES, JUDGE_CONFIDENCES, PAGE_WATCH_CATEGORIES,
+  isPageWatchStatus, isJudgeConfidence, isPageWatchCategory,
+} from './pageWatch/pageWatchVocabulary';
+export type { PageWatchChangeStatus, JudgeConfidence, PageWatchCategory } from './pageWatch/pageWatchVocabulary';
 
-// Also imported: a re-export does not bind the name locally.
-import type { PageWatchChangeStatus } from './pageWatch/pageWatchVocabulary';
+// Also imported: a re-export does not bind the name locally, and both are used below.
+import type { PageWatchChangeStatus, PageWatchCategory } from './pageWatch/pageWatchVocabulary';
 
 export interface PageWatch {
   id: string;

@@ -27,9 +27,8 @@ import { Loader2, RefreshCw, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/utils/datetime';
 
-type ProbeStatus =
-  | 'ok' | 'credit_exhausted' | 'not_found' | 'schema_rejected'
-  | 'auth_failed' | 'error' | 'timeout';
+// One source (#391).
+import type { ProbeStatus } from '@/services/generation/probeVocabulary';
 
 interface ModelRow {
   id: string;

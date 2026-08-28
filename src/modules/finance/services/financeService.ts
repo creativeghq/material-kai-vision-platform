@@ -150,7 +150,12 @@ export type PaymentDirection = 'in' | 'out';
  * the ledger had no IRIS member, so the register recorded it as `card` — making the ledger
  * disagree with the filed document and collapsing IRIS into card in the Z-report breakdown.
  */
-export type PaymentMethod = 'bank_transfer' | 'cash' | 'card' | 'iris' | 'check' | 'other';
+// One source (#391). Re-exported so existing imports from this service keep working.
+export { PAYMENT_METHODS, isPaymentMethod } from '../paymentVocabulary';
+export type { PaymentMethod } from '../paymentVocabulary';
+
+// Also imported: a re-export does not bind the name locally.
+import type { PaymentMethod } from '../paymentVocabulary';
 
 /** Human display labels for payment methods (Title Case). */
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {

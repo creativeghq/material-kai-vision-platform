@@ -22,26 +22,16 @@ import type { DbClient } from './supabase-client.ts';
 import { getTrustedClientIp } from './client-ip.ts';
 
 /**
- * The closed registry of trackable documents. Adding one is a migration (the
- * CHECK constraints on `document_events.entity_type` and
- * `email_logs.entity_type`) plus a value here — guarded by
- * tests/unit/documentEvents.test.ts, which reads both.
+ * The closed registry of trackable documents. Adding one is a migration (the CHECK
+ * constraints on `document_events.entity_type` and `email_logs.entity_type`) plus a value
+ * in the SOURCE — `src/services/documentDeliveryTypes.ts`. This was a hand-kept copy of
+ * that list until #391; it is now generated, so the two cannot disagree.
  */
-export const DOCUMENT_ENTITY_TYPES = [
-  'invoice',          // /pay/:token   — also covers receipts (invoices.document_type)
-  'quote',            // /q/:token
-  'contract',         // /sign/:token
-  'statement',        // /statement/:token
-  'catalog',          // /c/:slug
-  'moodboard_sheet',  // /sheets/share/:token
-  'client_view',      // /cv/:token
-  'property_listing', // /p/:token
-  'moodboard',        // /board/:id
-  'storefront',       // /store/:slug
-  'order',
-] as const;
+export { DOCUMENT_ENTITY_TYPES } from './documentDeliveryTypes.generated.ts';
+export type { DocumentEntityType } from './documentDeliveryTypes.generated.ts';
 
-export type DocumentEntityType = typeof DOCUMENT_ENTITY_TYPES[number];
+// Also imported: a re-export does not bind the name locally.
+import type { DocumentEntityType } from './documentDeliveryTypes.generated.ts';
 
 /** Email-channel events mirror the Resend webhook vocabulary. */
 export type EmailEventType =

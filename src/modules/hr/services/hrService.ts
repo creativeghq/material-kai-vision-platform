@@ -15,12 +15,14 @@ export {
 export type {
   EmploymentType, EmployeeStatus, AbsenceType,
   PostingStatus, LocationType, SeparationType,
+  AppStage, DocType,
 } from '../hrVocabulary';
 
 // Also imported for use WITHIN this file — a re-export does not bind the names locally.
 import type {
   EmploymentType, EmployeeStatus, AbsenceType,
   PostingStatus, LocationType, SeparationType,
+  AppStage, DocType,
 } from '../hrVocabulary';
 export type PayBasis = 'monthly' | 'hourly';
 export const PAY_BASIS_LABELS: Record<PayBasis, string> = { monthly: 'Monthly salary', hourly: 'Hourly rate' };
@@ -185,7 +187,6 @@ export interface Candidate {
   location?: string | null; links?: string | null;
   source: string | null; resume_path?: string | null; created_at: string;
 }
-export type AppStage = 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
 export interface Application {
   id: string; job_posting_id: string; candidate_id: string; stage: AppStage; rating: number | null; notes: string | null;
   applied_at: string; hired_employee_id: string | null;
@@ -197,7 +198,6 @@ export interface OnboardingTask {
   status: 'pending' | 'done'; sort_order: number; completed_at: string | null;
   employee?: { id: string; contact: { id: string; name: string } | null } | null;
 }
-export type DocType = 'contract' | 'id' | 'certificate' | 'payslip' | 'review' | 'other';
 export interface HrDocument {
   id: string; employee_id: string | null; name: string; doc_type: DocType;
   storage_bucket: string; storage_object_path: string; size_bytes: number | null; created_at: string;
@@ -278,7 +278,7 @@ export interface TimesheetRow { employee_id: string; name: string; total_hours: 
 
 export const POSTING_STATUS_LABELS: Record<PostingStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
 export const APP_STAGE_LABELS: Record<AppStage, string> = { applied: 'Applied', screening: 'Screening', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
-export const APP_STAGES: AppStage[] = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
+export { APP_STAGES, APP_STAGES_IN_FUNNEL } from '../hrVocabulary';
 export const DOC_TYPE_LABELS: Record<DocType, string> = { contract: 'Contract', id: 'ID / Tax', certificate: 'Certificate', payslip: 'Payslip', review: 'Review', other: 'Other' };
 
 // ── Ergani II (Ergani) integration types ──

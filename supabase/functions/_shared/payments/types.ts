@@ -13,8 +13,12 @@
  * The hosted pay page renders each differently, so the shape is discriminated.
  */
 
-/** Provider slug — always matches the module slug suffix (`payments-<slug>`). */
-export type PaymentProviderSlug = 'stripe' | 'viva' | 'revolut';
+// One source (#391) — the generated mirror. The slug always matches the module slug
+// suffix (`payments-<slug>`) and the CHECK on `revolut_bank_transactions.provider`.
+export { PAYMENT_PROVIDER_SLUGS, isPaymentProviderSlug } from '../paymentVocabulary.generated.ts';
+export type { PaymentProviderSlug } from '../paymentVocabulary.generated.ts';
+// Also imported: a re-export does not bind the name locally.
+import type { PaymentProviderSlug } from '../paymentVocabulary.generated.ts';
 
 /** A concrete way to pay, as offered to the customer. */
 export type PaymentMethodKind = 'card' | 'bank_reference';

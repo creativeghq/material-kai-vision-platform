@@ -83,6 +83,37 @@ export const VOCABULARIES = [
     'src/modules/finance/tripExpenseVocabulary.ts',
     'supabase/functions/_shared/tripExpenseVocabulary.generated.ts',
   ],
+  [
+    // #391 — payment method (a union + two label maps) and the payment-provider slug
+    // (a union, a display-order Record and four hand-written <SelectItem>s).
+    'src/modules/finance/paymentVocabulary.ts',
+    'supabase/functions/_shared/paymentVocabulary.generated.ts',
+  ],
+  [
+    // #391 — `FiscalCapability`, the same six-line union in both runtimes.
+    'src/services/fiscal/fiscalVocabulary.ts',
+    'supabase/functions/_shared/fiscal/fiscalVocabulary.generated.ts',
+  ],
+  [
+    // #391 — the tech-radar ring, written out three times across two files. NOT under
+    // `_shared/tools/`: `check-edge-functions.mjs` globs that directory as entrypoints
+    // ("every agent tool body"), so a vocabulary dropped there becomes a typecheck
+    // target in its own right and quietly changes what that glob means.
+    'src/services/techRadar/techRadarVocabulary.ts',
+    'supabase/functions/_shared/techRadarVocabulary.generated.ts',
+  ],
+  [
+    // #391 — generation-model probe status.
+    'src/services/generation/probeVocabulary.ts',
+    'supabase/functions/_shared/agents/probeVocabulary.generated.ts',
+  ],
+  [
+    // #391 — the trackable-document registry. This source PREDATES the mirror script and
+    // its own header called out "four copies ... held in step by the registry guard, not
+    // by care"; generating the edge copy removes one of the four outright.
+    'src/services/documentDeliveryTypes.ts',
+    'supabase/functions/_shared/documentDeliveryTypes.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

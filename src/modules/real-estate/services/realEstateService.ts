@@ -10,10 +10,19 @@ export type ListingStatus = 'draft' | 'active' | 'under_offer' | 'sold' | 'rente
 // One source (#391). Re-exported so existing imports from this service keep working.
 export { PROPERTY_TYPES, isPropertyType } from '../realEstateVocabulary';
 export { KYC_CHECK_TYPES, isKycCheckType } from '../realEstateVocabulary';
-export type { PropertyType, KycCheckType } from '../realEstateVocabulary';
+export {
+  INQUIRY_STATUSES, COMMISSION_PARTY_TYPES, BOOKING_CHANNELS, SYNCABLE_CHANNELS,
+  isInquiryStatus, isCommissionPartyType, isBookingChannel, isSyncableChannel,
+} from '../realEstateVocabulary';
+export type {
+  PropertyType, KycCheckType, InquiryStatus, CommissionPartyType,
+  BookingChannel, SyncableChannel,
+} from '../realEstateVocabulary';
 
 // Also imported: a re-export does not bind the name locally.
-import type { PropertyType, KycCheckType } from '../realEstateVocabulary';
+import type {
+  PropertyType, KycCheckType, BookingChannel, SyncableChannel,
+} from '../realEstateVocabulary';
 export type TransactionType = 'sale' | 'rent' | 'short_let' | 'business_transfer' | 'auction';
 
 export interface PropertyListItem {
@@ -153,7 +162,7 @@ export interface ListingViewPoint { property_id: string; day: string; views: num
 /** A short-let stay. Dates are half-open: `check_out` is the morning of departure, so a back-to-back
  *  changeover is two touching bookings, not an overlap. */
 export interface Booking {
-  id: string; property_id: string; channel: 'direct' | 'airbnb' | 'booking_com' | 'vrbo' | 'other';
+  id: string; property_id: string; channel: BookingChannel;
   external_ref: string | null; guest_name: string | null; guest_email: string | null; guest_phone: string | null;
   guests_count: number | null; check_in: string; check_out: string;
   nightly_rate: number | null; total_amount: number | null; currency: string;
@@ -166,7 +175,7 @@ export interface BookingTask {
   cost: number | null; notes: string | null; completed_at: string | null;
 }
 export interface ChannelLink {
-  id: string; property_id: string; channel: 'airbnb' | 'booking_com' | 'vrbo' | 'other';
+  id: string; property_id: string; channel: SyncableChannel;
   ical_import_url: string | null; is_active: boolean;
   last_synced_at: string | null; last_sync_status: string | null; last_sync_message: string | null; imported_count: number;
 }

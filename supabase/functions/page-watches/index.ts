@@ -18,6 +18,8 @@ import { authenticate, getUserId, userCanAccessWorkspace } from '../_shared/auth
 import { resolveSecret } from '../_shared/secrets.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+// One source (#391) — the generated mirror.
+import { PAGE_WATCH_CATEGORIES } from '../_shared/pageWatchVocabulary.generated.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertSameWorkspace } from '../_shared/same-workspace.ts';
@@ -48,7 +50,8 @@ const SCHEDULE_CRON: Record<string, string> = {
   'the 1st of every month at 09:00': '0 9 1 * *',
 };
 
-const CATEGORIES = new Set(['supplier_terms', 'regulatory', 'partner_docs', 'competitor', 'other']);
+// One source (#391) — the generated mirror.
+const CATEGORIES = new Set<string>(PAGE_WATCH_CATEGORIES);
 const SUBJECT_KINDS = new Set(['platform_supplier', 'crm_company']);
 
 type Db = DbClient;

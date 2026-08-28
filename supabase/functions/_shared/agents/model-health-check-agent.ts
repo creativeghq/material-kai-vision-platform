@@ -41,19 +41,15 @@ import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 const PROBEABLE_PROVIDERS = ['replicate'];
 
 /**
- * What the probe concluded. The distinction between the first two is the entire point:
- * `credit_exhausted` is an ACCOUNT problem (add funds — the model is fine), `not_found` is the model
- * being deleted upstream (no amount of money fixes it). Treating both as "failing" is why a
- * four-model deletion and a two-month billing outage looked like the same event.
+ * What the probe concluded — one source (#391), the generated mirror. The distinction
+ * between the first two is the entire point: `credit_exhausted` is an ACCOUNT problem (add
+ * funds — the model is fine), `not_found` is the model being deleted upstream (no amount of
+ * money fixes it). Treating both as "failing" is why a four-model deletion and a two-month
+ * billing outage looked like the same event.
  */
-type ProbeStatus =
-  | 'ok'
-  | 'credit_exhausted'
-  | 'not_found'
-  | 'schema_rejected'
-  | 'auth_failed'
-  | 'error'
-  | 'timeout';
+import {
+  type ProbeStatus, AUTHORITATIVE_PROBE_STATUSES,
+} from './probeVocabulary.generated.ts';
 
 interface RegistryModel {
   id: string;
@@ -91,7 +87,8 @@ function classify(httpStatus: number, body: string): ProbeStatus {
  * adapter, so an image-to-image model rejecting a prompt-only body says more about the probe than
  * about the model. Advisory verdicts get recorded but never change `status`.
  */
-const AUTHORITATIVE: ProbeStatus[] = ['ok', 'credit_exhausted', 'not_found', 'auth_failed'];
+// Derived in the vocabulary, not restated here (#391).
+const AUTHORITATIVE: readonly ProbeStatus[] = AUTHORITATIVE_PROBE_STATUSES;
 
 export class ModelHealthCheckAgent implements AgentRunner {
   readonly agentType    = 'model-health-check';

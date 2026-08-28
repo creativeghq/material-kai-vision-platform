@@ -162,7 +162,14 @@ const LABELS: Record<Lang, Record<string, string>> = {
   },
 };
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
+// One source (#391) — the generated mirror. `Record<PaymentMethod, …>` rather than
+// `Record<string, …>`: a seventh method then fails `deno check` here instead of
+// silently printing its raw column value on a customer's receipt.
+import {
+  type PaymentMethod, isPaymentMethod,
+} from '../_shared/paymentVocabulary.generated.ts';
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
 };
 
@@ -1350,7 +1357,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
 // settlement), a banded line table, bottom-left remarks and a bottom-right totals stack
 // ending in the large amount. Only the content differs — money received, not goods sold.
 // Document title mirrors the payment method (ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ …).
-const PAYMENT_METHOD_TITLE: Record<string, { en: string; el: string }> = {
+const PAYMENT_METHOD_TITLE: Record<PaymentMethod, { en: string; el: string }> = {
   bank_transfer: { en: 'BANK TRANSFER', el: 'ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ' },
   cash: { en: 'CASH', el: 'ΜΕΤΡΗΤΑ' },
   card: { en: 'CARD PAYMENT', el: 'ΚΑΡΤΑ' },
@@ -1470,7 +1477,10 @@ async function buildPaymentReceiptPdf(d: {
   }
   // Title = the payment method (ΤΡΑΠΕΖΙΚΟ ΕΜΒΑΣΜΑ / BANK TRANSFER …), with the receipt
   // kind spelled out underneath so the document still names itself.
-  const title = payment.method ? (PAYMENT_METHOD_TITLE[String(payment.method)]?.[lang] ?? L.paymentReceipt) : L.paymentReceipt;
+  // Hoisted to a local `unknown` first: `payment` is `any`, and a property access on an
+  // `any` value cannot be narrowed by a type guard in place.
+  const payMethod: unknown = payment.method;
+  const title = isPaymentMethod(payMethod) ? PAYMENT_METHOD_TITLE[payMethod][lang] : L.paymentReceipt;
   textR(title, right, topY - 11, 12, bold, ACC);
   textR(L.paymentReceipt, right, topY - 23, 7.5, font, MUTED);
 
@@ -1502,7 +1512,10 @@ async function buildPaymentReceiptPdf(d: {
   const isOut = payment.direction === 'out';
   const custName = customer ? (customer.name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')) : '—';
   const custCode = customer ? (customer.code || customer.customer_code || customer.customer_number) : null;
-  const methodLabel = payment.method ? (PAYMENT_METHOD_LABELS[String(payment.method)] ?? String(payment.method)) : '';
+  const rawMethod: unknown = payment.method;
+  const methodLabel = isPaymentMethod(rawMethod)
+    ? PAYMENT_METHOD_LABELS[rawMethod]
+    : (rawMethod ? String(rawMethod) : '');
 
   const receiptLines = [
     `${L.date}: ${fmtDate(payment.paid_at)}`,
