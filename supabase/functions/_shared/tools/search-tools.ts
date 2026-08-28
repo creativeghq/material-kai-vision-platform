@@ -718,13 +718,28 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
                 .select('id')
                 .in('title', titles)
                 .eq('workspace_id', workspaceId)
-                .then(({ data: matchedDocs }) => {
+                // Fire-and-forget is right — a failed counter must never fail the search — but
+                // SILENT is not (#352 A20). Both handlers discarded their error, so if the RPC
+                // were renamed or its grant revoked, every KB doc's mention count would sit at
+                // zero forever and the only symptom would be a plausible zero. That is the
+                // silent-zero shape; logging is the whole difference between it and a bug
+                // somebody can find.
+                .then(({ data: matchedDocs, error: matchErr }) => {
+                  if (matchErr) {
+                    console.warn('[knowledge_base_search] kb_docs lookup for mention counts failed:', matchErr.message);
+                    return;
+                  }
                   if (matchedDocs && matchedDocs.length > 0) {
                     matchedDocs.forEach(({ id }: { id: string }) => {
-                      supabase.rpc('increment_kb_doc_agent_mention', { doc_id: id }).then(() => {}, () => {});
+                      supabase.rpc('increment_kb_doc_agent_mention', { doc_id: id }).then(
+                        ({ error }: { error: { message: string } | null }) => {
+                          if (error) console.warn(`[knowledge_base_search] increment_kb_doc_agent_mention(${id}) failed:`, error.message);
+                        },
+                        (e: unknown) => console.warn(`[knowledge_base_search] increment_kb_doc_agent_mention(${id}) threw:`, e),
+                      );
                     });
                   }
-                }, () => {});
+                }, (e: unknown) => console.warn('[knowledge_base_search] kb_docs lookup threw:', e));
             }
           }
 

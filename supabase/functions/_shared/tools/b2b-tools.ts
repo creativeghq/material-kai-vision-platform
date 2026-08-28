@@ -388,7 +388,19 @@ export const createB2BManufacturerSearchTool = (
 ) => {
   return tool(
     async ({ country, region, category, limit = 8, _workflow_run_id }) => {
-      const _blocked = await b2bAffordabilityGate(userId, 5, 'b2b_manufacturer_search');
+      // MEASURED, not guessed (#352 A14). 55 real calls in `ai_usage_logs`: average 75.7
+      // credits, max 140.2 — against a gate that reserved FIVE. So a caller with 6 credits
+      // sailed through, the sweep ran, and they were charged ~76 they did not have. #352
+      // estimated 7.5 credits from the web-search surcharge alone; the token half is ten times
+      // that again, because a server-side search turn carries every fetched result back through
+      // the context (66.6k input tokens on average).
+      //
+      // Set at the observed MAXIMUM rather than the average, for the reason web-research-tools
+      // states about its own ceiling: an under-set ceiling is not a lost charge, it is a gate
+      // that lets through a caller who cannot afford the call — which is the only thing the
+      // gate exists to stop. The reservation is released immediately, so a high ceiling costs
+      // an affordable caller nothing.
+      const _blocked = await b2bAffordabilityGate(userId, 150, 'b2b_manufacturer_search');
       if (_blocked) return _blocked;
       // CLAMP, don't just document. The schema says >10 will blow the 90s tool timeout, but a
       // description is a suggestion and the model is free to ignore it — watched live on
@@ -540,14 +552,31 @@ export const createB2BManufacturerSearchTool = (
           const rawCost = inputCost + outputCost + webSearchSurcharge;
           const billedCost = rawCost * searchPrice.markup;
 
-          await supabase.rpc('debit_credits', {
+          // The RESULT IS CHECKED (#352 A14). `debit_credits` reports a failed charge in the
+          // returned row rather than throwing, so an unchecked call meant the search ran, the
+          // debit silently failed, and the tool still returned `success: true` — our money
+          // spent and nothing recorded. It cannot be undone at this point (the upstream call
+          // has already happened), so the correct response is to make it LOUD rather than to
+          // pretend it charged.
+          const { data: debitData, error: debitErr } = await supabase.rpc('debit_credits', {
             p_user_id: userId,
             p_amount: Math.round(billedCost * 100 * 100) / 100, // 1 credit = $0.01
             p_operation_type: 'b2b_manufacturer_search',
             p_description: `B2B manufacturer web search (${category})`,
             p_metadata: { country, region, category, limit, web_search_max_uses: searchBudget },
-            p_workspace_id: null,
+            // Attributed, so per-tenant cost views can see it. It was null while the
+            // `ai_usage_logs` row below carried the workspace — the same spend counted in one
+            // ledger and anonymous in the other.
+            p_workspace_id: workspaceId ?? null,
           });
+          const debitRow = Array.isArray(debitData) ? debitData[0] : debitData;
+          if (debitErr || (debitRow && debitRow.success === false)) {
+            console.error(
+              `[b2b_manufacturer_search] BILLING: debit of ${Math.round(billedCost * 10000) / 100} `
+              + `credits FAILED for user ${userId} — the search already ran. `
+              + `${debitRow?.error_message ?? debitErr?.message ?? 'unknown'}`,
+            );
+          }
 
           await supabase.from('ai_usage_logs').insert({
             user_id: userId,
@@ -980,7 +1009,8 @@ ${fenceUntrustedPage(markdown.substring(0, 15000))}`;
 export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ company_name, domain, country }) => {
-      const _blocked = await b2bAffordabilityGate(userId, 5, 'company_enrichment');
+      // Measured: 6 calls, 7.5 credits every time. The gate was 5. (#352 A14)
+      const _blocked = await b2bAffordabilityGate(userId, 8, 'company_enrichment');
       if (_blocked) return _blocked;
       try {
         const startTime = Date.now();

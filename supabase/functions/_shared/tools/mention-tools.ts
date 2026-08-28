@@ -162,7 +162,19 @@ async function refund(userId: string, workspaceId: string | null, amount: number
   }
 }
 
-async function getProductRow(productId: string) {
+/**
+ * Read a product BY ID AND WORKSPACE (#352 A11, security invariant 1).
+ *
+ * `productId` is a model-supplied tool argument and this is the service-role client, so without
+ * the workspace filter this is the pattern CLAUDE.md names as the recurring root cause of
+ * pentest #250. It was worse than a plain read: the caller emits `product.name` in a progress
+ * chunk before MIVAA gets a chance to authorise anything, so another tenant's product NAME
+ * reached the user's screen even when the tracking call was later refused.
+ *
+ * Returning null on a mismatch is the 404-not-403 rule — indistinguishable from "no such
+ * product", so ids cannot be enumerated.
+ */
+async function getProductRow(productId: string, workspaceId: string) {
   const sb = svcClient();
   const { data } = await sb
     .from('products')
@@ -172,16 +184,19 @@ async function getProductRow(productId: string) {
     // exist. Dropped rather than embedded, since nothing consumes it.
     .select('id, name, metadata')
     .eq('id', productId)
+    .eq('workspace_id', workspaceId)
     .maybeSingle();
   return data;
 }
 
-async function getTrackedForProduct(productId: string) {
+/** Same rule as `getProductRow` — the tracking row is workspace-scoped too. */
+async function getTrackedForProduct(productId: string, workspaceId: string) {
   const sb = svcClient();
   const { data } = await sb
     .from('tracked_mentions')
     .select('*')
     .eq('product_id', productId)
+    .eq('workspace_id', workspaceId)
     .is('api_key_id', null)
     .maybeSingle();
   return data;
@@ -299,7 +314,8 @@ export const createTrackProductMentionsTool = (
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring module disabled — ask an admin to enable it' });
       }
-      const product = await getProductRow(product_id);
+      // Server-derived workspace, from the factory — never a model argument.
+      const product = await getProductRow(product_id, workspaceId);
       if (!product) return JSON.stringify({ success: false, error: `product ${product_id} not found` });
 
       onChunk?.({ type: 'tool_progress', status: `${action} mention monitoring for "${product.name}"...`, timestamp: Date.now() });
