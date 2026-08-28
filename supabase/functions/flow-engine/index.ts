@@ -1197,6 +1197,27 @@ async function executeAction(
       } else if (resolved.row && typeof resolved.row === 'object') {
         row = resolved.row as Record<string, unknown>;
       }
+      /**
+       * ALLOWLISTED TABLE (#357 AE-2). This was `supabase.from(<any table>).insert(<any row>)`
+       * under the SERVICE ROLE — an arbitrary-write primitive configured from a stored flow
+       * graph. It is operator-only (neither action is in `tenant_flow_allowed_actions`), which
+       * is why the audit downgraded it from Critical, but "an admin can grant themselves
+       * anything by editing a config row" is still an escalation sitting in a config.
+       * `workspace_members`, `credit_transactions` and `roles` were all reachable.
+       *
+       * The list is EMPTY, which is measured rather than lazy: no flow in the database uses
+       * `log_event` at all. Its documented purpose is a dedup marker for recurring scheduled
+       * flows, and no marker table exists to write one to. So an empty allowlist breaks nothing
+       * that works today and turns the next use into a deliberate, reviewed decision instead of
+       * a config edit — which is the whole difference here.
+       */
+      if (!LOG_EVENT_ALLOWED_TABLES.has(table)) {
+        throw new Error(
+          `log_event: "${table}" is not an allowlisted target. This action writes with the `
+          + 'service role, so its tables are listed in code (LOG_EVENT_ALLOWED_TABLES in '
+          + 'flow-engine) rather than chosen in a flow config. Add it there if it belongs.',
+        );
+      }
       const { error } = await supabase.from(table).insert(row);
       if (error) throw new Error(`log_event insert failed: ${error.message}`);
       return { output: { logged: true, table } };
@@ -1217,6 +1238,23 @@ async function executeAction(
         }
       } else if (resolved.payload && typeof resolved.payload === 'object') {
         payload = resolved.payload as Record<string, unknown>;
+      }
+      /**
+       * ALLOWLISTED FUNCTION (#357 AE-2). `functions.invoke(<any name>, <any payload>)` under the
+       * service role lets a stored flow config call ANY edge function with platform authority —
+       * including the ones that treat a service-role bearer as an admin caller. That is a
+       * privilege-escalation primitive, not an integration point.
+       *
+       * The list is what flows ACTUALLY call, read out of `graph_definition` across every flow
+       * in the database: two. Adding a third is a code change with a review attached, which is
+       * the point — the alternative is that anyone who can edit a flow can reach everything.
+       */
+      if (!RUN_EDGE_FUNCTION_ALLOWED.has(fnName)) {
+        throw new Error(
+          `run_edge_function: "${fnName}" is not allowlisted. This action invokes with the `
+          + 'service role, so the callable set is listed in code (RUN_EDGE_FUNCTION_ALLOWED in '
+          + 'flow-engine) rather than chosen in a flow config.',
+        );
       }
       const { data, error } = await supabase.functions.invoke(fnName, { body: payload });
       if (error) throw new Error(`run_edge_function(${fnName}) failed: ${error.message}`);
@@ -1771,6 +1809,28 @@ async function executeFlowGraph(
 
 // Max runs/minute for one flow before we treat it as a runaway loop and refuse (backstop only —
 // a legit high-volume flow should stay far below this).
+/**
+ * Tables `log_event` may write (#357 AE-2).
+ *
+ * EMPTY BY MEASUREMENT: no flow in the database uses `log_event`, and the dedup-marker table its
+ * docstring describes does not exist. An empty allowlist therefore breaks nothing and converts an
+ * arbitrary service-role INSERT into an opt-in one. Add a table here — in code, with review —
+ * when something genuinely needs it.
+ */
+const LOG_EVENT_ALLOWED_TABLES = new Set<string>([]);
+
+/**
+ * Edge functions `run_edge_function` may invoke (#357 AE-2).
+ *
+ * Read out of `graph_definition` across every flow in the database — these two are the entire
+ * live usage. The action invokes under the service role, so an unrestricted name lets a stored
+ * config call anything that trusts a service-role bearer.
+ */
+const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>([
+  'real-estate-listing-social',
+  'finance-digest-aggregate',
+]);
+
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
 
 /**

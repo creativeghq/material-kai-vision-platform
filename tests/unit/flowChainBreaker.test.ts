@@ -80,3 +80,46 @@ describe('#357 AE-3 — the workspace is the EVENT\'s, not the flow\'s', () => {
     expect(block).toMatch(/if \(!isTestRun\)/);
   });
 });
+
+describe('#357 AE-2 — the service-role primitives are allowlisted', () => {
+  /**
+   * `log_event` was `supabase.from(<any table>).insert(<any row>)` and `run_edge_function` was
+   * `functions.invoke(<any name>, <any payload>)`, both under the SERVICE ROLE and both
+   * configured from a stored flow graph. Operator-only — neither is in
+   * `tenant_flow_allowed_actions` — which is why the audit downgraded from Critical. But "an
+   * admin can reach anything by editing a config row" is still an escalation living in a config:
+   * `workspace_members`, `credit_transactions` and `roles` were all writable that way.
+   */
+  it('log_event checks its table against a list in CODE', () => {
+    expect(src).toContain('LOG_EVENT_ALLOWED_TABLES');
+    const action = src.slice(src.indexOf("case 'log_event'"), src.indexOf("case 'run_edge_function'"));
+    // The check must come BEFORE the insert, or it is decoration.
+    const check = action.indexOf('LOG_EVENT_ALLOWED_TABLES.has(table)');
+    const insert = action.indexOf('.from(table).insert(row)');
+    expect(check).toBeGreaterThan(-1);
+    expect(check < insert, 'log_event inserts before it checks the table').toBe(true);
+  });
+
+  it('run_edge_function checks its target before invoking', () => {
+    expect(src).toContain('RUN_EDGE_FUNCTION_ALLOWED');
+    const action = src.slice(src.indexOf("case 'run_edge_function'"));
+    const check = action.indexOf('RUN_EDGE_FUNCTION_ALLOWED.has(fnName)');
+    const invoke = action.indexOf('functions.invoke(fnName');
+    expect(check).toBeGreaterThan(-1);
+    expect(check < invoke, 'run_edge_function invokes before it checks the name').toBe(true);
+  });
+
+  it('the allowlists are literal sets, not derived from the config', () => {
+    // A list read out of the flow graph, a settings table or an env var would be editable by the
+    // same person the allowlist exists to constrain.
+    expect(src).toMatch(/const LOG_EVENT_ALLOWED_TABLES = new Set<string>\(\[/);
+    expect(src).toMatch(/const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>\(\[/);
+  });
+
+  it('the callable set still covers what live flows actually use', () => {
+    // Read out of `graph_definition` across every flow in the database. If these two go, two
+    // seeded flows start failing at the action rather than at review time.
+    expect(src).toContain("'real-estate-listing-social'");
+    expect(src).toContain("'finance-digest-aggregate'");
+  });
+});
