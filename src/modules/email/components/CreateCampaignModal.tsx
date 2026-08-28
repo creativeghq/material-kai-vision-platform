@@ -22,7 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { marketingService, type CampaignAudience } from '@/modules/email-marketing/services/marketingService';
+import { marketingService, summarizeAudienceConsent, type CampaignAudience, type AudienceRecipient } from '@/modules/email-marketing/services/marketingService';
+import { AudienceConsentNotice } from '@/modules/email-marketing/components/AudienceConsentNotice';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 
@@ -68,7 +69,10 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 }) => {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(false);
-  const [estimatedRecipients, setEstimatedRecipients] = useState(0);
+  const [resolvedAudience, setResolvedAudience] = useState<AudienceRecipient[]>([]);
+  /** MAILABLE rows only — see AudienceConsentNotice. Counting resolved rows would let a campaign
+   *  whose whole audience is withheld pass validation and then email nobody. */
+  const estimatedRecipients = summarizeAudienceConsent(resolvedAudience).mailable;
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -178,13 +182,12 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
    *  disagree with the send: it double-counted an address held by both a user and a contact, never
    *  dropped unsubscribes, and counted every tenant's users rather than this workspace's. */
   const estimateAudience = async () => {
-    if (!activeWorkspaceId) { setEstimatedRecipients(0); return; }
+    if (!activeWorkspaceId) { setResolvedAudience([]); return; }
     try {
-      const rows = await marketingService.resolveAudience(activeWorkspaceId, buildAudience());
-      setEstimatedRecipients(rows.length);
+      setResolvedAudience(await marketingService.resolveAudience(activeWorkspaceId, buildAudience()));
     } catch (error) {
       console.error('Error estimating audience:', error);
-      setEstimatedRecipients(0);
+      setResolvedAudience([]);
     }
   };
 
@@ -247,7 +250,9 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
     if (estimatedRecipients === 0) {
       toast({
         title: 'Validation Error',
-        description: 'Please select at least one recipient',
+        description: resolvedAudience.length === 0
+          ? 'Please select at least one recipient'
+          : 'Every address in this audience is held back for want of a lawful basis — see the Audience tab.',
         variant: 'destructive',
       });
       return;
@@ -437,12 +442,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         {/* Audience Tab */}
         <TabsContent value="audience" className="space-y-4">
           <div className="space-y-4">
-            <div className="p-4 rounded-lg border bg-muted/50">
-              <p className="text-sm font-medium mb-2">Estimated Recipients: {estimatedRecipients}</p>
-              <p className="text-xs text-muted-foreground">
-                Select who will receive this campaign
-              </p>
-            </div>
+            <AudienceConsentNotice rows={resolvedAudience} />
 
             {/* Audience Type Selection */}
             <div className="space-y-2">

@@ -171,10 +171,20 @@ export const createManageEmailCampaignTool = (
           p_audience: camp.audience_filter ?? {},
         });
         if (resolveErr) return JSON.stringify({ success: false, error: `audience resolve failed: ${resolveErr.message}` });
-        const recipients = (Array.isArray(resolved) ? resolved : []) as { email: string }[];
+        const resolvedRows = (Array.isArray(resolved) ? resolved : []) as { email: string; mailable: boolean; consent_basis: string }[];
+        // The approval card must name the number that will actually be EMAILED (#357 AE-8).
+        // Counting resolved rows would ask the user to approve "247 recipients" and then send to
+        // the 12 with a lawful basis — an approval for a send that never happened.
+        const recipients = resolvedRows.filter((r) => r.mailable);
         if (recipients.length === 0) {
-          return JSON.stringify({ success: false, error: 'This campaign resolves to 0 recipients — set an audience on the Email page before sending.' });
+          return JSON.stringify({
+            success: false,
+            error: resolvedRows.length === 0
+              ? 'This campaign resolves to 0 recipients — set an audience on the Email page before sending.'
+              : `All ${resolvedRows.length} addresses in this audience are held back for want of a lawful basis (no marketing consent on file, or typed addresses that match nobody in CRM). Open Marketing → Email to review the audience.`,
+          });
         }
+        const withheld = resolvedRows.length - recipients.length;
 
         // HUMAN-IN-THE-LOOP GATE (invariant #9): mass email — confirm before sending.
         if (confirm !== true) {
@@ -183,7 +193,9 @@ export const createManageEmailCampaignTool = (
             tool: 'manage_email_campaign',
             input: { action: 'send', campaign_id },
             title: 'Send this email campaign?',
-            summary: `Send campaign "${camp.name}" to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'} from your CRM. Emails go out via the workspace's own Resend sender and cannot be recalled.`,
+            summary: `Send campaign "${camp.name}" to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'} from your CRM`
+              + (withheld > 0 ? ` (${withheld} more held back — no marketing consent on file)` : '')
+              + `. Emails go out via the workspace's own Resend sender and cannot be recalled.`,
             danger: true,
             toolkit_id: 'email-marketing',
             timestamp: Date.now(),

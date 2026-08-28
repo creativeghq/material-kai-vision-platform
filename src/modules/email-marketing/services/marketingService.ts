@@ -9,6 +9,7 @@
  * calls Resend directly.
  */
 import { supabase } from '@/integrations/supabase/client';
+import type { ConsentBasis } from '../consentBasis';
 import type { Json } from '@/integrations/supabase/types';
 import { edgeError } from '@/utils/edgeError';
 
@@ -55,7 +56,17 @@ export interface AudienceRecipient {
   crm_contact_id: string | null;
   crm_company_id: string | null;
   display_name: string | null;
+  /** Why this address may (or may not) be mailed — derived in SQL, never decided here (#357 AE-8). */
+  consent_basis: ConsentBasis;
+  mailable: boolean;
 }
+
+export {
+  CONSENT_BASIS_LABEL,
+  CONSENT_BASIS_REMEDY,
+  summarizeAudienceConsent,
+} from '../consentBasis';
+export type { ConsentBasis, AudienceConsentSummary } from '../consentBasis';
 
 /**
  * What a campaign is addressed to — stored verbatim as `campaigns.audience_filter` and resolved by
@@ -302,7 +313,13 @@ class MarketingService {
 
   async startCampaign(id: string) {
     const n = await this.ensureRecipients(id);
-    if (n === 0) throw new Error('This campaign resolves to 0 recipients — set an audience before sending.');
+    if (n === 0) {
+      throw new Error(
+        'This campaign resolves to 0 mailable recipients. Either the audience is empty, or every ' +
+        'address in it is held back for want of a lawful basis — a contact with marketing consent ' +
+        'unticked, or a typed address that matches nobody in your contacts.',
+      );
+    }
     return this.setStatus(id, 'sending', ['draft', 'paused']);
   }
   pauseCampaign(id: string) { return this.setStatus(id, 'paused', ['sending']); }

@@ -37937,10 +37937,12 @@ export type Database = {
       resolve_campaign_audience: {
         Args: { p_audience: Json; p_workspace_id: string }
         Returns: {
+          consent_basis: string
           crm_company_id: string
           crm_contact_id: string
           display_name: string
           email: string
+          mailable: boolean
           member_kind: string
           merge_vars: Json
           user_id: string

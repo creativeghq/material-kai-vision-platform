@@ -68,6 +68,31 @@ The nothing-here-calls-Resend-directly rule means every send goes through the [`
 
 ### Audience resolution
 
+**Every address carries a named lawful basis, and one without a basis is not mailed** (#357 AE-8).
+`crm_contacts.marketing_consent` existed from the start — it is a checkbox on the contact page and
+the real-estate module gates every buyer digest and instant alert on it — and the campaign resolver,
+the one surface actually labelled marketing, never read it. Every contact was mailable whatever the
+box said, and a pasted address matching nobody was mailed on no basis at all.
+
+`campaign_address_consent_basis(workspace_id, email)` is the single derivation:
+
+| Basis | Means | Mailable |
+|---|---|---|
+| `workspace_member` | an active member of this workspace | yes — the working relationship, not a mailing list |
+| `contact_opt_in` | `crm_contacts.marketing_consent = true` | yes |
+| `b2b_company` | a company's own business address | yes — the B2B soft opt-in, not a person's inbox |
+| `no_consent` | a contact with the box unticked | **no** |
+| `unverified` | a typed address matching nobody here | **no** |
+
+- `workspace_member` **wins over everything below it**. People file themselves as CRM contacts, and which record happens to be the richer identity is no basis for deciding whether a workspace may email its own member — that tie made the owner unmailable on the first read of real data.
+- An **unsubscribe is excluded outright**, not returned as non-mailable. It is a settled act by the person, and re-listing those addresses on a campaign screen is itself the wrong thing to do.
+- A **typed address is matched against the contact book first**, so the commonest paste (a customer you already hold) resolves to that contact — its identity, its merge vars and its consent. Before this it arrived with `display_name` NULL, so the mail opened "Hi ,".
+- `campaign_consent_basis_is_mailable(basis)` states the allowed set once. **Never re-derive mailability in TypeScript** — `summarizeAudienceConsent` in [`consentBasis.ts`](../src/modules/email-marketing/consentBasis.ts) only counts and formats what SQL decided.
+- **Every surface that shows or approves a count shows the MAILABLE one** — both campaign modals and the agent's approval card. Approving "247 recipients" and sending to the 12 with a basis is an approval for a send that never happened.
+- A count that shrinks must say why: `AudienceConsentNotice` renders the withheld total per reason with the remedy, and `campaign_materialize_recipients` stamps the same breakdown onto `campaigns.metadata.audience_withheld`.
+- Watched by `marketing.campaign_recipient_without_lawful_basis` (a pending recipient with no basis) and [tests/unit/campaignConsentBasis.test.ts](../tests/unit/campaignConsentBasis.test.ts).
+
+
 - `resolveAudience(workspaceId, categoryIds)` → the membership-guarded `crm_categories_resolve_recipients_ws(p_workspace_id, p_category_ids)` RPC (the `crm_categories` table itself is admin-only, so it can't be read directly by a tenant).
 - `listContacts(workspaceId)` → the full addressable audience: all `crm_contacts` in the workspace that have an email (workspace-RLS-scoped), de-duplicated by email.
 - `listCategories()` → the `list_crm_categories` RPC (picker fields only).
