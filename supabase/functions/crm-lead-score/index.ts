@@ -18,7 +18,7 @@ const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = 
   { match: 'claude-haiku', input: 1.0, output: 5.0 },
 ];
 const priceFor = (m: string) => FAMILY_PRICING.find((p) => m.toLowerCase().includes(p.match)) ?? { input: 3.0, output: 15.0 };
-const MODEL = () => Deno.env.get('CRM_AI_MODEL') || 'claude-sonnet-4-6';
+const MODEL = () => Deno.env.get('CRM_AI_MODEL') || 'claude-sonnet-5';
 const CEILING = 3;
 
 const TOOL = {

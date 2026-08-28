@@ -279,7 +279,7 @@ const klingai = new Proxy(function () {}, {
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
-const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-8';
+const DEFAULT_CLAUDE_MODEL = 'claude-opus-5';
 
 // ── Billing identity for the per-unit models ───────────────────────────────
 // `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They

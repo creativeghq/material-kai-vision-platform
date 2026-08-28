@@ -42,7 +42,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY');
 
-const RESEARCH_MODEL = 'claude-sonnet-4-6';   // tech judgement benefits from reasoning
+const RESEARCH_MODEL = 'claude-sonnet-5';   // tech judgement benefits from reasoning
 // Credit ceiling reserved before the (2× Sonnet + web_search) review, settled to actual after.
 // Injected on kai/Pepper for ALL users, so it must be metered (previously credits_debited=0).
 const REVIEW_CREDIT_CEILING = 40;

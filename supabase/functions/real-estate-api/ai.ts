@@ -14,7 +14,7 @@ function priceFor(model: string) {
   const m = model.toLowerCase();
   return FAMILY_PRICING.find((p) => m.includes(p.match)) ?? { input: 3.0, output: 15.0 };
 }
-const RE_MODEL = () => Deno.env.get('REAL_ESTATE_AI_MODEL') || 'claude-sonnet-4-6';
+const RE_MODEL = () => Deno.env.get('REAL_ESTATE_AI_MODEL') || 'claude-sonnet-5';
 const DRAFT_CEILING = 5; // conservative credit reservation for one listing-copy generation
 
 /** Reserve a credit ceiling up front (throws 402 if the pool/balance can't cover it). */

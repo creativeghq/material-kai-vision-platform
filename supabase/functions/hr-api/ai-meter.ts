@@ -26,7 +26,7 @@ function priceFor(model: string): { input: number; output: number } {
   return FAMILY_PRICING.find((p) => m.includes(p.match)) ?? { input: 3.0, output: 15.0 };
 }
 
-const HR_MODEL = () => Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-4-6';
+const HR_MODEL = () => Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-5';
 
 /**
  * Call Claude with a forced tool and return the structured input + token usage.

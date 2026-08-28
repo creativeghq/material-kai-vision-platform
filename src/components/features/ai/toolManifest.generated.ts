@@ -443,7 +443,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'task_prompt', type: 'string', optional: false, description: 'The complete task description — be detailed, include all context the background agent will need.' },
       { name: 'reason', type: 'string', optional: false, description: 'One sentence explaining WHY you are dispatching this to the background (e.g., "requires processing 500 products which would exceed the response time limit").' },
-      { name: 'model_override', type: 'string', optional: true, description: 'Specific model to use, e.g. claude-opus-4-8, claude-haiku-4-5. Omit to use default.' },
+      { name: 'model_override', type: 'string', optional: true, description: 'Specific model to use, e.g. claude-opus-5, claude-haiku-4-5. Omit to use default.' },
       { name: 'context_snippet', type: 'string', optional: true, description: 'Relevant excerpt from the current conversation for context (max 500 chars).' },
     ],
   },

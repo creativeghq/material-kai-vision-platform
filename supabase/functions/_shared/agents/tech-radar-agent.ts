@@ -25,7 +25,7 @@ export class TechRadarAgent implements AgentRunner {
   readonly name         = 'Tech Radar';
   readonly description  = 'Watches the tech landscape for a tracked solution and surfaces new, ring-scored improvement ideas (adopt/trial/assess/hold).';
   readonly defaultTools = ['web_search'];
-  readonly defaultModel = 'claude-sonnet-4-6';
+  readonly defaultModel = 'claude-sonnet-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { agentConfig, run, input, log, heartbeat } = ctx;

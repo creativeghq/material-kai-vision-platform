@@ -4480,7 +4480,11 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               type: 'final_result',
               text: `Error: ${errorMessage}`,
               agentId,
-              model: 'claude-opus-4-8',
+              // Resolved the same way the success path resolves it, rather than a
+              // literal. This said `claude-opus-4-8` on every error regardless of what
+              // the agent was configured with or what the caller pinned, so an error
+              // chunk attributed the failure to a model that may never have been called.
+              model: getModelNameForAgent(agentId, modelOverride),
               error: true,
               errorMessage: errorMessage
             });

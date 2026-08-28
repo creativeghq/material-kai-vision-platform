@@ -13,6 +13,7 @@ import type { DbClient } from '../supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LogLevel } from './types.ts';
 import { CancelledError } from './types.ts';
+import { resolveTokenPrice } from '../ai-logger.ts';
 
 // Re-export LangGraph utilities so agents that import from './base-agent.ts' continue to work.
 export type { LangGraphRunOptions, LangGraphRunOutput } from '../langgraph-core.ts';
@@ -50,15 +51,19 @@ export function createLogHelper(supabase: DbClient, runId: string) {
 // but historically never wrote to ai_usage_logs, so the Operations dashboard
 // underreported background-agent spend by 100%. Helper centralizes the insert
 // and is fire-and-forget — never blocks or breaks the agent's hot path.
-// Pricing: callers pass the model name; the helper looks up the per-1M-token
-// cost from a small static table. Unknown models are logged at $0 to avoid
-// guessing — admin can backfill via the model-pricing curation tool.
-const MODEL_USD_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
-  'claude-haiku-4-5':         { input: 1.0,  output: 5.0  },
-  'claude-sonnet-4-6':        { input: 3.0,  output: 15.0 },
-  'claude-opus-4-8':          { input: 15.0, output: 75.0 },
-  'gemini-2.0-flash':         { input: 0.075, output: 0.3 },
-};
+// Pricing comes from `ai_model_pricing` via `resolveTokenPrice`, the same resolver
+// ai-client.ts uses. It used to be a static table here, and the table was WRONG:
+// it priced `claude-opus-4-8` at $15/$75 while the database says $5/$25, so every
+// background-agent run reported 3x its real cost. Nothing could catch that — an
+// over-report is a plausible number, the agents ran fine, and the dashboard it fed
+// was the only place the figure was ever read.
+//
+// That is the second-price-surface failure CLAUDE.md names: `ai_model_pricing` is
+// the ONE USD source. A static mirror drifts the moment a rate changes, and this one
+// had also never learned that Opus 4.8 is not Opus-3-era pricing.
+//
+// An unresolvable model logs $0 rather than a guess — `resolveTokenPrice` returns
+// null and `get_ai_model_usage_coverage()` reports models that never reach a row.
 
 export async function logAgentAiUsage(
   supabase: DbClient,
@@ -76,7 +81,8 @@ export async function logAgentAiUsage(
   },
 ): Promise<void> {
   try {
-    const pricing = MODEL_USD_PER_M_TOKENS[args.model] ?? { input: 0, output: 0 };
+    const pricing = (await resolveTokenPrice(supabase, args.model))
+      ?? { input: 0, output: 0 };
     const inputCost  = (args.inputTokens  / 1_000_000) * pricing.input;
     const outputCost = (args.outputTokens / 1_000_000) * pricing.output;
     const rawCost    = inputCost + outputCost;
