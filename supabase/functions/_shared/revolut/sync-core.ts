@@ -34,6 +34,8 @@ export interface SyncResult {
   recovered?: number;
   /** True when the page walk hit its cap — the window was NOT fully covered. */
   truncated?: boolean;
+  /** True while an older window is still queued for backfill (#359 CM-13). */
+  backfillPending?: boolean;
   /** Failed webhook deliveries Revolut reports for this workspace's subscription. */
   webhookFailures?: number;
   /** Reconciliation pass that ran after the pull (#315 phase 2). */
@@ -255,18 +257,50 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
     const all: RevolutTransaction[] = [];
     let to: string | undefined;
     let truncated = false;
+    /** Where a capped walk stopped — the older boundary of a hole nothing else would revisit. */
+    let holeBefore: string | null = null;
     for (let page = 0; page < MAX_PAGES; page++) {
       const batch = await listTransactions(service, cfg, issuer, { from, to, count: PAGE });
       all.push(...batch);
       if (batch.length < PAGE) break;
       to = batch[batch.length - 1].created_at;
-      // Hitting the last page with a FULL batch means older transactions were left
-      // behind. Never let a bounded sweep read as a complete one (CLAUDE.md: no silent
-      // caps) — the watermark still advances, so say what was dropped.
+      // Hitting the last page with a FULL batch means older transactions were left behind. The
+      // watermark advances to the NEWEST transaction seen, which is correct — the newest pages
+      // really were pulled — but it means the next run starts after the ones we skipped, and they
+      // then sit outside every future window while the run reports success (#359 CM-13). The cap
+      // itself is right; what was missing was somewhere to record where it stopped.
       if (page === MAX_PAGES - 1) {
         truncated = true;
-        console.warn(`[revolut-sync] ${workspaceId}: page cap reached (${MAX_PAGES * PAGE} transactions); older lines before ${to} were not pulled this run`);
+        holeBefore = to;
+        console.warn(`[revolut-sync] ${workspaceId}: page cap reached (${MAX_PAGES * PAGE} transactions); older lines before ${to} are queued for backfill`);
       }
+    }
+
+    /**
+     * Continue an earlier capped run, oldest-window-first (#359 CM-13).
+     *
+     * Half this run's budget goes to the hole, so a large backlog drains over successive ticks
+     * instead of blocking today's transactions behind a year of history. The cursor moves down as
+     * the hole shrinks, and a SHORT page means the hole is closed.
+     */
+    if (!truncated && cfg.sync_backfill_before) {
+      const backfillFrom = cfg.sync_backfill_from ?? new Date(Date.now() - 365 * 86400_000).toISOString();
+      let bTo: string | undefined = cfg.sync_backfill_before as string;
+      let closed = false;
+      for (let page = 0; page < MAX_PAGES / 2; page++) {
+        const batch = await listTransactions(service, cfg, issuer, { from: backfillFrom, to: bTo, count: PAGE });
+        all.push(...batch);
+        if (batch.length < PAGE) { closed = true; break; }
+        bTo = batch[batch.length - 1].created_at;
+      }
+      // Closed → clear the cursor. Still open → move it down, so the next run resumes lower rather
+      // than re-reading what it just pulled.
+      holeBefore = closed ? null : (bTo ?? null);
+      if (!closed) {
+        console.warn(`[revolut-sync] ${workspaceId}: backfill still open, resuming before ${bTo} next run`);
+      }
+    } else if (!truncated) {
+      holeBefore = null;
     }
 
     const rows = all.flatMap((tx) => (tx.legs ?? []).map((leg) => legToRow(workspaceId, tx, leg, mapping)));
@@ -317,6 +351,12 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
       .from('workspace_revolut_config')
       .update({
         sync_watermark: maxCreated,
+        // The hole travels WITH the watermark (#359 CM-13). Advancing one without recording the
+        // other is what made a capped run indistinguishable from a complete one.
+        sync_backfill_before: holeBefore,
+        sync_backfill_from: holeBefore
+          ? (truncated ? from : (cfg.sync_backfill_from ?? from))
+          : null,
         last_sync_at: new Date().toISOString(),
         last_sync_error: null,
         updated_at: new Date().toISOString(),
@@ -340,7 +380,12 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
     }
     try { await notifyCardSpends(service, workspaceId); } catch { /* alerts never block the pull */ }
 
-    return { ok: true, workspaceId, fetched: all.length, upserted, recovered, truncated, webhookFailures, autoMatched, suggested };
+    return {
+      ok: true, workspaceId, fetched: all.length, upserted, recovered, truncated,
+      // A hole that is still open is part of the RESULT, not just a console line nobody reads.
+      backfillPending: holeBefore != null,
+      webhookFailures, autoMatched, suggested,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await service

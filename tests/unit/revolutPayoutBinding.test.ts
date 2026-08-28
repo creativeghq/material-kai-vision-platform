@@ -101,8 +101,10 @@ describe('#359 CM-19 — the payout is bound to the bill, not to a string', () =
     expect(outgoing).toMatch(/from\('revolut_payouts'\)/);
     expect(outgoing).toMatch(/\.eq\('provider_id', String\(tx\.transaction_id/);
     const linked = outgoing.indexOf('linkedBillId');
-    const textMatch = outgoing.indexOf('refText.includes');
+    // `referenceQuotes` since #359 CM-16 — the bare `refText.includes` substring match is gone.
+    const textMatch = outgoing.indexOf('referenceQuotes(');
     expect(linked).toBeGreaterThan(-1);
+    expect(textMatch).toBeGreaterThan(-1);
     expect(linked < textMatch, 'the text match runs before the recorded link').toBe(true);
   });
 

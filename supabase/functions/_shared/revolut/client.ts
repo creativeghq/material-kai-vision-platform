@@ -35,6 +35,15 @@ export interface RevolutConfigRow {
   webhook_signing_secret: string | null;
   connected_at: string | null;
   sync_watermark: string | null;
+  /**
+   * A capped page walk left transactions older than this unread (#359 CM-13). Not null means
+   * there is a HOLE: later runs walk backwards from here until a short page closes it. Advancing
+   * the watermark without recording this is what made a capped run indistinguishable from a
+   * complete one — the skipped transactions then sat outside every future window.
+   */
+  sync_backfill_before: string | null;
+  /** The far edge of that hole — the `from` of the run that was capped. */
+  sync_backfill_from: string | null;
   /** Registered in the Revolut dashboard; its DOMAIN is the JWT assertion's `iss`. */
   oauth_redirect_uri: string | null;
 }

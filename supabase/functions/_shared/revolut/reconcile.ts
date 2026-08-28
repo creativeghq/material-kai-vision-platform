@@ -72,6 +72,29 @@ function centsEqual(a: number, b: number): boolean {
   return Math.round(a * 100) === Math.round(b * 100);
 }
 
+/**
+ * Shortest document number that may auto-settle on a reference alone (#359 CM-16).
+ *
+ * `nameKey` reduces both sides to `A-Z0-9` runs, so `refText.includes(numberKey)` matched a bare
+ * substring: a bill numbered `7` matched the reference "INVOICE 1007", and `21` matched every
+ * transfer mentioning a date. Auto-settling is the one action here that moves money against a
+ * document without a human, and it is awkward to reverse.
+ */
+const MIN_AUTO_MATCH_NUMBER_LEN = 4;
+
+/**
+ * Does the transfer text quote this document number?
+ *
+ * Token-boundary, not substring: the keys are already space-separated runs of `A-Z0-9`, so a real
+ * quotation appears as a whole token. `INV1042` still matches `INV1042`; `7` no longer matches
+ * `1007`. Short numbers are not refused outright — they simply cannot carry an auto-settle on
+ * their own, and the amount+name ladder below still surfaces them for a human.
+ */
+function referenceQuotes(refText: string, numberKey: string): boolean {
+  if (!numberKey || numberKey.length < MIN_AUTO_MATCH_NUMBER_LEN) return false;
+  return ` ${refText} `.includes(` ${numberKey} `);
+}
+
 /** Names match when one normalized form contains the other (≥4 chars, so "AE" ≠ noise). */
 function namesMatch(a: string, b: string): boolean {
   if (a.length < 4 || b.length < 4) return false;
@@ -282,7 +305,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
     }
 
     if (!bill) {
-      const byNumber = sameCcy.filter((b: any) => b.numberKey && refText.includes(b.numberKey));
+      const byNumber = sameCcy.filter((b: any) => referenceQuotes(refText, b.numberKey));
       const byAmountName = sameCcy.filter((b: any) =>
         centsEqual(Number(b.amount_due), Number(tx.amount)) && cpName && namesMatch(b.nameKeyed, cpName));
 
@@ -327,8 +350,14 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
       }).select('id').single();
       if (pay) payId = pay.id;
       else if (payErr && /duplicate|unique/i.test(payErr.message ?? '')) {
+        // WORKSPACE-SCOPED (#359 CM-17). The heal-on-duplicate path looked a payment up by
+        // `(provider, provider_ref)` alone. Two workspaces can legitimately have the SAME Revolut
+        // organisation connected — the same business, two tenants — and then the same
+        // `<txid>:<legid>` exists in both. Picking the other one allocates this workspace's money
+        // against somebody else's bill.
         const { data: existing } = await service.from('payments')
-          .select('id').eq('provider', 'revolut').eq('provider_ref', tx.provider_ref).maybeSingle();
+          .select('id').eq('workspace_id', workspaceId)
+          .eq('provider', 'revolut').eq('provider_ref', tx.provider_ref).maybeSingle();
         payId = existing?.id ?? null;
         if (payId) {
           const { count } = await service.from('payment_allocations')
@@ -450,7 +479,7 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     const sameCurrency = invoices.filter((i) => i.currency === txCurrency);
 
     // 1. Invoice number quoted in the transfer text.
-    const byNumber = sameCurrency.filter((i) => refText.includes(nameKey(i.internal_number)));
+    const byNumber = sameCurrency.filter((i) => referenceQuotes(refText, nameKey(i.internal_number)));
     // 2/3. Amount and name signals.
     const byAmount = sameCurrency.filter((i) => centsEqual(i.amount_due, Number(tx.amount)));
     const byName = cpName ? sameCurrency.filter((i) => namesMatch(i.customer_name, cpName)) : [];
