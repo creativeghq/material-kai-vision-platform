@@ -47,7 +47,10 @@ describe('conversation sentiment', () => {
   it('fences the customer transcript as DATA', () => {
     // A WhatsApp message is whatever the sender typed, including "ignore your instructions".
     expect(stripComments(API)).toMatch(/<message index="\$\{i\}" from="\$\{who\}">/);
-    expect(stripComments(API)).toMatch(/<conversation>/);
+    // Through the canonical wrapper, not a bare `<conversation>` tag (#359 CM-8). A tag is
+    // something a message can itself contain and thereby close, after which the rest of the
+    // customer's text reads as instructions — and this test used to accept exactly that.
+    expect(stripComments(API)).toMatch(/wrapUntrusted\('customer conversation', transcript\)/);
   });
 
   it('caches on the last message id, not a timestamp', () => {
