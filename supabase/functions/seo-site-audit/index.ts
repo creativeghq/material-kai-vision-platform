@@ -100,8 +100,15 @@ const ISSUE_SECTIONS: Array<{
   issue_type: string;
   severity: 'error' | 'warning' | 'notice';
   label: string;
+  /** EXACTLY the params this endpoint's Python signature declares. */
   params?: Record<string, unknown>;
+  /** Applied client-side when the endpoint has no server-side filter for it. */
+  filter?: (item: any) => boolean;
 }> = [
+  // Each of these takes ONLY `task_id`. Passing a blanket `limit` to them returned
+  // `HTTP_400 ... got an unexpected keyword argument 'limit'` on every one — the
+  // dispatcher forwards params straight into the Python signature, so an extra is a
+  // hard failure rather than an ignored field. Every section would have failed.
   { kind: 'onpage_non_indexable',     issue_type: 'non_indexable',     severity: 'error',
     label: 'Page cannot be indexed' },
   { kind: 'onpage_redirect_chains',   issue_type: 'redirect_chain',    severity: 'warning',
@@ -110,9 +117,18 @@ const ISSUE_SECTIONS: Array<{
     label: 'Duplicate title or description' },
   { kind: 'onpage_duplicate_content', issue_type: 'duplicate_content', severity: 'warning',
     label: 'Duplicate content' },
+  // `onpage_links` DOES take `limit` but has no `is_broken` server filter, so the
+  // broken ones are selected here. Anything without a usable broken flag is dropped
+  // rather than reported — an "unknown" link is not a broken link.
   { kind: 'onpage_links',             issue_type: 'broken_link',       severity: 'error',
-    label: 'Broken link', params: { is_broken: true } },
+    label: 'Broken link', params: { limit: 500 },
+    filter: (it) => it?.is_broken === true || Number(it?.page_to_status_code) >= 400 },
+  // Pages the crawler could not load at all. `onpage_pages` takes `limit`.
+  { kind: 'onpage_pages',             issue_type: 'error_page',        severity: 'error',
+    label: 'Page returns an error', params: { limit: 500 },
+    filter: (it) => Number(it?.status_code) >= 400 },
 ];
+
 
 /** Best-effort URL off whatever shape a given OnPage section returns. */
 function issueUrl(item: any): string | null {
@@ -138,13 +154,14 @@ async function syncCrawl(supabase: any, crawl: any, userId: string | null): Prom
   }
 
   const info = summary.crawl_status || {};
+  const metrics = summary.page_metrics || {};
   const done = Number(info.pages_in_queue ?? 0) === 0 && Number(info.pages_crawled ?? 0) > 0;
   const patch: Record<string, unknown> = {
     pages_crawled: info.pages_crawled ?? null,
-    onpage_score: typeof summary.onpage_score === 'number' ? summary.onpage_score : null,
-    pages_with_issues: summary.page_metrics?.pages_by_status_code
-      ? null
-      : (summary.page_metrics?.broken_links ?? null),
+    // `onpage_score` sits on page_metrics, NOT at the top of the summary. Reading it
+    // from the root returned undefined and stored NULL on every crawl — the same
+    // silent-null shape as the Lighthouse categories.
+    onpage_score: typeof metrics.onpage_score === 'number' ? metrics.onpage_score : null,
     summary,
   };
 
@@ -161,8 +178,13 @@ async function syncCrawl(supabase: any, crawl: any, userId: string | null): Prom
 
   for (const section of ISSUE_SECTIONS) {
     try {
-      const r = await dfs(section.kind, { task_id: crawl.task_id, limit: 200, ...(section.params || {}) }, userId);
-      const items: any[] = r.items || [];
+      // Only the params this endpoint declares — see ISSUE_SECTIONS.
+      const r = await dfs(section.kind, { task_id: crawl.task_id, ...(section.params || {}) }, userId);
+      const all: any[] = r.items || [];
+      // A client-side filter narrows a general endpoint to the issue we asked about.
+      // `no_data` still means the SECTION answered: 200 links of which none are broken
+      // is a real "no broken links", not an absent check.
+      const items = section.filter ? all.filter(section.filter) : all;
       sectionStatus[section.issue_type] = items.length ? 'ok' : 'no_data';
       for (const it of items.slice(0, 200)) {
         rows.push({
@@ -340,12 +362,22 @@ Deno.serve(withApiLogging('seo-site-audit', async (req: Request) => {
 
     try {
       const target = website.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      // ONLY the parameters `onpage_task_post` actually declares. `enable_browser_rendering`
+      // was invented here and the route rejects an unknown kwarg outright —
+      // `HTTP_400 bad params: ... got an unexpected keyword argument`. The dispatcher
+      // forwards params verbatim to the Python signature, so a plausible-sounding extra
+      // is a hard 400, not an ignored field.
       const r = await dfs('onpage_task_post', {
-        target, max_crawl_pages: pages, load_resources: false,
-        enable_javascript: false, enable_browser_rendering: false,
+        target, max_crawl_pages: pages, load_resources: false, enable_javascript: false,
       }, auth.userId);
-      const taskId = (r.items || [])[0]?.id || r.task_id || null;
-      if (!taskId) throw new Error('The provider accepted the crawl but returned no task id.');
+      // `task_post` returns 20100 "Task Created" with result:null — the id is on the TASK,
+      // not in `result`, so the client's `items` projection is legitimately EMPTY here.
+      // Reading items[0].id could never have worked.
+      const taskId = r?.raw?.tasks?.[0]?.id || null;
+      if (!taskId) {
+        const upstream = r?.raw?.tasks?.[0]?.status_message || r?.error;
+        throw new Error(`The provider did not return a crawl task id${upstream ? ` — ${upstream}` : ''}.`);
+      }
       await supabase.from('website_crawls').update({ task_id: taskId }).eq('id', row.id);
       return json({ ok: true, crawl_id: row.id, task_id: taskId, requested_pages: pages });
     } catch (e) {

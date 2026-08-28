@@ -166,6 +166,12 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       const created = await createTrackedMention({
         subject_type: 'brand',
         subject_label: label,
+        // `brand_name` is REQUIRED by `chk_tracked_mentions_subject` for a brand or
+        // keyword subject that carries no product_id. Sending only `subject_label`
+        // passed the route's own validation and died one layer down as a raw 23514
+        // check violation surfaced as a 500 — the API accepts a shape the constraint
+        // rejects, which is the vocabulary-wider-than-the-CHECK trap.
+        brand_name: label,
         homepage_domain: state?.site_host,
         // Switched ON at creation. Every existing subject in this workspace was
         // created inactive and silently never probed; repeating that default here

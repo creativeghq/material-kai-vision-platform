@@ -209,9 +209,24 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
           ) : (
             <>
               {series?.note && (
-                <p className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs text-muted-foreground">
-                  {series.note}
-                </p>
+                <div className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">{series.note}</p>
+                  {series.competitors_tracked === 0 && (
+                    <div className="mt-2 flex gap-2">
+                      <Input
+                        value={adding}
+                        onChange={(e) => setAdding(e.target.value)}
+                        placeholder="flobali.gr"
+                        className="h-8 max-w-[260px]"
+                        onKeyDown={(e) => { if (e.key === 'Enter' && adding.trim()) void add(); }}
+                      />
+                      <Button size="sm" onClick={add} disabled={busy || !adding.trim()}>
+                        {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
+                        Add competitor
+                      </Button>
+                    </div>
+                  )}
+                </div>
               )}
 
               <MultiLineChart plots={plots} />

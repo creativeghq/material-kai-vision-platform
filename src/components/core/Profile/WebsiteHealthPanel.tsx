@@ -114,26 +114,6 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
         </CardContent>
       </Card>
 
-      {health?.status === 'ok' && (health.issues?.length ?? 0) > 0 && (
-        <Card className="dashboard-card">
-          <CardHeader>
-            <CardTitle className="text-base">Issues to fix ({health.issues!.length})</CardTitle>
-            <CardDescription>On-page problems detected on the homepage.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {health.issues!.map((it, i) => (
-              <div key={i} className="flex items-start gap-2 p-2 border rounded-lg">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{it.title}</p>
-                  {it.display_value && <p className="text-xs text-muted-foreground">{it.display_value}</p>}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       {/* ── What was actually CHECKED ────────────────────────────────────────
           52 booleans have always been stored on every audit and none of them
           were ever shown. The panel listed failures only, so a clean audit
@@ -218,11 +198,6 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
         );
       })()}
 
-      {health?.status === 'ok' && (health.issues?.length ?? 0) === 0 && (
-        <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 px-1">
-          <CheckCircle2 className="w-4 h-4" /> No on-page issues on the homepage. For a full multi-page crawl, ask the agent to "run a site crawl".
-        </div>
-      )}
     </div>
   );
 };
