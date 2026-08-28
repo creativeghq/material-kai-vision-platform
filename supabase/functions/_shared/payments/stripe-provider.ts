@@ -35,24 +35,43 @@ export const stripeProvider: PaymentProvider = {
     // which cannot populate env on the Supabase edge runtime.
     if (!(await getStripe())) return null;
 
-    // `get_workspace_payout_account` returns the connected account id only when the
-    // workspace's Connect onboarding is complete (charges_enabled).
-    const { data: destination, error } = await supabase.rpc('get_workspace_payout_account', {
+    /**
+     * WHERE THE MONEY LANDS IS A DECISION, NOT A FALLBACK (#359 CM-18).
+     *
+     * This used to be: connected account when onboarded, otherwise `credentials: {}` — and
+     * `createCharge` then omits `transfer_data`, so the charge is made on the PLATFORM account.
+     * The tenant's customer pays, the money lands in the operator's Stripe balance, and the
+     * operator carries the chargeback liability and has to remit by hand. The comment framed it as
+     * making Stripe offerable everywhere; what it actually did was settle a tenant's revenue into
+     * somebody else's account.
+     *
+     * The audit asked for per-workspace BYOK. That is the wrong prescription — Connect is already
+     * here and is strictly better, because the tenant's secret key never leaves Stripe. What was
+     * missing is the refusal.
+     *
+     * `stripe_charge_routing` gives the verdict, so this and `finance-pay-invoice` cannot disagree
+     * about whose balance a payment settles into. The platform-account charge survives for exactly
+     * one workspace: the operator's own, where the platform account IS the tenant's account.
+     */
+    const { data: routing, error } = await supabase.rpc('stripe_charge_routing', {
       p_workspace_id: workspaceId,
     });
     if (error) {
-      console.error('[payments/stripe] get_workspace_payout_account failed:', error.message || error);
+      console.error('[payments/stripe] stripe_charge_routing failed:', error.message || error);
+      return null;
+    }
+    const route = (Array.isArray(routing) ? routing[0] : routing) as
+      { destination: string | null; allowed: boolean; reason: string } | null;
+    if (!route?.allowed) {
+      // Null means "Stripe is not offerable for this workspace" — the pay page shows the other
+      // providers and the operator is told to connect Stripe, which is a better outcome than a
+      // payment that settles somewhere they cannot reach.
       return null;
     }
 
     return {
       workspaceId,
-      // Connect destination when the workspace completed onboarding → funds route to the tenant's own
-      // connected account (destination charge). Otherwise fall back to a PLATFORM-account charge (no
-      // transfer_data — createCharge omits it), matching the emailed admin pay-link. This makes Stripe
-      // offerable on the customer pay page for EVERY workspace, not only Connect-onboarded ones, so the
-      // pay page and the admin link no longer disagree on whether Stripe is usable.
-      credentials: destination ? { destination: String(destination) } : {},
+      credentials: route.destination ? { destination: String(route.destination) } : {},
       isSandbox: false,
     };
   },

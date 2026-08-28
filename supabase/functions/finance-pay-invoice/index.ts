@@ -200,8 +200,24 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       // This branch creates a Stripe session directly, so Stripe specifically must exist.
       if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
-      // Route funds to the workspace's connected Stripe account when configured.
-      const { data: destAcct } = await supabase.rpc('get_workspace_payout_account', { p_workspace_id: inv.workspace_id });
+      /**
+       * The same routing verdict the pay page uses (#359 CM-18).
+       *
+       * This read `get_workspace_payout_account` and simply omitted `transfer_data` when it came
+       * back empty — a charge on the PLATFORM account for a tenant's invoice, settling the
+       * tenant's revenue into the operator's balance along with its chargeback liability.
+       */
+      const { data: routing } = await supabase.rpc('stripe_charge_routing', { p_workspace_id: inv.workspace_id });
+      const route = (Array.isArray(routing) ? routing[0] : routing) as
+        { destination: string | null; allowed: boolean; reason: string } | null;
+      if (!route?.allowed) {
+        return json({
+          error: 'This workspace has not connected Stripe yet, so a card payment cannot be settled to it. '
+            + 'Finish Stripe onboarding in Payments settings, or send the invoice with a bank transfer.',
+          code: 'stripe_connect_required',
+        }, 409);
+      }
+      const destAcct = route.destination;
 
       // Create a Stripe Checkout session right now and return its URL too (so admin can paste either).
       const session = await stripe.checkout.sessions.create({
