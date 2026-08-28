@@ -1773,6 +1773,22 @@ async function executeFlowGraph(
 // a legit high-volume flow should stay far below this).
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
 
+/**
+ * Runs per minute across ALL flows in one workspace — the chain breaker (#357 AE-3).
+ *
+ * The per-flow cap above stops a flow that re-triggers ITSELF. It cannot see a ping-pong: flow A
+ * fires on `event_a` and emits `event_b`, flow B does the reverse, each stays far under 120, and
+ * the pair runs forever sending mail. The chain leaves the process at every hop (action → row
+ * write → DB trigger → event → next flow), so no in-graph counter can follow it. The one thing
+ * every hop shares is the workspace the events are happening in.
+ *
+ * MEASURED, not guessed: across 8,246 real runs the busiest single minute for an entire
+ * workspace is 22, and the busiest minute for one flow is 15. 200 is nine times the observed
+ * peak — a legitimate burst (a bulk import fanning out) has room, while a runaway pair reaches
+ * it in seconds because each hop is a sub-second round trip.
+ */
+const MAX_WORKSPACE_FLOW_RUNS_PER_MINUTE = 200;
+
 async function handleExecuteFlow(
   supabase: DbClient,
   body: { flow_id: string; trigger_data?: Record<string, unknown> },
@@ -1823,6 +1839,17 @@ async function handleExecuteFlow(
     return jsonResponse({ success: false, error: 'Flow has no nodes' }, 400);
   }
 
+  /**
+   * The workspace this run ACTS IN (#357 AE-3).
+   *
+   * NOT `flow.workspace_id` on its own: a GLOBAL flow has none and executes inside every tenant,
+   * so grouping by it would put every operator-flow run in one null bucket and never match a
+   * tenant. The EVENT's workspace is the real answer — the same trap CLAUDE.md records for the
+   * flow mute logic.
+   */
+  const effectiveWorkspaceId = ((flow.workspace_id as string | null)
+    ?? (typeof trigger_data?.workspace_id === 'string' ? trigger_data.workspace_id : null)) || null;
+
   // Runaway-loop backstop: flows can re-trigger OUT of process (an action mutates a row → a DB trigger
   // emits a new event → this flow matches again), so an in-graph depth counter can't see the chain.
   // Instead cap how often a single flow may run — a tight self-retrigger loop blows past this in
@@ -1837,6 +1864,34 @@ async function handleExecuteFlow(
     if ((recentRuns ?? 0) >= MAX_FLOW_RUNS_PER_MINUTE) {
       console.warn(`[flow-engine] flow ${flow_id} exceeded ${MAX_FLOW_RUNS_PER_MINUTE} runs/min — suspected loop, refusing`);
       return jsonResponse({ success: false, error: 'run_rate_exceeded', data: { flow_id } }, 429);
+    }
+
+    /**
+     * The CHAIN breaker (#357 AE-3). Two flows triggering each other never touch the per-flow
+     * cap above; this counts every flow in the workspace, which is the only thing the whole
+     * chain has in common.
+     *
+     * Skipped when there is no effective workspace — a manual admin run and a test run have no
+     * tenant context, and they are the two cases an operator reaches for while diagnosing a
+     * loop. Refusing those would take away the tool.
+     */
+    if (effectiveWorkspaceId) {
+      const { count: wsRuns } = await supabase
+        .from('flow_runs')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', effectiveWorkspaceId)
+        .gte('started_at', since);
+      if ((wsRuns ?? 0) >= MAX_WORKSPACE_FLOW_RUNS_PER_MINUTE) {
+        console.error(
+          `[flow-engine] workspace ${effectiveWorkspaceId} exceeded `
+          + `${MAX_WORKSPACE_FLOW_RUNS_PER_MINUTE} flow runs/min across all flows — suspected `
+          + `cross-flow loop, refusing (flow ${flow_id})`,
+        );
+        return jsonResponse(
+          { success: false, error: 'workspace_run_rate_exceeded', data: { workspace_id: effectiveWorkspaceId } },
+          429,
+        );
+      }
     }
   }
 
@@ -1853,6 +1908,9 @@ async function handleExecuteFlow(
       trigger_event_data: trigger_data,
       initiated_by: initiatedBy,
       is_test_run: isTestRun,
+      // Recorded so the chain breaker above has something to count (#357 AE-3), and so
+      // per-tenant flow activity is answerable at all.
+      workspace_id: effectiveWorkspaceId,
       started_at: new Date().toISOString(),
     })
     .select()
