@@ -100,6 +100,13 @@ export interface LegShape {
   inLegs: number;
   /** Legs that debit one of our accounts — their presence means the money never left us. */
   outLegs: number;
+  /**
+   * How many legs the parent transaction actually had, per the rows themselves.
+   *
+   * `inLegs + outLegs < legsTotal` means we are looking at part of a transaction. Its shape is
+   * unknown, not external — and the difference is a pocket transfer settling a customer invoice.
+   */
+  legsTotal: number | null;
 }
 
 /**
@@ -114,19 +121,38 @@ export async function loadLegShapes(service: any, workspaceId: string, transacti
   const shapes = new Map<string, LegShape>();
   if (transactionIds.length === 0) return shapes;
   for (let i = 0; i < transactionIds.length; i += 200) {
-    const { data } = await service
+    const { data, error } = await service
       .from('revolut_bank_transactions')
-      .select('transaction_id, direction')
+      .select('transaction_id, direction, legs_total')
       .eq('workspace_id', workspaceId)
       .eq('provider', 'revolut')
       .in('transaction_id', transactionIds.slice(i, i + 200));
-    for (const row of (data ?? []) as Array<{ transaction_id: string; direction: string }>) {
-      const cur = shapes.get(row.transaction_id) ?? { inLegs: 0, outLegs: 0 };
+    // THROW (#359 CM-12). This read destructured `{ data }` only, so a failed page contributed
+    // nothing and every transaction in it fell to the "external money" default — a whole page of
+    // pocket transfers auto-matched against customer invoices, with the run reporting success.
+    // An incomplete picture must stop the pass, not quietly shrink it.
+    if (error) throw new Error(`leg-shape load failed: ${error.message}`);
+    for (const row of (data ?? []) as Array<{ transaction_id: string; direction: string; legs_total: number | null }>) {
+      const cur = shapes.get(row.transaction_id) ?? { inLegs: 0, outLegs: 0, legsTotal: null };
       if (row.direction === 'in') cur.inLegs++; else cur.outLegs++;
+      // Every row of one transaction carries the same total; keep the first non-null we see.
+      if (cur.legsTotal === null && typeof row.legs_total === 'number') cur.legsTotal = row.legs_total;
       shapes.set(row.transaction_id, cur);
     }
   }
   return shapes;
+}
+
+/**
+ * Is this transaction's shape fully known? (#359 CM-12)
+ *
+ * `null` legsTotal is a row written before the column existed — unknowable, so it counts as
+ * incomplete. Fewer rows than the total means the rest have not been written yet.
+ */
+export function legShapeIsComplete(shape: LegShape | undefined): boolean {
+  if (!shape) return false;
+  if (typeof shape.legsTotal !== 'number') return false;
+  return shape.inLegs + shape.outLegs >= shape.legsTotal;
 }
 
 /** Settle one line against one invoice and stamp the row. Shared by auto + manual. */
@@ -209,10 +235,14 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
   })).filter((b: any) => b.numberKey.length > 0 || b.nameKeyed.length > 0);
 
   for (const tx of txs as any[]) {
+    const shape = shapes.get(String(tx.transaction_id));
+    // Same fail-closed rule as the incoming side (#359 CM-12): an incomplete picture is not
+    // "external", it is unknown. The default here was `{ inLegs: 0, outLegs: 1 }`, so a pocket
+    // move whose credit leg had not synced looked like a supplier payment.
+    if (!legShapeIsComplete(shape)) { out.unmatched++; continue; }
     // The mirror of the incoming guard: an out leg whose transaction also credits one of
     // our accounts is a pocket→pocket move, not a supplier payment.
-    const shape = shapes.get(String(tx.transaction_id)) ?? { inLegs: 0, outLegs: 1 };
-    if (shape.inLegs > 0) {
+    if (shape!.inLegs > 0) {
       await service
         .from('revolut_bank_transactions')
         .update({ match_status: 'ignored', updated_at: new Date().toISOString() })
@@ -357,13 +387,28 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
   }
 
   for (const tx of lines) {
-    const shape = shapes.get(String(tx.transaction_id)) ?? { inLegs: 1, outLegs: 0 };
+    const shape = shapes.get(String(tx.transaction_id));
+
+    // FAIL CLOSED on an incomplete picture (#359 CM-12). The default here used to be
+    // `{ inLegs: 1, outLegs: 0 }` — "external money" — so a transaction whose sibling out leg had
+    // not been written yet was auto-matched against a customer invoice. That is the exact hazard
+    // CLAUDE.md records about this feed: match a row in isolation and an internal pocket move
+    // settles a customer invoice.
+    //
+    // Left `unmatched` rather than `ignored`: we do not know it is internal either, and the next
+    // pass — once the missing legs have synced — will classify it properly. Ignoring it here would
+    // hide a real payment for good.
+    if (!legShapeIsComplete(shape)) {
+      result.unmatched++;
+      continue;
+    }
+
     // Both sides of the transaction are ours → pocket→pocket move, not a payment. Stamp
     // it so it stops coming back on every pass instead of silently re-suggesting.
     // Safe because Revolut carries transfer fees as leg ATTRIBUTES, not as extra legs, so
     // a genuine incoming transfer has exactly one leg — and because `ignored` is not a
     // dead end: the row stays visible in the feed and is still matchable by hand.
-    if (shape.outLegs > 0) {
+    if (shape!.outLegs > 0) {
       const { error } = await service
         .from('revolut_bank_transactions')
         .update({ match_status: 'ignored', updated_at: new Date().toISOString() })
@@ -387,7 +432,7 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     // A transaction split across several incoming legs cannot be auto-settled: this row
     // is a fragment of the payment, so its amount matches nothing and its reference
     // matches everything. Candidates still surface for a human.
-    const singleLeg = shape.inLegs === 1;
+    const singleLeg = shape!.inLegs === 1;
 
     let settled = false;
     if (singleLeg && byNumber.length === 1) {

@@ -55,8 +55,21 @@ export function legToRow(workspaceId: string, tx: RevolutTransaction, leg: Revol
     state: tx.state,
     type: tx.type,
     direction: leg.amount >= 0 ? 'in' : 'out',
-    // MAJOR units, positive; direction carries the sign (record-payment convention).
+    /**
+     * MAJOR units, positive; direction carries the sign (record-payment convention).
+     *
+     * SETTLED, do not "fix" this (#359 CM-15). The Revolut BUSINESS API returns decimal amounts —
+     * a documented leg reads `amount: -47.8, fee: 0.66, bill_amount: -13` — so there is nothing to
+     * divide by 100. The payment providers in #351 hardcode `Math.round(amount * 100)` because the
+     * MERCHANT APIs (Stripe, Viva) take minor units. Two different APIs with two different
+     * conventions; both are right, and making them agree would break one of them by 100×.
+     */
     amount: Math.abs(leg.amount),
+    // How many legs this transaction had, recorded on EVERY row of it (#359 CM-12). One row is
+    // then enough to tell "there is no sibling leg" (external money) from "the sibling has not
+    // arrived yet" — the two cases the reconciler must never confuse, because confusing them
+    // settles a customer invoice with a pocket→pocket move.
+    legs_total: Array.isArray(tx.legs) ? tx.legs.length : null,
     currency: leg.currency,
     booked_at: tx.completed_at ?? tx.created_at,
     counterparty_name: tx.counterparty?.name ?? tx.merchant?.name ?? null,

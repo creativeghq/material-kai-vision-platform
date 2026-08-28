@@ -64,7 +64,14 @@ describe('revolut reconciliation · what enters the matcher', () => {
     // A row is a fragment of a transaction. Matching one in isolation is how an internal
     // pocket move gets settled against a customer invoice.
     expect(RECONCILE).toMatch(/export async function loadLegShapes/);
-    expect(RECONCILE).toMatch(/\.select\('transaction_id,\s*direction'\)/);
+    // The select must carry direction AND the parent's leg count — one row has to be able to say
+    // whether the picture is complete (#359 CM-12). Pinned as "these fields are read", not as an
+    // exact select string: the previous version pinned the literal list and broke the moment a
+    // field was added, which teaches the next person to edit the test rather than think.
+    const load = fnBody(RECONCILE, 'loadLegShapes');
+    for (const field of ['transaction_id', 'direction', 'legs_total']) {
+      expect(load, field).toContain(field);
+    }
     expect(fnBody(RECONCILE, 'reconcileWorkspaceRevolut')).toMatch(/loadLegShapes\(/);
     expect(fnBody(RECONCILE, 'reconcileOutgoingRevolut')).toMatch(/loadLegShapes\(/);
   });
@@ -72,13 +79,17 @@ describe('revolut reconciliation · what enters the matcher', () => {
   it('treats a transaction with legs on both sides as internal, not as a payment', () => {
     // in + out legs, both ours = money never left the tenant. Stamped `ignored` so it
     // leaves the review surface instead of being re-suggested on every pass.
-    expect(RECONCILE).toMatch(/shape\.outLegs\s*>\s*0/);
-    expect(RECONCILE).toMatch(/shape\.inLegs\s*>\s*0/);
+    expect(RECONCILE).toMatch(/shape!?\.outLegs\s*>\s*0/);
+    expect(RECONCILE).toMatch(/shape!?\.inLegs\s*>\s*0/);
     expect(RECONCILE).toMatch(/match_status:\s*'ignored'/);
+    // …and a transaction whose shape is not fully known is neither: it stays unmatched until the
+    // missing legs sync (#359 CM-12). Reading an incomplete shape as external is what let a
+    // pocket transfer settle a customer invoice.
+    expect(RECONCILE).toMatch(/legShapeIsComplete\(shape\)/);
   });
 
   it('never auto-settles a payment split across several incoming legs', () => {
-    expect(RECONCILE).toMatch(/const singleLeg = shape\.inLegs === 1/);
+    expect(RECONCILE).toMatch(/const singleLeg = shape!?\.inLegs === 1/);
     // Both auto-settle branches must be gated on it; a fragment's amount matches nothing
     // and its reference matches everything.
     const branches = RECONCILE.match(/if \(singleLeg &&|else if \(singleLeg &&/g) ?? [];
