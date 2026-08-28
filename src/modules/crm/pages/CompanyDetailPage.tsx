@@ -26,7 +26,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-import { companiesAPI } from '@/services/crm.service';
+import { companiesAPI, type CreateCompanyError } from '@/services/crm.service';
+// The duplicate toast offers the existing row (#353 CRM-3).
+import { ToastAction } from '@/components/core/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { PartyDealsCard } from '@/components/business/crm/PartyDealsCard';
@@ -266,7 +268,39 @@ export const CompanyDetailPage: React.FC = () => {
       navigate(`/crm/companies/${response.data.id}`, { replace: true });
     } catch (error) {
       console.error('Error creating company:', error);
-      toast({ title: 'Error', description: 'Failed to create company', variant: 'destructive' });
+      /**
+       * A DUPLICATE IS NOT A FAILURE — offer the row we found (#353 CRM-3).
+       *
+       * `crm-api` refuses a create whose folded name already exists in the workspace and returns
+       * the existing company precisely so the caller can offer it; `CreateCompanyError` carries
+       * it, and its own comment says "so the caller can offer it instead of just reporting a
+       * failure". This page discarded both and showed "Failed to create company", which is a
+       * dead end: the operator has typed a full record, cannot save it, and is not told that the
+       * business already exists or where.
+       *
+       * `QuickAddCompanyDialog` already handles this properly. This is the path reached from
+       * AddCompanyModal, which does no probe of its own, so it is the one where the refusal is
+       * the FIRST time anybody mentions a duplicate.
+       */
+      const dup = error as CreateCompanyError;
+      if (dup?.code === 'duplicate_company' && dup.existing) {
+        const existing = dup.existing;
+        toast({
+          title: 'That business is already in your CRM',
+          description: `"${existing.name}" already exists. Open it instead of creating a second record — duplicates are what make spend-per-supplier and AP aging wrong later.`,
+          action: (
+            <ToastAction altText="Open the existing business" onClick={() => navigate(`/crm/companies/${existing.id}`)}>
+              Open it
+            </ToastAction>
+          ),
+        });
+        return;
+      }
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create company',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
