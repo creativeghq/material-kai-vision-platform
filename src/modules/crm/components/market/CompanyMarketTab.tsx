@@ -376,7 +376,16 @@ const LookalikesPanel: React.FC<{ companyId: string }> = ({ companyId }) => {
 const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, companyId, company }) => {
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<{ billedTotal: number; paidTotal: number; outstandingTotal: number } | null>(null);
-  const [unbooked, setUnbooked] = useState<{ count: number; total: number } | null>(null);
+  /**
+   * Unbooked myDATA documents, TOTALLED PER CURRENCY (#353 CRM-19).
+   *
+   * This was a single `total: number` reduced across every row and then rendered through
+   * `eur()`, which hardcodes EUR. `inbound_documents` carries a `currency` column, so a USD
+   * invoice was not merely added to euros — it was added AND relabelled, producing a figure that
+   * is true of nothing and says so with a currency symbol. Same defect `PipelineBoard` had
+   * before `get_deal_stage_totals` split it by (stage, currency).
+   */
+  const [unbooked, setUnbooked] = useState<{ count: number; totals: Array<{ currency: string; total: number }> } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -386,7 +395,7 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
       const acct = await financeService.getSupplierAccount({ companyId }).catch(() => null);
 
       // Unbooked myDATA received docs: matched to this company by issuer VAT, not yet a bill.
-      let unb: { count: number; total: number } | null = null;
+      let unb: { count: number; totals: Array<{ currency: string; total: number }> } | null = null;
       const vatDigits = (company.vat_number ?? '').replace(/[^0-9]/g, '');
       if (vatDigits.length >= 8) {
         const vatForms = Array.from(new Set([company.vat_number, vatDigits].filter(Boolean))) as string[];
@@ -394,15 +403,26 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
           .from('inbound_documents')
           // doc_type and total_net come too: on a reverse-charged purchase the amount owed is
           // the net, and summing AADE's gross overstated every foreign supplier by their VAT.
-          .select('total_gross, total_net, doc_type', { count: 'exact' })
+          .select('total_gross, total_net, doc_type, currency', { count: 'exact' })
           .in('issuer_vat', vatForms)
           .is('created_supplier_bill_id', null)
           .neq('status', 'dismissed');
         if (workspaceId) q = q.eq('workspace_id', workspaceId);
         const { data, count, error } = await q;
         if (!error) {
-          const total = (data ?? []).reduce((s: number, r: any) => s + invoicedTotal(r), 0);
-          unb = { count: count ?? (data?.length ?? 0), total };
+          // `invoicedTotal` stays the one derivation of "what this document is worth" — on a
+          // reverse-charged purchase that is the NET, and summing AADE's gross overstated every
+          // foreign supplier by their VAT. Grouping is the only thing added here.
+          const byCurrency = new Map<string, number>();
+          for (const r of (data ?? []) as any[]) {
+            const cur = (r.currency || 'EUR').toUpperCase();
+            byCurrency.set(cur, (byCurrency.get(cur) ?? 0) + invoicedTotal(r));
+          }
+          const totals = [...byCurrency.entries()]
+            .map(([currency, total]) => ({ currency, total }))
+            .filter((t) => t.total > 0)
+            .sort((a, b) => b.total - a.total);
+          unb = { count: count ?? (data?.length ?? 0), totals };
         }
       }
 
@@ -461,7 +481,9 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
                   <Inbox className="h-4 w-4 text-amber-500 shrink-0" />
                   <span className="text-sm">
                     <span className="font-medium">{unbooked.count}</span> invoice{unbooked.count === 1 ? '' : 's'} from this company in your myDATA inbox, not yet booked
-                    {unbooked.total > 0 && <span className="text-muted-foreground"> · {eur(unbooked.total)}</span>}
+                    {unbooked.totals.map((t) => (
+                      <span key={t.currency} className="text-muted-foreground"> · {formatMoney(t.total, t.currency)}</span>
+                    ))}
                   </span>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
