@@ -46,6 +46,34 @@ import type {
 import { EntityPicker } from './EntityPicker';
 import { EmailTemplateSelect } from './EmailTemplateSelect';
 
+/**
+ * A pre-save hint for the HTTP Request URL (#357 AE-10).
+ *
+ * Deliberately NOT the gate — `assertSafeUrl` in flow-engine is, and it resolves DNS, which a
+ * form cannot. This catches the shapes a person can see they typed: a non-https scheme, and the
+ * literal private/loopback/metadata hosts. Returns null when there is nothing useful to say,
+ * including for a URL carrying a `{{template}}` whose real value is unknowable here.
+ */
+function httpUrlHint(url: string | undefined): string | null {
+  const v = String(url ?? '').trim();
+  if (!v) return null;
+  if (v.includes('{{')) return null;
+  if (!/^https:\/\//i.test(v)) {
+    return /^https?:\/\//i.test(v)
+      ? 'Only https:// is accepted — this will be refused when the flow runs.'
+      : 'Enter a full https:// URL.';
+  }
+  const host = v.replace(/^https:\/\//i, '').split(/[/?#]/)[0].toLowerCase();
+  const privateHost = host === 'localhost'
+    || host === '169.254.169.254'
+    || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    || host.endsWith('.internal') || host.endsWith('.local');
+  return privateHost
+    ? 'That looks like a private or internal address — it will be refused when the flow runs.'
+    : null;
+}
+
 /** JSON editor for a `Record<string,string>` fields map. Keeps a free-text draft so typing invalid
  *  intermediate JSON doesn't reset the cursor; commits to onChange only when the draft parses to an
  *  object. Used by update_contact / update_product. */
@@ -358,6 +386,19 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               placeholder="https://api.example.com/webhook"
               className="h-8 text-sm"
             />
+            {/*
+              #357 AE-10. The engine refuses a non-public or non-https URL through the shared
+              SSRF guard, and that is the enforcement. This says so BEFORE saving, because the
+              alternative is a flow that looks fine, saves fine, and fails at run time inside a
+              run log — the point at which nobody is watching. It is a hint, never the gate.
+            */}
+            {httpUrlHint(cfg.url) && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">{httpUrlHint(cfg.url)}</p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Must be a public <code>https://</code> address. Internal and private addresses are
+              refused when the flow runs.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Method</Label>

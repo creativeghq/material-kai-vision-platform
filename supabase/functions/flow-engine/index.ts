@@ -22,6 +22,8 @@ import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 // One answer to "which sender does this workspace use" (#357 AE-1).
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
+// Invariant 7 — a config-supplied URL this runtime will fetch (#357 AE-10).
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -576,6 +578,30 @@ async function executeAction(
       const method = String(resolved.method || 'POST');
       const timeoutMs = Number(resolved.timeout_ms) || 30000;
 
+      /**
+       * SSRF GUARD ON A CONFIG-SUPPLIED URL (#357 AE-10, invariant 7).
+       *
+       * This was `fetch(String(resolved.url))` — raw, from the edge runtime's network position,
+       * with the URL coming out of a stored flow config and template variables substituted into
+       * it. Invariant 7 is unambiguous: any server-side fetch of an influenced URL goes through
+       * the shared guard — https-only, DNS-resolved, RFC1918/loopback/link-local and
+       * `169.254.169.254` rejected, redirects refused.
+       *
+       * `http_request` is operator-only (not in `tenant_flow_allowed_actions`), which caps who
+       * can point it somewhere — but a flow config is a stored, editable artifact, and "the
+       * person who edits automations can reach the metadata endpoint" is not an acceptable
+       * resting place. Resolved ONCE here, before the retry loop, so a redirect-to-internal
+       * cannot slip in between attempts.
+       */
+      let safeUrl: string;
+      try {
+        safeUrl = await assertSafeUrl(String(resolved.url ?? ''), { allowSchemes: ['https:'] });
+      } catch (e) {
+        throw new Error(
+          `http_request: refused ${String(resolved.url ?? '')} — ${e instanceof Error ? e.message : 'unsafe URL'}`,
+        );
+      }
+
       const doRequest = async () => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -586,11 +612,14 @@ async function executeAction(
             Object.assign(headers, resolved.headers);
           }
 
-          const response = await fetch(String(resolved.url), {
+          const response = await fetch(safeUrl, {
             method,
             headers,
             body: method !== 'GET' ? String(resolved.body || '{}') : undefined,
             signal: controller.signal,
+            // A followed redirect is a second, unguarded request — the guard above only ever
+            // saw the first URL.
+            redirect: 'error',
           });
 
           let responseBody: unknown;

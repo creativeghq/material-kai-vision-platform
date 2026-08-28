@@ -94,3 +94,44 @@ describe('#357 AE-17 — double-submit needs a synchronous latch', () => {
     expect(src).toContain('verifyingDomains.current.delete(domain)');
   });
 });
+
+describe('#357 AE-10 — the HTTP Request action cannot reach inside', () => {
+  it('the URL goes through the shared SSRF guard before any fetch', () => {
+    // `fetch(String(resolved.url))` from the edge runtime's network position, with the URL out
+    // of a stored flow config and template variables substituted into it. Invariant 7 is
+    // unambiguous about this.
+    const node = engine.slice(engine.indexOf("case 'http_request'"), engine.indexOf('const doRequest'));
+    expect(node).toContain('assertSafeUrl');
+    expect(node).toMatch(/allowSchemes: \['https:'\]/);
+  });
+
+  it('it resolves ONCE, outside the retry loop', () => {
+    // Guarding inside `doRequest` would re-resolve per attempt, which is both wasteful and a
+    // window: a host that answers safely once need not answer safely twice.
+    const guard = engine.indexOf('assertSafeUrl(String(resolved.url');
+    const loop = engine.indexOf('const doRequest');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard < loop, 'the guard runs inside the retry loop').toBe(true);
+  });
+
+  it('redirects are refused, and the guarded URL is the one fetched', () => {
+    // A followed redirect is a second, unguarded request — the guard only ever saw the first URL.
+    const node = engine.slice(engine.indexOf("case 'http_request'"), engine.indexOf("case 'ai_generate'"));
+    expect(node).toContain('await fetch(safeUrl,');
+    expect(node).toMatch(/redirect: 'error'/);
+    expect(node, 'the raw config URL is fetched again somewhere').not.toContain('fetch(String(resolved.url)');
+  });
+
+  it('the builder warns before saving, without pretending to be the gate', () => {
+    // A flow that saves fine and fails at run time fails inside a run log, where nobody is
+    // watching. The hint catches what a person can see they typed; DNS resolution is the
+    // engine's job and a form cannot do it.
+    const form = stripComments(
+      readFileSync(join(ROOT, 'src/components/Admin/FlowsManagement/panels/configs/ActionConfigForm.tsx'), 'utf8'),
+    );
+    expect(form).toContain('function httpUrlHint');
+    expect(form).toContain('169.254.169.254');
+    // A templated URL has no knowable value at edit time — warning on it would be noise.
+    expect(form).toMatch(/includes\('\{\{'\)/);
+  });
+});
