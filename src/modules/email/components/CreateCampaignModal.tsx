@@ -208,8 +208,23 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
     }
   };
 
+  /**
+   * Synchronous in-flight latch (#357 AE-17).
+   *
+   * `loading` is React state, so it cannot stop a submit that is already queued — a double-click
+   * or a double Enter fires the handler twice before the first `setLoading(true)` has rendered,
+   * and `disabled={loading}` on the button is the same state one render behind. A campaign
+   * created twice is two campaigns to the SAME audience, and `campaign-processor` will
+   * cheerfully send both: they are distinct rows, so the per-recipient claim added in AE-4
+   * cannot absorb them — exactly the distinction #355 WH-3 records about duplicate POs.
+   *
+   * A ref is set and read in the same synchronous turn. State is not.
+   */
+  const submitting = React.useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
 
     if (!formData.name.trim()) {
       toast({
@@ -238,6 +253,9 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
       return;
     }
 
+    // Latched after validation and before the first await: latching earlier would strand the
+    // form on a validation bounce, later would let the queued submit past.
+    submitting.current = true;
     try {
       setLoading(true);
 
@@ -286,6 +304,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         variant: 'destructive',
       });
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };

@@ -251,6 +251,23 @@ async function executeCondition(
   switch (conditionType) {
     case 'if_else': {
       const { field, operator, value } = config as { field: string; operator: string; value: string };
+      /**
+       * AN UNCONFIGURED CONDITION IS FALSE, NEVER TRUE (#357 AE-15).
+       *
+       * With a blank `field` and a blank `value`, `equals` compares '' to '' and returns TRUE —
+       * so a half-built if_else took its true branch on every event rather than none. That is
+       * the wrong direction for a node whose job is to narrow: the failure mode is a flow that
+       * fires on everything, which for a Send Email branch means mailing everybody.
+       *
+       * `evaluateComparison` already returns false for an unknown operator; this covers the
+       * other half, where the operator is valid and there is nothing to apply it to.
+       */
+      if (!String(field ?? '').trim() || !String(operator ?? '').trim()) {
+        return {
+          output: { result: false, reason: 'condition_not_configured' },
+          branch: 'false',
+        };
+      }
       const fieldValue = getNestedValue(context as unknown as Record<string, unknown>, resolveTemplate(field, context as unknown as Record<string, unknown>));
       const testValue = resolveTemplate(String(value), context as unknown as Record<string, unknown>);
       const result = evaluateComparison(fieldValue, operator, testValue);
@@ -272,7 +289,24 @@ async function executeCondition(
         conditions: Array<{ field: string; operator: string; value: string }>;
         logic: 'and' | 'or';
       };
-      const results = (conditions || []).map((cond) => {
+      /**
+       * AN EMPTY FILTER BLOCKS, IT DOES NOT PASS (#357 AE-15).
+       *
+       * `[].every(Boolean)` is TRUE, so a filter with no conditions and `and` logic — the
+       * default — let every record through. A filter node exists to narrow; one that has not
+       * been configured yet passing everything is the dangerous direction. "Only VIP customers"
+       * with nothing filled in meant everybody.
+       *
+       * Stopping the branch is the fail-closed answer, and it is visible: the run output says
+       * why rather than looking like a filter that legitimately matched nothing.
+       */
+      if (!Array.isArray(conditions) || conditions.length === 0) {
+        return {
+          output: { passed: false, reason: 'filter_not_configured', results: [] },
+          branch: '__stop__',
+        };
+      }
+      const results = (conditions).map((cond) => {
         const fv = getNestedValue(context as unknown as Record<string, unknown>, resolveTemplate(cond.field, context as unknown as Record<string, unknown>));
         return evaluateComparison(fv, cond.operator, resolveTemplate(cond.value, context as unknown as Record<string, unknown>));
       });

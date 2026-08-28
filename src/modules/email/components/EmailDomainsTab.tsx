@@ -3,7 +3,7 @@
  * Manage email domains for Resend
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, CheckCircle, XCircle, Clock, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -45,9 +45,23 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
     }
   };
 
-  const handleAddDomain = async () => {
-    if (!newDomain) return;
+  /**
+   * Synchronous in-flight latches (#357 AE-17).
+   *
+   * `saving` / `markingVerified` are React state and cannot stop a submit that is already
+   * queued — the second click fires before the first `setSaving(true)` has rendered, and the
+   * button's `disabled` is that same state one render behind. Adding a domain twice is noise;
+   * marking one verified twice races the read-back that `onDomainVerified` triggers.
+   *
+   * A ref is set and read in the same synchronous turn. State is not.
+   */
+  const addingDomain = useRef(false);
+  const verifyingDomains = useRef<Set<string>>(new Set());
 
+  const handleAddDomain = async () => {
+    if (!newDomain || addingDomain.current) return;
+
+    addingDomain.current = true;
     try {
       setSaving(true);
       await emailService.addDomain(newDomain);
@@ -64,11 +78,16 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
       console.error('Error adding domain:', error);
       toast({ title: 'Error', description: 'Failed to add domain', variant: 'destructive' });
     } finally {
+      addingDomain.current = false;
       setSaving(false);
     }
   };
 
   const handleMarkVerified = async (domain: string) => {
+    // Keyed per domain: two different domains may legitimately be marked at once, the SAME one
+    // twice may not.
+    if (verifyingDomains.current.has(domain)) return;
+    verifyingDomains.current.add(domain);
     try {
       setMarkingVerified(domain);
       await emailService.markDomainVerified(domain);
@@ -81,6 +100,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
       console.error('Error marking domain verified:', error);
       toast({ title: 'Error', description: 'Failed to update domain status', variant: 'destructive' });
     } finally {
+      verifyingDomains.current.delete(domain);
       setMarkingVerified(null);
     }
   };
