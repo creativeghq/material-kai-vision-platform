@@ -148,6 +148,53 @@ class MoodBoardAPI {
     if (error) throw error;
   }
 
+  /**
+   * Read a PUBLISHED board by its share token (#360 CB-15).
+   *
+   * The public page used to fetch by the board's own id, under an RLS policy that said
+   * `is_public = true` for role `public`. Two problems, and the second is the one that matters:
+   * the share never expired, and it could not be ROTATED — the URL was the board's identity, so
+   * revoking one recipient's link meant un-publishing for everybody, which is why nobody did it.
+   *
+   * `moodboard_by_share_token` is the only anonymous read now, and it projects: `user_id`, the
+   * client links, the dormancy fields and the keep-active token are not in it.
+   */
+  async getPublicMoodBoard(shareToken: string): Promise<MoodBoard | null> {
+    const { data, error } = await (supabase as any)
+      .rpc('moodboard_by_share_token', { p_token: shareToken });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      id: row.id,
+      // A public viewer is not told whose board it is.
+      userId: '',
+      title: row.title,
+      description: row.description,
+      isPublic: true,
+      items: [],
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      projectId: null,
+      roomId: null,
+      status: 'active',
+      deletionScheduledAt: null,
+    };
+  }
+
+  /**
+   * Revoke every outstanding public link by giving the board a new address (#360 CB-15).
+   *
+   * Owner-only, enforced in SQL. Returns the new token so the caller can show the new link
+   * without re-reading a row it just changed.
+   */
+  async rotatePublicShareToken(id: string): Promise<string> {
+    const { data, error } = await (supabase as any)
+      .rpc('rotate_moodboard_share_token', { p_moodboard_id: id });
+    if (error) throw error;
+    return String(data);
+  }
+
   // Get a specific moodboard by ID
   async getMoodBoard(id: string): Promise<MoodBoard | null> {
     const { data, error } = await supabase
