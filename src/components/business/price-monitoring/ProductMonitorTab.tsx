@@ -43,6 +43,7 @@ import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertPreferences } from './PriceAlertPreferences';
 import { formatNumber } from '@/utils/decimal';
 import { safeHref } from '@/utils/safeUrl';
+import { comparePrices, comparisonLabel, currencySymbol, type PriceComparison } from './priceComparison';
 import {
   refreshProduct,
   trackProduct,
@@ -123,7 +124,14 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   productId,
   productName,
   currentPrice,
-  currency = 'USD',
+  /**
+   * NO DEFAULT (#360 CB-14). This defaulted to `'USD'` on a platform whose products are priced in
+   * EUR, so a product with no stored currency was silently compared as dollars — the wrong half of
+   * the currency-mixing defect, and the half that looked fine because the number still rendered.
+   *
+   * Undefined now means "we do not know", and `comparePrices` refuses rather than assuming.
+   */
+  currency,
 }) => {
   const { toast } = useToast();
   const isDemo = isDemoProduct(productId);
@@ -396,10 +404,16 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   );
   const custom = useMemo(() => trackedSources.filter((s) => s.source_type === 'firecrawl_url'), [trackedSources]);
 
-  const priceDiff = (p: number | null) => {
-    if (!currentPrice || p == null) return null;
-    return ((p - currentPrice) / currentPrice) * 100;
-  };
+  /**
+   * Our price vs theirs — refusing when they are not the same money (#360 CB-14).
+   *
+   * This used to be `((p - currentPrice) / currentPrice) * 100` with no currency comparison at
+   * all: `p` is a competitor price in `row.current_currency`, `currentPrice` is ours in the
+   * `currency` prop, which DEFAULTS TO 'USD'. A GBP price against a EUR list price rendered as a
+   * confident red "+12%" with a trend arrow.
+   */
+  const compareToOurs = (theirs: number | null, theirsCurrency: string | null) =>
+    comparePrices({ ours: currentPrice, oursCurrency: currency, theirs, theirsCurrency });
 
   // ─── Render ─────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -620,7 +634,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 No retailers discovered yet. {isAdmin && 'Click Refresh now above to try.'}
               </div>
             )}
-            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />}
+            {discovered.length > 0 && <RetailerTable rows={discovered} currentPrice={currentPrice} priceDiff={compareToOurs} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />}
           </CardContent>
         </Card>
       )}
@@ -641,7 +655,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
+            <RetailerTable rows={merchants} currentPrice={currentPrice} priceDiff={compareToOurs} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
           </CardContent>
         </Card>
       )}
@@ -664,7 +678,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
+            <RetailerTable rows={marketplaces} currentPrice={currentPrice} priceDiff={compareToOurs} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
           </CardContent>
         </Card>
       )}
@@ -691,7 +705,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                 missed a retailer you know sells this product.
               </p>
             ) : (
-              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={priceDiff} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
+              <RetailerTable rows={custom} currentPrice={currentPrice} priceDiff={compareToOurs} isAdmin={isAdmin} productId={productId} trackedQueryId={trackedQueryId} onChange={() => { loadSources(); loadExclusions(); }} />
             )}
           </CardContent>
         </Card>
@@ -898,7 +912,9 @@ const SimilarProductsSection: React.FC<{
                   <div className="text-right">
                     <div className="text-sm font-medium">
                       {row.current_price != null
-                        ? `${row.current_currency || '€'}${row.current_price.toFixed(2)}`
+                        /* The raw ISO code was being used AS a symbol here — "EUR45.99" — and an
+                           absent one fell back to euro. Same helper as the retailer rows. */
+                        ? `${currencySymbol(row.current_currency)}${row.current_price.toFixed(2)}`
                         : '—'}
                     </div>
                   </div>
@@ -990,7 +1006,8 @@ const dismissAnomalyReading = async (
 const RetailerTable: React.FC<{
   rows: CompetitorSource[];
   currentPrice?: number;
-  priceDiff: (p: number | null) => number | null;
+  /** Our price vs theirs, or the reason there is no comparison (#360 CB-14). */
+  priceDiff: (p: number | null, theirsCurrency: string | null) => PriceComparison;
   isAdmin: boolean;
   productId: string;
   trackedQueryId: string | null;
@@ -1003,8 +1020,9 @@ const RetailerTable: React.FC<{
   return (
   <div className="divide-y">
     {rows.map((r) => {
-      const diff = priceDiff(r.current_price);
-      const currSym = r.current_currency === 'EUR' ? '€' : r.current_currency === 'GBP' ? '£' : '$';
+      const diff = priceDiff(r.current_price, r.current_currency);
+      // Not `: '$'` — an unrecognised or missing currency is not dollars (#360 CB-14).
+      const currSym = currencySymbol(r.current_currency);
       const stale = r.last_seen_at && Date.now() - new Date(r.last_seen_at).getTime() > 1000 * 60 * 60 * 24 * 7;
       const meta = r.current_metadata ?? {};
       const notesStr = typeof meta.notes === 'string' ? meta.notes : null;
@@ -1325,17 +1343,26 @@ toast({ title: 'Could not exclude retailer', description: String((e as Error)?.m
                     {Number(r.current_price).toFixed(2)}
                   </div>
                 </div>
-                {diff !== null && (
+                {diff.kind === 'incomparable' && (
+                  /* A stated reason beats a number that cannot mean anything (rule 3). */
+                  <div
+                    className="flex items-center justify-end gap-1 text-[11px] text-muted-foreground"
+                    title={`Their price is in ${diff.theirs}; yours is in ${diff.ours}. We do not convert — a monitoring snapshot has no exchange rate or date to convert with.`}
+                  >
+                    <span>{comparisonLabel(diff)}</span>
+                  </div>
+                )}
+                {diff.kind === 'pct' && (
                   <div className="flex items-center justify-end gap-1 text-[11px]">
-                    {diff > 0 ? (
+                    {diff.value > 0 ? (
                       <>
                         <TrendingUp className="h-3 w-3 text-red-600" />
-                        <span className="text-red-600">+{diff.toFixed(1)}%</span>
+                        <span className="text-red-600">{comparisonLabel(diff)}</span>
                       </>
-                    ) : diff < 0 ? (
+                    ) : diff.value < 0 ? (
                       <>
                         <TrendingDown className="h-3 w-3 text-green-600" />
-                        <span className="text-green-600">{diff.toFixed(1)}%</span>
+                        <span className="text-green-600">{comparisonLabel(diff)}</span>
                       </>
                     ) : (
                       <span className="text-muted-foreground">Same</span>
