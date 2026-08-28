@@ -22,6 +22,9 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
 import { getAllTriggerGroups } from '@/services/flows/triggerVariables';
 import { humanizeLabel } from '@/utils/humanize';
+// Invariant 11 — the canonical escaper, plus the URL scheme guard beside it (#357 AE-6).
+import { escapeHtml } from '@/utils/escapeHtml';
+import { safeHref, safeImageSrc } from '@/utils/safeUrl';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type DeviceView = 'desktop' | 'tablet' | 'mobile';
@@ -68,17 +71,27 @@ const FLOW_EVENT_TAG_GROUPS: Array<{ title: string; tags: Array<{ tag: string; l
   }));
 
 // ── HTML email card helpers ─────────────────────────────────────────────────
+// EVERY interpolated value below is escaped, and every URL is scheme-checked (#357 AE-6,
+// invariant 11). These are product titles, subtitles and links, and product data reaches this
+// platform from PDF extraction and supplier XML — untrusted by CLAUDE.md's own reckoning. The
+// result is PERSISTED as a template and later mailed, so an injection here is stored and
+// delivered rather than merely rendered.
+//
+// Two different jobs, both needed. `escapeHtml` stops a value breaking OUT of its attribute;
+// `safeHref` / `safeImageSrc` stop it being a live `javascript:` URL that is already inside the
+// quotes and perfectly well-formed.
 function cardHtml(imageUrl: string, title: string, subtitle: string, linkUrl = '#') {
-  const img = imageUrl
-    ? `<img src="${imageUrl}" width="100%" style="display:block;max-height:160px;object-fit:cover;border-radius:8px 8px 0 0;" alt="${title}" />`
+  const imgSrc = safeImageSrc(imageUrl);
+  const img = imgSrc
+    ? `<img src="${escapeHtml(imgSrc)}" width="100%" style="display:block;max-height:160px;object-fit:cover;border-radius:8px 8px 0 0;" alt="${escapeHtml(title)}" />`
     : '<div style="height:120px;background:#e8e0d8;border-radius:8px 8px 0 0;text-align:center;padding:40px 0;font-size:28px;">🧱</div>';
   return (
     '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #eee;">' +
       `<tr><td>${img}</td></tr>` +
       '<tr><td style="padding:12px;">' +
-        `<a href="${linkUrl}" style="text-decoration:none;">` +
-          `<div style="font-family:${BRAND.font};font-weight:600;font-size:14px;color:#1a1a1a;margin-bottom:4px;">${title}</div>` +
-          `<div style="font-family:${BRAND.font};font-size:12px;color:#888;">${subtitle}</div>` +
+        `<a href="${escapeHtml(safeHref(linkUrl))}" style="text-decoration:none;">` +
+          `<div style="font-family:${BRAND.font};font-weight:600;font-size:14px;color:#1a1a1a;margin-bottom:4px;">${escapeHtml(title)}</div>` +
+          `<div style="font-family:${BRAND.font};font-size:12px;color:#888;">${escapeHtml(subtitle)}</div>` +
         '</a>' +
       '</td></tr>' +
     '</table>'
@@ -100,17 +113,18 @@ function gridHtml(items: { image: string; title: string; subtitle: string; url?:
 
 function listHtml(items: { image: string; title: string; subtitle: string; url?: string }[]): string {
   const rows = items.map(it => {
-    const img = it.image
-      ? `<img src="${it.image}" width="80" height="64" style="display:block;object-fit:cover;border-radius:6px;" alt="${it.title}" />`
+    const imgSrc = safeImageSrc(it.image);
+    const img = imgSrc
+      ? `<img src="${escapeHtml(imgSrc)}" width="80" height="64" style="display:block;object-fit:cover;border-radius:6px;" alt="${escapeHtml(it.title)}" />`
       : '<div style="width:80px;height:64px;background:#e8e0d8;border-radius:6px;"></div>';
     return (
       '<tr><td style="padding:8px 0;border-bottom:1px solid #f0eae6;">' +
         '<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
           `<td width="88" style="vertical-align:top;">${img}</td>` +
           '<td style="padding-left:12px;vertical-align:top;">' +
-            `<a href="${it.url || '#'}" style="text-decoration:none;">` +
-              `<div style="font-family:${BRAND.font};font-weight:600;font-size:14px;color:#1a1a1a;">${it.title}</div>` +
-              `<div style="font-family:${BRAND.font};font-size:12px;color:#888;margin-top:3px;">${it.subtitle}</div>` +
+            `<a href="${escapeHtml(safeHref(it.url))}" style="text-decoration:none;">` +
+              `<div style="font-family:${BRAND.font};font-weight:600;font-size:14px;color:#1a1a1a;">${escapeHtml(it.title)}</div>` +
+              `<div style="font-family:${BRAND.font};font-size:12px;color:#888;margin-top:3px;">${escapeHtml(it.subtitle)}</div>` +
             '</a>' +
           '</td>' +
         '</tr></table>' +
@@ -214,7 +228,10 @@ async function processEmailHtml(html: string): Promise<string> {
 function injectPreheader(html: string, text: string): string {
   if (!text.trim()) return html;
   const padding = '&zwnj;&nbsp;'.repeat(90);
-  const snippet = `<span style="display:none;font-size:1px;color:#ffffff;max-height:0;overflow:hidden;mso-hide:all;">${text}${padding}</span>`;
+  // Escaped like everything else (#357 AE-6). The preheader is operator-typed free text going
+  // into a persisted template — the fact that it is rendered invisibly makes it a WORSE place to
+  // leave unescaped, not a better one: nobody reviewing the email would ever see the payload.
+  const snippet = `<span style="display:none;font-size:1px;color:#ffffff;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(text)}${padding}</span>`;
   return html.replace(/(<body[^>]*>)/i, `$1${snippet}`);
 }
 
