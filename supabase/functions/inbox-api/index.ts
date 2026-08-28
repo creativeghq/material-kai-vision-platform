@@ -180,6 +180,23 @@ async function resolveThreadAccess(
   return { canRead: false, isMember: false, participant: null };
 }
 
+/**
+ * A thread you cannot read does not exist, as far as you are concerned (#359 CM-11).
+ *
+ * Invariant 1 is explicit: *"Return 404 (not 403) on ownership mismatch to avoid id enumeration."*
+ * These handlers answered `403 You are not a participant of this thread`, which confirms the id is
+ * real, that a conversation exists behind it, and — for the workspace-scoped variants — that it
+ * belongs to a tenant the caller can name. `loadThreadIntake` already did the right thing and
+ * returned `404 Conversation not found`; the rest did not.
+ *
+ * The distinction that survives: a 403 is still correct for a CAPABILITY refusal to somebody who
+ * can already see the thread — "only members may leave private notes" tells them nothing they did
+ * not know. So `canRead` is the 404, and `isMember` stays a 403 behind it.
+ */
+function assertThreadVisible(access: { canRead: boolean }): void {
+  if (!access.canRead) throw new HttpError(404, 'Conversation not found');
+}
+
 /** Get-or-create the caller's member participant row (sales jump-in becomes a real participant). */
 async function ensureMemberParticipant(
   db: DbClient,
@@ -235,15 +252,13 @@ async function whatsappWindow(
   expires_at: string | null;
   source: 'local' | 'provider' | 'unknown';
 }> {
-  const { data } = await db
-    .from('inbox_messages')
-    .select('created_at')
-    .eq('thread_id', threadId)
-    .eq('metadata->>direction', 'incoming')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  let last = (data as { created_at?: string } | null)?.created_at ?? null;
+  // ONE derivation of "when did the customer last write" (#359 CM-2). This read used to be a
+  // private copy: `messaging-api`'s send path grew its own, and two definitions of one fact is how
+  // a member's composer and a campaign send come to disagree about whether they may write to
+  // somebody. The SQL function is the source for the LOCAL half; the provider fallback below is
+  // this function's own enrichment, and stays here because only a thread knows its conversation id.
+  const { data: lastLocal } = await db.rpc('whatsapp_thread_last_inbound_at', { p_thread_id: threadId });
+  let last = (lastLocal as string | null) ?? null;
   let source: 'local' | 'provider' | 'unknown' = 'local';
 
   if (!last) {
@@ -1303,8 +1318,10 @@ async function intakeContext(
   if (!threadId) throw new HttpError(400, 'thread_id is required');
   const thread = await getThreadOrThrow(db, threadId);
   const access = await resolveThreadAccess(db, userId, thread, operator);
+  assertThreadVisible(access);
   // Intake is a business surface: members only. A customer participant must never see the
-  // proposal, the matched cost, or the margin implied by it.
+  // proposal, the matched cost, or the margin implied by it — and 404 rather than 403 here too,
+  // because "you may not see the intake" would confirm there is one.
   if (!access.isMember && !operator) throw new HttpError(404, 'Conversation not found');
   return { thread, intake: await loadIntake(db, threadId) };
 }
@@ -1668,6 +1685,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may add participants');
       const callerRole = await callerRoleInWorkspace(db, userId, String(thread.workspace_id));
       const target = {
@@ -1711,6 +1729,7 @@ async function handleJwtAction(
       if (!threadId || !participantId) throw new HttpError(400, 'thread_id and participant_id are required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may remove participants');
       const { error } = await db
         .from('inbox_participants')
@@ -1735,6 +1754,7 @@ async function handleJwtAction(
 
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only members may react');
 
       const { data: target } = await db
@@ -1773,7 +1793,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
-      if (!access.canRead) throw new HttpError(403, 'You are not a participant of this thread');
+      assertThreadVisible(access);
       const messageType = String(payload.message_type || 'text') as 'text' | 'note';
       if (messageType === 'note' && !access.isMember) {
         throw new HttpError(403, 'Only members may leave private notes');
@@ -1851,7 +1871,8 @@ async function handleJwtAction(
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const me = await callerParticipant(db, threadId, userId);
-      if (!me) throw new HttpError(403, 'You are not a participant of this thread');
+      // 404, not 403 (#359 CM-11): "you are not a participant" confirms the thread is real.
+      if (!me) throw new HttpError(404, 'Conversation not found');
       const { error: readErr } = await db.from('inbox_participants')
         .update({ last_read_at: new Date().toISOString() }).eq('id', me.id);
       if (readErr) throw new HttpError(500, `Could not mark the thread read: ${readErr.message}`);
@@ -1962,6 +1983,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may add a contact');
 
       const workspaceId = String(thread.workspace_id);
@@ -2033,6 +2055,7 @@ async function handleJwtAction(
       }
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may change status');
       await db.from('inbox_threads').update({ status }).eq('id', threadId);
       return json({ ok: true });
@@ -2047,6 +2070,7 @@ async function handleJwtAction(
       }
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may hand a thread to the agent');
       const agentId = String(payload.agent_id || thread.agent_id || DEFAULT_INBOX_AGENT_ID);
       // Every write here was unchecked while the handler returned { ok: true }. The
@@ -2253,7 +2277,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
-      if (!access.canRead) throw new HttpError(403, 'You are not a participant of this thread');
+      assertThreadVisible(access);
       const isMember = access.isMember;
 
       const { data: participants } = await db
@@ -2340,6 +2364,32 @@ async function handleJwtAction(
       const qtyWanted = payload.qty_wanted != null ? Number(payload.qty_wanted) : null;
       const customMsg = payload.message != null ? String(payload.message).trim() : '';
 
+      /**
+       * The sourcing demand must be the BUYER'S own line (#359 CM-9).
+       *
+       * `demand_id` was taken from the body and stored unverified, and `accept` later wrote a
+       * `stock_allocations` row keyed on it — so naming another tenant's quote line got an
+       * allocation written against it, and the accept path read that line's `product_id` back.
+       * Two ids each individually valid, never checked against each other: the fifth confirmed
+       * instance of this shape (CRM-5 #353, RE-4 #356, PQ-4 #358).
+       *
+       * Verified HERE, where the id enters, rather than only at accept: an unverified id sitting
+       * in a stored row is a decision already taken.
+       */
+      const demandType = (payload.demand_type === 'order_item' || payload.demand_type === 'quote_item')
+        ? payload.demand_type
+        : null;
+      const demandId = demandType && payload.demand_id ? String(payload.demand_id) : null;
+      if (demandType && demandId) {
+        const { data: ownsDemand, error: demandErr } = await db.rpc('demand_line_belongs_to_workspace', {
+          p_workspace_id: buyerWorkspaceId,
+          p_demand_type: demandType,
+          p_demand_id: demandId,
+        });
+        // 404 on both "no such line" and "not yours" — invariant 1, no id enumeration.
+        if (demandErr || ownsDemand !== true) throw new HttpError(404, 'not found');
+      }
+
       // Inquiry row (RLS would also allow the buyer to insert this directly; we do it here so the
       // whole bridge is one atomic, server-authored call).
       const { data: inq, error: inqErr } = await db.from('marketplace_inquiries').insert({
@@ -2350,9 +2400,9 @@ async function handleJwtAction(
         qty_wanted: qtyWanted,
         message: customMsg || null,
         status: 'open',
-        // Carry the sourcing demand so accept can materialize an allocation
-        demand_type: (payload.demand_type === 'order_item' || payload.demand_type === 'quote_item') ? payload.demand_type : null,
-        demand_id: payload.demand_id ? String(payload.demand_id) : null,
+        // Carry the sourcing demand so accept can materialize an allocation. Both verified above.
+        demand_type: demandType,
+        demand_id: demandId,
       }).select('id').single();
       if (inqErr) throw new HttpError(500, `Failed to create inquiry: ${inqErr.message}`);
       const inquiryId = (inq as { id: string }).id;
@@ -2467,14 +2517,38 @@ async function handleJwtAction(
         supplierCompanyId = (newSup as Record<string, any>).id;
       }
 
-      // Buyer-side product from the demand line, if any.
+      /**
+       * Re-checked at accept, not merely at create (#359 CM-9).
+       *
+       * The row was written by a verified caller, but a stored id is still an id — the quote could
+       * have moved workspace, or a row could predate the check above. Confirming before an
+       * allocation is written costs one call and removes the class.
+       *
+       * The `quote_items` read below had NO workspace filter at all, and could not have had a
+       * simple one: `quote_items` carries no workspace, so tenancy lives on the parent quote.
+       * That is exactly why the predicate is in SQL.
+       */
       let productId: string | null = null;
-      if (inq2.demand_type === 'order_item' && inq2.demand_id) {
-        const { data: di } = await db.from('order_items').select('product_id').eq('id', inq2.demand_id).eq('workspace_id', buyerWs).maybeSingle();
-        productId = (di as Record<string, any> | null)?.product_id ?? null;
-      } else if (inq2.demand_type === 'quote_item' && inq2.demand_id) {
-        const { data: di } = await db.from('quote_items').select('product_id').eq('id', inq2.demand_id).maybeSingle();
-        productId = (di as Record<string, any> | null)?.product_id ?? null;
+      if (inq2.demand_type && inq2.demand_id) {
+        const { data: stillOurs } = await db.rpc('demand_line_belongs_to_workspace', {
+          p_workspace_id: buyerWs,
+          p_demand_type: inq2.demand_type,
+          p_demand_id: inq2.demand_id,
+        });
+        if (stillOurs !== true) throw new HttpError(404, 'not found');
+
+        if (inq2.demand_type === 'order_item') {
+          const { data: di } = await db.from('order_items').select('product_id').eq('id', inq2.demand_id).eq('workspace_id', buyerWs).maybeSingle();
+          productId = (di as Record<string, any> | null)?.product_id ?? null;
+        } else {
+          const { data: di } = await db.from('quote_items')
+            .select('product_id, quote:quotes!quote_id(workspace_id)')
+            .eq('id', inq2.demand_id)
+            .maybeSingle();
+          const row = di as { product_id?: string; quote?: { workspace_id?: string } | Array<{ workspace_id?: string }> } | null;
+          const q = Array.isArray(row?.quote) ? row?.quote[0] : row?.quote;
+          productId = q?.workspace_id === buyerWs ? (row?.product_id ?? null) : null;
+        }
       }
 
       const net = Math.round(acceptQty * acceptPrice * 100) / 100;
@@ -2535,6 +2609,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may analyse a conversation');
 
       const r = await readConversationSentiment(
@@ -2567,6 +2642,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may view conversation context');
 
       // The customer participant's CRM contact id (first active customer on the thread).
@@ -2725,6 +2801,7 @@ async function handleJwtAction(
       const labelIds = Array.isArray(payload.label_ids) ? payload.label_ids.map(String) : [];
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may label conversations');
       // Validate the labels belong to the thread's workspace (no cross-tenant labels).
       let valid: string[] = [];
@@ -2804,6 +2881,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may create a share link');
       if (String(thread.thread_type) === 'internal') {
         throw new HttpError(400, 'Internal team conversations cannot be shared');
@@ -2823,6 +2901,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may draft AI replies');
       const workspaceId = String(thread.workspace_id);
 
@@ -3158,6 +3237,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may archive conversations');
       await db.from('inbox_threads')
         .update({ archived_at: new Date().toISOString(), status: 'closed' }).eq('id', threadId);
@@ -3169,6 +3249,7 @@ async function handleJwtAction(
       if (!threadId) throw new HttpError(400, 'thread_id is required');
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may restore conversations');
       await db.from('inbox_threads')
         .update({ archived_at: null, status: 'open' }).eq('id', threadId);
