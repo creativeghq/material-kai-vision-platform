@@ -21,6 +21,8 @@ import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+// One answer to "may this workspace send" (#357 AE-1).
+import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -188,12 +190,12 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
     // and the frontend's "connect your email" gate never opened. Short-circuit with an actionable code
     // (root workspace is exempt — it sends via the platform sender).
     if (ownerWsId) {
-      const [{ data: emailCfg }, { data: wsRow }] = await Promise.all([
-        supabase.from('workspace_email_config').select('resend_api_key, from_email, enabled').eq('workspace_id', ownerWsId).maybeSingle(),
-        supabase.from('workspaces').select('is_root').eq('id', ownerWsId).maybeSingle(),
-      ]);
-      const hasByok = !!(emailCfg && emailCfg.enabled !== false && String(emailCfg.resend_api_key ?? '').trim() && String(emailCfg.from_email ?? '').trim());
-      if (!hasByok && wsRow?.is_root !== true) {
+      // ASK THE RESOLVER (#357 AE-1) — this was the fifth hand-written copy of "BYOK complete,
+      // or the operator's root workspace". The short-circuit below is still the point: without
+      // it `functions.invoke` masks the 503 and the batch returns "0 sent / 200 failed" with no
+      // actionable code, so the frontend's "connect your email" gate never opens.
+      const sender = await resolveWorkspaceEmailSender(supabase, ownerWsId);
+      if (sender.source === 'unconfigured') {
         return jsonResponse({
           success: false, code: 'workspace_sender_required',
           error: 'Connect your workspace email (Resend API key + verified sender) before sending catalogs to customers.',

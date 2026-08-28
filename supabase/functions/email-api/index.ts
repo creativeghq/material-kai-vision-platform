@@ -250,11 +250,12 @@ const CONTACT_SYNC_CAP = 300; // max NEW contacts pushed per run (Resend rate-li
  *  operator ROOT workspace — the platform key. A non-root workspace without BYOK is NOT allowed
  *  (we must never sync a tenant's CRM into the shared platform audience). */
 async function resolveContactsKey(supabase: AnyClient, workspaceId: string): Promise<{ apiKey: string | null; allowed: boolean }> {
+  // The root exemption lives in the resolver now (#357 AE-1) — it was duplicated here and in the
+  // send gate, and two copies of "who may use the platform key" is exactly the rule that must
+  // never disagree with itself.
   const sender = await resolveWorkspaceEmailSender(supabase, workspaceId);
-  if (sender.source === 'workspace') return { apiKey: sender.apiKey || null, allowed: true };
-  const { data: ws } = await supabase.from('workspaces').select('is_root').eq('id', workspaceId).maybeSingle();
-  if (ws?.is_root === true) return { apiKey: sender.apiKey || null, allowed: true };
-  return { apiKey: null, allowed: false };
+  if (sender.source === 'unconfigured') return { apiKey: null, allowed: false };
+  return { apiKey: sender.apiKey || null, allowed: true };
 }
 
 /** Get-or-create the workspace's Resend audience id (validated; recreated if stale). Persists it on
@@ -453,27 +454,41 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // otherwise the platform key + global email_settings sender.
         const sender = await resolveWorkspaceEmailSender(supabaseClient, body.workspace_id);
 
-        // Marketing BYOK-only gate: fail closed when strict and the resolved sender fell back
-        // to the platform key/domain. A workspace that hasn't configured its own verified Resend
-        // MUST NOT send marketing from the shared platform domain — EXCEPT the operator's ROOT
-        // workspace, which legitimately sends from the platform default (BYOK-only is a tenant rule).
+        /**
+         * BYOK gate, now for EVERY send rather than the ones that opted in (#357 AE-1).
+         *
+         * `resolveWorkspaceEmailSender` returns `source: 'unconfigured'` for a TENANT workspace
+         * with incomplete BYOK — it no longer silently hands back the operator's key. The root
+         * exemption moved in there too: it was written out twice in this file (here and in
+         * `resolveContactsKey`), which is two copies of a rule that must not disagree.
+         *
+         * `requireWorkspaceSender` is now implied for every send with a workspace. It is still
+         * accepted, and still means something narrower: STRICTLY the workspace's own key, which
+         * excludes the operator's root workspace sending on the platform default.
+         */
+        if (sender.source === 'unconfigured') {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: sender.reason
+                ?? 'This workspace must configure its own Resend account (API key + verified sender) before sending email.',
+              code: 'workspace_sender_required',
+            }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
         if (body.requireWorkspaceSender && sender.source !== 'workspace') {
-          let isRootWs = false;
-          if (body.workspace_id) {
-            const { data: ws } = await supabaseClient
-              .from('workspaces').select('is_root').eq('id', body.workspace_id).maybeSingle();
-            isRootWs = ws?.is_root === true;
-          }
-          if (!isRootWs) {
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: 'This workspace must configure its own Resend account (API key + verified sender) before sending marketing email.',
-                code: 'workspace_sender_required',
-              }),
-              { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-            );
-          }
+          // Reached only by the operator's root workspace now — everything else is already
+          // refused above. Kept because "this document must go out on the tenant's OWN domain"
+          // is a real, narrower requirement for statements and purchase sheets.
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "This send requires the workspace's own verified Resend sender.",
+              code: 'workspace_sender_required',
+            }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
         }
 
         // Pre-flight: require a Resend API key. Without this, sendViaResend()

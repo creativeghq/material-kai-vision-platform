@@ -24,6 +24,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+// One answer to "may this workspace send" (#357 AE-1).
+import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
@@ -35,12 +37,12 @@ type Any = any;
  *  sender (BYOK-only is a tenant rule; the operator is exempt — matches email-api's send gate). */
 async function canWorkspaceSendMarketing(supabase: Any, workspaceId: string | null): Promise<boolean> {
   if (!workspaceId) return false;
-  const [{ data: cfg }, { data: ws }] = await Promise.all([
-    supabase.from('workspace_email_config').select('resend_api_key, from_email, enabled').eq('workspace_id', workspaceId).maybeSingle(),
-    supabase.from('workspaces').select('is_root').eq('id', workspaceId).maybeSingle(),
-  ]);
-  const hasByok = !!(cfg && cfg.enabled !== false && (cfg.resend_api_key ?? '').trim() && (cfg.from_email ?? '').trim());
-  return hasByok || ws?.is_root === true;
+  // ASK THE RESOLVER (#357 AE-1). This was a hand-written copy of "BYOK complete, or the
+  // operator's root workspace" — the fourth of five. `unconfigured` is precisely that rule's
+  // negative, and having it in one place is what stops a campaign blocking on a condition the
+  // send path would have allowed (or worse, the reverse).
+  const sender = await resolveWorkspaceEmailSender(supabase, workspaceId);
+  return sender.source !== 'unconfigured';
 }
 
 /** Mark a campaign as blocked (paused) with a reason, so the cron stops re-picking it and the UI

@@ -20,6 +20,8 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+// One answer to "which sender does this workspace use" (#357 AE-1).
+import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -92,16 +94,21 @@ const FLOW_RUN_BASE_CREDITS = 20;
  * (+ their workspace pool if known). For a tenant flow fired by a 'system' trigger, bill the
  * flow owner against the flow's workspace pool.
  */
-/** Does this workspace have a usable BYOK Resend sender? (enabled + api key + from_email).
- *  Mirrors resolveWorkspaceEmailSender's `source==='workspace'` condition. */
+/**
+ * Does this workspace have a usable BYOK Resend sender?
+ *
+ * ASKS THE RESOLVER rather than re-deriving it (#357 AE-1). This used to be a hand-written copy
+ * of `resolveWorkspaceEmailSender`'s `source === 'workspace'` condition — its own comment said
+ * "mirrors", which is the word that precedes a drift. It was the third copy of that rule; the
+ * other two lived in `email-api` and are gone too.
+ *
+ * It matters more here than it looks: a wrong answer decides whether a tenant flow's email goes
+ * out on the tenant's domain or the operator's, and the resolver now REFUSES the second case
+ * outright, so a divergent copy would report "no BYOK" and then send anyway.
+ */
 async function workspaceHasByok(supabase: DbClient, workspaceId: string): Promise<boolean> {
-  const { data: cfg } = await supabase
-    .from('workspace_email_config')
-    .select('resend_api_key, from_email, enabled')
-    .eq('workspace_id', workspaceId)
-    .maybeSingle();
-  const c = cfg as { resend_api_key?: string; from_email?: string; enabled?: boolean } | null;
-  return !!(c && c.enabled !== false && (c.resend_api_key ?? '').trim() && (c.from_email ?? '').trim());
+  const sender = await resolveWorkspaceEmailSender(supabase, workspaceId);
+  return sender.source === 'workspace';
 }
 
 /** Global platform admin/super_admin — allowed to run operator (is_global) flows on demand. */
