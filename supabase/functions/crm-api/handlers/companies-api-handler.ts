@@ -80,6 +80,25 @@ async function companyWorkspaceInScope(
 const contactInScope = (contactId: string, scope: CrmScope) => rowInScope(supabase, 'crm_contacts', contactId, scope);
 
 /**
+ * The workspace a contact actually lives in, or null if it does not exist (#353 CRM-5).
+ *
+ * `contactInScope` answers "may the CALLER see this contact", which is a different question from
+ * "does this contact belong to the same tenant as this company" — and the join is a statement
+ * about the second. `_scope.ts`'s own header says it: scope is "an admission gate, NOT per-row
+ * authorization".
+ *
+ * Deliberately UNSCOPED. It is used only to compare against a workspace the caller has already
+ * been admitted to, and scoping it would reintroduce the same array-membership answer that is
+ * the bug. A caller who is not admitted to the company never reaches this call.
+ */
+async function contactWorkspace(contactId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('crm_contacts').select('workspace_id').eq('id', contactId)
+    .maybeSingle<{ workspace_id: string }>();
+  return data?.workspace_id ?? null;
+}
+
+/**
  * CRM Companies API
  * Handles company management: create, list, update, delete
  *
@@ -572,9 +591,23 @@ export async function handleCompanies(req: Request): Promise<Response> {
         contact_id = created.id;
         createdContactId = created.id;
       } else {
-        // An existing contact must also be in the caller's scope, else
-        // attaching a foreign contact_id leaks that tenant's contact PII via the join.
-        if (!(await contactInScope(contact_id, scope))) {
+        /**
+         * SAME TENANT AS THE COMPANY, not merely somewhere in the caller's scope (#353 CRM-5).
+         *
+         * `scope.workspaceIds` is an ARRAY of every workspace the caller is an active member of,
+         * so `contactInScope` said yes to a contact from ANY of them. A caller in workspaces A
+         * and B could therefore attach one of B's contacts to a company in A — and
+         * `GET /companies/{id}` returns nested contact name, email and phone, so B's contact PII
+         * became readable by every member of A, including members with no access to B at all.
+         *
+         * The create-and-attach branch above was already right: it stamps `workspace_id:
+         * companyWs`. Only this branch compared against the wrong thing.
+         *
+         * Both failures return the same 404 as a genuinely missing contact, so the response
+         * cannot be used to discover which ids exist in a workspace the caller cannot read.
+         */
+        const contactWs = await contactWorkspace(contact_id);
+        if (!contactWs || contactWs !== companyWs) {
           return new Response(
             JSON.stringify({ error: 'Contact not found' }),
             { status: 404, headers: corsHeaders },

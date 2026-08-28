@@ -33,6 +33,8 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+// Invariant 1 — tenancy comes from membership, never from the request body.
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
 import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
@@ -872,12 +874,37 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     const name = cleanStr(body?.name);
     const countryName = cleanStr(body?.country_name) || cleanStr(body?.country);
     const vat = cleanStr(body?.vat_number);
-    const workspaceId = cleanStr(body?.workspace_id);
+    const requestedWorkspaceId = cleanStr(body?.workspace_id);
     const companyId = cleanStr(body?.company_id);
 
     if (!name) return jsonResponse({ error: 'name is required' }, 400);
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
+
+    /**
+     * The workspace this call is BILLED and AUDITED against (#353 CRM-9, invariant 1).
+     *
+     * It arrives in the request body, and it was used unverified: for `reserveCredits`, for the
+     * `p_workspace_id` on every provider debit, and for the `ai_usage_logs` rows. So a caller
+     * could bill an enrichment to a tenant they have nothing to do with, and that tenant's cost
+     * view would show spend it never authorised — a wrong number in someone else's ledger, which
+     * nothing raises because it is a perfectly valid uuid.
+     *
+     * Not rejected outright when it fails: enrichment is a legitimate action for a user with no
+     * workspace context, and the fallback (bill the person, not a tenant) is exactly what
+     * `reserveCredits` does with an undefined workspace. Dropping it is therefore the safe
+     * degradation, and it is logged so a genuine misconfiguration is visible.
+     */
+    const workspaceId = requestedWorkspaceId
+      && await userCanAccessWorkspace(admin, user.id, requestedWorkspaceId)
+      ? requestedWorkspaceId
+      : undefined;
+    if (requestedWorkspaceId && !workspaceId) {
+      console.warn(
+        `[company-enrich] rejected body workspace_id ${requestedWorkspaceId} for user ${user.id} `
+        + '— not a member; billing the caller personally instead',
+      );
+    }
 
     // Affordability gate up front (invariant #10). Refund immediately — each provider
     // debits its actual cost below.
@@ -907,13 +934,29 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     if (companyId) {
       const { data: company } = await admin
         .from('crm_companies')
-        .select('id, created_by, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
+        .select('id, created_by, workspace_id, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
         .eq('id', companyId)
         .maybeSingle();
 
       if (company) {
-        let canWrite = company.created_by === user.id;
-        if (!canWrite) {
+        /**
+         * TENANCY FIRST (#353 CRM-6, invariant 1). This is a service-role client writing to a
+         * row identified by a body-supplied id, and it had no workspace check at all.
+         *
+         * `created_by === user.id` is not a tenancy check: a user who created a company in a
+         * workspace they have since LEFT still satisfies it, and could keep writing website,
+         * email, phone, socials, description, industry and address into that tenant's record.
+         * Neither is the account-tier fallback below — `public.roles` is the GLOBAL tier, true
+         * in every workspace at once, so a platform `admin` could write to any tenant's company.
+         *
+         * Membership is the boundary; the creator/tier test below stays as the within-tenant
+         * rule about WHO may cache-write. Silent skip rather than an error: this is an
+         * opportunistic cache of fields that are already being returned to the caller, so
+         * failing the whole enrichment over it would be worse than not caching.
+         */
+        const sameTenant = await userCanAccessWorkspace(admin, user.id, (company as any).workspace_id);
+        let canWrite = sameTenant && company.created_by === user.id;
+        if (sameTenant && !canWrite) {
           const { data: profile } = await admin
             .from('user_profiles')
             .select('roles!user_profiles_role_id_fkey(name)')
