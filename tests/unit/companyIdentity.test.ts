@@ -41,32 +41,58 @@ function walk(dir: string, out: string[] = []): string[] {
 import {
   companyIdentityPayload,
   emptyCompanyIdentity,
-  vatDedupeForms,
+  normalizeVat,
+  CRM_VAT_COLUMN,
 } from '@/components/business/crm/companyIdentity';
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
-describe('vatDedupeForms — a VAT matches whatever spelling the row was saved under', () => {
-  it('offers the raw, digits-only and EL-prefixed forms', () => {
-    expect(vatDedupeForms('EL800370260')).toEqual(['EL800370260', '800370260']);
-    expect(vatDedupeForms('800370260')).toEqual(['800370260', 'EL800370260']);
+describe('normalizeVat — one key, not a list of guessed spellings (#353 CRM-4)', () => {
+  /**
+   * `vatDedupeForms` used to return the raw string, the digits, and `EL` + digits, matched
+   * against the RAW `vat_number` column. Enumerating what a human might type is unbounded, and
+   * it missed the ordinary case: a row saved as `GR 800 370 260` is none of the three, so the
+   * probe said "no duplicate" and the business was created twice.
+   *
+   * Vectors below are `public.crm_vat_norm()` output captured from the live database
+   * 2026-08-28. Re-capture with:
+   *   select t, public.crm_vat_norm(t) from (values ('…')) v(t);
+   */
+  const VECTORS: Array<[string | null, string | null]> = [
+    ['800370260', '800370260'],
+    ['EL800370260', '800370260'],
+    ['GR 800 370 260', '800370260'],
+    ['el-800.370.260', '800370260'],
+    // Other countries KEEP their prefix — DE123456789 and FR123456789 are different taxpayers,
+    // and stripping to digits would collide them.
+    ['DE123456789', 'DE123456789'],
+    ['FR123456789', 'FR123456789'],
+    // The digit lookahead is what stops a word losing its first two letters.
+    ['GREECE', 'GREECE'],
+    ['  ', null],
+    [null, null],
+  ];
+
+  it('matches the SQL twin on every vector', () => {
+    for (const [input, expected] of VECTORS) {
+      expect(normalizeVat(input), JSON.stringify(input)).toBe(expected);
+    }
   });
 
-  it('a myDATA issuer_vat still matches a CRM row stored with the country prefix', () => {
-    // The exact-string match this replaced let every one of these through as a new duplicate.
-    const stored = 'EL800370260';
-    expect(vatDedupeForms('800370260')).toContain(stored);
-    expect(vatDedupeForms(' 800370260 ')).toContain(stored);
+  it('every Greek spelling of one number collapses to one key', () => {
+    // The whole point. These four are the same taxpayer and used to be up to four CRM rows.
+    const keys = new Set(
+      ['800370260', 'EL800370260', 'GR 800 370 260', 'el-800.370.260'].map(normalizeVat),
+    );
+    expect(keys.size).toBe(1);
   });
 
-  it('strips punctuation and dedupes the forms', () => {
-    expect(vatDedupeForms('EL 800-370-260')).toEqual(['EL 800-370-260', '800370260', 'EL800370260']);
-    // A pure-digit number yields no duplicate entry for the raw form.
-    expect(new Set(vatDedupeForms('800370260')).size).toBe(2);
+  it('is null for no VAT — the caller must fall back to a name probe, not query on ""', () => {
+    for (const v of [null, undefined, '', '   ']) expect(normalizeVat(v)).toBeNull();
   });
 
-  it('is empty for no VAT — the caller must fall back to a name probe, not query on ""', () => {
-    for (const v of [null, undefined, '', '   ']) expect(vatDedupeForms(v)).toEqual([]);
+  it('names the column, so no caller hand-types it', () => {
+    expect(CRM_VAT_COLUMN).toBe('vat_norm');
   });
 });
 
@@ -187,7 +213,10 @@ describe('the shared control is the only way a business gets created', () => {
 
   it('the quick-add dialog runs the dedupe probe before it offers a create', () => {
     const body = src(QUICK_ADD);
-    expect(body).toContain('vatDedupeForms');
+    // `normalizeVat`, not the old `vatDedupeForms` (#353 CRM-4): one normalised key rather than
+    // a list of guessed spellings, which is what let `GR 800 370 260` through as a new row.
+    expect(body).toContain('normalizeVat');
+    expect(body).toContain('CRM_VAT_COLUMN');
     // The duplicate must be offerable, not merely warned about — a warning you cannot act on
     // gets clicked past. (`adopt`, not `use`: a plain handler named use* reads as a React hook
     // and fails rules-of-hooks at the call site.)

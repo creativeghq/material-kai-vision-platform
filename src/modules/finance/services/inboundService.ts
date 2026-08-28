@@ -4,6 +4,8 @@
  * client reads what's been pulled and turns a doc into a supplier bill / warehouse intake.
  */
 import { supabase } from '@/integrations/supabase/client';
+// One normalised VAT key (#353 CRM-4).
+import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 import { edgeError } from '@/utils/edgeError';
 
 export interface InboundDocLine {
@@ -228,18 +230,18 @@ export const inboundService = {
    * letterhead; on our side they come from the registries via [[researchCompany]] and live on the
    * CRM company row. So the preview reads them from there rather than pretending AADE sent them.
    *
-   * Matched on the VAT number in all three forms it gets written in (raw / digits / EL-prefixed),
-   * the same live-match rule as `listForIssuerVat`. Returns null when the issuer isn't in CRM.
+   * Matched on the NORMALISED VAT key (#353 CRM-4), not the three spellings it used to guess
+   * at — a row stored as `GR 800 370 260` was none of them. Returns null when the issuer isn't
+   * in CRM.
    */
   async issuerProfile(workspaceId: string, vat: string | null): Promise<IssuerProfile | null> {
-    const digits = (vat ?? '').replace(/\D/g, '');
-    if (!digits) return null;
-    const forms = Array.from(new Set([(vat ?? '').trim(), digits, `EL${digits}`].filter(Boolean)));
+    const vatKey = normalizeVat(vat);
+    if (!vatKey) return null;
     const { data, error } = await supabase
       .from('crm_companies')
       .select('id, name, tax_office, gemi_number, gemi_legal_form, gemi_status, legal_status, kad_primary, kad_primary_description, profession, phone, email, website, street, street_number, postal_code, city')
       .eq('workspace_id', workspaceId)
-      .in('vat_number', forms)
+      .eq(CRM_VAT_COLUMN, vatKey)
       .limit(1)
       .maybeSingle();
     if (error) throw error;

@@ -29,7 +29,8 @@ import type { CompanyIdentityDraft } from './companyIdentity';
 export {
   emptyCompanyIdentity,
   companyIdentityPayload,
-  vatDedupeForms,
+  normalizeVat,
+  CRM_VAT_COLUMN,
 } from './companyIdentity';
 export type { CompanyIdentityDraft, CompanyIdentityVerification } from './companyIdentity';
 

@@ -26,6 +26,8 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+// One normalised VAT key (#353 CRM-4).
+import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 import { companiesAPI } from '@/services/crm.service';
 import { researchCompany, greekAfm, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
@@ -133,12 +135,14 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
     if (vat) {
       setChecking(true);
       try {
-        const forms = Array.from(new Set([vat, vat.replace(/\D/g, ''), `EL${vat.replace(/\D/g, '')}`].filter(Boolean)));
+        // One normalised key (#353 CRM-4) — this was a third hand-rolled copy of the same
+        // guess-list, and it missed a stored `GR 800 370 260` exactly like the others.
+        const vatKey = normalizeVat(vat);
         const { data } = await supabase
           .from('crm_companies')
           .select('id, name')
           .eq('workspace_id', workspaceId)
-          .in('vat_number', forms)
+          .eq(CRM_VAT_COLUMN, vatKey)
           .limit(1)
           .maybeSingle();
         if (data) setExisting({ id: (data as any).id, name: (data as any).name ?? null });

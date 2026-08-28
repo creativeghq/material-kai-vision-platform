@@ -22,11 +22,12 @@ import {
   CompanyIdentityLookup,
   companyIdentityPayload,
   emptyCompanyIdentity,
-  vatDedupeForms,
   type CompanyIdentityDraft,
 } from '@/components/business/crm/CompanyIdentityLookup';
 // Cross-alphabet dedupe key (#353 CRM-1).
 import { CRM_NAME_COLUMN, foldedName } from '@/services/crmSearch';
+// One normalised VAT key (#353 CRM-4).
+import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 
 export interface QuickCreatedCompany { id: string; name: string }
 
@@ -118,9 +119,11 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
     setProbing(true);
     const t = setTimeout(async () => {
       try {
-        const forms = vatDedupeForms(vat);
+        // ONE normalised key, not a list of guessed spellings (#353 CRM-4). `GR 800 370 260`,
+        // `EL800370260` and `800370260` are the same taxpayer and now the same key.
+        const vatKey = normalizeVat(vat);
         let q = supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).limit(1);
-        q = forms.length ? q.in('vat_number', forms) : q.eq(CRM_NAME_COLUMN, foldedName(name));
+        q = vatKey ? q.eq(CRM_VAT_COLUMN, vatKey) : q.eq(CRM_NAME_COLUMN, foldedName(name));
         const { data, error } = await q.maybeSingle();
         if (cancelled) return;
         if (error) throw error;

@@ -624,7 +624,7 @@ export const UserDetailPage: React.FC = () => {
                       <Shield className="h-3.5 w-3.5" /> Role &amp; classification
                     </div>
                     <div>
-                      <Label htmlFor="user-role">Role</Label>
+                      <Label htmlFor="user-role">Account tier (global)</Label>
                       <Select
                         value={user.role_id || ''}
                         onValueChange={(v) => patchInlineUser({ role_id: v })}
@@ -647,9 +647,25 @@ export const UserDetailPage: React.FC = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                      {/*
+                        #353 CRM-10. This writes `public.roles` — the GLOBAL account tier, which
+                        is true in EVERY workspace the person belongs to. It is NOT
+                        `workspace_members.role`, and it bypasses the workspace role allowlists
+                        entirely. Labelled "Role" with "determines platform permissions", it read
+                        as the workspace role to anyone who had not just read the schema.
+                        The control is right for this page (it is the platform-operator admin);
+                        only what it claimed to be was wrong. `Profile → Team` is written in the
+                        breadcrumb form on purpose so `linkifyDestinations` turns it into a real
+                        link wherever this copy is echoed.
+                      */}
                       <p className="text-xs text-muted-foreground mt-1">
-                        Role determines platform permissions and access levels. See the access
-                        matrix in docs/role-access-matrix.md.
+                        The platform-wide account tier (supplier, architect, admin). It applies in
+                        every workspace this person belongs to, so change it only for what someone
+                        <em> is</em> across the whole platform.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This is <strong>not</strong> their workspace role. Who runs HR, sales or
+                        the warehouse is set per workspace in Profile → Team.
                       </p>
                     </div>
                     <div>

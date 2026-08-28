@@ -122,19 +122,14 @@ function normalizeUrl(v: unknown): string | null {
   return `https://${s.replace(/^\/+/, '')}`;
 }
 
-/** Pull the last balanced {...} JSON object out of an LLM text blob. */
-function extractJson(text: string): Record<string, unknown> | null {
-  if (!text) return null;
-  const cleaned = text.replace(/```json/gi, '').replace(/```/g, '');
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  try {
-    return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+/*
+ * `extractJson` lived here — "pull the last balanced {...} out of an LLM text blob" — and it is
+ * DELETED rather than left unused (#353 CRM-8). Its only caller was the enrichment fallback that
+ * parsed the raw web-research text, and a salvage parser sitting in the file is an invitation:
+ * the next person needing "just parse whatever came back" finds it ready to hand. Security
+ * invariant 9 wants forced `tools` + `tool_choice` on anything whose verdict drives a DB write,
+ * and a helper that exists to undo that should not exist.
+ */
 
 interface CallPrice {
   inputCost: number; outputCost: number; surcharge: number;
@@ -266,9 +261,27 @@ async function enrichViaWebSearch(
     outTok += extract?.usage?.output_tokens ?? 0;
     const toolUse = (extract.content as any[])?.find((b) => b.type === 'tool_use');
     fields = (toolUse?.input as Partial<EnrichFields>) ?? {};
-  } catch {
-    // Fallback: parse JSON straight out of the research text
-    fields = (extractJson(researchText) as Partial<EnrichFields>) ?? {};
+  } catch (e) {
+    /**
+     * NO SALVAGE PARSER (#353 CRM-8, security invariant 9).
+     *
+     * This used to fall back to `extractJson(researchText)` — parsing a JSON object straight out
+     * of the WEB RESEARCH TEXT. That text is whatever the open internet said about a company
+     * name, so a page that ranks for that name and embeds
+     * `{"website":"…","email":"…","phone":"…"}` could write attacker-chosen contact details into
+     * a CRM record, every time the primary extraction happened to throw. The forced
+     * `tools` + `tool_choice` above exists precisely so the model cannot be talked into a
+     * different shape; a fallback that reads the raw page undoes it on the one path nobody
+     * watches.
+     *
+     * Invariant 9 is explicit: a classifier whose verdict drives a DB write MUST use
+     * `tools=[...]` + `tool_choice`, "not free-form JSON + a salvage parser". The competitor
+     * path in this same file already gets this right — it returns `[]` on exception. Enrichment
+     * now does the same: no fields is a correct, honest answer, and the caller reports which
+     * ones are missing.
+     */
+    console.warn('[company-enrich] structured extraction failed; returning no fields rather than parsing the research text:', e);
+    fields = {};
   }
 
   // Cost log + debit — rates from ai_model_pricing, never from a constant here. 4 web searches.
