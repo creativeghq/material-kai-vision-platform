@@ -21,8 +21,28 @@ import { inboxAutopilotSettings } from './inbox-autopilot.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
-/** Public-read bucket the Inbox already uses for attachments — #209 protects `inbox/{id}/`. */
-export const ATTACHMENT_BUCKET = 'generation-images';
+/**
+ * Where an INBOUND attachment lands — the PRIVATE bucket (#357 AE-9).
+ *
+ * It used to be `generation-images`, which is `public: true`. Anyone who can send an email to the
+ * inbound address could therefore put a file at a public URL under this platform's domain, with
+ * its own chosen `content-type` — usable for malware distribution or for phishing that inherits
+ * the domain's reputation. Inbound mail is the one surface where "anyone" is literal.
+ *
+ * MEASURING IT TURNED UP A SECOND, LOUDER BUG. `generation-images` carries an
+ * `allowed_mime_types` allowlist of eight image/video/3D types, so Storage was already refusing
+ * `text/html` — the filed attack was mostly blocked. But it was equally refusing
+ * `application/pdf`, `application/zip` and everything else a customer actually emails, and
+ * `storeAttachments` logged a `console.warn` and moved on. A customer emailing an order as a PDF
+ * had the attachment silently dropped, and the message arrived looking like they forgot to
+ * attach it.
+ *
+ * The private bucket fixes both: nothing is publicly addressable, and no MIME allowlist discards
+ * real business documents. Reads already mint signed URLs from the recorded
+ * `storage_bucket` + `storage_object_path` pair, so existing rows keep resolving from wherever
+ * they were written.
+ */
+export const ATTACHMENT_BUCKET = 'pdf-documents';
 
 /** Cap per attachment. Cloudflare caps the whole message at 25 MiB; this bounds one part. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -513,7 +533,27 @@ export async function storeAttachments(
       .from(ATTACHMENT_BUCKET)
       .upload(path, bytes, { contentType: att.mimeType, upsert: false });
     if (error) {
-      console.warn('[inbound-email] attachment upload failed:', error.message);
+      /**
+       * AN EXPLICIT FAILURE MARKER, not a silent skip (pipeline convention 1, #357 AE-9).
+       *
+       * This used to `continue`, so a failed upload produced a message with one fewer attachment
+       * and nothing anywhere saying so — the reader cannot tell "they didn't attach anything"
+       * from "we lost it". That is how the mime-allowlist rejection above went unnoticed: every
+       * PDF a customer emailed vanished into a console.warn.
+       *
+       * The row is still recorded, with no path and a reason, so the Inbox can say "an
+       * attachment could not be stored" instead of showing nothing at all.
+       */
+      console.error(`[inbound-email] attachment "${att.filename}" (${att.mimeType}) failed to store:`, error.message);
+      out.push({
+        storage_bucket: null,
+        storage_object_path: null,
+        name: att.filename,
+        content_type: att.mimeType,
+        size: att.size,
+        store_failed: true,
+        store_error: error.message,
+      });
       continue;
     }
     out.push({

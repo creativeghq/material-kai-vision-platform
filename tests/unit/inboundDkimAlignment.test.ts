@@ -122,3 +122,35 @@ describe('#357 AE-5 — the gate actually uses it', () => {
     expect(gate).toContain('quarantined_auth_fail');
   });
 });
+
+describe('#357 AE-9 — an inbound attachment is not publicly addressable', () => {
+  const shared = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/_shared/inbound-email.ts'), 'utf8').replace(/\r\n/g, '\n'),
+  );
+
+  it('inbound attachments land in the PRIVATE bucket', () => {
+    // `generation-images` is `public: true`. Anyone who can email the inbound address could put
+    // a file at a public URL under this platform's domain — malware distribution, or phishing
+    // that inherits the domain's reputation. Inbound mail is the one surface where "anyone" is
+    // literal.
+    expect(shared).toContain("export const ATTACHMENT_BUCKET = 'pdf-documents'");
+    expect(shared).not.toContain("export const ATTACHMENT_BUCKET = 'generation-images'");
+  });
+
+  it('a failed store is RECORDED, not skipped', () => {
+    // The silent `continue` is how the second bug hid: `generation-images` also carries a MIME
+    // allowlist of eight image/video types, so every `application/pdf` a customer emailed was
+    // refused by Storage and dropped with a console.warn. The message arrived looking like they
+    // forgot to attach it.
+    const fn = shared.slice(shared.indexOf('export async function storeAttachments'), shared.indexOf('/** Append an outcome row'));
+    expect(fn).toContain('store_failed: true');
+    expect(fn).toContain('store_error');
+    expect(fn).toContain('console.error');
+  });
+
+  it('the recorded failure carries no path, so nothing tries to sign it', () => {
+    const fn = shared.slice(shared.indexOf('export async function storeAttachments'), shared.indexOf('/** Append an outcome row'));
+    const failure = fn.slice(fn.indexOf('store_failed') - 400, fn.indexOf('store_failed'));
+    expect(failure).toContain('storage_object_path: null');
+  });
+});
