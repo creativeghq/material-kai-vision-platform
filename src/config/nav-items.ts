@@ -367,6 +367,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'real-estate',
   // Comms
   'messaging',
+  'whatsapp',
   'reviews',
   // Documents & people
   'contracts',
@@ -376,6 +377,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'email-marketing',
   'social',
   'seo',
+  'seo-websites',
   'automations',
   'mention-monitoring',
   'page-monitoring',
