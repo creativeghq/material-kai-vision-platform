@@ -4126,12 +4126,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       {/* What the cash actually settled. An expense opens its settlement ledger —
                           the Expenses tab beside this one lists the same bill, and the two used to
                           be unconnectable: cash that named no cost, next to a cost that named no
-                          cash. Nothing to show is itself an answer and is stated, because "paid a
-                          supplier with no expense booked" and "paid a booked expense" are different
-                          facts that rendered as an identical row. */}
+                          cash.
+                          Three outcomes, and they are three different facts that all rendered as
+                          the same row before: it settled a document; it went straight against the
+                          order with no cost document in between (the commonest shape — "Record
+                          payment" books cash, "Add expense" books a bill); or it is allocated to
+                          nothing at all, which is the only one of the three that is a loose end. */}
                       <span className="block text-[11px] text-muted-foreground">
                         {p.settles.length === 0
-                          ? <span className="italic">settles nothing booked — cash only</span>
+                          ? (p.settled_on_order > 0.005
+                            ? <span className="italic">against this order · no expense document</span>
+                            : <span className="italic">not allocated to anything</span>)
                           : (
                             <>
                               settles{' '}

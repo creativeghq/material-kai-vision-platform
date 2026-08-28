@@ -1329,7 +1329,14 @@ export const ordersService = {
        * An allocation onto THIS order is omitted: the row is already on this order's screen, so
        * "settles this order" is a line of text that tells the reader nothing.
        */
-      settles: OrderPaymentSettlement[] }>;
+      settles: OrderPaymentSettlement[];
+      /**
+       * How much of this payment is allocated straight onto the order with no cost document in
+       * between — the commonest shape here, and NOT the same fact as an unallocated payment.
+       * Both leave `settles` empty; only this tells them apart, and "paid against the order" vs
+       * "sitting on nothing" is the difference between a tidy book and a loose end.
+       */
+      settled_on_order: number }>;
     received: number;
     paid_out: number;
     profit: number;
@@ -1405,6 +1412,7 @@ export const ordersService = {
       // CRM name if the payee is a saved company/contact, else the free-text ad-hoc payee name.
       counterparty_name: nameFor(p.counterparty_company_id, p.counterparty_contact_id) ?? p.counterparty_name,
       settles: settlementsOf(allocations, orderId),
+      settled_on_order: (allocations ?? []).reduce((s, a) => s + (a.order_id === orderId ? Number(a.amount) : 0), 0),
     }));
     const creditApplied = creditAllocs.map((a) => ({
       allocation_id: a.id, payment_id: a.payment_id, direction: a.payments!.direction, amount: Number(a.amount),
