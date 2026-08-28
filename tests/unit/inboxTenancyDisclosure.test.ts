@@ -143,3 +143,35 @@ describe('#359 CM-2 — one derivation of the 24-hour window', () => {
     expect(api).toMatch(/source: 'unknown'/);
   });
 });
+
+describe('#359 CM-10 — a customer sees the customer projection', () => {
+  it('participants and messages are column-listed for a non-member', () => {
+    // `select('*')` handed a client-role user every internal member's user_id and last_read_at,
+    // and each message's delivery metadata and provider ids.
+    const get = sliceCase("case 'get_thread'");
+    expect(get).toMatch(/select\(isMember \? '\*' : 'id, participant_type, thread_role'\)/);
+    expect(get).toMatch(/select\(isMember \? '\*' : 'id, body, attachments, message_type, sender_participant_id, created_at'\)/);
+  });
+
+  it('the thread row is projected too', () => {
+    // It carries the routing metadata the relay reads — the mailbox we send FROM, the provider
+    // conversation id — plus assignment and internal counters.
+    const get = sliceCase("case 'get_thread'");
+    expect(get).toMatch(/const threadForCaller = isMember \? thread : \{/);
+    expect(get).toMatch(/return json\(\{ thread: threadForCaller,/);
+  });
+
+  it('it matches what the unauthenticated token path already gave the same person', () => {
+    // `token_get_thread` is this screen without an account. Two projections for one audience is
+    // how the narrower one comes to be treated as the special case.
+    const token = api.slice(api.indexOf("case 'token_get_thread'"), api.indexOf("case 'token_request_code'"));
+    for (const field of ['id, participant_type, thread_role', 'id, body, attachments, message_type, sender_participant_id, created_at']) {
+      expect(token, field).toContain(field);
+    }
+  });
+
+  it('notes stay excluded — the loud half of the rule', () => {
+    const get = sliceCase("case 'get_thread'");
+    expect(get).toMatch(/if \(!isMember\) mq = mq\.neq\('message_type', 'note'\)/);
+  });
+});

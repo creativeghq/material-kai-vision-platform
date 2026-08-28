@@ -2280,21 +2280,48 @@ async function handleJwtAction(
       assertThreadVisible(access);
       const isMember = access.isMember;
 
+      /**
+       * A customer gets the same projection the PUBLIC token path gives them (#359 CM-10).
+       *
+       * This returned `select('*')` on participants and messages and the whole thread row to
+       * anybody who could read the thread — including a client-role user on a customer thread.
+       * That is: every internal member's `user_id` and `last_read_at`, the workspace's own mailbox
+       * address and Zernio account id out of `thread.metadata`, and each message's delivery
+       * metadata and provider ids.
+       *
+       * `token_get_thread` — the unauthenticated version of exactly this screen, for exactly this
+       * audience — already projected narrowly. The JWT path simply never did, and the two serve
+       * the same person: one with an account, one without.
+       *
+       * Notes were already excluded, which is the loud half of the rule. This is the quiet half.
+       */
       const { data: participants } = await db
         .from('inbox_participants')
-        .select('*')
+        .select(isMember ? '*' : 'id, participant_type, thread_role')
         .eq('thread_id', threadId)
         .neq('status', 'removed');
 
       let mq = db
         .from('inbox_messages')
-        .select('*')
+        .select(isMember ? '*' : 'id, body, attachments, message_type, sender_participant_id, created_at')
         .eq('thread_id', threadId)
         .is('deleted_at', null)
         .order('created_at', { ascending: true })
         .limit(500);
       if (!isMember) mq = mq.neq('message_type', 'note'); // customers never see notes
       const { data: messages } = await mq;
+
+      // The thread row itself carries the routing metadata the relay reads — the mailbox we send
+      // from, the provider conversation id — plus assignment and internal counters.
+      const threadForCaller = isMember ? thread : {
+        id: thread.id,
+        subject: thread.subject,
+        status: thread.status,
+        channel: thread.channel,
+        thread_type: thread.thread_type,
+        last_message_at: thread.last_message_at,
+        created_at: thread.created_at,
+      };
 
       if (access.participant) {
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id);
@@ -2329,7 +2356,7 @@ async function handleJwtAction(
         }
       }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId, thread) : null;
-      return json({ thread, participants: participants || [], messages: messages || [], whatsapp_window: wa });
+      return json({ thread: threadForCaller, participants: participants || [], messages: messages || [], whatsapp_window: wa });
     }
 
     case 'create_marketplace_inquiry': {
