@@ -1,8 +1,10 @@
 import React from 'react';
+import { ShieldAlert } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
+import { riskyVariablesIn, SENSITIVITY_PRESENTATION } from '@/services/flows/triggerVariables';
 import {
   Select,
   SelectContent,
@@ -54,6 +56,33 @@ import { EmailTemplateSelect } from './EmailTemplateSelect';
  * literal private/loopback/metadata hosts. Returns null when there is nothing useful to say,
  * including for a URL carrying a `{{template}}` whose real value is unknowable here.
  */
+/**
+ * Names the risky variables an outbound field is about to send (#357 AE-14).
+ *
+ * The variables helper says what each token IS; this says what THIS message is about to do with
+ * one. A capability link pasted into a body that goes to a different recipient hands them the
+ * capability — the flow saves cleanly, the send succeeds, and nothing anywhere says so.
+ *
+ * Read out of the text, not out of what was clicked: a config can be typed, pasted, or restored
+ * from a saved flow, and only the text itself says what will actually be sent.
+ */
+const OutboundVariableWarning: React.FC<{ text: string | undefined }> = ({ text }) => {
+  const risky = riskyVariablesIn(text || '');
+  if (risky.length === 0) return null;
+  return (
+    <div className="rounded-sm border border-hairline bg-surface-sunken px-2 py-1.5 text-[10px] leading-tight">
+      {risky.map((r) => (
+        <div key={r.key} className="flex items-start gap-1.5">
+          <ShieldAlert className="h-3 w-3 shrink-0 text-amber-800 dark:text-amber-300" aria-hidden />
+          <span className="text-muted-foreground">
+            <code className="font-mono text-foreground">{r.key}</code> — {SENSITIVITY_PRESENTATION[r.sensitivity].note}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 function httpUrlHint(url: string | undefined): string | null {
   const v = String(url ?? '').trim();
   if (!v) return null;
@@ -225,6 +254,9 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               rows={4}
               className="text-sm"
             />
+            {/* Subject and body are read together: the warning is about what this email SENDS,
+                and a capability link is no safer for being in the subject line. */}
+            <OutboundVariableWarning text={`${cfg.subject || ''}\n${cfg.body || ''}`} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Template (optional)</Label>
@@ -246,6 +278,9 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               rows={3}
               className="text-sm font-mono"
             />
+            {/* A template's variables end up in the same email — mapping a capability link into a
+                tag is the same act as pasting it into the body. */}
+            <OutboundVariableWarning text={cfg.variables} />
             <p className="text-[10px] text-muted-foreground">
               Maps the template's {'{{tag}}'} names to values. Values can use {'{{trigger.data.*}}'} —
               see Available variables above.

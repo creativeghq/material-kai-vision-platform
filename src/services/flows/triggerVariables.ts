@@ -24,6 +24,91 @@ export interface TriggerVariable {
   example?: string;
 }
 
+/**
+ * What kind of thing a variable holds, so an operator pasting it into an outbound email knows
+ * what they are pasting (#357 AE-14).
+ *
+ * The helper offered ninety variables as one undifferentiated list of `{{…}}` tokens. Among them
+ * are one-click URLs that ACT on possession, other people's email addresses, and internal UUIDs —
+ * and nothing on the screen distinguished those from a title or a count. Placing a keep-active
+ * link or an invite URL into a body that goes to a different recipient hands that recipient the
+ * capability, and the flow builder is exactly where somebody does that without meaning to.
+ *
+ * DERIVED FROM THE KEY, not hand-labelled per variable. Ninety hand-kept flags is the "a rule
+ * written N times" shape: the ninety-first variable arrives unlabelled and reads as safe.
+ */
+export type VariableSensitivity =
+  | 'capability'  // acts on possession — anyone holding it can use it, signed in or not
+  | 'link'        // a URL into the app; still needs the recipient to be signed in
+  | 'personal'    // somebody's own contact detail
+  | 'internal'    // an internal id — meaningless to a customer, and it leaks structure
+  | 'markup'      // pre-built HTML, not a value to drop into a sentence
+  | 'plain';      // a title, a name, a count
+
+/**
+ * Keys whose SHAPE misleads. Shrink-only: an entry here means the derivation got it wrong for a
+ * named reason, never that somebody wanted a quieter badge.
+ */
+const SENSITIVITY_OVERRIDES: Array<{ key: string; sensitivity: VariableSensitivity; why: string }> = [
+  { key: 'action_url', sensitivity: 'link', why: 'Ends _url but is an in-app deep link — following it still lands on the login wall.' },
+  { key: 'keep_active_url', sensitivity: 'capability', why: 'Acts with no session at all: one click keeps the board and clears the deletion schedule.' },
+  { key: 'invite_url', sensitivity: 'capability', why: 'Carries the invite code, so it enrols whoever opens it.' },
+];
+
+/**
+ * The one classifier. Order matters: a key can match more than one shape, and the more dangerous
+ * reading wins.
+ */
+export function variableSensitivity(key: string): VariableSensitivity {
+  // An array of {key, sensitivity, why} rather than a keyed object, so the reason is written down
+  // next to each entry — and so this file never contains the literal `action_url: '…'`, which the
+  // deep-link guard reads as a notification target being given a non-path value.
+  const override = SENSITIVITY_OVERRIDES.find((o) => o.key === key);
+  if (override) return override.sensitivity;
+  if (/(^|_)(token|secret|code|password|signature)$/.test(key)) return 'capability';
+  if (/_html$/.test(key)) return 'markup';
+  if (/(^|_)(url|link)$/.test(key)) return 'link';
+  if (/(^|_)(email|phone|mobile|address|iban)$/.test(key)) return 'personal';
+  if (/_id$/.test(key) || key === 'id') return 'internal';
+  return 'plain';
+}
+
+/** How each class is named and explained wherever variables are offered. Formatting only. */
+export const SENSITIVITY_PRESENTATION: Record<
+  VariableSensitivity,
+  { label: string; note: string; tone: 'error' | 'warning' | 'info' | 'neutral' }
+> = {
+  capability: {
+    label: 'Acts on click',
+    note: 'Anyone holding this can use it without signing in. Only send it to the person it was made for.',
+    tone: 'error',
+  },
+  link: { label: 'Link', note: 'A link into the app — the recipient still has to sign in.', tone: 'info' },
+  personal: { label: 'Personal', note: "Somebody's own contact detail. Do not forward it to a third party.", tone: 'warning' },
+  internal: { label: 'Internal id', note: 'Means nothing to a customer, and tells a stranger how the system is put together.', tone: 'neutral' },
+  markup: { label: 'HTML', note: 'A pre-built HTML body. Put it in an HTML field on its own, not inside a sentence.', tone: 'neutral' },
+  plain: { label: '', note: '', tone: 'neutral' },
+};
+
+/** The classes worth stopping an author over when they appear in an outbound body or subject. */
+export const RISKY_SENSITIVITIES: VariableSensitivity[] = ['capability', 'personal'];
+
+/**
+ * Which risky variables a piece of composed text actually references.
+ *
+ * Reads the tokens out of the text rather than tracking what was clicked: a config can be typed,
+ * pasted, or restored from a saved flow, and only the text itself says what will be sent.
+ */
+export function riskyVariablesIn(text: string): Array<{ key: string; sensitivity: VariableSensitivity }> {
+  const found = new Map<string, VariableSensitivity>();
+  for (const m of String(text || '').matchAll(/\{\{\s*trigger\.data\.([a-zA-Z0-9_]+)\s*\}\}/g)) {
+    const key = m[1];
+    const sensitivity = variableSensitivity(key);
+    if (RISKY_SENSITIVITIES.includes(sensitivity)) found.set(key, sensitivity);
+  }
+  return [...found.entries()].map(([key, sensitivity]) => ({ key, sensitivity }));
+}
+
 export interface TriggerVariableGroup {
   /** The trigger_type this set of variables belongs to. */
   trigger: string;
@@ -387,9 +472,18 @@ export const LOOP_VARIABLES: TriggerVariable[] = [
  * { token: '{{trigger.data.title}}', label: 'Title', note: '…' }.
  * Falls back to the standard envelope for unknown/payload-less triggers.
  */
-export function getTriggerVariables(trigger: string | undefined): Array<TriggerVariable & { token: string }> {
+export function getTriggerVariables(
+  trigger: string | undefined,
+): Array<TriggerVariable & { token: string; sensitivity: VariableSensitivity }> {
   const vars = (trigger && TRIGGER_VARIABLES[trigger]) || STANDARD;
-  return vars.map((v) => ({ ...v, token: `{{trigger.data.${v.key}}}` }));
+  // Classified here rather than at each call site, so every surface that offers a variable also
+  // says what kind of thing it is — the helper, the template builder's tag reference, and
+  // anything added later.
+  return vars.map((v) => ({
+    ...v,
+    token: `{{trigger.data.${v.key}}}`,
+    sensitivity: variableSensitivity(v.key),
+  }));
 }
 
 /** Human display title for every trigger that has a documented payload. */
@@ -443,7 +537,11 @@ export const TRIGGER_TITLES: Record<string, string> = {
  * by TRIGGER_TITLES. Used by the email template builder's tag reference so an
  * author can see every event whose data a flow can map into a template.
  */
-export function getAllTriggerGroups(): Array<{ trigger: string; title: string; variables: Array<TriggerVariable & { token: string }> }> {
+export function getAllTriggerGroups(): Array<{
+  trigger: string;
+  title: string;
+  variables: Array<TriggerVariable & { token: string; sensitivity: VariableSensitivity }>;
+}> {
   return Object.keys(TRIGGER_TITLES)
     .filter((t) => TRIGGER_VARIABLES[t]) // only triggers with a documented payload
     .map((trigger) => ({

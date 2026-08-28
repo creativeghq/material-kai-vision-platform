@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Copy, Check, ChevronDown, ChevronRight, Braces } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
-import { getTriggerVariables, LOOP_VARIABLES } from '@/services/flows/triggerVariables';
+import {
+  getTriggerVariables,
+  LOOP_VARIABLES,
+  SENSITIVITY_PRESENTATION,
+  variableSensitivity,
+  type VariableSensitivity,
+} from '@/services/flows/triggerVariables';
 
 interface VariablesHelperProps {
   /** The flow's trigger type (drives which variables are shown). */
@@ -14,15 +20,40 @@ interface VariablesHelperProps {
  * Shows the `{{trigger.data.*}}` variables available for the current flow's
  * trigger, so an operator knows what they can paste into an action's config
  * fields. Click a token to copy it. Collapsible to stay out of the way.
+ *
+ * Each one says WHAT KIND OF THING IT IS (#357 AE-14). This used to be ninety undifferentiated
+ * `{{…}}` tokens, among them one-click URLs that act on possession, other people's email
+ * addresses, and internal UUIDs — indistinguishable on screen from a title or a count. Pasting a
+ * keep-active link or an invite URL into a body that goes to somebody else hands them the
+ * capability, and this panel is exactly where that happens without anyone meaning it.
  */
+/** One tinted squared tag per class. `plain` renders nothing — most variables are ordinary. */
+const SensitivityBadge: React.FC<{ sensitivity: VariableSensitivity }> = ({ sensitivity }) => {
+  const p = SENSITIVITY_PRESENTATION[sensitivity];
+  if (!p.label) return null;
+  return (
+    <Badge variant={p.tone} className="text-[9px] h-4 px-1 shrink-0" title={p.note}>
+      {p.label}
+    </Badge>
+  );
+};
+
 export const VariablesHelper: React.FC<VariablesHelperProps> = ({ triggerType, insideLoop }) => {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   const vars = getTriggerVariables(triggerType);
   const loopVars = insideLoop
-    ? LOOP_VARIABLES.map((v) => ({ ...v, token: v.key === 'loop_index' ? '{{loop_index}}' : `{{${v.key}}}` }))
+    ? LOOP_VARIABLES.map((v) => ({
+        ...v,
+        token: v.key === 'loop_index' ? '{{loop_index}}' : `{{${v.key}}}`,
+        sensitivity: variableSensitivity(v.key),
+      }))
     : [];
+  const shown = [...loopVars, ...vars];
+  // The legend only lists classes actually present — an explanation of a badge nobody can see is
+  // noise, and noise is how a warning gets ignored when it matters.
+  const classesShown = [...new Set(shown.map((v) => v.sensitivity))].filter((c) => c !== 'plain');
 
   const copy = async (token: string) => {
     try {
@@ -57,7 +88,17 @@ export const VariablesHelper: React.FC<VariablesHelperProps> = ({ triggerType, i
             Click to copy, then paste into any field below. Plain text overrides the value the
             source sends; <code className="bg-muted px-1 rounded">{'{{…}}'}</code> is filled at run time.
           </p>
-          {[...loopVars, ...vars].map((v) => (
+          {classesShown.length > 0 && (
+            <ul className="space-y-0.5 rounded border border-hairline bg-background/60 px-2 py-1.5">
+              {classesShown.map((c) => (
+                <li key={c} className="flex items-start gap-1.5 text-[10px] leading-tight">
+                  <SensitivityBadge sensitivity={c} />
+                  <span className="text-muted-foreground">{SENSITIVITY_PRESENTATION[c].note}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {shown.map((v) => (
             <button
               key={v.token}
               type="button"
@@ -66,6 +107,7 @@ export const VariablesHelper: React.FC<VariablesHelperProps> = ({ triggerType, i
             >
               <div className="flex items-center justify-between gap-2">
                 <code className="text-[11px] font-mono text-primary break-all">{v.token}</code>
+                <SensitivityBadge sensitivity={v.sensitivity} />
                 {copied === v.token ? (
                   <Check className="h-3 w-3 text-emerald-500 shrink-0" />
                 ) : (

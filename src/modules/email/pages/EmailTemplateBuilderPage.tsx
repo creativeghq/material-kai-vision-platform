@@ -20,7 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getProductName, getMaterialCategory, getAvailableColors } from '@/utils/productMetadata';
-import { getAllTriggerGroups } from '@/services/flows/triggerVariables';
+import { getAllTriggerGroups, SENSITIVITY_PRESENTATION } from '@/services/flows/triggerVariables';
 import { humanizeLabel } from '@/utils/humanize';
 // Invariant 11 — the canonical escaper, plus the URL scheme guard beside it (#357 AE-6).
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -66,7 +66,12 @@ const FLOW_EVENT_TAG_GROUPS: Array<{ title: string; tags: Array<{ tag: string; l
       // "variables" field maps it (e.g. firstName ← {{trigger.data.client_name}}).
       tag: `{{${v.key}}}`,
       label: v.label,
-      note: v.note,
+      // The class rides along with the note (#357 AE-14). A template author is choosing what an
+      // email will SAY, and "acts on click" is the part of a tag they most need to know before
+      // they put it in a body that may go to somebody other than the person it was minted for.
+      note: SENSITIVITY_PRESENTATION[v.sensitivity].label
+        ? `${v.note} (${SENSITIVITY_PRESENTATION[v.sensitivity].label} — ${SENSITIVITY_PRESENTATION[v.sensitivity].note})`
+        : v.note,
     })),
   }));
 
