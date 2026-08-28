@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
 import { messagingService, MessagingTemplate } from '../services';
 import type { MessageType } from '../services/types';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
 
@@ -37,15 +38,19 @@ export const MessagingTemplatesTab: React.FC = () => {
   const [previewTemplate, setPreviewTemplate] = useState<MessagingTemplate | null>(null);
   const [page, setPage] = useState(1);
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
 
+  // A template belongs to ONE business (#359 CM-4) — switching workspace must not leave the
+  // previous tenant's copy on screen.
   useEffect(() => {
     loadTemplates();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId]);
 
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      const data = await messagingService.getTemplates();
+      const data = await messagingService.getTemplates(activeWorkspaceId ?? '');
       setTemplates(data);
       // Deleting a template can shrink the list — don't strand the user on a now-empty page.
       setPage((p) => clampPage(p, data.length));
@@ -83,13 +88,17 @@ export const MessagingTemplatesTab: React.FC = () => {
 
   const handleDuplicateTemplate = async (template: MessagingTemplate) => {
     try {
-      await messagingService.createTemplate({
-        ...template,
+      // A COPY is not approved, whatever the original was: Meta approved that name, not this one.
+      // `is_approved` is derived from `approval_status` in SQL now, so it is not set by hand.
+      const { id: _id, created_at: _c, updated_at: _u, is_approved: _a, ...base } = template as MessagingTemplate & {
+        created_at?: string; updated_at?: string;
+      };
+      await messagingService.createTemplate(activeWorkspaceId ?? '', {
+        ...base,
         name: `${template.name} (Copy)`,
         slug: `${template.slug}-copy-${Date.now()}`,
-        is_approved: false,
         approval_status: 'pending',
-      });
+      } as never);
       toast({
         title: 'Success',
         description: 'Template duplicated successfully',
@@ -250,6 +259,7 @@ export const MessagingTemplatesTab: React.FC = () => {
       {/* Create/Edit Modal */}
       {(showCreateModal || editingTemplate) && (
         <TemplateModal
+          workspaceId={activeWorkspaceId ?? ''}
           template={editingTemplate}
           onClose={() => {
             setShowCreateModal(false);
@@ -277,6 +287,8 @@ export const MessagingTemplatesTab: React.FC = () => {
 // Template Modal Component
 interface TemplateModalProps {
   template: MessagingTemplate | null;
+  /** The business this template belongs to (#359 CM-4). */
+  workspaceId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -305,7 +317,7 @@ function toMetaBody(content: string): string {
   return content.replace(/\{\{(\w+)\}\}/g, () => `{{${++n}}}`);
 }
 
-const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSuccess }) => {
+const TemplateModal: React.FC<TemplateModalProps> = ({ template, workspaceId, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: template?.name || '',
     slug: template?.slug || '',
@@ -402,7 +414,9 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
         slug,
         variables,
         buttons: [],
-        is_approved: false,
+        // `is_approved` is GENERATED from `approval_status` in SQL now (#359 CM-3) — two columns
+        // holding one fact were free to disagree, and a send path reading the wrong one is a
+        // message Meta rejects or, worse, accepts under the wrong category.
         approval_status: 'pending' as const,
       };
 
@@ -413,7 +427,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
           description: 'Template updated successfully',
         });
       } else {
-        await messagingService.createTemplate(templateData);
+        await messagingService.createTemplate(workspaceId, templateData);
         toast({
           title: 'Success',
           description: 'Template created successfully',

@@ -70,6 +70,48 @@ interface SendBulkRequest extends Omit<SendMessageRequest, 'to'> {
 
 
 /**
+ * Resolve a template for SENDING (#359 CM-3).
+ *
+ * The send paths did `.from('messaging_templates').select('*').eq('id', body.templateId)` — id
+ * alone, on the service-role client. No workspace, so any id sent any tenant's template; no
+ * `is_active`, so a retired one still sent; no approval check, so a row Meta had never seen went
+ * out under whatever `whatsapp_template_name` it claimed.
+ *
+ * Four conditions, and each is a different failure:
+ *   • the workspace  — otherwise this is a cross-tenant read AND a cross-tenant send
+ *   • is_active      — a template retired for a reason
+ *   • approved       — Meta rejects an unapproved name, and the rejection counts against the number
+ *   • a template name — an "approved" row with no Meta name is a freeform send wearing a template
+ *
+ * Returns null when the id is unusable, and the caller refuses the send. A missing template must
+ * never degrade to "send the freeform body instead": that is how a marketing blast goes out as an
+ * unapproved freeform message to people who never opened a conversation.
+ */
+async function resolveSendableTemplate(
+  db: SupabaseClient<any, 'public', 'public', any, any>,
+  workspaceId: string,
+  templateId: string,
+): Promise<{ template: any } | { error: string }> {
+  const { data, error } = await db
+    .from('messaging_templates')
+    .select('*')
+    .eq('id', templateId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (error) return { error: `Could not load the template: ${error.message}` };
+  // 404-shaped for both "no such template" and "not yours" — invariant 1, no id enumeration.
+  if (!data) return { error: 'Template not found.' };
+  if (data.is_active === false) return { error: 'That template is not active.' };
+  if (data.approval_status !== 'approved') {
+    return { error: `That template is not approved by Meta (status: ${data.approval_status ?? 'unknown'}). Submit it for approval first.` };
+  }
+  if (!data.whatsapp_template_name) {
+    return { error: 'That template has no approved WhatsApp template name, so it cannot be sent as a template.' };
+  }
+  return { template: data };
+}
+
+/**
  * E.164 for the provider, and a REFUSAL when the number is not in international form (#359 CM-1).
  *
  * There were four normalizers with three behaviours. This one prefixed a bare `+`, so
@@ -509,9 +551,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         let template: any = null;
         if (body.templateId) {
-          const { data } = await supabaseClient
-            .from('messaging_templates').select('*').eq('id', body.templateId).maybeSingle();
-          template = data;
+          const resolved = await resolveSendableTemplate(supabaseClient, tenantWsId, String(body.templateId));
+          if ('error' in resolved) throw new HttpError(404, resolved.error);
+          template = resolved.template;
         }
 
         const recipients = Array.isArray(body.to) ? body.to : [body.to];
@@ -651,9 +693,9 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         let template: any = null;
         if (body.templateId) {
-          const { data } = await supabaseClient
-            .from('messaging_templates').select('*').eq('id', body.templateId).maybeSingle();
-          template = data;
+          const resolved = await resolveSendableTemplate(supabaseClient, tenantWsId, String(body.templateId));
+          if ('error' in resolved) throw new HttpError(404, resolved.error);
+          template = resolved.template;
         }
 
         const results: any[] = [];
@@ -2637,10 +2679,19 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       case 'templates': {
-        const { data, error } = await supabaseClient
+        // WORKSPACE-SCOPED (#359 CM-4). This selected every row on the service-role client, so one
+        // tenant read every other tenant's template bodies — which are their prices, their offers
+        // and the way they talk to their own customers.
+        // Same convention as `logs`: null means the caller is a platform operator and is not
+        // scoped; an empty array means a tenant who belongs to no workspace and sees nothing.
+        const tplScope = await readScopeWorkspaceIds();
+        if (tplScope && tplScope.length === 0) return jsonResponse({ templates: [] });
+        let tplQuery = supabaseClient
           .from('messaging_templates').select('*')
           .eq('channel_type', 'whatsapp')
           .order('name', { ascending: true });
+        if (tplScope) tplQuery = tplQuery.in('workspace_id', tplScope);
+        const { data, error } = await tplQuery;
         if (error) throw error;
         return jsonResponse({ templates: data });
       }

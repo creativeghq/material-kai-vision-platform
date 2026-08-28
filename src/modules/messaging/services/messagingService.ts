@@ -200,10 +200,14 @@ export class MessagingService {
   /**
    * Get all messaging templates
    */
-  async getTemplates(channelType?: MessagingChannelType): Promise<MessagingTemplate[]> {
+  async getTemplates(workspaceId: string, channelType?: MessagingChannelType): Promise<MessagingTemplate[]> {
+    // Explicitly workspace-filtered as well as RLS-scoped (#359 CM-4). The table had no workspace
+    // column at all until this fix, so every tenant read every other tenant's template bodies —
+    // which are their prices, their offers and the way they talk to their own customers.
     let query = supabase
       .from('messaging_templates')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false });
 
     if (channelType) {
@@ -223,13 +227,15 @@ export class MessagingService {
   /**
    * Get template by slug
    */
-  async getTemplateBySlug(slug: string): Promise<MessagingTemplate | null> {
+  async getTemplateBySlug(workspaceId: string, slug: string): Promise<MessagingTemplate | null> {
+    // A slug is unique per BUSINESS, not per platform — two tenants may both have `order-ready`.
     const { data, error } = await supabase
       .from('messaging_templates')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .eq('slug', slug)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching template:', error);
@@ -242,10 +248,19 @@ export class MessagingService {
   /**
    * Create a new messaging template
    */
-  async createTemplate(template: Omit<MessagingTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<MessagingTemplate> {
+  async createTemplate(
+    workspaceId: string,
+    // `is_approved` is omitted as well: it is GENERATED in SQL from `approval_status` (#359 CM-3),
+    // and Postgres refuses a non-DEFAULT write to a generated column — so a caller that still
+    // supplies it is a hard runtime error, not a no-op.
+    template: Omit<MessagingTemplate, 'id' | 'created_at' | 'updated_at' | 'is_approved'>,
+  ): Promise<MessagingTemplate> {
+    // The workspace is a parameter, never a field the caller can put in the object: a template is
+    // owned by the business that wrote it, and letting the payload name the owner is the mass
+    // assignment invariant 8 forbids.
     const { data, error } = await supabase
       .from('messaging_templates')
-      .insert(template)
+      .insert({ ...template, workspace_id: workspaceId })
       .select()
       .single();
 
@@ -261,14 +276,24 @@ export class MessagingService {
    * Update a messaging template
    */
   async updateTemplate(id: string, updates: Partial<MessagingTemplate>): Promise<MessagingTemplate> {
+    // `workspace_id` is never patchable: re-homing a template is not an edit, it is a transfer of
+    // somebody's business copy to another tenant.
+    // `workspace_id` is never patchable, and `is_approved` is a GENERATED column Postgres refuses
+    // to be written at all.
+    const { workspace_id: _ignored, is_approved: _derived, ...safe } =
+      updates as Partial<MessagingTemplate> & { workspace_id?: string };
     const { data, error } = await supabase
       .from('messaging_templates')
-      .update(updates)
+      .update(safe)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
+      // An approved template is frozen in SQL (#359 CM-3): Meta approved specific text under a
+      // specific name, and changing it while keeping the approval sends something Meta never saw.
+      // The trigger raises 42501 with the sentence to show the user.
+      if (error.code === '42501') throw new Error(error.message);
       console.error('Error updating template:', error);
       throw new Error('Failed to update messaging template');
     }

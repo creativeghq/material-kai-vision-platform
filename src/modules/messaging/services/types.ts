@@ -54,7 +54,8 @@ export interface MessagingTemplate {
   whatsapp_template_name?: string;
   whatsapp_template_namespace?: string;
   whatsapp_language_code?: string;
-  is_approved: boolean;
+  /** GENERATED in SQL from `approval_status` (#359 CM-3). Read-only — never send it in a write. */
+  readonly is_approved: boolean;
   approval_status: ApprovalStatus;
   is_active: boolean;
   created_by?: string;
