@@ -14,6 +14,7 @@
  */
 
 import { useState } from 'react';
+import { safeHref } from '@/utils/safeUrl';
 
 export interface SEOResearchCardData {
   keyword: string;
@@ -219,7 +220,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                 {videos.source.videos.map((v: any, i: number) => (
                   <div key={i} className="leading-snug">
                     {v.url ? (
-                      <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{v.title || v.url}</a>
+                      <a href={safeHref(v.url)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{v.title || v.url}</a>
                     ) : (
                       <span>{v.title}</span>
                     )}
@@ -245,7 +246,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                 {news.map((n, i) => (
                   <div key={i} className="leading-snug">
                     {n.source?.url ? (
-                      <a href={n.source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{n.source.title || n.title}</a>
+                      <a href={safeHref(n.source.url)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{n.source.title || n.title}</a>
                     ) : (
                       <span>{n.source?.title || n.title}</span>
                     )}
@@ -269,7 +270,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                   <div key={i} className="leading-snug">
                     <div>
                       {p.source?.url ? (
-                        <a href={p.source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{p.source.domain}</a>
+                        <a href={safeHref(p.source.url)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{p.source.domain}</a>
                       ) : (
                         <span className="font-medium">{p.source?.domain}</span>
                       )}
@@ -293,7 +294,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                   <div key={i} className="leading-snug">
                     <div>
                       {s.source?.url ? (
-                        <a href={s.source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{s.source.title}</a>
+                        <a href={safeHref(s.source.url)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{s.source.title}</a>
                       ) : (
                         <span className="font-medium">{s.source?.title}</span>
                       )}
@@ -331,7 +332,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                     {ai.source.references.map((r: any, i: number) => (
                       <div key={i} className="text-xs leading-snug">
                         {r.url ? (
-                          <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{r.title || r.domain || r.url}</a>
+                          <a href={safeHref(r.url)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{r.title || r.domain || r.url}</a>
                         ) : (
                           <span>{r.title || r.domain}</span>
                         )}
@@ -362,7 +363,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
               <div className="text-sm">
                 Held by{' '}
                 {fs.source?.current_url ? (
-                  <a href={fs.source.current_url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{fs.source?.current_domain || 'unknown'}</a>
+                  <a href={safeHref(fs.source.current_url)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{fs.source?.current_domain || 'unknown'}</a>
                 ) : (
                   <span className="font-medium">{fs.source?.current_domain || 'unknown'}</span>
                 )}
@@ -386,7 +387,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
               <div className="text-sm">
                 {kg.source?.knowledge_graph_present
                   ? <>Present — {kg.source?.url
-                      ? <a href={kg.source.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{kg.source?.title || '(unnamed entity)'}</a>
+                      ? <a href={safeHref(kg.source.url)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{kg.source?.title || '(unnamed entity)'}</a>
                       : <span className="font-medium">{kg.source?.title || '(unnamed entity)'}</span>}</>
                   : <span className={WARN}>Not shown — build entity authority (Wikipedia, Wikidata, consistent NAP) to earn one.</span>}
               </div>
@@ -430,7 +431,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
           ) : competitors.map((c) => (
             <a
               key={`${c.source?.rank}-${c.source?.url}`}
-              href={c.source?.url}
+              href={safeHref(c.source?.url)}
               target="_blank"
               rel="noopener noreferrer"
               className="block bg-muted/40 hover:bg-muted rounded-lg p-2.5 border border-border transition"

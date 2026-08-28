@@ -30,19 +30,59 @@ interface PinData {
 
 
 /**
- * Extract pin ID from various Pinterest URL formats
+ * Pinterest hosts we accept a pin URL from (#360 CB-10).
+ *
+ * `pinterest.com` plus its country domains (`pinterest.co.uk`, `pinterest.de`, …) and the `pin.it`
+ * shortener, which redirects into one of them.
+ */
+const PINTEREST_HOST = /^(?:[a-z0-9-]+\.)*pinterest\.[a-z.]{2,6}$|^pin\.it$/i;
+
+/**
+ * Is this actually a Pinterest pin URL? (#360 CB-10)
+ *
+ * `extractPinId` matched `/pinterest\.com\/pin\/(\d+)/` ANYWHERE in the string, so
+ * `https://attacker.test/?ref=pinterest.com/pin/123` passed as a pin — a substring test standing
+ * in for a host test, which is the same mistake as matching a domain with `includes()`.
+ *
+ * The URL is then handed to Pinterest's oEmbed endpoint, which fetches it server-side. Our own
+ * infrastructure is not the target (the fetch is always to pinterest.com, and the image download
+ * further down goes through `assertSafeUrl`), but forwarding an arbitrary URL to a third party's
+ * fetcher on a caller's say-so is a favour to nobody, and it is what turns this endpoint into a
+ * probe. Parse it, check the HOST, and require the pin path.
+ */
+function parsePinterestUrl(pinUrl: string): { url: URL; pinId: string | null } | null {
+  let url: URL;
+  try {
+    url = new URL(String(pinUrl).trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (!PINTEREST_HOST.test(url.hostname)) return null;
+  const m = url.pathname.match(/^\/pin\/(\d+)/);
+  return { url, pinId: m ? m[1] : null };
+}
+
+/**
+ * Extract pin ID from various Pinterest URL formats.
+ *
+ * Host-checked first — see parsePinterestUrl. A number lifted out of a foreign URL is not a pin id.
  */
 function extractPinId(pinUrl: string): string | null {
-  // Matches: pinterest.com/pin/123456/, www.pinterest.com/pin/123456789/, etc.
-  const match = pinUrl.match(/pinterest\.com\/pin\/(\d+)/i);
-  return match ? match[1] : null;
+  return parsePinterestUrl(pinUrl)?.pinId ?? null;
 }
 
 /**
  * Fetch pin metadata via Pinterest oEmbed API
  */
 async function extractPinData(pinUrl: string): Promise<PinData> {
-  const oembedUrl = `https://www.pinterest.com/oembed.json?url=${encodeURIComponent(pinUrl)}`;
+  const parsed = parsePinterestUrl(pinUrl);
+  if (!parsed) {
+    throw new Error('That is not a Pinterest pin URL. Copy the link from a pin — it looks like https://www.pinterest.com/pin/123456789/');
+  }
+  // The normalised URL, not the caller's string: a fragment, a userinfo prefix or a stray
+  // whitespace-encoded suffix should not travel to the provider.
+  const oembedUrl = `https://www.pinterest.com/oembed.json?url=${encodeURIComponent(parsed.url.toString())}`;
   const res = await fetch(oembedUrl);
 
   if (!res.ok) {

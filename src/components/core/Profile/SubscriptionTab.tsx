@@ -47,6 +47,35 @@ export const SubscriptionTab: React.FC = () => {
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean } | null>(null);
 
   const tiers = stripeService.getSubscriptionTiers();
+
+  /**
+   * The plan ids the SERVER recognises (#360 CB-12).
+   *
+   * This screen used to post `tier.priceId` — a Stripe price id baked into the bundle from
+   * `VITE_STRIPE_PRO_PRICE_ID` — and the checkout handler charged whatever it was told. The price
+   * belongs to `subscription_plans`; the client's job is to name a plan.
+   *
+   * The tier CARDS are still the hardcoded list (a separate problem: the code says "Enterprise"
+   * where the DB says "Request Self Hosting"). What changes here is what gets SENT, and the
+   * mapping is exact because the plan rows are named `free` / `pro` / `enterprise`.
+   */
+  const [planIdByName, setPlanIdByName] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('subscription_plans')
+        .select('id, name')
+        .eq('is_active', true);
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      for (const row of (data ?? []) as Array<{ id: string; name: string }>) {
+        map[String(row.name).toLowerCase()] = row.id;
+      }
+      setPlanIdByName(map);
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const hasSubscription = currentTier !== 'free';
 
   useEffect(() => {
@@ -160,13 +189,19 @@ export const SubscriptionTab: React.FC = () => {
   };
 
   const handleSubscribe = async (tier: ReturnType<typeof stripeService.getSubscriptionTiers>[number]) => {
-    if (!user || !tier.priceId) return;
+    const planId = planIdByName[tier.id.toLowerCase()];
+    if (!user || !planId) {
+      toast({
+        title: 'That plan is not available right now',
+        description: 'It has no active pricing configured. Try again shortly, or contact support.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
     try {
-      const { url } = await stripeService.createSubscriptionCheckoutSession(
-        tier.priceId,
-      );
+      const { url } = await stripeService.createSubscriptionCheckoutSession(planId);
 
       if (url) window.location.href = url;
     } catch (error) {
@@ -280,7 +315,7 @@ export const SubscriptionTab: React.FC = () => {
                   </li>
                 ))}
               </ul>
-              {tier.id !== currentTier && tier.id !== 'free' && (
+              {tier.id !== currentTier && tier.id !== 'free' && planIdByName[tier.id.toLowerCase()] && (
                 <Button
                   onClick={() => handleSubscribe(tier)}
                   disabled={loading}

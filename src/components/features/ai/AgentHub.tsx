@@ -141,6 +141,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { safeHref } from '@/utils/safeUrl';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
@@ -4363,7 +4364,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <div key={l.id || `${idx}-${l.url}`} className="bg-muted/40 rounded-md p-2.5 border border-border">
                 <div className="flex items-start justify-between gap-2">
                   <a
-                    href={l.url}
+                    href={safeHref(l.url)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-sm font-medium text-primary hover:underline inline-flex items-start gap-1 min-w-0"
@@ -4552,7 +4553,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           <div className="space-y-1 text-sm text-foreground">
             <div><span className="text-muted-foreground">PO number:</span> {message.purchaseOrderSentData.order_number}</div>
             {message.purchaseOrderSentData.recipient && <div><span className="text-muted-foreground">Sent to:</span> {message.purchaseOrderSentData.recipient}</div>}
-            {message.purchaseOrderSentData.pdf_url && <a href={message.purchaseOrderSentData.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">Open PDF</a>}
+            {message.purchaseOrderSentData.pdf_url && <a href={safeHref(message.purchaseOrderSentData.pdf_url)} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">Open PDF</a>}
           </div>
         </div>
       );
@@ -4763,7 +4764,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   <details className="group">
                     <summary className="cursor-pointer list-none">
                       <a
-                        href={r.url} target="_blank" rel="noopener noreferrer"
+                        href={safeHref(r.url)} target="_blank" rel="noopener noreferrer"
                         className="text-sm text-primary hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >{r.title || r.url}</a>
@@ -4944,7 +4945,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               mediaType="image"
               mediaTitle={`Materials Selection Board — ${message.materialsBoardData.board_mode.replace(/-/g, ' ')}`}
             />
-            <a href={message.materialsBoardData.image_url} download title="Download board">
+            <a href={safeHref(message.materialsBoardData.image_url)} download title="Download board">
               <Button variant="outline" size="sm" className="gap-2">
                 <Download className="h-4 w-4" />
                 Download
@@ -4986,7 +4987,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           />
           <div className="flex items-center justify-end gap-2">
             <MoodboardSavePopover mediaUrl={message.videoData.video_url} mediaType="video" mediaTitle="Generated Video" />
-            <a href={message.videoData.video_url} download title="Download video">
+            <a href={safeHref(message.videoData.video_url)} download title="Download video">
               <Button variant="outline" size="sm" className="gap-2">
                 <Download className="h-4 w-4" />
                 Download
@@ -5801,7 +5802,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             mediaTitle={`Materials Selection Board — ${message.materialsBoardData.board_mode.replace(/-/g, ' ')}`}
                           />
                           <a
-                            href={message.materialsBoardData.image_url}
+                            href={safeHref(message.materialsBoardData.image_url)}
                             download
                             title="Download board"
                           >
@@ -5929,7 +5930,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             mediaTitle="Generated Video"
                           />
                           <a
-                            href={message.videoData.video_url}
+                            href={safeHref(message.videoData.video_url)}
                             download
                             title="Download video"
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors"

@@ -43,6 +43,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { safeHref } from '@/utils/safeUrl';
 
 export interface SEOGenericCardData {
   type: string;
@@ -125,7 +126,7 @@ function ItemList({ rows, max = 8 }: { rows: Array<{ left: string; right?: strin
         <li key={i} className="text-xs bg-muted/40 rounded px-2 py-1 border border-border">
           <div className="flex justify-between items-baseline gap-2">
             {r.href ? (
-              <a href={r.href} target="_blank" rel="noopener noreferrer" className="truncate hover:underline flex-1 text-primary">{r.left}</a>
+              <a href={safeHref(r.href)} target="_blank" rel="noopener noreferrer" className="truncate hover:underline flex-1 text-primary">{r.left}</a>
             ) : (
               <span className="truncate flex-1 text-foreground">{r.left}</span>
             )}
@@ -1476,7 +1477,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
               <p className="text-[11px] text-muted-foreground">{i.address || i.address_info?.address}</p>
             )}
             {i.url && (
-              <a href={i.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+              <a href={safeHref(i.url)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
                 {i.url}
               </a>
             )}

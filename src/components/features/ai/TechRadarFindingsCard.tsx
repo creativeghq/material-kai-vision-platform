@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { safeHref } from '@/utils/safeUrl';
 // One source (#391).
 import {
   RING_VALUES, ringRank, isTechRadarRing, type TechRadarRing,
@@ -236,7 +237,7 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
                 {f.impact && <span title="Expected payoff">impact {levelDot(f.impact)}</span>}
                 {(f.evidence || []).slice(0, 3).map((e, i) =>
                   e.url ? (
-                    <a key={i} href={e.url} target="_blank" rel="noreferrer" className="text-primary hover:underline line-clamp-1">
+                    <a key={i} href={safeHref(e.url)} target="_blank" rel="noreferrer" className="text-primary hover:underline line-clamp-1">
                       {e.title || safeHostname(e.url)}
                     </a>
                   ) : null,
@@ -254,7 +255,7 @@ export function TechRadarFindingsCard({ data }: { data: TechRadarFindingsData })
                       <div key={i} className="space-y-0.5">
                         {e.url ? (
                           <a
-                            href={e.url}
+                            href={safeHref(e.url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary hover:underline break-words"

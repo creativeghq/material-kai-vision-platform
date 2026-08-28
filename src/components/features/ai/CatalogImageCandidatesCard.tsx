@@ -3,6 +3,7 @@ import { ImageIcon, Loader2, Globe, Database, Check } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService } from '@/services/catalogsService';
+import { safeHref } from '@/utils/safeUrl';
 
 export interface ImageCandidate {
   source: 'db' | 'web';
@@ -130,7 +131,7 @@ export const CatalogImageCandidatesCard: React.FC<Props> = ({
               {domain && (
                 sourceUrl ? (
                   <a
-                    href={sourceUrl}
+                    href={safeHref(sourceUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline text-[10px] truncate px-0.5"

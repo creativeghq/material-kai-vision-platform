@@ -18,7 +18,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Share2, MessageCircle, ArrowRight,
-  FileImage, Landmark, Mail, Users, Truck, Code2,
+  FileImage, Landmark, Mail, Users, Truck, Code2, KeyRound,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,7 @@ import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentials
 import { ShippingCredentialsCard } from '@/modules/stock/components/ShippingCredentialsCard';
 import { EmbedKeysCard } from '@/components/core/Profile/EmbedKeysCard';
 import { useModule } from '@/modules/_core';
+import { isAdmin } from '@/auth/roles';
 
 interface ConnState {
   social: number;
@@ -63,6 +64,31 @@ const ConnectionRow: React.FC<{
   </div>
 );
 
+/**
+ * What "leave it blank" actually does (#360 CB-1 / CB-2).
+ *
+ * The Finance section said *"Leave blank to use the platform defaults."* It is not true, and the
+ * backends say so in their own comments: `_shared/aade/soap.ts` — *"Tenants NEVER use the
+ * operator's master credentials"* — and `resolveWorkspaceEmailSender`, since #357 AE-1, exempts
+ * only a system send with no workspace and the operator's own root workspace.
+ *
+ * A wrong mental model here is worse than a silent bug, because the tenant ACTS on it: they leave
+ * the fields empty believing there is a fallback, and then their invoices are not submitted to
+ * AADE and their email does not send — and nothing on this screen ever said otherwise.
+ *
+ * Stated once, at the top, because it is one rule for every card below. Per-section prose is how
+ * two sections came to describe two different platforms.
+ */
+const ByokRuleNote: React.FC = () => (
+  <div className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+    <span className="font-medium text-foreground">These are your own accounts.</span>{' '}
+    Nothing here falls back to ours: a connection you leave blank is simply <em>off</em> for this
+    workspace — tax submissions, email and payouts that need it will refuse rather than run on
+    someone else&apos;s credentials. That is deliberate, and it is what keeps your sending
+    reputation, your settlement and your tax filings yours.
+  </div>
+);
+
 const SectionHead: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({
   icon: Icon, title, description,
 }) => (
@@ -78,7 +104,7 @@ const SectionHead: React.FC<{ icon: React.ElementType; title: string; descriptio
 type SectionId = 'finance' | 'email' | 'documents' | 'hr' | 'shipping' | 'social' | 'embed';
 
 export const WorkspaceKeysTab: React.FC = () => {
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
   const stockModule = useModule('stock');
   const hrModule = useModule('hr');
   const [conn, setConn] = useState<ConnState>({ social: 0 });
@@ -134,6 +160,30 @@ export const WorkspaceKeysTab: React.FC = () => {
     return <p className="text-sm text-muted-foreground">Select a workspace to manage its keys.</p>;
   }
 
+  /**
+   * Credential entry is owner/admin work (#360 CB-4).
+   *
+   * The individual cards self-gate through RLS, which is the wall that matters — but every member
+   * of a workspace could reach this screen, read which integrations exist and attempt to change
+   * them, and discover the boundary only as a failed save. Connecting a payment provider or a tax
+   * account is a money-and-identity capability; it belongs behind the same role that owns the rest
+   * of the workspace's commercial settings.
+   */
+  if (!isAdmin(workspaceRole)) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <KeyRound className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+          <p className="text-sm font-medium">Only an owner or admin manages this workspace&apos;s connections</p>
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+            Tax credentials, checkout providers, bank access and the sending domain all bill, file
+            or settle under this business&apos;s name. Ask an owner to set them up.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const renderSection = (id: SectionId) => {
     switch (id) {
       case 'finance':
@@ -142,7 +192,7 @@ export const WorkspaceKeysTab: React.FC = () => {
             <SectionHead
               icon={Landmark}
               title="Finance & Tax"
-              description="Tax credentials, the checkout providers buyers pay through, and your own bank connection. Leave blank to use the platform defaults."
+              description="Tax credentials, the checkout providers buyers pay through, and your own bank connection."
             />
             {/* Subgrouped so the six cards scan as three questions: taxes? checkout? bank? */}
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tax & e-Invoicing</p>
@@ -169,7 +219,7 @@ export const WorkspaceKeysTab: React.FC = () => {
             <SectionHead
               icon={Mail}
               title="Email"
-              description="Send transactional + marketing email from your own Resend account and verified sender."
+              description="Send transactional + marketing email from your own Resend account and verified sender. Until both the key and the from-address are set, this workspace sends no email."
             />
             <WorkspaceEmailConfigCard workspaceId={activeWorkspaceId} />
           </>
@@ -284,6 +334,8 @@ export const WorkspaceKeysTab: React.FC = () => {
 
         {/* Content pane */}
         <section className="min-w-0 flex-1 space-y-4">
+          {/* One rule, above every section — see ByokRuleNote (#360 CB-1/CB-2). */}
+          <ByokRuleNote />
           {renderSection(active)}
         </section>
       </div>

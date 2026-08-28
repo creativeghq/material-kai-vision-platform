@@ -38,6 +38,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildMentionFeedFilters } from './mentionFilters';
 import { formatDate } from '@/utils/datetime';
+import { safeHref } from '@/utils/safeUrl';
 import {
   CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
@@ -582,7 +583,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                                   </span>
                                 )}
                               </div>
-                              <a href={row.url} target="_blank" rel="noopener noreferrer"
+                              <a href={safeHref(row.url)} target="_blank" rel="noopener noreferrer"
                                  className="font-medium text-sm hover:underline flex items-center gap-1">
                                 {row.title || row.url}
                                 <ExternalLink className="h-3 w-3 opacity-50" />

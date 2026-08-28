@@ -833,7 +833,7 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
                   <span className="text-sm font-medium truncate">{comp.title}</span>
                 </div>
                 <a
-                  href={comp.url}
+                  href={safeHref(comp.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-primary hover:underline truncate block"
@@ -1000,7 +1000,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
                   {m.title && <p className="text-xs text-foreground truncate">{m.title}</p>}
                   {m.description && <p className="text-xs text-muted-foreground line-clamp-2">{m.description}</p>}
                   <a
-                    href={m.url}
+                    href={safeHref(m.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline truncate inline-flex items-center gap-1"
@@ -1090,7 +1090,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
                   <span className="text-sm truncate">{link.anchor}</span>
                 </div>
                 <a
-                  href={link.href}
+                  href={safeHref(link.href)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-primary hover:underline truncate max-w-[45%]"
@@ -1142,7 +1142,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
                     <span className="text-sm font-medium truncate">{comp.title}</span>
                   </div>
                   <a
-                    href={comp.url}
+                    href={safeHref(comp.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline truncate block"
@@ -1158,7 +1158,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
                   {comp.contentScore != null && comp.contentScore > 0 && (
                     <Badge variant="secondary" className="text-xs">{comp.contentScore}</Badge>
                   )}
-                  <a href={comp.url} target="_blank" rel="noopener noreferrer">
+                  <a href={safeHref(comp.url)} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -1454,6 +1454,7 @@ function parseArticle(markdown: string): ArticleBlock[] {
 
 import type { Components } from 'react-markdown';
 import { formatNumber } from '@/utils/decimal';
+import { safeHref } from '@/utils/safeUrl';
 
 /** Slugify heading text so each heading gets a stable anchor id. */
 function slugify(text: string): string {
@@ -1514,7 +1515,7 @@ function buildMarkdownComponents(opts: { dense?: boolean } = {}): Components {
     ),
     a: ({ children, href }) => (
       <a
-        href={href}
+        href={safeHref(href)}
         target={href?.startsWith('http') ? '_blank' : undefined}
         rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
         className="text-primary font-medium underline decoration-primary/30 underline-offset-[3px] hover:decoration-primary transition-colors"

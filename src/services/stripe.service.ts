@@ -101,8 +101,15 @@ export const stripeAPI = {
   /**
    * Create Stripe Checkout session for subscription
    */
+  /**
+   * Start a subscription checkout for a PLAN (#360 CB-12).
+   *
+   * This took a Stripe price id and posted it — so the server was being told what to charge by
+   * the browser, and a caller could name any price on the platform's Stripe account. The price
+   * lives in `subscription_plans`; the client's job is to say which plan.
+   */
   async createSubscriptionCheckoutSession(
-    priceId: string,
+    planId: string,
   ): Promise<{ url: string }> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
@@ -116,7 +123,7 @@ export const stripeAPI = {
       body: JSON.stringify({
         action: 'checkout',
         type: 'subscription',
-        priceId,
+        planId,
         successUrl: `${window.location.origin}/profile?tab=subscription&success=true`,
         cancelUrl: `${window.location.origin}/profile?tab=subscription&canceled=true`,
       }),
@@ -221,8 +228,8 @@ export class StripeService {
     return stripeAPI.createCreditCheckoutSession(credits, price, workspaceId);
   }
 
-  async createSubscriptionCheckoutSession(priceId: string) {
-    return stripeAPI.createSubscriptionCheckoutSession(priceId);
+  async createSubscriptionCheckoutSession(planId: string) {
+    return stripeAPI.createSubscriptionCheckoutSession(planId);
   }
 
   async createCustomerPortalSession() {

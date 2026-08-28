@@ -9,6 +9,7 @@ import { getDestination } from '@/config/appDestinations';
 import { Badge } from '@/components/core/ui/badge';
 import { formatDate } from '@/utils/datetime';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { safeHref } from '@/utils/safeUrl';
 
 /**
  * Generic structured renderer for agent result chunks that were
@@ -78,7 +79,7 @@ function Scalar({ v }: { v: any }) {
     if (ENUM_VALUE_RE.test(v)) return <span>{labelize(v)}</span>;
     if (IMG_URL_RE.test(v)) {
       return (
-        <a href={v} target="_blank" rel="noopener noreferrer" className="inline-block" aria-label="Open image in a new tab">
+        <a href={safeHref(v)} target="_blank" rel="noopener noreferrer" className="inline-block" aria-label="Open image in a new tab">
           <img
             src={v}
             alt=""
@@ -90,7 +91,7 @@ function Scalar({ v }: { v: any }) {
     }
     if (URL_RE.test(v)) {
       return (
-        <a href={v} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+        <a href={safeHref(v)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
           {v}
         </a>
       );

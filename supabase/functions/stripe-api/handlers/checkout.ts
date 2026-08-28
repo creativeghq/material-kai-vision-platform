@@ -126,19 +126,71 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
         cancel_url: cancelUrl,
       });
     } else if (type === 'subscription') {
-      // Recurring subscription
+      /**
+       * THE SERVER DECIDES WHAT A SUBSCRIPTION COSTS (#360 CB-12).
+       *
+       * `price: priceId` took the Stripe price id straight from the request body, so a caller
+       * could name ANY price that exists on the platform's Stripe account — a test price, an
+       * archived one, a price belonging to a different product — and have a subscription created
+       * against it. The one thing standing between that and a mispriced subscription was the
+       * webhook's tier mapping, which is a different file with a different author.
+       *
+       * `subscription_plans` already holds the answer, and `crm-api`'s handler already reads it
+       * that way. The client names a PLAN; the server names the price. Same defect as FE-23 in
+       * #351 on the unified Stripe route.
+       *
+       * A legacy `priceId` is still accepted, but only if it IS one of the active plans' stored
+       * price ids — which makes it a lookup, not a trust.
+       */
+      const planIdRaw = typeof body.planId === 'string' ? body.planId : null;
+      const { data: plans, error: plansErr } = await supabase
+        .from('subscription_plans')
+        .select('id, name, stripe_price_id, is_active, contact_sales')
+        .eq('is_active', true)
+        .not('stripe_price_id', 'is', null);
+      if (plansErr) {
+        return new Response(
+          JSON.stringify({ error: 'Could not load the plans; checkout was not started.' }),
+          { status: 503, headers: corsHeaders },
+        );
+      }
+      const activePlans = (plans ?? []) as Array<{
+        id: string; name: string; stripe_price_id: string; contact_sales: boolean | null;
+      }>;
+      const plan = planIdRaw
+        ? activePlans.find((pl) => pl.id === planIdRaw)
+        : activePlans.find((pl) => pl.stripe_price_id === priceId);
+
+      if (!plan) {
+        return new Response(
+          JSON.stringify({ error: 'That plan is not available.', code: 'unknown_plan' }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+      // A "contact sales" plan has no self-serve checkout by definition — it is priced per deal.
+      if (plan.contact_sales) {
+        return new Response(
+          JSON.stringify({ error: 'This plan is arranged with sales, not bought online.', code: 'contact_sales' }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
       session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         line_items: [
           {
-            price: priceId,
+            price: plan.stripe_price_id,
             quantity: 1,
           },
         ],
         subscription_data: {
           metadata: {
             user_id: userId,
+            // The plan the server chose, so the webhook can settle the tier from OUR record
+            // rather than re-deriving it from a price id it has to recognise.
+            plan_id: plan.id,
+            plan_name: plan.name,
           },
         },
         success_url: successUrl,

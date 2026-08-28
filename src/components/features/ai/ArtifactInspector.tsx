@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import { safeHref } from '@/utils/safeUrl';
 
 const humanize = (s?: string): string =>
   (s || '')
@@ -75,7 +76,7 @@ export const SheetInspector: React.FC<{ data: any }> = ({ data }) => (
     </div>
     {data.pdf_url && (
       <a
-        href={data.pdf_url}
+        href={safeHref(data.pdf_url)}
         target="_blank"
         rel="noreferrer"
         className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"
@@ -256,7 +257,7 @@ export const OrderInspector: React.FC<{ created?: any; sent?: any }> = ({ create
     </div>
     {sent?.pdf_url && (
       <a
-        href={sent.pdf_url}
+        href={safeHref(sent.pdf_url)}
         target="_blank"
         rel="noreferrer"
         className="inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"

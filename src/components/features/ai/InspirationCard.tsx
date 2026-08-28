@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Globe, ChevronDown, ChevronUp, ExternalLink, Palette, Layers, Paintbrush, Package } from 'lucide-react';
+import { safeHref } from '@/utils/safeUrl';
 
 interface InspirationProduct {
   id?: string | null;
@@ -167,7 +168,7 @@ export function InspirationCard({
 
           {/* Source link */}
           <a
-            href={sourceUrl}
+            href={safeHref(sourceUrl)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"

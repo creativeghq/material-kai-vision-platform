@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import { Link, useInRouterContext } from 'react-router-dom';
 
 import { linkifyDestinations } from '@/utils/linkifyDestinations';
+import { safeHref } from '@/utils/safeUrl';
 
 interface MarkdownRendererProps {
   content: string;
@@ -88,7 +89,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }
             return (
               <a
-                href={href}
+                href={safeHref(href)}
                 className="underline opacity-90 hover:opacity-100"
                 {...(internal ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
               >

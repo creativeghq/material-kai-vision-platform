@@ -20,6 +20,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { imageUrlToBase64 } from '@/utils/imageToBase64';
+import { safeHref } from '@/utils/safeUrl';
 /**
  * Video models and what they cost, in one place.
  *
@@ -888,7 +889,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                     </button>
                   )}
                   <a
-                    href={edited.url}
+                    href={safeHref(edited.url)}
                     download
                     target="_blank"
                     rel="noopener noreferrer"

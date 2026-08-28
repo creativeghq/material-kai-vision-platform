@@ -42,6 +42,7 @@ import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertPreferences } from './PriceAlertPreferences';
 import { formatNumber } from '@/utils/decimal';
+import { safeHref } from '@/utils/safeUrl';
 import {
   refreshProduct,
   trackProduct,
@@ -881,7 +882,7 @@ const SimilarProductsSection: React.FC<{
                     )}
                   </div>
                   <a
-                    href={row.source_url}
+                    href={safeHref(row.source_url)}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"
@@ -1028,7 +1029,7 @@ const RetailerTable: React.FC<{
       return (
         <div key={r.id} className={rowClasses}>
           {thumb && (
-            <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+            <a href={safeHref(r.source_url)} target="_blank" rel="noopener noreferrer" className="shrink-0">
               <img
                 src={thumb}
                 alt={r.source_name}
@@ -1043,7 +1044,7 @@ const RetailerTable: React.FC<{
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <a
-                href={r.source_url}
+                href={safeHref(r.source_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-sm hover:underline truncate flex items-center gap-1.5"
@@ -1222,7 +1223,7 @@ toast({ title: 'Could not dismiss this reading', description: String((e as Error
               </div>
             )}
             <a
-              href={r.source_url}
+              href={safeHref(r.source_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[11px] text-muted-foreground hover:underline flex items-center gap-1 mt-0.5 truncate"
