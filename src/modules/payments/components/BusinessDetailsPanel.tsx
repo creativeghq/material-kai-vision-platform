@@ -15,6 +15,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 interface Props { embedded?: boolean }
 
@@ -51,20 +52,19 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const { activeWorkspaceId } = useWorkspace();
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-      const { data: member } = await (supabase as any)
-        .from('workspace_members')
-        .select('workspace_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      const wsId = member?.workspace_id;
-      if (!wsId) throw new Error('No workspace for this user');
+      // The ACTIVE workspace, not the first one this user ever joined (#359 CM-22).
+      //
+      // `order('created_at').limit(1)` picks whichever membership is oldest, which for anyone in
+      // more than one workspace is arbitrary and for the platform operator is the root workspace.
+      // These panels write invoice numbering and the business identity that goes on documents, so
+      // the wrong answer here configures a tenant nobody meant to touch — and the screen said
+      // nothing about which one it had picked.
+      const wsId = activeWorkspaceId;
+      if (!wsId) throw new Error('No workspace selected');
       setWorkspaceId(wsId);
 
       const { data: settings } = await (supabase as any)
@@ -81,7 +81,7 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, activeWorkspaceId]);
 
   useEffect(() => { void load(); }, [load]);
 

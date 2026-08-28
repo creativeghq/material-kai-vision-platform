@@ -255,16 +255,42 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
     const txCurrency = String(tx.currency ?? 'EUR').toUpperCase();
     const sameCcy = bills.filter((b: any) => b.currency === txCurrency && Number(b.amount_due) > 0);
 
-    const byNumber = sameCcy.filter((b: any) => b.numberKey && refText.includes(b.numberKey));
-    const byAmountName = sameCcy.filter((b: any) =>
-      centsEqual(Number(b.amount_due), Number(tx.amount)) && cpName && namesMatch(b.nameKeyed, cpName));
-
     let bill: any = null;
     let method: 'reference' | 'amount_name' | null = null;
-    if (byNumber.length === 1 && Number(tx.amount) <= Number(byNumber[0].amount_due) + 0.01) {
-      bill = byNumber[0]; method = 'reference';
-    } else if (byNumber.length === 0 && byAmountName.length === 1) {
-      bill = byAmountName[0]; method = 'amount_name';
+
+    /**
+     * WE INSTRUCTED THIS PAYMENT, SO WE KNOW WHICH BILL IT PAYS (#359 CM-19).
+     *
+     * Re-deriving that from the reference text is guessing at something we recorded — and the
+     * reference is editable in the dialog, so the guess fails exactly when somebody typed
+     * something helpful. The payout row is looked up by the id Revolut gave the payment, which
+     * is the same id the feed carries as `transaction_id`.
+     */
+    const { data: payout } = await service
+      .from('revolut_payouts')
+      .select('supplier_bill_id')
+      .eq('workspace_id', workspaceId)
+      .eq('provider_id', String(tx.transaction_id ?? ''))
+      .not('supplier_bill_id', 'is', null)
+      .maybeSingle();
+    const linkedBillId = (payout as { supplier_bill_id?: string } | null)?.supplier_bill_id ?? null;
+    if (linkedBillId) {
+      const linked = sameCcy.find((b: any) => b.id === linkedBillId);
+      // Only when the bill still owes something in this currency. A linked bill that is already
+      // settled is not an error — it means the feed caught up after a manual match.
+      if (linked) { bill = linked; method = 'reference'; }
+    }
+
+    if (!bill) {
+      const byNumber = sameCcy.filter((b: any) => b.numberKey && refText.includes(b.numberKey));
+      const byAmountName = sameCcy.filter((b: any) =>
+        centsEqual(Number(b.amount_due), Number(tx.amount)) && cpName && namesMatch(b.nameKeyed, cpName));
+
+      if (byNumber.length === 1 && Number(tx.amount) <= Number(byNumber[0].amount_due) + 0.01) {
+        bill = byNumber[0]; method = 'reference';
+      } else if (byNumber.length === 0 && byAmountName.length === 1) {
+        bill = byAmountName[0]; method = 'amount_name';
+      }
     }
     if (!bill || !method) {
       out.unmatched++;

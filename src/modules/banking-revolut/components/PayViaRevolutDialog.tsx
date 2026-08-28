@@ -6,8 +6,14 @@
  * source pocket → Draft (default: a human approves in the Revolut app) or Send now.
  * The payment reference carries the bill number, so when the transfer executes, the
  * bank-feed matcher settles the bill automatically — no second bookkeeping step.
+ *
+ * That intent used to be defeated by the screen stating it: the reference was a free-text input
+ * and `reference || bill.supplier_bill_number` let anything typed in it REPLACE the number
+ * (#359 CM-19). The number is composed in now, and the real binding is a foreign key —
+ * `revolut_payouts.supplier_bill_id`, set here because this screen already knows the answer the
+ * feed would otherwise have to guess.
  */
-import React from 'react';
+import React, { useRef } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -18,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi, getRevolutStatus, type RevolutAccountInfo } from '../services/revolutConfigService';
+import { payoutReference } from '../payoutReference';
 
 interface BillInfo {
   id: string;
@@ -105,8 +112,24 @@ export const PayViaRevolutDialog: React.FC<{
     })();
   }, [billId, workspaceId, toast]);
 
+  /**
+   * Synchronous in-flight latch, and a stable idempotency key (#359 CM-19).
+   *
+   * `busy` is React state: a double-click enters `send()` twice before the first `setBusy(true)`
+   * has rendered, and `disabled={busy}` is that same state one render behind. Eleventh instance of
+   * this class platform-wide, and the only one whose consequence is an IRREVERSIBLE duplicate bank
+   * transfer.
+   *
+   * The latch alone is not enough, because a retry after a network error is a legitimate second
+   * call. So the dialog also mints ONE request id when it opens and sends it with every attempt:
+   * Revolut deduplicates on it, and the server answers a repeat with what already happened instead
+   * of instructing a second payment.
+   */
+  const sending = useRef(false);
+  const requestId = useRef(crypto.randomUUID());
+
   const send = async () => {
-    if (!bill) return;
+    if (!bill || sending.current) return;
     const amt = Number(amount);
     if (!bankId || !pocketId || !(amt > 0)) {
       toast({ title: 'Pick the supplier account, a source account and a positive amount', variant: 'destructive' });
@@ -116,6 +139,7 @@ export const PayViaRevolutDialog: React.FC<{
     if (direct && !window.confirm(
       `Send ${amt.toFixed(2)} ${String(bill.currency ?? 'EUR').toUpperCase()} to ${bankSel?.account_holder || bankSel?.bank_name || 'this account'} NOW? This moves money immediately, without the in-app approval.`,
     )) return;
+    sending.current = true;
     setBusy(true);
     try {
       const bank = bankSel;
@@ -136,7 +160,14 @@ export const PayViaRevolutDialog: React.FC<{
         source_revolut_account_id: pocketId,
         amount: amt,
         currency: String(bill.currency ?? 'EUR').toUpperCase(),
-        reference: reference || bill.supplier_bill_number || '',
+        // The bill number is COMPOSED IN, never replaced (#359 CM-19). `reference ||
+        // bill.supplier_bill_number` meant anything typed in the box replaced the number, and the
+        // box is right there — after which the transfer reconciles to nothing.
+        reference: payoutReference(bill.supplier_bill_number, reference),
+        // …and the real link is this, not the text. The screen knows which bill it is paying, so
+        // the feed does not have to guess later from a string a human could edit.
+        supplier_bill_id: bill.id,
+        request_id: requestId.current,
         mode: direct ? 'payment' : 'draft',
       });
       toast({
@@ -147,6 +178,7 @@ export const PayViaRevolutDialog: React.FC<{
     } catch (e) {
       toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' });
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };
@@ -204,8 +236,12 @@ export const PayViaRevolutDialog: React.FC<{
                 <Input id="pvr-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs" htmlFor="pvr-ref">Reference</Label>
-                <Input id="pvr-ref" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={140} />
+                <Label className="text-xs" htmlFor="pvr-ref">Reference note (optional)</Label>
+                <Input id="pvr-ref" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100} />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Sent as <span className="font-mono">{payoutReference(bill?.supplier_bill_number, reference)}</span> — the
+                  bill number always goes with it.
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">

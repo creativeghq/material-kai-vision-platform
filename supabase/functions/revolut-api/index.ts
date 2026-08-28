@@ -530,8 +530,26 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const currency = String(body?.currency ?? 'EUR').toUpperCase();
       const reference = String(body?.reference ?? '').slice(0, 140);
       const mode = body?.mode === 'payment' ? 'payment' : 'draft';
+      const supplierBillId = body?.supplier_bill_id ? String(body.supplier_bill_id) : null;
       if (!crmBankId || !sourceAccountId) throw new HttpError(400, 'crm_bank_account_id and source_revolut_account_id are required');
       if (!(amount > 0)) throw new HttpError(400, 'amount must be positive');
+
+      /**
+       * The caller's idempotency key (#359 CM-19).
+       *
+       * `request_id` was a fresh `crypto.randomUUID()` per call, which is the opposite of an
+       * idempotency key: two clicks produced two request ids and Revolut executed both. It is an
+       * IRREVERSIBLE bank transfer, and the eleventh instance of the double-submit class platform
+       * wide — the only one whose consequence is money leaving twice.
+       *
+       * The dialog now mints one id when it opens and sends it with every attempt, so a repeat is
+       * deduplicated by Revolut itself rather than by hoping the button was disabled in time.
+       * Validated as a UUID because it is passed to the provider.
+       */
+      const clientRequestId = typeof body?.request_id === 'string'
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.request_id)
+        ? body.request_id
+        : null;
 
       const cfg = await requireConfig(service, workspaceId);
       const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
@@ -544,7 +562,40 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (!bank) throw new HttpError(404, 'not found');
       if (!bank.revolut_counterparty_id) throw new HttpError(400, 'create the Revolut counterparty for this bank first (VoP-gated)');
 
-      const requestId = crypto.randomUUID();
+      // Tenancy-checked before it is stored: an id from the request body that lands in a foreign
+      // key is invariant 1's exact shape, and a payout pointing at another workspace's bill would
+      // settle it from the feed.
+      if (supplierBillId) {
+        const { data: billRow } = await service
+          .from('supplier_bills')
+          .select('id')
+          .eq('id', supplierBillId)
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+        if (!billRow) throw new HttpError(404, 'not found');
+      }
+
+      const requestId = clientRequestId ?? crypto.randomUUID();
+
+      // A repeat of the SAME instruction is not a second payment. The audit row is keyed on the
+      // request id, so an existing one means Revolut has already been told — answer with what
+      // happened rather than telling it again.
+      const { data: priorPayout } = await service
+        .from('revolut_payouts')
+        .select('id, provider_id, state, kind')
+        .eq('workspace_id', workspaceId)
+        .eq('request_id', requestId)
+        .maybeSingle();
+      if (priorPayout) {
+        return jsonResponse({
+          ok: true,
+          mode: priorPayout.kind,
+          duplicate: true,
+          ...(priorPayout.kind === 'draft' ? { draft_id: priorPayout.provider_id } : { payment_id: priorPayout.provider_id }),
+          note: 'This payment instruction was already sent — nothing was sent twice.',
+        });
+      }
+
       const bankAny = bank as any;
       const cpName = String(bankAny.account_holder || bankAny.company?.name || bankAny.contact?.name || '');
       const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
@@ -556,6 +607,9 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         crm_bank_account_id: crmBankId,
         counterparty_name: cpName,
         reference,
+        // The LINK (#359 CM-19). The reference text is a convenience for whoever reads the bank
+        // statement; the bill this pays is a foreign key, set by the screen that already knew it.
+        supplier_bill_id: supplierBillId,
         created_by: auth.userId,
       }).select('id').single();
       if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
