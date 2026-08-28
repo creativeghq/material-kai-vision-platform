@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Sparkles, ShoppingCart, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -50,8 +50,29 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
     } finally { setAiBusy(false); }
   };
 
+  /**
+   * Synchronous in-flight latch (#355 WH-3).
+   *
+   * `setReordering` / `setBulkBusy` are async React state, so they cannot stop a second click
+   * that is already queued: `confirm()` blocks the main thread, the second click's event waits
+   * behind it, and the moment the first handler `await`s the queued handler runs from the top.
+   * Both POs are then legitimate, DISTINCT orders — so `receive_order_into_warehouse`'s
+   * idempotency does not help, and receiving both correctly adds double the stock. This is the
+   * one place in the module where double-submit survives the SQL guards, precisely because the
+   * duplicate is a NEW object rather than a repeat operation on an existing one.
+   *
+   * A ref is set and read in the same synchronous turn, which is what state cannot do.
+   */
+  const inFlightReorders = useRef<Set<string>>(new Set());
+  const bulkRunning = useRef(false);
+
   const reorder = async (c: ForecastCandidate) => {
+    if (inFlightReorders.current.has(c.warehouse_item_id) || bulkRunning.current) return;
     if (!confirm(`Draft a replenishment PO for "${c.name}"${c.recommended_order_qty ? ` (${c.recommended_order_qty} ${c.unit})` : ''}? This costs 2 credits.`)) return;
+    // Latched after the confirm and before the first await — the queued second click reaches
+    // here with the id already present and returns.
+    if (inFlightReorders.current.has(c.warehouse_item_id)) return;
+    inFlightReorders.current.add(c.warehouse_item_id);
     setReordering(c.warehouse_item_id);
     try {
       const r = await stockService.reorder(workspaceId, c.warehouse_item_id, c.recommended_order_qty ? { quantity: c.recommended_order_qty } : {});
@@ -65,14 +86,16 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
         description: `${r.quantity} ${c.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.${moqNote}`,
       });
     } catch (err: any) { toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' }); }
-    finally { setReordering(null); }
+    finally { inFlightReorders.current.delete(c.warehouse_item_id); setReordering(null); }
   };
 
   // Draft a replenishment PO for every flagged item in one go (each is an independent, credit-metered
   // reorder → its supplier's draft PO). Sequential so a mid-run failure stops cleanly.
   const reorderAll = async () => {
-    if (flagged.length === 0) return;
+    if (flagged.length === 0 || bulkRunning.current) return;
     if (!confirm(`Draft replenishment POs for ${flagged.length} flagged item(s)? This costs 2 credits each (${flagged.length * 2} total).`)) return;
+    if (bulkRunning.current) return;
+    bulkRunning.current = true;
     setBulkBusy(true);
     let drafted = 0; let failed = 0;
     try {
@@ -84,7 +107,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
         } catch { failed++; }
       }
       toast({ title: 'Bulk reorder complete', description: `${drafted} PO(s) drafted${failed ? ` · ${failed} skipped (no supplier / error)` : ''}.` });
-    } finally { setBulkBusy(false); setReordering(null); }
+    } finally { bulkRunning.current = false; setBulkBusy(false); setReordering(null); }
   };
 
   return (

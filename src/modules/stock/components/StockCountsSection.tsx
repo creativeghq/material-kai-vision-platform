@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ClipboardList, CheckCircle2, XCircle, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -222,17 +222,73 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
 
   const readOnly = count?.status !== 'draft';
 
-  const saveLine = async (line: StockCountLine) => {
-    if (readOnly) return;
+  /**
+   * The latest persisted lines, readable after an `await` (#355 WH-1).
+   *
+   * `flushPendingEdits` waits on in-flight blur saves and must then compare drafts against what
+   * those saves stored. A closure over `lines` captures the value from the render that created
+   * it, so it would re-send edits that had just landed.
+   */
+  const linesRef = useRef<StockCountLine[]>(lines);
+  useEffect(() => { linesRef.current = lines; }, [lines]);
+
+  /** Blur saves currently in flight, so Post can wait for them rather than race them. */
+  const inFlight = useRef<Set<Promise<unknown>>>(new Set());
+
+  /**
+   * Persist one line. Returns false if the value did not reach the database.
+   *
+   * ON FAILURE THE INPUT IS ROLLED BACK. It used to keep the typed value, and `variance()` reads
+   * `drafts` — so a failed save left the screen showing `92` and a variance of `−8` while the
+   * durable line held neither. A stock count is the mechanism for correcting drift in a conserved
+   * quantity; showing a correction that was never stored is the worst possible lie for it to tell.
+   */
+  const saveLine = async (line: StockCountLine): Promise<boolean> => {
+    if (readOnly) return true;
     const raw = drafts[line.id] ?? '';
     const parsed = raw.trim() === '' ? null : parseDecimal(raw);
-    if (raw.trim() !== '' && (parsed == null || parsed < 0)) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
+    if (raw.trim() !== '' && (parsed == null || parsed < 0)) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return false; }
     // No change vs persisted → skip the round-trip.
-    if ((line.counted_qty ?? null) === (parsed ?? null)) return;
-    try {
-      const updated = await stockService.updateCountLine(workspaceId, line.id, { counted_qty: parsed });
-      setLines((prev) => prev.map((l) => (l.id === line.id ? updated : l)));
-    } catch (err: any) { toast({ title: 'Save failed', description: err?.message, variant: 'destructive' }); }
+    if ((line.counted_qty ?? null) === (parsed ?? null)) return true;
+    const p = (async () => {
+      try {
+        const updated = await stockService.updateCountLine(workspaceId, line.id, { counted_qty: parsed });
+        setLines((prev) => prev.map((l) => (l.id === line.id ? updated : l)));
+        return true;
+      } catch (err: any) {
+        toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+        setDrafts((d) => ({ ...d, [line.id]: line.counted_qty == null ? '' : String(line.counted_qty) }));
+        return false;
+      }
+    })();
+    inFlight.current.add(p);
+    try { return await p; } finally { inFlight.current.delete(p); }
+  };
+
+  /**
+   * Make the durable count match what is on screen. Returns false if anything failed.
+   *
+   * Counted quantities used to persist ONLY on the input's `onBlur`, so clicking Post while a
+   * field still had focus raced that save: the count could post with the old or null quantity and
+   * no adjustment movement was ever created. `post_stock_count` cannot catch this — it correctly
+   * refuses a *second* post, but it cannot know the first one carried stale data. A count that
+   * silently posts the wrong number is worse than no count, because it closes the discrepancy in
+   * the audit trail without fixing the stock.
+   *
+   * This also covers the case blur never handled at all: a value typed and then submitted by
+   * keyboard, where no blur fires before the click.
+   */
+  const flushPendingEdits = async (): Promise<boolean> => {
+    // Blur saves already running: let them finish before diffing, or the diff re-sends them.
+    await Promise.allSettled([...inFlight.current]);
+    const stale = linesRef.current.filter((l) => {
+      const raw = drafts[l.id] ?? '';
+      const parsed = raw.trim() === '' ? null : parseDecimal(raw);
+      return (l.counted_qty ?? null) !== (parsed ?? null);
+    });
+    if (stale.length === 0) return true;
+    const results = await Promise.all(stale.map((l) => saveLine(l)));
+    return results.every(Boolean);
   };
 
   const post = async () => {
@@ -240,6 +296,16 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
     if (!confirm('Post this count? It records adjustment movements for every counted line that differs from the system.')) return;
     try {
       setBusy(true);
+      // Before the post, not after: an unsaved line posts as "not counted" and produces no
+      // adjustment, so the physical shortfall is never recorded.
+      if (!(await flushPendingEdits())) {
+        toast({
+          title: 'Not posted — some counted quantities did not save',
+          description: 'The count is unchanged. Check the highlighted lines and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
       const res = await stockService.postCount(workspaceId, count.id);
       toast({ title: `Count posted — ${res.adjusted_lines} item(s) adjusted` });
       onChanged();

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox, Coins, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -55,8 +55,21 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
   }, [workspaceId, toast]);
 
   const [reordering, setReordering] = useState<string | null>(null);
+  /**
+   * Synchronous in-flight latch (#355 WH-3). `setReordering` is async React state and cannot
+   * stop a click that is already queued: `confirm()` blocks the main thread, the second click
+   * waits behind it, and it runs the moment the first handler awaits. The result is two
+   * legitimate, DISTINCT purchase orders — which `receive_order_into_warehouse`'s idempotency
+   * cannot absorb, so receiving both correctly doubles the stock. A ref is set and read in the
+   * same synchronous turn; state is not.
+   */
+  const inFlightReorders = useRef<Set<string>>(new Set());
   const reorder = async (it: LowStockItem) => {
+    if (inFlightReorders.current.has(it.id)) return;
     if (!confirm(`Draft a replenishment purchase order for "${it.name}"? This costs 2 credits.`)) return;
+    // Latched after the confirm and before the first await.
+    if (inFlightReorders.current.has(it.id)) return;
+    inFlightReorders.current.add(it.id);
     setReordering(it.id);
     try {
       const r = await stockService.reorder(workspaceId, it.id);
@@ -75,6 +88,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
     } catch (err: any) {
       toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' });
     } finally {
+      inFlightReorders.current.delete(it.id);
       setReordering(null);
     }
   };
