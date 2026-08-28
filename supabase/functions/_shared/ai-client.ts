@@ -1438,6 +1438,153 @@ export async function generateVideoWithWan(
   }
 }
 
+// ── QwenCloud: research with the provider's own web search ─────────────────
+//
+// The CHALLENGER half of the B2B research validation lane (#394). Not a model swap:
+// Anthropic's `web_search_20260209` and Qwen's `enable_search` are different search
+// backends as well as different models, so this compares research END TO END, which
+// is the only comparison worth having — a model is only as good as what it can find.
+//
+// OpenAI-compatible endpoint, so `extra_body` fields from their Python examples are
+// simply top-level body fields here.
+
+const QWEN_COMPAT_URL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
+
+export interface QwenResearchResult<T> {
+  data: T;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Sources the provider's own search surfaced, when it reports them. */
+  searchResults: unknown[];
+}
+
+/**
+ * Run a forced-function research call on QwenCloud and return the parsed arguments.
+ *
+ * THE STRUCTURED-OUTPUT DIFFERENCE, WHICH IS THE WHOLE RISK HERE. Anthropic's forced
+ * `tool_choice` hands back `input` as a parsed object. OpenAI-compatible hands back
+ * `arguments` as a STRING that this function must parse.
+ *
+ * So a malformed reply is possible here in a way it is not on the Anthropic path, and
+ * the rule is the one the vision pipeline learned the hard way: a parse failure is a
+ * FAILED RUN. It is never repaired, never salvaged, never partially recovered. A
+ * repaired research payload is worse than none, because it becomes rows that look
+ * exactly like verified ones.
+ */
+export async function researchWithQwen<T = unknown>(
+  opts: UnitBillingConfig & {
+    model?: string;
+    system: string;
+    prompt: string;
+    /** JSON Schema function the model is forced to call. */
+    fn: { name: string; description?: string; parameters: Record<string, unknown> };
+    maxTokens?: number;
+    /** 'agent' (default) or 'agent_max' — multi-search + extractor, for research. */
+    searchStrategy?: 'agent' | 'agent_max';
+    timeoutMs?: number;
+  },
+): Promise<QwenResearchResult<T>> {
+  const model = opts.model ?? 'qwen3.8-max';
+  const _start = Date.now();
+
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_API_KEY')).value
+    : Deno.env.get('DASHSCOPE_API_KEY');
+  if (!apiKey) {
+    throw new Error('DASHSCOPE_API_KEY is not configured — the research challenger cannot run');
+  }
+
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 90_000);
+  try {
+    const res = await fetch(QWEN_COMPAT_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      signal: ctl.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: opts.maxTokens ?? 8000,
+        messages: [
+          { role: 'system', content: opts.system },
+          { role: 'user', content: opts.prompt },
+        ],
+        tools: [{ type: 'function', function: opts.fn }],
+        tool_choice: { type: 'function', function: { name: opts.fn.name } },
+        // Their own web search, the challenger's other half.
+        enable_search: true,
+        search_options: {
+          // 'agent_max' searches repeatedly and may use the web extractor — the
+          // research-heavy setting, which is what this lane is for.
+          search_strategy: opts.searchStrategy ?? 'agent_max',
+          enable_source: true,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`QwenCloud ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    }
+    const body = await res.json();
+    const choice = body?.choices?.[0];
+    const call = choice?.message?.tool_calls?.[0];
+    const raw = call?.function?.arguments;
+    if (typeof raw !== 'string') {
+      throw new Error(
+        `QwenCloud returned no tool call for ${opts.fn.name} (finish_reason=${choice?.finish_reason})`,
+      );
+    }
+
+    let data: T;
+    try {
+      data = JSON.parse(raw) as T;
+    } catch (e) {
+      // Deliberately terminal. See the docstring: repairing this produces rows
+      // indistinguishable from verified ones.
+      throw new Error(
+        `QwenCloud returned unparseable arguments for ${opts.fn.name} — treating as a `
+        + `failed run rather than repairing it: ${e instanceof Error ? e.message : e}`,
+      );
+    }
+
+    const usage = body?.usage ?? {};
+    const inputTokens = Number(usage.prompt_tokens ?? 0);
+    const outputTokens = Number(usage.completion_tokens ?? 0);
+
+    void _logTrackedCall({
+      task: opts.task ?? 'qwen_research',
+      model,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+    });
+
+    return {
+      data,
+      model,
+      inputTokens,
+      outputTokens,
+      searchResults: body?.search_info?.search_results ?? [],
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task: opts.task ?? 'qwen_research',
+      model,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+    });
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Grok (xAI Aurora): Image generation + editing ──────────────────────────
 
 // Current xAI image model (the older grok-2-image-1212 is legacy). Note: this

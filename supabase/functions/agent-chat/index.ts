@@ -1104,7 +1104,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
-      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
+      'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment',
       'company_registry_lookup', 'industrial_facility_search',
       'contact_discovery', 'email_validate', 'save_to_crm',
       // Material scraping — pull products off a supplier page (#347)
@@ -1317,7 +1317,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
-      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup',
+      'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup',
       'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
       // The open web. Pepper is the agent people bring competitor, brand and distribution
@@ -2043,7 +2043,7 @@ async function executeAgent(
   const needsOps = config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
   const needsDb = config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
-  const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
+  const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'b2b_research_validate', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
   const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
@@ -2166,6 +2166,7 @@ async function executeAgent(
   const createBusinessAnalysisTool = subAgentMod?.createBusinessAnalysisTool;
   const createProductAnalysisTool = subAgentMod?.createProductAnalysisTool;
   const createB2BManufacturerSearchTool = b2bMod?.createB2BManufacturerSearchTool;
+  const createB2BResearchValidateTool = b2bMod?.createB2BResearchValidateTool;
   const createCompanyWebsiteScrapeTool = b2bMod?.createCompanyWebsiteScrapeTool;
   const createMaterialScrapeTool = matScrapeMod?.createMaterialScrapeTool;
   const createFieldSuggestTool = matScrapeMod?.createFieldSuggestTool;
@@ -2905,6 +2906,9 @@ async function executeAgent(
       // silently advertises no markets.
       const markets = await loadVocabulary(supabase, 'sourcing_markets');
       tools.push(createB2BManufacturerSearchTool(markets, userId, workspaceId ?? null, sendProgress, onChunk));
+    }
+    if (config.tools.includes('b2b_research_validate')) {
+      tools.push(createB2BResearchValidateTool(userId, workspaceId ?? null, sendProgress));
     }
     if (config.tools.includes('company_website_scrape')) {
       tools.push(createCompanyWebsiteScrapeTool(userId, workspaceId ?? null, sendProgress));

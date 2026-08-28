@@ -181,6 +181,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'b2b_research_validate',
+    file: 'supabase/functions/_shared/tools/b2b-tools.ts',
+    factory: 'createB2BResearchValidateTool',
+    description: 'Second-opinion check on a B2B manufacturer search that already ran.',
+    params: [
+      { name: 'validation_id', type: 'string', optional: false, description: 'The `validation_id` returned by a prior b2b_manufacturer_search call.' },
+    ],
+  },
+  {
     name: 'brand_overview',
     file: 'supabase/functions/_shared/tools/graph-tools.ts',
     factory: 'createBrandOverviewTool',

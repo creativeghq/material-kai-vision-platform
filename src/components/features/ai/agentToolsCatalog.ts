@@ -702,6 +702,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
 
   // ── B2B Research (admin/owner only) ───────────────────────────────
   {
+    id: 'b2b_research_validate', name: 'Validate Research', category: 'B2B Research',
+    adminOnly: true,
+    desc: 'Second-source a manufacturer search that already ran: same query, different provider, and a check of which domains actually resolve.',
+    examples: [
+      'Validate that manufacturer search',
+      'What might we be missing from those results?',
+    ],
+  },
+  {
     id: 'b2b_manufacturer_search', name: 'Manufacturer Search', category: 'B2B Research',
     adminOnly: true,
     desc: 'Find manufacturers in target markets via web search (Anthropic web_search tool).',
@@ -3154,7 +3163,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Building2',
     adminOnly: true,
     tool_ids: [
-      'b2b_manufacturer_search', 'company_website_scrape', 'company_registry_lookup',
+      'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_registry_lookup',
       'industrial_facility_search', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm',
       'scrape_materials_from_url', 'suggest_extraction_fields',
     ],

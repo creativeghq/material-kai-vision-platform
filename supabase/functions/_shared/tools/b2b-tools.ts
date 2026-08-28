@@ -28,6 +28,9 @@ const { z } = await import('npm:zod@3.25.76');
 const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.5.6');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 const { createWorkflowEmitter, STEPS } = await import('./_workflow-chunks.ts');
+const { researchWithQwen } = await import('../ai-client.ts');
+const { compareResearchRuns } = await import('../research-validation.ts');
+type ManufacturerRecord = import('../research-validation.ts').ManufacturerRecord;
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -445,6 +448,7 @@ export const createB2BManufacturerSearchTool = (
         // Both this and flow-engine used to carry their own copy of this query, and the two
         // had already drifted — flow-engine's dropped "or retailers" and stopped asking for
         // manufacturing indicators. One row, two readers (#347 phase 3P).
+        const _searchStartedAt = Date.now();
         const query = renderPromptTemplate(
           await loadPrompt(supabase, 'tool', 'b2b_manufacturer_query'),
           { category, scope, limit },
@@ -608,6 +612,34 @@ export const createB2BManufacturerSearchTool = (
 
         const withDomain = manufacturers.filter((m) => m?.domain).length;
         onProgress?.(`Search complete — ${manufacturers.length} companies, ${withDomain} with a domain.`);
+
+        // Record the INCUMBENT half of a validation pair (#394). Recording it here
+        // rather than re-running the search inside the validation lane is deliberate:
+        // this call takes ~68s and spends ~76 credits, and a validation that re-ran it
+        // would double both to learn nothing new about the incumbent. The challenger
+        // completes the row later, against the same stored query.
+        //
+        // Best-effort and never blocking: the search has already succeeded and been
+        // paid for, so a bookkeeping failure must not turn it into an error.
+        let validationId: string | null = null;
+        try {
+          const { data: vRow } = await supabase
+            .from('b2b_research_validations')
+            .insert({
+              workspace_id: workspaceId,
+              user_id: userId,
+              query: { country, region, category, limit },
+              incumbent_provider: 'anthropic',
+              incumbent_model: SEARCH_MODEL,
+              incumbent_results: manufacturers,
+              incumbent_ms: Date.now() - _searchStartedAt,
+            })
+            .select('id')
+            .single();
+          validationId = vRow?.id ?? null;
+        } catch (vErr) {
+          console.warn('[b2b_manufacturer_search] validation row insert failed:', vErr);
+        }
         emitter.step({
           step_id: STEPS.B2B_RESEARCH[0],
           status: 'done',
@@ -640,6 +672,10 @@ export const createB2BManufacturerSearchTool = (
           search_results: textContent || (manufacturers.length ? '' : 'No results found.'),
           query_params: { country, region, category, limit },
           source: 'claude_web_search',
+          // Hand this to `b2b_research_validate` to run a second provider over the
+          // SAME query and get a coverage/verifiability comparison. Null means the
+          // pair could not be recorded, so validation is unavailable for this run.
+          validation_id: validationId,
         });
       } catch (error) {
         console.error('B2B manufacturer search error:', error);
@@ -2587,6 +2623,143 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         })).optional().describe('Contacts to save and link to the company'),
         confirm: z.boolean().optional().describe('Leave unset. The tool previews and asks the user to approve; the Approve button re-invokes it with confirm:true.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/save:<run_id>]` prefix.'),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: Validation lane (issue #394)
+ *
+ * The SECOND FLOW. `b2b_manufacturer_search` records its run as the incumbent half of
+ * a pair; this completes the pair by running a different provider over the SAME stored
+ * query, then reports coverage and verifiability.
+ *
+ * WHY IT IS A SEPARATE FLOW AND NOT A FLAG. The incumbent search takes ~68s and spends
+ * ~76 credits. Running both on every call would double both to learn nothing new about
+ * the incumbent, and two sequential 68s searches cannot finish inside the tool timeout
+ * anyway. Validation is a deliberate act on a run that already happened.
+ *
+ * WHAT IT DOES NOT DO. It does not pick a winner and it does not merge the two result
+ * sets into the CRM. For research there is no single right answer — a challenger that
+ * surfaces companies the incumbent missed has done something useful, provided they
+ * exist. The output is evidence for a human, and the objective half of that evidence is
+ * whether the domains resolve.
+ */
+export const createB2BResearchValidateTool = (
+  userId: string,
+  workspaceId: string | null,
+  onProgress?: (status: string) => void,
+) => {
+  return tool(
+    async ({ validation_id }: { validation_id: string }) => {
+      try {
+        const { data: row, error: loadErr } = await supabase
+          .from('b2b_research_validations')
+          .select('id, workspace_id, query, incumbent_provider, incumbent_model, incumbent_results, challenger_error')
+          .eq('id', validation_id)
+          .single();
+
+        if (loadErr || !row) {
+          return JSON.stringify({
+            success: false,
+            error: `No recorded research run with id ${validation_id}. Run b2b_manufacturer_search first and pass the validation_id it returns.`,
+          });
+        }
+        // Tenancy: this is a service-role client, so the row's workspace must be
+        // checked against the caller's rather than trusted (invariant 1).
+        if (row.workspace_id && workspaceId && row.workspace_id !== workspaceId) {
+          return JSON.stringify({ success: false, error: `No recorded research run with id ${validation_id}.` });
+        }
+
+        const q = (row.query ?? {}) as { country?: string; region?: string; category?: string; limit?: number };
+        const incumbent = (row.incumbent_results ?? []) as ManufacturerRecord[];
+
+        onProgress?.(`Running the challenger over the same query (${q.category ?? 'category'})…`);
+
+        const systemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
+        const where = q.country ? ` in ${q.country}` : q.region ? ` in the ${q.region} region` : '';
+        const prompt =
+          `Find up to ${q.limit ?? 8} B2B manufacturers of ${q.category ?? 'the requested product'}${where}. `
+          + `Use web search. Record every one you find with the record_manufacturers function. `
+          + `Use null for anything you could not verify — never guess a website, email or city.`;
+
+        let challengerRows: ManufacturerRecord[] = [];
+        let challengerError: string | null = null;
+        let challengerMs: number | null = null;
+        let challengerModel: string | null = null;
+
+        const t0 = Date.now();
+        try {
+          const out = await researchWithQwen<{ manufacturers: ManufacturerRecord[] }>({
+            system: systemPrompt,
+            prompt,
+            fn: {
+              name: RECORD_MANUFACTURERS_TOOL.name,
+              description: RECORD_MANUFACTURERS_TOOL.description,
+              parameters: RECORD_MANUFACTURERS_TOOL.input_schema,
+            },
+            task: 'b2b_research_validation_challenger',
+            userId,
+            workspaceId: workspaceId ?? undefined,
+          });
+          challengerRows = Array.isArray(out.data?.manufacturers) ? out.data.manufacturers : [];
+          challengerModel = out.model;
+          challengerMs = Date.now() - t0;
+        } catch (e) {
+          // Recorded, not swallowed. An absent challenger must never read as a
+          // challenger that searched and found nothing.
+          challengerError = e instanceof Error ? e.message : String(e);
+          challengerMs = Date.now() - t0;
+        }
+
+        onProgress?.('Checking which domains actually resolve…');
+        const comparison = await compareResearchRuns(incumbent, challengerRows, {
+          challengerRan: challengerError === null,
+        });
+
+        await supabase
+          .from('b2b_research_validations')
+          .update({
+            challenger_provider: 'qwencloud',
+            challenger_model: challengerModel,
+            challenger_results: challengerRows,
+            challenger_ms: challengerMs,
+            challenger_error: challengerError,
+            comparison,
+          })
+          .eq('id', validation_id);
+
+        return JSON.stringify({
+          success: true,
+          validation_id,
+          query: q,
+          challenger_ran: challengerError === null,
+          challenger_error: challengerError,
+          comparison,
+          // The rows themselves, so the agent can show what the challenger uniquely
+          // found rather than only the counts.
+          challenger_results: challengerRows,
+        });
+      } catch (error) {
+        console.error('b2b_research_validate error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'validation failed',
+        });
+      }
+    },
+    {
+      name: 'b2b_research_validate',
+      description:
+        'Second-opinion check on a B2B manufacturer search that already ran. Pass the `validation_id` '
+        + 'returned by b2b_manufacturer_search; this re-runs the SAME query on a different provider '
+        + '(QwenCloud, with its own web search) and reports what each found, what only one found, and '
+        + 'crucially how many of the domains actually resolve. It does NOT pick a winner and does not '
+        + 'save anything to CRM — it is evidence for a person. Use it when the user asks to validate, '
+        + 'double-check or second-source a research result, or wants to know what we might be missing.',
+      schema: z.object({
+        validation_id: z.string().describe('The `validation_id` returned by a prior b2b_manufacturer_search call.'),
       }),
     }
   );
