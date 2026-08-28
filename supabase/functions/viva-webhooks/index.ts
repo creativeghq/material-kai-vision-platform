@@ -244,6 +244,60 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     return json({ ok: true, ignored: true, event_type_id: eventTypeId });
   }
 
+  /**
+   * ONE DELIVERY, ONE PROCESSING (#360 CB-9).
+   *
+   * Viva retries 24 times, hourly, until it gets a 2xx, and these payment webhooks carry no
+   * per-message signature — so a replay is indistinguishable from a new notification. The card
+   * path was covered by accident (`recordInvoicePayment` is idempotent on the TransactionId);
+   * the reversal path had nothing, so a refund raised its alarm on every one of those retries,
+   * and the 2054 account-transaction path re-polled every pending order each time.
+   *
+   * The claim IS the row. A duplicate key means somebody already has this delivery.
+   */
+  if (messageId) {
+    const { error: claimErr } = await db.from('payment_webhook_events').insert({
+      provider: 'viva',
+      event_id: messageId,
+      workspace_id: cfg.workspace_id,
+      event_type: String(eventTypeId),
+      status: 'processing',
+    });
+    if (claimErr) {
+      if (!/duplicate|unique/i.test(claimErr.message ?? '')) {
+        // We could not record that we are about to move money. Let Viva retry rather than act
+        // without an audit row.
+        return json({ error: 'could not claim the delivery' }, 500);
+      }
+      /**
+       * A duplicate is only a REPLAY when the first attempt finished.
+       *
+       * This is the trap in the obvious version of this fix: if any duplicate short-circuits,
+       * then a delivery that failed and answered 500 is claimed forever — and Viva's retry, the
+       * very thing meant to recover it, gets acknowledged as "already processed". The failure
+       * becomes permanent BECAUSE of the dedupe.
+       *
+       * So: `done` short-circuits; `processing` or `failed` is taken over and retried.
+       */
+      const { data: prior } = await db.from('payment_webhook_events')
+        .select('status').eq('provider', 'viva').eq('event_id', messageId).maybeSingle();
+      if ((prior as { status?: string } | null)?.status === 'done') {
+        return json({ ok: true, ignored: true, reason: 'already processed' });
+      }
+      await db.from('payment_webhook_events')
+        .update({ status: 'processing', updated_at: new Date().toISOString() })
+        .eq('provider', 'viva').eq('event_id', messageId);
+    }
+  }
+
+  /** Settle the claim, so a row stuck at `processing` is a run that died mid-way. */
+  const settleDelivery = async (status: 'done' | 'failed', detail?: unknown) => {
+    if (!messageId) return;
+    await db.from('payment_webhook_events')
+      .update({ status, detail: detail ?? null, updated_at: new Date().toISOString() })
+      .eq('provider', 'viva').eq('event_id', messageId);
+  };
+
   const ctx = ctxFromConfig(cfg);
 
   // Failures are informational only — nothing to reverse, and the customer may retry
@@ -257,6 +311,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
         .eq('provider', 'viva')
         .eq('provider_order_code', oc);
     }
+    await settleDelivery('done', { outcome: 'payment_failed' });
     return json({ ok: true, recorded: false, outcome: 'failed' });
   }
 
@@ -321,13 +376,47 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       body: 'Viva reversed a payment. The original payment is still allocated, so the invoice still reads as paid — issue a credit note to reverse it.',
       action_url: '/finance?tab=doc_payments',
     };
+    /**
+     * THE REVERSAL GOES IN THE BOOKS, NOT JUST IN A NOTIFICATION (#360 CB-7).
+     *
+     * Everything this branch did was announce: a console.error and a flow event, both of which
+     * are `.catch(() => {})`. So money that LEFT the account left no durable trace at all — the
+     * invoice still reads as paid (correct: reversing settled books from an unsigned message is
+     * the credit note's job), but there was nothing to reconcile the credit note against, and
+     * nothing at all if the notification failed to deliver.
+     *
+     * It lands in the bank feed as money OUT, unmatched, which is what it is. A person places it
+     * against the credit note they raise.
+     */
+    if (wsId) {
+      const feed = await upsertVivaFeedRow(db, wsId, {
+        ref: `viva-reversal-${parentId || rawOrderCode(rawBody) || messageId}`,
+        type: 'refund',
+        direction: 'out',
+        amount,
+        currency: 'EUR',
+        reference: parentId
+          ? `Reversal of Viva transaction ${parentId}`
+          : 'Viva reversal — original transaction not identified',
+        matchedInvoiceId: null,
+        paymentId: null,
+      });
+      if (!feed.ok) {
+        // Refuse the acknowledgement: Viva retries, and a reversal nobody recorded is a hole in
+        // the books that no later process can find.
+        await settleDelivery('failed', { reason: 'reversal_not_recorded', parent_transaction_id: parentId });
+        return json({ error: 'could not record the reversal' }, 500);
+      }
+    }
+
     if (wsId) {
       await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'payment_reversed',
         (recipientUserId) => ({ ...payload, user_id: recipientUserId })).catch(() => {});
     } else {
       await emitFlowEvent('payment_reversed', payload).catch(() => {});
     }
-    return json({ ok: true, recorded: false, outcome: 'reversal_flagged' });
+    await settleDelivery('done', { outcome: 'reversal_recorded', parent_transaction_id: parentId });
+    return json({ ok: true, recorded: true, outcome: 'reversal_recorded' });
   }
 
   // ─── RF / bank transfer settled (Account Transaction Created, 2054) ───────
@@ -336,7 +425,10 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
   // trigger to re-check any RF orders we're waiting on. We resolve each by polling the
   // ORDER state (StateId === 3 = Paid), which is keyed on the orderCode we already hold.
   if (eventTypeId === EVENT_ACCOUNT_TRANSACTION) {
-    return await settlePendingRfOrders(db, cfg, ctx);
+    const rf = await settlePendingRfOrders(db, cfg, ctx);
+    // Only a 2xx is "handled". A 500 leaves the claim takeable, so Viva's retry actually retries.
+    await settleDelivery(rf.status < 300 ? 'done' : 'failed', { outcome: 'rf_sweep', status: rf.status });
+    return rf;
   }
 
   // ─── Card payment succeeded (1796) ────────────────────────────────────────
@@ -355,31 +447,64 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
   } catch (err) {
     // Non-2xx → Viva retries. Better a retry than recording an unverified payment.
     console.error('[viva-webhooks] read-back failed', transactionId, err);
+    await settleDelivery('failed', { reason: 'read_back_failed' });
     return json({ error: 'could not verify the transaction with Viva' }, 502);
   }
 
   // 'F' Finished / 'C' Captured are the settled states.
   if (tx.statusId !== 'F' && tx.statusId !== 'C') {
+    await settleDelivery('done', { outcome: 'not_settled', status_id: tx.statusId });
     return json({ ok: true, recorded: false, status_id: tx.statusId });
   }
 
   const orderCode = tx.orderCode ?? rawOrderCode(rawBody);
   if (!orderCode) {
     console.error('[viva-webhooks] no orderCode on verified transaction', transactionId);
+    await settleDelivery('done', { outcome: 'no_order_code' });
     return json({ ok: true, ignored: true });
   }
 
   // Resolve OUR invoice from OUR intent row — never from anything Viva sent us.
   const { data: intent } = await db
     .from('invoice_payment_intents')
-    .select('id, invoice_id, workspace_id, method, currency')
+    .select('id, invoice_id, workspace_id, method, currency, amount')
     .eq('provider', 'viva')
     .eq('provider_order_code', orderCode)
     .maybeSingle();
 
   if (!intent) {
-    console.warn(`[viva-webhooks] no intent for orderCode ${orderCode} (merchant ${merchantId})`);
-    return json({ ok: true, ignored: true, reason: 'unknown order' });
+    /**
+     * MONEY WE CANNOT PLACE IS STILL MONEY (#360 CB-5).
+     *
+     * This returned 200 `ignored`, and Viva stops retrying on a 2xx — so a verified, captured
+     * card payment whose intent row is missing was collected and never recorded anywhere. The
+     * intent row can genuinely be absent: #351 FE-2 found its insert is unchecked, so the
+     * mapping may never have been written for a payment the customer completed.
+     *
+     * It goes into the bank feed as UNMATCHED money in. That is durable, visible, and
+     * reconcilable by hand. Only if we cannot even do that do we refuse the acknowledgement, so
+     * Viva keeps retrying rather than the payment vanishing.
+     */
+    console.warn(`[viva-webhooks] no intent for orderCode ${orderCode} (merchant ${merchantId}) — recording as unmatched`);
+    const feed = await upsertVivaFeedRow(db, cfg.workspace_id, {
+      ref: `viva-tx-${transactionId}`,
+      type: 'card_payment',
+      direction: 'in',
+      amount: tx.amount,
+      // No intent means no stored currency. Viva's `currencyCode` is the ISO 4217 NUMERIC
+      // code ("978"), which is not what the feed stores — so the workspace's own default is
+      // the honest answer, and the reference line says the amount is unplaced.
+      currency: await workspaceDefaultCurrency(db, cfg.workspace_id),
+      reference: `Order ${orderCode} — no matching invoice`,
+      matchedInvoiceId: null,
+      paymentId: null,
+    });
+    if (!feed.ok) {
+      await settleDelivery('failed', { reason: 'unmatched_receipt_not_recorded', order_code: orderCode });
+      return json({ error: 'could not record the unmatched receipt' }, 500);
+    }
+    await settleDelivery('done', { outcome: 'unmatched_receipt', order_code: orderCode });
+    return json({ ok: true, recorded: false, outcome: 'unmatched_receipt' });
   }
 
   // Cross-tenant guard: the intent must belong to the same workspace the merchant maps to.
@@ -388,6 +513,42 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       `[viva-webhooks] merchant ${merchantId} (ws ${cfg.workspace_id}) referenced an intent in ws ${intent.workspace_id} — refusing`,
     );
     return json({ ok: true, ignored: true }, 200);
+  }
+
+  /**
+   * THE AMOUNT MUST BE THE AMOUNT WE ASKED FOR (#360 CB-8).
+   *
+   * `recordInvoicePayment` was called with whatever the read-back reported, with nothing
+   * comparing it to the intent. The read-back is trustworthy — it comes from Viva's API under the
+   * tenant's own credentials — but "trustworthy" is not "expected": an order paid for a different
+   * amount than the one we created settles an invoice it does not cover, and there is no second
+   * check anywhere downstream.
+   *
+   * A mismatch is not settled and not thrown away: it lands in the feed as unmatched money for a
+   * person to place. Compared in cents, because these are floats.
+   */
+  const expected = Number(intent.amount ?? 0);
+  const paid = Number(tx.amount ?? 0);
+  if (expected > 0 && Math.round(expected * 100) !== Math.round(paid * 100)) {
+    console.error(
+      `[viva-webhooks] amount mismatch on order ${orderCode}: expected ${expected}, paid ${paid} — not settling`,
+    );
+    const feed = await upsertVivaFeedRow(db, cfg.workspace_id, {
+      ref: `viva-tx-${transactionId}`,
+      type: 'card_payment',
+      direction: 'in',
+      amount: paid,
+      currency: intent.currency,
+      reference: `Order ${orderCode} — paid ${paid.toFixed(2)}, expected ${expected.toFixed(2)}`,
+      matchedInvoiceId: null,
+      paymentId: null,
+    });
+    if (!feed.ok) {
+      await settleDelivery('failed', { reason: 'amount_mismatch_not_recorded', order_code: orderCode });
+      return json({ error: 'could not record the mismatched receipt' }, 500);
+    }
+    await settleDelivery('done', { outcome: 'amount_mismatch', expected, paid, order_code: orderCode });
+    return json({ ok: true, recorded: false, outcome: 'amount_mismatch' });
   }
 
   const res = await recordInvoicePayment(db, intent.invoice_id, {
@@ -404,6 +565,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
 
   if (!res.ok) {
     // Let Viva retry — the money is real and we failed to book it.
+    await settleDelivery('failed', { reason: 'ingestion_failed', error: res.error });
     return json({ error: `ingestion failed: ${res.error}` }, 500);
   }
 
@@ -424,6 +586,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     paymentId: res.paymentId ?? null,
   });
 
+  await settleDelivery('done', { outcome: 'settled', order_code: orderCode, payment_id: res.paymentId ?? null });
   return json({
     ok: true,
     recorded: !res.duplicate,
@@ -437,6 +600,21 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
  * itself always happens above through record-payment; the feed row just makes Viva money
  * visible next to Revolut and Stripe). Best-effort: a feed failure never fails a webhook.
  */
+/**
+ * The workspace's own base currency, for money that arrived with no intent to name one.
+ *
+ * Viva's `currencyCode` is the ISO 4217 NUMERIC code ("978"), which is not what
+ * `payments.currency` or the feed store — so it cannot simply be copied across.
+ */
+async function workspaceDefaultCurrency(db: any, workspaceId: string): Promise<string> {
+  const { data } = await db
+    .from('finance_settings')
+    .select('base_currency')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  return String((data as { base_currency?: string } | null)?.base_currency || 'EUR').toUpperCase();
+}
+
 async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
   ref: string;
   type: string;
@@ -447,7 +625,7 @@ async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
   reference?: string | null;
   matchedInvoiceId?: string | null;
   paymentId?: string | null;
-}): Promise<void> {
+}): Promise<{ ok: boolean; error?: string }> {
   try {
     const { data: acct } = await db
       .from('finance_bank_accounts')
@@ -471,15 +649,24 @@ async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
       booked_at: new Date().toISOString(),
       counterparty_name: row.counterparty ?? null,
       reference: row.reference ?? null,
-      match_status: row.matchedInvoiceId ? 'matched' : 'ignored',
+      // `ignored` HIDES a row from the review queue — right for a fee or a payout we never
+      // expected to match, wrong for money that arrived and could not be placed (#360 CB-5).
+      // Unmatched money must be visible to somebody.
+      match_status: row.matchedInvoiceId ? 'matched' : 'unmatched',
       matched_invoice_id: row.matchedInvoiceId ?? null,
       reconciled_payment_id: row.paymentId ?? null,
       raw: { source: 'viva-webhook' },
       updated_at: new Date().toISOString(),
     }, { onConflict: 'workspace_id,provider,provider_ref' });
-    if (error) console.warn('[viva-webhooks] feed upsert failed:', error.message);
+    if (error) {
+      console.warn('[viva-webhooks] feed upsert failed:', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
   } catch (err) {
-    console.warn('[viva-webhooks] feed upsert threw:', err instanceof Error ? err.message : err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[viva-webhooks] feed upsert threw:', message);
+    return { ok: false, error: message };
   }
 }
 
@@ -520,12 +707,18 @@ async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Respo
   }
 
   let settled = 0;
+  /** Anything that did not complete. A non-empty list means this delivery must NOT be acked. */
+  const failures: string[] = [];
   for (const intent of pending) {
     let order;
     try {
       order = await retrieveVivaOrder(String(intent.provider_order_code), ctx);
     } catch (err) {
+      // Viva was unreachable for this order. Not a settlement failure — the order may not even
+      // be paid — but the sweep did not cover what it was asked to, so it must not report as if
+      // it had (#360 CB-6).
       console.error('[viva-webhooks] RF order retrieve failed', intent.provider_order_code, err);
+      failures.push(`${intent.provider_order_code}: retrieve failed`);
       continue;
     }
     if (order.stateId !== VIVA_ORDER_STATE.PAID) continue;
@@ -540,10 +733,13 @@ async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Respo
       notes: `Bank transfer (RF) via Viva — order ${intent.provider_order_code}`,
     });
     if (!res.ok) {
+      // MONEY RECEIVED AND UNBOOKED. This `continue` plus the 200 below told Viva the event was
+      // handled, and Viva stops retrying on a 2xx — so a failed ingestion was permanent.
       console.error('[viva-webhooks] RF ingestion failed', intent.provider_order_code, res.error);
+      failures.push(`${intent.provider_order_code}: ${res.error}`);
       continue;
     }
-    await upsertVivaFeedRow(db, cfg.workspace_id, {
+    const feed = await upsertVivaFeedRow(db, cfg.workspace_id, {
       ref: `viva-rf-${intent.provider_order_code}`,
       type: 'bank_transfer',
       direction: 'in',
@@ -553,12 +749,25 @@ async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Respo
       matchedInvoiceId: intent.invoice_id,
       paymentId: res.paymentId ?? null,
     });
-    await db
+    if (!feed.ok) failures.push(`${intent.provider_order_code}: feed row not written`);
+    const { error: intentErr } = await db
       .from('invoice_payment_intents')
       .update({ status: 'paid', updated_at: new Date().toISOString() })
       .eq('id', intent.id);
+    if (intentErr) failures.push(`${intent.provider_order_code}: intent not marked paid`);
     settled += 1;
   }
 
+  /**
+   * A 200 tells Viva the delivery is done and it stops retrying (#360 CB-6).
+   *
+   * Every failure above used to `continue` into an unconditional 200, so an unreachable order
+   * API or a failed ingestion was permanent: money received, never booked, no retry, no record.
+   * Anything that did not complete now refuses the acknowledgement, and Viva's 24 hourly retries
+   * become the recovery mechanism they are meant to be.
+   */
+  if (failures.length > 0) {
+    return json({ error: `RF settlement incomplete: ${failures.join('; ')}`, settled }, 500);
+  }
   return json({ ok: true, settled, checked: pending.length });
 }
