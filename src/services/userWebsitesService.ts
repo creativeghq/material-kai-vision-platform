@@ -392,6 +392,18 @@ export interface WebsiteHealth {
   bp_score: number | null;
   seo_score: number | null;
   issues: { title: string; score: number; display_value: string | null }[] | null;
+  /**
+   * The 52 raw on-page booleans. `get_website_health` has always returned these —
+   * `to_jsonb(h)` sends the whole row — but the type omitted them, so nothing
+   * rendered them and the panel showed only failures. See `seo/onPageChecks.ts`.
+   */
+  onpage: {
+    onpage_score?: number | null;
+    meta?: Record<string, any> | null;
+    page_timing?: Record<string, any> | null;
+    checks?: Record<string, unknown> | null;
+  } | null;
+  lighthouse: { categories?: Record<string, { score?: number }> } | null;
   error: string | null;
   created_at: string;
 }

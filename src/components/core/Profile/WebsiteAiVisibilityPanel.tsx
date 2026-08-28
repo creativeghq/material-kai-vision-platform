@@ -17,6 +17,7 @@ import {
   updateTrackedMention,
 } from '@/services/mentionMonitoringApi';
 import { Button } from '@/components/core/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Sparkline } from './seo/Sparkline';
 import { timeAgo } from '@/utils/datetime';
@@ -162,7 +163,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     setBusy('track');
     try {
       const label = website.display_name?.trim() || (state?.site_host ?? '').split('.')[0];
-      await createTrackedMention({
+      const created = await createTrackedMention({
         subject_type: 'brand',
         subject_label: label,
         homepage_domain: state?.site_host,
@@ -172,6 +173,16 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         sources_enabled: { llm: true, news: true, blogs: true, rss: true, youtube: false },
         run_first_refresh: false,
       });
+      // Attach it to THIS site. Without the link the subject is workspace-level and
+      // this panel deliberately ignores it — which is exactly the bug that put price
+      // monitoring subjects into a website's AI Visibility report.
+      if (created?.id) {
+        const { error: linkErr } = await supabase
+          .from('tracked_mentions')
+          .update({ website_id: website.id } as any)
+          .eq('id', created.id);
+        if (linkErr) throw new Error(`Tracked, but could not attach it to this site: ${linkErr.message}`);
+      }
       toast({ title: `Now tracking ${label}`, description: 'It joins tonight’s probe run.' });
       await load();
     } catch (e: any) {

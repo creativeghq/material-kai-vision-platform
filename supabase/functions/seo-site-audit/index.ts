@@ -219,6 +219,9 @@ async function auditWebsite(supabase: any, website: { id: string; workspace_id: 
     const row = {
       website_id: website.id, workspace_id: website.workspace_id, url: homepage, status: 'ok',
       perf_score: pct(cats.performance?.score), a11y_score: pct(cats.accessibility?.score),
+      // HYPHEN here on purpose: DataForSEO accepts `best_practices` in the REQUEST and
+      // returns `best-practices` in the RESPONSE. Matching this to the request spelling
+      // would read undefined forever.
       bp_score: pct(cats['best-practices']?.score), seo_score: seoScore,
       lighthouse: Object.keys(cats).length ? { categories: cats } : null,
       onpage: { onpage_score: ip.onpage_score ?? null, meta: ip.meta ?? null, page_timing: ip.page_timing ?? null, checks },

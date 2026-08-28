@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, BarChart3, KeyRound, Loader2, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -90,6 +90,25 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
     }
   };
 
+  /**
+   * Widen the Google grant to include Analytics.
+   *
+   * The existing token was authorized before Analytics was supported, so it carries
+   * `webmasters.readonly` and not `analytics.readonly`. Because the consent URL sets
+   * `include_granted_scopes`, re-consenting MERGES the new scope in — Search Console
+   * is not disturbed and no data is lost.
+   */
+  const reconnect = async () => {
+    setBusy('reauth');
+    try {
+      const url = await userWebsitesService.gscAuthorize(website.id);
+      window.location.href = url;
+    } catch (e: any) {
+      toast({ title: 'Could not start the Google flow', description: e?.message, variant: 'destructive' });
+      setBusy(null);
+    }
+  };
+
   const sync = async () => {
     setBusy('sync');
     try {
@@ -140,15 +159,23 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
       <CardContent className="space-y-4">
         {summary?.note && (
           <div className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-xs leading-snug ${
-            summary.status === 'collector_failed'
+            summary.status === 'collector_failed' || summary.status === 'needs_reauth'
               ? 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300'
               : 'border-hairline bg-surface-sunken text-muted-foreground'
           }`}>
-            {summary.status === 'collector_failed' && (
+            {(summary.status === 'collector_failed' || summary.status === 'needs_reauth') && (
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             )}
             <span>{summary.note}</span>
           </div>
+        )}
+
+        {/* The grant predates Analytics. One button, not a support ticket. */}
+        {summary?.status === 'needs_reauth' && (
+          <Button size="sm" variant="outline" onClick={reconnect} disabled={!!busy}>
+            {busy === 'reauth' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <KeyRound className="mr-1 h-4 w-4" />}
+            Reconnect Google to include Analytics
+          </Button>
         )}
 
         {/* Property picker — only when Google is connected but nothing is chosen. */}

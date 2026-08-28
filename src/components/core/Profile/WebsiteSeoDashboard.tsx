@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles, Swords,
+  LayoutDashboard, Sparkles, Swords, Plus,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -15,6 +16,7 @@ import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearch
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -63,6 +65,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
   const [loading, setLoading] = useState(true);
   const [recrawling, setRecrawling] = useState(false);
 
+  const launchQuickStart = useLaunchQuickStart();
   const [openResearchId, setOpenResearchId] = useState<string | null>(null);
   const [articles, setArticles] = useState<SeoArticleRow[]>([]);
   const [freshness, setFreshness] = useState<SeoArticleFreshnessRow[]>([]);
@@ -292,15 +295,30 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
             </Card>
           )}
           <Card className="dashboard-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
               <CardTitle>SEO Articles</CardTitle>
               <CardDescription>Articles generated for this website. Click one to open the full viewer.</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" className="shrink-0"
+                onClick={() => launchQuickStart('seo-article', 'Generate full article')}>
+                <Plus className="w-3.5 h-3.5 mr-1" />New article
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
                 <Loading />
               ) : articles.length === 0 ? (
-                <Empty text="No articles generated for this site yet. Ask the JARVIS agent to write one." />
+                <HubEmptyState
+                  variant="empty"
+                  title="No articles yet"
+                  description="The article pipeline researches a keyword, plans the piece and writes it. Start one and it files itself here."
+                  action={
+                    <Button size="sm" onClick={() => launchQuickStart('seo-article', 'Generate full article')}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />New article
+                    </Button>
+                  }
+                />
               ) : (
                 <Table>
                   <TableHeader>
@@ -355,18 +373,33 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* Keyword Research */}
         <TabsContent value="research">
           <Card className="dashboard-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
               <CardTitle>Keyword Research</CardTitle>
               <CardDescription>
                 Open a run to read the whole results page it captured — AI Overview citations, image and
                 local packs, People Also Ask, clusters and who ranks now.
               </CardDescription>
+              </div>
+              <Button size="sm" variant="outline" className="shrink-0"
+                onClick={() => launchQuickStart('seo-research', 'Research a keyword')}>
+                <Plus className="w-3.5 h-3.5 mr-1" />New research
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
                 <Loading />
               ) : research.length === 0 ? (
-                <Empty text="No keyword research filed under this site yet." />
+                <HubEmptyState
+                  variant="empty"
+                  title="No keyword research yet"
+                  description="A research pass captures the whole results page for a keyword — AI Overview citations, image and local packs, People Also Ask, and who ranks now."
+                  action={
+                    <Button size="sm" onClick={() => launchQuickStart('seo-research', 'Research a keyword')}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />New research
+                    </Button>
+                  }
+                />
               ) : (
                 <Table>
                   <TableHeader>
@@ -402,15 +435,30 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* Toolkit Runs */}
         <TabsContent value="runs">
           <Card className="dashboard-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
               <CardTitle>Toolkit Runs</CardTitle>
               <CardDescription>SEO research + audit passes the agent and toolkit ran for this website.</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" className="shrink-0"
+                onClick={() => launchQuickStart('seo-research', 'Audit a URL')}>
+                <Plus className="w-3.5 h-3.5 mr-1" />New run
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
                 <Loading />
               ) : runs.length === 0 ? (
-                <Empty text="No toolkit runs filed under this site yet." />
+                <HubEmptyState
+                  variant="empty"
+                  title="No toolkit runs yet"
+                  description="Every audit or research pass the agent runs for this site is filed here so you can re-read it later."
+                  action={
+                    <Button size="sm" onClick={() => launchQuickStart('seo-research', 'Audit a URL')}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />New run
+                    </Button>
+                  }
+                />
               ) : (
                 <Table>
                   <TableHeader>
@@ -444,15 +492,30 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* Domain Audits */}
         <TabsContent value="domains">
           <Card className="dashboard-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-3">
+              <div>
               <CardTitle>Domain Audits</CardTitle>
               <CardDescription>Scheduled domain-rank tracking for this website's domain.</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" className="shrink-0"
+                onClick={() => launchQuickStart('seo-domain', 'Snapshot a domain')}>
+                <Plus className="w-3.5 h-3.5 mr-1" />Track a domain
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
                 <Loading />
               ) : domains.length === 0 ? (
-                <Empty text="This website's domain isn't tracked for scheduled audits yet. Ask the agent to run a site review to start." />
+                <HubEmptyState
+                  variant="empty"
+                  title="This domain is not tracked yet"
+                  description="Tracking takes a weekly rank and backlink snapshot so movement shows up as a trend rather than a surprise."
+                  action={
+                    <Button size="sm" onClick={() => launchQuickStart('seo-domain', 'Snapshot a domain')}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />Track a domain
+                    </Button>
+                  }
+                />
               ) : (
                 <Table>
                   <TableHeader>
@@ -539,6 +602,21 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
   );
 };
 
+/**
+ * Send the operator into the agent with a specific guided flow already open.
+ *
+ * `?quickstart=<toolkitId>:<label>` is the existing deep-link AgentHub already
+ * honours — it dispatches through the SAME handleQuickStart the in-app picker
+ * uses, so these buttons cannot drift from the flows themselves. A tab that lists
+ * past runs with no way to start a new one makes the reader go and find the agent,
+ * guess the toolkit, and guess the flow.
+ */
+function useLaunchQuickStart() {
+  const navigate = useNavigate();
+  return (toolkitId: string, label: string) =>
+    navigate(`/agent-hub?quickstart=${encodeURIComponent(toolkitId)}:${encodeURIComponent(label)}`);
+}
+
 function Loading() {
   return (
     <div className="flex items-center justify-center py-12">
@@ -547,8 +625,5 @@ function Loading() {
   );
 }
 
-function Empty({ text }: { text: string }) {
-  return <div className="text-center py-12 text-sm text-muted-foreground">{text}</div>;
-}
 
 export default WebsiteSeoDashboard;
