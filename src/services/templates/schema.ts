@@ -217,10 +217,18 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     sourceTable: 'supplier_bills',
     capability: 'finance.manage',
     moduleSlug: 'sales-finance',
-    // Amounts are captured by the adapter under `default_amount` / `default_vat_amount`, NOT under
-    // the column names: on a bill they are typed inputs rather than derivations, but a payload key
-    // called `subtotal_net` would be indistinguishable from the stored-total mistake the guard
-    // test exists to catch. `notes` is the description shown on the bill.
+    // NO AMOUNT, and no payee. The amount is gone on purpose (#385 FN-4): it was captured under
+    // synthetic `default_amount` / `default_vat_amount` keys that read `subtotal_net` and
+    // `vat_amount` straight off the bill — both FORBIDDEN_CAPTURE_FIELDS — and an expense
+    // template applies as a `prefill`, so the operator is looking at the actual bill when they
+    // type the figure. Last quarter's electricity is not this quarter's.
+    //
+    // The payee is absent because NO adapter captures a party: an invoice template does not
+    // remember the customer either. A template is a SHAPE you apply to whichever party you pick,
+    // which is also why `crm_company` sits in the CHECK unbuilt (a party goes through duplicate
+    // search, never a silent create). So what this actually saves is the category, the currency
+    // and the description — the stable half of a rent/retainer/subscription bill.
+    // `notes` is the description shown on the bill.
     captureFields: ['currency', 'notes', 'category_id'],
     editableFields: [
       { key: 'notes', label: 'Description', kind: 'textarea' },

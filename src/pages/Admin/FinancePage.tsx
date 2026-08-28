@@ -500,7 +500,7 @@ const FinancePage: React.FC = () => {
               to read as the first two rows of the list they are meant to sit outside of.
 
               OUTSIDE the `TabsList`, which is the other half of the same argument: the list
-              carries the rail's trailing rule (`data-[orientation=vertical]:border-r`), and
+              carries the rail's trailing rule (the lg-scoped vertical-orientation border), and
               that rule belongs to the SECTIONS. Nested inside, it ran up the right of the two
               buttons and closed the pair into a box — the one thing this row is styled not to
               be. Being outside also means `hidden lg:block` rather than leaning on

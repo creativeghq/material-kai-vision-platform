@@ -838,12 +838,19 @@ All colors MUST be HSL.
    `display: contents` and every item becomes a sibling in the strip.
    ============================================================ */
 @media (max-width: 1023px) {
-  .section-rail {
+  /* `.section-rail.section-rail` — the class twice, on purpose. Measured against the
+     compiled sheet: plain utilities (`.flex-wrap`, `.p-0`, `.inline-flex`) land BEFORE
+     this file's unlayered rules, but VARIANT utilities — `lg:*` and every
+     `data-[orientation=vertical]:*` — land after it, and the data- ones are attribute-
+     qualified on top of that. So a single class wins against one bucket and loses to
+     the other, which is a coin-flip nobody reading the rule can predict. Doubling the
+     class costs one specificity point and settles it for both. */
+  .section-rail.section-rail {
     display: flex;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    justify-content: flex-start !important;
+    justify-content: flex-start;
     gap: 0.25rem;
     width: 100%;
     max-width: 100%;
@@ -852,7 +859,7 @@ All colors MUST be HSL.
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     border-bottom: 1px solid hsl(var(--hairline));
-    padding-bottom: 0.25rem;
+    padding: 0 0 0.25rem;
   }
   .section-rail::-webkit-scrollbar {
     display: none;
@@ -1769,15 +1776,23 @@ html.light .msg-assistant a { color: hsl(var(--primary)); }
 }
 
 /* A VERTICAL tab rail (Finance's section nav) puts the indicator on the leading
-   edge instead — a horizontal rule under a stacked row is meaningless. */
-[role="tablist"][aria-orientation="vertical"] > [role="tab"][data-state="active"]::after {
-  left: 0;
-  right: auto;
-  top: 15%;
-  bottom: 15%;
-  width: 3px;
-  height: auto;
-  border-radius: 0 3px 3px 0;
+   edge instead — a horizontal rule under a stacked row is meaningless.
+
+   `lg` and up ONLY. Radix keeps `aria-orientation="vertical"` on the list at
+   every width, so below `lg` — where `.section-rail` has turned the rail into a
+   horizontal strip — this painted a 3px bar down the LEFT EDGE of the selected
+   chip. Four attribute selectors deep, it outranked anything the strip could
+   say, so the marker pointed the wrong way on every rail on every phone. */
+@media (min-width: 1024px) {
+  [role="tablist"][aria-orientation="vertical"] > [role="tab"][data-state="active"]::after {
+    left: 0;
+    right: auto;
+    top: 15%;
+    bottom: 15%;
+    width: 3px;
+    height: auto;
+    border-radius: 0 3px 3px 0;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────────

@@ -35,7 +35,15 @@ const TabsList = React.forwardRef<
         // A VERTICAL rail (Finance's section nav) gets the rule on its trailing
         // edge instead, and no fixed height — a 36px-tall stack of 19 sections
         // is not a thing. Radix stamps data-orientation on the list itself.
-        'data-[orientation=vertical]:h-auto data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch data-[orientation=vertical]:gap-0 data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-r',
+        //
+        // SCOPED TO `lg:` ON PURPOSE. Radix keeps `data-orientation="vertical"`
+        // at every width, so unscoped these six said "stack me" on a phone too —
+        // and each one is `[data-orientation=vertical]`-qualified, i.e. MORE
+        // specific than the `.section-rail` class that turns the rail into a
+        // strip, and emitted after it. The strip therefore came out with the
+        // column's stretch, no gaps and no bottom rule while looking like it had
+        // been fixed. Below `lg` the horizontal base above IS the strip.
+        'lg:data-[orientation=vertical]:h-auto lg:data-[orientation=vertical]:flex-col lg:data-[orientation=vertical]:items-stretch lg:data-[orientation=vertical]:gap-0 lg:data-[orientation=vertical]:border-b-0 lg:data-[orientation=vertical]:border-r',
         className,
       )}
       {...props}

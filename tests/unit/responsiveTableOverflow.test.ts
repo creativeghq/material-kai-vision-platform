@@ -252,9 +252,43 @@ describe('a section rail is a strip on a phone, not a wall', () => {
     expect(nav, 'group captions need data-rail-heading to be hidden in the strip').toContain('data-rail-heading');
   });
 
+  /**
+   * The reason the Finance rail looked broken AFTER it had a fix. Radix keeps
+   * `data-orientation="vertical"` / `aria-orientation="vertical"` on the list at every width,
+   * so the vertical treatment kept applying inside the strip — and it applies from selectors
+   * that are attribute-qualified, i.e. strictly more specific than the `.section-rail` class
+   * and emitted after it in the compiled sheet. The strip came out with the column's stretch,
+   * no gaps, no bottom rule and the active marker painted down the LEFT EDGE of the chip.
+   * `.section-rail` cannot win that fight; the vertical treatment has to be scoped instead.
+   */
+  it('the vertical-orientation treatment is scoped to lg, in both places that carry it', () => {
+    const tabs = readFileSync(join(SRC, 'components/core/ui/tabs.tsx'), 'utf8');
+    const unscoped = [...tabs.matchAll(/(^|[\s'"`])(data-\[orientation=vertical\]:)/g)];
+    expect(
+      unscoped.map((m) => m[2]),
+      'An unscoped `data-[orientation=vertical]:` utility on TabsList says "stack me" on a phone ' +
+      'too, and outranks `.section-rail`. Prefix it with `lg:`.',
+    ).toEqual([]);
+    expect(tabs).toContain('lg:data-[orientation=vertical]:flex-col');
+
+    const css = readFileSync(join(SRC, 'index.css'), 'utf8');
+    const marker = css.indexOf('[role="tablist"][aria-orientation="vertical"] > [role="tab"][data-state="active"]::after');
+    expect(marker, 'the vertical active-marker rule has moved — re-check this guard').toBeGreaterThan(0);
+    const before = css.slice(0, marker);
+    const openMedia = before.lastIndexOf('@media');
+    expect(
+      before.slice(openMedia, openMedia + 40),
+      'The leading-edge active marker must live inside `@media (min-width: 1024px)`. Below `lg` ' +
+      'the rail is a horizontal strip, and this rule paints a 3px bar down the left edge of the ' +
+      'selected chip — four attribute selectors deep, so nothing the strip says can override it.',
+    ).toContain('min-width: 1024px');
+  });
+
   it('.section-rail is defined once, and only below lg', () => {
     const css = readFileSync(join(SRC, 'index.css'), 'utf8');
-    expect(css).toContain('.section-rail {');
+    // Doubled class on purpose — Tailwind's utilities are emitted after this file, so a single
+    // class ties and loses on order. See the comment on the rule.
+    expect(css).toContain('.section-rail.section-rail {');
     expect(css).not.toContain('.finance-tabs-list');
     const block = css.slice(css.indexOf('@media (max-width: 1023px)'));
     expect(block.slice(0, block.indexOf('\n}\n\n') + 1)).toContain('.section-rail');
