@@ -28,6 +28,10 @@
 import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
 import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
+// Invariant 7 — a model-supplied URL that OUR infrastructure will fetch (#352 A19).
+import { assertSafeUrl } from '../ssrf-guard.ts';
+// Invariant 9 — third-party text inside a structured result (#352 A17).
+import { UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -275,6 +279,11 @@ function condenseForLLM(data: any): Record<string, any> {
   }));
 
   return {
+    // Every title, question and related search below was written by whoever wanted to rank for
+    // this query (#352 A17). One note on the object rather than a banner per string: the model
+    // reads the whole result at once, and twenty results wrapped individually would be mostly
+    // framing.
+    _untrusted: UNTRUSTED_FIELDS_NOTE,
     subject: data?.subject_label,
     opportunity_count: ops.length,
     types: byType,
@@ -675,6 +684,19 @@ export const createSEOAuditUrlTool = (
 ) => {
   return tool(
     async ({ url, for_mobile }) => {
+      // #352 A19. `url` is a model argument and `quick-page` runs a Lighthouse pass on OUR
+      // MIVAA host — so an internal address here is a fetch from our own infrastructure, not
+      // a vendor's. The audit rated this Low "unless MIVAA's quick-page runs a local
+      // browser/fetch on our infrastructure, which should be checked"; it does, so the guard
+      // goes in. Cheap, and it belongs on the side that knows the URL came from a model.
+      try {
+        url = await assertSafeUrl(url, { allowSchemes: ['https:'] });
+      } catch (e) {
+        return JSON.stringify({
+          success: false,
+          error: `That URL cannot be audited: ${e instanceof Error ? e.message : 'invalid or non-public address'}`,
+        });
+      }
       onChunk?.({ type: 'tool_progress', status: `Auditing ${url}...`, timestamp: Date.now() });
       const r = await callSEOAgentRoute('onpage/quick-page', {
         url, for_mobile: !!for_mobile, attribution: { user_id: _userId },
@@ -1187,6 +1209,7 @@ export const createSEOYouTubeSearchTool = (
       });
       return JSON.stringify({
         success: true, keyword, count: items.length,
+        _untrusted: UNTRUSTED_FIELDS_NOTE, // video + channel titles are third-party (#352 A17)
         top: items.slice(0, 5).map((v: any) => ({
           title: v.title, channel: v.channel?.title, views: v.views, url: v.url,
         })),
@@ -2024,6 +2047,7 @@ export const createSEOGoogleMapsTool = (_userId: string, onChunk?: (chunk: any) 
       onChunk?.({ type: 'seo_google_maps_card', keyword, items, timestamp: Date.now() });
       return JSON.stringify({
         success: true, keyword, count: items.length,
+        _untrusted: UNTRUSTED_FIELDS_NOTE, // business names are third-party (#352 A17)
         top: items.slice(0, 5).map((p: any) => ({ title: p.title, rating: p.rating?.value, reviews: p.rating?.votes_count, address: p.address })),
       });
     },

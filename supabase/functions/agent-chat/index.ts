@@ -263,10 +263,21 @@ function createAgentGraph(
     agentId?: string;
     supabase?: any;
   },
+  /**
+   * Fires when the client goes away (#352 A16).
+   *
+   * Checked BETWEEN steps, never mid-tool. A tool that is already running has usually already
+   * sent its upstream request, and killing it half-way is how you get a message sent but not
+   * recorded, or a row written but not linked. Stopping before the next model call and before
+   * the next tool is where the saving is anyway: those are the expensive, mutating steps.
+   */
+  abortSignal?: AbortSignal,
 ) {
 
   // Agent node: calls the model
   async function agentNode(state: AgentState): Promise<Partial<AgentState>> {
+    // The client has gone. Stop before spending another model call (#352 A16).
+    if (abortSignal?.aborted) throw new DOMException('Client disconnected', 'AbortError');
     const iteration = state.iteration + 1;
 
     // Send iteration status
@@ -325,7 +336,12 @@ function createAgentGraph(
     // Chunks are concatenated back into one AIMessage because the tool loop downstream needs
     // the aggregate: `tool_calls` are assembled from `input_json_delta` fragments and only
     // exist on the concatenated message.
-    const stream = await modelWithTools.stream([systemMessage, ...state.messages]);
+    // `signal` so a disconnect kills the completion that is already streaming, rather than
+    // paying for tokens nobody will read (#352 A16).
+    const stream = await modelWithTools.stream(
+      [systemMessage, ...state.messages],
+      abortSignal ? { signal: abortSignal } : undefined,
+    );
     let response: any = null;
     for await (const part of stream) {
       response = response === null ? part : response.concat(part);
@@ -472,6 +488,10 @@ function createAgentGraph(
             + `${toolCall.name} — the approval gate is not the model's to set`,
           );
         }
+
+        // Same check, one level down (#352 A16): a turn that was cancelled while the model was
+        // writing must not then run the tools it asked for — several of them mutate.
+        if (abortSignal?.aborted) throw new DOMException('Client disconnected', 'AbortError');
 
         const _t_start = Date.now();
         const timeoutMs = timeoutFor(toolCall.name);
@@ -1450,6 +1470,8 @@ async function executeAgent(
   // the THREAD rather than from anything the customer wrote — that is what makes those tools
   // injection-proof.
   customerThreadId?: string | null,
+  /** Aborted when the client disconnects (#352 A16). Checked between steps by the graph. */
+  abortSignal?: AbortSignal,
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -3261,7 +3283,7 @@ async function executeAgent(
     conversationId: conversation_id || undefined,
     agentId,
     supabase, // module-level service-role client
-  });
+  }, abortSignal);
 
   // ── Conversation compaction ─────────────────────────────────────────────────
   // For long conversations (> 12 messages), summarize the older turns via Haiku
@@ -4068,11 +4090,26 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
         console.warn('Partner turn refund failed:', e);
       }
     };
+    /**
+     * Stream state, hoisted OUT of `start` so `cancel` can see it (#352 A16).
+     *
+     * `cancel` is a sibling of `start` on the underlying-source object, not a nested closure, so
+     * anything it must touch has to live here. That is not incidental to the bug: `streamClosed`
+     * and `heartbeatInterval` were `start`-locals, which is part of why a `cancel` handler was
+     * never written — there was nothing it could reach.
+     *
+     * `cancelRequested` used to be a bare `let` that nothing ever assigned and nothing ever
+     * read, and the stream had no `cancel()` at all, so closing the tab mid-run was not observed
+     * anywhere. The turn kept going: more model calls, more TOOLS (several of which mutate),
+     * memory promotion, flow events and usage logging, all for a reader that had gone.
+     */
+    let streamClosed = false;
+    let heartbeatInterval: any = null;
+    let cancelRequested = false;
+    const abortController = new AbortController();
+
     const stream = new ReadableStream({
       start(controller) {
-        let streamClosed = false;
-        let heartbeatInterval: any = null;
-        let cancelRequested = false;
 
         // Safe enqueue helper that checks if stream is still open
         const safeEnqueue = (data: any): boolean => {
@@ -4195,6 +4232,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               modelOverride, // Internal/eval pin; null for every ordinary caller
               audience, // 'customer' clamps the tools, drops memory both ways, and fences the message
               customerThreadId, // scopes the account tools — read from the THREAD, never the message
+              abortController.signal, // fires when the client goes away (#352 A16)
             );
             if (finalResult) {
             }
@@ -4408,8 +4446,19 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             console.warn('⚠️ Stream already closed:', closeError);
           }
         } catch (error) {
-          console.error('❌ Streaming error:', error);
-          console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+          // A cancelled turn is not a crash (#352 A16). The client is gone, so there is nobody
+          // to send an error to and nothing to report — but the partner refund still runs
+          // below, because a turn the user abandoned mid-flight should not be charged as a
+          // completed one.
+          const wasCancelled = cancelRequested
+            || (error instanceof DOMException && error.name === 'AbortError')
+            || (error instanceof Error && error.name === 'AbortError');
+          if (wasCancelled) {
+            console.log('🛑 Turn cancelled — client disconnected; stopped between steps.');
+          } else {
+            console.error('❌ Streaming error:', error);
+            console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+          }
 
           // Refund partner per-turn credit if the agent crashed before
           // producing any real content. (No-op for internal users.)
@@ -4421,8 +4470,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             heartbeatInterval = null;
           }
 
-          // Only try to send error if stream is not already closed
-          if (!streamClosed) {
+          // Only try to send error if stream is not already closed — and never for a
+          // cancellation, where the reader has already gone.
+          if (!streamClosed && !wasCancelled) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
             // Try to send error using safe enqueue
@@ -4448,7 +4498,30 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           }
         }
         })(); // End of async IIFE
-      }
+      },
+
+      /**
+       * The client went away (#352 A16).
+       *
+       * `ReadableStream.cancel` is how a disconnect is observed at all, and this stream did not
+       * implement it — so `cancelRequested` sat declared, unassigned and unread while the turn
+       * carried on running model calls and mutating tools for a reader that had gone.
+       *
+       * Aborting stops work BETWEEN steps, not mid-tool: a tool already in flight has usually
+       * already sent its upstream request, and killing it half-way is how you get a message
+       * sent but not recorded. The next model call and the next tool are where the money and
+       * the mutations are.
+       */
+      cancel(reason) {
+        cancelRequested = true;
+        streamClosed = true;
+        abortController.abort();
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
+        console.log(`🛑 Client cancelled the stream${reason ? `: ${reason}` : ''} — aborting the turn.`);
+      },
     });
 
     return new Response(stream, {

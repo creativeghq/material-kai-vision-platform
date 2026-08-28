@@ -158,7 +158,11 @@ describe('the agent system prompt travels as a message', () => {
     expect(
       text,
       'agentNode must call model.stream() so text can be forwarded as text_delta chunks',
-    ).toMatch(/await modelWithTools\.stream\(\[systemMessage, \.\.\.state\.messages\]\)/);
+      // Matches across newlines: the call gained a second argument (the abort signal, #352 A16)
+      // and had to wrap. The PROPERTY is "it streams, with the system message first" — pinning
+      // the one-line layout instead made a reformat look like a regression, which is the shape
+      // that gets a guard deleted rather than understood.
+    ).toMatch(/await modelWithTools\.stream\(\s*\[systemMessage, \.\.\.state\.messages\]/);
 
     expect(
       text.includes('modelWithTools.invoke('),
