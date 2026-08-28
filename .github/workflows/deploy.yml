@@ -189,7 +189,17 @@ jobs:
         id: changed-functions
         run: |
           set -euo pipefail
-          ALL=$(ls -d supabase/functions/*/ 2>/dev/null | xargs -n1 basename | grep -v '^_shared$' || true)
+          # A function is a directory with an `index.ts`, not merely a directory. `_shared` is
+          # excluded by name; the entrypoint test covers everything else, including a stray
+          # `supabase/functions/node_modules/` — which `deno check --node-modules-dir=auto`
+          # drops in exactly that spot, and which would otherwise reach
+          # `supabase functions deploy node_modules` and fail the whole job.
+          ALL=$(
+            for d in supabase/functions/*/; do
+              n=$(basename "$d")
+              if [ "$n" != "_shared" ] && [ -f "$d/index.ts" ]; then echo "$n"; fi
+            done
+          )
           FUNCS=""
           SHARED=false
 
@@ -712,6 +722,19 @@ jobs:
             echo "✅ All $(echo "$FUNCS" | wc -w | tr -d ' ') functions deployed"
           fi
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # Asks the question the deploy has never asked: what is running in production that this
+      # repo has no source for? Thirteen such functions had accumulated by 2026-08-11 (#345) —
+      # unreadable, unreviewable, unfixable — including one CLAUDE.md described as deleted while
+      # v54 of it was still live. Runs AFTER the deploy so it judges the state we just created.
+      # `if: always()` because a failed deploy is exactly when "repo function not deployed"
+      # matters most, and a red job must not hide the reason.
+      - name: 🔍 Deployed-vs-repo drift
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: node scripts/check-deployed-functions.mjs
 
       - name: 📋 Summary
         if: always()

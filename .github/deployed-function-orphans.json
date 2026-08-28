@@ -1,0 +1,10 @@
+{
+  "_comment": "Edge functions deployed with NO source in this repo. They cannot be read, reviewed, fixed or redeployed — only invoked or deleted. The list may only SHRINK: a new orphan fails the build. Each entry needs a reason and a way out. Regenerate with: node scripts/check-deployed-functions.mjs --write-baseline",
+  "orphans": {
+    "tmp-b2b-search-probe": {
+      "reason": "Diagnostic from #370 (b2b search model/effort measurement). Already retired IN PLACE to a 4-line 410 stub whose own first comment reads 'RETIRED diagnostic (issue #370) ... Safe to DELETE'; the findings live on #370 and in _shared/tools/b2b-tools.ts. Nothing invokes it and it answers 410 to everything that tries.",
+      "version": 10,
+      "wayOut": "supabase functions delete tmp-b2b-search-probe --project-ref \"$PROJECT_REF\" — needs a management token, which is why it is recorded here rather than removed in the commit that added this file."
+    }
+  }
+}
