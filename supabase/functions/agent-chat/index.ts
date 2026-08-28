@@ -2844,18 +2844,31 @@ async function executeAgent(
   };
 
   if (isAdmin) {
-    // Sub-agent orchestration tools
+    // Sub-agent orchestration tools.
+    //
+    // `userId` IS THE BILLING ARGUMENT AND IT WAS NEVER PASSED (#352 A5). Every one of these
+    // factories takes it as an optional trailing arg, and `reserveCredits` returns
+    // `{ ok: true }` immediately when it is undefined ("no identified user → nothing to meter
+    // against") while `settleCredits` returns without charging. So every Opus sub-agent call
+    // debited exactly nothing, and the resulting zero in the credit ledger is a plausible
+    // number that nothing raises — the silent-zero family CLAUDE.md names as this platform's
+    // dominant historical failure.
+    //
+    // MIND THE ARGUMENT ORDER: `createAnalyticsAnalysisTool` takes (userId, workspaceId) and the
+    // other three take (workspaceId, userId). Passing them uniformly would silently meter the
+    // analytics sub-agent against a user id that is really a workspace id — which debits nobody
+    // and looks exactly like the bug being fixed.
     if (config.tools.includes('research_analysis')) {
-      tools.push(createResearchAnalysisTool(workspaceId));
+      tools.push(createResearchAnalysisTool(workspaceId, userId));
     }
     if (config.tools.includes('analytics_analysis')) {
-      tools.push(createAnalyticsAnalysisTool());
+      tools.push(createAnalyticsAnalysisTool(userId, workspaceId));
     }
     if (config.tools.includes('business_analysis')) {
-      tools.push(createBusinessAnalysisTool(workspaceId));
+      tools.push(createBusinessAnalysisTool(workspaceId, userId));
     }
     if (config.tools.includes('product_analysis')) {
-      tools.push(createProductAnalysisTool(workspaceId));
+      tools.push(createProductAnalysisTool(workspaceId, userId));
     }
 
     // B2B Research tools — onChunk wired so the search + save_to_crm tools

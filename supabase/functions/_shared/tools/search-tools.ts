@@ -27,6 +27,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { rerankResults, type RerankCandidate } from '../rerank.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
+// One wording for every untrusted block (security invariant 9).
+import { wrapUntrusted } from '../untrusted.ts';
 
 /**
  * Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place.
@@ -627,7 +629,11 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
               // section boundary.
               chunkIndex: chunk.chunk_index,
               heading: chunk.heading ?? chunk.metadata?.heading ?? null,
-              content: chunk.content || chunk.text,
+              // Security invariant 9 (#352 A6). A KB chunk is whatever a supplier PDF happened
+              // to contain, ingested once and returned to EVERY future turn that searches for
+              // it — a PERSISTENT instruction channel, which is worse than a one-shot scrape.
+              // It looks like our own content, which is exactly why it needs saying out loud.
+              content: wrapUntrusted('knowledge base excerpt', chunk.content || chunk.text),
               documentTitle: chunk.document_title || chunk.metadata?.title || 'Knowledge Base Article',
               category: chunk.category || chunk.metadata?.category || 'general',
               categorySlug: chunk.category_slug,
@@ -673,7 +679,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
               entityType: entity.entity_type,
               name: entity.name,
               description: entity.description,
-              content: entity.content,
+              content: wrapUntrusted('knowledge base entity', entity.content),
               pageRange: entity.page_range ?? null,
               relevanceScore: entity.relevance_score || 0,
             }));
@@ -874,7 +880,8 @@ export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = fal
               chunkIndex: c.chunk_index,
               heading: c.heading,
               pageNumber: c.page_number ?? null,
-              content: c.content,
+              // Same corpus, same rule (#352 A6) — this returns a whole section verbatim.
+              content: wrapUntrusted('document section', c.content),
             })),
             // When the span exceeded the token budget the agent gets the outline of what
             // it did NOT receive, so it can ask for a narrower, specific range instead of

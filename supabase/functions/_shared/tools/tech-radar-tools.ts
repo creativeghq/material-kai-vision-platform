@@ -77,6 +77,8 @@ export interface TechRadarFinding {
 }
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+// One wording for every untrusted block (security invariant 9).
+import { wrapUntrusted } from '../untrusted.ts';
 
 export { svcClient };
 async function sha1Hex(input: string): Promise<string> {
@@ -202,7 +204,14 @@ export async function researchSolution(
         role: 'user',
         content:
           `Solution under review:\n${ctx}\n\n` +
-          `Research notes from a web scan:\n${researchText}\n\n` +
+          // Security invariant 9 (#352 A7). `researchText` is pass 1's sweep of the OPEN
+          // INTERNET, and the structured output of this pass is PERSISTED to
+          // `tech_radar_findings` and returned verbatim later by `review_solution` /
+          // `list_tech_radar` — so an injection here is an injection with persistence.
+          // The forced `tools` + `tool_choice` above already constrains the SHAPE of the
+          // answer; it does nothing about the CONTENT being steered, which is what the
+          // delimiters address.
+          `${wrapUntrusted('web research notes', researchText)}\n\n` +
           `Convert this into concrete radar findings. Use rings honestly: most ideas are ` +
           `'assess' or 'trial'; reserve 'adopt' for clear wins and 'hold' for things to avoid ` +
           `or where the current approach should stay. Skip anything not materially better than today.`,
