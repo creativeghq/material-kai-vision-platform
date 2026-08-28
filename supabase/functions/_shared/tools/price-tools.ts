@@ -44,11 +44,16 @@ interface CustomerDiscount {
  * the row is missing, or the row has no discount on file.
  */
 async function loadCustomerDiscount(
+  workspaceId: string,
   customer_company_id?: string,
   customer_contact_id?: string,
 ): Promise<CustomerDiscount | null> {
   if (!customer_company_id && !customer_contact_id) return null;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  // No workspace, no lookup. Failing closed matters more than usual here: the caller passes the
+  // tool's server-derived workspace, so an empty one means something upstream changed shape, and
+  // continuing would restore exactly the unscoped query this parameter exists to prevent.
+  if (!workspaceId) return null;
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -57,6 +62,14 @@ async function loadCustomerDiscount(
       .from('crm_companies')
       .select('id, name, discount_percent, discount_notes')
       .eq('id', customer_company_id)
+      // BOLA (#352 A2, security invariant 1). Both ids are MODEL-supplied tool arguments and
+      // this is a service-role client, which CLAUDE.md names as the recurring root cause of
+      // pentest #250: "service-role client + trust a body-supplied id". Without this filter,
+      // workspace A could pass a workspace B company UUID and get back B's name,
+      // `discount_percent` and `discount_notes` — and A's pricing guidance was then computed
+      // from B's discount. Returning null on a mismatch is the 404-not-403 rule: it is
+      // indistinguishable from "no such company", so ids cannot be enumerated.
+      .eq('workspace_id', workspaceId)
       .maybeSingle();
     if (!data) return null;
     return {
@@ -72,6 +85,7 @@ async function loadCustomerDiscount(
     .from('crm_contacts')
     .select('id, name, discount_percent, discount_notes')
     .eq('id', customer_contact_id!)
+    .eq('workspace_id', workspaceId)
     .maybeSingle();
   if (!data) return null;
   // A contact attached to a business uses that company's pricing; an unattached
@@ -144,6 +158,8 @@ export const createPriceLookupTool = (
         // the supplier/contract layer (from KB docs) and the customer layer
         // (from crm_companies/contacts) into a single proposed unit price.
         const customerDiscountPromise = loadCustomerDiscount(
+          // Server-derived, from the tool factory — never from the model's arguments.
+          workspaceId,
           customer_company_id,
           customer_contact_id,
         ).catch((err) => {

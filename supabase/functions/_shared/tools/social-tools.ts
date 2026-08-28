@@ -117,7 +117,7 @@ export const createManageSocialTool = (
   }
 
   return tool(
-    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt }: any) => {
+    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt, confirm }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -143,6 +143,44 @@ export const createManageSocialTool = (
         const resolved = await resolveAccount(ws, account_id, platform);
         if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
         const acct = resolved.account;
+
+        // SECURITY INVARIANT 9 (#352 A3). Publishing had NO gate of any kind — no `confirm` in
+        // the schema, no `action_confirmation` chunk. The only "confirm" in this file was the
+        // word in the tool description, which is a request to the model rather than a gate.
+        //
+        // The caption is frequently model-written from material this agent scraped
+        // (`generate_content`, tech-radar results, SERP snippets), so a poisoned page could
+        // supply the copy AND trigger the call, and the post was live on the workspace's real
+        // account before any human saw it. A published post cannot be recalled — the platform
+        // has already fanned it out — which is why this is gated like a WhatsApp send rather
+        // than like a draft.
+        //
+        // Placed AFTER account resolution so the card can name the real handle: "post to
+        // @materialshub" is a decision someone can make, "post to platform instagram" is not.
+        // It is still before the draft row and before any call to Zernio.
+        if (confirm !== true) {
+          const preview = String(caption).trim().slice(0, 180);
+          const tags = Array.isArray(hashtags) && hashtags.length ? ` ${hashtags.map(String).join(' ')}` : '';
+          const imgs = Array.isArray(image_urls) && image_urls.length ? ` with ${image_urls.length} image(s)` : '';
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'manage_social',
+            input: { action, account_id: acct.id, caption, hashtags, image_urls, scheduled_at },
+            title: action === 'publish' ? 'Publish this post now?' : 'Schedule this post?',
+            summary: `"${preview}${tags}"${imgs} → ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}`
+              + (action === 'publish'
+                ? '. It goes out immediately and cannot be recalled.'
+                : ` at ${scheduled_at}. It will go out automatically.`),
+            danger: true,
+            toolkit_id: 'social',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({
+            success: true,
+            awaiting_confirmation: true,
+            message: "Awaiting the user's approval to post. Do not retry.",
+          });
+        }
 
         // Draft the post row (server-derived identity). Allowlisted payload — never spread input.
         const { data: post, error: postErr } = await svc
@@ -251,10 +289,12 @@ export const createManageSocialTool = (
         '  generate_image   → AI-generate an image from a prompt; returns an image_url to attach on publish.',
         '',
         'Typical flow: generate_content (+ generate_image) → review with the user → publish/schedule.',
-        'Always confirm the copy, target account, and (for schedule) the exact time with the user before publishing.',
+        'publish/schedule ALWAYS show the user an Approve/Decline card first — never set confirm:true',
+        'yourself; the UI sets it on approval.',
       ].join('\n'),
       schema: z.object({
         action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image']),
+        confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
         account_id: z.string().uuid().optional().describe('Target connected account id.'),
         platform: z.string().optional().describe("Platform name (e.g. 'instagram', 'facebook', 'linkedin') to resolve the account, or the target platform for generate_content/generate_image."),
         caption: z.string().optional().describe('Post text/caption (publish/schedule).'),

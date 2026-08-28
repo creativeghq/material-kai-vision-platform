@@ -1112,6 +1112,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Publish/schedule social posts and read analytics over the workspace\'s ALREADY-CONNECTED social accounts.',
     params: [
       { name: 'action', type: 'enum', enum: ['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image'], optional: false },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
       { name: 'account_id', type: 'string', optional: true, description: 'Target connected account id.' },
       { name: 'platform', type: 'string', optional: true, description: 'Platform name (e.g. \'instagram\', \'facebook\', \'linkedin\') to resolve the account, or the target platform for generate_content/generate_image.' },
       { name: 'caption', type: 'string', optional: true, description: 'Post text/caption (publish/schedule).' },
