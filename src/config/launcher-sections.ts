@@ -25,6 +25,7 @@ import {
   Radar, Search, PenTool, Activity,
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
   Share2, Globe, Coins, CreditCard, ScanLine, Star, MessagesSquare,
+  Link2, FileSearch, Layers, BadgeCheck, Bot,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { HubId } from './nav-items';
@@ -177,6 +178,37 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   seo: [
     { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search },
     { label: 'Write an article', to: '/agent-hub?capability=seo-article', icon: PenTool },
+  ],
+  // SEO Module (nav id 'seo-websites', /profile?tab=websites). The tile itself is the connected
+  // WEBSITES surface — free, ungated. These chips are the rest of Edith's SEO bench: six toolkit
+  // clusters that existed in the picker and were reachable from no menu at all. `?capability=`
+  // primes the toolkit and shows its quick-starts without firing one, which is what makes a chip
+  // an entry point rather than a spend.
+  // Both gates are real, and they are different questions. `seo-toolkit` is the PURCHASE: seo-api
+  // refuses a workspace that doesn't own it, so an ungated chip would be a live link to a 402.
+  // `agent.use` is the PERSON: these all land in the AI studio.
+  // The FIRST chip is deliberately ungated, and that is what gives this tile a card at all.
+  // Every other chip needs `seo-toolkit`, so on a workspace without it the launcher found zero
+  // links, judged the app "nothing to expand", and promoted it out of the centre column into the
+  // Jump-to rail — correct by its own rule, and misleading here, because the surface behind the
+  // tile is a seven-tab dashboard that is free. A paid bench should not make a free surface look
+  // like a bare link.
+  //
+  // Keyword research and Write an article ARE repeated from the Marketing 'seo' tile on purpose.
+  // The earlier note called that duplication; it is not the kind the rail rule guards against
+  // (two CARDS for one app). These are two entry points to one capability from two different
+  // starting questions — "market my content" and "manage this website" — and a person in the SEO
+  // Module should not have to know the Marketing hub exists to write an article about their site.
+  'seo-websites': [
+    { label: 'Connected websites', to: '/profile?tab=websites', icon: Globe },
+    { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Write an article', to: '/agent-hub?capability=seo-article', icon: PenTool, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Domain intel', to: '/agent-hub?capability=seo-domain', icon: Globe, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Backlinks', to: '/agent-hub?capability=seo-backlinks', icon: Link2, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Content & tech', to: '/agent-hub?capability=seo-content', icon: FileSearch, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Beyond Google', to: '/agent-hub?capability=seo-multi-engine', icon: Layers, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Full site audit', to: '/agent-hub?capability=seo-composite', icon: BadgeCheck, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'AI visibility', to: '/agent-hub?capability=ai-visibility', icon: Bot, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
   ],
   // Image Studio (agent app). Its path uses ?generation_mode= rather than ?capability=, so the
   // launcher's capability-quickstart fallback can't resolve anything → it rendered empty. These

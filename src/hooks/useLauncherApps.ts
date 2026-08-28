@@ -28,6 +28,8 @@ export interface LauncherApp {
   priceLabel?: string;
   /** Hub grouping. Undefined → catch-all "More" group in the launcher. */
   hub?: HubId;
+  /** Lower sorts first within the group; unset ties fall back to alphabetical. */
+  launcherOrder?: number;
 }
 
 export interface EnableResult { ok: boolean; message: string; checkout?: boolean }
@@ -63,7 +65,12 @@ export function groupAppsByHub(apps: LauncherApp[]): HubGroup[] {
     byHub.set(key, list);
   }
   const sortApps = (list: LauncherApp[]) =>
-    [...list].sort((a, b) => (Number(b.active) - Number(a.active)) || a.label.localeCompare(b.label));
+    [...list].sort((a, b) =>
+      (Number(b.active) - Number(a.active))
+      // Explicit intent beats the alphabet, and an unset order is 0 — so every tile
+      // that does not opt in keeps exactly the ordering it had before this existed.
+      || ((a.launcherOrder ?? 0) - (b.launcherOrder ?? 0))
+      || a.label.localeCompare(b.label));
 
   const groups: HubGroup[] = [];
   for (const hub of HUBS) {
@@ -140,6 +147,7 @@ export function useLauncherApps(): LauncherApi {
         isAddon: cat?.is_addon,
         priceLabel: cat?.is_addon ? (formatAddonPrice(cat.addon_price_cents, cat.addon_currency, cat.billing_interval) || undefined) : undefined,
         hub: i.hub,
+        launcherOrder: i.launcherOrder,
       };
     };
 

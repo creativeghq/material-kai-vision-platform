@@ -99,6 +99,13 @@ export interface SidebarNavItem {
    * Only meaningful for `surface:'app'` items; `top` surfaces stay in the lean top bar.
    * Apps with no `hub` land in the launcher's catch-all "More" group.
    */
+  /**
+   * Position within its launcher group. Lower sorts first; ties fall back to the
+   * alphabetical order every tile used before this existed, so an unset value is
+   * exactly today's behaviour. Only set it where the alphabet gets the reading
+   * order wrong.
+   */
+  launcherOrder?: number;
   hub?: HubId;
   /**
    * Where the item renders (App Launcher IA):
@@ -278,6 +285,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     path: '/profile?tab=websites',
     icon: Globe,
     surface: 'app',
+    // Reads last in "More": Blueprints, Docs, Templates are workspace primitives,
+    // this is a whole product surface and belongs at the end rather than wedged
+    // between Docs and Templates by the alphabet.
+    launcherOrder: 10,
     description: 'Connect a website and open its SEO dashboard — articles, keywords, audits and Search Console.',
   },
   // Supplier portal lives under Finance → Payables /
