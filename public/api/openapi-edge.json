@@ -11500,8 +11500,53 @@
                     "type": "object",
                     "required": [
                       "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "token_request_code"
+                        ],
+                        "description": "Email a one-time code to the address the share link was issued for. Rate-limited per token."
+                      },
+                      "token": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {sent_to: string (masked), expires_in_minutes: number}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
                       "token",
-                      "body"
+                      "code"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "token_verify_code"
+                        ],
+                        "description": "Exchange the one-time code for a short-lived sender proof this browser can keep."
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: {proof: string, valid_for_hours: number}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token",
+                      "body",
+                      "sender_proof"
                     ],
                     "properties": {
                       "action": {
@@ -11509,16 +11554,19 @@
                         "enum": [
                           "token_send_message"
                         ],
-                        "description": "Tokenized customer reply to a thread"
+                        "description": "Tokenized customer reply to a thread. Requires sender_proof — possession of the link is not identity."
                       },
                       "token": {
                         "type": "string"
                       },
                       "body": {
                         "type": "string"
+                      },
+                      "sender_proof": {
+                        "type": "string"
                       }
                     },
-                    "description": "Returns: {data: message}"
+                    "description": "Returns: {data: message} | 401 {code: sender_verification_required}"
                   },
                   {
                     "type": "object",

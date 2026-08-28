@@ -5752,8 +5752,37 @@
         "response": "{data: {thread, messages}}"
       },
       {
+        "name": "token_request_code",
+        "summary": "Email a one-time code to the address the share link was issued for. Rate-limited per token.",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{sent_to: string (masked), expires_in_minutes: number}"
+      },
+      {
+        "name": "token_verify_code",
+        "summary": "Exchange the one-time code for a short-lived sender proof this browser can keep.",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "code",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{proof: string, valid_for_hours: number}"
+      },
+      {
         "name": "token_send_message",
-        "summary": "Tokenized customer reply to a thread",
+        "summary": "Tokenized customer reply to a thread. Requires sender_proof — possession of the link is not identity.",
         "params": [
           {
             "name": "token",
@@ -5764,9 +5793,14 @@
             "name": "body",
             "type": "string",
             "required": true
+          },
+          {
+            "name": "sender_proof",
+            "type": "string",
+            "required": true
           }
         ],
-        "response": "{data: message}"
+        "response": "{data: message} | 401 {code: sender_verification_required}"
       },
       {
         "name": "token_claim",

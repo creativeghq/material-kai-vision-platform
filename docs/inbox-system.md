@@ -91,6 +91,22 @@ Four tables in `public` (all writes are performed by `inbox-api` under the servi
 
 The capability token behind the public `/i/:token` page and the signup conversion handshake.
 
+### `inbox_thread_token_challenges`
+`id, token_id, code_hash, sent_to, expires_at, attempts, consumed_at, created_at`
+
+**Possession of a share link is not identity** (#357 AE-12). The link authorises by possession, and
+`token_send_message` posts as the contact the token is bound to — so a forwarded mail, a quoted
+reply chain, a shared mailbox or a leaked archive handed whoever held it the ability to write into
+a customer's conversation *as that customer*.
+
+- **Reading stays link-only, deliberately.** The link is an invitation, and challenging someone before they can see the conversation they were invited to would make the feature useless. That read is bounded by the 30-day TTL and by the token dying on claim.
+- **Writing costs a one-time code** sent to the address the link was issued for (`token_request_code` → `token_verify_code`), after which the browser holds a short-lived HMAC proof (`_shared/thread-sender-proof.ts`, 12h). A forwarded link carries no `localStorage`, which is the whole mechanism.
+- The code is stored **hashed with its token**, so a leaked row is not a working code anywhere, and the row cascades away with the token.
+- **The attempt is claimed before the comparison** — compare-and-set on `attempts`, the same shape as the campaign recipient claim (#357 AE-4). Read-then-write would let five parallel guesses each cost one attempt out of five.
+- Requests are **rate-limited per token** (5/hour): an unthrottled code endpoint turns the customer's own inbox into the attack.
+- **Fail closed on both edges** — no HMAC secret, or a token with no contact/email to verify against, refuses the write rather than waving it through.
+- Guarded by [tests/unit/threadSenderProof.test.ts](../tests/unit/threadSenderProof.test.ts).
+
 ---
 
 ## 3. `inbox-api` — the action router
@@ -99,7 +115,7 @@ One `POST`-only, action-discriminated function (merge rule; precedent `moodboard
 
 1. **Internal branch** — `action='internal_agent_reply'`, guarded by the service-role bearer (`Authorization: Bearer <SERVICE_ROLE_KEY>`). Used by `zernio-webhook-handler` after a WhatsApp inbound to let the agent reply. Never reachable externally.
 2. **`token_claim`** — the post-signup conversion handshake. **Requires a JWT** and overrides any body `user_id` with the verified caller (pentest #250 C17 — previously it took `user_id` from the body on the unauthenticated path, allowing force-enrollment of an arbitrary victim).
-3. **Token branch** — `token_get_thread`, `token_send_message` — unauthenticated customer, resolved purely by the capability token.
+3. **Token branch** — `token_get_thread`, `token_request_code`, `token_verify_code`, `token_send_message` — unauthenticated customer, resolved by the capability token. Reading is resolved purely by the token; **writing additionally requires a `sender_proof`** earned by a one-time code (see `inbox_thread_token_challenges`).
 4. **JWT branch** — every member/operator/customer-account action, authenticated via `authenticate(req, { requireUser: true })`.
 
 ### JWT actions

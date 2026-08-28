@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MessageSquare, Send, Loader2, Paperclip, X, UserPlus } from 'lucide-react';
+import { MessageSquare, Send, Loader2, Paperclip, X, UserPlus, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Input } from '@/components/core/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -16,7 +17,39 @@ import { formatDate } from '@/utils/datetime';
  * navigate beyond this thread; signup carries the token so the account can adopt the
  * thread via token_claim (the conversion handshake). Anonymous reads go through the
  * service-role token branch of inbox-api (RLS would otherwise hide the thread).
+ *
+ * READING is link-only; REPLYING is not (#357 AE-12). Possession of the URL proves possession of
+ * the URL — a forwarded mail, a quoted reply chain or a shared mailbox hands it to someone who
+ * would then be posting as the customer. So the first reply from a browser costs a one-time code
+ * sent to the address the link was issued for, and the proof that comes back is kept locally for
+ * a few hours. A forwarded link carries no localStorage, which is the whole point.
  */
+
+/** Where this browser keeps its proof for one conversation. Keyed by token: a customer may hold
+ *  links to several, and a proof is minted for exactly one. */
+const proofKey = (token: string) => `inbox_thread_proof:${token}`;
+
+/** localStorage throws in some privacy modes — a reply must still be possible, via a fresh code. */
+function readProof(token: string): string | null {
+  try {
+    const raw = localStorage.getItem(proofKey(token));
+    if (!raw) return null;
+    // The proof carries its own expiry in the part before the dot, so nothing else has to be
+    // stored or kept in sync.
+    const exp = Number(raw.slice(0, raw.indexOf('.')));
+    if (!Number.isFinite(exp) || exp * 1000 <= Date.now()) {
+      localStorage.removeItem(proofKey(token));
+      return null;
+    }
+    return raw;
+  } catch { return null; }
+}
+function writeProof(token: string, proof: string): void {
+  try { localStorage.setItem(proofKey(token), proof); } catch { /* private mode — verify each time */ }
+}
+function clearProof(token: string): void {
+  try { localStorage.removeItem(proofKey(token)); } catch { /* nothing to clear */ }
+}
 const PublicInboxThreadPage: React.FC = () => {
   const { token = '' } = useParams();
   const navigate = useNavigate();
@@ -30,6 +63,11 @@ const PublicInboxThreadPage: React.FC = () => {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -53,8 +91,28 @@ const PublicInboxThreadPage: React.FC = () => {
   }, [load]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const send = async () => {
+  /** Ask for a code and open the dialog. Also the recovery path when a proof has expired. */
+  const startVerification = useCallback(async () => {
+    setVerifyError(null);
+    setCode('');
+    setVerifyOpen(true);
+    setVerifyBusy(true);
+    try {
+      const res = await inboxApi.tokenRequestCode(token);
+      setSentTo(res.sent_to);
+    } catch (e) {
+      setVerifyError((e as Error).message);
+    } finally {
+      setVerifyBusy(false);
+    }
+  }, [token]);
+
+  const send = useCallback(async () => {
     if (!draft.trim() && !attachment) return;
+    const proof = readProof(token);
+    // No proof yet — get one first. The draft is left in the box, so nothing is lost.
+    if (!proof) { await startVerification(); return; }
+
     setSending(true);
     try {
       let attachments;
@@ -64,14 +122,37 @@ const PublicInboxThreadPage: React.FC = () => {
         for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
         attachments = [{ filename: attachment.name, content_type: attachment.type || 'application/octet-stream', data_base64: btoa(bin) }];
       }
-      await inboxApi.tokenSendMessage({ token, body: draft.trim() || undefined, attachments });
+      await inboxApi.tokenSendMessage({ token, body: draft.trim() || undefined, attachments, sender_proof: proof });
       setDraft('');
       setAttachment(null);
       await load();
     } catch (e) {
+      // The server is the authority on whether the proof is still good — a clock skew or a
+      // rotated secret both land here, and both are fixed by verifying again rather than by
+      // showing the customer an error they cannot act on.
+      if ((e as { code?: string }).code === 'sender_verification_required') {
+        clearProof(token);
+        await startVerification();
+        return;
+      }
       setError((e as Error).message);
     } finally {
       setSending(false);
+    }
+  }, [draft, attachment, token, load, startVerification]);
+
+  const submitCode = async () => {
+    setVerifyBusy(true);
+    setVerifyError(null);
+    try {
+      const res = await inboxApi.tokenVerifyCode(token, code);
+      writeProof(token, res.proof);
+      setVerifyOpen(false);
+      await send();
+    } catch (e) {
+      setVerifyError((e as Error).message);
+    } finally {
+      setVerifyBusy(false);
     }
   };
 
@@ -133,6 +214,37 @@ const PublicInboxThreadPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" /> Confirm it is you
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {sentTo
+              ? <>We emailed a 6-digit code to <span className="font-medium text-foreground">{sentTo}</span>. Enter it to reply — this browser will remember you for a few hours.</>
+              : 'Sending you a code…'}
+          </p>
+          <Input
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onKeyDown={(e) => { if (e.key === 'Enter' && code.length === 6) submitCode(); }}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            className="text-center text-lg tracking-[0.4em] tabular-nums"
+          />
+          {verifyError && <p className="text-sm text-red-700 dark:text-red-400">{verifyError}</p>}
+          <DialogFooter>
+            <Button variant="ghost" onClick={startVerification} disabled={verifyBusy}>Send a new code</Button>
+            <Button onClick={submitCode} disabled={verifyBusy || code.length !== 6}>
+              {verifyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm and reply'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showConvert} onOpenChange={setShowConvert}>
         <DialogContent>

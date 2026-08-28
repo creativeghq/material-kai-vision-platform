@@ -17,6 +17,14 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { sha256hex } from '../_shared/hash.ts';
+import {
+  generateNumericCode,
+  maskEmail,
+  mintSenderProof,
+  verifySenderProof,
+  SENDER_PROOF_TTL_HOURS,
+} from '../_shared/thread-sender-proof.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { inboxAutopilotSettings } from '../_shared/inbox-autopilot.ts';
@@ -3136,6 +3144,58 @@ async function resolveToken(db: DbClient, token: string, allowClaimed = false) {
   return t;
 }
 
+/**
+ * Sender verification for a share link (#357 AE-12).
+ *
+ * A `/i/:token` link authorises by possession, and `token_send_message` posts as the contact the
+ * token is bound to — so anyone who comes by the URL (a forwarded mail, a quoted reply chain, a
+ * shared mailbox, a leaked archive) could write into a customer's conversation as that customer.
+ *
+ * READING stays link-only, deliberately: the link is an invitation, and challenging someone before
+ * they can see the conversation they were invited to would make the feature useless. That read is
+ * bounded by the 30-day TTL and by the token dying on claim. WRITING costs a one-time code sent to
+ * the address the link was issued for.
+ */
+const CHALLENGE_TTL_MINUTES = 10;
+const MAX_CHALLENGE_ATTEMPTS = 5;
+/** Per token, per hour. A code arriving unbidden is itself a nuisance to the customer. */
+const MAX_CHALLENGES_PER_HOUR = 5;
+
+/** The address a code for this token would go to, with the thread it belongs to. */
+async function tokenContactAddress(
+  db: DbClient,
+  tok: Record<string, unknown>,
+): Promise<{ email: string; workspaceId: string; name: string | null }> {
+  if (!tok.contact_id) {
+    // Nothing to bind to. A token with no contact cannot be verified, and letting it write anyway
+    // is exactly the unbound case this closes.
+    throw new HttpError(409, 'This link is not linked to a contact, so replies cannot be verified. Ask for a new link.');
+  }
+  const { data: contact } = await db
+    .from('crm_contacts')
+    .select('email, name, workspace_id')
+    .eq('id', String(tok.contact_id))
+    .maybeSingle();
+  const email = (contact as { email?: string } | null)?.email;
+  if (!email) {
+    throw new HttpError(409, 'This contact has no email address on file, so replies cannot be verified. Ask for a new link.');
+  }
+  return {
+    email,
+    workspaceId: String((contact as { workspace_id?: string }).workspace_id ?? ''),
+    name: (contact as { name?: string | null }).name ?? null,
+  };
+}
+
+/** The HMAC key for sender proofs. Unset means we cannot verify anyone — refuse, never wave through. */
+async function senderProofSecret(db: DbClient): Promise<string> {
+  const secret = (await resolveSecret(db as unknown as SupabaseClient, 'CRON_SECRET')).value;
+  if (!secret) {
+    throw new HttpError(503, 'Reply verification is unavailable right now. Please try again shortly.');
+  }
+  return secret;
+}
+
 async function handleTokenAction(db: DbClient, action: string, payload: Json): Promise<Response> {
   const token = String(payload.token || '');
 
@@ -3164,8 +3224,125 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
       });
     }
 
+    case 'token_request_code': {
+      // Send a one-time code to the address this link was issued for.
+      const tok = await resolveToken(db, token);
+      const { email, workspaceId } = await tokenContactAddress(db, tok);
+
+      // Rate limit per token: a code the customer did not ask for is a nuisance, and an
+      // unthrottled endpoint turns their inbox into the attack.
+      const sinceIso = new Date(Date.now() - 3_600_000).toISOString();
+      const { count: recent } = await db
+        .from('inbox_thread_token_challenges')
+        .select('id', { count: 'exact', head: true })
+        .eq('token_id', String(tok.id))
+        .gt('created_at', sinceIso);
+      if ((recent ?? 0) >= MAX_CHALLENGES_PER_HOUR) {
+        throw new HttpError(429, 'Too many codes requested for this conversation. Try again in an hour.');
+      }
+
+      const code = generateNumericCode(6);
+      const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MINUTES * 60_000).toISOString();
+      const { error: insErr } = await db.from('inbox_thread_token_challenges').insert({
+        token_id: String(tok.id),
+        // Hashed WITH the token, so a leaked row is not a working code anywhere.
+        code_hash: await sha256hex(`${token}:${code}`),
+        sent_to: email,
+        expires_at: expiresAt,
+      });
+      if (insErr) throw new HttpError(500, `Could not start verification: ${insErr.message}`);
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/email-api`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send',
+          to: email,
+          subject: `Your code to reply: ${code}`,
+          // Plain text: the code is the whole message, and assembling HTML around anything here
+          // buys nothing and risks invariant 11.
+          text:
+            `Your one-time code to reply to this conversation is ${code}.\n\n` +
+            `It expires in ${CHALLENGE_TTL_MINUTES} minutes and can be used once.\n\n` +
+            `If you did not ask to reply, you can ignore this email — nothing has been sent on your behalf.`,
+          emailType: 'notification',
+          workspace_id: workspaceId || undefined,
+          // A verification code the person just asked for is transactional: an unsubscribe must
+          // not silently swallow it, which is why the feature is on email-api's allowlist.
+          tags: { feature: 'inbox_thread_verification', thread_id: String(tok.thread_id) },
+        }),
+      });
+      if (!res.ok) {
+        // The row stays: it expires on its own, and a failed delivery must not look like a sent
+        // code the customer simply has not found yet.
+        throw new HttpError(502, 'We could not send the code. Please try again in a moment.');
+      }
+
+      return json({ sent_to: maskEmail(email), expires_in_minutes: CHALLENGE_TTL_MINUTES });
+    }
+
+    case 'token_verify_code': {
+      const tok = await resolveToken(db, token);
+      const code = String(payload.code || '').replace(/\D/g, '');
+      if (!code) throw new HttpError(400, 'code is required');
+
+      const { data: challenge } = await db
+        .from('inbox_thread_token_challenges')
+        .select('id, code_hash, attempts, expires_at')
+        .eq('token_id', String(tok.id))
+        .is('consumed_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const ch = challenge as { id: string; code_hash: string; attempts: number } | null;
+      if (!ch) throw new HttpError(410, 'That code has expired. Ask for a new one.');
+      if (ch.attempts >= MAX_CHALLENGE_ATTEMPTS) {
+        throw new HttpError(429, 'Too many incorrect attempts. Ask for a new code.');
+      }
+
+      // Claim the attempt BEFORE comparing — the `receive_order_into_warehouse` pattern (#355 WH-3)
+      // applied to a guess. Reading the counter and then writing it back lets N concurrent guesses
+      // all read the same value, so five parallel requests would each cost one attempt out of five
+      // and a six-digit code would fall to a wide-enough fan-out.
+      const { data: bumped } = await db
+        .from('inbox_thread_token_challenges')
+        .update({ attempts: ch.attempts + 1 })
+        .eq('id', ch.id)
+        .eq('attempts', ch.attempts)
+        .select('id')
+        .maybeSingle();
+      if (!bumped) throw new HttpError(429, 'Please try that code again.');
+
+      if (await sha256hex(`${token}:${code}`) !== ch.code_hash) {
+        throw new HttpError(403, 'That code is not right.');
+      }
+
+      await db
+        .from('inbox_thread_token_challenges')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('id', ch.id);
+
+      const proof = await mintSenderProof(await senderProofSecret(db), token, Date.now());
+      return json({ proof, valid_for_hours: SENDER_PROOF_TTL_HOURS });
+    }
+
     case 'token_send_message': {
       const tok = await resolveToken(db, token);
+      // POSSESSION OF THE LINK IS NOT IDENTITY (#357 AE-12). Reading it was the invitation;
+      // writing as the customer requires having proved control of their mailbox.
+      const proven = await verifySenderProof(
+        await senderProofSecret(db), token, payload.sender_proof ? String(payload.sender_proof) : null, Date.now(),
+      );
+      if (!proven) {
+        return json(
+          {
+            error: 'Confirm it is you before replying.',
+            code: 'sender_verification_required',
+          },
+          401,
+        );
+      }
       const thread = await getThreadOrThrow(db, String(tok.thread_id));
       // The customer participant bound to this token's contact.
       const { data: cp } = await db
@@ -3227,7 +3404,11 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
 // Entry
 // ──────────────────────────────────────────────────────────────────────────
 
-const TOKEN_ACTIONS = new Set(['token_get_thread', 'token_send_message', 'token_claim']);
+const TOKEN_ACTIONS = new Set([
+  'token_get_thread', 'token_send_message', 'token_claim',
+  // #357 AE-12 — the two halves of proving the holder of the link is the contact it was issued for.
+  'token_request_code', 'token_verify_code',
+]);
 
 // ── Public "Hire me" contact form (PublicProfilePage → HireMeModal) ───────────────────────────
 // The modal is rendered on a PUBLIC profile page with no auth gate, but it wrote to

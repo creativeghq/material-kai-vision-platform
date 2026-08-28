@@ -558,6 +558,9 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           'inbox_email_reply',    // inbox-api — a reply on a thread they wrote to
           'role_upgrade_requests',// role-upgrade-requests — an account notice
           'vendor_report',        // _shared/real-estate — to a property's own vendor
+          // A one-time code the person just asked for, in order to reply. Suppressing it would
+          // silently break the reply they are in the middle of (#357 AE-12).
+          'inbox_thread_verification', // inbox-api — sender verification for a /i/:token link
         ]);
         const sendFeature = typeof body.tags?.feature === 'string' ? body.tags.feature : null;
         const suppressionExempt = isAdminAccess(auth)

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { parseEdgeError } from '@/utils/edgeError';
 
 /**
  * Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
@@ -288,9 +289,15 @@ async function call<T = unknown>(action: string, payload: Record<string, unknown
     body: { action, ...payload },
   });
   if (error) {
-    // Surface the server-side message when present (HttpError shape: { error }).
-    const ctx = (error as { context?: { error?: string } }).context;
-    throw new Error(ctx?.error || error.message || 'Inbox request failed');
+    // `error.context` is a Response, not a parsed body — reading `.error` off it was always
+    // undefined, so every inbox failure surfaced as "Edge Function returned a non-2xx status
+    // code". Unwrap it properly, and carry the machine code so a caller can BRANCH on it
+    // (#357 AE-12 needs `sender_verification_required`, not a sentence).
+    const parsed = await parseEdgeError(error, 'Inbox request failed');
+    const err = new Error(parsed.message) as Error & { code?: string; status?: number };
+    err.code = parsed.code;
+    err.status = parsed.status;
+    throw err;
   }
   if (data && (data as { error?: string }).error) throw new Error((data as { error: string }).error);
   return data as T;
@@ -554,8 +561,22 @@ export const inboxApi = {
       claimed: boolean;
     }>('token_get_thread', { token });
   },
-  tokenSendMessage(input: { token: string; body?: string; attachments?: AttachmentInput[] }) {
+  /**
+   * Post as the customer. Requires `sender_proof` — possession of the link is not identity
+   * (#357 AE-12). Without one the server answers `sender_verification_required`.
+   */
+  tokenSendMessage(input: {
+    token: string; body?: string; attachments?: AttachmentInput[]; sender_proof?: string;
+  }) {
     return call<{ message: { id: string; created_at: string } }>('token_send_message', input);
+  },
+  /** Email a one-time code to the address this link was issued for. Returns it masked. */
+  tokenRequestCode(token: string) {
+    return call<{ sent_to: string; expires_in_minutes: number }>('token_request_code', { token });
+  },
+  /** Exchange the code for a short-lived proof this browser can keep. */
+  tokenVerifyCode(token: string, code: string) {
+    return call<{ proof: string; valid_for_hours: number }>('token_verify_code', { token, code });
   },
   tokenClaim(token: string, user_id: string) {
     return call<{ ok: boolean; thread_id: string }>('token_claim', { token, user_id });
