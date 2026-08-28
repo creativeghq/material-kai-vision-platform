@@ -53,8 +53,8 @@ export const CompanyMarketTab: React.FC<CompanyMarketTabProps> = ({ workspaceId,
   // Sub-tabs rather than one scroll: the four questions here are asked one at a time, and three of
   // them cost money or a round-trip to answer. Mirrors the Details tab's section nav.
   return (
-    <Tabs defaultValue="demand" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
-      <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+    <Tabs defaultValue="demand" orientation="vertical" className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <TabsList className="section-rail h-auto w-full shrink-0 flex-row justify-start gap-1 bg-transparent p-0 lg:w-52 lg:flex-col lg:flex-nowrap">
         <TabsTrigger value="demand" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><BarChart3 className="h-4 w-4 mr-2" />Demand</TabsTrigger>
         <TabsTrigger value="pricing" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Gauge className="h-4 w-4 mr-2" />Pricing</TabsTrigger>
         <TabsTrigger value="competitors" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2" />Competitors</TabsTrigger>

@@ -107,6 +107,7 @@ export const PartyInboundDocsCard: React.FC<{
             <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
           ) : (
             <>
+              <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead className="border-b border-border/60 text-xs text-muted-foreground">
                   <tr>
@@ -178,6 +179,7 @@ export const PartyInboundDocsCard: React.FC<{
                   })}
                 </tbody>
               </table>
+              </div>
               <TablePagination page={page} total={rows.length} onPageChange={setPage} label="documents" />
             </>
           )}

@@ -411,6 +411,7 @@ export const OrdersPanel: React.FC<{
             )
           ) : (
             <>
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
@@ -485,6 +486,7 @@ export const OrdersPanel: React.FC<{
                 ))}
               </tbody>
             </table>
+            </div>
             <TablePagination page={page} total={total} onPageChange={setPage} label="orders" />
             </>
           )}

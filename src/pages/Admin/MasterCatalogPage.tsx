@@ -133,6 +133,7 @@ export default function MasterCatalogPage() {
                 {drift.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-10 text-center">Nothing to review.</p>
                 ) : (
+                  <div className="table-scroll">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-xs text-muted-foreground">
@@ -173,6 +174,7 @@ export default function MasterCatalogPage() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -200,6 +202,7 @@ export default function MasterCatalogPage() {
                   No products carry your identity yet.
                 </p>
               ) : (
+                <div className="table-scroll">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-xs text-muted-foreground">
@@ -242,6 +245,7 @@ export default function MasterCatalogPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </CardContent>
           </Card>

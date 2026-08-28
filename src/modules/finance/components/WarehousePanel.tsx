@@ -214,6 +214,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -298,6 +299,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
               })}
             </tbody>
           </table>
+          </div>
         )}
         {!loading && <TablePagination page={page} total={visibleItems.length} onPageChange={setPage} label="items" />}
       </CardContent>

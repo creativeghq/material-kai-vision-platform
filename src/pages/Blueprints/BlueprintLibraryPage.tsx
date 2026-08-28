@@ -318,7 +318,7 @@ export const BlueprintLibraryPage: React.FC = () => {
               <Plus className="h-4 w-4" /> Add New
             </Button>
 
-            <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
+            <TabsList className="section-rail flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
               {BLUEPRINT_TABS.map((t) => (
                 <TabsTrigger key={t.value} value={t.value} className="w-full justify-start">
                   <t.icon className="h-4 w-4 mr-2 shrink-0" />

@@ -78,7 +78,7 @@ export default function HRPage() {
 
       <div className="p-3 sm:p-6">
         <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+          <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             <TabsTrigger value="overview" className="w-full justify-start"><LayoutDashboard className="h-4 w-4 mr-2" /> Overview</TabsTrigger>
             <TabsTrigger value="employees" className="w-full justify-start"><Users className="h-4 w-4 mr-2" /> Employees</TabsTrigger>
             <TabsTrigger value="departments" className="w-full justify-start"><Network className="h-4 w-4 mr-2" /> Departments</TabsTrigger>

@@ -61,7 +61,7 @@ export default function StockPage() {
           <WorkspaceQuotaBadge table="products" quotaKey="max_materials" label="materials" notEq={{ column: 'item_type', value: 'service' }} />
         </div>
         <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+          <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             <TabsTrigger value="overview" className="w-full justify-start"><LayoutDashboard className="h-4 w-4 mr-2" /> Overview</TabsTrigger>
             <TabsTrigger value="inventory" className="w-full justify-start"><Boxes className="h-4 w-4 mr-2" /> Inventory</TabsTrigger>
             <TabsTrigger value="resupply" className="w-full justify-start"><TrendingUp className="h-4 w-4 mr-2" /> Resupply</TabsTrigger>

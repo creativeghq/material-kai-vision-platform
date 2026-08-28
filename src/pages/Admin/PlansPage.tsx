@@ -103,6 +103,7 @@ const PlansPage: React.FC = () => {
                 <CardDescription className="text-xs">The lowest plan that includes each module. A plan also includes everything below it.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="table-scroll">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60">
@@ -145,6 +146,7 @@ const PlansPage: React.FC = () => {
                     })}
                   </tbody>
                 </table>
+                </div>
               </CardContent>
             </Card>
 
@@ -155,6 +157,7 @@ const PlansPage: React.FC = () => {
                 <CardDescription className="text-xs">Usage caps per plan. Leave blank or enter <code>-1</code> for unlimited (∞).</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="table-scroll">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60">
@@ -188,6 +191,7 @@ const PlansPage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </CardContent>
             </Card>
             <p className="text-xs text-muted-foreground">

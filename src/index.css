@@ -797,47 +797,103 @@ All colors MUST be HSL.
     scroll-snap-align: start;
   }
 
-  /* "There's more" affordance: fade whichever edge still has off-screen tabs.
-     Driven by the data-overflow attribute the TabsList sets from its scroll
-     position (see tabs.tsx). 24px keeps a label edge faintly visible. */
-  [role='tablist'][data-overflow='right'] {
+  /* "There's more" affordance: fade whichever edge still has off-screen items.
+     Driven by the data-overflow attribute `useStripAffordance` sets from the
+     scroll position. Keyed on the ATTRIBUTE, not on `role=tablist`: the same
+     strip is a <nav> when it is a HubSideNav rail, and only the tablist form
+     used to get the fade. 24px keeps a label edge faintly visible. */
+  [data-overflow='right'] {
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
   }
-  [role='tablist'][data-overflow='left'] {
+  [data-overflow='left'] {
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px);
     mask-image: linear-gradient(to right, transparent 0, #000 24px);
   }
-  [role='tablist'][data-overflow='both'] {
+  [data-overflow='both'] {
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
   }
 }
 
-/* Finance's section navigation is a VERTICAL tab list (sidebar on lg+). Below
-   the lg breakpoint — where it would otherwise stack 19 full-width rows and
-   bury the content far below the fold — collapse it into a single horizontal
-   scroll strip: content-width chips, no section dividers. */
+/* ============================================================
+   SECTION RAIL — the vertical section nav, below `lg`.
+   ------------------------------------------------------------
+   A rail is a COLUMN of sections and that is the right shape on a wide
+   screen. On a phone it is 11–19 full-width rows stacked above the page:
+   the section you selected renders below the fold, so every one of these
+   pages reads as "it just lists the tabs and drops the content". Wrapping
+   them into a block (`flex-wrap`) is the same bug with fewer rows.
+
+   Below `lg` the rail becomes ONE swipeable strip of content-width chips.
+   `useStripAffordance` (hooks/useStripAffordance.ts) keeps the active chip
+   in view and stamps `data-overflow`, which fades the edge that still has
+   sections on it — a strip with no fade is a strip nobody scrolls.
+
+   It is ONE class because it is one behaviour: Radix `TabsList` rails
+   (Finance, HR, Stock, Blueprints, Templates, CRM detail) and `HubSideNav`
+   (Profile, Social, Party work) are indistinguishable on a phone, and the
+   Finance-only version of this rule is why the other eight were broken.
+   `HubSideNav` nests its items (group > ul > li > a), so the wrappers go
+   `display: contents` and every item becomes a sibling in the strip.
+   ============================================================ */
 @media (max-width: 1023px) {
-  .finance-tabs-list {
+  .section-rail {
+    display: flex;
+    flex-direction: row !important;
     flex-wrap: nowrap !important;
+    align-items: center;
     justify-content: flex-start !important;
+    gap: 0.25rem;
+    width: 100%;
+    max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    border-bottom: 1px solid hsl(var(--hairline));
+    padding-bottom: 0.25rem;
   }
-  .finance-tabs-list::-webkit-scrollbar {
+  .section-rail::-webkit-scrollbar {
     display: none;
   }
-  .finance-tabs-list > [role='tab'],
-  .finance-tabs-list > a {
+
+  /* Flatten the rail's own structure so every item is a sibling in the strip.
+     Higher specificity than the `> div` heading rule below, deliberately. */
+  .section-rail > [data-rail-group],
+  .section-rail ul,
+  .section-rail li {
+    display: contents;
+  }
+
+  /* Group captions (Documents / Tools / Delivery) are a vertical-rail device;
+     in a horizontal strip they are a chip you cannot press. */
+  .section-rail [data-rail-heading],
+  .section-rail > div {
+    display: none;
+  }
+
+  .section-rail [role='tab'],
+  .section-rail .sidebar-item {
     width: auto !important;
     flex: 0 0 auto;
+    white-space: nowrap;
+    /* Nested rows carry `pl-8` for their indent, which is meaningless once the
+       tree is flat and just pushes the label off its own chip. */
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
   }
-  /* Section dividers (Documents / Tools) don't belong in a horizontal strip. */
-  .finance-tabs-list > div {
-    display: none;
+
+  /* The selected marker follows the platform's tab language: an underline. A
+     3px bar down the LEFT of a chip in a horizontal row marks nothing. */
+  .section-rail .sidebar-item.active::before {
+    top: auto;
+    bottom: 0;
+    left: 0.25rem;
+    right: 0.25rem;
+    width: auto;
+    height: 2px;
+    border-radius: 0;
   }
 }
 
@@ -933,6 +989,39 @@ All colors MUST be HSL.
      anything that sits INSIDE a panel and should recede from it. */
   .panel-sunken {
     background: hsl(var(--surface-sunken));
+  }
+
+  /* ============================================================
+     TABLE SCROLLER — the wrapper every hand-rolled <table> needs.
+     ------------------------------------------------------------
+     `<main>` is `overflow-x-hidden` (see Layout.tsx), so a table wider
+     than the viewport does not push the page sideways — it is CLIPPED.
+     The right-hand columns simply are not there, with no scrollbar and
+     no swipe to recover them. That is silent on every desktop and total
+     on a phone: on a 375px screen a seven-column finance table loses its
+     money column, which is the column the table exists for.
+     `Table` (components/core/ui/table.tsx) carries its own scroller; a
+     raw <table> gets this class on its immediate wrapper.
+
+     `th { white-space: nowrap }` is half the fix, not a flourish. Without
+     it the browser resolves the overflow by wrapping every header into
+     three lines instead of scrolling, so the table "fits" and is
+     unreadable — no scrollbar appears, because nothing overflows. With
+     it the table has an honest minimum width and the wrapper scrolls.
+     Cells still wrap; only the header row is pinned to one line.
+     ============================================================ */
+  .table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* `thead` only. A `<th scope="row">` carrying a long label belongs to the
+     body and must stay free to wrap — pinning it is how one long party name
+     doubles the width of a table that was otherwise fine. */
+  .table-scroll > table > thead th {
+    white-space: nowrap;
   }
 
   /* `.gradient-border` and the universal bordered-box ring it powered are

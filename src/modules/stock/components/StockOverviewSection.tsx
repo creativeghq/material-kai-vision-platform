@@ -116,6 +116,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
             <CardTitle className="flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> Stock valuation</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <tbody>
                 {val.by_warehouse.map((w) => (
@@ -130,6 +131,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                 </tr>
               </tbody>
             </table>
+            </div>
             {val.items_missing_cost > 0 && (
               <div className="px-4 py-2 text-xs text-amber-500 border-t border-border/60 flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5" /> {val.items_missing_cost} item{val.items_missing_cost === 1 ? '' : 's'} with stock have no product cost — set a cost on the product to value them.
@@ -153,6 +155,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
           {low.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing below its reorder point. Inventory is healthy.</div>
           ) : (
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
@@ -182,6 +185,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                 ))}
               </tbody>
             </table>
+            </div>
           )}
           <TablePagination page={lowPage} total={low.length} onPageChange={setLowPage} label="items" />
         </CardContent>

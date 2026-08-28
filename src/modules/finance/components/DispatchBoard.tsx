@@ -171,6 +171,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
           </div>
           <Card>
             <CardContent className="p-0">
+              <div className="table-scroll">
               <table className="w-full text-sm">
                 <tbody>
                   {paginate(buckets[k], pages[k]).map((o) => {
@@ -238,6 +239,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                           <tr className="border-b border-border/30 bg-muted/20">
                             <td />
                             <td colSpan={5} className="px-2 py-2">
+                              <div className="table-scroll">
                               <table className="w-full text-xs">
                                 <thead className="text-muted-foreground">
                                   <tr>
@@ -258,6 +260,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                                   ))}
                                 </tbody>
                               </table>
+                              </div>
                             </td>
                           </tr>
                         )}
@@ -266,6 +269,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                   })}
                 </tbody>
               </table>
+              </div>
               <TablePagination
                 page={pages[k]}
                 total={buckets[k].length}

@@ -728,6 +728,7 @@ const MyDataReconTable: React.FC<{
       <div className="grid gap-2 border-b border-border/60 bg-muted/20 px-4 py-2 text-xs" style={{ gridTemplateColumns: `repeat(${totals.length}, minmax(0, 1fr))` }}>
         {totals.map((t) => (<div key={t.label}><span className="text-muted-foreground">{t.label}: </span><span className="font-semibold">{t.value}</span></div>))}
       </div>
+      <div className="table-scroll">
       <table className="w-full text-sm">
         <thead className="text-xs text-muted-foreground">
           <tr className="border-b border-border/60">
@@ -755,6 +756,7 @@ const MyDataReconTable: React.FC<{
           })}
         </tbody>
       </table>
+      </div>
       {/* The totals strip above counts every document, not just this page. */}
       <TablePagination page={page} total={ordered.length} onPageChange={onPageChange} label="documents" />
     </div>
@@ -772,6 +774,7 @@ const Table: React.FC<{
         <div key={t.label}><span className="text-muted-foreground">{t.label}: </span><span className="font-semibold">{t.value}</span></div>
       ))}
     </div>
+    <div className="table-scroll">
     <table className="w-full text-sm">
       <thead className="text-xs text-muted-foreground">
         <tr className="border-b border-border/60">
@@ -786,6 +789,7 @@ const Table: React.FC<{
         ))}
       </tbody>
     </table>
+    </div>
     {footer}
   </div>
 );

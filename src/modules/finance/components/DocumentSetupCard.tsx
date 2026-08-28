@@ -111,6 +111,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
         <CardTitle>Document Types &amp; Series</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
+        <div className="table-scroll">
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b border-border/60">
@@ -230,6 +231,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
             })}
           </tbody>
         </table>
+        </div>
       </CardContent>
     </Card>
   );

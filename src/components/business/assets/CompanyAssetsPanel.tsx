@@ -227,6 +227,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
           />
         ) : (
           <>
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
@@ -280,6 +281,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                 })}
               </tbody>
             </table>
+            </div>
             <TablePagination page={page} total={filtered.length} pageSize={15} onPageChange={setPage} />
           </>
         )}

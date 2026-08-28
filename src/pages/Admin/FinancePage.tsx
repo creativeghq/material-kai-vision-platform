@@ -504,7 +504,7 @@ const FinancePage: React.FC = () => {
               that rule belongs to the SECTIONS. Nested inside, it ran up the right of the two
               buttons and closed the pair into a box — the one thing this row is styled not to
               be. Being outside also means `hidden lg:block` rather than leaning on
-              `.finance-tabs-list > div`: the horizontal strip below lg has no room for them,
+              `.section-rail > div`: the horizontal strip below lg has no room for them,
               and both surfaces are one tap away in the bottom nav. */}
           <div className="w-full shrink-0 lg:w-56">
             {!isAccountant && (
@@ -530,7 +530,7 @@ const FinancePage: React.FC = () => {
               </div>
             )}
 
-            <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
+            <TabsList className="section-rail flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
               <TabsTrigger value="dashboard" className="w-full justify-start">
                 <PieChart className="h-4 w-4 mr-2" /> Dashboard
               </TabsTrigger>
@@ -870,6 +870,7 @@ const FinancePage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="table-scroll">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60">
@@ -991,6 +992,7 @@ const FinancePage: React.FC = () => {
                     })}
                   </tbody>
                 </table>
+                </div>
                 <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
@@ -1076,6 +1078,7 @@ const FinancePage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="table-scroll">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60">
@@ -1204,6 +1207,7 @@ const FinancePage: React.FC = () => {
                     })}
                   </tbody>
                 </table>
+                </div>
                 <TablePagination page={apPage} total={apFiltered.length} onPageChange={setApPage} label="payables" />
               </CardContent>
             </Card>
@@ -1303,6 +1307,7 @@ const FinancePage: React.FC = () => {
                   />
                 ) : (
                   <>
+                  <div className="table-scroll">
                   <table className="w-full text-sm">
                     <thead className="text-xs text-muted-foreground">
                       <tr className="border-b border-border/60">
@@ -1329,6 +1334,7 @@ const FinancePage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                   <TablePagination page={followUpsPage} total={followUpsView.length} onPageChange={setFollowUpsPage} label="quotes" />
                   </>
                 )}
@@ -1541,6 +1547,7 @@ const BucketSummary: React.FC<{
       <Button size="sm" variant="ghost" onClick={() => document.querySelector<HTMLButtonElement>(`[data-value=${viewLink}]`)?.click()}>View all</Button>
     </CardHeader>
     <CardContent className="p-0">
+      <div className="table-scroll">
       <table className="w-full text-sm">
         <tbody>
           {AGE_BUCKETS.map((b) => (
@@ -1581,6 +1588,7 @@ const BucketSummary: React.FC<{
           )}
         </tbody>
       </table>
+      </div>
     </CardContent>
   </Card>
   );
@@ -1605,6 +1613,7 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
         <CardTitle className="flex items-center gap-2"><LineChart className="h-4 w-4" /> Cash flow (next 90 days)</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
+        <div className="table-scroll">
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b border-border/60">
@@ -1628,6 +1637,7 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
             ))}
           </tbody>
         </table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1844,6 +1854,7 @@ const TopProductsCard: React.FC<{ rows: SalesPerProductRow[]; onViewAll?: () => 
   const top = useMemo(() => [...rows].sort((a, b) => Number(b.revenue_net || 0) - Number(a.revenue_net || 0)).slice(0, 6), [rows]);
   return (
     <InsightCard title="Best sellers" icon={Boxes} onViewAll={onViewAll} isEmpty={top.length === 0} empty="No products sold in this period yet.">
+      <div className="table-scroll">
       <table className="w-full text-sm">
         <thead className="text-xs text-muted-foreground">
           <tr className="border-b border-border/60">
@@ -1865,6 +1876,7 @@ const TopProductsCard: React.FC<{ rows: SalesPerProductRow[]; onViewAll?: () => 
           ))}
         </tbody>
       </table>
+      </div>
     </InsightCard>
   );
 };

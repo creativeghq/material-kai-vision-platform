@@ -167,6 +167,7 @@ export const ExpensePaymentsDialog: React.FC<{
                     Nothing paid against this expense yet.
                   </p>
                 ) : (
+                  <div className="table-scroll">
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
                       <tr>
@@ -210,6 +211,7 @@ export const ExpensePaymentsDialog: React.FC<{
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
 

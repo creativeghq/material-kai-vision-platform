@@ -401,6 +401,7 @@ const InvoiceDetailPage: React.FC = () => {
           <CardTitle>Line Items</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -432,6 +433,7 @@ const InvoiceDetailPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -493,6 +495,7 @@ const InvoiceDetailPage: React.FC = () => {
           <CardTitle>Payments</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -528,6 +531,7 @@ const InvoiceDetailPage: React.FC = () => {
               })}
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -537,6 +541,7 @@ const InvoiceDetailPage: React.FC = () => {
             <CardTitle>Credit Notes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="border-b border-border/60 text-xs text-muted-foreground">
                 <tr>
@@ -564,6 +569,7 @@ const InvoiceDetailPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -495,6 +495,7 @@ const TripCardDetail: React.FC<{
             ) : undefined}
           />
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -570,6 +571,7 @@ const TripCardDetail: React.FC<{
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </CardContent>
 

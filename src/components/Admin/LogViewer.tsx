@@ -356,7 +356,7 @@ export function LogViewer() {
 
             {/* Logs Table */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="max-h-[600px] overflow-y-auto">
+              <div>
                 {logs.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     {loading ? (
@@ -374,6 +374,7 @@ export function LogViewer() {
                   </div>
                 ) : (
                   <>
+                    <div className="table-scroll max-h-[600px] overflow-y-auto">
                     <table className="w-full">
                       <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
                         <tr>
@@ -430,6 +431,7 @@ export function LogViewer() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
 
                     <TablePagination
                       page={page}

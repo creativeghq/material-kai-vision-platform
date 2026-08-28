@@ -266,6 +266,7 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
           ) : !items || items.length === 0 ? (
             <p className="py-3 text-center text-xs text-muted-foreground">No line items recorded for this order.</p>
           ) : (
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="text-[10px] uppercase text-muted-foreground">
                 <tr>
@@ -291,6 +292,7 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
           {preview ? (
             <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs space-y-1">

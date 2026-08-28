@@ -2,84 +2,9 @@ import * as React from 'react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 
 import { cn } from '@/lib/utils';
+import { useStripAffordance } from '@/hooks/useStripAffordance';
 
 const Tabs = TabsPrimitive.Root;
-
-/**
- * On mobile the global stylesheet turns a horizontal TabsList into a single
- * swipeable strip (see index.css). For many-tab pages that introduces two
- * needs this hook handles:
- *   1. keep the ACTIVE trigger in view (so a deep-linked tab is never hidden
- *      off-screen at rest), and
- *   2. expose how the strip is overflowing via `data-overflow` so CSS can fade
- *      the edge(s) that have more tabs — the "there's more" affordance.
- * It is a no-op when the list isn't actually scrollable (e.g. desktop), so it
- * is safe to apply to every TabsList.
- */
-function useTabStripAffordance(elRef: React.RefObject<HTMLElement>) {
-  const [overflow, setOverflow] = React.useState<'none' | 'left' | 'right' | 'both'>('none');
-
-  const measure = React.useCallback(() => {
-    const el = elRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    if (max <= 1) {
-      setOverflow('none');
-      return;
-    }
-    const atStart = el.scrollLeft <= 1;
-    const atEnd = el.scrollLeft >= max - 1;
-    setOverflow(!atStart && !atEnd ? 'both' : atStart ? 'right' : 'left');
-  }, [elRef]);
-
-  const centerActive = React.useCallback(() => {
-    const el = elRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    if (max <= 1) return;
-    const active = el.querySelector<HTMLElement>('[role="tab"][data-state="active"]');
-    if (!active) return;
-    const er = el.getBoundingClientRect();
-    const ar = active.getBoundingClientRect();
-    // Already fully in view → leave the scroll position alone. This keeps a
-    // leading tab (the common case) resting at the start instead of being
-    // yanked toward centre, and prevents transient mid-mount re-centres.
-    if (ar.left >= er.left && ar.right <= er.right) return;
-    // Active tab's offset within the scroll content, then centre it — clamped
-    // to the valid scroll range so a stale measurement can't fling the strip.
-    const target = el.scrollLeft + (ar.left - er.left) - (el.clientWidth - ar.width) / 2;
-    el.scrollLeft = Math.max(0, Math.min(target, max));
-  }, [elRef]);
-
-  React.useEffect(() => {
-    const el = elRef.current;
-    if (!el) return;
-    centerActive();
-    measure();
-
-    const onScroll = () => measure();
-    el.addEventListener('scroll', onScroll, { passive: true });
-    const ro = new ResizeObserver(() => {
-      centerActive();
-      measure();
-    });
-    ro.observe(el);
-    // Re-center + re-measure whenever the active trigger changes.
-    const mo = new MutationObserver(() => {
-      centerActive();
-      measure();
-    });
-    mo.observe(el, { attributes: true, subtree: true, attributeFilter: ['data-state'] });
-
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      ro.disconnect();
-      mo.disconnect();
-    };
-  }, [centerActive, measure]);
-
-  return overflow;
-}
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
@@ -94,7 +19,7 @@ const TabsList = React.forwardRef<
     },
     [ref],
   );
-  const overflow = useTabStripAffordance(innerRef);
+  const overflow = useStripAffordance(innerRef);
 
   return (
     <TabsPrimitive.List

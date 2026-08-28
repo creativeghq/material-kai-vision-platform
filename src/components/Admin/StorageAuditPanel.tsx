@@ -165,6 +165,7 @@ export function StorageAuditPanel() {
         )}
 
         {rows && rows.length > 0 ? (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-left text-muted-foreground border-b">
               <tr>
@@ -213,6 +214,7 @@ export function StorageAuditPanel() {
               </tr>
             </tbody>
           </table>
+          </div>
         ) : !loading ? (
           <div className="px-4 py-6 text-sm text-muted-foreground flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" /> No orphans detected.

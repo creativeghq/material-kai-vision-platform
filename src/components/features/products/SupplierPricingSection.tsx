@@ -144,6 +144,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
             action={<Button size="sm" onClick={() => setEditing('new')}><Plus /> Add supplier</Button>}
           />
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-xs text-muted-foreground">
@@ -185,6 +186,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {/* MOQ figures above are inert without this: it decides whether a shortfall of 3

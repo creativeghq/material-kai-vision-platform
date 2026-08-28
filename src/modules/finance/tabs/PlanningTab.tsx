@@ -282,6 +282,7 @@ const FlatTable: React.FC<{
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
   return (
   <>
+  <div className="table-scroll">
   <table className="w-full text-sm">
     <thead className="text-xs text-muted-foreground">
       <tr className="border-b border-border/60">
@@ -319,6 +320,7 @@ const FlatTable: React.FC<{
       ))}
     </tbody>
   </table>
+  </div>
   <TablePagination page={page} total={rows.length} onPageChange={setPage} label="planned payments" />
   </>
   );

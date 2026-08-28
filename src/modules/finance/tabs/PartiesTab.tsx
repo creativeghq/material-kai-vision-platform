@@ -256,6 +256,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
             <div className="p-12 text-center text-sm text-muted-foreground">No parties match.</div>
           ) : (
             <>
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
@@ -338,6 +339,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                 ))}
               </tbody>
             </table>
+            </div>
             <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="parties" />
             </>
           )}

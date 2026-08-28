@@ -345,6 +345,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
             (report?.byUser.length ?? 0) === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No time logged in this period.</p>
             ) : (
+              <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border/60">
@@ -369,11 +370,13 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )
           ) : (
             (report?.byContact.length ?? 0) === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No time logged in this period.</p>
             ) : (
+              <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border/60">
@@ -398,6 +401,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )
           )}
         </CardContent>

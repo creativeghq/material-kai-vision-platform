@@ -213,6 +213,7 @@ export default function PageWatchesPage() {
               notice and you will hear about it the day it changes.
             </div>
           ) : (
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-xs text-muted-foreground">
@@ -299,6 +300,7 @@ export default function PageWatchesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

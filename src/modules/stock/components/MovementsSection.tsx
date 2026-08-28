@@ -64,6 +64,7 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -98,6 +99,7 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
               })}
             </tbody>
           </table>
+          </div>
         )}
         {!loading && <TablePagination page={page} total={visible.length} onPageChange={setPage} label="movements" />}
       </CardContent>

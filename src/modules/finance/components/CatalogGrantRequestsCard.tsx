@@ -88,6 +88,7 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
             No requests yet. A dealer asks from the product form when they try to add something you already carry.
           </p>
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="border-b border-border/60 text-xs text-muted-foreground">
               <tr>
@@ -135,6 +136,7 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </CardContent>
     </Card>

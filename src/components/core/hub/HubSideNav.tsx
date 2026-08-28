@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useStripAffordance } from '@/hooks/useStripAffordance';
 
 export interface HubNavItem {
   id: string;
@@ -44,6 +45,13 @@ interface HubSideNavProps {
  *    A parent with children is a disclosure; a leaf is a link.
  *  - **It scrolls independently** (`sticky` + own overflow), so a long section
  *    list does not drag the page's scroll position around.
+ *  - **Below `lg` it is not a rail at all — it is a horizontal strip.** A rail
+ *    is a column, and a column of 11 full-width rows on a phone is 500px of
+ *    navigation before the first word of content: the section you asked for
+ *    renders below the fold, so the page reads as empty. `.section-rail`
+ *    (index.css) flattens the group/list nesting into one swipeable row of
+ *    chips, and `useStripAffordance` keeps the active one in view and fades
+ *    whichever edge still has sections on it.
  */
 export const HubSideNav: React.FC<HubSideNavProps> = ({
   groups,
@@ -51,30 +59,44 @@ export const HubSideNav: React.FC<HubSideNavProps> = ({
   onSelect,
   className,
   'aria-label': ariaLabel = 'Section navigation',
-}) => (
-  <nav
-    aria-label={ariaLabel}
-    className={cn(
-      'scroll-y-clean w-full shrink-0 border-hairline lg:sticky lg:top-0 lg:max-h-[calc(100dvh-3rem)] lg:w-56 lg:border-r lg:pr-2',
-      className,
-    )}
-  >
-    {groups.map((group, gi) => (
-      <div key={group.label ?? `group-${gi}`} className={gi > 0 ? 'mt-4' : undefined}>
-        {group.label && (
-          <h3 className="px-3 pb-1 font-sans text-[11px] font-semibold text-muted-foreground">
-            {group.label}
-          </h3>
-        )}
-        <ul className="space-y-0.5">
-          {group.items.map((item) => (
-            <HubSideNavRow key={item.id} item={item} activeId={activeId} onSelect={onSelect} />
-          ))}
-        </ul>
-      </div>
-    ))}
-  </nav>
-);
+}) => {
+  const ref = React.useRef<HTMLElement | null>(null);
+  const overflow = useStripAffordance(ref, '.sidebar-item.active');
+
+  return (
+    <nav
+      ref={ref}
+      aria-label={ariaLabel}
+      data-overflow={overflow}
+      className={cn(
+        'section-rail scroll-y-clean w-full shrink-0 border-hairline lg:sticky lg:top-0 lg:max-h-[calc(100dvh-3rem)] lg:w-56 lg:border-r lg:pr-2',
+        className,
+      )}
+    >
+      {groups.map((group, gi) => (
+        <div
+          key={group.label ?? `group-${gi}`}
+          data-rail-group=""
+          className={gi > 0 ? 'mt-4' : undefined}
+        >
+          {group.label && (
+            <h3
+              data-rail-heading=""
+              className="px-3 pb-1 font-sans text-[11px] font-semibold text-muted-foreground"
+            >
+              {group.label}
+            </h3>
+          )}
+          <ul className="space-y-0.5">
+            {group.items.map((item) => (
+              <HubSideNavRow key={item.id} item={item} activeId={activeId} onSelect={onSelect} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+};
 
 /**
  * A group separator for a rail built from a FLAT list of rows.
@@ -89,7 +111,7 @@ export const HubSideNav: React.FC<HubSideNavProps> = ({
  * loudest strokes on the screen. One copy now, at the weight every other divider uses.
  */
 export const HubRailSectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex w-full items-center gap-2 px-3 pb-1 pt-3">
+  <div data-rail-heading="" className="flex w-full items-center gap-2 px-3 pb-1 pt-3">
     <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
       {children}

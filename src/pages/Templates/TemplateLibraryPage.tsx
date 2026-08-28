@@ -51,7 +51,7 @@ const LIBRARIES_TAB = 'libraries';
  * The type filter is a VERTICAL tab rail (the HR / Finance / Stock idiom), not a row of chips:
  * ten types plus the external libraries wrapped to two or three rows of buttons and pushed the
  * grid below the fold. Below `lg` the same list collapses into a horizontal scroll strip via
- * `.finance-tabs-list` in index.css.
+ * `.section-rail` in index.css.
  */
 export const TemplateLibraryPage: React.FC = () => {
   const { toast } = useToast();
@@ -409,7 +409,7 @@ export const TemplateLibraryPage: React.FC = () => {
               <Plus className="h-4 w-4" /> Add New
             </Button>
 
-            <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-full lg:flex-col lg:flex-nowrap">
+            <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-full lg:flex-col lg:flex-nowrap">
             <TabsTrigger value={MINE_TAB} className="w-full justify-start">
               <LayoutTemplate className="h-4 w-4 mr-2 shrink-0" />
               <span className="truncate">My Templates</span>
@@ -440,7 +440,7 @@ export const TemplateLibraryPage: React.FC = () => {
               );
             })}
 
-            {/* A plain <div> child: `.finance-tabs-list > div` hides it below lg, where a rule
+            {/* A plain <div> child: `.section-rail > div` hides it below lg, where a rule
                 inside a horizontal chip strip would just be noise. */}
             <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
 

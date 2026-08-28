@@ -815,8 +815,8 @@ export const CompanyDetailPage: React.FC = () => {
 
               {/* Details — section nav (left) + property panel (right). */}
               <TabsContent value="details">
-                <Tabs defaultValue="address" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
-                  <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
+                <Tabs defaultValue="address" orientation="vertical" className="flex flex-col gap-6 lg:flex-row lg:items-start">
+                  <TabsList className="section-rail h-auto w-full shrink-0 flex-row justify-start gap-1 bg-transparent p-0 lg:w-52 lg:flex-col lg:flex-nowrap">
                     <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2"/>Address &amp; Phone</TabsTrigger>
                     <TabsTrigger value="tax" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ShieldCheck className="h-4 w-4 mr-2"/>Tax &amp; VAT</TabsTrigger>
                     {showCommercial && (

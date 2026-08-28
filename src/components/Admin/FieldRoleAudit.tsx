@@ -172,6 +172,7 @@ export const FieldRoleAudit: React.FC = () => {
         ) : shown.length === 0 ? (
           <p className="p-6 text-sm text-muted-foreground">No field matches that filter.</p>
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border/40 text-left text-xs text-muted-foreground">
@@ -224,6 +225,7 @@ export const FieldRoleAudit: React.FC = () => {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </CardContent>
     </Card>

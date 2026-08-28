@@ -710,7 +710,7 @@ export const MarketTrendsTab: React.FC = () => {
           deep-link a sub-area and a reader can send a URL that lands where they mean.
           NOTE: every query still runs on arrival — these tabs divide the READING, not the loading. */}
       <Tabs value={tab} onValueChange={setTab} className="space-y-5">
-        <TabsList className="finance-tabs-list flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0">
+        <TabsList className="section-rail flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0">
           {MARKET_TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value} className="gap-2">
               <t.icon className="h-4 w-4 shrink-0" />

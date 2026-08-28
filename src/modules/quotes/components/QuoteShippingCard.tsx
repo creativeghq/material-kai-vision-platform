@@ -93,6 +93,7 @@ export const QuoteShippingCard: React.FC<{ quoteId: string; editable: boolean; o
                 {q.status === 'quoted' && <Badge variant="outline" className="border-emerald-500/50 text-emerald-500">{q.offer_count} offer{q.offer_count === 1 ? '' : 's'}</Badge>}
               </div>
               {q.status === 'quoted' ? (
+                <div className="table-scroll">
                 <table className="w-full text-sm">
                   <tbody>
                     {q.offers.map((o, i) => (
@@ -110,6 +111,7 @@ export const QuoteShippingCard: React.FC<{ quoteId: string; editable: boolean; o
                     ))}
                   </tbody>
                 </table>
+                </div>
               ) : q.status === 'declined' ? (
                 <div className="px-3 py-2 text-xs text-muted-foreground">Declined by the operator{q.operator_note ? `: ${q.operator_note}` : '.'}</div>
               ) : (

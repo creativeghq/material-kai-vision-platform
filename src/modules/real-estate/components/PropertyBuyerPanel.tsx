@@ -95,6 +95,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
               action={<Button size="sm" onClick={() => openNew()} disabled={!ws}><Plus /> Add property</Button>}
             />
           ) : (
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border/60">
@@ -169,6 +170,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

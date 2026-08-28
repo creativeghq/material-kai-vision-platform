@@ -503,6 +503,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 ) : type === 'cheques' ? (
                   <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewChequeOpen(true)} />
                 ) : (
+                  <div className="table-scroll">
                   <table className="w-full text-sm">
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
                       <tr>
@@ -553,6 +554,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
                 {/* One footer for whichever document table is active — they all render inside
                     this CardContent, so the border lines up with the last row. */}
@@ -678,6 +680,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
         <div className="text-sm font-semibold">Recurring expenses</div>
       </div>
       <CardContent className="p-0">
+        <div className="table-scroll">
         <table className="w-full text-sm">
           <thead className="border-b border-border/60 text-xs text-muted-foreground">
             <tr>
@@ -717,6 +720,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
             ))}
           </tbody>
         </table>
+        </div>
         <TablePagination page={page} total={rows.length} onPageChange={setPage} label="recurring expenses" />
       </CardContent>
     </Card>
@@ -765,6 +769,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
   };
   const overdue = (c: Cheque) => c.status === 'pending' && c.due_date && new Date(c.due_date) < new Date();
   return (
+    <div className="table-scroll">
     <table className="w-full text-sm">
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
         <tr>
@@ -807,6 +812,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
         ))}
       </tbody>
     </table>
+    </div>
   );
 };
 
@@ -840,6 +846,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
     finally { setBusy(null); }
   };
   return (
+    <div className="table-scroll">
     <table className="w-full text-sm">
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
         <tr>
@@ -899,6 +906,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         ))}
       </tbody>
     </table>
+    </div>
   );
 };
 
@@ -930,6 +938,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
     } finally { setBusy(null); }
   };
   return (
+  <div className="table-scroll">
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
@@ -971,6 +980,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
       ))}
     </tbody>
   </table>
+  </div>
   );
 };
 
@@ -982,6 +992,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
  * action against the bill it credits, not a document-list action.
  */
 const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] } & DocEmptyProps> = ({ rows, ...empty }) => (
+  <div className="table-scroll">
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
@@ -1017,12 +1028,14 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] } & DocEmpt
       ))}
     </tbody>
   </table>
+  </div>
 );
 const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string } & DocEmptyProps> = ({ rows, categoryName, financeBase, ...empty }) => {
   // Deep-link the party name to its CRM record. One address — CRM is workspace work and lives
   // at /crm; the `/admin/crm` twin this used to branch on is now only a redirect.
   const crmBase = '/crm';
   return (
+  <div className="table-scroll">
   <table className="w-full text-sm">
     <thead className="border-b border-border/60 text-xs text-muted-foreground">
       <tr>
@@ -1115,6 +1128,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
       })}
     </tbody>
   </table>
+  </div>
   );
 };
 
@@ -1226,6 +1240,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     );
   }
   return (
+    <div className="table-scroll">
     <table className="w-full text-sm">
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
         <tr>
@@ -1392,6 +1407,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
         />
       )}
     </table>
+    </div>
   );
 };
 

@@ -60,6 +60,7 @@ export default function FreightQuoteRequestsPage() {
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">No pending freight-quote requests.</div>
             ) : (
               <>
+              <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border/60">
@@ -87,6 +88,7 @@ export default function FreightQuoteRequestsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
               <TablePagination page={page} total={rows.length} onPageChange={setPage} label="requests" />
               </>
             )}

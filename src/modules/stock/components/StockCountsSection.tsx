@@ -97,6 +97,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
             />
           )
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -128,6 +129,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
               })}
             </tbody>
           </table>
+          </div>
         )}
         {!loading && <TablePagination page={page} total={filtered.length} onPageChange={setPage} label="counts" />}
       </CardContent>
@@ -347,7 +349,8 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="max-h-[60vh] overflow-y-auto rounded-md border border-border/60">
+          <div className="rounded-md border border-border/60">
+            <div className="table-scroll max-h-[60vh] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground sticky top-0 bg-background">
                 <tr className="border-b border-border/60">
@@ -386,6 +389,7 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
         <DialogFooter className="gap-2">

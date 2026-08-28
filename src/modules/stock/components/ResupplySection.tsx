@@ -136,6 +136,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
             Not enough movement history yet. Once items start selling/issuing, the forecast ranks what to restock first.
           </div>
         ) : (
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -180,6 +181,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
               ))}
             </tbody>
           </table>
+          </div>
         )}
         {!loading && <TablePagination page={page} total={rows.length} onPageChange={setPage} label="items" />}
       </CardContent>

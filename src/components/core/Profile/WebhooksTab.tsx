@@ -179,6 +179,7 @@ export const WebhooksTab: React.FC = () => {
               action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus /> Add endpoint</Button>}
             />
           ) : (
+            <div className="table-scroll">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
@@ -223,6 +224,7 @@ export const WebhooksTab: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -330,6 +332,7 @@ export const WebhooksTab: React.FC = () => {
             <p className="py-6 text-center text-sm text-muted-foreground">Nothing delivered yet.</p>
           ) : (
             <div className="max-h-[60vh] overflow-y-auto">
+              <div className="table-scroll">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border/60 text-left text-muted-foreground">
@@ -354,6 +357,7 @@ export const WebhooksTab: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </DialogContent>

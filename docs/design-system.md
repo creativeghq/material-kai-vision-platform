@@ -239,9 +239,35 @@ Sticky sunken header · hairline row separators · no zebra striping (it consume
 table needs free: the row's own status colour) · 11px semibold headers · right-aligned
 `tabular-nums` for numbers.
 
-Never wrap a table in `overflow-hidden` — `<main>` already clips, so the right-hand columns vanish
-on a narrow viewport with no scrollbar and no swipe. Guarded by
-[tests/unit/responsiveTableOverflow.test.ts](../tests/unit/responsiveTableOverflow.test.ts).
+**Every table scrolls horizontally.** `<main>` is `overflow-x-hidden`, so a table wider than the
+viewport is not pushed off-screen — it is CLIPPED: the right-hand columns are simply absent, with no
+scrollbar and no swipe to recover them. On a phone the column that goes is usually the money.
+
+- The `<Table>` primitive carries its own scroller. Use it and there is nothing to do.
+- A hand-rolled `<table>` goes in `<div className="table-scroll">` (index.css).
+- Never wrap either in `overflow-hidden`.
+- `.table-scroll` also pins `thead th` to one line. That half is not cosmetic: without it the browser
+  resolves the overflow by wrapping every header into three lines, so nothing overflows, no scrollbar
+  appears, and the table "fits" while being unreadable.
+- If the table already sits in a `max-h-… overflow-y-auto` box with a sticky header, put
+  `table-scroll` on THAT box rather than nesting a second scroller inside it — a nested scroll
+  container re-parents the sticky `<thead>` to a box with no height and silently kills it.
+
+Guarded by [tests/unit/responsiveTableOverflow.test.ts](../tests/unit/responsiveTableOverflow.test.ts).
+
+### Section rail
+
+A settings/section rail is a COLUMN on `lg`+ and a horizontal strip below it. Both `HubSideNav` and a
+vertical Radix `TabsList` carry **`.section-rail`**, which is the whole mobile behaviour: one
+swipeable row of content-width chips, group captions hidden, the active chip scrolled into view, and
+a fade on whichever edge still has sections on it (`useStripAffordance` stamps `data-overflow`).
+
+Without it a rail on a phone is 11–19 full-width rows stacked above the page, so the section the
+reader selected renders below the fold and the page reads as empty — which is exactly how it was
+reported. `flex-wrap` is the same bug with fewer rows.
+
+The collapse breakpoint is `lg`, in the CSS **and** in the utilities. A rail that goes `sm:flex-col`
+spends 640–1023px with the media query forcing a row and the utilities asking for a column.
 
 ---
 
@@ -263,7 +289,7 @@ that a record page has three columns with three different jobs. Those rules live
 | `HubProperty` / `HubPropertyList` | Stored fields. Stacked by default: a side-by-side pair in a 300px rail truncates every email address. |
 | `HubTimeline` + `Group` + `Item` | The activity feed. Grouped, because 200 undifferentiated events answer "what happened here" with "everything, equally". |
 | `HubStatTile` / `HubStatGrid` | KPI tile with a meaning-coloured delta; auto-fitting grid (no orphan tile on the last row). |
-| `HubSideNav` | The settings / section rail. Active row = tint + leading accent bar. |
+| `HubSideNav` | The settings / section rail. Active row = tint + leading accent bar. Below `lg` it is a horizontal strip, not a column — see §5, Section rail. |
 | `HubTabNav` | Underline tabs for routes and saved views. Route tabs are real `<a>`s — middle-click and ⌘-click are how people use a tab strip. |
 | `HubEmptyState` | Two variants, because "you have none" and "your filters excluded all 4,000" need opposite offers. **Always pass `action`** — see §6b. |
 
@@ -391,7 +417,7 @@ Side rails (`HubSideNav`, `.sidebar-item`) mark the active row with a 3px leadin
 
 **Tables**
 - ✅ sticky header, hairline rows, right-aligned `tabular-nums` money, an explicit empty state
-- ❌ zebra stripes, `overflow-hidden` wrappers, an empty `<td>`, a status rendered as a solid pill
+- ❌ zebra stripes, `overflow-hidden` wrappers, a `<table>` with no `.table-scroll`, an empty `<td>`, a status rendered as a solid pill
 
 **Type**
 - ✅ weight for hierarchy; serif for h1/h2 only
