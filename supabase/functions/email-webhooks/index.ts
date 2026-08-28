@@ -28,6 +28,8 @@ import {
   isPlatformAddress,
   logInbound,
   parseAuthResults,
+  // DKIM alignment — a pass for ANY domain is not a pass for THIS sender (#357 AE-5).
+  dkimAlignedWith,
   parseRawEmail,
   resolveCustomer,
   resolveRecipient,
@@ -270,10 +272,21 @@ async function handleInbound(
     auth,
   };
 
-  // Spoofing gate. DMARC fail means the sender is not who they claim, so the message is stored
-  // and visible but never auto-replied to. DKIM pass alone is enough — forwarding breaks SPF,
-  // and "use my own address" is a forwarding flow by design.
-  const dmarcFailed = auth.dmarc === 'fail' && auth.dkim !== 'pass';
+  /**
+   * Spoofing gate. DMARC fail means the sender is not who they claim, so the message is stored
+   * and visible but never auto-replied to.
+   *
+   * DKIM rescues a DMARC fail — forwarding breaks SPF and "use my own address" is a forwarding
+   * flow by design — but ONLY WHEN IT IS ALIGNED WITH THE FROM DOMAIN (#357 AE-5).
+   *
+   * This read `auth.dkim !== 'pass'`, i.e. a pass for ANY domain. An attacker signs a message
+   * with a domain they own, sets `From: someone@yourcustomer.test`, and DMARC fails while
+   * `dkim=pass` — so the gate opened and the agent could auto-reply as though the claimed sender
+   * were verified. Every header on an inbound message is attacker-chosen; the signature domain
+   * is the one thing that is not.
+   */
+  const dkimVouchesForSender = dkimAlignedWith(fromAddress, auth);
+  const dmarcFailed = auth.dmarc === 'fail' && !dkimVouchesForSender;
   if (dmarcFailed) {
     await logInbound(db, { ...logBase, outcome: 'quarantined_auth_fail' });
     return inboundJson({ ok: true, outcome: 'quarantined_auth_fail' });

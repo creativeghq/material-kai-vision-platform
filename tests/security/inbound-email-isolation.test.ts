@@ -115,22 +115,41 @@ describe('#342 inbound mail fails closed', () => {
 });
 
 describe('#342 the auth gate is DKIM-based, because forwarding breaks SPF', () => {
-  const src = readFileSync(WEBHOOKS_SRC, 'utf8');
-  const shared = readFileSync(INBOUND_SHARED, 'utf8');
+  // Comments STRIPPED. The fix for #357 AE-5 explains itself by quoting the expression it
+  // replaced, so a raw scan flags its own footnote — the same trap documentEvents.test.ts
+  // records. The sibling block below already strips for exactly this reason.
+  const src = stripComments(readFileSync(WEBHOOKS_SRC, 'utf8'));
+  const shared = stripComments(readFileSync(INBOUND_SHARED, 'utf8'));
 
   it('does not quarantine on SPF failure alone', () => {
     // "Use my own address" is a forwarding flow: the forwarding host becomes the envelope
     // sender, so legitimate forwarded mail fails SPF every time. Quarantining on it would
     // silently swallow exactly the customers who followed our own setup instructions.
     expect(src).not.toMatch(/auth\.spf\s*===\s*'fail'/);
-    expect(src).toMatch(/auth\.dmarc === 'fail' && auth\.dkim !== 'pass'/);
+    // DMARC fail is the quarantine condition, and DKIM is what rescues it.
+    expect(src).toMatch(/auth\.dmarc === 'fail'/);
+  });
+
+  it('a DKIM pass only rescues when it is ALIGNED with the From domain', () => {
+    // This used to pin the literal `auth.dmarc === 'fail' && auth.dkim !== 'pass'`, which is a
+    // pass for ANY domain — #357 AE-5. An attacker signs with a domain they own, sets
+    // `From: someone@yourcustomer.test`, and that expression opened the gate. Pinning the
+    // expression rather than the PROPERTY is what let the weaker check read as tested.
+    expect(src).toMatch(/dkimAlignedWith\(fromAddress, auth\)/);
+    expect(
+      src,
+      'the gate is back to a bare dkim-pass check — any domain rescues a DMARC fail',
+    ).not.toMatch(/auth\.dkim !== 'pass'/);
   });
 
   it('reads the verdicts out of the Authentication-Results header', () => {
     // The header is read where the message is parsed (the webhook), and interpreted in the
     // shared module. Both halves must exist or the gate is inert.
     expect(src).toMatch(/parseAuthResults\(parsed\.headers\.get\('authentication-results'\)\)/);
-    expect(shared).toMatch(/export function parseAuthResults/);
+    // The parser moved to `_shared/email-auth.ts` so it could be unit-tested at all
+    // (inbound-email imports flow-events, which reads Deno.env at module load). inbound-email
+    // re-exports it, so this accepts either the definition or the re-export.
+    expect(shared).toMatch(/export (function parseAuthResults|\{[^}]*parseAuthResults)/);
   });
 });
 

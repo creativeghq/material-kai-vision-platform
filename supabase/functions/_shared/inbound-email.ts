@@ -173,27 +173,19 @@ export async function allocateUserEmailAddress(
 
 // ── gates ───────────────────────────────────────────────────────────────────────────────────
 
-export interface AuthResults {
-  spf: string | null;
-  dkim: string | null;
-  dmarc: string | null;
-}
-
-/**
- * SPF/DKIM/DMARC verdicts out of the `Authentication-Results` header Cloudflare adds.
+/*
+ * `AuthResults`, `parseAuthResults` and `dkimAlignedWith` moved to `_shared/email-auth.ts` and
+ * are re-exported here so every import site keeps working.
  *
- * The gate is **DKIM-based**, not SPF-based, and that is deliberate: forwarding rewrites the
- * envelope sender, so a legitimate forwarded message ("use my own address", §8 of #229) fails SPF
- * every time. DKIM survives forwarding as long as the body is not rewritten.
+ * They left because THIS module cannot be unit-tested: it imports `flow-events.ts`, which reads
+ * `Deno.env` at module load, so vitest cannot load it at all. The DKIM alignment rule is exactly
+ * the logic that most needs a test — it is the difference between "a signature verified" and
+ * "the sender is who they say" (#357 AE-5) — and it had none.
  */
-export function parseAuthResults(headerValue: string | null | undefined): AuthResults {
-  const v = String(headerValue || '').toLowerCase();
-  const pick = (k: string) => {
-    const m = v.match(new RegExp(`\\b${k}=([a-z]+)`));
-    return m ? m[1] : null;
-  };
-  return { spf: pick('spf'), dkim: pick('dkim'), dmarc: pick('dmarc') };
-}
+export type { AuthResults } from './email-auth.ts';
+export { parseAuthResults, dkimAlignedWith } from './email-auth.ts';
+// Also imported: a re-export does not bind the name locally, and the type is used below.
+import type { AuthResults } from './email-auth.ts';
 
 /** True when the message must never be auto-replied to (it is itself automated, or it is us). */
 export function isAutomatedSender(headers: Map<string, string>, from: string | null): boolean {
