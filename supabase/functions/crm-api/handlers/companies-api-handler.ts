@@ -6,6 +6,8 @@ import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_
 import { pickContactFields, escapeLike, parseIdsParam } from './contacts-api-handler.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
+// Generated mirror of src/services/crm/vatNormalize.ts — the receipt key (#353 CRM-7).
+import { normalizeVat } from '../../_shared/crm/vatNormalize.generated.ts';
 // Generated mirror of src/services/crm/greekTransliteration.ts (#353 CRM-1).
 import { transliterateGreek } from '../../_shared/crm/greekTransliteration.generated.ts';
 
@@ -54,6 +56,114 @@ function pickCompanyFields(body: Record<string, unknown>): Record<string, unknow
     if (body[col] !== undefined) out[col] = body[col];
   }
   return out;
+}
+
+/**
+ * Fields that assert THIS SERVER verified a VAT number against a tax authority (#353 CRM-7).
+ *
+ * They are stamped from a `vat_validation_receipts` row written by `myaade-rgwspublic2` /
+ * `vies-validate`, never taken from the request. They stay in `COMPANY_WRITABLE_COLUMNS` above
+ * only so the shape of that list still describes the row; `stripServerStampedFields` removes
+ * them from every client payload before it reaches a write.
+ *
+ * The descriptive halves — `vat_validated_name`, `vat_validated_address` and their `_latin`
+ * twins — are deliberately NOT here. They are what the registry SAID, not a claim that anyone
+ * asked it; the worst a client can do is store a wrong name.
+ */
+const SERVER_STAMPED_VAT_COLUMNS = ['vat_validated', 'vat_validated_at', 'vat_validation_source'] as const;
+
+/**
+ * Commercial terms — who this customer pays and how much (#353 CRM-7).
+ *
+ * Writable by workspace OWNER and ADMIN only. Before this, every role the handler admits could
+ * set them: `sales`, and the GLOBAL `supplier` and `architect` tiers, which are true in every
+ * workspace at once. A supplier account could raise a customer's credit limit.
+ *
+ * The check is on the caller's role IN THE TARGET WORKSPACE, not on the global tier, because a
+ * supplier or architect who OWNS their own workspace legitimately manages their own customers'
+ * terms — they are an `owner` there. Global tier says what someone is on the platform; the
+ * workspace role says what they may do to this row.
+ */
+const COMMERCIAL_TERMS_COLUMNS = ['discount_percent', 'discount_notes', 'credit_limit', 'user_level_key'] as const;
+
+/** The workspace roles permitted to move commercial terms. */
+const COMMERCIAL_TERMS_ROLES = ['owner', 'admin'] as const;
+
+async function callerMayWriteCommercialTerms(
+  userId: string | null,
+  workspaceId: string | undefined,
+  scope: CrmScope,
+): Promise<boolean> {
+  // A platform operator and a service-role/admin-secret caller act across tenants by design —
+  // that is what `isGlobalOperator` means, and server-to-server callers have no workspace role.
+  if (scope.isGlobalOperator) return true;
+  if (!userId || !workspaceId) return false;
+  const { data } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .maybeSingle<{ role: string }>();
+  return !!data && (COMMERCIAL_TERMS_ROLES as readonly string[]).includes(data.role);
+}
+
+/**
+ * Remove everything the client is not allowed to assert, and say what was dropped.
+ *
+ * Silent stripping on purpose for the VAT flags — a client that sends them is following the old
+ * contract, not attacking, and a 400 would break the identity-lookup save. The commercial-terms
+ * drop IS logged, because it is a permission decision somebody may need to explain.
+ */
+async function stripServerStampedFields(
+  fields: Record<string, unknown>,
+  userId: string | null,
+  workspaceId: string | undefined,
+  scope: CrmScope,
+): Promise<Record<string, unknown>> {
+  const out = { ...fields };
+  for (const col of SERVER_STAMPED_VAT_COLUMNS) delete out[col];
+
+  const attempted = COMMERCIAL_TERMS_COLUMNS.filter((c) => out[c] !== undefined);
+  if (attempted.length > 0 && !(await callerMayWriteCommercialTerms(userId, workspaceId, scope))) {
+    for (const col of attempted) delete out[col];
+    console.warn(
+      `[crm-companies-api] dropped commercial terms (${attempted.join(', ')}) — user ${userId} `
+      + `is not an owner/admin of workspace ${workspaceId}`,
+    );
+  }
+  return out;
+}
+
+/**
+ * Stamp the VAT verification flags from a receipt this server wrote (#353 CRM-7).
+ *
+ * Returns the columns to merge into the write, or `{}` when there is no fresh receipt — in which
+ * case the row simply stays unverified, which is the honest answer.
+ *
+ * ONE HOUR, not the receipt table's 24. The table's TTL is a cleanup bound; this is the TRUST
+ * window, and it is applied on the read so that shortening it later cannot be undone by a stale
+ * row surviving somewhere. The real flow is look-up → review → save, which is seconds to minutes.
+ */
+async function stampVatValidation(
+  vatNumber: unknown,
+  workspaceId: string | undefined,
+): Promise<Record<string, unknown>> {
+  const key = normalizeVat(typeof vatNumber === 'string' ? vatNumber : null);
+  if (!key || !workspaceId) return {};
+  const { data } = await supabase
+    .from('vat_validation_receipts')
+    .select('source, validated_at')
+    .eq('workspace_id', workspaceId)
+    .eq('vat_norm', key)
+    .gte('validated_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    .maybeSingle<{ source: string; validated_at: string }>();
+  if (!data) return {};
+  return {
+    vat_validated: true,
+    vat_validated_at: data.validated_at,
+    vat_validation_source: data.source,
+  };
 }
 
 /** Verify a company id is reachable by the caller's workspace scope. */
@@ -191,7 +301,12 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // the receivables aging. The column now defaults to false and the "said nothing -> it's a
       // customer" convention lives here instead, because only a request can be inspected for
       // whether it stated a role at all. A caller that names either flag is taken at its word.
-      const companyFields = pickCompanyFields(body);
+      // Strip what the client may not assert (#353 CRM-7), then stamp VAT verification from a
+      // receipt this server wrote — never from the request.
+      const companyFields = {
+        ...(await stripServerStampedFields(pickCompanyFields(body), userId, targetWs, scope)),
+        ...(await stampVatValidation(body.vat_number, targetWs)),
+      };
       if (companyFields.is_customer === undefined && companyFields.is_supplier === undefined) {
         companyFields.is_customer = true;
       }
@@ -421,7 +536,12 @@ export async function handleCompanies(req: Request): Promise<Response> {
       const companyId = path[0];
       const body = await req.json();
 
-      if (!(await companyInScope(companyId, scope))) {
+      // The company's OWN workspace, not merely "somewhere in the caller's scope" — the
+      // commercial-terms check and the VAT receipt lookup are both about this row's tenant.
+      // `companyWorkspaceInScope` returns null when the caller cannot reach it, which is the
+      // same 404 as a missing company.
+      const updateWs = await companyWorkspaceInScope(companyId, scope);
+      if (!updateWs) {
         return new Response(
           JSON.stringify({ error: 'Company not found' }),
           { status: 404, headers: corsHeaders },
@@ -429,7 +549,10 @@ export async function handleCompanies(req: Request): Promise<Response> {
       }
 
       const updates: Record<string, unknown> = {
-        ...pickCompanyFields(body),
+        ...(await stripServerStampedFields(pickCompanyFields(body), userId, updateWs, scope)),
+        // Re-stamped on every update that carries a VAT number, so changing the number cannot
+        // leave the OLD number's verification standing beside it.
+        ...(await stampVatValidation(body.vat_number, updateWs)),
         updated_at: new Date().toISOString(),
       };
       // workspace_id is never reassignable through the writable-columns set; drop any

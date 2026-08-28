@@ -116,6 +116,12 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/crm/greekTransliteration.generated.ts',
   ],
   [
+    // #353 CRM-4/CRM-7 — the VAT normaliser. Mirrored because the validation receipt is keyed
+    // on it, written by `vies-validate` / `myaade-rgwspublic2` and read by `crm-api`.
+    'src/services/crm/vatNormalize.ts',
+    'supabase/functions/_shared/crm/vatNormalize.generated.ts',
+  ],
+  [
     // #391 — the trackable-document registry. This source PREDATES the mirror script and
     // its own header called out "four copies ... held in step by the registry guard, not
     // by care"; generating the edge copy removes one of the four outright.

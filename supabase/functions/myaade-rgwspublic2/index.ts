@@ -42,6 +42,8 @@ import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
+// Generated mirror of src/services/crm/vatNormalize.ts — the receipt key must match crm_vat_norm.
+import { normalizeVat as vatReceiptKey } from '../_shared/crm/vatNormalize.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -434,6 +436,32 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
         source: 'aade',
         checked_at: new Date().toISOString(),
       }, 404);
+    }
+
+    /**
+     * RECORD THAT *WE* VERIFIED IT (#353 CRM-7).
+     *
+     * `crm_companies.vat_validated` is a trust assertion on a record that feeds invoicing, and it
+     * sat in the crm-api write allowlist — so any CRM-capable caller could mark a number verified
+     * having done no lookup at all. It could not simply be dropped: the real flow is this
+     * server-side lookup followed by a client save.
+     *
+     * The receipt is the missing link. Written only when ΑΑΔΕ actually answered with an ACTIVE
+     * business (`deactivation_flag === '1'`), so a save cannot stamp "verified" for a number ΑΑΔΕ
+     * reported as deactivated. Keyed on the normalised number (#353 CRM-4) so `EL800370260` and
+     * `800 370 260` are one receipt. The workspace is already verified above by
+     * `is_workspace_finance_manager`.
+     */
+    if (body.workspace_id && basicRec.deactivation_flag === '1') {
+      const { error: receiptErr } = await admin.from('vat_validation_receipts').upsert({
+        workspace_id: body.workspace_id,
+        vat_norm: vatReceiptKey(rawAfm) ?? rawAfm,
+        source: 'aade',
+        validated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,vat_norm' });
+      // Logged, never swallowed: a lost receipt presents as "verification never sticks", which
+      // is unactionable without this line.
+      if (receiptErr) console.error('[myaade-rgwspublic2] could not record validation receipt:', receiptErr.message);
     }
 
     // English translation for bilingual forms (own-business prefill opts in via translate=true).

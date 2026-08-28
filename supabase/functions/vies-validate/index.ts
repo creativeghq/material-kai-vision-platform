@@ -31,6 +31,12 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { transliterateToLatin } from '../_shared/transliterate.ts';
+// Invariant 1 — tenancy from membership, never from the request body.
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
+// Generated mirror of src/services/crm/vatNormalize.ts — the receipt key must match crm_vat_norm.
+// Aliased: this file already has a `normalizeVat` that splits a VAT into country + number.
+// This one produces the CRM dedupe/receipt key, and they must not be confused.
+import { normalizeVat as vatReceiptKey } from '../_shared/crm/vatNormalize.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -47,6 +53,8 @@ const EU_COUNTRY_CODES = new Set([
 ]);
 
 interface VatRequest {
+  /** Tenant this lookup belongs to — scopes the cache write and keys the receipt (#353). */
+  workspace_id?: string;
   country_code: string;
   vat_number: string;
   company_id?: string;
@@ -264,43 +272,69 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
       source: 'vies' as const,
     };
 
-    // Cache the result on crm_companies if requested and authorized
-    if (body.company_id) {
-      const admin = createClient(supabaseUrl, supabaseServiceKey);
+    const admin = createClient(supabaseUrl, supabaseServiceKey);
 
-      const { data: company } = await admin
-        .from('crm_companies')
-        .select('id, created_by')
+    /**
+     * The tenant this lookup belongs to, VERIFIED (#353 CRM-6, invariant 1).
+     *
+     * The cache write below used to authorise on `company.created_by === user.id` or a GLOBAL
+     * account tier from `public.roles`. Neither is a tenancy check: the first still passes for
+     * someone who created a company in a workspace they have since LEFT, and the second is true
+     * in every workspace at once, so a platform admin could write VAT-verification fields into
+     * any tenant's company. Membership is the boundary.
+     */
+    const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
+    const workspaceId = requestedWs && await userCanAccessWorkspace(admin, user.id, requestedWs)
+      ? requestedWs
+      : null;
+    if (requestedWs && !workspaceId) {
+      console.warn(`[vies-validate] rejected workspace_id ${requestedWs} for user ${user.id} — not a member`);
+    }
+
+    /**
+     * RECORD THAT *WE* VERIFIED IT (#353 CRM-7).
+     *
+     * `vat_validated` is a trust assertion on a record that feeds invoicing, and it sat in the
+     * crm-api write allowlist — so any CRM-capable caller could mark a number verified having
+     * done no lookup at all. The fields could not simply be dropped, because the real flow is a
+     * server-side lookup followed by a client save.
+     *
+     * This receipt is the missing link: the server writes it only when a registry actually
+     * answered, and `crm-api` stamps the flag only when a recent one exists. The client is no
+     * longer believed about what it looked up. Keyed on the NORMALISED number so `EL800370260`
+     * and `800 370 260` are one receipt (#353 CRM-4).
+     *
+     * Only on a POSITIVE result: a VIES "not recognised" is a real answer, and recording it
+     * would let a subsequent save stamp `vat_validated` for a number VIES rejected.
+     */
+    if (workspaceId && result.valid === true) {
+      const { error: receiptErr } = await admin.from('vat_validation_receipts').upsert({
+        workspace_id: workspaceId,
+        vat_norm: vatReceiptKey(`${country}${number}`) ?? number,
+        source: 'vies',
+        validated_at: result.checked_at,
+      }, { onConflict: 'workspace_id,vat_norm' });
+      // Bound and logged. A lost receipt costs the operator a re-lookup; silently swallowing it
+      // would present as "verification never sticks" with nothing to look at.
+      if (receiptErr) console.error('[vies-validate] could not record validation receipt:', receiptErr.message);
+    }
+
+    // Cache the result on crm_companies when the caller named one IN THIS WORKSPACE.
+    if (body.company_id && workspaceId) {
+      const { error: cacheErr } = await admin.from('crm_companies').update({
+        vat_validated: result.valid,
+        vat_validated_at: result.checked_at,
+        vat_validated_name: result.legal_name,
+        vat_validated_address: result.address,
+        vat_validated_name_latin: result.legal_name_latin,
+        vat_validated_address_latin: result.address_latin,
+        vat_validation_source: 'vies',
+        updated_at: new Date().toISOString(),
+      })
         .eq('id', body.company_id)
-        .maybeSingle();
-
-      if (company) {
-        // Allow cache update if: caller owns the company OR caller is admin
-        let canWrite = company.created_by === user.id;
-        if (!canWrite) {
-          const { data: profile } = await admin
-            .from('user_profiles')
-            .select('roles!user_profiles_role_id_fkey(name)')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          // deno-lint-ignore no-explicit-any
-          const rn = (profile as any)?.roles?.name;
-          canWrite = rn === 'admin' || rn === 'super_admin' || rn === 'owner';
-        }
-
-        if (canWrite) {
-          await admin.from('crm_companies').update({
-            vat_validated: result.valid,
-            vat_validated_at: result.checked_at,
-            vat_validated_name: result.legal_name,
-            vat_validated_address: result.address,
-            vat_validated_name_latin: result.legal_name_latin,
-            vat_validated_address_latin: result.address_latin,
-            vat_validation_source: 'vies',
-            updated_at: new Date().toISOString(),
-          }).eq('id', body.company_id);
-        }
-      }
+        // Scoped: the id is client-supplied and this is the service-role client.
+        .eq('workspace_id', workspaceId);
+      if (cacheErr) console.warn('[vies-validate] cache write failed:', cacheErr.message);
     }
 
     return jsonResponse(result);

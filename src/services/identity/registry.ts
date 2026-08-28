@@ -52,10 +52,12 @@ async function lookupViaAade(
  * transliteration is carried through as a readability aid, never as a trading name.
  */
 async function lookupViaVies(
-  { countryCode, vatNumber, companyId }: IdentityLookupArgs,
+  { countryCode, vatNumber, companyId, workspaceId }: IdentityLookupArgs,
 ): Promise<IdentityLookupResult> {
   const cc = countryCode.trim().toUpperCase();
-  const res = await validateVatViaVies({ countryCode: cc, vatNumber, companyId });
+  // `workspaceId` was dropped here while the AADE adapter beside it passed it through — so the
+  // VIES path could neither scope its cache write nor record a validation receipt (#353 CRM-7).
+  const res = await validateVatViaVies({ countryCode: cc, vatNumber, companyId, workspaceId });
 
   if (res.valid === null) {
     return {

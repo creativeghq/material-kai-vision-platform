@@ -48,18 +48,32 @@ export interface ViesValidateArgs {
   vatNumber: string;
   /** If provided, the server caches the result onto crm_companies.vat_validated*. */
   companyId?: string;
+  /**
+   * The tenant this lookup belongs to (#353 CRM-6/CRM-7).
+   *
+   * Two jobs: it scopes the cache write, which previously authorised on `created_by` or a
+   * GLOBAL account tier and so could reach another tenant's company; and it keys the validation
+   * RECEIPT the server records, which is what lets `crm-api` stamp `vat_validated` on a save
+   * without believing a client that says it looked something up.
+   */
+  workspaceId?: string;
 }
 
 export async function validateVatViaVies({
   countryCode,
   vatNumber,
   companyId,
+  workspaceId,
 }: ViesValidateArgs): Promise<ViesValidationResult> {
   const { data, error } = await supabase.functions.invoke('vies-validate', {
     body: {
       country_code: countryCode,
       vat_number: vatNumber,
       company_id: companyId,
+      // Required by the edge function (#353 CRM-6/CRM-7): it scopes the cache write to this
+      // tenant and records the validation receipt against it. Without it the lookup still
+      // answers, it just cannot write anything.
+      workspace_id: workspaceId,
     },
   });
   if (error) {
