@@ -133,11 +133,14 @@ serve(withApiLogging('messaging-processor', async (req) => {
         continue;
       }
 
-      // Opt-outs (whatsapp + all) checked once per campaign
-      const { data: optouts } = await supabase
-        .from('messaging_optouts').select('phone_number')
-        .or('channel_type.eq.whatsapp,channel_type.eq.all');
-      const optedOut = new Set((optouts || []).map((o) => o.phone_number));
+      // Opt-outs were read once per campaign and compared as RAW STRINGS (#359 CM-1). The webhook
+      // stores whatever shape the provider sent, `messaging-api` stored a `+`-prefixed one, and the
+      // two frontend copies defaulted to country code +1 — so a stored opt-out and a campaign
+      // recipient were routinely different strings for the same person, and the Set never matched.
+      // A guard that cannot see is worse than no guard: it reads as coverage.
+      //
+      // The verdict is now `messaging_number_is_opted_out`, which normalizes both sides. Called per
+      // recipient rather than prefetched: a STOP that arrives mid-campaign must stop the rest of it.
 
       // Enforce the channel's CUMULATIVE daily send cap (was only a per-request size guard in
       // send-bulk; the cron blew past it unchecked). Count today's sends for this channel and cap this
@@ -173,7 +176,21 @@ serve(withApiLogging('messaging-processor', async (req) => {
       }
 
       for (const recipient of pending) {
-        if (optedOut.has(recipient.phone_number)) {
+        const { data: optedOut, error: optErr } = await supabase.rpc('messaging_number_is_opted_out', {
+          p_workspace_id: channel.workspace_id,
+          p_phone: recipient.phone_number,
+          p_channel_type: 'whatsapp',
+        });
+        // FAIL CLOSED — a compliance check that switches itself off when it cannot run guarantees
+        // the violation happens on the day the database is unwell. Re-queued, not failed: the
+        // recipient is still sendable once the check works again.
+        if (optErr) {
+          await supabase.from('messaging_campaign_recipients')
+            .update({ status: 'pending', error_message: 'Opt-out check unavailable — not sent' })
+            .eq('id', recipient.id);
+          continue;
+        }
+        if (optedOut === true) {
           await supabase.from('messaging_campaign_recipients')
             .update({ status: 'opted_out', error_message: 'Recipient has opted out' })
             .eq('id', recipient.id);

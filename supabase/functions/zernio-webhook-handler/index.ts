@@ -555,13 +555,33 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // message. Reading an echo here would let us withdraw consent on the customer's behalf.
   const text = isOutgoingEcho ? '' : String(msg.text || '').trim();
   const upper = text.toUpperCase();
-  if (text && OPT_OUT_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
-    await supabase.from('messaging_optouts').upsert({
-      phone_number: phone, channel_type: 'whatsapp',
-      reason: `STOP keyword: ${text}`, source: 'keyword', opted_out_at: new Date().toISOString(),
-    }, { onConflict: 'phone_number,channel_type' });
-  } else if (text && OPT_IN_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
-    await supabase.from('messaging_optouts').delete().eq('phone_number', phone).eq('channel_type', 'whatsapp');
+  if (text && (OPT_OUT_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))
+            || OPT_IN_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' ')))) {
+    // Which business was this said TO (#359 CM-1). Consent is per sender: telling one shop to stop
+    // is not telling every shop on the platform to stop, and the table had no workspace at all.
+    // An unresolvable account keeps the old platform-wide behaviour (workspace_id NULL) rather than
+    // dropping the opt-out — over-suppressing is the safe direction for a withdrawal of consent.
+    const { workspaceId: optoutWs } = await resolveAccountWorkspace(supabase, accountId);
+    // Through the RPC, not a direct write: uniqueness is now a pair of PARTIAL indexes, which
+    // PostgREST's `onConflict` cannot target at all — an upsert here would fail with a raw 42P10
+    // on the one path where a compliance record must never be lost.
+    if (OPT_OUT_KEYWORDS.some((k) => upper === k || upper.startsWith(k + ' '))) {
+      const { error: optoutErr } = await supabase.rpc('messaging_record_optout', {
+        p_workspace_id: optoutWs ?? null,
+        p_phone: phone,
+        p_channel_type: 'whatsapp',
+        p_reason: `STOP keyword: ${text}`,
+        p_source: 'keyword',
+      });
+      // Loud, because the alternative is carrying on messaging somebody who said stop.
+      if (optoutErr) console.error('[zernio-webhook] STOP received but the opt-out was NOT recorded', phone, optoutErr);
+    } else {
+      // START only lifts what THIS business holds. It must not clear another shop's opt-out, nor a
+      // platform-wide suppression somebody set deliberately.
+      await supabase.rpc('messaging_clear_optout', {
+        p_workspace_id: optoutWs ?? null, p_phone: phone, p_channel_type: 'whatsapp',
+      });
+    }
   }
 
   // Resolve owning workspace — required because inbox_threads.workspace_id is NOT NULL and the

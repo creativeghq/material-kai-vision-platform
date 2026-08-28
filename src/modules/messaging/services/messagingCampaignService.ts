@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeToE164 } from '../phoneNumber';
 import { edgeError } from '@/utils/edgeError';
 import type { MessagingCampaignRecipient, MessagingCampaignStats, MessagingChannelType } from './types';
 
@@ -244,10 +245,12 @@ class MessagingCampaignService {
         continue;
       }
 
-      // Normalize phone number
-      const normalized = this.normalizePhoneNumber(phoneNumber);
-      if (!this.validatePhoneNumber(normalized)) {
-        errors.push(`Row ${i + 1}: Invalid phone number format: ${phoneNumber}`);
+      // One normalizer, and it does not invent a country (#359 CM-1). This file's private copy
+      // defaulted to **+1**, so a Greek mobile typed as `6912345678` was imported as a US number —
+      // a paid WhatsApp message to a stranger, and it looked like a clean import.
+      const normalized = normalizeToE164(phoneNumber);
+      if (!normalized) {
+        errors.push(`Row ${i + 1}: not in international form — write it as +30 691 234 5678: ${phoneNumber}`);
         skipped++;
         continue;
       }
@@ -270,30 +273,7 @@ class MessagingCampaignService {
     };
   }
 
-  /**
-   * Validate phone number format (E.164)
-   */
-  private validatePhoneNumber(phoneNumber: string): boolean {
-    const e164Regex = /^\+[1-9]\d{7,14}$/;
-    return e164Regex.test(phoneNumber);
-  }
 
-  /**
-   * Normalize phone number to E.164 format
-   */
-  private normalizePhoneNumber(phoneNumber: string, defaultCountryCode: string = '+1'): string {
-    let normalized = phoneNumber.replace(/[^\d+]/g, '');
-
-    if (!normalized.startsWith('+')) {
-      if (normalized.startsWith('00')) {
-        normalized = '+' + normalized.substring(2);
-      } else {
-        normalized = defaultCountryCode + normalized;
-      }
-    }
-
-    return normalized;
-  }
 
   /**
    * Create a new messaging campaign

@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeToE164 } from '../phoneNumber';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import type {
   MessagingChannel,
@@ -758,71 +759,85 @@ export class MessagingService {
   // =====================================================
 
   /**
-   * Check if a phone number has opted out
+   * Has this number opted out of this channel, for this workspace? (#359 CM-1)
+   *
+   * The previous version was true for almost everybody. Its filter was
+   * `.or('phone_number.eq.X, channel_type.eq.whatsapp, channel_type.eq.all')` — three OR'd
+   * conditions, so ANY whatsapp opt-out anywhere on the platform satisfied it regardless of the
+   * number asked about. The phone was also interpolated into a PostgREST filter unescaped, so a
+   * value containing a comma or a parenthesis rewrote the query.
+   *
+   * And it returned FALSE on error: a compliance check that answers "go ahead" when it cannot run.
+   *
+   * All three are gone: one SQL verdict, normalized on both sides, workspace-scoped, and a thrown
+   * error rather than a cheerful false.
    */
-  async checkOptOut(phoneNumber: string, channelType: MessagingChannelType): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('messaging_optouts')
-      .select('id')
-      .or(`phone_number.eq.${phoneNumber},channel_type.eq.${channelType},channel_type.eq.all`)
-      .limit(1);
-
-    if (error) {
-      console.error('Error checking opt-out:', error);
-      return false;
-    }
-
-    return (data?.length || 0) > 0;
+  async checkOptOut(
+    workspaceId: string,
+    phoneNumber: string,
+    channelType: MessagingChannelType = 'whatsapp',
+  ): Promise<boolean> {
+    const { data, error } = await supabase.rpc('messaging_number_is_opted_out', {
+      p_workspace_id: workspaceId,
+      p_phone: phoneNumber,
+      p_channel_type: channelType,
+    });
+    if (error) throw new Error(`Could not check the opt-out list: ${error.message}`);
+    return data === true;
   }
 
   /**
    * Add a phone number to opt-out list
    */
   async addOptOut(
+    workspaceId: string,
     phoneNumber: string,
     channelType: MessagingChannelType | 'all',
     reason?: string,
     source: 'keyword' | 'manual' | 'api' | 'complaint' = 'manual',
   ): Promise<void> {
-    const { error } = await supabase
-      .from('messaging_optouts')
-      .upsert({
-        phone_number: phoneNumber,
-        channel_type: channelType,
-        reason,
-        source,
-        opted_out_at: new Date().toISOString(),
-      });
-
-    if (error) {
-      console.error('Error adding opt-out:', error);
-      throw new Error('Failed to add opt-out');
-    }
+    // Through the RPC: uniqueness is a pair of PARTIAL indexes, which PostgREST's `onConflict`
+    // cannot target — and this upsert did not name one at all, so a second opt-out for the same
+    // number raised a duplicate-key error rather than refreshing the first.
+    const { error } = await supabase.rpc('messaging_record_optout', {
+      p_workspace_id: workspaceId,
+      p_phone: phoneNumber,
+      p_channel_type: channelType,
+      p_reason: reason ?? null,
+      p_source: source,
+    });
+    if (error) throw new Error(`Failed to add opt-out: ${error.message}`);
   }
 
   /**
    * Remove a phone number from opt-out list
    */
-  async removeOptOut(phoneNumber: string, channelType: MessagingChannelType | 'all'): Promise<void> {
-    const { error } = await supabase
-      .from('messaging_optouts')
-      .delete()
-      .eq('phone_number', phoneNumber)
-      .eq('channel_type', channelType);
-
-    if (error) {
-      console.error('Error removing opt-out:', error);
-      throw new Error('Failed to remove opt-out');
-    }
+  async removeOptOut(
+    workspaceId: string,
+    phoneNumber: string,
+    channelType: MessagingChannelType | 'all',
+  ): Promise<void> {
+    // Scoped: lifting one business's opt-out must not clear another's, and the raw delete matched
+    // on `phone_number` as typed — so it missed the same person stored in a different shape.
+    const { error } = await supabase.rpc('messaging_clear_optout', {
+      p_workspace_id: workspaceId,
+      p_phone: phoneNumber,
+      p_channel_type: channelType,
+    });
+    if (error) throw new Error(`Failed to remove opt-out: ${error.message}`);
   }
 
   /**
    * Get all opt-outs
    */
-  async getOptOuts(channelType?: MessagingChannelType | 'all'): Promise<MessagingOptout[]> {
+  async getOptOuts(workspaceId: string, channelType?: MessagingChannelType | 'all'): Promise<MessagingOptout[]> {
+    // Explicitly workspace-filtered as well as RLS-scoped. The table had RLS ENABLED with no
+    // policies at all, so this screen rendered an empty list to everybody — and the empty result
+    // is what hid `checkOptOut`'s always-true filter for as long as it existed.
     let query = supabase
       .from('messaging_optouts')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .order('opted_out_at', { ascending: false });
 
     if (channelType) {
@@ -858,29 +873,14 @@ export class MessagingService {
    * Validate phone number format (E.164)
    */
   validatePhoneNumber(phoneNumber: string): boolean {
-    // E.164 format: +[country code][number], 8-15 digits total
-    const e164Regex = /^\+[1-9]\d{7,14}$/;
-    return e164Regex.test(phoneNumber);
+    return normalizeToE164(phoneNumber) !== null;
   }
 
   /**
    * Normalize phone number to E.164 format
    */
-  normalizePhoneNumber(phoneNumber: string, defaultCountryCode: string = '+1'): string {
-    // Remove all non-digit characters except leading +
-    let normalized = phoneNumber.replace(/[^\d+]/g, '');
-
-    // If no + prefix, add default country code
-    if (!normalized.startsWith('+')) {
-      // If starts with 00, replace with +
-      if (normalized.startsWith('00')) {
-        normalized = '+' + normalized.substring(2);
-      } else {
-        normalized = defaultCountryCode + normalized;
-      }
-    }
-
-    return normalized;
+  normalizePhoneNumber(phoneNumber: string): string | null {
+    return normalizeToE164(phoneNumber);
   }
 }
 

@@ -15,6 +15,8 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingOptout, MessagingChannelType } from '../services';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { normalizeToE164 } from '../phoneNumber';
 import { buildMessagingOptoutFilters } from './messagingFilters';
 import { format } from 'date-fns';
 
@@ -31,6 +33,9 @@ const sourceLabels: Record<string, string> = {
 };
 
 export const MessagingOptoutsTab: React.FC = () => {
+  // An opt-out belongs to the business it was given to (#359 CM-1) — telling one shop to stop is
+  // not telling every shop on the platform to stop.
+  const { activeWorkspaceId } = useWorkspace();
   const [optouts, setOptouts] = useState<MessagingOptout[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -46,7 +51,10 @@ export const MessagingOptoutsTab: React.FC = () => {
 
   useEffect(() => {
     loadOptouts();
-  }, [filterChannel]);
+    // Reloads when the workspace changes too — the list is now scoped to one business, so
+    // switching workspace and keeping the previous tenant's rows on screen would be wrong.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterChannel, activeWorkspaceId]);
 
   useEffect(() => { setPage((p) => clampPage(p, filteredOptouts.length)); }, [filteredOptouts.length]);
 
@@ -54,6 +62,7 @@ export const MessagingOptoutsTab: React.FC = () => {
     try {
       setLoading(true);
       const data = await messagingService.getOptOuts(
+        activeWorkspaceId ?? '',
         filterChannel !== 'all' ? filterChannel as MessagingChannelType | 'all' : undefined,
       );
       setOptouts(data);
@@ -75,7 +84,7 @@ export const MessagingOptoutsTab: React.FC = () => {
     if (!confirm(`Are you sure you want to remove ${optout.phone_number} from the opt-out list?`)) return;
 
     try {
-      await messagingService.removeOptOut(optout.phone_number, optout.channel_type);
+      await messagingService.removeOptOut(activeWorkspaceId ?? '', optout.phone_number, optout.channel_type);
       toast({
         title: 'Success',
         description: 'Opt-out removed successfully',
@@ -212,6 +221,7 @@ export const MessagingOptoutsTab: React.FC = () => {
       {/* Add Opt-out Modal */}
       {showAddModal && (
         <AddOptoutModal
+          workspaceId={activeWorkspaceId ?? ''}
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
@@ -225,11 +235,13 @@ export const MessagingOptoutsTab: React.FC = () => {
 
 // Add Opt-out Modal
 interface AddOptoutModalProps {
+  /** The business this opt-out is being recorded for. */
+  workspaceId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ onClose, onSuccess }) => {
+const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ workspaceId, onClose, onSuccess }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [channelType, setChannelType] = useState<MessagingChannelType | 'all'>('all');
   const [reason, setReason] = useState('');
@@ -250,7 +262,19 @@ const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ onClose, onSuccess }) =
 
     try {
       setSaving(true);
-      await messagingService.addOptOut(phoneNumber, channelType, reason, 'manual');
+      // Refused rather than guessed: this used to run through a normalizer that defaulted to
+      // country code +1, so a locally-typed Greek mobile was suppressed under a US number and the
+      // real one kept receiving messages.
+      const e164 = normalizeToE164(phoneNumber);
+      if (!e164) {
+        toast({
+          title: 'Write the number in international form',
+          description: 'For example +30 691 234 5678. Without a country code we cannot tell which number this is.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      await messagingService.addOptOut(workspaceId, e164, channelType, reason, 'manual');
       toast({
         title: 'Success',
         description: 'Opt-out added successfully',

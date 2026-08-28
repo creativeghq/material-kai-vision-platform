@@ -69,10 +69,69 @@ interface SendBulkRequest extends Omit<SendMessageRequest, 'to'> {
 }
 
 
-function normalizePhoneNumber(phone: string): string {
-  let n = (phone || '').replace(/[^\d+]/g, '');
-  if (!n.startsWith('+')) n = '+' + n;
-  return n;
+/**
+ * E.164 for the provider, and a REFUSAL when the number is not in international form (#359 CM-1).
+ *
+ * There were four normalizers with three behaviours. This one prefixed a bare `+`, so
+ * `0030691…` became `+0030691…`. The two frontend copies default to country code **+1**, so a
+ * Greek mobile typed as `6912345678` becomes a US number — a paid message to a stranger, in
+ * violation of Meta's rules, and it looks exactly like a successful send.
+ *
+ * Guessing a country is the whole defect, so this does not: a value with no `+` and no `00` is
+ * ambiguous and is refused with something the operator can act on. `normalize_msisdn` in SQL is
+ * the comparator for storage; this is the outbound form.
+ */
+function toE164(phone: string): string | null {
+  const raw = String(phone || '').trim();
+  const intl = /^\+/.test(raw) ? raw.slice(1) : /^00/.test(raw) ? raw.slice(2) : null;
+  if (intl === null) return null;
+  const digits = intl.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15) return null;
+  return `+${digits}`;
+}
+
+/**
+ * May we send to this number at all? (#359 CM-1 / CM-2)
+ *
+ * The module ships a 330-line opt-outs tab and records every STOP keyword the webhook sees, and
+ * the direct send path never looked at either — only the campaign cron did. WhatsApp opt-out is
+ * both a legal and a Meta platform-policy requirement, and repeated violations degrade the
+ * number's quality rating up to a ban.
+ *
+ * The 24-hour window was a comment on a type. Meta permits a freeform message only within 24 hours
+ * of the customer's OWN last message; outside it, only an approved template. Both verdicts are
+ * derived in SQL so this path, the campaign cron and the UI cannot disagree.
+ *
+ * Returns null when the send may proceed, or the reason it may not.
+ */
+async function whyNotSendable(
+  db: SupabaseClient<any, 'public', 'public', any, any>,
+  opts: { workspaceId: string; to: string; isTemplate: boolean },
+): Promise<string | null> {
+  const { data: optedOut, error: optErr } = await db.rpc('messaging_number_is_opted_out', {
+    p_workspace_id: opts.workspaceId,
+    p_phone: opts.to,
+    p_channel_type: 'whatsapp',
+  });
+  // FAIL CLOSED. A compliance check that switches itself off when it cannot run is the one shape
+  // that guarantees the violation happens on the day the database is unwell.
+  if (optErr) return 'Could not check the opt-out list; the message was not sent.';
+  if (optedOut === true) return 'This number has opted out of WhatsApp messages.';
+
+  // A template is allowed outside the window — that is what templates are FOR. Only a freeform
+  // body is bounded by it.
+  if (opts.isTemplate) return null;
+
+  const { data: open, error: winErr } = await db.rpc('whatsapp_service_window_open', {
+    p_workspace_id: opts.workspaceId,
+    p_phone: opts.to,
+  });
+  if (winErr) return 'Could not check the 24-hour service window; the message was not sent.';
+  if (open !== true) {
+    return 'Outside the 24-hour window: Meta only allows a free-form message within 24 hours of the '
+      + 'customer\'s last message. Send an approved template instead.';
+  }
+  return null;
 }
 
 /** Best-effort refund of a pre-charged WhatsApp credit when the send fails (invariant #10). */
@@ -459,7 +518,20 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const results: any[] = [];
 
         for (const raw of recipients) {
-          const to = normalizePhoneNumber(raw);
+          const to = toE164(raw);
+          if (!to) {
+            results.push({ to: raw, success: false, error: 'Enter the number in international form, e.g. +30 691 234 5678.' });
+            continue;
+          }
+
+          // Compliance BEFORE the debit, which is before the send. Charging for a message that
+          // must not go out, and then refunding it, is a worse shape than not charging: the
+          // refund path is the one that gets skipped when something else fails first.
+          const refusal = await whyNotSendable(supabaseClient, { workspaceId: tenantWsId, to, isTemplate: Boolean(template) });
+          if (refusal) {
+            results.push({ to, success: false, skipped: 'not_sendable', error: refusal });
+            continue;
+          }
 
           // Debit BEFORE the WhatsApp send (invariant #10 — fail-closed). A caller with no
           // credits is blocked before the message is delivered; the charge is refunded if the
@@ -586,8 +658,20 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
         const results: any[] = [];
         for (const r of body.recipients) {
-          const to = normalizePhoneNumber(r.to);
+          const to = toE164(r.to);
           const vars = r.variables || {};
+          if (!to) {
+            results.push({ to: r.to, success: false, error: 'Enter the number in international form, e.g. +30 691 234 5678.' });
+            continue;
+          }
+
+          // Same order as the single send: compliance, then debit, then provider. A bulk run is
+          // where an opt-out breach becomes many breaches, and Meta rates the NUMBER.
+          const refusal = await whyNotSendable(supabaseClient, { workspaceId: tenantWsId, to, isTemplate: Boolean(template) });
+          if (refusal) {
+            results.push({ to, success: false, skipped: 'not_sendable', error: refusal });
+            continue;
+          }
 
           // Debit BEFORE each send (invariant #10 — fail-closed). Out-of-credits stops the
           // blast before delivery; per-recipient debit keeps bulk accounting exact and each
@@ -669,14 +753,34 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             if (logErr) console.error('[messaging-api] message sent but messaging_logs row FAILED', to, logErr);
           } else {
             // Soft failure — refund the pre-charged credit for this recipient.
-            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
+            //
+            // This read `user.id` where every sibling path reads `billingUserId`, and there is no
+            // `user` on the service-role path — so the first soft failure in a cron-driven bulk run
+            // threw inside the loop, out of the handler, and took the rest of the batch with it as
+            // a 500. The other two errors in the edge-typecheck baseline were this one line.
+            if (billingUserId && debit.credits_debited) {
+              await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
+            }
           }
           // Pace from the channel's configured rate, not a constant.
           await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
         }
 
         const sent = results.filter((r) => r.success).length;
-        return jsonResponse({ success: true, sent, failed: results.length - sent, results });
+        const failed = results.filter((r) => !r.success).length;
+        // #359 CM-5 — `success: true` was hardcoded, so a run that failed every recipient, or
+        // stopped on the credits `break` with recipients untouched, reported success. The caller
+        // then has no reason to look at `results`, which is where the truth was.
+        const untouched = body.recipients.length - results.length;
+        return jsonResponse({
+          success: failed === 0 && untouched === 0,
+          sent,
+          failed,
+          // Named separately from `failed`: nothing was attempted for these, so they are still
+          // sendable — retrying them is safe, retrying a failure may not be.
+          not_attempted: untouched,
+          results,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
