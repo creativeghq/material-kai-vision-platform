@@ -2976,13 +2976,35 @@ async function executeAgent(
     // Only bind tools this agent is actually allowed to use.
     const allowedIds = def.tool_ids.filter((t) => agentFullToolIds.has(t));
     if (allowedIds.length === 0) {
-      // This capability belongs to a different specialist (e.g. the Interior agent for
-      // some design tools). Do NOT tell the user to "switch to the KAI agent" — that agent
-      // no longer exists under that name and is often the one they're already on. Handle the
-      // request with the tools you have, or explain plainly what you can't do here.
+      /**
+       * Residual refusal — the menu above should mean the model never asks for a cluster it
+       * cannot load, but a stale conversation or a hallucinated id can still land here.
+       *
+       * NAME THE REAL OWNER, DERIVED. The old message ended "tell the user which specialist
+       * handles it — never suggest switching to a 'KAI' agent", and on the five measured
+       * refusals that left nothing true to say: `manage_stock`, `manage_hr`, `manage_my_hr`
+       * and `manage_company_assets` are listed by the GENERALIST and by no specialist at all,
+       * so the only correct answer was the one the message forbade.
+       *
+       * The prohibition was really about a STRING — "KAI" is not the name of anything the user
+       * can see; that agent is called JARVIS. Reading the owner out of `AGENT_CONFIGS` and
+       * using its display `name` cannot produce the forbidden string, so the ban is not needed:
+       * the same declaration that refuses the load supplies the honest answer. Aliases pointing
+       * at the same agent collapse because the Set is keyed on the display name.
+       */
+      const owners = [...new Set(
+        Object.values(AGENT_CONFIGS)
+          .filter((c: any) => c?.id !== agentId && (c?.tools ?? []).some((t: string) => def.tool_ids.includes(t)))
+          .map((c: any) => c.name as string),
+      )];
+      const whoHandlesIt = owners.length
+        ? ` ${owners.join(' or ')} handles it.`
+        : ' No agent in this workspace has it.';
       return {
         success: false,
-        error: `The "${toolkitId}" toolkit isn't available in this chat. Use the tools you already have to help as much as possible; only if it's genuinely a different specialist's capability, tell the user which specialist handles it — never suggest switching to a "KAI" agent.`,
+        error: `The "${toolkitId}" toolkit isn't available in this chat.${whoHandlesIt} `
+          + 'Use the tools you already have to help as much as possible; if the request genuinely '
+          + 'needs that capability, say plainly who handles it and what to ask there.',
       };
     }
     mergeTools(await registerTools(new Set(allowedIds)));
@@ -3001,8 +3023,24 @@ async function executeAgent(
   if (BOUND_META_TOOLS.includes('load_toolkit')) {
     try {
       const { createLoadToolkitTool } = await import('../_shared/tools/toolkit-tools.ts');
-      const loadableToolkitIds = Object.keys(TOOLKIT_CLUSTERS).filter((id) => !TOOLKIT_CLUSTERS[id].alwaysOn);
-      tools.push(createLoadToolkitTool(isAdmin, onChunk, applyToolkitInRun, loadableToolkitIds));
+      // Only clusters THIS agent can actually load. `availableToolkitIds` goes into the tool's
+      // description AND its schema `.describe()`, so an unfiltered list is a menu handed to the
+      // model with entries it can only ever be refused on.
+      //
+      // That is not hypothetical: measured over 90 days (#380), `load_toolkit` was called 14
+      // times and refused 5 — a 36% failure rate, every one of them a specialist reaching for a
+      // cluster its own config does not list (`erp`→`stock`, `product-business`→`my-hr`, `hr`,
+      // `stock`, `company-assets`). Those were never discovery failures, so nothing about
+      // smarter discovery would have fixed them; the menu was simply wrong. `kai` — whose menu
+      // was accurate because it owns nearly everything — went 3 for 3.
+      const loadableToolkitIds = Object.keys(TOOLKIT_CLUSTERS)
+        .filter((id) => !TOOLKIT_CLUSTERS[id].alwaysOn)
+        .filter((id) => TOOLKIT_CLUSTERS[id].tool_ids.some((t) => agentFullToolIds.has(t)));
+      // An agent with nothing left to load gets no escape hatch rather than one advertising an
+      // empty list — "Available toolkits: " invites a guess, and every guess is a refusal.
+      if (loadableToolkitIds.length > 0) {
+        tools.push(createLoadToolkitTool(isAdmin, onChunk, applyToolkitInRun, loadableToolkitIds));
+      }
     } catch (loadToolkitErr) {
       console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);
     }
