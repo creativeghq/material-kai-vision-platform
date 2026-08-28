@@ -33,6 +33,9 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
+// One derivation for catalog line money (#352 A13).
+import { scaleToTargetNet } from '../catalog-repricing.ts';
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -1085,26 +1088,47 @@ export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSin
 
         const factor = targetNet / currentNet;
 
-        // Scale every priced line by the SAME factor — unit price, net, and discount
-        // value all move together, so each line keeps its discount % and it reads as a
-        // genuine re-quote (never a single hand-edited line).
-        for (const m of priced) {
+        // ONE DERIVATION, in `_shared/catalog-repricing.ts` (#352 A13).
+        //
+        // This block used to scale `price`, `net_value` and `discount_value` INDEPENDENTLY by
+        // the same factor, each rounded to 2dp on its own — so the three stopped reconciling.
+        // The audit's worked case: `price 33.33 x qty 3 - discount 10.00 = net 89.99`,
+        // retargeted to net 100, stored `price 37.04, discount 11.11, net 100.00`, while the
+        // reader adds up `37.04 x 3 - 11.11` and gets 100.01. Every figure is a valid number, so
+        // nothing raises and no typecheck sees it; the customer's document simply does not add
+        // up. Rule 1c: every figure the reader can add up must add up.
+        //
+        // EXTRACTED rather than fixed in place, because in place it was untestable — inline in a
+        // tool closure there was nowhere to put the worked example, which is why it could be
+        // wrong for as long as it was. `tests/unit/catalogRepricing.test.ts` runs those numbers.
+        const scaled = scaleToTargetNet(
+          priced.map((m) => {
+            const sp = m.specs || (m.specs = {});
+            return {
+              price: m.price != null ? Number(m.price) : null,
+              quantity: Number(sp.quantity_tmet ?? sp.quantity_tem ?? sp.quantity ?? 1) || 1,
+              discountPct: Number(sp.discount_pct ?? 0),
+              discountValue: sp.discount_value != null ? Number(sp.discount_value) : null,
+              net: sp.net_value != null ? Number(sp.net_value) : netOf(m),
+            };
+          }),
+          targetNet,
+        );
+        scaled.lines.forEach((line, idx) => {
+          const m = priced[idx];
           const sp = m.specs || (m.specs = {});
-          if (m.price != null) m.price = r2(Number(m.price) * factor);
-          sp.net_value = r2((sp.net_value != null ? Number(sp.net_value) : netOf(m)) * factor);
-          if (sp.discount_value != null) sp.discount_value = r2(Number(sp.discount_value) * factor);
-        }
-
-        // Absorb the sub-cent rounding remainder onto the largest lines (±0.01 each)
-        // so the total lands EXACTLY on target — standard ERP rounding, invisible.
-        let remainderCents = Math.round((targetNet - priced.reduce((a, m) => a + Number(m.specs.net_value), 0)) * 100);
-        const byNetDesc = [...priced].sort((a, b) => Number(b.specs.net_value) - Number(a.specs.net_value));
-        let i = 0;
-        while (remainderCents !== 0 && byNetDesc.length > 0) {
-          const m = byNetDesc[i % byNetDesc.length];
-          m.specs.net_value = r2(Number(m.specs.net_value) + (remainderCents > 0 ? 0.01 : -0.01));
-          remainderCents += remainderCents > 0 ? -1 : 1;
-          i++;
+          if (line.price != null) m.price = line.price;
+          if (line.discountValue != null) sp.discount_value = line.discountValue;
+          sp.net_value = line.net;
+        });
+        if (scaled.remainderCents !== 0) {
+          // Reported, never forced. A catalog whose lines all carry a zero discount cannot land
+          // on an exact cent without breaking a printed figure, and being a cent off target is
+          // far better than a document whose own arithmetic disagrees.
+          console.warn(
+            `[adjust_catalog_pricing] ${scaled.remainderCents} cent(s) could not be absorbed `
+            + `without making a line's figures disagree; total is off target by that much.`,
+          );
         }
 
         await persistBody(supabase, input.catalog_id, body);

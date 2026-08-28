@@ -38,8 +38,22 @@
  *
  * One list rather than a per-tool opt-in: a new tool implementing the same gate is protected the
  * day it is written, which is the opposite of how `confirm` spread to seven tools unguarded.
+ *
+ * The test for membership is not "is this dangerous" — most tool arguments are. It is: **does
+ * setting this skip a human decision that would otherwise be asked for?**
+ *
+ *  - `confirm` — the Approve/Decline card. Absent means "not approved".
+ *  - `auto_add` — `extract_from_catalog_pdfs`, whose own description reads "every candidate is
+ *    added ... WITHOUT APPROVAL" (#352 A12). The candidates are a Vision pass over supplier PDFs,
+ *    so this is untrusted tool-result content driving a DB write, which invariant 9 says needs
+ *    explicit confirmation. The tool already emits `catalog_extraction_candidates` for approval;
+ *    stripping the flag simply routes the model down that existing path. A quick-start or an
+ *    Approve click can still set it, because those come from the client.
+ *
+ * A name added here applies to EVERY tool, so check it is not a legitimate model choice
+ * somewhere else first — `auto_add` appears on exactly one tool today.
  */
-export const MODEL_FORBIDDEN_ARG_KEYS = ['confirm'] as const;
+export const MODEL_FORBIDDEN_ARG_KEYS = ['confirm', 'auto_add'] as const;
 
 export interface StrippedArgs {
   /** The arguments as they should actually be invoked. */

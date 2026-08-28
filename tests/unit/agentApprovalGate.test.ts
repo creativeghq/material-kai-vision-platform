@@ -156,4 +156,15 @@ describe('#352 — the forbidden-key list is the one source', () => {
     // unguarded.
     expect(MODEL_FORBIDDEN_ARG_KEYS).toContain('confirm');
   });
+
+  it('auto_add is on it (#352 A12)', () => {
+    // `extract_from_catalog_pdfs` describes it as adding every candidate "without approval",
+    // and the candidates are a Vision pass over supplier PDFs — untrusted tool-result content
+    // driving a DB write, which invariant 9 says needs explicit confirmation. Stripping it
+    // routes the model down the approval path the tool already has.
+    expect(MODEL_FORBIDDEN_ARG_KEYS).toContain('auto_add');
+    const { args, removed } = stripModelAuthoredApproval({ catalog_id: 'x', auto_add: true });
+    expect(args).toEqual({ catalog_id: 'x' });
+    expect(removed).toEqual(['auto_add']);
+  });
 });
