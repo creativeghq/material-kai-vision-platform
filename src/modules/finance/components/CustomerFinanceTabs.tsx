@@ -236,10 +236,7 @@ export const PartyAccountSummary: React.FC<{
           {showCreditTile && (
             <Card
               className="dashboard-card border-0"
-              title={'Money of THEIRS we are holding that is not settled against any order, invoice or bill yet.'
-                + ' It is a liability, not earnings — gross margin is what you made on the sale and needs no'
-                + ' action, while this is their cash sitting with you. Apply it to an order, refund it — or'
-                + ' keep it as income.'}
+              title="Their money we hold, unmatched to any order, invoice or bill."
             >
               <CardContent className="p-3">
                 <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Wallet className="h-3.5 w-3.5" />On account</div>
@@ -254,6 +251,7 @@ export const PartyAccountSummary: React.FC<{
                   /* The way to stop holding it. Without this the balance had no exit other than
                      refunding the customer, so leftover money sat as a liability forever. */
                   <button type="button" onClick={onReleaseCredit}
+                    title="Keep it as income instead of holding it."
                     className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
                     <Coins className="h-3 w-3" /> Release to Income
                   </button>
@@ -607,6 +605,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
           />
         ) : (
           <>
+          <div className="table-scroll">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
@@ -646,6 +645,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
               })}
             </tbody>
           </table>
+          </div>
           <TablePagination page={page} total={rows.length} onPageChange={setPage} label="payments" />
           </>
         )}
@@ -702,6 +702,7 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
         <CardTitle className="flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
       </CardHeader>
       <CardContent className="p-0">
+        <div className="table-scroll">
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b border-border/60">
@@ -735,6 +736,7 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
             )}
           </tbody>
         </table>
+        </div>
       </CardContent>
     </Card>
   );
