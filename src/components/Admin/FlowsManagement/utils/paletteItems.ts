@@ -342,6 +342,14 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'email_complained', group: 'Email Marketing',
     label: 'Spam Complaint', description: 'A recipient marked a campaign email as spam', icon: 'MailWarning', color: 'amber',
     defaultData: { label: 'Spam Complaint', category: 'trigger', triggerType: 'email_complained', config: {} } as TriggerNodeData },
+  // #357 AE-13. `email_sender_not_configured` was in the TriggerType union, had an icon and a
+  // label in MyFlowsTab and TriggerNode, was emitted by `emailSenderGate`, and had a seeded
+  // system-default flow — and was missing from HERE, the one list a builder can pick from. That
+  // is the documented silent failure: the trigger exists and fires, and nobody can build an
+  // automation on it, with nothing anywhere reporting a problem.
+  { type: 'triggerNode', category: 'trigger', subType: 'email_sender_not_configured', group: 'Email Marketing',
+    label: 'Email Sender Not Configured', description: 'A send was refused because this workspace has no verified Resend sender of its own', icon: 'MailWarning', color: 'amber',
+    defaultData: { label: 'Email Sender Not Configured', category: 'trigger', triggerType: 'email_sender_not_configured', config: {} } as TriggerNodeData },
   // Social publishing (Zernio)
   { type: 'triggerNode', category: 'trigger', subType: 'social_post_published', group: 'Social',
     label: 'Social Post Published', description: 'A scheduled social post went live', icon: 'Share2', color: 'emerald',

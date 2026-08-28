@@ -132,6 +132,40 @@ describe('flow event contract', () => {
     ).toEqual([]);
   });
 
+  it('every EMITTED trigger can be picked in the builder (#357 AE-13)', () => {
+    /**
+     * The other half of the case above. That one catches an emitter with no union entry — the
+     * event fires and no flow can listen. This catches a trigger that fires, HAS a union entry,
+     * icon and label, and is still unbuildable because `paletteItems` never listed it: the
+     * builder's palette is the only place a person can pick one from.
+     *
+     * `email_sender_not_configured` was in exactly that state — union member, icon in
+     * `MyFlowsTab` and `TriggerNode`, emitted by `emailSenderGate`, seeded default flow, and
+     * absent from the palette. Nothing reported a problem; the trigger simply could not be used.
+     *
+     * Scoped to triggers with an IN-REPO EMITTER on purpose. The union also holds entry points
+     * (`manual`, `scheduled`, `webhook`) and events raised from SQL triggers, and demanding a
+     * palette entry for those would make this red for correct code — the surest way to get a
+     * guard deleted rather than fixed.
+     */
+    const PALETTE = 'src/components/Admin/FlowsManagement/utils/paletteItems.ts';
+    const palette = stripComments(readFileSync(PALETTE, 'utf8'));
+    const inPalette = new Set(
+      [...palette.matchAll(/subType:\s*'([a-z0-9_.]+)'/g)].map((m) => m[1]),
+    );
+    expect(inPalette.size, `parsed no subTypes from ${PALETTE} — the slice is wrong`).toBeGreaterThan(20);
+
+    const emitted = [...new Set(emits.map((e) => e.event))].filter((e) => union.has(e));
+    const unpickable = emitted.filter((t) => !inPalette.has(t)).sort();
+    expect(
+      unpickable,
+      'These triggers are emitted and listed in TriggerType, but absent from the builder palette '
+      + '— so they fire and nobody can build an automation on them, with nothing reporting a '
+      + `problem. Add an entry to ${PALETTE}: ${unpickable.join(', ')}
+`,
+    ).toEqual([]);
+  });
+
   it('reports union members with no in-repo emitter (informational, never fails)', () => {
     const emitted = new Set(emits.map((e) => e.event));
     const unemitted = [...union].filter((t) => !emitted.has(t)).sort();
