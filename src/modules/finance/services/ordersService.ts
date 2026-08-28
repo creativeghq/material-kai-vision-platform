@@ -435,6 +435,58 @@ export interface OrderSearchOptions extends OrderListOptions {
   paymentStatus?: OrderPaymentStatus;
 }
 
+/**
+ * One document a payment settled. `payment_allocations` has no `target_type` column — the target
+ * is whichever `*_id` FK is set — so the kind is derived from that here, once, rather than by
+ * every reader guessing.
+ */
+export interface OrderPaymentSettlement {
+  allocation_id: string;
+  kind: 'invoice' | 'expense' | 'order';
+  target_id: string;
+  /** What to print. Falls back to a short id: an unnumbered expense is still a real expense. */
+  label: string;
+  amount: number;
+}
+
+/** The embedded allocation shape `getOrderFinance` asks PostgREST for. */
+type SettlementEmbed = {
+  id: string; amount: number;
+  invoice_id: string | null; supplier_bill_id: string | null; order_id: string | null;
+  invoice: { internal_number: string | null } | null;
+  supplier_bill: { supplier_bill_number: string | null; supplier_name: string | null } | null;
+  allocated_order: { order_number: string | null } | null;
+};
+
+/**
+ * Resolve a payment's allocations into what it settled. Allocations onto `selfOrderId` are
+ * dropped: the row is already being rendered on that order's own screen.
+ */
+function settlementsOf(rows: SettlementEmbed[] | null | undefined, selfOrderId: string): OrderPaymentSettlement[] {
+  return (rows ?? []).flatMap((a): OrderPaymentSettlement[] => {
+    const amount = Number(a.amount);
+    if (a.supplier_bill_id) {
+      return [{
+        allocation_id: a.id, kind: 'expense', target_id: a.supplier_bill_id, amount,
+        label: a.supplier_bill?.supplier_bill_number || a.supplier_bill?.supplier_name || `Expense ${a.supplier_bill_id.slice(0, 8)}`,
+      }];
+    }
+    if (a.invoice_id) {
+      return [{
+        allocation_id: a.id, kind: 'invoice', target_id: a.invoice_id, amount,
+        label: a.invoice?.internal_number ? `Invoice ${a.invoice.internal_number}` : `Invoice ${a.invoice_id.slice(0, 8)}`,
+      }];
+    }
+    if (a.order_id && a.order_id !== selfOrderId) {
+      return [{
+        allocation_id: a.id, kind: 'order', target_id: a.order_id, amount,
+        label: a.allocated_order?.order_number ?? `Order ${a.order_id.slice(0, 8)}`,
+      }];
+    }
+    return [];
+  });
+}
+
 export const ordersService = {
   /**
    * Server-paged orders list: filters, free-text search AND the party-name join all run in SQL
@@ -1267,7 +1319,17 @@ export const ordersService = {
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
+    payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null;
+      /**
+       * The documents this cash actually settled, read from `payment_allocations` — the link the
+       * Payments list never showed. A money-out with no expense document has NONE, and that is a
+       * real answer (bare cash out, nothing booked) rather than a missing one, so the UI says
+       * which of the two it is instead of rendering an identical row for both.
+       *
+       * An allocation onto THIS order is omitted: the row is already on this order's screen, so
+       * "settles this order" is a line of text that tells the reader nothing.
+       */
+      settles: OrderPaymentSettlement[] }>;
     received: number;
     paid_out: number;
     profit: number;
@@ -1290,18 +1352,37 @@ export const ordersService = {
     payment_status: OrderPaymentStatus;
     // Money re-homed onto this order from a payment that is NOT tagged to it (an on-account credit
     // applied here). Shown read-only in the Payments list so a credit-settled order isn't blank.
-    creditApplied: Array<{ allocation_id: string; payment_id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
+    creditApplied: Array<{ allocation_id: string; payment_id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; counterparty_name: string | null;
+      /** The WHOLE payment this slice came off, so the row can say where it came from. */
+      payment_amount: number }>;
+    /**
+     * Credit an operator has taken back OFF this order. The sweep re-places every unallocated
+     * remainder in the workspace on the next recorded payment, so an un-apply is only durable
+     * because a block row exists — which means the block has to be visible and reversible here,
+     * or the money silently never comes back and nobody can see why.
+     */
+    creditBlocks: Array<{ id: string; payment_id: string; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
   }> {
-    const [inv, bills, pay, alloc, settlement] = await Promise.all([
+    const [inv, bills, pay, alloc, settlement, blocks] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, notes, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name').eq('order_id', orderId).order('paid_at', { ascending: false }),
-      supabase.from('payment_allocations').select('id, amount, payment_id, payments!inner(direction, order_id, currency, paid_at, counterparty_company_id, counterparty_contact_id)').eq('order_id', orderId),
+      // The allocations come with the payment: the target is whichever *_id FK is set, and each
+      // one is embedded so the row can NAME what it settled without a second lookup.
+      supabase.from('payments').select(`id, direction, amount, currency, paid_at, method, reference, notes, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name,
+        allocations:payment_allocations(id, amount, invoice_id, supplier_bill_id, order_id,
+          invoice:invoices(internal_number),
+          supplier_bill:supplier_bills(supplier_bill_number, supplier_name),
+          allocated_order:orders(order_number))`).eq('order_id', orderId).order('paid_at', { ascending: false }),
+      supabase.from('payment_allocations').select('id, amount, payment_id, payments!inner(direction, order_id, currency, amount, paid_at, counterparty_company_id, counterparty_contact_id)').eq('order_id', orderId),
       // Canonical settlement (model B): allocations against this order OR its invoices/bills.
       supabase.rpc('get_order_settlements', { p_order_ids: [orderId] }),
+      // Credit deliberately held back from this order — see the `creditBlocks` note above.
+      (supabase as any).from('payment_auto_allocation_blocks')
+        .select('id, payment_id, payment:payments(amount, currency, paid_at, counterparty_company_id, counterparty_contact_id)')
+        .eq('order_id', orderId),
     ]);
-    const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
-    type AllocRow = { id: string; amount: number; payment_id: string; payments: { direction: 'in' | 'out'; order_id: string | null; currency: string; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
+    const rawPayments = (pay.data ?? []) as unknown as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null; allocations: SettlementEmbed[] | null }>;
+    type AllocRow = { id: string; amount: number; payment_id: string; payments: { direction: 'in' | 'out'; order_id: string | null; currency: string; amount: number; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
     const allocRows = (alloc.data ?? []) as unknown as AllocRow[];
     // Credit rows = allocations whose source payment is tagged to a DIFFERENT order (or none) — i.e.
     // on-account money re-homed here. Order-tagged payments are already in `rawPayments`, so exclude
@@ -1310,24 +1391,35 @@ export const ordersService = {
     // Resolve the counterparty (who the cash went to / came from) so the UI can show it.
     // Money-in → the order's customer; money-out → the supplier paid. Both land in counterparty_company_id;
     // a bare contact customer/supplier lands in counterparty_contact_id instead.
-    const companyIds = [...rawPayments.map((p) => p.counterparty_company_id), ...creditAllocs.map((a) => a.payments!.counterparty_company_id)].filter(Boolean) as string[];
-    const contactIds = [...rawPayments.map((p) => p.counterparty_contact_id), ...creditAllocs.map((a) => a.payments!.counterparty_contact_id)].filter(Boolean) as string[];
+    const blockRows = (blocks?.data ?? []) as Array<{ payment: { counterparty_company_id: string | null; counterparty_contact_id: string | null } | null }>;
+    const companyIds = [...rawPayments.map((p) => p.counterparty_company_id), ...creditAllocs.map((a) => a.payments!.counterparty_company_id), ...blockRows.map((b) => b.payment?.counterparty_company_id ?? null)].filter(Boolean) as string[];
+    const contactIds = [...rawPayments.map((p) => p.counterparty_contact_id), ...creditAllocs.map((a) => a.payments!.counterparty_contact_id), ...blockRows.map((b) => b.payment?.counterparty_contact_id ?? null)].filter(Boolean) as string[];
     const [companyNames, contactNames] = await Promise.all([
       this.getCompanyNames(companyIds).catch(() => new Map<string, string>()),
       this.getContactNames(contactIds).catch(() => new Map<string, string>()),
     ]);
     const nameFor = (companyId: string | null, contactId: string | null) =>
       (companyId ? companyNames.get(companyId) : null) ?? (contactId ? contactNames.get(contactId) : null) ?? null;
-    const payments = rawPayments.map((p) => ({
+    const payments = rawPayments.map(({ allocations, ...p }) => ({
       ...p,
       // CRM name if the payee is a saved company/contact, else the free-text ad-hoc payee name.
       counterparty_name: nameFor(p.counterparty_company_id, p.counterparty_contact_id) ?? p.counterparty_name,
+      settles: settlementsOf(allocations, orderId),
     }));
     const creditApplied = creditAllocs.map((a) => ({
       allocation_id: a.id, payment_id: a.payment_id, direction: a.payments!.direction, amount: Number(a.amount),
       currency: a.payments!.currency, paid_at: a.payments!.paid_at,
+      payment_amount: Number(a.payments!.amount),
       counterparty_name: nameFor(a.payments!.counterparty_company_id, a.payments!.counterparty_contact_id),
     }));
+    type BlockRow = { id: string; payment_id: string; payment: { amount: number; currency: string; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
+    const creditBlocks = ((blocks?.data ?? []) as BlockRow[])
+      .filter((b) => b.payment)
+      .map((b) => ({
+        id: b.id, payment_id: b.payment_id, amount: Number(b.payment!.amount),
+        currency: b.payment!.currency, paid_at: b.payment!.paid_at,
+        counterparty_name: nameFor(b.payment!.counterparty_company_id, b.payment!.counterparty_contact_id),
+      }));
     // "Received" / "Paid to suppliers" = cash actually on this order: payments TAGGED to it (rawPayments)
     // PLUS credit re-homed onto it from an on-account payment (creditApplied). NOT the allocation ledger
     // alone — a direct supplier payment (money-out with no supplier bill) has no allocation, and a bare
@@ -1345,8 +1437,25 @@ export const ordersService = {
       settled_in: Number(b?.settled_in ?? 0), settled_out: Number(b?.settled_out ?? 0),
       settled: Number(b?.settled ?? 0), outstanding: Number(b?.outstanding ?? 0),
       payment_status: (b?.payment_status ?? 'unpaid') as OrderPaymentStatus,
-      creditApplied,
+      creditApplied, creditBlocks,
     };
+  },
+
+  /**
+   * Take a slice of on-account credit back OFF this order. The allocation is deleted AND the
+   * (payment, order) pair is blocked from auto-allocation in the same transaction — see
+   * `deallocate_payment_from_order`. Without the block the sweep re-places it on the next
+   * recorded payment and the un-apply is theatre.
+   */
+  async unapplyCreditFromOrder(allocationId: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('deallocate_payment_from_order', { p_allocation_id: allocationId });
+    if (error) throw error;
+  },
+
+  /** Undo the block above. Lets the sweep place that payment here again; it does not place it now. */
+  async allowCreditOnOrder(blockId: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('allow_payment_auto_allocation', { p_block_id: blockId });
+    if (error) throw error;
   },
 
   /**

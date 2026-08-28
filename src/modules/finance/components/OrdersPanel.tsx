@@ -48,6 +48,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
+import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { LinkExpenseToOrderDialog } from '@/modules/finance/components/LinkExpenseToOrderDialog';
 import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { buildOrderPrefill, type OrderPrefill } from '@/services/templates/registry';
@@ -1675,6 +1676,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // Attaching an expense that ALREADY exists (booked before the order, or arriving separately —
   // transport, customs, an installer). `setSupplierBillOrder` on an existing bill, not a new one.
   const [linkExpenseOpen, setLinkExpenseOpen] = useState(false);
+  // Which expense to open the settlement ledger for — from the Expenses tab row OR from a payment
+  // row that settles it. Both tabs hold half of the same fact ("this cost, that cash"), and until
+  // this existed neither half could reach the other: the Expenses list named a bill you could not
+  // open, and the Payments list showed cash that never said what it paid for.
+  const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   // Money-in modal (received / customer refund). `{ amount }` seeds it; null = closed.
   const [payInOpen, setPayInOpen] = useState<{ amount?: number } | null>(null);
   const [editing, setEditing] = useState(false);
@@ -3951,7 +3957,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   </p>
                 ) : fin.supplierBills.map((b) => (
                   <div key={b.id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
-                    <span className="font-mono text-xs">{b.supplier_bill_number ?? b.id.slice(0, 8)} · {humanizeLabel(b.status)}</span>
+                    {/* The row opens the expense's settlement ledger — what has been paid against
+                        it, and the two ways to add to it. It used to be inert text, so an expense
+                        listed here could not be reached from the one screen that named it. */}
+                    <button
+                      type="button"
+                      className="font-mono text-xs text-left hover:underline"
+                      title="Open this expense — what's been paid against it"
+                      onClick={() => setPaymentsExpenseId(b.id)}
+                    >
+                      {b.supplier_bill_number ?? b.id.slice(0, 8)} · {humanizeLabel(b.status)}
+                    </button>
                     <span className="flex items-center gap-2">
                       <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(b.amount_due), b.currency)}</span></span>
                       <Button
@@ -3986,7 +4002,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             {/* Attached payments. "No cash has moved" is a real and important answer about an
                 order — it is the difference between unpaid and unknown — so the tab states it
                 instead of disappearing. */}
-            {(!fin || (fin.payments.length === 0 && fin.creditApplied.length === 0)) && (
+            {(!fin || (fin.payments.length === 0 && fin.creditApplied.length === 0 && fin.creditBlocks.length === 0)) && (
               <div className="rounded-md border border-border/60">
                 <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
                   <span>Payments &amp; expenses</span>
@@ -4005,7 +4021,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 </p>
               </div>
             )}
-            {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0) && (
+            {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0 || fin.creditBlocks.length > 0) && (
               <div className="rounded-md border border-border/60">
                 <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
                   <span>Payments &amp; expenses</span>
@@ -4016,8 +4032,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     Record payment
                   </Button>
                 </div>
-                {/* Credit re-homed onto this order from an on-account payment — no fresh cash, so it's
-                    read-only here (to reverse it, un-apply from the source payment). Counts in Received. */}
+                {/* Credit re-homed onto this order from an on-account payment — no fresh cash, so
+                    there is no payment here to edit or delete: the cash row lives on the party, and
+                    this is one SLICE of it. What the row does offer is the un-apply, which sends
+                    that slice back to their account. The subtitle names the payment it came off,
+                    because "Applied from account credit · €328.00" on its own gives the reader no
+                    way to find the €1,173.00 that is actually sitting in the bank. */}
                 {fin.creditApplied.map((c) => (
                   <div key={c.allocation_id} className="flex items-start justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="min-w-0">
@@ -4025,9 +4045,66 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         Applied from account credit
                         {c.counterparty_name && <span className="text-muted-foreground">{c.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{c.counterparty_name}</span></span>}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{formatDate(c.paid_at)} · {c.direction === 'in' ? 'Payment' : 'Expense'} · account credit</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatDate(c.paid_at)} · {c.direction === 'in' ? 'Payment' : 'Expense'} · account credit
+                        {c.payment_amount > c.amount + 0.005 && <> · part of {formatMoney(c.payment_amount, c.currency)}</>}
+                      </span>
                     </span>
-                    <span className={`tabular-nums shrink-0 ${c.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(c.amount, c.currency)}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className={`tabular-nums ${c.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(c.amount, c.currency)}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                        title="Un-apply — the money goes back to their account credit and stays there"
+                        disabled={saving}
+                        onClick={async () => {
+                          setSaving(true);
+                          try {
+                            await ordersService.unapplyCreditFromOrder(c.allocation_id);
+                            toast({
+                              title: 'Credit un-applied',
+                              description: `${formatMoney(c.amount, c.currency)} is back on their account and will not be re-applied to this order. Undo it from the note below.`,
+                            });
+                            await load(order.id);
+                            onChanged();
+                          } catch (err: unknown) {
+                            toast({ title: 'Could not un-apply', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                          } finally { setSaving(false); }
+                        }}
+                      >
+                        <Unlink className="h-3 w-3" />
+                      </Button>
+                    </span>
+                  </div>
+                ))}
+                {/* The un-apply is only durable because a block row exists — so the block is shown,
+                    with its way out. A held-back credit that nothing mentions is money the operator
+                    cannot explain the absence of. */}
+                {fin.creditBlocks.map((b) => (
+                  <div key={b.id} className="flex items-start justify-between gap-2 border-t border-border/40 bg-muted/20 px-3 py-1.5 text-[11px] text-muted-foreground">
+                    <span className="min-w-0">
+                      Held back from this order — the {formatMoney(b.amount, b.currency)} payment of {formatDate(b.paid_at)}
+                      {b.counterparty_name && <> from <span className="text-foreground/80">{b.counterparty_name}</span></>} stays on account.
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 underline hover:text-foreground disabled:opacity-40"
+                      disabled={saving}
+                      onClick={async () => {
+                        setSaving(true);
+                        try {
+                          await ordersService.allowCreditOnOrder(b.id);
+                          toast({ title: 'Re-allowed', description: 'The next recorded payment can place this credit here again.' });
+                          await load(order.id);
+                          onChanged();
+                        } catch (err: unknown) {
+                          toast({ title: 'Could not re-allow', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                        } finally { setSaving(false); }
+                      }}
+                    >
+                      Re-allow
+                    </button>
                   </div>
                 ))}
                 {fin.payments.map((p) => {
@@ -4046,6 +4123,38 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       {/* Account only — the method is derived from it, so printing both said
                           "Postbank BG · Bank Payment" and taught the reader nothing twice. */}
                       <span className="text-[11px] text-muted-foreground">{formatDate(p.paid_at)} · {p.direction === 'in' ? 'Payment' : 'Expense'}{acctName ? ` · ${acctName}` : ''}</span>
+                      {/* What the cash actually settled. An expense opens its settlement ledger —
+                          the Expenses tab beside this one lists the same bill, and the two used to
+                          be unconnectable: cash that named no cost, next to a cost that named no
+                          cash. Nothing to show is itself an answer and is stated, because "paid a
+                          supplier with no expense booked" and "paid a booked expense" are different
+                          facts that rendered as an identical row. */}
+                      <span className="block text-[11px] text-muted-foreground">
+                        {p.settles.length === 0
+                          ? <span className="italic">settles nothing booked — cash only</span>
+                          : (
+                            <>
+                              settles{' '}
+                              {p.settles.map((s, i) => (
+                                <React.Fragment key={s.allocation_id}>
+                                  {i > 0 && ', '}
+                                  {s.kind === 'expense' ? (
+                                    <button type="button" className="underline hover:text-foreground" onClick={() => setPaymentsExpenseId(s.target_id)}>
+                                      {s.label}
+                                    </button>
+                                  ) : s.kind === 'invoice' ? (
+                                    <button type="button" className="underline hover:text-foreground" onClick={() => setActiveTab('invoices')}>
+                                      {s.label}
+                                    </button>
+                                  ) : (
+                                    <Link className="underline hover:text-foreground" to={`${financeBase}/orders/${s.target_id}`}>{s.label}</Link>
+                                  )}
+                                  {Math.abs(s.amount - Number(p.amount)) > 0.005 && <> ({formatMoney(s.amount, p.currency)})</>}
+                                </React.Fragment>
+                              ))}
+                            </>
+                          )}
+                      </span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
@@ -4323,6 +4432,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           await load(order.id);
           onChanged();
         }}
+      />
+    )}
+    {/* One expense's settlement ledger. The SAME dialog Payables and the Parties tab open — opened
+        here from either side of the link: the Expenses row, or a payment that settled it. */}
+    {order && (
+      <ExpensePaymentsDialog
+        workspaceId={order.workspace_id}
+        expenseId={paymentsExpenseId}
+        open={!!paymentsExpenseId}
+        onOpenChange={(v) => { if (!v) setPaymentsExpenseId(null); }}
+        onChanged={async () => { await load(order.id); onChanged(); }}
       />
     )}
     {/* Keeping the customer's leftover cash. The SAME dialog Finance -> Parties opens: the amount
