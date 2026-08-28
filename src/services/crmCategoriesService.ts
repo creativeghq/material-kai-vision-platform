@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 // The kind vocabulary + the hand-assignment rule live in a client-free module (see the note
 // there); re-exported here so every existing import site keeps working.
 export { AUTO_CATEGORY_KINDS, isHandAssignableKind } from './crmCategoryKinds';
+// Also imported: a re-export does not bind the name locally, and assertHandAssignable uses it.
+import { isHandAssignableKind } from './crmCategoryKinds';
 export type { CrmCategoryKind, CrmCategoryMemberKind } from './crmCategoryKinds';
 
 import type { CrmCategoryKind, CrmCategoryMemberKind } from './crmCategoryKinds';
@@ -215,6 +217,38 @@ class CrmCategoriesService {
     return (data || []).map((r: any) => r.category_id);
   }
 
+  /**
+   * Refuse a hand-assignment to an AUTO kind, with a message someone can act on (#353 CRM-22).
+   *
+   * This is the COURTESY, not the guarantee. `trg_crm_category_no_manual_auto_member` is the
+   * guarantee — a BEFORE INSERT/UPDATE trigger, so it covers every caller including the edge
+   * functions and anything reaching the table directly, and it cannot be outrun. Without this
+   * though, the operator sees a raw `check_violation` and has no idea that the answer lives in
+   * Profile → Team or the HR roster.
+   *
+   * The list page already filters its options through `isHandAssignableKind`; the service used
+   * to take a raw id and write it. CLAUDE.md's rule for exactly that shape: the offer and the
+   * gate must read the same answer.
+   */
+  async assertHandAssignable(categoryIds: string[]): Promise<void> {
+    const ids = categoryIds.filter(Boolean);
+    if (ids.length === 0) return;
+    const { data, error } = await supabase
+      .from('crm_categories').select('id, name, kind').in('id', ids);
+    // A failed lookup does NOT fall through to the write — the trigger would reject it anyway,
+    // and a clear refusal beats a raw Postgres error surfacing three layers up.
+    if (error) throw new Error(`Could not check the category kind: ${error.message}`);
+    const auto = (data ?? []).filter((c: any) => !isHandAssignableKind(c.kind));
+    if (auto.length > 0) {
+      const names = auto.map((c: any) => `"${c.name}" (${c.kind})`).join(', ');
+      throw new Error(
+        `${names} ${auto.length === 1 ? 'is' : 'are'} derived, not assigned by hand. `
+        + 'Membership comes from the workspace role (Profile → Team) or the HR roster, and the '
+        + 'nightly resync rewrites it from there.',
+      );
+    }
+  }
+
   async addMember(categoryId: string, target:
     | { user_id: string }
     | { crm_contact_id: string }
@@ -224,6 +258,7 @@ class CrmCategoriesService {
     const memberKind: CrmCategoryMemberKind =
       'user_id' in target ? 'platform_user' :
       'crm_contact_id' in target ? 'crm_contact' : 'crm_company';
+    await this.assertHandAssignable([categoryId]);
     const row: any = {
       category_id: categoryId,
       member_kind: memberKind,
@@ -251,6 +286,7 @@ class CrmCategoriesService {
    * manual category IDs; the auto rows stay attached.
    */
   async setMembershipsForUser(userId: string, manualCategoryIds: string[]): Promise<void> {
+    await this.assertHandAssignable(manualCategoryIds);
     const { data: existing } = await supabase
       .from('crm_category_members')
       .select('id, category_id, source')
@@ -278,6 +314,7 @@ class CrmCategoriesService {
   }
 
   async setMembershipsForContact(contactId: string, manualCategoryIds: string[]): Promise<void> {
+    await this.assertHandAssignable(manualCategoryIds);
     const { data: existing } = await supabase
       .from('crm_category_members')
       .select('id, category_id, source')
@@ -305,6 +342,7 @@ class CrmCategoriesService {
   }
 
   async setMembershipsForCompany(companyId: string, manualCategoryIds: string[]): Promise<void> {
+    await this.assertHandAssignable(manualCategoryIds);
     const { data: existing } = await supabase
       .from('crm_category_members')
       .select('id, category_id, source')
