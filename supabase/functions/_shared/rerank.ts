@@ -45,7 +45,7 @@ import type { DbClient } from './supabase-client.ts';
 /**
  * The default model.
  *
- * `claude-opus-4-8` is the module-wide default in ai-client.ts and is the wrong tier for
+ * `claude-opus-5` is the module-wide default in ai-client.ts and is the wrong tier for
  * reranking: this is a short, mechanical relevance-ordering task over text we already have.
  * The admin cost card in OperationsDashboard already lists Haiku 4.5 under "Reranking" — code
  * and dashboard disagreed, and the dashboard was right.

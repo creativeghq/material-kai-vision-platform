@@ -948,7 +948,6 @@ const MAIN_MODEL = 'claude-opus-5';
 
 const MODEL_OVERRIDE_ALLOWED = new Set([
   'claude-haiku-4-5',
-  'claude-opus-4-8',
   'claude-opus-5',
   'claude-sonnet-4-7',
 ]);
@@ -4408,7 +4407,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             }
           }
 
-          const modelUsed = finalResult.usage?.modelName || 'claude-opus-4-8';
+          const modelUsed = finalResult.usage?.modelName || MAIN_MODEL;
           const finalChunk = {
             type: 'final_result',
             // The agent that answered. The client persists this into message metadata, which

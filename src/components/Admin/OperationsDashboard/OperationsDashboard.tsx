@@ -839,7 +839,7 @@ const OperationsDashboardInner: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {agentChatRows.map((chat) => {
-                      const model = chat.metadata?.model || 'claude-opus-4-8';
+                      const model = chat.metadata?.model || 'claude-opus-5';
                       const inputTokens = estimateTokens(chat.content);
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);

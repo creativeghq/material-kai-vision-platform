@@ -222,8 +222,9 @@ export const creditsAPI = {
     // Model pricing per 1M tokens (in USD) — must stay in sync with the
     // ai_model_pricing DB table and Python AIPricingConfig.
     const pricing: Record<string, { input: number; output: number }> = {
-      // Claude Models — canonical 3 latest-tier
-      'claude-opus-4-8':            { input: 15.00, output: 75.00 },
+      // Claude Models — canonical latest tier. Was `claude-opus-4-8` at 15.00/75.00,
+      // which is Opus-3-era pricing and 3x what ai_model_pricing says.
+      'claude-opus-5':     { input:  5.00, output: 25.00 },
       'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
       // OpenAI Embeddings (chat models removed — platform uses Claude only)

@@ -169,7 +169,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'interior-designer',
@@ -178,7 +178,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'product-business',
@@ -187,7 +187,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-amber-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'marketing',
@@ -196,7 +196,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-emerald-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'property-advisor',
@@ -205,7 +205,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-teal-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'erp',
@@ -214,7 +214,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-rose-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'social-media',
@@ -223,7 +223,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-sky-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'demo',
@@ -245,7 +245,7 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'member',
     available: false,
     comingSoon: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   {
     id: 'qa-reviewer',
@@ -255,7 +255,7 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'member',
     available: false,
     comingSoon: true,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
   // Hidden: the generalist that JARVIS falls back to, and the target of legacy
   // `?agent=kai` deep-links. Not shown in the picker (available:false) — users
@@ -267,7 +267,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: false,
-    defaultModel: 'anthropic/claude-opus-4-8',
+    defaultModel: 'anthropic/claude-opus-5',
   },
 ];
 
@@ -929,7 +929,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const renderedResultCardRef = useRef(false);
   // Initialize with JARVIS (orchestrator) default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-4-8',
+    AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-5',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
@@ -2237,6 +2237,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    // The turn is committed, so the toolkit-onboarding focus has done its job. This is the
+    // "or sends any message" clause the state's own comment has always claimed and never
+    // implemented — the launchers used to clear it on CLICK instead, which is why cancelling a
+    // quick-start's form threw the canvas back to the generic starter card.
+    setJustEnabledToolkitId(null);
     setInput('');
     setAttachedImages([]);
     setAttachedCatalogPdfs([]);
@@ -5043,7 +5048,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // both the canvas empty state and the (canvas-hidden) chat empty state so the
   // dispatch behaviour is identical wherever the starters are shown.
   const launchQuickStartFromOnboarding = (prompt: string, qs: ToolkitQuickStart, tk: ToolkitDefinition) => {
-    setJustEnabledToolkitId(null);
+    // NOT cleared here. Clicking a starter that opens a FORM or a guided modal has launched
+    // nothing yet — the user can still cancel it, and on `?capability=seo-research` that cancel
+    // dropped the canvas from "SEO Research loaded" back to the generic all-toolkits card, whose
+    // first group is Core: the user came in on Edith and Cancel handed them JARVIS. The focus is
+    // released where the turn actually commits (handleSendMessage) or where a wizard boots below.
     ensureAgentAndToolkit(tk);
     if (deriveAutoFields(qs).length) {
       setToolkitFormState({ quickStart: qs, toolkit: tk });
@@ -5055,6 +5064,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       return;
     }
     if (qs.workflow_id) {
+      setJustEnabledToolkitId(null);
       bootWorkflowLocally(qs.workflow_id);
     } else {
       setInput(prompt);
@@ -5370,7 +5380,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 mode="just_enabled"
                 toolkits={[tk]}
                 onLaunch={(prompt, qs, tkParam) => {
-                  setJustEnabledToolkitId(null);
+                  // Same rule as launchQuickStartFromOnboarding: a form or a guided modal is
+                  // cancellable, so the card must survive until the turn actually commits.
                   ensureAgentAndToolkit(tkParam);
                   // Form-bearing quick-starts collect their fields first, then
                   // auto-send one complete message (takes priority over the
@@ -5389,6 +5400,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     return;
                   }
                   if (qs.workflow_id) {
+                    setJustEnabledToolkitId(null);
                     bootWorkflowLocally(qs.workflow_id);
                   } else {
                     setInput(prompt);
