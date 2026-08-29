@@ -314,6 +314,25 @@ reviewed, the `.ts` is what ships. Run **`npm run skills:sync`** after editing a
 the `.ts`, and never use `String.raw` (it leaks the backslash of every escaped backtick into the prompt).
 Guarded by [tests/unit/skillsRegistry.test.ts](tests/unit/skillsRegistry.test.ts).
 
+**What the picker OFFERS must equal what the binder BINDS — on BOTH axes, and each is silent alone.**
+`agentToolsCatalog` is the browse surface (`getAccessibleAgents`/`getAccessibleToolkits` drop what a role
+may not have); `agent-chat` is the enforcer. Offered-but-not-bound never errors: the user clicks, a prompt is
+sent, the model has no such tool and answers from memory or apologises for what the screen just advertised.
+**Role axis** — a tool pushed inside `if (isAdmin)` gets `adminOnly: true` in the catalog, and a cluster whose
+tools are all admin-gated gets it too (projected into `toolkitClusters.generated.ts`, so `load_toolkit`'s menu
+leaves it out — an unfiltered menu is entries the model can only be refused on). 36 SEO tools and 6 clusters
+sat offered-and-unbound; `web-research` sat the other way, `alwaysOn: true` with all three tools inside the
+admin gate, so a member's agent could not search the web at all. Note `isAdmin` passed as an ARGUMENT
+(`createKnowledgeBaseSearchTool(workspaceId, isAdmin, agentId)`) is not a gate. **Module axis** — a tool whose
+entry declares a `moduleSlug` MUST call `moduleGate(workspaceId, slug)` (`_shared/tools/module-gate.ts`), which
+asks the operator kill switch AND `is_workspace_entitled` and fails closed. `EntitlementGuard` on the page is
+UX; the tool reaches the same tables without passing it. 10 of 19 files did not ask, five of them checking only
+`modules.enabled` — the platform-wide flag, true for everyone, so it read like a gate and refused nobody. And a
+`moduleSlug` naming no `public.modules` row is worse than no gate: `finance` (the slug is `sales-finance`) made
+`enabledModules.includes()` false in every workspace, hiding the whole Expenses toolkit from everyone
+including the operator, permanently. Guarded by [tests/unit/adminOnlyParity.test.ts](tests/unit/adminOnlyParity.test.ts)
+and [tests/unit/toolModuleGates.test.ts](tests/unit/toolModuleGates.test.ts).
+
 **Naming a place is LINKING to it, and a button must not ask the model for something no tool can do.**
 `src/config/appDestinations.ts` is the one registry of in-app destinations; `linkifyDestinations` turns
 `Profile → Social Accounts` (or the paraphrase, "the Social Accounts tab") into a real link inside every agent
