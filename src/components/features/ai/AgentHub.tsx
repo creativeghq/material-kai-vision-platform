@@ -3522,6 +3522,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 } else if (event === 'unpublished') {
                   line = 'Catalog archived (no longer publicly accessible).';
                 }
+                /**
+                 * A catalog chunk with no branch renders an EMPTY assistant bubble (#395).
+                 *
+                 * `line` starts as '' and every arm above is an `else if`, so a chunk type added
+                 * to a catalog tool — or one renamed on the tool side and not here — produces a
+                 * message with no content at all. That is the same defect the `run:` quick-starts
+                 * had: the work happened, the screen said nothing. The sibling `seo_*_card` router
+                 * twenty lines up cannot do this, because it derives its line FROM the type.
+                 *
+                 * The fallback does the same, so the worst case is a plain sentence rather than a
+                 * blank turn. `tests/unit/agentChunkRendering.test.ts` fails the build if a branch
+                 * is actually missing — this is the floor under that, not a substitute for it.
+                 */
+                if (!line) line = `Catalog updated — ${event.replace(/_/g, ' ')}.`;
                 const m: Message = {
                   id: `msg-catalog-${event}-${Date.now()}`,
                   role: 'assistant',
