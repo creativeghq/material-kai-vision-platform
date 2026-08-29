@@ -55,8 +55,27 @@ function emit(onChunk: ChunkSink, chunk: any) {
  * state needed; if the user resumes a half-built catalog the run_id resolves
  * to the same tracker.
  */
+/**
+ * `definition_id` NAMES THE WORKFLOW, and it used to be hardcoded (#395).
+ *
+ * `WorkflowTracker` resolves everything from it: `getWorkflow(runtime.definition_id)` gives the
+ * header name, the icon and the step list a row can be matched against. So a plan that says
+ * `catalog-build` puts the reader in "Build a catalog", with its eight steps, whatever actually
+ * ran.
+ *
+ * `translate_pdf_to_catalog` is the first step of `catalog-translate` — the registry says so, on
+ * that step's own `tool_id`. It emitted a `catalog-build` plan plus `step_id: 'translate' as any`,
+ * and a step id absent from the named definition falls through to `title={s.def?.title || s.id}`:
+ * a raw "translate" row, appended to the wrong workflow's plan. The `as any` was the tell.
+ *
+ * The comment on that call site said the wizard "advances from Translate PDF → Generate PDF
+ * automatically". It could not: `catalog-build` has no Translate PDF step to advance from.
+ */
+type CatalogWorkflowId = 'catalog-build' | 'catalog-translate';
+
 function emitWorkflowPlan(onChunk: ChunkSink, args: {
   catalog_id: string;
+  definition_id: CatalogWorkflowId;
   title?: string;
   subtitle?: string;
   metadata?: Record<string, any>;
@@ -64,7 +83,7 @@ function emitWorkflowPlan(onChunk: ChunkSink, args: {
   emit(onChunk, {
     type: 'workflow_plan',
     run_id: args.catalog_id,
-    definition_id: 'catalog-build',
+    definition_id: args.definition_id,
     title: args.title,
     subtitle: args.subtitle,
     metadata: { catalog_id: args.catalog_id, ...(args.metadata || {}) },
@@ -73,8 +92,12 @@ function emitWorkflowPlan(onChunk: ChunkSink, args: {
 
 function emitWorkflowStep(onChunk: ChunkSink, args: {
   catalog_id: string;
-  // NB: no 'send' step — sending to customers is UI-only (SendToCustomersModal), never an agent workflow step.
-  step_id: 'create' | 'attach' | 'extract' | 'add_extra' | 'images' | 'generate' | 'publish';
+  // Every id here exists in a catalog workflow definition in workflowRegistry.ts — `translate`
+  // belongs to `catalog-translate`, the rest to `catalog-build`. Guarded by
+  // tests/unit/workflowStepRegistry.test.ts, which reads both sides.
+  // NB: no 'send' step — sending to customers is UI-only (SendToCustomersModal), never an agent
+  // workflow step. It is `skippable` in the registry, so its absence cannot stall the run.
+  step_id: 'create' | 'attach' | 'extract' | 'add_extra' | 'images' | 'generate' | 'publish' | 'translate';
   status: 'pending' | 'running' | 'awaiting_input' | 'done' | 'failed' | 'skipped';
   status_line?: string;
   input?: Record<string, any>;
@@ -220,6 +243,7 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
 
         // Workflow tracker — boot the plan + mark step 1 complete.
         emitWorkflowPlan(onChunk, {
+          definition_id: 'catalog-build',
           catalog_id: catalog.id,
           title: catalog.title,
           subtitle: catalog.subtitle,
@@ -620,17 +644,27 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
           preserve_original_layout: !!input.preserve_original_layout,
         });
 
-        // catalog-translate workflow: emit plan + step done so the wizard
-        // advances from "Translate PDF" → "Generate PDF" automatically.
-        // run_id = catalog_id (the natural primary entity).
+        /**
+         * The catalog-translate workflow, named as itself (#395).
+         *
+         * `metadata: { workflow_def: 'catalog-translate' }` was the previous attempt at saying
+         * this, and NOTHING reads that key — the tracker resolves the definition from
+         * `definition_id` alone, which said `catalog-build`.
+         *
+         * `run_id` stays the catalog id, which is the module's deterministic-resume rule. The
+         * consequence is deliberate and worth stating: translating a PDF into a catalog that is
+         * mid-BUILD switches that tracker to the translate workflow. That is what the user just
+         * did, and it beats the previous behaviour of showing the build plan with a raw
+         * "translate" row bolted on.
+         */
         emitWorkflowPlan(onChunk, {
           catalog_id: catalogId!,
+          definition_id: 'catalog-translate',
           title: input.new_catalog_title,
-          metadata: { workflow_def: 'catalog-translate' },
         });
         emitWorkflowStep(onChunk, {
           catalog_id: catalogId!,
-          step_id: 'translate' as any,
+          step_id: 'translate',
           status: 'done',
           status_line: `${invokeData.sections_count ?? 0} sections · ${invokeData.materials_count ?? 0} materials`,
           input: {
