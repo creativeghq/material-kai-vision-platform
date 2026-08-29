@@ -1047,6 +1047,39 @@ hours earlier by the POS idempotency work in #351 C1, with the identical `WHERE 
 - Fixed the same way. The trade is index size — every invoice gets an entry rather than only the
   POS ones — against a silent write failure for the next author.
 
+### Invariant 5 — a route excluded from the JWT middleware, gating nothing
+
+`JWTAuthMiddleware.exclude_paths` is matched by PREFIX, so everything under an entry is outside the
+middleware and its only remaining protection is whatever the route declares. CLAUDE.md invariant 5
+says exactly that, and **nothing enforced it** while the list grew to 39 prefixes covering 225
+routes — several of which spend real money (`/api/v1/seo-agent/*` is DataForSEO,
+`/api/v1/modules/*/search` is Firecrawl).
+
+The failure mode is silent in the direction that matters: a new route under an existing excluded
+prefix inherits the exclusion automatically and announces nothing. Nobody has to make a decision
+for the gap to open.
+
+**The audit result was the reassuring one — all 225 are gated.** What was missing was any record of
+HOW, and any way to learn when that stops being true.
+
+- **Guarded by:** `mivaa-pdf-extractor/tests/unit/test_excluded_routes_gate_themselves.py`. It reads
+  the exclusion list OUT OF THE MIDDLEWARE rather than restating it (a copy would drift and the test
+  would then check a list nobody uses), walks every `@router` decorator, and requires each route
+  under an excluded prefix to name a gate — `require_rag_resource_access`, `require_trusted_service`,
+  `require_deploy_token`, `_check_secret`, `_admin_user_id_from_request`, `get_workspace_context`,
+  … — or sit on a 9-entry public-by-design list. It also refuses a bare `/`, `/api` or `/api/v1`
+  prefix, and fails if a public exemption stops resolving to a real route, so a stale entry cannot
+  end up covering something else.
+- **Proven to fire:** 2026-08-29 — `Depends(require_trusted_service)` removed from
+  `/api/internal/classify-images/{job_id}`; the guard named that exact route. Restored
+  byte-identically, 4/4 green.
+- **Why the marker list is a feature:** adding a new way to authenticate means adding its name.
+  Having to write it down is what turns "how does this route authenticate" from folklore into a
+  line someone reviewed.
+- **Blind spot:** it proves a gate is NAMED, not that the gate is correct. `require_rag_resource_access`
+  could be a no-op and this test would still pass. It also cannot see a route mounted outside the
+  `@router` idiom.
+
 ## Not defects — checked, and deliberately left alone
 
 Recording these so they are not re-raised every time an advisor runs.
