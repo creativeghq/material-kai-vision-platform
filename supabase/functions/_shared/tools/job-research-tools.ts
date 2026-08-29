@@ -78,12 +78,24 @@ async function callMivaa(
   }
 }
 
-async function findUserTrackedJobByLabel(userId: string, label: string): Promise<any | null> {
+/**
+ * A tracked search resolved by label, WITHIN THIS WORKSPACE (#395).
+ *
+ * `tracked_jobs` carries `workspace_id` and the client is service-role, so `user_id` alone let a
+ * workspace-A session reach, rename and pause a search the same person set up in workspace B.
+ * Same shape as the catalog and project gates; same resolution — the workspace check is added and
+ * the owner check stays.
+ */
+async function findUserTrackedJobByLabel(
+  userId: string, workspaceId: string | null, label: string,
+): Promise<any | null> {
   const sb = svcClient();
-  const { data } = await sb
+  let q = sb
     .from('tracked_jobs')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', userId);
+  if (workspaceId) q = q.eq('workspace_id', workspaceId);
+  const { data } = await q
     .ilike('label', label)
     .is('api_key_id', null)
     .maybeSingle();
@@ -118,7 +130,7 @@ export const createTrackJobSearchTool = (
       // Resolve target row by id or label
       let targetId = tracked_job_id;
       if (!targetId && label) {
-        const existing = await findUserTrackedJobByLabel(userId, label);
+        const existing = await findUserTrackedJobByLabel(userId, workspaceId, label);
         targetId = existing?.id;
       }
 
@@ -290,6 +302,7 @@ export const createTrackJobSearchTool = (
 
 export const createListMyJobSearchesTool = (
   userId: string,
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -324,6 +337,7 @@ export const createListMyJobSearchesTool = (
 
 export const createFindJobsTool = (
   userId: string,
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -334,7 +348,7 @@ export const createFindJobsTool = (
       }
       let targetId = tracked_job_id;
       if (!targetId && label) {
-        const existing = await findUserTrackedJobByLabel(userId, label);
+        const existing = await findUserTrackedJobByLabel(userId, workspaceId, label);
         targetId = existing?.id;
       }
       if (!targetId) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
@@ -421,6 +435,7 @@ export const createFindJobsTool = (
 
 export const createManageJobSitesTool = (
   userId: string,
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -552,6 +567,7 @@ export const createManageJobSitesTool = (
 
 export const createGetJobDigestPreviewTool = (
   userId: string,
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -563,11 +579,13 @@ export const createGetJobDigestPreviewTool = (
 
       // Pull all of the user's tracked_jobs, then for each one collect the matches in the window.
       const sb = svcClient();
-      const { data: tracked } = await sb
+      // This workspace's searches, not every workspace the user belongs to (#395).
+      let tq = sb
         .from('tracked_jobs')
         .select('id, label, digest_hour_utc, current_listing_count_24h, current_listing_count_7d')
-        .eq('user_id', userId)
-        .eq('is_active', true);
+        .eq('user_id', userId);
+      if (workspaceId) tq = tq.eq('workspace_id', workspaceId);
+      const { data: tracked } = await tq.eq('is_active', true);
 
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const sections: any[] = [];

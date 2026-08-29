@@ -31,6 +31,8 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').re
 const catalogTools = read('supabase/functions/_shared/tools/catalog-tools.ts');
 const projectTools = read('supabase/functions/_shared/tools/project-tools.ts');
 const expenseTools = read('supabase/functions/_shared/tools/expense-tools.ts');
+const mentionTools = read('supabase/functions/_shared/tools/mention-tools.ts');
+const jobTools = read('supabase/functions/_shared/tools/job-research-tools.ts');
 const agentChat = read('supabase/functions/agent-chat/index.ts');
 
 describe('#395 — the catalog gate is bound to a workspace', () => {
@@ -148,5 +150,49 @@ describe('#395 — an expense whose payment failed is still an expense', () => {
     expect(rpcThrow).toBeGreaterThan(-1);
     expect(localCatch).toBeGreaterThan(rpcThrow);
     expect(fn.slice(rpcThrow, localCatch)).not.toContain('return JSON.stringify');
+  });
+});
+
+describe('#395 — the same shape in two more user-owned tables', () => {
+  it('a tracked mention subject is resolved inside this workspace', () => {
+    const fn = mentionTools.slice(mentionTools.indexOf('async function resolveSubjectBase'), mentionTools.indexOf('async function callMivaa'));
+    expect(fn).toMatch(/workspaceId: string \| null,/);
+    // All three reads it makes: the product check, the uuid lookup and the label search.
+    expect(fn.match(/eq\('workspace_id', workspaceId\)/g) ?? []).toHaveLength(3);
+    expect(fn, 'the owner check was replaced rather than joined').toMatch(/\.eq\('user_id', userId\)/);
+  });
+
+  it('and a product id from the model is proven before it reaches MIVAA', () => {
+    // `callMivaa` sends the SERVICE-ROLE key when no user JWT is passed, so an unchecked uuid
+    // travelled upstream under service-role authority.
+    const fn = mentionTools.slice(mentionTools.indexOf('async function resolveSubjectBase'), mentionTools.indexOf('async function callMivaa'));
+    const check = fn.indexOf("from('products')");
+    const build = fn.indexOf('/api/v1/mention-monitoring/products/');
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(build);
+    expect(fn).toMatch(/in this workspace/);
+  });
+
+  it('a tracked job search is resolved inside this workspace', () => {
+    const fn = jobTools.slice(jobTools.indexOf('async function findUserTrackedJobByLabel'));
+    expect(fn.slice(0, 900)).toMatch(/workspaceId: string \| null, label: string/);
+    expect(fn.slice(0, 900)).toMatch(/if \(workspaceId\) q = q\.eq\('workspace_id', workspaceId\);/);
+    expect(jobTools).toMatch(/if \(workspaceId\) tq = tq\.eq\('workspace_id', workspaceId\);/);
+  });
+
+  it('every factory in both files takes the workspace, and the binder passes it', () => {
+    const byFile: Array<[string, string, string[]]> = [
+      ['mention', mentionTools, ['createGetMentionSummaryTool', 'createFindNegativeMentionsTool', 'createCheckLlmVisibilityTool', 'createTrackProductMentionsTool']],
+      ['job', jobTools, ['createTrackJobSearchTool', 'createListMyJobSearchesTool', 'createFindJobsTool', 'createManageJobSitesTool', 'createGetJobDigestPreviewTool']],
+    ];
+    for (const [label, src, factories] of byFile) {
+      for (const factory of factories) {
+        const decl = src.match(new RegExp(`export const ${factory} = \\(([\\s\\S]*?)\\) => \\{`));
+        expect(decl, `${label}/${factory}`).not.toBeNull();
+        expect(decl![1], `${label}/${factory}`).toContain('workspaceId');
+        expect(agentChat, `${factory} is constructed without a workspace`)
+          .toMatch(new RegExp(`${factory}\\(userId, workspaceId`));
+      }
+    }
   });
 });

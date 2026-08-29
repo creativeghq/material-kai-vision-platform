@@ -224,21 +224,42 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 async function resolveSubjectBase(
   args: { product_id?: string; subject?: string },
   userId: string,
+  workspaceId: string | null,
 ): Promise<{ base: string; label: string; trackedMentionId?: string } | { error: string; candidates?: string[] }> {
+  const sb = svcClient();
   if (args.product_id) {
+    /**
+     * A product id from the MODEL is proven to be in this workspace first (#395).
+     *
+     * This branch used to build the MIVAA path straight from the argument with no check at all,
+     * and `callMivaa` sends the SERVICE-ROLE key as the bearer when no user JWT is passed — so an
+     * arbitrary uuid reached MIVAA under service-role authority. Whether MIVAA gates it is the
+     * half of #395 nobody has read yet; on this side the tool has to prove it (invariant 1).
+     */
+    if (workspaceId) {
+      const { data: prod } = await sb
+        .from('products')
+        .select('id')
+        .eq('id', args.product_id)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!prod) return { error: `No product ${args.product_id} in this workspace.` };
+    }
     return { base: `/api/v1/mention-monitoring/products/${args.product_id}`, label: args.product_id };
   }
   const subject = (args.subject || '').trim();
   if (!subject) return { error: 'Give either a product_id or a subject (brand / keyword name).' };
 
-  const sb = svcClient();
   if (UUID_RE.test(subject)) {
-    const { data } = await sb
+    let q = sb
       .from('tracked_mentions')
       .select('id, subject_label')
       .eq('id', subject)
-      .eq('user_id', userId)
-      .maybeSingle();
+      .eq('user_id', userId);
+    // The workspace as well as the owner: a subject you track in another workspace is not this
+    // workspace's to report on.
+    if (workspaceId) q = q.eq('workspace_id', workspaceId);
+    const { data } = await q.maybeSingle();
     if (!data) return { error: `No tracked subject ${subject} belongs to you.` };
     return {
       base: `/api/v1/mention-monitoring/track/${data.id}`,
@@ -248,12 +269,14 @@ async function resolveSubjectBase(
   }
 
   // Scoped to the caller: the service-role client bypasses RLS, so ownership is checked
-  // here or not at all (invariant 1).
-  const { data: rows } = await sb
+  // here or not at all (invariant 1). Scoped to the WORKSPACE too, for the same reason (#395).
+  let lq = sb
     .from('tracked_mentions')
     .select('id, subject_label')
     .eq('user_id', userId)
-    .is('api_key_id', null)
+    .is('api_key_id', null);
+  if (workspaceId) lq = lq.eq('workspace_id', workspaceId);
+  const { data: rows } = await lq
     .ilike('subject_label', `${subject}%`)
     .limit(10);
   const matches = rows || [];
@@ -383,6 +406,7 @@ export const createTrackProductMentionsTool = (
 
 export const createGetMentionSummaryTool = (
   userId: string,
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -391,7 +415,7 @@ export const createGetMentionSummaryTool = (
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
       }
-      const resolved = await resolveSubjectBase({ product_id, subject }, userId);
+      const resolved = await resolveSubjectBase({ product_id, subject }, userId, workspaceId);
       if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
       const { base, label } = resolved;
       onChunk?.({ type: 'tool_progress', status: `Loading ${days}d mention summary...`, timestamp: Date.now() });
@@ -440,7 +464,7 @@ export const createCheckLlmVisibilityTool = (
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
       }
-      const resolved = await resolveSubjectBase({ product_id, subject }, userId);
+      const resolved = await resolveSubjectBase({ product_id, subject }, userId, workspaceId);
       if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
       const { base, label } = resolved;
       // If force_run, debit + run probe; otherwise return latest cached snapshot
@@ -501,6 +525,7 @@ export const createCheckLlmVisibilityTool = (
 
 export const createFindNegativeMentionsTool = (
   userId: string,
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -509,7 +534,7 @@ export const createFindNegativeMentionsTool = (
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
       }
-      const resolved = await resolveSubjectBase({ product_id, subject }, userId);
+      const resolved = await resolveSubjectBase({ product_id, subject }, userId, workspaceId);
       if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
       const { base, label } = resolved;
       onChunk?.({ type: 'tool_progress', status: 'Loading negative-sentiment mentions...', timestamp: Date.now() });

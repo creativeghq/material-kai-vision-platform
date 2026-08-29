@@ -2575,13 +2575,13 @@ async function executeAgent(
     tools.push(createTrackProductMentionsTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('get_mention_summary') && createGetMentionSummaryTool) {
-    tools.push(createGetMentionSummaryTool(userId, userJwt, onChunk));
+    tools.push(createGetMentionSummaryTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   if (config.tools.includes('check_llm_visibility') && createCheckLlmVisibilityTool) {
     tools.push(createCheckLlmVisibilityTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   if (config.tools.includes('find_negative_mentions') && createFindNegativeMentionsTool) {
-    tools.push(createFindNegativeMentionsTool(userId, userJwt, onChunk));
+    tools.push(createFindNegativeMentionsTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
 
   // Price monitoring tools (all users; module-gated; internal flow unmetered → 0 cr)
@@ -2634,16 +2634,16 @@ async function executeAgent(
     tools.push(createTrackJobSearchTool(userId, workspaceId, userJwt, onChunk, conversation_id));
   }
   if (config.tools.includes('list_my_job_searches') && createListMyJobSearchesTool) {
-    tools.push(createListMyJobSearchesTool(userId, userJwt, onChunk));
+    tools.push(createListMyJobSearchesTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   if (config.tools.includes('find_jobs') && createFindJobsTool) {
-    tools.push(createFindJobsTool(userId, userJwt, onChunk));
+    tools.push(createFindJobsTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   if (config.tools.includes('get_job_digest_preview') && createGetJobDigestPreviewTool) {
-    tools.push(createGetJobDigestPreviewTool(userId, userJwt, onChunk));
+    tools.push(createGetJobDigestPreviewTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
-    tools.push(createManageJobSitesTool(userId, userJwt, onChunk));
+    tools.push(createManageJobSitesTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   // Flows toolkit (module-gated flows-toolkit + workspace entitlement enforced inside the tool)
   if (config.tools.includes('manage_flows') && createManageFlowsTool) {
