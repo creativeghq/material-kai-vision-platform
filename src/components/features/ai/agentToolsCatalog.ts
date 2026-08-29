@@ -336,6 +336,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── Projects (all users) ──────────────────────────────────────────────
   {
     id: 'create_project', name: 'Create Project', category: 'Projects',
+    moduleSlug: 'projects',
     desc: 'Create a new project to organize tasks and deliverables.',
     examples: [
       'Create a project called "Athens loft renovation"',
@@ -343,6 +344,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'list_my_projects', name: 'My Projects', category: 'Projects',
+    moduleSlug: 'projects',
     desc: 'List your projects with status and task counts.',
     examples: [
       'List my projects',
@@ -350,6 +352,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'find_project', name: 'Find Project', category: 'Projects',
+    moduleSlug: 'projects',
     desc: 'Look up a project by name or id and return its details + tasks.',
     examples: [
       'Find the "Athens loft renovation" project',
@@ -357,6 +360,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'add_task', name: 'Add Task', category: 'Projects',
+    moduleSlug: 'projects',
     desc: 'Add a task to a project.',
     examples: [
       'Add a task "order travertine samples" to the Athens loft project',
@@ -1788,7 +1792,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
     name: 'Expenses',
     description: 'Record a business operating expense as a categorized supplier bill.',
     icon: 'ReceiptText',
-    moduleSlug: 'finance',
+    // `finance` is not a row in `public.modules` — the slug is `sales-finance` everywhere else in
+    // the repo (#395). `enabledModules.includes('finance')` is therefore false in every workspace,
+    // so `getAccessibleToolkits` hid this toolkit from EVERYONE, permanently, including the
+    // operator root. None of its four tools has an `AgentToolEntry` either, so the command palette
+    // did not list them individually — Expenses was unreachable from both browse surfaces.
+    moduleSlug: 'sales-finance',
     tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'],
     quick_starts: [
       { label: 'Recent expenses', description: 'List recent expenses', prompt: 'Show my recent expenses.', icon: 'ListChecks' },

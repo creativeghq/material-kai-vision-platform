@@ -2602,7 +2602,7 @@ async function executeAgent(
     tools.push(createTrackProductPricesTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('get_price_summary') && createGetPriceSummaryTool) {
-    tools.push(createGetPriceSummaryTool(userId, userJwt, onChunk));
+    tools.push(createGetPriceSummaryTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
 
   // Email marketing (module + entitlement gated inside the tool; draft-only → 0 cr)

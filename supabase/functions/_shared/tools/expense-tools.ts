@@ -21,6 +21,7 @@
  */
 
 import { computeExpenseSplit } from '../finance/expense-math.ts';
+import { moduleGate } from './module-gate.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -116,6 +117,8 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
     vat_amount?: number; currency?: string; expense_date?: string; paid?: boolean;
     trip?: string; property?: string;
   }) => {
+    const denied = await moduleGate(workspaceId, 'sales-finance');
+    if (denied) return denied;
     try {
       // Validation + net/VAT/total split — pure, shared with tests/unit/expenseMath.test.ts.
       const split = computeExpenseSplit({ amount, vat_amount, category, payee, currency });
@@ -318,6 +321,8 @@ export const createPayExpenseTool = (userId: string, workspaceId: string, onChun
   tool(async ({ expense, amount, paid_on, method, reference }: {
     expense: string; amount?: number; paid_on?: string; method?: string; reference?: string;
   }) => {
+    const denied = await moduleGate(workspaceId, 'sales-finance');
+    if (denied) return denied;
     try {
       const found = await resolveExpense(workspaceId, expense);
       if (found.kind === 'none') {
@@ -404,6 +409,8 @@ export const createPayExpenseTool = (userId: string, workspaceId: string, onChun
 // ───────────────────────────── get_expense_payments ─────────────────────────────
 export const createGetExpensePaymentsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
   tool(async ({ expense }: { expense: string }) => {
+    const denied = await moduleGate(workspaceId, 'sales-finance');
+    if (denied) return denied;
     try {
       const found = await resolveExpense(workspaceId, expense);
       // A fully-paid expense is exactly what someone asks about here, and resolveExpense only
@@ -466,6 +473,8 @@ export const createGetExpensePaymentsTool = (userId: string, workspaceId: string
 // ───────────────────────────── list_recent_expenses ─────────────────────────────
 export const createListExpensesTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
   tool(async ({ limit }: { limit?: number }) => {
+    const denied = await moduleGate(workspaceId, 'sales-finance');
+    if (denied) return denied;
     try {
       const sb = svc();
       const { data, error } = await sb.from('supplier_bills')

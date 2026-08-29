@@ -44,20 +44,8 @@ const LLM_PROBE_CREDITS = 2;
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { moduleGate } from './module-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
-async function isModuleEnabled(): Promise<boolean> {
-  try {
-    const sb = svcClient();
-    const { data } = await sb
-      .from('modules')
-      .select('enabled')
-      .eq('slug', MODULE_SLUG)
-      .maybeSingle();
-    return Boolean(data?.enabled);
-  } catch (_) {
-    return false;
-  }
-}
 
 async function debit(userId: string, workspaceId: string | null, amount: number, op: string, productId?: string): Promise<boolean> {
   if (amount <= 0) return true;
@@ -342,9 +330,8 @@ export const createTrackProductMentionsTool = (
 ) => {
   return tool(
     async ({ product_id, subject_label, subject_type, action, aliases, auto_expand_aliases, sources_enabled, language_codes, country_codes, alert_on_spike, alert_on_negative_sentiment, alert_on_new_outlet, alert_on_llm_visibility_change }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'mention-monitoring module disabled — ask an admin to enable it' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       /**
        * A SUBJECT is trackable from chat, not only a product (#395).
        *
@@ -506,9 +493,8 @@ export const createGetMentionSummaryTool = (
 ) => {
   return tool(
     async ({ product_id, subject, days = 30 }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const resolved = await resolveSubjectBase({ product_id, subject }, userId, workspaceId);
       if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
       const { base, label } = resolved;
@@ -555,9 +541,8 @@ export const createCheckLlmVisibilityTool = (
 ) => {
   return tool(
     async ({ product_id, subject, models, force_run }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const resolved = await resolveSubjectBase({ product_id, subject }, userId, workspaceId);
       if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
       const { base, label } = resolved;
@@ -625,9 +610,8 @@ export const createFindNegativeMentionsTool = (
 ) => {
   return tool(
     async ({ product_id, subject, days = 30, limit = 25 }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'mention-monitoring disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const resolved = await resolveSubjectBase({ product_id, subject }, userId, workspaceId);
       if ('error' in resolved) return JSON.stringify({ success: false, ...resolved });
       const { base, label } = resolved;

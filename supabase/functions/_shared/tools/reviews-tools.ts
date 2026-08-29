@@ -33,7 +33,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MODULE_SLUG = 'reviews';
 
-import { serviceClient as svcClient } from '../supabase-client.ts';
+import { moduleGate } from './module-gate.ts';
 /** User-scoped client so RLS scopes reads/writes to the caller exactly as on the page. */
 function userClient(jwt: string | undefined) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -41,26 +41,17 @@ function userClient(jwt: string | undefined) {
   });
 }
 
-async function moduleReady(): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const { data: mod } = await svcClient().from('modules').select('enabled').eq('slug', MODULE_SLUG).maybeSingle();
-    if (!mod?.enabled) return { ok: false, error: 'The Reviews module is not enabled on this platform.' };
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: `Reviews availability check failed: ${(e as Error).message}` };
-  }
-}
-
 export const createManageReviewsTool = (
   userId: string,
-  _workspaceId: string,
+  workspaceId: string,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
     async ({ action, only_unanswered, limit = 20, review_id, reply, confirm }) => {
-      const gate = await moduleReady();
-      if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
+      // Was `modules.enabled` only — the PLATFORM publish flag, true for everyone (#395).
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       if (!userId) return JSON.stringify({ success: false, error: 'No signed-in user.' });
       const sb = userClient(jwt);
 

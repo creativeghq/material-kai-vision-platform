@@ -35,6 +35,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 // One derivation for catalog line money (#352 A13).
 import { scaleToTargetNet } from '../catalog-repricing.ts';
+import { moduleGate } from './module-gate.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -196,6 +197,8 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
       template_id?: string;
       cover_client_name?: string;
     }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         let templateId = input.template_id;
         if (!templateId) {
@@ -298,6 +301,8 @@ export const createAttachCatalogPdfsTool = (userId: string, workspaceId: string 
 
   return tool(
     async (input: { catalog_id: string; source_pdf_ids: string[] }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'attach', status: 'running', status_line: 'Linking source PDFs…' });
         const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
@@ -390,6 +395,8 @@ export const createExtractFromCatalogPdfsTool = (userId: string, workspaceId: st
       max_results?: number;
       auto_add?: boolean;
     }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       const maxResults = input.max_results ?? 12;
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'extract', status: 'running', status_line: `Vision-extracting "${input.query}"…` });
@@ -557,6 +564,8 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
       preserve_original_layout?: boolean;
       template_id?: string;
     }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         // Scoped to THIS workspace as well as this uploader (#395). `attach_catalog_pdfs` already
         // filters source PDFs by `catalog.workspace_id` — under a comment naming it a BOLA guard —
@@ -730,6 +739,8 @@ export const createAddMaterialToCatalogTool = (userId: string, workspaceId: stri
         specs?: Record<string, any>;
       };
     }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) return JSON.stringify({ error });
@@ -910,6 +921,8 @@ export const createFindImageForMaterialTool = (userId: string, workspaceId: stri
       search_db_first?: boolean;
       max_candidates?: number;
     }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       const maxCandidates = input.max_candidates ?? 6;
       const searchDbFirst = input.search_db_first !== false;
       try {
@@ -992,6 +1005,8 @@ export const createGenerateCatalogPdfTool = (userId: string, workspaceId: string
 
   return tool(
     async (input: { catalog_id: string; regenerate?: boolean; layout?: 'list' | 'grid'; proforma?: boolean; vat_rate?: number }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'generate', status: 'running', status_line: 'Rendering A4 PDF…' });
         const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
@@ -1077,6 +1092,8 @@ export const createAdjustCatalogPricingTool = (userId: string, workspaceId: stri
 
   return tool(
     async (input: { catalog_id: string; mode: 'target_total' | 'delta' | 'percent' | 'per_item'; amount: number; basis?: 'payable' | 'net' }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) return JSON.stringify({ error: error || 'Catalog not found' });
@@ -1243,6 +1260,8 @@ export const createPublishCatalogTool = (userId: string, workspaceId: string | n
 
   return tool(
     async (input: { catalog_id: string; desired_slug?: string; unpublish?: boolean }) => {
+      const denied = await moduleGate(workspaceId, 'presentation-catalogs');
+      if (denied) return denied;
       try {
         if (!input.unpublish) {
           emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'publish', status: 'running', status_line: 'Minting public slug…' });

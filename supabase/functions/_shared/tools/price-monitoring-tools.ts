@@ -41,16 +41,8 @@ const MODULE_SLUG = 'price-monitoring';
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { moduleGate } from './module-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
-async function isModuleEnabled(): Promise<boolean> {
-  try {
-    const sb = svcClient();
-    const { data } = await sb.from('modules').select('enabled').eq('slug', MODULE_SLUG).maybeSingle();
-    return Boolean(data?.enabled);
-  } catch (_) {
-    return false;
-  }
-}
 
 async function getProductRow(productId: string) {
   const sb = svcClient();
@@ -95,9 +87,8 @@ export const createTrackProductPricesTool = (
 ) => {
   return tool(
     async ({ product_id, action }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'price-monitoring module disabled — ask an admin to enable it' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const product = await getProductRow(product_id);
       if (!product) return JSON.stringify({ success: false, error: `product ${product_id} not found` });
 
@@ -141,14 +132,16 @@ export const createTrackProductPricesTool = (
 
 export const createGetPriceSummaryTool = (
   userId: string,
+  // Added for the module gate (#395): this tool read a monitored product's price history with no
+  // idea which workspace was asking, so it could not check entitlement even in principle.
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
     async ({ product_id, include_sources = true }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'price-monitoring disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       onChunk?.({ type: 'tool_progress', status: 'Loading price summary...', timestamp: Date.now() });
 
       const summaryRes = await callMivaa(`/api/v1/price-monitoring/products/${product_id}`, { method: 'GET', jwt });

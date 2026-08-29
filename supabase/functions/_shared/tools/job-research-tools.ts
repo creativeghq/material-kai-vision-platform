@@ -41,20 +41,8 @@ const MODULE_SLUG = 'job-research';
 // ───────────────────────────────────────────────────────────────────────────
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { moduleGate } from './module-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
-async function isModuleEnabled(): Promise<boolean> {
-  try {
-    const sb = svcClient();
-    const { data } = await sb
-      .from('modules')
-      .select('enabled')
-      .eq('slug', MODULE_SLUG)
-      .maybeSingle();
-    return Boolean(data?.enabled);
-  } catch (_) {
-    return false;
-  }
-}
 
 async function callMivaa(
   path: string,
@@ -121,9 +109,8 @@ export const createTrackJobSearchTool = (
       digest_hour_utc, digest_day_of_week, alert_channels, refresh_interval_hours,
       tracked_job_id, pause_scope,
     }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'job-research module is disabled — ask an admin to enable it' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
 
       onChunk?.({ type: 'tool_progress', status: `${action} job search "${label || tracked_job_id}"...`, timestamp: Date.now() });
 
@@ -308,9 +295,8 @@ export const createListMyJobSearchesTool = (
 ) => {
   return tool(
     async ({ only_active = true }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'job-research disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const r = await callMivaa(`/api/v1/job-research/track?only_active=${only_active}`, { method: 'GET', jwt });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       const tracked = r.data?.tracked_jobs ?? [];
@@ -343,9 +329,8 @@ export const createFindJobsTool = (
 ) => {
   return tool(
     async ({ label, tracked_job_id, days = 7, only_unactioned = false, limit = 25 }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'job-research disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       let targetId = tracked_job_id;
       if (!targetId && label) {
         const existing = await findUserTrackedJobByLabel(userId, workspaceId, label);
@@ -441,9 +426,8 @@ export const createManageJobSitesTool = (
 ) => {
   return tool(
     async ({ action, site_type, url_or_domain, display_name, country_code, category, notes, site_id, is_enabled }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'job-research disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
 
       // No fields → open the modal form for the user to fill in. Useful when
       // the user says "add a job site" without specifics.
@@ -573,9 +557,8 @@ export const createGetJobDigestPreviewTool = (
 ) => {
   return tool(
     async ({ days = 1 }) => {
-      if (!await isModuleEnabled()) {
-        return JSON.stringify({ success: false, error: 'job-research disabled' });
-      }
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
 
       // Pull all of the user's tracked_jobs, then for each one collect the matches in the window.
       const sb = svcClient();

@@ -1,4 +1,5 @@
 import { describeUpstreamError } from '../tool-result-shape.ts';
+import { moduleGate } from './module-gate.ts';
 /**
  * CRM Tools for JARVIS — workspace-scoped queries over the CRM roster.
  *
@@ -52,6 +53,8 @@ async function callEdge(path: string, body: AnyRow, jwt: string | undefined): Pr
 export const createCrmKadSearchTool = (workspaceId: string, onChunk?: (chunk: AnyRow) => void) => {
   return tool(
     async ({ kad, match }: { kad: string; match?: 'exact' | 'prefix' }) => {
+      const denied = await moduleGate(workspaceId, 'crm');
+      if (denied) return denied;
       const code = String(kad || '').trim();
       if (!code) return JSON.stringify({ error: 'Provide a ΚΑΔ activity code, e.g. "46.73.10".' });
       const mode = match ?? (code.length <= 2 || code.endsWith('.') ? 'prefix' : 'exact');
@@ -137,6 +140,8 @@ export const createCompanyFromVatTool = (
 ) => {
   return tool(
     async ({ vat_number, country_code }: { vat_number: string; country_code?: string }) => {
+      const denied = await moduleGate(workspaceId, 'crm');
+      if (denied) return denied;
       const digits = String(vat_number || '').replace(/[^0-9]/g, '');
       if (!digits) return JSON.stringify({ success: false, error: 'Provide a VAT / ΑΦΜ number.' });
       const cc = (country_code || '').toUpperCase();
@@ -212,6 +217,8 @@ export const createManageCrmTool = (
 ) => {
   return tool(
     async ({ action, name, email, phone, company_name, contact_id, contact_query, kind, title, note }: AnyRow) => {
+      const denied = await moduleGate(workspaceId, 'crm');
+      if (denied) return denied;
       if (action === 'create_contact') {
         if (!name) return JSON.stringify({ success: false, error: 'create_contact needs a name.' });
         const created = await callEdge('crm-api/contacts', {
@@ -299,6 +306,8 @@ export const createManageDealTool = (
 
   return tool(
     async ({ action, deal_type, deal_id, title, contact_query, value, stage, lost_reason }: AnyRow) => {
+      const denied = await moduleGate(workspaceId, 'deals');
+      if (denied) return denied;
       const db = sb();
 
       /** Resolve a deal type by fuzzy label/key, or the workspace default when unspecified. */
@@ -430,6 +439,8 @@ export const createEnrichCompanyFromAadeTool = (
 ) => {
   return tool(
     async ({ company_id, company_query }: { company_id?: string; company_query?: string }) => {
+      const denied = await moduleGate(workspaceId, 'crm');
+      if (denied) return denied;
       // Resolve the company (service-role read, explicitly workspace-scoped).
       let q = supabase.from('crm_companies').select('id, name, vat_number, country_code').eq('workspace_id', workspaceId);
       if (company_id) q = q.eq('id', company_id);

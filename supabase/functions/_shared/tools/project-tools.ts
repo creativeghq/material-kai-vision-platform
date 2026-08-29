@@ -38,27 +38,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODULE_SLUG = 'projects';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
-async function isModuleEnabled(): Promise<boolean> {
-  try {
-    const sb = svcClient();
-    const { data } = await sb
-      .from('modules')
-      .select('enabled')
-      .eq('slug', MODULE_SLUG)
-      .maybeSingle();
-    return Boolean(data?.enabled);
-  } catch (_) {
-    return false;
-  }
-}
-
-async function moduleDisabledError(): Promise<string> {
-  return JSON.stringify({
-    success: false,
-    error: 'Projects module is disabled — ask an admin to enable it in /admin/modules.',
-  });
-}
-
+import { moduleGate } from './module-gate.ts';
 /**
  * Resolve project_id from either an explicit id or a fuzzy name, WITHIN THIS WORKSPACE (#395).
  *
@@ -118,7 +98,8 @@ export const createCreateProjectTool = (
       client_contact_id?: string;
       client_name?: string;
     }) => {
-      if (!await isModuleEnabled()) return moduleDisabledError();
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const sb = svcClient();
 
       // Resolve the project's client — everything downstream (quotes, invoices, client views,
@@ -241,7 +222,8 @@ export const createListMyProjectsTool = (
 ) => {
   return tool(
     async ({ include_archived }: { include_archived?: boolean }) => {
-      if (!await isModuleEnabled()) return moduleDisabledError();
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const sb = svcClient();
 
       onChunk?.({ type: 'tool_progress', status: 'Loading your projects...', timestamp: Date.now() });
@@ -304,7 +286,8 @@ export const createFindProjectTool = (
 ) => {
   return tool(
     async ({ query }: { query: string }) => {
-      if (!await isModuleEnabled()) return moduleDisabledError();
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const sb = svcClient();
 
       // Scoped to this workspace as well as this user (#395) — see `resolveProjectId`.
@@ -370,7 +353,8 @@ export const createAddTaskTool = (
       due_date?: string;
       visibility?: 'internal' | 'client_visible';
     }) => {
-      if (!await isModuleEnabled()) return moduleDisabledError();
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const sb = svcClient();
 
       const resolvedProjectId = await resolveProjectId(userId, workspaceId, project_id, project_name);
@@ -484,7 +468,8 @@ export const createAddPurchaseItemTool = (
       room_name?: string;
       notes?: string;
     }) => {
-      if (!await isModuleEnabled()) return moduleDisabledError();
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const sb = svcClient();
 
       const projectId = await resolveProjectId(userId, workspaceId, input.project_id, input.project_name);
@@ -600,7 +585,8 @@ export const createGeneratePurchaseSheetTool = (
       project_name?: string;
       mode?: 'schedule' | 'per_item' | 'both' | 'order';
     }) => {
-      if (!await isModuleEnabled()) return moduleDisabledError();
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
       const sb = svcClient();
 
       const projectId = await resolveProjectId(userId, workspaceId, project_id, project_name);
