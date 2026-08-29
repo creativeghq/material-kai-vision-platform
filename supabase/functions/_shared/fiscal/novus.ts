@@ -227,10 +227,10 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           totalNetValue: summary.totalNetValue,
           totalVatAmount: summary.totalVatAmount,
           totalWithheldAmount: summary.totalWithheldAmount ?? 0,
-          totalFeesAmount: (summary as any).totalFeesAmount ?? 0,
-          totalStampDutyAmount: (summary as any).totalStampDutyAmount ?? 0,
-          totalOtherTaxesAmount: (summary as any).totalOtherTaxesAmount ?? 0,
-          totalDeductionsAmount: (summary as any).totalDeductionsAmount ?? 0,
+          totalFeesAmount: summary.totalFeesAmount ?? 0,
+          totalStampDutyAmount: summary.totalStampDutyAmount ?? 0,
+          totalOtherTaxesAmount: summary.totalOtherTaxesAmount ?? 0,
+          totalDeductionsAmount: summary.totalDeductionsAmount ?? 0,
           totalGrossValue: summary.totalGrossValue,
           incomeClassification: summary.incomeClassificationType
             ? [

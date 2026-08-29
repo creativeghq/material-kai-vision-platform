@@ -441,10 +441,17 @@ export async function buildInvoiceInputFromDb(
 }
 
 /**
- * Build a myDATA 5.1 credit-note FiscalInvoiceInput from a credit_notes row. The
- * issuer is the workspace; the counterpart + correlated MARK come from the original
- * invoice. Lines come from credit_note_items. Type 5.1 (correlated) when the original
- * carries a fiscal_mark, else 5.2.
+ * Build a credit-note FiscalInvoiceInput from a credit_notes row. The issuer is the
+ * workspace; the counterpart + correlated MARK come from the original invoice. Lines come
+ * from credit_note_items.
+ *
+ * THE TYPE FOLLOWS THE DOCUMENT BEING CORRECTED. A retail receipt (11.x) is reversed by
+ * **11.4** (Πιστωτικό Στοιχείο Λιανικής); only a wholesale invoice takes 5.1 (correlated,
+ * when the original carries a MARK) or 5.2. Filing a 5.x against an 11.x is a mis-typed
+ * document at AADE, and it was all this could produce — while `buildInvoiceInputFromDb`
+ * emits 11.1 for every counterparty with no VAT number, which is every register and
+ * storefront sale. `issue_credit_note` stamps the same type at creation; this recomputes it
+ * so a row written before that fix still transmits correctly.
  */
 export async function buildCreditNoteInputFromDb(
   supabase: any,
@@ -485,10 +492,27 @@ export async function buildCreditNoteInputFromDb(
   // Credit note inherits the corrected invoice's chosen sub-unit address.
   counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
 
+  const creditDocType = String(
+    overrides.invoiceType ?? cn.document_type
+      ?? (String(inv.document_type ?? '').startsWith('11.') ? '11.4' : (cn.correlated_mark ?? inv.fiscal_mark ? '5.1' : '5.2')),
+  );
+  const isRetailCredit = creditDocType.startsWith('11.');
+  // Income classification is INHERITED per line from the invoice line being credited
+  // (`issue_credit_note` copies it), so the retail/wholesale split the invoice made — product
+  // retail codes included — carries over without being re-derived here. These are only the
+  // fallback for a whole-amount credit that has no source line.
+  const defaultIncType = fs?.default_income_classification_type ?? 'E3_561_001';
+  const defaultIncCat = fs?.default_income_classification_category ?? 'category1_1';
+
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
     const net = round2(Number(it.net_value ?? 0));
-    const linePct = Number(it.vat_percent ?? inv.vat_rate ?? 24);
-    const lineCat = it.vat_category ?? vatCategory(linePct);
+    // Category ↔ percent, same precedence as the invoice line: an explicit category wins and
+    // the percent is derived from it, so a 0% line cannot be transmitted at the invoice rate.
+    const explicitCat = it.vat_category ?? null;
+    const lineCat = explicitCat != null && VAT_PCT_BY_CATEGORY[Number(explicitCat)] !== undefined
+      ? Number(explicitCat)
+      : vatCategory(Number(it.vat_percent ?? inv.vat_rate ?? 24));
+    const linePct = VAT_PCT_BY_CATEGORY[lineCat] ?? Number(it.vat_percent ?? inv.vat_rate ?? 24);
     return {
       lineNumber: i + 1,
       code: it.sku ?? undefined,
@@ -506,15 +530,36 @@ export async function buildCreditNoteInputFromDb(
       vatPercent: linePct,
       vatAmount: round2((net * linePct) / 100),
       // Carry the exemption reason on 0%/exempt lines — myDATA rejects a cat-7/8 line
-      // without it (mirrors the main-invoice line mapping above).
+      // without it (mirrors the main-invoice line mapping above). The column this reads did
+      // not exist until 2026-08-29: the mapping was here, the fact never arrived, and the
+      // omission is invisible because the envelope simply drops an undefined field.
       vatExemptionCategory: it.vat_exemption_category ?? undefined,
-      incomeClassificationType: it.income_classification_type ?? fs?.default_income_classification_type ?? 'E3_561_001',
-      incomeClassificationCategory: it.income_classification_category ?? fs?.default_income_classification_category ?? 'category1_1',
+      // Per-line taxes, PRO-RATED onto the credited share by `issue_credit_note`. Without
+      // these a reversal of a services invoice restates net + VAT and silently forgets the
+      // 20% withholding the original declared.
+      withheldAmount: Number(it.withheld_amount ?? 0) || undefined,
+      withheldCategory: it.withheld_category ?? undefined,
+      feesAmount: Number(it.fees_amount ?? 0) || undefined,
+      feesCategory: it.fees_category ?? undefined,
+      stampDutyAmount: Number(it.stamp_duty_amount ?? 0) || undefined,
+      stampDutyCategory: it.stamp_duty_category ?? undefined,
+      otherTaxesAmount: Number(it.other_taxes_amount ?? 0) || undefined,
+      otherTaxesCategory: it.other_taxes_category ?? undefined,
+      deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
+      incomeClassificationType: it.income_classification_type ?? defaultIncType,
+      incomeClassificationCategory: it.income_classification_category ?? defaultIncCat,
     };
   });
 
   const totalNet = round2(lines.reduce((s, l) => s + l.netValue, 0));
   const totalVat = round2(lines.reduce((s, l) => s + l.vatAmount, 0));
+  // The per-line tax totals are SUMMED FROM THE LINES TRANSMITTED, not read from a second
+  // stored copy on `credit_notes` — the invoice reads header columns because it has them, and
+  // a cached total on a document whose lines are already the source would need its own drift
+  // check to be worth anything. Same rule as the printed document: what the reader can add up
+  // must add up.
+  const sumLines = (pick: (l: FiscalLine) => number | undefined) =>
+    round2(lines.reduce((acc, l) => acc + (pick(l) ?? 0), 0));
   const correlatedMark = cn.correlated_mark ?? inv.fiscal_mark ?? null;
   const isCorrelated = !!correlatedMark;
 
@@ -525,7 +570,7 @@ export async function buildCreditNoteInputFromDb(
       series: overrides.series ?? (cn.series || fs?.invoice_number_prefix || 'A'),
       aa: overrides.aa ?? String(cn.series_number ?? cn.credit_note_number ?? ''),
       issueDate: String(cn.issued_at ?? cn.created_at ?? new Date().toISOString()).slice(0, 10),
-      invoiceType: overrides.invoiceType ?? cn.document_type ?? (isCorrelated ? '5.1' : '5.2'),
+      invoiceType: creditDocType,
       currency: cn.currency ?? inv.currency ?? 'EUR',
     },
     correlatedInvoices: isCorrelated ? [Number(correlatedMark)] : undefined,
@@ -533,11 +578,19 @@ export async function buildCreditNoteInputFromDb(
     summary: {
       totalNetValue: totalNet,
       totalVatAmount: totalVat,
+      totalWithheldAmount: sumLines((l) => l.withheldAmount),
+      totalFeesAmount: sumLines((l) => l.feesAmount),
+      totalStampDutyAmount: sumLines((l) => l.stampDutyAmount),
+      totalOtherTaxesAmount: sumLines((l) => l.otherTaxesAmount),
+      totalDeductionsAmount: sumLines((l) => l.deductionsAmount),
       totalGrossValue: round2(totalNet + totalVat),
-      incomeClassificationType: fs?.default_income_classification_type ?? 'E3_561_001',
-      incomeClassificationCategory: fs?.default_income_classification_category ?? 'category1_1',
+      incomeClassificationType: defaultIncType,
+      incomeClassificationCategory: defaultIncCat,
     },
-    documentLabel: overrides.documentLabel ?? 'Πιστωτικό Τιμολόγιο',
+    // A retail credit note is not a "Πιστωτικό Τιμολόγιο" — AADE names 11.4 differently, and
+    // the label is what the customer's copy prints.
+    documentLabel: overrides.documentLabel
+      ?? (isRetailCredit ? 'Πιστωτικό Στοιχείο Λιανικής' : 'Πιστωτικό Τιμολόγιο'),
     documentComments: cn.reason ?? undefined,
     // Follows the invoice it corrects — the two are read side by side.
     documentLanguageCode: String(inv.doc_language ?? 'en').toUpperCase(),

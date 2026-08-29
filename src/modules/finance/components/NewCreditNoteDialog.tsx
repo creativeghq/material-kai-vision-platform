@@ -1,9 +1,13 @@
 /**
  * New credit note from the Credit-notes list. Pick the invoice it corrects, then credit
- * its specific lines (full or partial quantity). The note is
- * created against the invoice (myDATA 5.1 correlated when the invoice has a MARK, else 5.2),
- * nets the invoice balance, and optionally transmits. Falls back to a whole-amount credit
- * for legacy invoices that have no stored line items.
+ * its specific lines (full or partial quantity). The note is created against the invoice,
+ * nets its balance, and optionally transmits. Falls back to a whole-amount credit for legacy
+ * invoices that have no stored line items.
+ *
+ * The myDATA type FOLLOWS THE CREDITED DOCUMENT and is decided by `issue_credit_note`, not
+ * here: 11.4 for a retail receipt (11.x), otherwise 5.1 when the invoice carries a MARK and
+ * 5.2 when it does not. The exemption category and the per-line taxes are copied from the
+ * credited invoice line by the same RPC — never restated by this form.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
@@ -150,7 +154,11 @@ export const NewCreditNoteDialog: React.FC<{
             </Select>
             {invoice && (
               <p className="text-[11px] text-muted-foreground">
-                {(invoice as any).fiscal_mark ? 'Correlated 5.1 credit note (references the invoice MARK).' : 'Non-correlated 5.2 (the invoice has no myDATA MARK).'} Crediting the full invoice flips it to credit_noted.
+                {String((invoice as any).document_type ?? '').startsWith('11.')
+                  ? 'Retail credit note (11.4) — a retail receipt is reversed by 11.4, not by a credit invoice.'
+                  : (invoice as any).fiscal_mark
+                    ? 'Correlated 5.1 credit note (references the invoice MARK).'
+                    : 'Non-correlated 5.2 (the invoice has no myDATA MARK).'} Crediting the full invoice flips it to credit_noted.
               </p>
             )}
           </div>
@@ -205,7 +213,7 @@ export const NewCreditNoteDialog: React.FC<{
           {invoice && (invoice as any).fiscal_mark && (
             <label className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 p-3">
               <div>
-                <div className="text-sm font-medium">Transmit to myDATA (5.1)</div>
+                <div className="text-sm font-medium">Transmit to myDATA</div>
                 <p className="text-xs text-muted-foreground">Correlated to the invoice MARK.</p>
               </div>
               <Switch checked={submitFiscal} onCheckedChange={setSubmitFiscal} />

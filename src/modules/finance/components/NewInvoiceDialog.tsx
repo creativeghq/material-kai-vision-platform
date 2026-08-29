@@ -36,6 +36,7 @@ import { MYDATA_TYPE_FAMILY } from '@/modules/finance/components/mydataTypes';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 import { parseDecimalOr } from '@/utils/decimal';
+import { MYDATA_PAYMENT_CODE } from '@/modules/finance/paymentVocabulary';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import { projectIdentity, variantKey, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
@@ -267,7 +268,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Manual amount for an 'amount'-kind withholding category (wage/solidarity/termination/etc.),
   // which has no percentage to auto-compute from.
   const [withholdingAmount, setWithholdingAmount] = useState('');
-  const [paymentMethodCode, setPaymentMethodCode] = useState('3'); // default "On credit"
+  // AADE 8.12 code 5. Was the literal '3' commented "On credit" — which AADE reads as CASH,
+  // because the reference seed feeding the picker had the table rotated by two.
+  const [paymentMethodCode, setPaymentMethodCode] = useState(String(MYDATA_PAYMENT_CODE.on_credit));
   const [paymentMethodInfo, setPaymentMethodInfo] = useState('');
   const [vatSuspension, setVatSuspension] = useState(false);
   const [selfPricing, setSelfPricing] = useState(false);

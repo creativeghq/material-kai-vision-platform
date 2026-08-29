@@ -89,6 +89,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
   el: {
     invoice: 'ΤΙΜΟΛΟΓΙΟ ΠΩΛΗΣΗΣ', service: 'ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ',
     receipt: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ', creditNote: 'ΠΙΣΤΩΤΙΚΟ ΤΙΜΟΛΟΓΙΟ', deliveryNote: 'ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ',
+    retailCreditNote: 'ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ',
     issuer: 'ΕΚΔΟΤΗΣ', customer: 'ΠΕΛΑΤΗΣ', vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', profession: 'Δραστηριότητα',
     phone: 'Τηλ.', email: 'Email', establishment: 'Εγκατάσταση',
     number: 'Αριθμός', series: 'Σειρά', date: 'Ημερομηνία', due: 'Λήξη',
@@ -126,6 +127,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
     receipt: 'RETAIL RECEIPT', creditNote: 'CREDIT NOTE', deliveryNote: 'DELIVERY NOTE',
+    retailCreditNote: 'RETAIL CREDIT NOTE',
     issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
     phone: 'Tel.', email: 'Email', establishment: 'Establishment',
     number: 'Number', series: 'Series', date: 'Date', due: 'Due',
@@ -166,20 +168,17 @@ const LABELS: Record<Lang, Record<string, string>> = {
 // `Record<string, …>`: a seventh method then fails `deno check` here instead of
 // silently printing its raw column value on a customer's receipt.
 import {
-  type PaymentMethod, isPaymentMethod,
+  type PaymentMethod, isPaymentMethod, mydataPaymentLabel,
 } from '../_shared/paymentVocabulary.generated.ts';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
 };
 
-/** myDATA payment-method code → label. Mirrors PAYMENT_METHOD_LABELS in
- *  src/modules/finance/invoice-templates/labels.ts — a Greek παραστατικό carries the method in
- *  its header band, not only beside the bank details. */
-const PAY_METHODS: Record<number, string> = {
-  1: 'Cash', 2: 'Check', 3: 'On credit', 4: 'Web banking', 5: 'POS / e-POS',
-  6: 'IRIS', 7: 'Domestic account', 8: 'Foreign account',
-};
+// The myDATA CODE → name (AADE 8.12) comes from `mydataPaymentLabel` in the mirrored
+// vocabulary, not from a local map. The local one here was AADE's list rotated by two, so a
+// register receipt written as 7 (POS / e-POS) printed as "Domestic account" — a Greek
+// παραστατικό carries the method in its header band, so the name is on the document itself.
 
 function docTitle(documentType: string | null, L: Record<string, string>, status?: string | null): string {
   // A DRAFT sales/service invoice is a pre-invoice (προτιμολόγιο): numbered but not issued
@@ -189,7 +188,10 @@ function docTitle(documentType: string | null, L: Record<string, string>, status
   if (status === 'draft' && isSalesOrService) return L.preInvoice;
   switch (documentType) {
     case '2.1': case '2.2': case '2.3': case '2.4': return L.service;
-    case '11.1': case '11.2': case '11.3': case '11.4': case '11.5': return L.receipt;
+    // 11.4 is the RETAIL CREDIT note — it sat in the receipt row and printed as
+    // "ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ", i.e. a refund document titled as a sale.
+    case '11.4': return L.retailCreditNote;
+    case '11.1': case '11.2': case '11.3': case '11.5': return L.receipt;
     case '5.1': case '5.2': return L.creditNote;
     case '9.3': return L.deliveryNote;
     default: return L.invoice;
@@ -676,9 +678,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   ].filter(Boolean) as string[];
   const locale = lang === 'el' ? 'el-GR' : 'en-GB';
   const issuedAt = inv.issued_at ? new Date(inv.issued_at) : null;
-  const paymentMethodLabel = inv.payment_method_code
-    ? (PAY_METHODS[Number(inv.payment_method_code)] ?? String(inv.payment_method_code))
-    : '';
+  const paymentMethodLabel = mydataPaymentLabel(inv.payment_method_code, lang);
   const metaRows: [string, string][] = [
     // The myDATA document-type code (1.1, 2.1, 11.2 …) is what an auditor matches against the
     // transmitted envelope; the title alone does not identify it.

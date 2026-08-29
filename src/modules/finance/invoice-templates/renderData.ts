@@ -1,7 +1,7 @@
 // Single source of truth for WHICH invoice fields appear and how totals/VAT are computed.
 // The pdf-lib generator mirrors this exact logic so HTML preview and PDF stay in lockstep.
 import {
-  INVOICE_LABELS, invoiceDocTitle, PAYMENT_METHOD_LABELS,
+  INVOICE_LABELS, invoiceDocTitle, mydataPaymentLabel,
   VAT_PCT_BY_CAT, UNIT_LABEL_BY_CODE, type Lang,
 } from './labels';
 import type {
@@ -100,7 +100,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // Payment method is resolved before the meta block because a Greek παραστατικό carries it
   // in the header band, not only down beside the bank details.
   const paymentMethodLabel = inv.payment_method_code
-    ? (PAYMENT_METHOD_LABELS[Number(inv.payment_method_code)] ?? String(inv.payment_method_code))
+    ? mydataPaymentLabel(inv.payment_method_code, lang)
     : undefined;
 
   // ── Meta (right column) ──

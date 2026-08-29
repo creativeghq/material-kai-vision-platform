@@ -24,6 +24,7 @@ import {
   type InvoiceWithItems,
 } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
@@ -465,9 +466,10 @@ const InvoiceDetailPage: React.FC = () => {
 
       {(() => {
         const inv = invoice as any;
-        const PAY: Record<number, string> = { 1: 'Cash', 2: 'Check', 3: 'On credit', 4: 'Web banking', 5: 'POS / e-POS', 6: 'IRIS', 7: 'Domestic account', 8: 'Foreign account' };
         const rows: [string, any][] = [
-          ['Payment method', inv.payment_method_code ? (PAY[Number(inv.payment_method_code)] ?? inv.payment_method_code) : null],
+          // AADE 8.12 via the one table — the literal that used to sit here was that list
+          // rotated by two, so code 7 (POS / e-POS) read as "Domestic account".
+          ['Payment method', inv.payment_method_code ? mydataPaymentLabel(inv.payment_method_code) : null],
           ['Payment note', inv.payment_method_info],
           ['Related document', inv.related_document],
           ['Digital transaction fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, inv.currency) : null],

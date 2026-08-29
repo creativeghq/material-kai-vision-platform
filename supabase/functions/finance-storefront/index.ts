@@ -21,6 +21,7 @@ const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materi
 import { grossFromNet, round2 } from '../_shared/money.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
+import { MYDATA_PAYMENT_CODE } from '../_shared/paymentVocabulary.generated.ts';
 
 // Image extraction and the net→gross conversion moved to _shared once the #321 embed API became a
 // second public surface publishing the same products at the same prices. Two copies of a price
@@ -192,7 +193,9 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         currency,
         subtotal_net: totalNet, vat_rate: vatRate, vat_amount: totalVat, total: totalGross,
         prices_include_vat: true,
-        payment_method_code: 7, // card (online)
+        // AADE 8.12 — POS / e-POS. Named, not the literal 7: the same table is spelled out
+        // elsewhere in a rotated form where 7 means a domestic bank account.
+        payment_method_code: MYDATA_PAYMENT_CODE.pos,
         // Online store sells physical goods → the paid invoice must land on the dispatch board
         // (listDispatchQueue filters has_shipping=true AND status='paid'), where issuing the
         // dispatch note moves stock. Without this the order was a dead end after payment.

@@ -192,13 +192,22 @@ export interface FiscalInvoiceInput {
     deliveryDetails?: { street?: string; city?: string; postalCode?: string };
   };
   lines: FiscalLine[];
-  // type 7=card, 8=IRIS carry the EFT-POS terminal id + NSP for the Law 5155 signature.
+  /** myDATA payment method (AADE table 8.12 — `MYDATA_PAYMENT_CODE` in the payment
+   *  vocabulary is the one place those integers are named). 7 = POS / e-POS and 8 = IRIS
+   *  carry the EFT-POS terminal id + NSP for the Law 5155 signature. */
   paymentMethods?: { type: number; amount: number; info?: string; terminalId?: string; posNspId?: number }[];
   summary: {
     totalNetValue: number;
     totalVatAmount: number;
     totalGrossValue: number;
+    // The four below were read out of `summary` by the connector through an `as any` cast,
+    // so nothing checked that a builder actually supplied them — and the credit-note builder
+    // supplied none of the five. Declared, so omitting one is now a type error at the reader.
     totalWithheldAmount?: number;
+    totalFeesAmount?: number;
+    totalStampDutyAmount?: number;
+    totalOtherTaxesAmount?: number;
+    totalDeductionsAmount?: number;
     incomeClassificationType?: string;
     incomeClassificationCategory?: string;
   };

@@ -203,11 +203,14 @@ describe('document header and fiscal footer', () => {
       document_type: '1.1',
       internal_number: 'INV-2026-0042',
       issued_at: '2026-08-20T19:19:57.000Z',
-      payment_method_code: 2,
+      // AADE table 8.12: 4 = Επιταγή. This fixture said `2` and expected "Check", which was
+      // the rotated copy of the table the printed maps used to carry — 2 is the FOREIGN
+      // payments account. See `MYDATA_PAYMENT_CODE`.
+      payment_method_code: 4,
     }, []);
     const meta = META(data);
     expect(meta['Document type']).toBe('1.1');
-    expect(meta['Payment method']).toBe('Check');
+    expect(meta['Payment method']).toBe('Cheque');
     expect(meta.Time).toBeTruthy();
     // The date and time come from the same instant, rendered in the operator's locale.
     expect(meta.Date).toBeTruthy();

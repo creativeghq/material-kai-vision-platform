@@ -29,6 +29,7 @@ import { posSessionService, type PosSession, type PosReport } from '@/modules/fi
 import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { parseDecimal } from '@/utils/decimal';
+import { MYDATA_PAYMENT_CODE } from '@/modules/finance/paymentVocabulary';
 import { edgeError } from '@/utils/edgeError';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { formatDate, formatTime } from '@/utils/datetime';
@@ -75,9 +76,15 @@ type PayMethod = 'cash' | 'card' | 'iris';
  * looks right and collapses IRIS to the card code, which declares **every IRIS receipt to
  * AADE as a card payment** and takes the Z-report payment-method breakdown with it.
  *
- *   3 = cash · 7 = card / e-POS · 8 = IRIS
+ * The integers come from `MYDATA_PAYMENT_CODE` (AADE table 8.12) rather than being written
+ * out here: the same eight codes were also spelled out, ROTATED BY TWO, in the reference
+ * seed behind the manual invoice picker and in the three maps that print them.
  */
-const AADE_PAYMENT_CODE: Record<PayMethod, 3 | 7 | 8> = { cash: 3, card: 7, iris: 8 };
+const AADE_PAYMENT_CODE: Record<PayMethod, number> = {
+  cash: MYDATA_PAYMENT_CODE.cash,
+  card: MYDATA_PAYMENT_CODE.pos,
+  iris: MYDATA_PAYMENT_CODE.iris,
+};
 
 /** The `payments.method` ledger value for a register payment — IRIS is not card. */
 const LEDGER_METHOD: Record<PayMethod, 'cash' | 'card' | 'iris'> = { cash: 'cash', card: 'card', iris: 'iris' };

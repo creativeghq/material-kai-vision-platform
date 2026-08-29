@@ -5,6 +5,8 @@ import { join } from 'path';
 import { stripComments } from '../helpers/stripComments';
 import {
   PAYMENT_METHODS, PAYMENT_PROVIDER_SLUGS, isPaymentMethod, isPaymentProviderSlug,
+  MYDATA_PAYMENT_CODE, MYDATA_PAYMENT_METHOD_LABELS, MYDATA_PAYMENT_CODE_BY_LEDGER_METHOD,
+  mydataPaymentLabel,
 } from '@/modules/finance/paymentVocabulary';
 import { FISCAL_CAPABILITIES, isFiscalCapability } from '@/services/fiscal/fiscalVocabulary';
 import { RING_VALUES, ringRank, isTechRadarRing } from '@/services/techRadar/techRadarVocabulary';
@@ -171,5 +173,101 @@ describe('#391 — `priority_level` was a false positive, not a missed unificati
     // cylinders, which is plumbing and has nothing to do with the enum.
     expect(src).not.toContain('priority_level');
     expect(src).not.toMatch(/from '@\/services\/.*[Vv]ocabulary'/);
+  });
+});
+
+
+/**
+ * AADE Appendix table 8.12 — the payment method a fiscal envelope transmits.
+ *
+ * Two DIFFERENT numberings of the same eight entries were live at once. The register, the
+ * storefront and the fiscal envelope used AADE's; the `mydata_reference` seed behind the
+ * manual invoice picker and the three maps that PRINT the result used it rotated by two, so
+ * "3 — On credit" in the dialog transmitted **Cash** and a POS receipt (7) printed as
+ * "Domestic account". Both halves were internally consistent and every value involved is a
+ * valid integer 1–8, so nothing could raise. Found by reading another vendor's public API
+ * docs on 2026-08-29, not by anything we own — hence this.
+ */
+describe("myDATA payment methods are AADE table 8.12, in AADE's order", () => {
+  /** `select code, description from mydata_reference where category='payment_method'`, 2026-08-29. Verbatim. */
+  const SEED: [number, string][] = [
+    [1, 'Domestic Payments Account Number'],
+    [2, 'Foreign Payments Account Number'],
+    [3, 'Cash'],
+    [4, 'Cheque'],
+    [5, 'On credit'],
+    [6, 'Web Banking'],
+    [7, 'POS / e-POS'],
+    [8, 'IRIS Direct Payments'],
+  ];
+
+  it('the named codes ARE the table', () => {
+    expect(MYDATA_PAYMENT_CODE).toEqual({
+      domestic_account: 1, foreign_account: 2, cash: 3, cheque: 4,
+      on_credit: 5, web_banking: 6, pos: 7, iris: 8,
+    });
+  });
+
+  it('every seeded reference row has a label under the same code', () => {
+    // The seed is what the picker OFFERS and this map is what the document PRINTS. They
+    // disagreeing is precisely the defect: an operator picks one method and reads another.
+    for (const [code, seeded] of SEED) {
+      const label = MYDATA_PAYMENT_METHOD_LABELS[code];
+      expect(label, `no label for code ${code}`).toBeTruthy();
+      // Not byte-equal — AADE's own wording is longer than a table cell wants — but the same
+      // method: the first word of the seeded description has to appear in the printed one.
+      expect(label.en.toLowerCase()).toContain(seeded.split(' ')[0].toLowerCase());
+    }
+    expect(Object.keys(MYDATA_PAYMENT_METHOD_LABELS)).toHaveLength(SEED.length);
+  });
+
+  it('the three codes that carry money on a Law 5155 terminal are the AADE ones', () => {
+    // Pinned individually because these are the ones the rotation moved, and the ones a
+    // register writes: cash 3, POS 7, IRIS 8.
+    expect(MYDATA_PAYMENT_CODE.cash).toBe(3);
+    expect(MYDATA_PAYMENT_CODE.pos).toBe(7);
+    expect(MYDATA_PAYMENT_CODE.iris).toBe(8);
+    expect(mydataPaymentLabel(7)).toBe('POS / e-POS');
+    expect(mydataPaymentLabel(8)).toBe('IRIS');
+    // The rotated table's readings of the same integers. If either comes back, so did the bug.
+    expect(mydataPaymentLabel(7)).not.toBe('Domestic account');
+    expect(mydataPaymentLabel(6)).not.toBe('IRIS');
+  });
+
+  it('an unknown code reads as itself rather than as some other method', () => {
+    expect(mydataPaymentLabel(99)).toBe('99');
+    expect(mydataPaymentLabel(null)).toBe('');
+  });
+
+  it('every ledger method resolves, and `other` refuses to guess', () => {
+    for (const m of PAYMENT_METHODS) {
+      expect(MYDATA_PAYMENT_CODE_BY_LEDGER_METHOD).toHaveProperty(m);
+    }
+    // AADE has no "other". Mapping it to the nearest code would file a method nobody chose.
+    expect(MYDATA_PAYMENT_CODE_BY_LEDGER_METHOD.other).toBeNull();
+    expect(MYDATA_PAYMENT_CODE_BY_LEDGER_METHOD.iris).toBe(MYDATA_PAYMENT_CODE.iris);
+    expect(MYDATA_PAYMENT_CODE_BY_LEDGER_METHOD.card).toBe(MYDATA_PAYMENT_CODE.pos);
+  });
+
+  it('no file keeps its own copy of the code table', () => {
+    // The five that did: two frontend maps, the edge PDF, the register and the storefront.
+    // A `Record<number, string>` of payment names is the shape that drifted; a bare integer
+    // literal at a call site is how it drifted back the first time.
+    const FILES = [
+      'src/modules/finance/invoice-templates/labels.ts',
+      'src/modules/finance/invoice-templates/renderData.ts',
+      'src/pages/Admin/InvoiceDetailPage.tsx',
+      'src/modules/finance/pages/PosPage.tsx',
+      'supabase/functions/finance-invoice-pdf/index.ts',
+      'supabase/functions/finance-storefront/index.ts',
+    ];
+    for (const f of FILES) {
+      const src = stripComments(readFileSync(join(ROOT, f), 'utf8'));
+      expect(src, `${f} spells out the table again`).not.toMatch(/1:\s*'Cash'/);
+      expect(src, `${f} spells out the table again`).not.toMatch(/6:\s*'IRIS'/);
+      expect(src, `${f} spells out the table again`).not.toMatch(/7:\s*'Domestic/);
+      expect(src, `${f} writes a bare payment_method_code integer`)
+        .not.toMatch(/payment_method_code:\s*\d/);
+    }
   });
 });

@@ -10,6 +10,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
   el: {
     invoice: 'ΤΙΜΟΛΟΓΙΟ ΠΩΛΗΣΗΣ', service: 'ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ',
     receipt: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ', creditNote: 'ΠΙΣΤΩΤΙΚΟ ΤΙΜΟΛΟΓΙΟ', deliveryNote: 'ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ',
+    retailCreditNote: 'ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ',
     issuer: 'ΕΚΔΟΤΗΣ', customer: 'ΠΕΛΑΤΗΣ', vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', profession: 'Δραστηριότητα',
     phone: 'Τηλ.', email: 'Email', establishment: 'Εγκατάσταση',
     number: 'Αριθμός', series: 'Σειρά', date: 'Ημερομηνία', due: 'Λήξη',
@@ -38,6 +39,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
     receipt: 'RETAIL RECEIPT', creditNote: 'CREDIT NOTE', deliveryNote: 'DELIVERY NOTE',
+    retailCreditNote: 'RETAIL CREDIT NOTE',
     issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
     phone: 'Tel.', email: 'Email', establishment: 'Establishment',
     number: 'Number', series: 'Series', date: 'Date', due: 'Due',
@@ -76,16 +78,21 @@ export function invoiceDocTitle(
   if (status === 'draft' && isSalesOrService) return L.preInvoice;
   switch (documentType) {
     case '2.1': case '2.2': case '2.3': case '2.4': return L.service;
-    case '11.1': case '11.2': case '11.3': case '11.4': case '11.5': return L.receipt;
+    // 11.4 is the RETAIL CREDIT note — it sat in the receipt row and printed as
+    // "ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ", i.e. a refund document titled as a sale.
+    case '11.4': return L.retailCreditNote;
+    case '11.1': case '11.2': case '11.3': case '11.5': return L.receipt;
     case '5.1': case '5.2': return L.creditNote;
     case '9.3': return L.deliveryNote;
     default: return L.invoice;
   }
 }
 
-export const PAYMENT_METHOD_LABELS: Record<number, string> = {
-  1: 'Cash', 2: 'Check', 3: 'On credit', 4: 'Web banking', 5: 'POS / e-POS', 6: 'IRIS', 7: 'Domestic account', 8: 'Foreign account',
-};
+// The myDATA payment-method name comes from the ONE table (AADE 8.12) in
+// `@/modules/finance/paymentVocabulary`, re-exported here so a template keeps importing its
+// labels from one place. The literal that used to sit here was AADE's list rotated by two, so
+// a POS receipt printed as "Domestic account" — see the header on `MYDATA_PAYMENT_CODE`.
+export { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 
 // myDATA VAT category → percent (when a line carries an explicit category).
 export const VAT_PCT_BY_CAT: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
