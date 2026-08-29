@@ -60,26 +60,35 @@ async function moduleDisabledError(): Promise<string> {
 }
 
 /**
- * Resolve project_id from either an explicit id or a fuzzy name. Returns null
- * when neither matches a project owned by the user. When both are given, the
- * id takes precedence.
+ * Resolve project_id from either an explicit id or a fuzzy name, WITHIN THIS WORKSPACE (#395).
+ *
+ * `project_id` is a model-supplied argument and the client is service-role, so the only thing
+ * standing between a turn and another tenant's project was `user_id` — a user identity, not a
+ * tenancy binding. Someone who belongs to two workspaces reached, from a workspace-A session,
+ * every project they own in workspace B: listed by `list_my_projects`, found by `find_project`,
+ * and WRITTEN by `add_task` and `add_purchase_item`. `projects.workspace_id` has been the
+ * tenancy column since the table was created — these tools simply never asked for it.
+ *
+ * Same shape as `loadCatalog` in catalog-tools.ts, and the same resolution: the workspace check
+ * is added, the user check stays. Widening access to teammates is a product decision, not part
+ * of closing a hole.
+ *
+ * When both are given, the id takes precedence.
  */
-async function resolveProjectId(userId: string, projectId?: string, projectName?: string): Promise<string | null> {
+async function resolveProjectId(
+  userId: string, workspaceId: string | null, projectId?: string, projectName?: string,
+): Promise<string | null> {
   const sb = svcClient();
   if (projectId) {
-    const { data } = await sb
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('user_id', userId)
-      .maybeSingle();
+    let q = sb.from('projects').select('id').eq('id', projectId).eq('user_id', userId);
+    if (workspaceId) q = q.eq('workspace_id', workspaceId);
+    const { data } = await q.maybeSingle();
     return (data as any)?.id || null;
   }
   if (projectName) {
-    const { data } = await sb
-      .from('projects')
-      .select('id')
-      .eq('user_id', userId)
+    let q = sb.from('projects').select('id').eq('user_id', userId);
+    if (workspaceId) q = q.eq('workspace_id', workspaceId);
+    const { data } = await q
       .ilike('name', `%${projectName}%`)
       .order('last_activity_at', { ascending: false })
       .limit(1);
@@ -118,6 +127,24 @@ export const createCreateProjectTool = (
       let companyId = client_company_id ?? null;
       let contactId = client_contact_id ?? null;
       if (companyId && contactId) return JSON.stringify({ success: false, error: 'Provide a client company OR contact, not both.' });
+      /**
+       * A client id supplied by the MODEL is proven to be in this workspace (#395, invariant 1).
+       *
+       * The `client_name` path below has always searched inside the workspace. The explicit-id
+       * path did not check anything — a service-role insert of a body-supplied FK — so a project
+       * here could name another tenant's company, and the comment right above says everything
+       * downstream depends on that link: quotes, invoices, client views, finance attach.
+       */
+      if (companyId) {
+        const { data: okCo } = await sb.from('crm_companies').select('id')
+          .eq('id', companyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!okCo) return JSON.stringify({ success: false, error: 'That client company was not found in this workspace.' });
+      }
+      if (contactId) {
+        const { data: okCt } = await sb.from('crm_contacts').select('id')
+          .eq('id', contactId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!okCt) return JSON.stringify({ success: false, error: 'That client contact was not found in this workspace.' });
+      }
       if (!companyId && !contactId && client_name) {
         const { data: co } = await sb.from('crm_companies').select('id')
           .eq('workspace_id', workspaceId).ilike('name', client_name).limit(1).maybeSingle();
@@ -149,6 +176,7 @@ export const createCreateProjectTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
 
       let roomCount = 0;
+      let roomsError: string | null = null;
       if (rooms && rooms.length > 0) {
         const rows = rooms.map((rname, idx) => ({
           project_id: (project as any).id,
@@ -156,7 +184,10 @@ export const createCreateProjectTool = (
           sort_order: idx,
         }));
         const { error: rErr } = await sb.from('project_rooms').insert(rows);
-        if (!rErr) roomCount = rooms.length;
+        // The project is committed; failing the whole call would invite a duplicate. But the user
+        // ASKED for these rooms, and a silent 0 reads as "I did not want any".
+        if (rErr) roomsError = rErr.message;
+        else roomCount = rooms.length;
       }
 
       onChunk?.({
@@ -171,8 +202,10 @@ export const createCreateProjectTool = (
         project_id: (project as any).id,
         name: (project as any).name,
         rooms_added: roomCount,
+        rooms_error: roomsError ?? undefined,
         url: `/projects/${(project as any).id}`,
-        message: `Project "${name}" created${roomCount ? ` with ${roomCount} ${roomCount === 1 ? 'room' : 'rooms'}` : ''}.`,
+        message: `Project "${name}" created${roomCount ? ` with ${roomCount} ${roomCount === 1 ? 'room' : 'rooms'}` : ''}.`
+          + (roomsError ? ` The rooms could NOT be added (${roomsError}) — add them on the project page rather than creating it again.` : ''),
       });
     },
     {
@@ -203,6 +236,7 @@ export const createCreateProjectTool = (
 
 export const createListMyProjectsTool = (
   userId: string,
+  workspaceId: string | null,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -212,11 +246,15 @@ export const createListMyProjectsTool = (
 
       onChunk?.({ type: 'tool_progress', status: 'Loading your projects...', timestamp: Date.now() });
 
+      // Scoped to this workspace as well as this user (#395) — see `resolveProjectId`. Without
+      // it, "my projects" answered with every workspace the user belongs to, in one list, with
+      // no way to tell which was which.
       let q = sb
         .from('projects')
         .select('id, name, status, deadline, budget_amount, budget_currency, actual_amount, accepted_quote_count, moodboard_count, last_activity_at')
-        .eq('user_id', userId)
-        .order('last_activity_at', { ascending: false });
+        .eq('user_id', userId);
+      if (workspaceId) q = q.eq('workspace_id', workspaceId);
+      q = q.order('last_activity_at', { ascending: false });
       if (!include_archived) {
         q = q.not('status', 'in', '("archived","completed")');
       }
@@ -261,6 +299,7 @@ export const createListMyProjectsTool = (
 
 export const createFindProjectTool = (
   userId: string,
+  workspaceId: string | null,
   _onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -268,10 +307,13 @@ export const createFindProjectTool = (
       if (!await isModuleEnabled()) return moduleDisabledError();
       const sb = svcClient();
 
-      const { data, error } = await sb
+      // Scoped to this workspace as well as this user (#395) — see `resolveProjectId`.
+      let fq = sb
         .from('projects')
         .select('id, name, status, deadline, budget_amount, actual_amount, budget_currency, accepted_quote_count, moodboard_count')
-        .eq('user_id', userId)
+        .eq('user_id', userId);
+      if (workspaceId) fq = fq.eq('workspace_id', workspaceId);
+      const { data, error } = await fq
         .ilike('name', `%${query}%`)
         .order('last_activity_at', { ascending: false })
         .limit(5);
@@ -314,6 +356,7 @@ export const createFindProjectTool = (
 
 export const createAddTaskTool = (
   userId: string,
+  workspaceId: string | null,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -330,7 +373,7 @@ export const createAddTaskTool = (
       if (!await isModuleEnabled()) return moduleDisabledError();
       const sb = svcClient();
 
-      const resolvedProjectId = await resolveProjectId(userId, project_id, project_name);
+      const resolvedProjectId = await resolveProjectId(userId, workspaceId, project_id, project_name);
       if (!resolvedProjectId) {
         return JSON.stringify({
           success: false,
@@ -415,6 +458,7 @@ export const createAddTaskTool = (
 
 export const createAddPurchaseItemTool = (
   userId: string,
+  workspaceId: string | null,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -443,7 +487,7 @@ export const createAddPurchaseItemTool = (
       if (!await isModuleEnabled()) return moduleDisabledError();
       const sb = svcClient();
 
-      const projectId = await resolveProjectId(userId, input.project_id, input.project_name);
+      const projectId = await resolveProjectId(userId, workspaceId, input.project_id, input.project_name);
       if (!projectId) {
         return JSON.stringify({
           success: false,
@@ -452,10 +496,12 @@ export const createAddPurchaseItemTool = (
             : 'Need either project_id or project_name to add a purchase item.',
         });
       }
-      // workspace_id is required on the row.
+      // workspace_id is required on the row. Read from the PROJECT rather than reusing the
+      // session's, because the resolver above has already proven the two are the same and a
+      // project predating the workspace column may carry none.
       const { data: proj } = await sb.from('projects').select('workspace_id').eq('id', projectId).maybeSingle();
-      const workspaceId = (proj as any)?.workspace_id;
-      if (!workspaceId) {
+      const itemWorkspaceId = (proj as any)?.workspace_id ?? workspaceId;
+      if (!itemWorkspaceId) {
         return JSON.stringify({ success: false, error: 'This project has no workspace — purchase items need one.' });
       }
 
@@ -481,7 +527,7 @@ export const createAddPurchaseItemTool = (
         .from('project_purchase_items')
         .insert({
           project_id: projectId,
-          workspace_id: workspaceId,
+          workspace_id: itemWorkspaceId,
           item_type: input.item_type || 'door',
           name: input.name,
           room_id: roomId,
@@ -545,6 +591,7 @@ export const createAddPurchaseItemTool = (
 
 export const createGeneratePurchaseSheetTool = (
   userId: string,
+  workspaceId: string | null,
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
@@ -556,7 +603,7 @@ export const createGeneratePurchaseSheetTool = (
       if (!await isModuleEnabled()) return moduleDisabledError();
       const sb = svcClient();
 
-      const projectId = await resolveProjectId(userId, project_id, project_name);
+      const projectId = await resolveProjectId(userId, workspaceId, project_id, project_name);
       if (!projectId) {
         return JSON.stringify({
           success: false,

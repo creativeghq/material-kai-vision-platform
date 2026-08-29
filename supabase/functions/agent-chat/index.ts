@@ -2705,19 +2705,19 @@ async function executeAgent(
     tools.push(createCreateProjectTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('list_my_projects') && createListMyProjectsTool) {
-    tools.push(createListMyProjectsTool(userId, onChunk));
+    tools.push(createListMyProjectsTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('find_project') && createFindProjectTool) {
-    tools.push(createFindProjectTool(userId, onChunk));
+    tools.push(createFindProjectTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('add_task') && createAddTaskTool) {
-    tools.push(createAddTaskTool(userId, onChunk));
+    tools.push(createAddTaskTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('add_purchase_item') && createAddPurchaseItemTool) {
-    tools.push(createAddPurchaseItemTool(userId, onChunk));
+    tools.push(createAddPurchaseItemTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('generate_purchase_sheet') && createGeneratePurchaseSheetTool) {
-    tools.push(createGeneratePurchaseSheetTool(userId, onChunk));
+    tools.push(createGeneratePurchaseSheetTool(userId, workspaceId, onChunk));
   }
 
   // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).

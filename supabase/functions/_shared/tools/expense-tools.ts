@@ -161,36 +161,59 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
       if (billIns.error) throw billIns.error;
       const billId = billIns.data.id;
 
+      /**
+       * The bill above is COMMITTED (#395, the #351 C3 shape on the agent surface).
+       *
+       * Bill and payment are two writes with no transaction between them. Throwing here rejected
+       * the whole call, so the agent reported "could not record expense" for a payable that
+       * exists — and the obvious next turn recreates it, booking the cost and the cash-out twice.
+       * The identical defect was fixed in `financeService.createExpense` for the dialog; the tool
+       * kept it.
+       *
+       * So a payment failure is REPORTED, not thrown. The bill is settleable from Payables, which
+       * is the recovery the operator actually has, and `pay_expense` is the tool for it.
+       */
       let paymentId: string | null = null;
+      let paymentError: string | null = null;
       if (paid && total > 0) {
-        // Default bank account for the money-out; NULL is acceptable if none configured.
-        const acct = await sb.from('finance_bank_accounts')
-          .select('id').eq('workspace_id', workspaceId).eq('is_active', true)
-          .order('is_default', { ascending: false }).limit(1).maybeSingle();
-        const rp = await sb.rpc('record_payment_fx', {
-          p_workspace_id: workspaceId, p_direction: 'out', p_amount: total, p_currency: cur,
-          p_fx_rate_to_base: 1, p_method: 'bank_transfer', p_paid_at: new Date().toISOString(),
-          p_counterparty_contact_id: null, p_counterparty_company_id: pay.id,
-          p_reference: description ?? null, p_notes: description ?? null,
-          p_allocations: [{ target_id: billId, target_type: 'supplier_bill', amount_doc: total, fx_rate: 1 }],
-          p_category_id: cat.id, p_bank_account_id: acct.data?.id ?? null,
-        });
-        if (rp.error) throw rp.error;
-        paymentId = rp.data as string;
+        try {
+          // Default bank account for the money-out; NULL is acceptable if none configured.
+          const acct = await sb.from('finance_bank_accounts')
+            .select('id').eq('workspace_id', workspaceId).eq('is_active', true)
+            .order('is_default', { ascending: false }).limit(1).maybeSingle();
+          const rp = await sb.rpc('record_payment_fx', {
+            p_workspace_id: workspaceId, p_direction: 'out', p_amount: total, p_currency: cur,
+            p_fx_rate_to_base: 1, p_method: 'bank_transfer', p_paid_at: new Date().toISOString(),
+            p_counterparty_contact_id: null, p_counterparty_company_id: pay.id,
+            p_reference: description ?? null, p_notes: description ?? null,
+            p_allocations: [{ target_id: billId, target_type: 'supplier_bill', amount_doc: total, fx_rate: 1 }],
+            p_category_id: cat.id, p_bank_account_id: acct.data?.id ?? null,
+          });
+          if (rp.error) throw rp.error;
+          paymentId = rp.data as string;
+        } catch (payErr: any) {
+          paymentError = payErr?.message || 'the payment could not be recorded';
+          console.error('[expense-tools] bill created, payment not recorded', payErr);
+        }
       }
+      const reallyPaid = Boolean(paid) && !paymentError;
 
       // The filing is part of what happened, so it travels in the chunk the card renders as well
       // as in the sentence. A tool that files an expense somewhere and does not say where has told
       // the operator less than the form would have.
-      onChunk?.({ type: 'expense_recorded', data: { bill_id: billId, category: cat.name, payee: pay.name, total, currency: cur, paid: Boolean(paid), trip: tripRef?.name ?? null, property: propRef?.name ?? null } });
+      onChunk?.({ type: 'expense_recorded', data: { bill_id: billId, category: cat.name, payee: pay.name, total, currency: cur, paid: reallyPaid, trip: tripRef?.name ?? null, property: propRef?.name ?? null } });
       return JSON.stringify({
         success: true, bill_id: billId, payment_id: paymentId,
         category: cat.name, payee: pay.name, total, vat, net, currency: cur,
         trip: tripRef?.name ?? null, property: propRef?.name ?? null,
-        status: paid ? 'paid' : 'payable',
-        message: (paid
+        status: reallyPaid ? 'paid' : 'payable',
+        payment_recorded: paid ? reallyPaid : undefined,
+        payment_error: paymentError ?? undefined,
+        message: (reallyPaid
           ? `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) and marked it paid.`
-          : `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable in AP.`)
+          : paymentError
+            ? `Recorded the ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable — the PAYMENT was not recorded (${paymentError}). Settle it from Payables or with pay_expense. Do NOT record the expense again.`
+            : `Recorded ${total} ${cur} expense to ${pay.name} (${cat.name}) as an open payable in AP.`)
           + (tripRef ? ` Filed against ${tripRef.name}.` : '')
           + (propRef ? ` For ${propRef.name}.` : ''),
       });
