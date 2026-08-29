@@ -46,10 +46,10 @@ body-supplied id" and "SECURITY DEFINER exposed to anon" — do not reintroduce 
 
 **Enforcement:** (a) this section, followed by anyone editing the repo; (b) `check_security_invariants()` surfaces live DB violations for 2–4; (c) code-level patterns (1, 6–11) live in the CI semgrep ruleset (`.github/semgrep-security.yml`, guarded by [tests/unit/semgrepRuleset.test.ts](tests/unit/semgrepRuleset.test.ts)).
 
-## Two anti-regression rules — READ BEFORE ADDING A DERIVED NUMBER OR A JANITOR CRON
+## Anti-regression rules — READ BEFORE ADDING A DERIVED NUMBER, A JANITOR CRON, OR A SECOND WRITE
 
-Two bug shapes account for nearly every "small issue" found by hand in this platform. Both have enforcement;
-do not work around either.
+These bug shapes account for nearly every "small issue" found by hand in this platform. All have
+enforcement; do not work around any of them.
 
 ### 1. One derivation per money quantity. TypeScript formats; SQL derives.
 "How much is settled / still owed on an order" was implemented **five times** — twice in SQL, three times in
@@ -113,6 +113,20 @@ which is why every stored snapshot's `backlinks`/`referring_domains`/`domain_ran
 - **A collector records WHICH source failed** — `seo_domain_snapshots.source_errors` — so the panel can say "we could not fetch this". A call that succeeds but returns no row is *unverified*, not zero.
 - **A rate is measured against attempts that SUCCEEDED.** All 212 `gpt-4o-mini` LLM probes returned HTTP 429; mentions ÷ probes-**sent** renders that as "0% AI visibility", which reads as "assistants never mention us". Divide by `answered`; report "No verdict" plus the upstream error when there is nothing to divide by.
 - Same rule for feature detection: an absent featured snippet or an image pack you are not in is a **finding**, so `serpFeatures.ts` renders an inventory with present/absent verdicts, not a list of hits.
+
+### 4. A create-then-stamp pair is ONE thing, and a retry must not do it twice.
+Eight findings across #351 and #354 were one sentence: two writes with no transaction and a button
+that stays armed. The first commits, the second fails, the screen says `Failed`, and the operator
+does the only thing offered. That billed the same hours twice, booked a second supplier bill AND a
+second payment for one cost, cut an invisible duplicate delivery note, re-issued transmitted credit
+notes, took two POS receipts each holding its own legal ΑΑΔΕ number, and filed a second declaration
+to ΕΡΓΑΝΗ. Nothing catches it: each half works, each error is reported accurately for the half that
+failed, and `uncheckedSupabaseWrites` cannot see it because every write in the pair IS checked.
+- **Naturally atomic → one SQL RPC**, and make the stamp the CLAIM: `where <marker> is null` plus a count check, so a lost race aborts instead of double-writing (`bill_time_entries_to_invoice`).
+- **A retry is legitimate but the work is not repeatable → an idempotency key** minted per unit of work, replayed from what was stored (`pos_issue_receipt`'s `p_client_token`). A client-side `useRef` latch is NOT enough on its own: it closes the double-tap and cannot close the dropped connection, which is the case where the operator holds an error for a document that exists.
+- **The second half cannot be rolled back → resumable and honest.** A filing to a ministry happened whatever the local row says. Record each leg, resume at the first that did not run, and NAME the half that failed: reported as a failure the operator re-files, reported as a clean success nobody repairs the record.
+- **A duplicate guard reads the record written on the SUCCESS path**, never the local status column written after it — that column is exactly the one that can be missing (`hr_ergani_submissions`, not `hr_overtime.status`).
+- Guarded by [tests/unit/financeAtomicity.test.ts](tests/unit/financeAtomicity.test.ts) and [tests/unit/hrFilingIntegrity.test.ts](tests/unit/hrFilingIntegrity.test.ts); both assert ORDER, because a check after the side effect is not a check. Full write-up: [docs/prevention-coverage.md](docs/prevention-coverage.md) shape 18.
 
 ## Data layering — the pipeline is Medallion; name the layers
 
