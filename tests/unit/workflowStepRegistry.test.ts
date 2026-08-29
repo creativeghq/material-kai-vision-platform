@@ -125,6 +125,50 @@ describe('#395 — the workflow step vocabulary is one list, twice', () => {
     expect(catalog, "a step id is cast past its own union again").not.toMatch(/step_id: '[a-z_]+' as any/);
   });
 
+  it('a step naming a tool names one that exists', () => {
+    /**
+     * `tool_id` is documented as "purely informational; the agent picks" — the form values are
+     * serialised into a chat message, not passed to the tool as arguments, so a mismatched FIELD
+     * NAME is translated by the model rather than dropped. That is why this checks the tool
+     * exists and not that the field names line up.
+     *
+     * Documentation that names nothing is still a defect in this codebase: `unlinkedOnly`
+     * promised a guarantee it did not implement, and the ops tools' comment claimed an isAdmin
+     * gate that was not there. Both were found by reading the comment and then the code.
+     */
+    const manifest = readFileSync(join(ROOT, 'src/components/features/ai/toolManifest.generated.ts'), 'utf8');
+    const toolNames = new Set([...manifest.matchAll(/^ {4}name: '([a-z0-9_]+)',$/gm)].map((m) => m[1]));
+    expect(toolNames.size).toBeGreaterThan(150);
+
+    // Steps whose `tool_id` names something that is deliberately NOT an agent tool. Each entry
+    // is an edge function the UI drives directly, and shrinking this list is the direction of
+    // travel — an agent step that cannot be run by an agent is a step the wizard cannot finish.
+    const NOT_A_TOOL = new Set(['catalog-send-to-customers']);
+
+    const offenders: string[] = [];
+    for (const m of registrySrc.matchAll(/tool_id:\s*'([a-z0-9_.-]+)'/g)) {
+      if (!toolNames.has(m[1]) && !NOT_A_TOOL.has(m[1])) offenders.push(m[1]);
+    }
+    expect([...new Set(offenders)],
+      'A workflow step names a tool that is not in the manifest. Either the tool was renamed and '
+      + `the registry still names the old one, or the step describes work nothing can do:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('the mention workflow asks for a subject its tool can enrol', () => {
+    // `mention-monitor`'s first step asks for `subject_label` + `subject_type`, and
+    // `track_product_mentions` required a `product_id` and offered nothing else — so launching
+    // "Monitor mentions" and typing a brand name reached a step no bound tool could act on.
+    // MIVAA has served `POST /track` with subject_label since the feature shipped.
+    const manifest = readFileSync(join(ROOT, 'src/components/features/ai/toolManifest.generated.ts'), 'utf8');
+    const entry = manifest.slice(manifest.indexOf("name: 'track_product_mentions'"));
+    const body = entry.slice(0, entry.indexOf('\n  {'));
+    expect(body).toMatch(/\{ name: 'subject_label'/);
+    expect(body).toMatch(/\{ name: 'subject_type', type: 'enum', enum: \['brand', 'keyword'\]/);
+    expect(body, 'product_id is mandatory again, so the subject arm is unreachable')
+      .toMatch(/\{ name: 'product_id', type: 'string', optional: true/);
+  });
+
   it('the registry step that names a tool is a step that tool can emit', () => {
     // `catalog-translate.translate` declares `tool_id: 'translate_pdf_to_catalog'`; that tool has
     // to be able to report it, or the definition describes something unreachable.

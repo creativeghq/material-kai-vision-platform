@@ -2139,9 +2139,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'track_product_mentions',
     file: 'supabase/functions/_shared/tools/mention-tools.ts',
     factory: 'createTrackProductMentionsTool',
-    description: 'Start or stop mention monitoring on a product.',
+    description: 'Start or stop mention monitoring on a catalogue PRODUCT (product_id) or on a free BRAND or KEYWORD subject (subject_label) — exactly one of the two.',
     params: [
-      { name: 'product_id', type: 'string', optional: false, description: 'Product UUID to track.' },
+      { name: 'product_id', type: 'string', optional: true, description: 'Product UUID to track. Omit when tracking a brand or keyword.' },
+      { name: 'subject_label', type: 'string', optional: true, description: 'Brand or keyword to track, e.g. "Materials Hub" or "porcelain tiles". Omit when tracking a product.' },
+      { name: 'subject_type', type: 'enum', enum: ['brand', 'keyword'], optional: true, description: 'What subject_label is. Default brand.' },
       { name: 'action', type: 'enum', enum: ['start', 'stop'], optional: true },
       { name: 'aliases', type: 'array', optional: true, description: 'Alternate spellings/SKUs/abbreviations to use as additional discovery queries.' },
       { name: 'auto_expand_aliases', type: 'boolean', optional: true, description: 'Default false. When true, an LLM (Haiku) expands the subject_label into per-word aliases on first refresh — broader recall on multi-word labels but higher cost.' },

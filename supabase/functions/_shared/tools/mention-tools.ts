@@ -341,12 +341,93 @@ export const createTrackProductMentionsTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ product_id, action, aliases, auto_expand_aliases, sources_enabled, language_codes, country_codes, alert_on_spike, alert_on_negative_sentiment, alert_on_new_outlet, alert_on_llm_visibility_change }) => {
+    async ({ product_id, subject_label, subject_type, action, aliases, auto_expand_aliases, sources_enabled, language_codes, country_codes, alert_on_spike, alert_on_negative_sentiment, alert_on_new_outlet, alert_on_llm_visibility_change }) => {
       if (!await isModuleEnabled()) {
         return JSON.stringify({ success: false, error: 'mention-monitoring module disabled — ask an admin to enable it' });
       }
+      /**
+       * A SUBJECT is trackable from chat, not only a product (#395).
+       *
+       * `tracked_mentions` is reached two ways — a product enrolment and a free brand/keyword
+       * subject — and MIVAA has served both since the feature shipped (`POST /track` takes
+       * `subject_label` / `subject_type` / `brand_name` and enforces the table's own constraint).
+       * This tool required a `product_id` and offered nothing else, so the subject arm had no
+       * agent surface at all.
+       *
+       * That is not hypothetical: `mention-monitor`'s FIRST step in workflowRegistry asks for
+       * exactly `subject_label` + `subject_type` (brand / keyword / product). Someone launching
+       * "Monitor mentions" from the command palette and typing a brand name reached a step whose
+       * only bound tool could not act on it.
+       *
+       * Same shape as `docs/prevention-coverage.md` #16 — one addressing mode has a surface and
+       * the other does not — with the halves swapped: here the SCREEN existed and the tool did
+       * not. Exactly one of the two ids is required, and saying neither is refused rather than
+       * defaulted, because guessing which thing to monitor is how a paid feed ends up watching
+       * the wrong word.
+       */
+      const wantsSubject = !!subject_label?.trim();
+      if (!product_id && !wantsSubject) {
+        return JSON.stringify({
+          success: false,
+          error: 'Give either a product_id (to monitor a catalogue product) or a subject_label (to monitor a brand or keyword).',
+        });
+      }
+      if (product_id && wantsSubject) {
+        return JSON.stringify({
+          success: false,
+          error: 'Give a product_id OR a subject_label, not both — they enrol different kinds of subject.',
+        });
+      }
+
+      // ── brand / keyword subject ────────────────────────────────────────────
+      if (wantsSubject) {
+        const label = subject_label!.trim();
+        const kind = subject_type === 'keyword' ? 'keyword' : 'brand';
+        if (action === 'stop') {
+          // Resolve the label to the row it belongs to — the DELETE is by id, and the resolver
+          // is already the one place that proves the subject is this caller's and this
+          // workspace's.
+          const found = await resolveSubjectBase({ subject: label }, userId, workspaceId);
+          if ('error' in found) return JSON.stringify({ success: false, ...found });
+          const r = await callMivaa(`/api/v1/mention-monitoring/track/${found.trackedMentionId}`, { method: 'DELETE', jwt });
+          return JSON.stringify({ success: r.ok, error: r.error, ...r.data });
+        }
+        onChunk?.({ type: 'tool_progress', status: `Starting mention monitoring for "${label}"...`, timestamp: Date.now() });
+        const subjectBody: Record<string, any> = {
+          subject_type: kind,
+          subject_label: label,
+          // The table's CHECK requires a brand_name on any subject with no product; the route
+          // derives it from the label when omitted, and sending it explicitly keeps the two
+          // from disagreeing about what was asked for.
+          brand_name: label,
+          run_first_refresh: true,
+        };
+        if (aliases?.length) subjectBody.aliases = aliases;
+        if (auto_expand_aliases !== undefined) subjectBody.auto_expand_aliases = auto_expand_aliases;
+        if (sources_enabled) subjectBody.sources_enabled = sources_enabled;
+        if (language_codes?.length) subjectBody.language_codes = language_codes;
+        if (country_codes?.length) subjectBody.country_codes = country_codes;
+        if (alert_on_spike !== undefined) subjectBody.alert_on_spike = alert_on_spike;
+        if (alert_on_negative_sentiment !== undefined) subjectBody.alert_on_negative_sentiment = alert_on_negative_sentiment;
+        if (alert_on_new_outlet !== undefined) subjectBody.alert_on_new_outlet = alert_on_new_outlet;
+        if (alert_on_llm_visibility_change !== undefined) subjectBody.alert_on_llm_visibility_change = alert_on_llm_visibility_change;
+
+        const r = await callMivaa('/api/v1/mention-monitoring/track', { method: 'POST', body: JSON.stringify(subjectBody), jwt });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
+        onChunk?.({
+          type: 'mention_tracking_started',
+          subject_label: label,
+          subject_type: kind,
+          product_name: label,
+          tracked: r.data?.data,
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, data: r.data?.data });
+      }
+
+      // ── product enrolment (unchanged) ─────────────────────────────────────
       // Server-derived workspace, from the factory — never a model argument.
-      const product = await getProductRow(product_id, workspaceId);
+      const product = await getProductRow(product_id!, workspaceId);
       if (!product) return JSON.stringify({ success: false, error: `product ${product_id} not found` });
 
       onChunk?.({ type: 'tool_progress', status: `${action} mention monitoring for "${product.name}"...`, timestamp: Date.now() });
@@ -390,9 +471,14 @@ export const createTrackProductMentionsTool = (
     },
     {
       name: 'track_product_mentions',
-      description: 'Start or stop mention monitoring on a product. Returns the tracked_mentions row including alert preferences and the first-refresh outcome.',
+      description:
+        'Start or stop mention monitoring on a catalogue PRODUCT (product_id) or on a free BRAND '
+        + 'or KEYWORD subject (subject_label) — exactly one of the two. Returns the tracked_mentions '
+        + 'row including alert preferences and the first-refresh outcome.',
       schema: z.object({
-        product_id: z.string().describe('Product UUID to track.'),
+        product_id: z.string().optional().describe('Product UUID to track. Omit when tracking a brand or keyword.'),
+        subject_label: z.string().optional().describe('Brand or keyword to track, e.g. "Materials Hub" or "porcelain tiles". Omit when tracking a product.'),
+        subject_type: z.enum(['brand', 'keyword']).optional().describe('What subject_label is. Default brand.'),
         action: z.enum(['start', 'stop']).default('start'),
         aliases: z.array(z.string()).optional().describe('Alternate spellings/SKUs/abbreviations to use as additional discovery queries.'),
         auto_expand_aliases: z.boolean().optional().describe('Default false. When true, an LLM (Haiku) expands the subject_label into per-word aliases on first refresh — broader recall on multi-word labels but higher cost.'),
