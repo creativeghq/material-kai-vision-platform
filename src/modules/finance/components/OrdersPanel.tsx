@@ -3638,6 +3638,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   <span className="font-medium">{partyCredit.display_name}</span> is holding{' '}
                   <span className="font-semibold text-amber-600 dark:text-amber-400">{formatMoney(partyCredit.on_account_credit, order.currency)}</span>{' '}
                   of theirs that is settled against nothing, and they owe you nothing.
+                  {/* The disambiguator. This banner and the margin banner below it are adjacent,
+                      both money, both with a button — so they read as one story in two steps, and
+                      the smaller number reads as the share of the bigger one you may actually take.
+                      They are unrelated: this is cash that arrived in the wrong SIZE, and it would
+                      say the same thing on an order that lost money. Keeping it is income ON TOP OF
+                      the margin, never a slice of it. */}
+                  {' '}<span className="text-muted-foreground">Their cash, not earnings from this order.</span>
                 </span>
                 <Button size="sm" variant="outline" className="ml-auto h-7 text-[11px]" onClick={() => setReleaseOpen(true)}>
                   Keep it as income
@@ -3659,9 +3666,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                       {formatMoney(profitPos.margin, order.currency)}
                     </span>
+                    {/* The derivation, inline. Without it the figure is an assertion, and the
+                        reader has no way to tell it apart from the other money on this screen —
+                        which is how it started reading as a pot that the credit banner above had
+                        taken a bite out of. Sold minus cost is unmistakably about GOODS. */}
+                    {' '}<span className="text-muted-foreground">
+                      — {formatMoney(profitPos.revenue_net, order.currency)} sold, {formatMoney(profitPos.cogs, order.currency)} cost
+                    </span>
                     {profitPos.allocated > 0.005 && (
                       <> · <span className="text-muted-foreground">{formatMoney(profitPos.allocated, order.currency)} taken</span></>
                     )}
+                    {/* "left" only makes sense once something has been taken; before that the
+                        available figure IS the margin and printing it twice invites the reader to
+                        look for the difference between two identical numbers. */}
                     {profitPos.available > 0.005 && profitPos.allocated > 0.005 && (
                       <> · <span className="font-medium">{formatMoney(profitPos.available, order.currency)} left</span></>
                     )}
