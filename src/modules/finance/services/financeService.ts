@@ -2279,7 +2279,7 @@ const _financeServiceCore = {
     /** …or an expense card, or a building. Filing links: neither changes a single figure. */
     tripReportId?: string | null;
     propertyId?: string | null;
-  }): Promise<{ billId: string; paymentId: string | null }> {
+  }): Promise<{ billId: string; paymentId: string | null; paymentError: string | null }> {
     // A supplier bill needs a payee — a saved CRM supplier OR a one-off free-text name.
     if (!input.supplierCompanyId && !input.supplierContactId && !input.supplierName?.trim()) {
       throw new Error('An expense needs a supplier / payee.');
@@ -2314,8 +2314,24 @@ const _financeServiceCore = {
       propertyId: input.propertyId ?? null,
     });
 
+    /**
+     * The bill above is COMMITTED (#351 C3).
+     *
+     * Create-bill and record-payment are two writes with no transaction between them. When the
+     * payment leg threw, the whole call rejected, the dialog said `Failed` and left the form
+     * armed — and saving again created a SECOND bill and a second payment for one cost. The
+     * caller could not tell "nothing happened" from "half of it happened", because both arrived
+     * as one rejected promise.
+     *
+     * So a payment failure is REPORTED, not thrown: the bill exists and is settleable from
+     * Payables, which is the same recovery the recurring-template and receipt-upload legs of
+     * this same flow already offer. Throwing here would be the one outcome that cannot be
+     * recovered from without creating a duplicate.
+     */
     let paymentId: string | null = null;
+    let paymentError: string | null = null;
     if (input.paidNow && total > 0) {
+      try {
       paymentId = await this.recordPayment({
         workspaceId: input.workspaceId,
         direction: 'out',
@@ -2334,8 +2350,12 @@ const _financeServiceCore = {
         counterpartyBankAccountId: input.paymentMethod === 'bank_transfer' ? (input.counterpartyBankAccountId ?? null) : null,
         allocations: [{ target_id: bill.id, target_type: 'supplier_bill', amount: total }],
       });
+      } catch (payErr) {
+        paymentError = payErr instanceof Error ? payErr.message : String(payErr);
+        console.error('[finance] expense bill created but the payment was not recorded', payErr);
+      }
     }
-    return { billId: bill.id, paymentId };
+    return { billId: bill.id, paymentId, paymentError };
   },
 
   /**
@@ -3329,6 +3349,17 @@ export interface OpenTaskRow { quote_id: string; quote_label: string; kind: stri
 
 export interface SalesPerFactoryRow { factory_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface SpendPerSupplierRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; bill_count: number; billed_total: number; paid_total: number; outstanding: number }
+export interface CashOutPerCategoryRow {
+  category_id: string | null;
+  /** 'Uncategorised' when the payment named none — a row, never an omission. */
+  category_name: string;
+  /** Set for the built-ins, so the reader can mark 'Profit allocation' as what it is. */
+  system_key: string | null;
+  currency: string;
+  payment_count: number;
+  total_paid: number;
+}
+
 export interface PaymentsPerCounterpartyOutRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_paid: number }
 export interface PaymentsPerCounterpartyInRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_received: number }
 export interface SalesPerDesignerRow { user_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number; accepted_quote_count: number }
@@ -3778,6 +3809,19 @@ const _financeServiceV2 = {
     const { data, error } = await supabase.rpc('report_payments_out_per_counterparty', { p_workspace_id: workspaceId, p_from: from, p_to: to });
     if (error) throw error;
     return (data ?? []) as PaymentsPerCounterpartyOutRow[];
+  },
+  /**
+   * Where the money went, by category — the money-OUT counterpart of "P&L by category".
+   *
+   * The P&L groups DOCUMENTS, which is right for profit and wrong for "what left the bank": most
+   * money-out carries no document at all, and an appropriation like a profit drawing is outside the
+   * P&L on purpose. So a categorised payment could be made and appear in no report that named its
+   * category. Rows are per category AND currency — two currencies in one category do not add up.
+   */
+  async reportCashOutPerCategory(workspaceId: string, from: string, to: string): Promise<CashOutPerCategoryRow[]> {
+    const { data, error } = await (supabase as any).rpc('report_cash_out_per_category', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as CashOutPerCategoryRow[];
   },
   async reportPaymentsInPerCounterparty(workspaceId: string, from: string, to: string): Promise<PaymentsPerCounterpartyInRow[]> {
     const { data, error } = await supabase.rpc('report_payments_in_per_counterparty', { p_workspace_id: workspaceId, p_from: from, p_to: to });

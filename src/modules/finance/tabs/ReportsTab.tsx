@@ -11,7 +11,7 @@ import { AccountingExportCard } from '@/modules/finance/components/AccountingExp
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 type ReportKind =
-  | 'cashflow_per_day' | 'pnl_per_category' | 'profit_taken'
+  | 'cashflow_per_day' | 'pnl_per_category' | 'profit_taken' | 'cash_out_per_category'
   | 'sales_per_day' | 'sales_per_customer' | 'sales_per_product' | 'sales_per_category'
   | 'sales_per_factory' | 'sales_per_designer'
   | 'purchases_per_product' | 'receipts_per_product'
@@ -44,6 +44,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'spend_per_supplier',    label: 'Spend per supplier',    group: 'purchases',   period: 'range' },
   // Payments / cash
   { value: 'payments_out_per_counterparty', label: 'Money sent (per supplier)',  group: 'payments', period: 'range' },
+  { value: 'cash_out_per_category',        label: 'Money out (by category)',    group: 'payments', period: 'range' },
   { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
   // VAT / tax
   { value: 'vat_return', label: 'VAT analysis (by rate)', group: 'vat', period: 'range' },
@@ -137,6 +138,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportCashflowPerDay(workspaceId, range.from, range.to); break;
         case 'pnl_per_category':
           data = await financeService.reportPnlPerCategory(workspaceId, range.from, range.to); break;
+        case 'cash_out_per_category':
+          data = await financeService.reportCashOutPerCategory(workspaceId, range.from, range.to); break;
         case 'profit_taken':
           data = await financeService.reportProfitTaken(workspaceId, range.from, range.to);
           // A failed read leaves it null, which renders no drawdown line at all — never a
@@ -388,6 +391,8 @@ function primarySortKey(report: ReportKind): string {
       return 'net';
     case 'profit_taken':
       return 'amount';
+    case 'cash_out_per_category':
+      return 'total_paid';
     case 'sales_per_day':
     case 'sales_per_customer':
     case 'sales_per_product':
@@ -428,6 +433,22 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
         { label: 'Receipts (in)', value: formatMoney(inAmt) },
         { label: 'Payments (out)', value: formatMoney(outAmt) },
         { label: 'Net movement', value: formatMoney(inAmt - outAmt) },
+      ];
+    }
+    case 'cash_out_per_category': {
+      // Per currency, never one number: the rows are already split that way because two currencies
+      // in one category do not add up, and a total that re-merges them undoes the point.
+      const byCcy = new Map<string, number>();
+      let payments = 0;
+      for (const r of rows) {
+        const ccy = String(r.currency || 'EUR');
+        byCcy.set(ccy, (byCcy.get(ccy) ?? 0) + Number(r.total_paid || 0));
+        payments += Number(r.payment_count || 0);
+      }
+      return [
+        { label: 'Payments', value: String(payments) },
+        ...[...byCcy].sort(([a], [b]) => a.localeCompare(b))
+          .map(([ccy, amt]) => ({ label: byCcy.size > 1 ? `Out (${ccy})` : 'Money out', value: formatMoney(amt, ccy) })),
       ];
     }
     case 'profit_taken': {
@@ -575,6 +596,19 @@ function renderReport(
     return (
       <Table headers={['Date', 'Receipts', 'Payments', 'Difference']} totals={totals} rows={rows.map((r: any) => [
         r.period, formatMoney(Number(r.receipts || 0)), formatMoney(Number(r.payments || 0)), formatMoney(Number(r.difference || 0)),
+      ])} />
+    );
+  }
+  if (report === 'cash_out_per_category') {
+    return (
+      <Table headers={['Category', 'Payments', 'Money out']} totals={totals} rows={rows.map((r: any) => [
+        // The built-in that is deliberately outside the P&L says so here, where somebody reading
+        // "money out" would otherwise expect to find it in the profit figure too.
+        r.system_key === 'profit_allocation'
+          ? <span key="n">{r.category_name} <span className="text-[10px] text-muted-foreground">· not a P&amp;L expense</span></span>
+          : r.category_name,
+        String(r.payment_count ?? 0),
+        formatMoney(Number(r.total_paid || 0), r.currency || 'EUR'),
       ])} />
     );
   }
@@ -799,7 +833,14 @@ const MyDataReconTable: React.FC<{
 };
 
 const Table: React.FC<{
-  headers: string[]; rows: string[][]; totals: { label: string; value: string }[];
+  /**
+   * Cells are React nodes, not strings. They always were — `{cell}` is how they render — and the
+   * `string[][]` declaration only held because every caller maps over `any`. A row that wants to
+   * mark a value (a category that is deliberately outside the P&L, say) should not have to lie
+   * about its type to do it. The CSV export reads the RAW report rows, not these, so it is
+   * unaffected by anything rendered here.
+   */
+  headers: string[]; rows: React.ReactNode[][]; totals: { label: string; value: string }[];
   /** Pagination footer — only the document-level reports pass one. */
   footer?: React.ReactNode;
 }> = ({ headers, rows, totals, footer }) => (
