@@ -110,13 +110,25 @@ export const JobCostCard: React.FC<{
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Stat label="Contracted" value={money(pnl.contracted_revenue, currency)} hint="accepted quotes" />
-          <Stat label="Billed" value={money(pnl.billed_revenue, currency)} hint="issued invoices" />
+          {/* Revenue, not "Billed". Margin is taken against everything sold, and plenty of sales
+              here never become an invoice — reporting only the invoiced half made a job that sells
+              on orders read as pure loss, because its cost counted and its revenue did not. The
+              hint names both halves so the figure is never a bare assertion. */}
+          <Stat
+            label="Revenue"
+            value={money(pnl.revenue, currency)}
+            hint={pnl.order_revenue > 0.005
+              ? (pnl.billed_revenue > 0.005
+                ? `${money(pnl.billed_revenue, currency)} invoiced + ${money(pnl.order_revenue, currency)} on orders`
+                : 'on orders, not yet invoiced')
+              : 'issued invoices'}
+          />
           <Stat label="Actual cost" value={money(pnl.actual_cost, currency)} hint="bills + labor + expenses" />
           <Stat
             label="Margin"
             value={money(pnl.margin_amount, currency)}
             tone={marginTone(pnl.margin_amount)}
-            hint={pnl.margin_pct == null ? 'nothing billed yet' : `${pnl.margin_pct}% of billed`}
+            hint={pnl.margin_pct == null ? 'nothing sold yet' : `${pnl.margin_pct}% of revenue`}
           />
         </div>
 

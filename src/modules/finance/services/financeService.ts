@@ -3826,6 +3826,22 @@ const _financeServiceV2 = {
    * P&L on purpose. So a categorised payment could be made and appear in no report that named its
    * category. Rows are per category AND currency — two currencies in one category do not add up.
    */
+  /**
+   * Which currencies this workspace's money is actually in.
+   *
+   * Most finance reports return money with no currency column: they sum across currencies and the
+   * formatter defaults to EUR. Nothing is wrong in a single-currency workspace and everything is
+   * wrong the day it is not — silently, because a mislabelled sum is still a valid number. Reading
+   * this lets a report SAY its totals mix money instead of stating a confident figure in a currency
+   * nobody uses. A failed read returns an empty array, which warns about nothing: the caveat is
+   * worth showing when it is true, never worth inventing when the check itself did not run.
+   */
+  async workspaceMoneyCurrencies(workspaceId: string): Promise<string[]> {
+    const { data, error } = await (supabase as any).rpc('workspace_money_currencies', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return ((data ?? []) as string[]).filter(Boolean);
+  },
+
   async reportCashOutPerCategory(workspaceId: string, from: string, to: string): Promise<CashOutPerCategoryRow[]> {
     const { data, error } = await (supabase as any).rpc('report_cash_out_per_category', { p_workspace_id: workspaceId, p_from: from, p_to: to });
     if (error) throw error;

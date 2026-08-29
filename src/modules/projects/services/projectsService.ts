@@ -249,8 +249,18 @@ export interface ProjectFinanceSummary {
 export interface ProjectPnl {
   /** Accepted quotes — what the client agreed to. */
   contracted_revenue: number;
-  /** Issued (non-draft, non-void) invoices — what we actually billed. */
+  /** Issued (non-draft, non-void) invoices, NET of VAT — what we actually billed. */
   billed_revenue: number;
+  /**
+   * Revenue on this project's sales orders that nothing has invoiced yet, net of VAT. Real revenue
+   * with no document behind it: a business that sells on orders and invoices later used to see its
+   * whole margin as loss, because cost counted and this did not.
+   */
+  order_revenue: number;
+  /** Cost of goods on that same un-invoiced remainder. Part of `actual_cost`. */
+  order_cogs: number;
+  /** `billed_revenue + order_revenue` — the figure margin is actually taken against. */
+  revenue: number;
   /** Open purchase-order value: PO total minus bills already received against it. */
   committed_cost: number;
   supplier_cost: number;
@@ -263,7 +273,7 @@ export interface ProjectPnl {
   /** Claims awaiting review. Reported so they are visible, but deliberately NOT in actual_cost. */
   pending_expense_cost: number;
   expense_count: number;
-  /** supplier_cost + labor_cost + expense_cost. */
+  /** supplier_cost + labor_cost + expense_cost + order_cogs. */
   actual_cost: number;
   margin_amount: number;
   margin_pct: number | null;
@@ -1262,6 +1272,9 @@ class ProjectsService {
     return {
       contracted_revenue: n(r.contracted_revenue),
       billed_revenue: n(r.billed_revenue),
+      order_revenue: n(r.order_revenue),
+      order_cogs: n(r.order_cogs),
+      revenue: n(r.revenue),
       committed_cost: n(r.committed_cost),
       supplier_cost: n(r.supplier_cost),
       labor_cost: n(r.labor_cost),

@@ -129,6 +129,24 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
    */
   const [drawdown, setDrawdown] = useState<Awaited<ReturnType<typeof financeService.getProfitDrawdown>> | null>(null);
 
+  /**
+   * Most of these reports have no currency column: they sum across currencies and the formatter
+   * defaults to EUR. Rather than let that pass as a confident number, the tab says so when it is
+   * true. Empty (or a failed read) warns about nothing — an invented caveat is its own defect.
+   */
+  const [moneyCurrencies, setMoneyCurrencies] = useState<string[]>([]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    financeService.workspaceMoneyCurrencies(workspaceId)
+      .then((c) => { if (!cancelled) setMoneyCurrencies(c); })
+      .catch(() => { if (!cancelled) setMoneyCurrencies([]); });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+  // The two reports that DO carry a currency per row are exempt: theirs are already split.
+  const currencyBlind = moneyCurrencies.length > 1
+    && report !== 'cash_out_per_category' && report !== 'profit_taken';
+
   const runReport = async () => {
     try {
       setLoading(true);
@@ -350,7 +368,16 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           ) : sorted.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">No data for this report and period.</div>
           ) : (
-            renderReport(report, sorted, totalsShown, page, setPage)
+            <>
+              {currencyBlind && (
+                <p className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                  This workspace holds money in {moneyCurrencies.join(', ')}. This report has no
+                  currency column, so the figures below add them together — read them as indicative,
+                  not as a total in any one currency.
+                </p>
+              )}
+              {renderReport(report, sorted, totalsShown, page, setPage)}
+            </>
           )}
         </CardContent>
       </Card>

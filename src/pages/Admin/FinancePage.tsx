@@ -827,20 +827,24 @@ const FinancePage: React.FC = () => {
                 question operators actually open this tab with: what came in, what is still out,
                 and what we made on it. */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {/* Each tile names its own WINDOW. The three cover all-time cash, a right-now
+                  snapshot and the last 12 months of trading — three different questions sitting in
+                  one row, which invites a subtraction across them that means nothing. Every figure
+                  was already correct; only the periods were unstated. */}
               <MoneySummaryCard
-                label="Money received"
+                label="Money received — all time"
                 value={formatMoney(cashIn)}
                 sub={`${formatMoney(cashOut)} paid out · ${formatMoney(cashPosition)} net in bank`}
               />
               <MoneySummaryCard
-                label="Still owed to us"
+                label="Still owed to us — right now"
                 value={formatMoney(kpis.arOutstanding, arMoney.currency)}
                 sub={kpis.creditHeld > 0
                   ? `we hold ${formatMoney(kpis.creditHeld, arMoney.currency)} of customer credit for their next orders`
                   : 'across all open receivables'}
               />
               <MoneySummaryCard
-                label="Gross profit"
+                label="Gross profit — last 12 months"
                 value={formatMoney(profit.margin)}
                 sub={profit.pct !== null
                   ? `${formatMoney(profit.revenue)} sold − ${formatMoney(profit.cogs)} cost · ${profit.pct}%`
