@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Ambassador | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Ambassador</div>
+  <h1>Account · Ambassador</h1>
+  <div class="routes"><span class="badge route">/profile?tab=ambassador</span></div>
+  <p class="lead">The <strong>Ambassador</strong> tab is where you say <strong>which brands you represent</strong> — the factories and suppliers you actually work with, and the material categories you promote each one in. It's a showcase for your <a href="account-profile.html">public profile</a>: pick a brand from the platform's supplier list, describe your relationship, and it goes live on your profile straight away. This is <em>not</em> a referral or affiliate scheme — there's no link to share, no sign-ups to track and nothing to earn. It's about credibility: showing visitors the brands behind your work.</p>
+
+  <div class="callout"><p><strong>Where:</strong> your <a href="account-profile.html">Profile</a> → the <strong>Ambassador</strong> tab (<span class="badge route">/profile?tab=ambassador</span>). Open to everyone — no plan, no module, no approval step.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/ambassador.png" alt="The Ambassador tab">
+    <figcaption>The Ambassador tab — stat tiles (Brands you represent, Categories covered, Suppliers on our list, Featured), then the <strong>Brands you represent</strong> card with <strong>Add brand</strong>.</figcaption>
+  </figure>
+
+  <h2>What's on the tab</h2>
+  <ul class="feat">
+    <li><strong>Four stat tiles</strong> — <strong>Brands</strong> (you represent), <strong>Categories</strong> (covered), <strong>On our list</strong> (how many of your brands are suppliers on the platform), and <strong>Featured</strong> (your lead brands).</li>
+    <li><strong>Brands you represent</strong> — the card that lists them, with <strong>Add brand</strong> and a <strong>View profile</strong> link to see how they appear publicly.</li>
+    <li>Each brand row shows its relationship label, an <em>“On our supplier list”</em> badge where applicable, a <em>“Featured”</em> badge, and the year you've worked with them — with reorder arrows and Edit / Feature / Remove actions.</li>
+  </ul>
+  <div class="callout warn"><p><strong>Your profile has to be public.</strong> If your profile is private, the tab warns you that none of this is visible, with a <strong>Make profile public</strong> button. Brands only appear to visitors once your <a href="account-profile.html">public profile</a> is public.</p></div>
+
+  <h2>Adding a brand</h2>
+  <p>Click <strong>Add brand</strong> and fill in:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Brand</strong></td><td>Search the platform's supplier list and pick a factory/supplier. (A brand that isn't on the list can still be added by hand.)</td></tr>
+      <tr><td><strong>Your relationship</strong></td><td>How you're connected — see the types below.</td></tr>
+      <tr><td><strong>Categories you promote it in</strong></td><td>The material categories you represent this brand in.</td></tr>
+      <tr><td><strong>What you say about them</strong></td><td>A short headline (up to 280 characters) shown on your profile.</td></tr>
+      <tr><td><strong>Working with them since</strong></td><td>The year the relationship started.</td></tr>
+      <tr><td><strong>Brand link</strong></td><td>A link to the brand (https only).</td></tr>
+      <tr><td><strong>Showcase moodboard</strong></td><td>Optionally feature a <a href="moodboards.html">moodboard</a> that shows your work with them.</td></tr>
+      <tr><td><strong>Feature this brand</strong></td><td>A switch to mark it a <em>lead</em> brand, surfaced more prominently.</td></tr>
+    </tbody>
+  </table></div>
+  <p>It's live <strong>the moment you save</strong> — nobody has to approve it.</p>
+
+  <h2>Relationship types</h2>
+  <p>The relationship you choose sets how the brand reads on your public profile:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th><th>Reads on your profile as…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ambassador</strong></td><td>“Ambassador for …” — you represent and actively promote the brand in your work.</td></tr>
+      <tr><td><strong>Authorized dealer</strong></td><td>“Authorized dealer of …”</td></tr>
+      <tr><td><strong>Certified installer</strong></td><td>“Certified installer for …”</td></tr>
+      <tr><td><strong>Specifier</strong></td><td>“Specifies …”</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>What it affects</h2>
+  <ul class="feat">
+    <li><strong>Your public profile</strong> — the brands, relationships and categories appear at <span class="badge route">/u/:userId</span> <span class="badge public">Public</span> (once your profile is public).</li>
+    <li><strong>The brand can see you.</strong> If the brand you picked matches a company on the platform's supplier list <em>and that company has an account</em>, that supplier sees who represents it in its <strong>Supplier Portal</strong>. Nothing else is shared, and there's nothing for them to approve.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>In short:</strong> add the real brands behind your work, say how you're connected and in which categories, and — with your profile public — they become part of how clients and partners size you up. It's a credibility signal, not a rewards programme.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

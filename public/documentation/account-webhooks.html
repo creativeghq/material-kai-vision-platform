@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Webhooks | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Webhooks</div>
+  <h1>Account · Outbound Webhooks</h1>
+  <div class="routes"><span class="badge route">/profile?tab=webhooks</span> <span class="badge gated">workspace member</span></div>
+  <p class="lead">Outbound webhooks let <strong>your own systems get notified the moment something happens in your workspace</strong> — an invoice is paid, an order ships, a quote is approved. You register an <strong>HTTPS endpoint</strong>, pick which <strong>events</strong> it should receive, and the platform POSTs a signed JSON payload to it as each one occurs. Every request is <strong>HMAC-signed</strong> so your receiver can verify it genuinely came from us. This is the integration surface for wiring MaterialsHub into an ERP, a Zapier/Make scenario, a Slack notifier or your own backend.</p>
+
+  <div class="callout"><p><strong>Where:</strong> your <a href="account-profile.html">Profile</a> → the <strong>Webhooks</strong> tab (<span class="badge route">/profile?tab=webhooks</span>). It's <strong>workspace-scoped</strong> — any member of the active workspace can manage them (not admin-only, no add-on). Pick a workspace first if none is active. See also <a href="account-keys.html">Keys &amp; Connections</a> and the <a href="api.html">API</a>.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/webhooks.png" alt="The Outbound Webhooks tab">
+    <figcaption>Outbound webhooks — a table of endpoints (Endpoint · Events · Last delivery · Active) with per-row Delivery log, Rotate secret and Delete, and an <strong>Add endpoint</strong> button.</figcaption>
+  </figure>
+
+  <h2>Adding an endpoint</h2>
+  <ol>
+    <li>Click <strong>Add endpoint</strong> and enter the <strong>URL</strong> — it must be <strong>https</strong> and reachable from the public internet.</li>
+    <li>Optionally add a <strong>description</strong>.</li>
+    <li>Tick the <strong>events</strong> you want it to receive (at least one; there's deliberately no “all events” option — you subscribe to exactly what you need). <strong>Create</strong> enables once you've set a URL and an event.</li>
+    <li>The platform shows your <strong>signing secret exactly once</strong> — <em>“Copy your signing secret now.”</em> Store it; it can't be shown again, and if you lose it you <strong>rotate</strong> for a new one.</li>
+  </ol>
+  <p>Each endpoint row has an <strong>Active</strong> toggle, a <strong>Delivery log</strong>, <strong>Rotate signing secret</strong> and <strong>Delete</strong>. A workspace can have up to <strong>10 endpoints</strong>.</p>
+
+  <h2>The events you can subscribe to</h2>
+  <p>27 event types, across the areas you'd integrate:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Area</th><th>Events</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Invoicing &amp; payments</strong></td><td><code>invoice_issued</code>, <code>receipt_issued</code>, <code>invoice_paid</code>, <code>payment_received</code>, <code>payment_sent</code>, <code>payment_reversed</code>, <code>fiscal_document_rejected</code></td></tr>
+      <tr><td><strong>Orders</strong></td><td><code>order_created</code>, <code>order_status_changed</code>, <code>order_dispatched</code>, <code>upstream_order_created</code></td></tr>
+      <tr><td><strong>Quotes &amp; contracts</strong></td><td><code>quote_sent</code>, <code>quote_approved</code>, <code>quote_rejected</code>, <code>contract_signed</code></td></tr>
+      <tr><td><strong>Purchasing &amp; RFQ</strong></td><td><code>purchase_order.sent</code>, <code>purchase_order.received</code>, <code>supplier_po_received</code>, <code>rfq_lines_requested</code>, <code>rfq_lines_priced</code></td></tr>
+      <tr><td><strong>Inventory</strong></td><td><code>inventory_low_stock</code></td></tr>
+      <tr><td><strong>CRM, projects &amp; bookings</strong></td><td><code>crm_contact_created</code>, <code>crm_company_created</code>, <code>project_request_raised</code>, <code>project_request_answered</code>, <code>client_view_feedback_received</code>, <code>appointment_booked</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>The UI shows each event humanised (e.g. <code>purchase_order.sent</code> → “Purchase order sent”) with its raw id beside it.</p>
+
+  <h2>Verifying a delivery — signature &amp; headers</h2>
+  <p>Every POST carries these headers so your receiver can trust it:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Header</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>X-MaterialKai-Event</code></td><td>The event type.</td></tr>
+      <tr><td><code>X-MaterialKai-Timestamp</code></td><td>Unix seconds when it was sent.</td></tr>
+      <tr><td><code>X-MaterialKai-Signature</code></td><td><code>sha256=&lt;hex&gt;</code> — the HMAC.</td></tr>
+      <tr><td><code>X-MaterialKai-Delivery</code></td><td>A delivery id, stable across retries — use it to de-duplicate.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The <strong>signature</strong> is <code>HMAC-SHA256(secret, "&lt;timestamp&gt;.&lt;raw body&gt;")</code>. To verify: recompute it over the exact raw body with your signing secret, compare, and <strong>reject a timestamp more than a few minutes old</strong> (replay protection). The body envelope is <code>{ "type", "workspace_id", "data" }</code>.</p>
+  <div class="callout"><p><strong>Built to be safe.</strong> Endpoints are <strong>https-only and SSRF-guarded</strong> — the URL is checked at registration <em>and</em> again at delivery (in case DNS is re-pointed), and internal addresses are refused. The signing secret (<code>whsec_…</code>) is generated server-side and never readable back — only shown once, and rotating one invalidates the old immediately.</p></div>
+
+  <h2>Delivery log, retries &amp; auto-disable</h2>
+  <p>Each endpoint's <strong>Delivery log</strong> (When · Event · Status · HTTP · Detail) is your observability — there's no separate “test” button; you watch real deliveries here. A delivery is <strong>delivered</strong>, <strong>pending</strong>, <strong>delivering</strong>, <strong>failed</strong>, or <strong>dropped</strong> (queued for an endpoint that was disabled or deleted). Retries back off over increasing delays, and after a run of consecutive failures the platform <strong>auto-disables</strong> the endpoint with a visible reason — re-enabling it clears the counter. Log rows are pruned after 30 days.</p>
+
+  <div class="callout tip"><p><strong>Worked example — notify your ERP when a customer pays.</strong> Add an endpoint pointing at your ERP's HTTPS receiver, tick <code>invoice_paid</code> and <code>payment_received</code>, and copy the signing secret. On each payment, your endpoint gets a signed POST; verify the <code>X-MaterialKai-Signature</code> against the raw body, de-dupe on <code>X-MaterialKai-Delivery</code>, and post the payment into your books. Watch the <strong>Delivery log</strong> to confirm 2xx responses.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

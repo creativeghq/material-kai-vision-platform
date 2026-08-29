@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account: Schedule | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="account.html">Account &amp; Billing</a> / Schedule</div>
+  <h1>Account · Schedule</h1>
+  <div class="routes"><span class="badge route">/profile?tab=schedule</span></div>
+  <p class="lead">The <strong>Schedule</strong> tab is your personal calendar hub — it brings together three things that used to be separate tabs: your <strong>Availability</strong> (when clients may book you), your <strong>Bookings</strong> (the requests they've made), and <strong>My calendar</strong> (the meetings you've logged in CRM). It's organised as a small side-nav so you set your hours, work your incoming bookings and see your meetings all in one place.</p>
+
+  <div class="callout"><p><strong>Where:</strong> your <a href="account-profile.html">Profile</a> → the <strong>Schedule</strong> tab (<span class="badge route">/profile?tab=schedule</span>), with three sections reachable directly: <span class="badge route">?tab=schedule&amp;section=availability</span>, <span class="badge route">…&amp;section=appointments</span> (Bookings, the default) and <span class="badge route">…&amp;section=calendar</span>. Old <span class="badge route">?tab=appointments</span> and <span class="badge route">?tab=calendar</span> links now redirect here.</p></div>
+
+  <h2>Availability — when clients can book you</h2>
+  <p><strong>What it is —</strong> the hours you're open to being booked. <strong>Why it matters —</strong> it's what turns your <a href="account-profile.html">public profile</a> into something a client can act on: set your windows and a <em>“Book a time”</em> option appears on your public page.</p>
+  <ul class="feat">
+    <li><strong>Accept bookings</strong> — the master toggle. Turn it off and your public profile shows no booking option and the Bookings section stays empty.</li>
+    <li><strong>Set your windows</strong> — a month calendar; click a <strong>future date</strong> and add one or more time windows (options run <strong>7:00 AM–9:00 PM in 30-minute steps</strong>). Clients book <strong>1-hour slots</strong> inside those windows.</li>
+    <li><strong>Save Availability</strong> to publish it.</li>
+  </ul>
+  <div class="callout"><p><strong>No external calendar to connect.</strong> Availability is a simple per-day window you set here; there's no Google/Outlook sync, and the “booking link” is just your public profile at <span class="badge route">/u/:userId</span>.</p></div>
+
+  <h2>Bookings — requests from your public profile</h2>
+  <p><strong>What it is —</strong> the meetings clients have requested with you, from your public profile. <strong>Why it matters —</strong> it's the queue you actually work: confirm the ones that suit you, decline the ones that don't, and keep the details in one place. <strong>You don't create bookings here</strong> — clients do, from your public page; this is where you respond to them.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/account/schedule.png" alt="The Schedule tab — Bookings section">
+    <figcaption>Schedule → Bookings — client booking requests with a status filter and a pending count; open one to confirm, decline, mark it done, and keep private notes.</figcaption>
+  </figure>
+
+  <ul class="feat">
+    <li><strong>Statuses</strong> — each booking is <strong>pending</strong>, <strong>confirmed</strong>, <strong>cancelled</strong> or <strong>completed</strong>; a badge shows how many are <em>pending</em> your response.</li>
+    <li><strong>Filter</strong> — search by client or service and filter by status.</li>
+    <li><strong>The detail drawer</strong> — open a booking to <strong>Confirm</strong> or <strong>Decline</strong> it, <strong>Mark as completed</strong> afterwards, <strong>Open inbox</strong> to message the client, set <em>“What is this about?”</em> to tie it to a <a href="projects.html">project</a> or <a href="real-estate.html">property</a>, and keep <strong>Private notes</strong> only you see.</li>
+  </ul>
+  <div class="callout"><p><strong>It feeds your automations.</strong> Confirming, completing or cancelling a booking raises a <a href="flows.html">Flow</a> event (<em>appointment confirmed / completed / cancelled</em>), so you can send the client a confirmation or reminder without doing it by hand.</p></div>
+
+  <h2>My calendar — the meetings you've logged</h2>
+  <p><strong>What it is —</strong> the CRM <strong>meetings you've recorded</strong> against your contacts and companies, split into <strong>Upcoming meetings</strong> and <strong>Past &amp; done</strong>. Each row links back to the <a href="crm-contacts.html">contact</a> or <a href="crm-companies.html">company</a> and shows its reminder badges. <strong>Why it matters —</strong> it's your own agenda of logged meetings alongside the client bookings above.</p>
+  <p>Meetings are <strong>logged from a CRM contact's Activity tab</strong> (not created here) — this section is the read-across view of all of yours in one list.</p>
+
+  <div class="callout tip"><p><strong>Day-to-day:</strong> set your <strong>Availability</strong> once (and keep <em>Accept bookings</em> on), then live in <strong>Bookings</strong> — confirm what fits, decline what doesn't, mark meetings done, and let the flow events handle the confirmations. Glance at <strong>My calendar</strong> for the meetings you've logged in CRM.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
