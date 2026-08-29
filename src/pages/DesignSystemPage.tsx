@@ -53,6 +53,7 @@ import {
   HubPropertyList,
   HubRecordIdentity,
   HubRecordLayout,
+  HubSegmented,
   HubSideNav,
   HubStatGrid,
   HubStatTile,
@@ -123,6 +124,8 @@ export default function DesignSystemPage() {
   const [sort, setSort] = React.useState<HubSort>({ columnId: 'value', direction: 'desc' });
   const [section, setSection] = React.useState('overview');
   const [navItem, setNavItem] = React.useState('account');
+  const [dsSide, setDsSide] = React.useState<'customer' | 'supplier'>('customer');
+  const [dsLang, setDsLang] = React.useState<'en' | 'gr'>('en');
 
   const rows = React.useMemo(() => {
     const filtered = DEMO_ROWS.filter(
@@ -374,6 +377,40 @@ export default function DesignSystemPage() {
                       Tasks panel.
                     </TabsContent>
                   </Tabs>
+                </CardContent>
+              </Card>
+            </section>
+
+            <section>
+              <SectionHeader
+                title="Segmented control"
+                subtitle="Two views of the SAME list. A tab changes the section; this changes the answer."
+              />
+              <Card>
+                <CardContent className="flex flex-wrap items-center gap-4">
+                  <HubSegmented
+                    aria-label="Credit note side"
+                    value={dsSide}
+                    onChange={setDsSide}
+                    options={[
+                      { value: 'customer', label: 'Issued to customers' },
+                      { value: 'supplier', label: 'Received from suppliers' },
+                    ]}
+                  />
+                  <HubSegmented
+                    aria-label="Field language"
+                    value={dsLang}
+                    onChange={setDsLang}
+                    options={[
+                      { value: 'en', label: 'EN' },
+                      { value: 'gr', label: 'GR' },
+                    ]}
+                  />
+                  <p className="w-full text-sm text-muted-foreground">
+                    Squared track, and the selected segment's radius matches it. Four hand-rolled
+                    copies of this were `rounded-full` with a square accent fill inside the round
+                    outline — the two edges fought, and that is what got reported.
+                  </p>
                 </CardContent>
               </Card>
             </section>

@@ -38,4 +38,7 @@ export type { HubNavItem, HubNavGroup } from './HubSideNav';
 export { HubTabNav, HubTabAddAction } from './HubTabNav';
 export type { HubTabItem } from './HubTabNav';
 
+export { HubSegmented } from './HubSegmented';
+export type { HubSegment } from './HubSegmented';
+
 export { HubEmptyState } from './HubEmptyState';

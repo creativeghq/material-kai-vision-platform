@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, PackageSearch, Truck, PackageCheck, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubSegmented } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -105,16 +106,15 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
         title="Sourcing"
         subtitle="What needs ordering, what's on its way, and what's reserved for customers."
         actions={<>
-          <div className="inline-flex rounded-full border border-border overflow-hidden text-xs">
-            <button
-              className={`px-3 py-1 ${!mine ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
-              onClick={() => setMine(false)}
-            >All</button>
-            <button
-              className={`px-3 py-1 ${mine ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
-              onClick={() => setMine(true)}
-            >My orders</button>
-          </div>
+          <HubSegmented
+            aria-label="Sourcing scope"
+            value={mine ? 'mine' : 'all'}
+            onChange={(v) => setMine(v === 'mine')}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'mine', label: 'My orders' },
+            ]}
+          />
           <Button size="sm" variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>

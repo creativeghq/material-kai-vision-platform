@@ -15,6 +15,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubSegmented } from '@/components/core/hub';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -325,18 +326,15 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
 };
 
 const LangToggle: React.FC<{ lang: Lang; onChange: (l: Lang) => void }> = ({ lang, onChange }) => (
-  <div className="flex rounded-full border border-border/60 p-0.5 text-xs">
-    {(['en', 'gr'] as Lang[]).map((l) => (
-      <button
-        key={l}
-        type="button"
-        onClick={() => onChange(l)}
-        className={`px-3 py-1 font-medium transition-colors ${lang === l ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-      >
-        {l === 'en' ? 'EN' : 'GR'}
-      </button>
-    ))}
-  </div>
+  <HubSegmented
+    aria-label="Field language"
+    value={lang}
+    onChange={onChange}
+    options={[
+      { value: 'en', label: 'EN', title: 'English' },
+      { value: 'gr', label: 'GR', title: 'Greek' },
+    ]}
+  />
 );
 
 const FieldGrid: React.FC<{ fields: Field[]; data: Record<string, any>; set: (k: string, v: any) => void; lang: Lang }> = ({ fields, data, set, lang }) => (

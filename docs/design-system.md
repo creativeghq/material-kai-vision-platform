@@ -255,6 +255,25 @@ scrollbar and no swipe to recover them. On a phone the column that goes is usual
 
 Guarded by [tests/unit/responsiveTableOverflow.test.ts](../tests/unit/responsiveTableOverflow.test.ts).
 
+### Segmented control
+
+`HubSegmented`. A switch between two or three views of the **same** list. Not a tab (a tab changes
+the section of the page), not a filter chip (a chip narrows a set), not a button (nothing happens
+when you press it except that the answer to a question changes).
+
+- **Squared** — `rounded-sm` track, `rounded-xs` segment. A pill is the silhouette of nothing else
+  in this platform, which is exactly why it stood out.
+- **The selected segment's radius matches the track's**, inset by the track's own 2px padding. All
+  four hand-rolled copies missed this, so a square accent fill sat inside a fully-round outline and
+  the two edges visibly fought.
+- **Sunken track**, so it reads as a groove with something in it rather than two touching buttons.
+- **It belongs next to what it scopes.** The credit-note switch sat opposite the search across a
+  card header; it decides what that search searches, and a card's width of gap said otherwise.
+
+Guarded by the "no rounded-full track wrapping segment buttons" case in
+[tests/unit/pillControls.test.ts](../tests/unit/pillControls.test.ts) — a hard zero, since
+`HubSegmented` is now the only one of these in the platform.
+
 ### Section rail
 
 A settings/section rail is a COLUMN on `lg`+ and a horizontal strip below it. Both `HubSideNav` and a
@@ -291,6 +310,7 @@ that a record page has three columns with three different jobs. Those rules live
 | `HubStatTile` / `HubStatGrid` | KPI tile with a meaning-coloured delta; auto-fitting grid (no orphan tile on the last row). |
 | `HubSideNav` | The settings / section rail. Active row = tint + leading accent bar. Below `lg` it is a horizontal strip, not a column — see §5, Section rail. |
 | `HubTabNav` | Underline tabs for routes and saved views. Route tabs are real `<a>`s — middle-click and ⌘-click are how people use a tab strip. |
+| `HubSegmented` | Two or three views of the SAME list — customer side vs supplier side, all vs mine, EN vs GR. **Squared, and the selected segment's radius matches the track's.** |
 | `HubEmptyState` | Two variants, because "you have none" and "your filters excluded all 4,000" need opposite offers. **Always pass `action`** — see §6b. |
 
 ---

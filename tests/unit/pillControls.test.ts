@@ -90,6 +90,9 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const rel = (p: string) => relative(ROOT, p).split(sep).join('/');
 
+/** Written as a code point: a literal CR in this source would be normalised by git on checkout. */
+const CR = String.fromCharCode(13);
+
 /** Files rendering a pill-shaped button / tab / chip, and how many. */
 export function findPillControls(): Record<string, number> {
   const out: Record<string, number> = {};
@@ -150,6 +153,44 @@ describe('buttons, tabs and chips are rectangular', () => {
         '`rounded-full` remains correct for avatars, dots and status pips — a square-sized ' +
         '(w-8 h-8 / size-8) or uniformly padded (p-1.5) control is not flagged at all.\n\n' +
         added.join('\n'),
+    ).toEqual([]);
+  });
+
+  /**
+   * THE GAP THIS CLOSES
+   * -------------------
+   * `findPillControls` reads the OPENING TAG of the control itself, so it never saw a segmented
+   * control: there the `rounded-full` is on the track `<div>` and the segments are square. Four
+   * shipped that way — Documents, Business identity, GSC breakdown, Sourcing — each a separate
+   * hand-roll, each fully round, and each with a SQUARE accent fill sitting inside the round
+   * outline, because none of the four gave the selected segment a radius. The two edges visibly
+   * fought, which is how it finally got reported.
+   *
+   * Use `HubSegmented`. It is the only one of these in the platform now, so this is a hard zero
+   * rather than a ratchet.
+   */
+  it('no rounded-full track wrapping segment buttons', () => {
+    const tracks: string[] = [];
+    for (const file of walk(SRC)) {
+      const raw = readFileSync(file, 'utf8');
+      const src = blankComments(raw.includes(CR) ? raw.split(CR).join('') : raw);
+      if (!src.includes('rounded-full')) continue;
+
+      for (const m of src.matchAll(/<div\b/g)) {
+        const end = openingTagEnd(src, m.index!);
+        if (end === -1) continue;
+        if (!src.slice(m.index!, end + 1).includes('rounded-full')) continue;
+        // A segmented track: two or more horizontally-padded buttons directly inside it.
+        const body = src.slice(end, end + 900);
+        const segments = [...body.matchAll(/<button\b[^>]*/g)].filter((b) => CHIP_SHAPED.test(b[0]));
+        if (segments.length >= 2) tracks.push(`${rel(file)}:${src.slice(0, m.index!).split('\n').length}`);
+      }
+    }
+    expect(
+      tracks,
+      'This is a segmented control built by hand with a `rounded-full` track. Use `HubSegmented` ' +
+        '(components/core/hub) — squared track, and the selected segment gets a radius that ' +
+        'matches it, which is the part every hand-rolled copy got wrong.\n' + tracks.join('\n'),
     ).toEqual([]);
   });
 

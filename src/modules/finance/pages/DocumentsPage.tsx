@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { Button } from '@/components/core/ui/button';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubSegmented } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -352,6 +352,23 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   // title/actions look identical whether the content is a Card table or the kanban board.
   const docActions = (
     <div className="flex items-center gap-2 flex-wrap">
+      {/* Credit notes exist on BOTH sides of the trade. Only the customer side had a surface, so
+          supplier credit notes were unreachable once recorded.
+
+          It belongs at the HEAD of the actions row rather than opposite them across the header:
+          it scopes what the search searches and what the Filters filter, so a card's width of
+          gap between it and them said the three were unrelated. */}
+      {type === 'credit_notes' && (
+        <HubSegmented
+          aria-label="Credit note side"
+          value={creditSide}
+          onChange={(side) => { setCreditSide(side); setPage(1); }}
+          options={[
+            { value: 'customer', label: 'Issued to customers' },
+            { value: 'supplier', label: 'Received from suppliers' },
+          ]}
+        />
+      )}
       {type !== 'dispatch' && filterGroups.length > 0 && (
         <FilterBar
           groups={filterGroups}
@@ -448,22 +465,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <CardTitle className="flex items-center gap-2 capitalize"><FileText className="h-4 w-4" /> {DOC_LABEL[type]}</CardTitle>
-                {/* Credit notes exist on BOTH sides of the trade. Only the customer side had a
-                    surface, so supplier credit notes were unreachable once recorded. */}
-                {type === 'credit_notes' && (
-                  <div className="flex items-center gap-1 rounded-full border border-border/60 p-0.5 text-xs">
-                    {(['customer', 'supplier'] as const).map((sideKey) => (
-                      <button
-                        key={sideKey}
-                        type="button"
-                        onClick={() => { setCreditSide(sideKey); setPage(1); }}
-                        className={`px-3 py-1 transition ${creditSide === sideKey ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                      >
-                        {sideKey === 'customer' ? 'Issued to customers' : 'Received from suppliers'}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 {docActions}
               </CardHeader>
               <CardContent className="p-0">

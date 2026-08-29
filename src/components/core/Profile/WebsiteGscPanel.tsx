@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { HubSegmented } from '@/components/core/hub';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { formatNumber } from '@/utils/decimal';
@@ -247,12 +248,18 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
           <CardTitle className="text-base">Breakdown</CardTitle>
-          <div className="inline-flex rounded-full bg-muted p-0.5 text-xs flex-wrap">
-            {(['queries', 'pages', 'countries', 'appearance'] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-1 capitalize ${view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{v}</button>
-            ))}
-          </div>
+          <HubSegmented
+            aria-label="Breakdown dimension"
+            value={view}
+            onChange={setView}
+            className="flex-wrap"
+            options={[
+              { value: 'queries', label: 'Queries' },
+              { value: 'pages', label: 'Pages' },
+              { value: 'countries', label: 'Countries' },
+              { value: 'appearance', label: 'Appearance' },
+            ]}
+          />
         </CardHeader>
         <CardContent className="p-0">
           {rows.length === 0 ? (
