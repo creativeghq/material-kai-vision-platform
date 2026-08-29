@@ -20,6 +20,7 @@ import {
 import {
   financeService, formatMoney, type PartyRow, type Invoice, type SupplierBill,
   type PaymentWithAllocation, type PartyLedgerRow, type CustomerAgingBuckets,
+  type PartyProfitPosition,
 } from '@/modules/finance/services/financeService';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL, type PartyOrderPosition,
@@ -28,6 +29,7 @@ import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanc
 import { netPositionDirection } from '@/modules/finance/utils/netPosition';
 import { usePartyStatementActions } from '@/modules/finance/components/StatementActions';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
+import { AllocatePartyProfitDialog } from '@/modules/finance/components/AllocatePartyProfitDialog';
 import { CreditReleasesCard } from '@/modules/finance/components/CreditReleasesCard';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { humanizeLabel } from '@/utils/humanize';
@@ -405,6 +407,10 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   /** Their cash we hold that isn't settled against anything yet (unallocated money-in). */
   const [credit, setCredit] = useState(0);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  // Margin still takeable across their orders — the allocate button's cap. See the prop's note on
+  // why this is not `profitability.profit_unallocated`.
+  const [profitPosition, setProfitPosition] = useState<PartyProfitPosition | null>(null);
+  const [allocateOpen, setAllocateOpen] = useState(false);
   /** Bumped after a credit release so the drill-down re-reads the balance it just changed. */
   const [reloadKey, setReloadKey] = useState(0);
   /**
@@ -597,11 +603,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const reload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
-    if (!party) { setInvoices([]); setBills([]); setPayments([]); setOrderPos(null); setCredit(0); setProfitability(null); return; }
+    if (!party) { setInvoices([]); setBills([]); setPayments([]); setOrderPos(null); setCredit(0); setProfitability(null); setProfitPosition(null); return; }
     void (async () => {
       try {
         setLoading(true);
-        const [res, bal, orders, profit] = await Promise.all([
+        const [res, bal, orders, profit, profitPos] = await Promise.all([
           financeService.getPartyDetail({
             workspaceId: party.workspace_id, partyType: party.party_type, partyId: party.party_id,
           }),
@@ -624,10 +630,17 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
             companyId: party.party_type === 'company' ? party.party_id : null,
             contactId: party.party_type === 'contact' ? party.party_id : null,
           }).catch(() => null),
+          // What is still takeable off their orders. A failed read stays null — no figure and no
+          // button — rather than becoming a confident "nothing left".
+          financeService.getPartyProfitPosition(party.workspace_id, {
+            companyId: party.party_type === 'company' ? party.party_id : null,
+            contactId: party.party_type === 'contact' ? party.party_id : null,
+          }).catch(() => null),
         ]);
         setInvoices(res.invoices); setBills(res.bills); setPayments(res.payments);
         setOrderPos(orders);
         setProfitability(profit);
+        setProfitPosition(profitPos);
         setCredit(Number(bal?.customer_credit ?? 0));
       } catch (err: any) {
         toast({ title: 'Failed to load detail', description: err?.message, variant: 'destructive' });
@@ -776,6 +789,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               creditReleasable={party.credit_releasable}
               onReleaseCredit={() => setReleaseOpen(true)}
               profitability={profitability}
+              profitPosition={profitPosition}
+              onAllocateProfit={() => setAllocateOpen(true)}
             />
 
             {/* Renders itself away when nothing has been released, so it costs a party who has
@@ -1178,6 +1193,20 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               name: party.display_name,
             }}
             available={credit}
+            onDone={reload}
+          />
+        )}
+
+        {party && (
+          <AllocatePartyProfitDialog
+            workspaceId={party.workspace_id}
+            open={allocateOpen}
+            onOpenChange={setAllocateOpen}
+            party={{
+              companyId: party.party_type === 'company' ? party.party_id : null,
+              contactId: party.party_type === 'contact' ? party.party_id : null,
+              name: party.display_name,
+            }}
             onDone={reload}
           />
         )}

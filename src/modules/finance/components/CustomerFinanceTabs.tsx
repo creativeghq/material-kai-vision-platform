@@ -12,6 +12,7 @@ import {
   financeService,
   formatMoney,
   type CustomerTopProductRow,
+  type PartyProfitPosition,
   type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
 import { ordersService, type PartyOrderPosition } from '@/modules/finance/services/ordersService';
@@ -21,6 +22,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
+import { AllocatePartyProfitDialog } from '@/modules/finance/components/AllocatePartyProfitDialog';
 import { CreditReleasesCard } from '@/modules/finance/components/CreditReleasesCard';
 import { netPositionDirection, netPositionTotal, netPositionVisible } from '@/modules/finance/utils/netPosition';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -84,13 +86,21 @@ export const PartyAccountSummary: React.FC<{
   profitability?: {
     revenue_net: number; cogs: number; gross_margin: number;
     gross_margin_pct: number | null; cost_coverage_pct: number | null;
-    /** How much of that margin has been taken as profit, and what is left. Reported BESIDE the
-     *  margin rather than added to it: an allocation is the act of claiming money the revenue and
-     *  cost above already account for, not a second earning of it. */
-    profit_allocated?: number; profit_unallocated?: number;
   } | null;
+  /**
+   * What is TAKEABLE across this party's orders, from `get_party_profit_position` — an
+   * aggregation of the same per-order derivation the order screen offers, so the party button and
+   * the order button can never name different amounts for one margin.
+   *
+   * Deliberately NOT `profitability.profit_allocated / profit_unallocated`. Those come off the
+   * P&L view (invoice lines + uninvoiced orders) and are a different quantity; printing one and
+   * enforcing the other would put two answers to "how much may I take" on a single card.
+   */
+  profitPosition?: PartyProfitPosition | null;
+  /** Turn that figure into the action. Omitted on read-only surfaces — it then just reports. */
+  onAllocateProfit?: () => void;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, aging, orders, credit, onReleaseCredit, creditReleasable, profitability, meta }) => {
+}> = ({ customer, supplier, aging, orders, credit, onReleaseCredit, creditReleasable, profitability, profitPosition, onAllocateProfit, meta }) => {
   // Unallocated cash of theirs is a liability — we're holding money that isn't settled against
   // anything yet — so it pushes the net position into THEIR favour, exactly like a supplier
   // balance does. Leaving it out was why a customer who had overpaid still read "settled · €0".
@@ -334,16 +344,30 @@ export const PartyAccountSummary: React.FC<{
                     only {profitability.cost_coverage_pct}% of revenue has a cost
                   </div>
                 )}
-                {/* How much of it has actually been taken. Rendered only once something has, so a
-                    party nobody has allocated from does not carry a permanent "€0.00 taken" — but
-                    once one euro is taken, both halves are stated, because "€420 margin" alone
-                    stops being the whole answer the moment part of it is spoken for. */}
-                {(profitability.profit_allocated ?? 0) > 0.005 && (
-                  <div className="mt-1 text-[10px] text-muted-foreground" title="Margin you have taken as profit on this party's orders, and what is still on them. Taking it does not move cash and is not counted as income twice — the revenue and cost above already are the P&L.">
-                    {formatMoney(profitability.profit_allocated ?? 0)} taken
-                    {(profitability.profit_unallocated ?? 0) > 0.005
-                      ? <> · {formatMoney(profitability.profit_unallocated ?? 0)} left</>
-                      : <> · all of it</>}
+                {/* How much of it has actually been taken, and the way to take the rest. Rendered
+                    only once there is something to say, so a party with no orders carries no
+                    permanent "€0.00 taken" — but once one euro is either taken or takeable, both
+                    halves are stated, because "€420 margin" alone stops being the whole answer the
+                    moment part of it is spoken for.
+
+                    Figures from `profitPosition`, never from `profitability`: the button's cap and
+                    the printed number have to be the same derivation. */}
+                {profitPosition && (profitPosition.allocated > 0.005 || profitPosition.available > 0.005) && (
+                  <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span title="Margin you have taken as profit on this party's orders, and what is still on them. Taking it does not move cash and is not counted as income twice — the revenue and cost above already are the P&L.">
+                      {profitPosition.allocated > 0.005
+                        ? <>{formatMoney(profitPosition.allocated, profitPosition.currency)} taken</>
+                        : <>none taken</>}
+                      {profitPosition.available > 0.005
+                        ? <> · {formatMoney(profitPosition.available, profitPosition.currency)} left</>
+                        : <> · all of it</>}
+                    </span>
+                    {onAllocateProfit && profitPosition.available > 0.005 && (
+                      <button type="button" onClick={onAllocateProfit}
+                        className="ml-auto shrink-0 underline hover:text-foreground">
+                        Allocate as profit
+                      </button>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -394,6 +418,10 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [creditReleasable, setCreditReleasable] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [profitability, setProfitability] = useState<Awaited<ReturnType<typeof financeService.getCustomerProfitability>> | null>(null);
+  // What is TAKEABLE across their orders — the allocate button's cap, and the figure printed
+  // beside it. Separate from `profitability`, which is the P&L view; see the prop's own note.
+  const [profitPosition, setProfitPosition] = useState<PartyProfitPosition | null>(null);
+  const [allocateOpen, setAllocateOpen] = useState(false);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
 
@@ -442,6 +470,13 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         // What we actually earned on this customer (revenue net − cost of goods on the lines).
         setProfitability(await financeService
           .getCustomerProfitability(activeWorkspaceId, { companyId, contactId })
+          .catch(() => null));
+
+        // Margin still on their orders. A failed read leaves this null, which renders as no
+        // figure and no button — never as "nothing left to take", which would be a wrong answer
+        // rather than an absent one.
+        setProfitPosition(await financeService
+          .getPartyProfitPosition(activeWorkspaceId, { companyId, contactId })
           .catch(() => null));
 
         // Unallocated money-in — cash of theirs sitting on account. Invisible before, so a
@@ -495,6 +530,8 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         creditReleasable={creditReleasable}
         onReleaseCredit={activeWorkspaceId ? () => setReleaseOpen(true) : undefined}
         profitability={profitability}
+        profitPosition={profitPosition}
+        onAllocateProfit={activeWorkspaceId ? () => setAllocateOpen(true) : undefined}
         meta={[
           { label: 'Open orders', value: openOrders },
           { label: 'Last payment', value: lastPayment ? formatDate(lastPayment.paid_at) : '—' },
@@ -521,6 +558,16 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
           onOpenChange={setReleaseOpen}
           party={{ companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null }}
           available={credit}
+          onDone={() => void load()}
+        />
+      )}
+
+      {activeWorkspaceId && (
+        <AllocatePartyProfitDialog
+          workspaceId={activeWorkspaceId}
+          open={allocateOpen}
+          onOpenChange={setAllocateOpen}
+          party={{ companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null }}
           onDone={() => void load()}
         />
       )}

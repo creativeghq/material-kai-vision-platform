@@ -306,6 +306,23 @@ export interface OrderProfitPosition {
   available: number;
 }
 
+/**
+ * What is takeable across one party's sales orders. `available` is the sum of the per-order
+ * `available` figures — the same derivation, aggregated — so the party button and the order
+ * button can never offer different amounts for the same margin.
+ */
+export interface PartyProfitPosition {
+  currency: string;
+  margin: number;
+  allocated: number;
+  /** margin − allocated across the party, never negative. The cap the RPC re-reads and enforces. */
+  available: number;
+  /** How many orders still carry something. 0 with `available` 0 means there is nothing to take. */
+  order_count: number;
+  /** Where it sits, oldest first — the order the spread will fill in. */
+  orders: Array<{ order_id: string; order_number: string | null; available: number }>;
+}
+
 /** Margin taken off an order as profit (see `allocateOrderProfit`). */
 export interface ProfitAllocation {
   id: string;
@@ -1705,6 +1722,78 @@ const _financeServiceCore = {
       allocated: Number(r.allocated ?? 0),
       available: Number(r.available ?? 0),
       allocation_id: r.allocation_id ?? null,
+    };
+  },
+
+  /**
+   * What is takeable across ALL of one party's sales orders — the party-screen counterpart of
+   * `orderProfitPositions`, and an aggregation of the very same per-order derivation rather than
+   * a second answer to "how much may be taken". Refuses (22000) when the party's orders span more
+   * than one currency: a cross-currency sum is a confident number in no currency at all.
+   *
+   * NOT the same quantity as `getCustomerProfitability().profit_unallocated`, which is a P&L view
+   * (invoice lines + uninvoiced orders). This one is the ALLOCATION cap, so it is what the button
+   * beside it must show.
+   */
+  async getPartyProfitPosition(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<PartyProfitPosition> {
+    const { data, error } = await (supabase as any).rpc('get_party_profit_position', {
+      p_workspace_id: workspaceId,
+      p_company_id: party.companyId ?? null,
+      p_contact_id: party.companyId ? null : (party.contactId ?? null),
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      currency: String(r.currency ?? 'EUR'),
+      margin: Number(r.margin ?? 0),
+      allocated: Number(r.allocated ?? 0),
+      available: Number(r.available ?? 0),
+      order_count: Number(r.order_count ?? 0),
+      orders: ((r.orders ?? []) as Array<Record<string, unknown>>).map((o) => ({
+        order_id: String(o.order_id),
+        order_number: (o.order_number as string | null) ?? null,
+        available: Number(o.available ?? 0),
+      })),
+    };
+  },
+
+  /**
+   * Take margin across a party's orders in one go — spread oldest-first, capped per order by the
+   * same derivation, one `finance_profit_allocations` row per order. Never a party-level row: each
+   * order has to keep telling the truth about itself, and each take stays separately reversible.
+   *
+   * `allocatedOn` is the OPERATOR's local day and is required by the RPC — same reason as
+   * `allocateOrderProfit`.
+   */
+  async allocatePartyProfit(input: {
+    workspaceId: string;
+    companyId?: string | null;
+    contactId?: string | null;
+    amount?: number | null;
+    categoryId?: string | null;
+    allocatedOn: string;
+    notes?: string | null;
+  }): Promise<{ allocated: number; available: number; currency: string; orders: Array<{ order_id: string; order_number: string | null; amount: number }> }> {
+    const { data, error } = await (supabase as any).rpc('allocate_party_profit', {
+      p_workspace_id: input.workspaceId,
+      p_company_id: input.companyId ?? null,
+      p_contact_id: input.companyId ? null : (input.contactId ?? null),
+      p_amount: input.amount ?? undefined,
+      p_category_id: input.categoryId ?? undefined,
+      p_allocated_on: input.allocatedOn,
+      p_notes: input.notes ?? undefined,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      allocated: Number(r.allocated ?? 0),
+      available: Number(r.available ?? 0),
+      currency: String(r.currency ?? 'EUR'),
+      orders: ((r.orders ?? []) as Array<Record<string, unknown>>).map((o) => ({
+        order_id: String(o.order_id),
+        order_number: (o.order_number as string | null) ?? null,
+        amount: Number(o.amount ?? 0),
+      })),
     };
   },
 
