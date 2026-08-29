@@ -56,6 +56,41 @@ function webhooksV2Base(cfg: RevolutConfigRow): string {
   return revolutHosts(cfg.environment).api.replace('/api/1.0', '/api/2.0');
 }
 
+/**
+ * Refuse to settle anything with an INTERNAL leg (#351 D1).
+ *
+ * A pocket transfer produces `out €1,000` + `in €1,000`, both ours, and the auto-matcher stamps
+ * them `ignored` — NOT `matched` — so they stayed offerable in the feed's row menu, and the server
+ * only checked provider, direction and not-already-matched. Matching the inbound leg to an invoice
+ * of the same amount records a bank-transfer payment and the invoice reads settled though no
+ * customer paid a thing.
+ *
+ * `docs/banking-revolut.md` already warns about exactly this — *"the feed is per-leg: match a row
+ * in isolation and an internal pocket move settles a customer invoice."* The hazard was documented
+ * and the UI permitted it. #359 CM-12 fixed the AUTOMATIC half; this is the manual one.
+ *
+ * The same `legShapeIsComplete` predicate, so a transaction whose shape is not fully known is
+ * refused rather than assumed external.
+ */
+async function assertNotInternalLeg(service: any, workspaceId: string, tx: any): Promise<void> {
+  const { loadLegShapes, legShapeIsComplete } = await import('../_shared/revolut/reconcile.ts');
+  const shapes = await loadLegShapes(service, workspaceId, [String(tx.transaction_id ?? '')]);
+  const shape = shapes.get(String(tx.transaction_id ?? ''));
+  if (!legShapeIsComplete(shape)) {
+    throw new HttpError(
+      409,
+      'This transaction has not fully synced yet, so we cannot tell whether it is money from outside. Try again after the next sync.',
+    );
+  }
+  const otherSide = tx.direction === 'in' ? shape!.outLegs : shape!.inLegs;
+  if (otherSide > 0) {
+    throw new HttpError(
+      400,
+      'Both sides of this transfer are your own accounts — it is a transfer between your pockets, not money from a customer or to a supplier.',
+    );
+  }
+}
+
 Deno.serve(withApiLogging('revolut-api', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') throw new HttpError(405, 'POST only');
@@ -343,6 +378,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (tx.provider !== 'revolut') throw new HttpError(400, 'stripe/viva feed rows were settled by their provider webhooks — matching them again would double-book');
       if (tx.match_status === 'matched') throw new HttpError(400, 'line is already matched');
       if (tx.direction !== 'in') throw new HttpError(400, 'only incoming lines can settle an invoice');
+      await assertNotInternalLeg(service, workspaceId, tx);
 
       const { data: inv } = await service
         .from('invoices')
@@ -375,6 +411,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (tx.provider !== 'revolut') throw new HttpError(400, 'only bank-feed (Revolut) lines can settle bills — provider rows are informational');
       if (tx.direction !== 'out') throw new HttpError(400, 'only outgoing lines can settle a supplier bill');
       if (tx.match_status === 'matched') throw new HttpError(400, 'line is already matched');
+      await assertNotInternalLeg(service, workspaceId, tx);
 
       const { data: bill } = await service
         .from('supplier_bills')

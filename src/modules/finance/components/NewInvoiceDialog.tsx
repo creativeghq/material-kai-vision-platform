@@ -639,9 +639,23 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       // stores. (audit #271 item 6)
       const lineNet = round2(lineNetOf(l));
       const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
-      // vatOfRaw on the ROUNDED net: VAT is not stored per line here, so it still accumulates
-      // unrounded and rounds once at the end — but off the same net the line carries.
-      net += lineNet; vat += vatOfRaw(lineNet, pct);
+      /**
+       * VAT rounds PER LINE too (#351 B2).
+       *
+       * The comment above states the rule for net — "the header must be the sum of what is
+       * actually transmitted, not of a more precise intermediate nobody stores" — and it was
+       * applied to net and never to VAT. VAT accumulated unrounded and rounded once at document
+       * level, while the printed VAT analysis derives each line's VAT and rounds it there. So
+       * `round2(Σ raw)` was compared against `Σ round2()`.
+       *
+       * Three lines of €10.10 at 24%: raw 2.424 each. Analysis prints 7.26; the header said 7.27.
+       * One cent apart on a document a customer reads and an auditor checks.
+       *
+       * Now the line VAT is rounded here, stored on the line (see `vat_amount` in itemsPayload),
+       * and the header is their sum — so the analysis and the header cannot disagree, because
+       * they are the same numbers.
+       */
+      net += lineNet; vat += round2(vatOfRaw(lineNet, pct));
       // fees / stamp / other are category-driven: a 'percent' category computes net × rate%,
       // an 'amount' category uses the typed amount.
       fees += taxAmountOf(feesRefs, l.fees_category, l.fees, lineNet);
@@ -650,10 +664,27 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       deduct += parseDecimalOr(l.deductions, 0);
     }
     // paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
+    /**
+     * The cash discount scales the LINES, so the header sums the scaled lines (#351 B2).
+     *
+     * `net * cashFactor` on the accumulated total is a more precise intermediate than the stored
+     * lines carry — the same mistake the net comment above describes, one level up. Re-summing the
+     * per-line rounded values keeps `subtotal_net` equal to `Σ net_value` and `vat_amount` equal
+     * to `Σ invoice_items.vat_amount`, which is what myDATA checks and what the printed VAT
+     * analysis prints.
+     */
     const cashFactor = paidUpfront ? (1 - cashPct / 100) : 1;
     const cashDiscount = net * (1 - cashFactor);
-    net = net * cashFactor;
-    vat = vat * cashFactor;
+    if (cashFactor !== 1) {
+      let scaledNet = 0, scaledVat = 0;
+      for (const l of lines) {
+        const lineNet = round2(round2(lineNetOf(l)) * cashFactor);
+        const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
+        scaledNet += lineNet;
+        scaledVat += round2(vatOfRaw(round2(lineNetOf(l)), pct) * cashFactor);
+      }
+      net = scaledNet; vat = scaledVat;
+    }
     const digital = parseDecimalOr(digitalFee, 0);
     // Document-level withholding: a 'percent' category withholds net × rate%; an 'amount'
     // category uses the manually-entered withholding amount.
@@ -831,6 +862,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         whAllocated = Number((whAllocated + share).toFixed(2));
         return share;
       });
+      /**
+       * The cash-discount factor the HEADER applies, applied to the lines too (#351 B2).
+       *
+       * `totals` scales net and vat by this after summing, while the stored `net_value` was the
+       * unscaled line — so with "paid upfront" ticked, the lines did not foot to the header for
+       * NET either, which is the very thing the comment in `totals` says was fixed. myDATA rejects
+       * a document whose lines do not add up to its header.
+       */
+      const cashFactorForLines = paidUpfront ? (1 - cashPct / 100) : 1;
+
       const itemsPayload = clean.map((l, li) => {
         const q = parseDecimalOr(l.quantity, 0); const p = parseDecimalOr(l.unit_price, 0);
         const disc = parseDecimalOr(l.discount, 0);
@@ -842,7 +883,22 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           invoice_id: invoice.id, description: l.description.trim(), sku: l.sku.trim() || null,
           quantity: q, unit_price: Number(unitNet.toFixed(4)), unit: l.unit || null,
           measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
-          discounted_price: disc || null, net_value: Number(net.toFixed(2)), line_total: Number(net.toFixed(2)),
+          discounted_price: disc || null,
+          net_value: round2(round2(net) * cashFactorForLines),
+          line_total: round2(round2(net) * cashFactorForLines),
+          /**
+           * The line's own VAT, stored (#351 B2 + CLAUDE.md rule 1c).
+           *
+           * `renderData` already PREFERS `it.vat_amount` and only falls back to re-deriving it
+           * when the column is null — which it always was from this dialog, which is why the
+           * printed analysis could differ from the header by a cent. Storing it makes the two the
+           * same numbers, and it is a figure we already transmit, so rule 1c says it belongs on
+           * the customer's copy.
+           *
+           * Rounded on the same rounded net the line carries, and scaled by the same cash factor
+           * the header uses, so `Σ vat_amount` IS `invoices.vat_amount`.
+           */
+          vat_amount: round2(vatOfRaw(round2(net), pct) * cashFactorForLines),
           unit_cost_snapshot: l.unit_cost.trim() ? parseDecimalOr(l.unit_cost, 0) : null,
           selected_attributes: l.selected_attributes ?? {}, selected_color: l.color || null, selected_size: l.size || null,
           vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
@@ -893,7 +949,27 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           const sub = await fiscalConnectorService.submitInvoice(invoice.id);
           // Credit exhaustion at issue: the invoice is issued but the myDATA transmission
           // was blocked for lack of credits. Surface a top-up CTA; retransmit from the invoice page.
+          /**
+           * EVERY fiscal failure is reported, not just the one with a code (#351 B1).
+           *
+           * This tested `fr.code === 'insufficient_credits'` and let everything else fall through
+           * to "Invoice created". But `finance-issue-invoice`'s own catch builds
+           * `{ ok: false, error: err?.message }` with NO `code` field at all, inside a 200 — so a
+           * connector outage, a signature failure or a Novus timeout produced a success toast and
+           * an untransmitted legal document.
+           *
+           * The codes that DO carry one (`not_entitled`, `not_configured`) return 402/400, which
+           * `submitInvoice` throws on, and the catch below reports those. This branch is for the
+           * ones that arrive as a 200 saying they failed.
+           */
           const fr = sub?.fiscal;
+          if (fr && fr.ok === false && fr.code !== 'insufficient_credits') {
+            toast({
+              title: 'Invoice issued — NOT sent to myDATA',
+              description: `${fr.error ?? 'The transmission failed.'} Retransmit from the invoice page once it is resolved.`,
+              variant: 'destructive',
+            });
+          }
           if (fr && fr.ok === false && fr.code === 'insufficient_credits') {
             toast({
               title: 'Out of credits — not sent to myDATA',

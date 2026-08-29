@@ -320,13 +320,20 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel className="text-xs">{Number(r.amount).toFixed(2)} {r.currency} · {PROVIDER_LABEL[r.provider] ?? r.provider}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {revolut && r.direction === 'in' && r.match_status !== 'matched' && (
+                      {/* `ignored` is how the auto-matcher stamps BOTH legs of an internal pocket
+                          transfer — not `matched` — so these actions stayed offered on money that
+                          never came from outside (#351 D1). Matching the inbound leg to an invoice
+                          of the same amount settles it though no customer paid.
+                          The server refuses it outright now; offering it here anyway would just be
+                          a button that always errors. Un-ignoring first is the deliberate act,
+                          and it is one item down this same menu. */}
+                      {revolut && r.direction === 'in' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <>
                           <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'invoice' }); setPickQuery(''); }}>Match to invoice…</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'order' }); setPickQuery(''); }}>Attach to order…</DropdownMenuItem>
                         </>
                       )}
-                      {revolut && r.direction === 'out' && r.match_status !== 'matched' && (
+                      {revolut && r.direction === 'out' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to supplier bill…</DropdownMenuItem>
                       )}
                       {revolut && r.match_status !== 'matched' && (
