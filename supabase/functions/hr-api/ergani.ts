@@ -166,6 +166,11 @@ async function stampAfterFiling(
   console.error('[ergani]', note, { workspace: ctx.workspaceId, audit: auditId });
   if (auditId) {
     try {
+      // The failure is NOT invisible: console.error above has already recorded it, and `note` is
+      // returned so the caller dresses the response as a partial success. This update is the THIRD
+      // place the same fact is written; if it is the one that fails, the other two still say the
+      // document was filed but not recorded.
+      // nosemgrep: no-swallowed-write
       await ctx.supabase.from('hr_ergani_submissions')
         .update({ error: note }).eq('id', auditId).eq('workspace_id', ctx.workspaceId);
     } catch { /* the console line and the response are the remaining record */ }
