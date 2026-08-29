@@ -49,8 +49,13 @@ export interface ApplyToolkitResult {
 
 export type ApplyToolkitFn = (toolkitId: string) => Promise<ApplyToolkitResult>;
 
+/**
+ * `isAdmin` used to be the first parameter here and NOTHING read it (#395) — the vestige of a
+ * gate that was never applied. The admin filter belongs to the MENU, not to the tool: what the
+ * model may ask for is `availableToolkitIds`, and the caller now builds that list with the same
+ * `isAdmin` it was passing here.
+ */
 export const createLoadToolkitTool = (
-  isAdmin: boolean,
   onChunk: ChunkSink,
   applyToolkit: ApplyToolkitFn,
   availableToolkitIds: string[],

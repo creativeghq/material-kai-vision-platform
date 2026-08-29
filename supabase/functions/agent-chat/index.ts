@@ -2879,6 +2879,31 @@ async function executeAgent(
     }
   };
 
+  // The open web. Both halves matter and neither substitutes for the other: web_search finds a
+  // URL, web_fetch reads it. Binding only the first leaves the agent able to learn that a page
+  // exists and unable to open it, which is the state the platform was in until 2026-08-25.
+  //
+  // OUTSIDE the isAdmin block below, and that is the fix rather than the accident (#395). The
+  // `web-research` cluster is declared `alwaysOn: true` — bound for every agent, no user opt-in —
+  // and all three tools sat inside the admin gate, so a member's agent could not search the web
+  // at all. Nothing reported it: an alwaysOn cluster is not in `load_toolkit`'s menu, so there is
+  // no refusal path either; the model simply has no such tool and answers from memory.
+  //
+  // The money boundary here is the credit ledger, not the role: `web_search` reserves and settles
+  // against the caller's workspace and `web_fetch` debits `firecrawl-scrape` before the call
+  // (invariant 10), and the URL goes through the SSRF guard (invariant 7). That is the same
+  // posture as `analyze_inspiration_url`, which scrapes an arbitrary page for 1 credit and has
+  // always been available to members.
+  if (config.tools.includes('web_search')) {
+    tools.push(createWebSearchTool(userId, workspaceId ?? null, sendProgress));
+  }
+  if (config.tools.includes('web_research_validate')) {
+    tools.push(createWebResearchValidateTool(userId, workspaceId ?? null, sendProgress));
+  }
+  if (config.tools.includes('web_fetch')) {
+    tools.push(createWebFetchTool(userId, workspaceId ?? null, sendProgress));
+  }
+
   if (isAdmin) {
     // Sub-agent orchestration tools.
     //
@@ -2928,18 +2953,6 @@ async function executeAgent(
     }
     if (config.tools.includes('scrape_materials_from_url')) {
       tools.push(createMaterialScrapeTool(userId, workspaceId ?? null, sendProgress));
-    }
-    // The open web. Both halves matter and neither substitutes for the other: web_search finds a
-    // URL, web_fetch reads it. Binding only the first leaves the agent able to learn that a page
-    // exists and unable to open it, which is the state the platform was in until 2026-08-25.
-    if (config.tools.includes('web_search')) {
-      tools.push(createWebSearchTool(userId, workspaceId ?? null, sendProgress));
-    }
-    if (config.tools.includes('web_research_validate')) {
-      tools.push(createWebResearchValidateTool(userId, workspaceId ?? null, sendProgress));
-    }
-    if (config.tools.includes('web_fetch')) {
-      tools.push(createWebFetchTool(userId, workspaceId ?? null, sendProgress));
     }
     if (config.tools.includes('suggest_extraction_fields')) {
       tools.push(createFieldSuggestTool(userId, workspaceId ?? null, sendProgress));
@@ -3119,11 +3132,17 @@ async function executeAgent(
       // was accurate because it owns nearly everything — went 3 for 3.
       const loadableToolkitIds = Object.keys(TOOLKIT_CLUSTERS)
         .filter((id) => !TOOLKIT_CLUSTERS[id].alwaysOn)
+        // The same rule as the line below, on the other axis (#395). A cluster whose tools the
+        // binder gates on `isAdmin` can only ever be refused for anyone else — `applyToolkitInRun`
+        // does refuse it correctly, which is exactly why it never showed up as a failure: the
+        // model burns a turn asking for something the menu should not have offered. Six SEO
+        // clusters sat in every member's menu.
+        .filter((id) => isAdmin || !TOOLKIT_CLUSTERS[id].adminOnly)
         .filter((id) => TOOLKIT_CLUSTERS[id].tool_ids.some((t) => agentFullToolIds.has(t)));
       // An agent with nothing left to load gets no escape hatch rather than one advertising an
       // empty list — "Available toolkits: " invites a guess, and every guess is a refusal.
       if (loadableToolkitIds.length > 0) {
-        tools.push(createLoadToolkitTool(isAdmin, onChunk, applyToolkitInRun, loadableToolkitIds));
+        tools.push(createLoadToolkitTool(onChunk, applyToolkitInRun, loadableToolkitIds));
       }
     } catch (loadToolkitErr) {
       console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);

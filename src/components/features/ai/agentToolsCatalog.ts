@@ -398,6 +398,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO research (all users; 0 user credits) ──────────────────────
   {
     id: 'seo_research_keyword', name: 'SEO Research', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Full SERP research for one keyword: AI Overview, featured snippet, top organic, PAA, related searches, video carousel, knowledge graph state.',
     examples: [
       'Research the keyword "porcelain tile installation" in the UK',
@@ -407,6 +408,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_keyword_difficulty', name: 'Keyword Difficulty', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Bulk-score SEO ranking difficulty (0–100) for up to 1000 keywords in one call.',
     examples: [
       'What\'s the SEO difficulty of these 50 keywords I have in mind?',
@@ -414,6 +416,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_keyword_suggestions', name: 'Keyword Suggestions', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Phrase-match keyword expansion. Returns up to 1000 keywords containing the seed phrase, with volume + competition.',
     examples: [
       'Expand "travertine sealer" — give me 50 suggestions with volume',
@@ -421,6 +424,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_search_intent', name: 'Search Intent', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Bulk-classify keyword intent (informational / navigational / commercial / transactional).',
     examples: [
       'Classify the intent for these 30 keywords',
@@ -428,6 +432,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_keyword_overview', name: 'Keyword Overview', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Single-call keyword overview: volume, KD, intent, CPC, monthly searches history. Bulk up to 700 keywords.',
     examples: [
       'Give me a full overview for these 20 keywords',
@@ -435,6 +440,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_serp_audit', name: 'SERP Audit', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Fetch the raw, complete Google SERP for a keyword — every block type (organic, PAA, AI Overview, featured snippet, video, news, KG, paid, shopping).',
     examples: [
       'Pull the full SERP for "buy tile online"',
@@ -442,6 +448,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_audit_url', name: 'URL Audit', category: 'SEO Research',
+    adminOnly: true,
     desc: 'Audit any public URL — Lighthouse (perf / a11y / best-practices / SEO scores) + on-page issues + content parsing. Works on competitor pages too.',
     examples: [
       'Audit https://flobali.gr/products/porcelain-12mm',
@@ -452,6 +459,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO domain intel ──────────────────────────────────────────────
   {
     id: 'seo_domain_snapshot', name: 'Domain Snapshot', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'Domain-level SEO snapshot: rank, organic ranking-keyword count, est. monthly traffic, referring domains, total backlinks.',
     examples: [
       'What\'s the SEO snapshot for flobali.gr?',
@@ -459,6 +467,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_ranked_keywords', name: 'Ranked Keywords', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'Every keyword the domain currently ranks for — with rank position, volume, and estimated traffic share.',
     examples: [
       'What does flobali.gr rank for in Greece?',
@@ -466,6 +475,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_domain_competitors', name: 'Domain Competitors', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'Top organic competitors for a domain — domains ranking on the same keyword set.',
     examples: [
       'Who competes with flobali.gr?',
@@ -473,6 +483,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_keyword_gap', name: 'Keyword Gap', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'Keywords where COMPETITOR ranks but YOU do not — pure content-gap delta. Highest-leverage tool for finding what to write next.',
     examples: [
       'Find keyword gaps between flobali.gr and carrelagedirect.fr',
@@ -480,6 +491,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_traffic_estimation', name: 'Traffic Estimation', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'Bulk-estimate monthly organic + paid traffic for up to 1000 domains in one call.',
     examples: [
       'Estimate monthly traffic for these 5 brand domains',
@@ -487,6 +499,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_subdomains', name: 'Subdomains', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'List indexed subdomains of a target domain with their organic-ranking metrics.',
     examples: [
       'Show me all subdomains of shopify.com',
@@ -494,6 +507,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_relevant_pages', name: 'Top Pages', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'Top-ranking pages of a domain by traffic share. Use to identify which page templates perform best.',
     examples: [
       'What are the top-traffic pages on flobali.gr?',
@@ -501,6 +515,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_categories_for_domain', name: 'Domain Categories', category: 'SEO Domain',
+    adminOnly: true,
     desc: 'What Google Ads categories the algorithm associates with a domain.',
     examples: [
       'What categories does Google associate with flobali.gr?',
@@ -510,6 +525,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO backlinks ─────────────────────────────────────────────────
   {
     id: 'seo_backlinks_summary', name: 'Backlinks Summary', category: 'SEO Backlinks',
+    adminOnly: true,
     desc: 'Backlinks overview: total backlinks, referring domains + TLDs, anchors, spam score, trust flow.',
     examples: [
       'Backlinks summary for flobali.gr',
@@ -517,6 +533,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_backlinks_anchors', name: 'Anchor Texts', category: 'SEO Backlinks',
+    adminOnly: true,
     desc: 'Top anchor texts pointing to a domain. Reveals brand-mention vs over-optimised patterns.',
     examples: [
       'Top anchor texts pointing to flobali.gr',
@@ -524,6 +541,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_referring_domains', name: 'Referring Domains', category: 'SEO Backlinks',
+    adminOnly: true,
     desc: 'List domains linking to a target. Use for backlink-profile analysis.',
     examples: [
       'List the domains linking to flobali.gr',
@@ -533,6 +551,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO OnPage / site crawl ───────────────────────────────────────
   {
     id: 'seo_site_crawl_start', name: 'Site Crawl Start', category: 'SEO OnPage',
+    adminOnly: true,
     desc: 'Kick off a full DataForSEO OnPage crawl of a domain (up to 1000 pages). Returns task_id immediately.',
     examples: [
       'Crawl flobali.gr (up to 100 pages)',
@@ -540,6 +559,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_site_crawl_status', name: 'Site Crawl Status', category: 'SEO OnPage',
+    adminOnly: true,
     desc: 'Poll a running site-crawl by task_id. Returns crawl_progress, page metrics, broken links, redirect chains, duplicate titles.',
     examples: [
       'Check the status of crawl task abc-123',
@@ -549,6 +569,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO content + analytics ───────────────────────────────────────
   {
     id: 'seo_content_sentiment', name: 'Content Sentiment', category: 'SEO Content',
+    adminOnly: true,
     desc: 'Sentiment distribution across all open-web mentions of a keyword.',
     examples: [
       'What\'s the sentiment around "Flobali tiles" on the open web?',
@@ -556,6 +577,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_domain_technologies', name: 'Tech Stack', category: 'SEO Content',
+    adminOnly: true,
     desc: 'Tech stack identification — CMS, analytics, CDN, JS frameworks, e-commerce platform, marketing tools.',
     examples: [
       'What tech stack does flobali.gr use?',
@@ -563,6 +585,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_domain_whois', name: 'Domain WHOIS', category: 'SEO Content',
+    adminOnly: true,
     desc: 'Domain WHOIS data + age + registrar.',
     examples: [
       'Show WHOIS for flobali.gr',
@@ -570,6 +593,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_historical_serps', name: 'Historical SERPs', category: 'SEO Content',
+    adminOnly: true,
     desc: 'Historical SERP snapshots for a keyword. Track how positions changed over time.',
     examples: [
       'Show historical SERPs for "porcelain tile" between 2025-01 and 2025-12',
@@ -577,6 +601,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_ai_keyword_volume', name: 'AI Search Volume', category: 'SEO Content',
+    adminOnly: true,
     desc: 'LLM-search keyword volume — how often a query is asked of AI engines (different from Google Ads volume).',
     examples: [
       'AI search volume for these 20 keywords',
@@ -586,6 +611,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO multi-engine ──────────────────────────────────────────────
   {
     id: 'seo_llm_mentions_search', name: 'LLM Mentions', category: 'SEO Multi-Engine',
+    adminOnly: true,
     desc: 'DataForSEO native LLM-mention search. Pages and domains LLMs cite when answering questions about a keyword.',
     examples: [
       'What pages do LLMs cite for "recycled concrete aggregates"?',
@@ -593,6 +619,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_youtube_search', name: 'YouTube Search', category: 'SEO Multi-Engine',
+    adminOnly: true,
     desc: 'YouTube organic search — top videos for a keyword with view counts, channel, duration.',
     examples: [
       'YouTube search for "porcelain tile installation"',
@@ -600,6 +627,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_local_pack', name: 'Local Pack', category: 'SEO Multi-Engine',
+    adminOnly: true,
     desc: 'Google Maps 3-pack for a keyword in a specific country. Use for local SEO research.',
     examples: [
       'Local pack for "tile shop in Athens"',
@@ -607,6 +635,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_google_trends', name: 'Google Trends', category: 'SEO Multi-Engine',
+    adminOnly: true,
     desc: 'Google Trends interest-over-time + regional breakdown for up to 5 keywords.',
     examples: [
       'Google Trends for "travertine" over the past 12 months',
@@ -616,6 +645,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO niche ─────────────────────────────────────────────────────
   {
     id: 'seo_amazon_asin', name: 'Amazon ASIN', category: 'SEO Niche',
+    adminOnly: true,
     desc: 'Amazon SEO — list every keyword an ASIN ranks for, with rank and volume.',
     examples: [
       'What does ASIN B07ZPKBL9V rank for on Amazon?',
@@ -623,6 +653,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_app_keywords', name: 'App Keywords', category: 'SEO Niche',
+    adminOnly: true,
     desc: 'Mobile-app SEO — keywords a Google Play / Apple App Store app ranks for.',
     examples: [
       'ASO keywords for app com.figma.figma on Google Play',
@@ -630,6 +661,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_trustpilot_search', name: 'Trustpilot Search', category: 'SEO Niche',
+    adminOnly: true,
     desc: 'Find Trustpilot business listings with ratings + review counts.',
     examples: [
       'Trustpilot listings for "Flobali"',
@@ -637,6 +669,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_pinterest_search', name: 'Pinterest Search', category: 'SEO Niche',
+    adminOnly: true,
     desc: 'Pinterest pin/board search for a keyword. Surfaces visual-trend signal.',
     examples: [
       'Pinterest search for "Mediterranean kitchen"',
@@ -644,6 +677,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_reddit_search', name: 'Reddit Search', category: 'SEO Niche',
+    adminOnly: true,
     desc: 'Reddit thread search for a keyword. Surfaces real user discussion + pain points.',
     examples: [
       'Reddit threads about "best porcelain tile installer"',
@@ -653,6 +687,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   // ── SEO composite audits ──────────────────────────────────────────
   {
     id: 'seo_site_review', name: 'Site Review', category: 'SEO Composite',
+    adminOnly: true,
     desc: 'Multi-section domain audit: rank overview + top ranking keywords + competitors + backlinks summary + top anchors. ONE tool call.',
     examples: [
       'Run a full site review of flobali.gr',
@@ -660,6 +695,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'seo_brand_search_audit', name: 'Brand Search Audit', category: 'SEO Composite',
+    adminOnly: true,
     desc: 'SERP audit for "{brand}" query. Surfaces Knowledge Panel, AI Overview brand mention, organic listings, paid bids on own brand.',
     examples: [
       'Run a brand-search audit for "Flobali"',
@@ -2826,6 +2862,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-research',
     name: 'SEO Research',
+    adminOnly: true,
     description: 'Keyword research, SERP audit, URL audit, intent classification — read-only.',
     icon: 'Search',
     tool_ids: [
@@ -2873,6 +2910,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-domain',
     name: 'SEO Domain Intel',
+    adminOnly: true,
     description: 'Domain snapshot, ranked keywords, competitor + keyword gap, traffic estimation.',
     icon: 'Globe',
     tool_ids: [
@@ -2919,6 +2957,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-backlinks',
     name: 'SEO Backlinks',
+    adminOnly: true,
     description: 'Backlinks summary, anchor texts, referring domains.',
     icon: 'Link2',
     tool_ids: [
@@ -2951,6 +2990,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-content',
     name: 'SEO Content & Tech',
+    adminOnly: true,
     description: 'Sentiment, tech stack, WHOIS, OnPage crawl, LLM mentions.',
     icon: 'FileSearch',
     tool_ids: [
@@ -2995,6 +3035,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-multi-engine',
     name: 'SEO Multi-Engine + Niche',
+    adminOnly: true,
     description: 'YouTube, Local Pack, Google Trends, Amazon, App keywords, Trustpilot, Pinterest, Reddit.',
     icon: 'Layers',
     tool_ids: [
@@ -3052,6 +3093,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'seo-composite',
     name: 'SEO Composite Audits',
+    adminOnly: true,
     description: 'Full site review + brand-search audit (multi-section bundles).',
     icon: 'BadgeCheck',
     tool_ids: ['seo_site_review', 'seo_brand_search_audit'],

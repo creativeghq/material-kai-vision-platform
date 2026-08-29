@@ -15,6 +15,12 @@
 export interface ToolkitCluster {
   /** Bound for every agent that declares the tool, with no user opt-in. */
   alwaysOn?: boolean;
+  /**
+   * Only an admin/owner can actually use this cluster — the binder gates its tools on
+   * `isAdmin`. Projected so `load_toolkit`'s menu can leave it out for everyone else: an
+   * unfiltered list is a menu handed to the model with entries it can only be refused on.
+   */
+  adminOnly?: boolean;
   tool_ids: string[];
 }
 
@@ -32,6 +38,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],
   },
   'catalogs': {
+    adminOnly: true,
     tool_ids: ['create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog'],
   },
   'mentions': {
@@ -89,9 +96,11 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['manage_my_hr'],
   },
   'hr': {
+    adminOnly: true,
     tool_ids: ['manage_hr'],
   },
   'stock': {
+    adminOnly: true,
     tool_ids: ['manage_stock'],
   },
   'website-embed': {
@@ -107,6 +116,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['manage_social'],
   },
   'tech-radar': {
+    adminOnly: true,
     tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
   },
   'projects': {
@@ -122,36 +132,46 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status'],
   },
   'seo-research': {
+    adminOnly: true,
     tool_ids: ['seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps', 'seo_gsc_striking_distance', 'seo_gsc_top_movers', 'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview'],
   },
   'seo-domain': {
+    adminOnly: true,
     tool_ids: ['seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains', 'seo_relevant_pages', 'seo_categories_for_domain', 'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_domain_intersection'],
   },
   'seo-backlinks': {
+    adminOnly: true,
     tool_ids: ['seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains', 'seo_backlinks_timeseries', 'seo_backlinks_competitors'],
   },
   'seo-content': {
+    adminOnly: true,
     tool_ids: ['seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois', 'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_llm_mentions_search', 'seo_onpage_issues'],
   },
   'seo-multi-engine': {
+    adminOnly: true,
     tool_ids: ['seo_youtube_search', 'seo_local_pack', 'seo_google_trends', 'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search', 'seo_google_maps', 'seo_gbp_info'],
   },
   'seo-composite': {
+    adminOnly: true,
     tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
   },
   'ai-visibility': {
     tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume'],
   },
   'seo-article': {
+    adminOnly: true,
     tool_ids: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
   },
   'b2b': {
+    adminOnly: true,
     tool_ids: ['b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_registry_lookup', 'industrial_facility_search', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm', 'scrape_materials_from_url', 'suggest_extraction_fields'],
   },
   'sub-agents': {
+    adminOnly: true,
     tool_ids: ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'],
   },
   'admin-misc': {
+    adminOnly: true,
     tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call', 'checkServerHealth', 'querySentry', 'queryDatabase'],
   },
 };

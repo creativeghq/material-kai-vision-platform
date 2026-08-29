@@ -505,12 +505,13 @@ export function buildToolkitClusters() {
       problems.push('TOOLKITS entry is not an object literal (spread?)');
       continue;
     }
-    let id = null; let alwaysOn = false; let toolIds = null;
+    let id = null; let alwaysOn = false; let adminOnly = false; let toolIds = null;
     for (const p of el.properties) {
       if (!ts.isPropertyAssignment(p)) continue;
       const key = propName(p);
       if (key === 'id') id = lit(p.initializer);
       else if (key === 'alwaysOn') alwaysOn = p.initializer.kind === ts.SyntaxKind.TrueKeyword;
+      else if (key === 'adminOnly') adminOnly = p.initializer.kind === ts.SyntaxKind.TrueKeyword;
       else if (key === 'tool_ids') {
         if (!ts.isArrayLiteralExpression(p.initializer)) { problems.push(`${id ?? '?'}: tool_ids is not an array literal`); continue; }
         const vals = p.initializer.elements.map(lit);
@@ -520,7 +521,7 @@ export function buildToolkitClusters() {
     }
     if (!id) { problems.push('TOOLKITS entry with no literal `id`'); continue; }
     if (!toolIds) { problems.push(`${id}: unreadable tool_ids`); continue; }
-    clusters.push({ id, alwaysOn, tool_ids: toolIds });
+    clusters.push({ id, alwaysOn, adminOnly, tool_ids: toolIds });
   }
 
   const dupes = clusters.map((c) => c.id).filter((v, i, a) => a.indexOf(v) !== i);
@@ -535,6 +536,7 @@ export function renderToolkitClusters(clusters) {
     return [
       `  ${q(c.id)}: {`,
       ...(c.alwaysOn ? ['    alwaysOn: true,'] : []),
+      ...(c.adminOnly ? ['    adminOnly: true,'] : []),
       c.tool_ids.length ? `    tool_ids: [${ids}],` : '    tool_ids: [],',
       '  },',
     ].join('\n');
@@ -557,6 +559,12 @@ export function renderToolkitClusters(clusters) {
 export interface ToolkitCluster {
   /** Bound for every agent that declares the tool, with no user opt-in. */
   alwaysOn?: boolean;
+  /**
+   * Only an admin/owner can actually use this cluster — the binder gates its tools on
+   * \`isAdmin\`. Projected so \`load_toolkit\`'s menu can leave it out for everyone else: an
+   * unfiltered list is a menu handed to the model with entries it can only be refused on.
+   */
+  adminOnly?: boolean;
   tool_ids: string[];
 }
 
