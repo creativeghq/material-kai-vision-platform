@@ -75,12 +75,17 @@ import { createByteDance } from 'npm:@ai-sdk/bytedance@1';
 // same way as the two above: `npm view @ai-sdk/minimax@^2 dependencies.@ai-sdk/provider`
 // answers 3.0.15, which is the major `npm:ai@6` itself carries.
 import { createMiniMax } from 'npm:@ai-sdk/minimax@2';
+// Wan3.0 video over DashScope. Major 1 = spec v3; @ai-sdk/alibaba@2 is spec v4. The
+// provider is named for the VENDOR, not the platform — which is why a search for
+// "@ai-sdk/dashscope" found nothing and this code was hand-written for a year.
+import { createAlibaba } from 'npm:@ai-sdk/alibaba@1';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 import { resolveTokenPrice, resolveUnitPrice } from './ai-logger.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 import { resolveSecret } from './secrets.ts';
+import { assertTransferAllowed, isEeaEndpoint } from './residency-gate.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
 // Every call through generateWithGemini / generateWithClaude is automatically
@@ -1301,30 +1306,35 @@ export async function generateVideoWithKling(
   }
 }
 
-// ── Wan3.0-Video-Prime (Alibaba, via DashScope) ────────────────────────────
+// ── Wan3.0 (Alibaba) ───────────────────────────────────────────────────────
 //
-// Raw REST rather than the AI SDK, and DashScope's video endpoint is asynchronous
-// (submit a task, poll for it). It lives HERE rather than in the calling edge function
-// precisely because this module is the chokepoint — the rule is that edge functions
-// never reach a provider directly, not that this file only ever uses the SDK.
+// Through `@ai-sdk/alibaba@1` (major 1 for spec v3, same rule as Kling/Seedance/MiniMax).
+// This replaced a hand-written DashScope REST client on 2026-08-29, and the rewrite
+// corrected three things the hand-written version had wrong — none of which could have
+// surfaced as a test failure, because no call had ever been verified against a funded key:
 //
-// UPDATED 2026-08-29: there IS a provider now, and it is not called dashscope — it is
-// `@ai-sdk/alibaba` (major 1 for spec v3), whose video ids include `wan3.0-video`
-// alongside the 2.6/2.7 t2v/i2v/r2v line. This code was written when that did not exist.
-// Not migrated yet on purpose: the id it exposes is `wan3.0-video`, ours is
-// `wan3.0-video-prime`, and the parameter names below (`img_url`, `ref_images`,
-// `X-DashScope-Async`) are this endpoint's, not the provider's — so it is a rewrite plus
-// a re-verification against a funded key, not a swap. Worth doing; do it deliberately.
+//   1. THE MODEL ID. It sent `wan3.0-video-prime`, which does not appear on Alibaba's own
+//      model page. The documented id is `wan3.0-video`.
+//   2. THE BODY SHAPE. It sent `input.img_url` / `input.ref_images` / `parameters.size`.
+//      The documented shape — and the one the provider builds — is `input.media[]` with a
+//      `type` per entry (`first_frame`, `last_frame`, `reference_image`, ...) plus
+//      `parameters.ratio`.
+//   3. THE PRICE. It was priced at $0.068/$0.14/$0.28 per second; QwenCloud's list rate
+//      for wan3.0-video is $0.05/$0.10/$0.20. We were over-stating our own cost, which is
+//      the safe direction to be wrong in but still wrong — the credit prices derived from
+//      it were ~35% higher than the arithmetic supports.
 //
-// What Wan buys over the existing roster: 30 seconds against Veo's 8 and Kling's 10,
-// audio generated with the picture in the same pass (our video has always been
-// silent), and up to 20 references held consistent across the clip — which is the
-// one that matters for a materials platform, because a generated room that does not
-// preserve the ACTUAL product is not a sales asset.
-
-const WAN_TASK_URL =
-  'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis';
-const WAN_POLL_URL = 'https://dashscope-intl.aliyuncs.com/api/v1/tasks';
+// What Wan buys over the rest of the roster: 30 seconds against Veo's 8 and Kling's 10,
+// audio generated with the picture in the same pass, and reference media held consistent
+// across the clip — which is the one that matters for a materials platform, because a
+// generated room that does not preserve the ACTUAL product is not a sales asset.
+//
+// FRAMES AND REFERENCES ARE MUTUALLY EXCLUSIVE on wan3 (the same constraint MiniMax H3
+// has). A first/last frame and a reference image cannot travel in the same `media` array;
+// the provider passes an explicit array through verbatim, so nothing local complains and
+// the REJECTION arrives from DashScope. This function decides — frames win — and reports
+// what it dropped rather than letting the references evaporate.
+const WAN_MODEL_ID = 'wan3.0-video';
 
 export type WanResolution = '480P' | '720P' | '1080P';
 
@@ -1335,18 +1345,31 @@ const WAN_PRICING_MODEL_ID: Record<WanResolution, string> = {
   '1080P': 'wan-3.0-1080p',
 };
 
+/**
+ * The AI SDK takes `resolution` as `{width}x{height}` and the provider maps it back onto
+ * DashScope's tier string. These three are in its table; an unmapped size is forwarded
+ * verbatim and rejected. Orientation rides on `ratio`, so one landscape size per tier.
+ */
+const WAN_RESOLUTION_SIZE: Record<WanResolution, string> = {
+  '480P': '832x480',
+  '720P': '1280x720',
+  '1080P': '1920x1080',
+};
+
 export interface WanVideoResult {
-  /** Provider-hosted URL. Callers download it through the SSRF guard and re-host. */
-  url: string;
+  /** Raw bytes — the SDK downloads the finished clip. 30s of 1080p is large; do not base64 it. */
+  bytes: Uint8Array;
   mimeType: string;
   model: string;
   durationSeconds: number;
   resolution: WanResolution;
   hasAudio: boolean;
+  /** References supplied alongside a frame image, which wan3 will not accept together. */
+  referencesDropped: number;
 }
 
 export interface WanReference {
-  /** One of image | video | audio. Wan accepts up to 10 / 5 / 5 respectively. */
+  /** One of image | video | audio. wan3 takes at most 5 reference items in total. */
   kind: 'image' | 'video' | 'audio';
   url: string;
 }
@@ -1356,9 +1379,9 @@ export async function generateVideoWithWan(
   config?: UnitBillingConfig & {
     /** First frame. Wan can run text-only, but every caller here is image-to-video. */
     imageUrl?: string;
-    /** Optional last-frame guidance. */
+    /** Optional last-frame guidance. Requires a first frame. */
     lastFrameUrl?: string;
-    /** Extra references held consistent across the clip (max 20 total with the above). */
+    /** References — used ONLY when no frame image is given. Max 5 items. */
     references?: WanReference[];
     /** 2-30. Clamped by the caller, which is where the credit price is decided. */
     durationSeconds?: number;
@@ -1367,6 +1390,8 @@ export async function generateVideoWithWan(
     /** Wan scores the clip in the same pass. Default true — a silent reel is the bug. */
     generateAudio?: boolean;
     pollTimeoutMs?: number;
+    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
+    logUsage?: boolean;
   },
 ): Promise<WanVideoResult> {
   const _start = Date.now();
@@ -1377,6 +1402,8 @@ export async function generateVideoWithWan(
 
   // Lazy, and via resolveSecret: `Deno.env.set` is a no-op on Supabase edge, so a
   // module-load capture reads undefined and an admin-configured key is never seen.
+  // The provider would read ALIBABA_API_KEY from process.env on its own; the key is
+  // passed explicitly so the platform keeps ONE secret name for this vendor.
   const apiKey = _logSupabase
     ? (await resolveSecret(_logSupabase, 'DASHSCOPE_API_KEY')).value
     : Deno.env.get('DASHSCOPE_API_KEY');
@@ -1384,81 +1411,100 @@ export async function generateVideoWithWan(
     throw new Error('DASHSCOPE_API_KEY is not configured — cannot generate with Wan3.0');
   }
 
-  const refs = (config?.references ?? []).slice(0, 20);
-  const input: Record<string, unknown> = { prompt };
-  if (config?.imageUrl) input.img_url = config.imageUrl;
-  if (config?.lastFrameUrl) input.last_frame_url = config.lastFrameUrl;
-  if (refs.length) {
-    input.ref_images = refs.filter((r) => r.kind === 'image').map((r) => r.url);
-    input.ref_videos = refs.filter((r) => r.kind === 'video').map((r) => r.url);
-    input.ref_audios = refs.filter((r) => r.kind === 'audio').map((r) => r.url);
+  // Same endpoint question as the research path: Singapore unless pointed at the
+  // Frankfurt EU scope. The SDK reads `baseURL`/`videoBaseURL`; both default to
+  // dashscope-intl, which was verified rather than assumed — a default of
+  // dashscope.aliyuncs.com (Beijing) would have made residency worse as a silent
+  // side-effect of adopting the provider.
+  const videoBase = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_BASE_URL')).value
+    : Deno.env.get('DASHSCOPE_BASE_URL');
+
+  // A video prompt is far less exposed than a research query — it describes a room,
+  // not a customer — but it is still free text a user typed, so it gets the same
+  // floor. The image itself is not inspected: that is what invariant 9b's
+  // `assertEditableSource` is for, on the paths that edit user-supplied images.
+  const verdict = assertTransferAllowed([prompt], {
+    destinationIsEea: isEeaEndpoint(videoBase),
+    providerLabel: 'Wan3.0 (Alibaba)',
+  });
+  if (!verdict.allowed) {
+    throw new Error(verdict.message ?? 'Blocked: personal data may not leave the EEA.');
   }
 
-  try {
-    const submit = await fetch(WAN_TASK_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        // Without this the call is synchronous and dies on the gateway timeout.
-        'X-DashScope-Async': 'enable',
-      },
-      body: JSON.stringify({
-        model: 'wan3.0-video-prime',
-        input,
-        parameters: {
-          duration: seconds,
-          resolution,
-          size: config?.aspectRatio ?? '16:9',
-          audio: withAudio,
-        },
-      }),
-    });
-    if (!submit.ok) {
-      throw new Error(`DashScope submit ${submit.status}: ${(await submit.text()).slice(0, 300)}`);
-    }
-    const taskId = (await submit.json())?.output?.task_id;
-    if (!taskId) throw new Error('DashScope returned no task_id');
+  const alibaba = createAlibaba({
+    apiKey,
+    ...(videoBase ? { baseURL: videoBase, videoBaseURL: videoBase } : {}),
+  });
 
-    const deadline = Date.now() + (config?.pollTimeoutMs ?? 600_000);
-    for (;;) {
-      if (Date.now() > deadline) throw new Error(`Wan3.0 task ${taskId} timed out`);
-      await new Promise((r) => setTimeout(r, 5_000));
-      const poll = await fetch(`${WAN_POLL_URL}/${taskId}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      if (!poll.ok) {
-        throw new Error(`DashScope poll ${poll.status}: ${(await poll.text()).slice(0, 300)}`);
-      }
-      const out = (await poll.json())?.output ?? {};
-      const status = out.task_status;
-      if (status === 'SUCCEEDED') {
-        const url = out.video_url || out.results?.[0]?.url;
-        if (!url) throw new Error('Wan3.0 succeeded but returned no video URL');
-        // Billed on the seconds we ASKED for. DashScope charges for the produced
-        // clip, and a partial result we then reject is still a clip they rendered.
-        void _logUnitCall({
-          task: config?.task ?? 'wan_video_generation',
-          modelKey,
-          units: seconds,
-          latencyMs: Date.now() - _start,
-          userId: config?.userId,
-          workspaceId: config?.workspaceId,
-        });
-        return {
-          url,
-          mimeType: 'video/mp4',
-          model: 'wan3.0-video-prime',
-          durationSeconds: seconds,
-          resolution,
-          hasAudio: withAudio,
-        };
-      }
-      if (status === 'FAILED' || status === 'CANCELED' || status === 'UNKNOWN') {
-        throw new Error(`Wan3.0 task ${taskId} ${status}: ${out.message ?? 'no detail'}`);
-      }
-    }
+  const refs = (config?.references ?? []).slice(0, 5);
+  const usesFrame = Boolean(config?.imageUrl);
+  const referencesDropped = usesFrame ? refs.length : 0;
+  if (referencesDropped > 0) {
+    console.warn(
+      `[ai-client] Wan3.0: ${referencesDropped} reference(s) ignored — wan3 will not accept ` +
+      'reference media together with a first/last frame. Drop the source image to use them.',
+    );
+  }
+
+  // Built explicitly rather than left to the provider's automatic mapping, because the
+  // roles are the whole point: DashScope treats a `reference_image` and a `first_frame`
+  // as different instructions, and the automatic path cannot know which one we meant.
+  const media: Array<{ type: string; url: string }> = usesFrame
+    ? [
+        { type: 'first_frame', url: config!.imageUrl! },
+        ...(config?.lastFrameUrl ? [{ type: 'last_frame', url: config.lastFrameUrl }] : []),
+      ]
+    : refs.map((r) => ({
+        type: r.kind === 'video'
+          ? 'reference_video'
+          : r.kind === 'audio' ? 'reference_audio' : 'reference_image',
+        url: r.url,
+      }));
+
+  try {
+    const { video } = await generateVideo({
+      model: alibaba.video(WAN_MODEL_ID),
+      prompt,
+      duration: seconds,
+      resolution: WAN_RESOLUTION_SIZE[resolution],
+      generateAudio: withAudio,
+      providerOptions: {
+        alibaba: {
+          ratio: config?.aspectRatio ?? '16:9',
+          // Sold output, not a demo.
+          watermark: false,
+          ...(media.length ? { media } : {}),
+        },
+      },
+      pollTimeoutMs: config?.pollTimeoutMs ?? 600_000,
+    } as any);
+
+    const bytes: Uint8Array = (video as any).uint8Array;
+    if (!bytes?.length) throw new Error('Wan3.0 returned an empty video');
+
+    // Billed on the seconds we ASKED for. DashScope charges for the produced clip, and a
+    // partial result we then reject is still a clip they rendered.
+    if (config?.logUsage !== false) void _logUnitCall({
+      task: config?.task ?? 'wan_video_generation',
+      modelKey,
+      units: seconds,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      bytes,
+      mimeType: (video as any).mediaType ?? 'video/mp4',
+      model: WAN_MODEL_ID,
+      durationSeconds: seconds,
+      resolution,
+      hasAudio: withAudio,
+      referencesDropped,
+    };
   } catch (err) {
+    // Always logged, even when the caller owns the success row — see the Seedance note.
     void _logUnitCall({
       task: config?.task ?? 'wan_video_generation',
       modelKey,
@@ -1964,7 +2010,19 @@ export async function generateVideoWithMinimax(
 // OpenAI-compatible endpoint, so `extra_body` fields from their Python examples are
 // simply top-level body fields here.
 
-const QWEN_COMPAT_URL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
+// Singapore by default — an EEA transfer. Alibaba runs an EU deployment scope in
+// Frankfurt whose hosts look like `{workspaceId}.eu-central-1.maas.aliyuncs.com`, and
+// pointing DASHSCOPE_BASE_URL there is the real fix for residency rather than the
+// gate below, which is only the floor. The workspace id is part of the HOST in that
+// region, so this has to be a full base URL and cannot be a region code.
+const QWEN_DEFAULT_BASE = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+
+async function qwenBaseUrl(): Promise<string> {
+  const configured = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_BASE_URL')).value
+    : Deno.env.get('DASHSCOPE_BASE_URL');
+  return (configured || QWEN_DEFAULT_BASE).replace(/\/+$/, '');
+}
 
 export interface QwenResearchResult<T> {
   data: T;
@@ -2011,10 +2069,23 @@ export async function researchWithQwen<T = unknown>(
     throw new Error('DASHSCOPE_API_KEY is not configured — the research challenger cannot run');
   }
 
+  const baseUrl = await qwenBaseUrl();
+
+  // Second line, not the first. The first is the endpoint above: point it at Frankfurt
+  // and this is a no-op. Until then, refuse to hand identifiable customer data to a
+  // provider outside the EEA. Fails closed.
+  const verdict = assertTransferAllowed([opts.system, opts.prompt], {
+    destinationIsEea: isEeaEndpoint(baseUrl),
+    providerLabel: 'QwenCloud',
+  });
+  if (!verdict.allowed) {
+    throw new Error(verdict.message ?? 'Blocked: personal data may not leave the EEA.');
+  }
+
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 90_000);
   try {
-    const res = await fetch(QWEN_COMPAT_URL, {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       signal: ctl.signal,

@@ -2929,8 +2929,8 @@
   {
     "name": "generate-social-video",
     "tag": "Social",
-    "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 also selectable)",
-    "description": "Generates a short-form social video. DEFAULT minimax-h3 (40cr): 5-15s at native 2K with stereo audio, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (40/80/155cr) and seedance-2.5-480p/720p (60/125cr) and ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundable.",
+    "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)",
+    "description": "Generates a short-form social video. DEFAULT minimax-h3 (40cr): 5-15s at native 2K with stereo audio, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (40/80/155cr) and seedance-2.5-480p/720p (60/125cr) ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundable.",
     "security": [
       "supabaseJwt"
     ],

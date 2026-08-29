@@ -142,6 +142,7 @@ import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import { safeHref } from '@/utils/safeUrl';
+import { GENERATION_MODELS } from '@/config/generationModels.generated';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
@@ -1971,11 +1972,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const resolvedModel = videoModel === 'auto' ? undefined : videoModel;
       const isAsyncModel = resolvedModel && ['runway-gen4-turbo'].includes(resolvedModel);
 
-      const modelLabels: Record<string, string> = {
-        'veo-2': 'Veo 2.0', 'kling-v3.0': 'Kling v3.0 Pro',
-        'runway-gen4-turbo': 'Runway Gen-4',
-      };
-      const modelLabel = resolvedModel ? modelLabels[resolvedModel] : 'auto-selected model';
+      // Read from the registry projection rather than a hand-kept map. The map this
+      // replaced listed three models and the picker offers eleven, so choosing Wan,
+      // Seedance, MiniMax or Ray produced a toast reading "Using undefined." — a lookup
+      // miss renders as the word, not as a blank. `display_name` is the same string the
+      // admin sees, and it cannot drift: the projection is regenerated from the table.
+      const modelLabel = resolvedModel
+        ? (GENERATION_MODELS.find((m) => m.id === resolvedModel)?.display_name ?? resolvedModel)
+        : 'auto-selected model';
       toast({
         title: `Generating ${resolvedVideoType.replace('_', ' ')} video…`,
         description: `Using ${modelLabel}. ${isAsyncModel ? 'This may take 2-5 minutes.' : 'This may take 30-60 seconds.'}`,

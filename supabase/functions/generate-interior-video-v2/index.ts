@@ -8,9 +8,9 @@
  *   veo-2           → 50 credits (Google, cinematic walkthroughs)
  *   kling-v3.0      → 20 credits (native SDK, cinematic + audio)
  *   runway-gen4-turbo → 40 credits (Replicate, premium quality)
- *   wan-3.0-480p/720p/1080p → 40/80/155 credits (Alibaba DashScope). The only models
- *     here that reach 30 seconds, return the clip SCORED, and hold up to 20 references
- *     consistent across it. Issue #394.
+ *   wan-3.0-480p/720p/1080p → 30/55/110 credits (Alibaba, via @ai-sdk/alibaba). Reaches
+ *     30 seconds and returns the clip SCORED, with up to 5 reference items held consistent
+ *     across it — though not alongside a source frame. Issue #394.
  *   seedance-2.5-480p/720p → 60/125 credits (ByteDance, via BytePlus ModelArk). Also 30
  *     seconds with audio, but generated in ONE pass and with references that carry an
  *     explicit ROLE (first frame / last frame / reference image) rather than an
@@ -75,9 +75,9 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 //   veo-2              8s x $0.35/s = $2.80 -> x1.5 = $4.20 -> >= 50 credits
 //   kling-v3.0        10s x $0.10/s = $1.00 -> x1.5 = $1.50 -> >= 18 credits (20 charged)
 //   runway-gen4-turbo 10s x $0.15/s = $1.50 -> x1.5 = $2.25 -> >= 27 credits (40 charged)
-//   wan-3.0-480p      30s x $0.068/s = $2.04 -> x1.5 = $3.06  -> >= 36 credits (40 charged)
-//   wan-3.0-720p      30s x $0.14/s  = $4.20 -> x1.5 = $6.30  -> >= 75 credits (80 charged)
-//   wan-3.0-1080p     30s x $0.28/s  = $8.40 -> x1.5 = $12.60 -> >= 149 credits (155 charged)
+//   wan-3.0-480p      30s x $0.05/s  = $1.50 -> x1.5 = $2.25  -> >= 27 credits (30 charged)
+//   wan-3.0-720p      30s x $0.10/s  = $3.00 -> x1.5 = $4.50  -> >= 53 credits (55 charged)
+//   wan-3.0-1080p     30s x $0.20/s  = $6.00 -> x1.5 = $9.00  -> >= 106 credits (110 charged)
 //   seedance-2.5-480p 30s x $0.104/s = $3.12 -> x1.5 = $4.68  -> >= 56 credits (60 charged)
 //   seedance-2.5-720p 30s x $0.231/s = $6.93 -> x1.5 = $10.40 -> >= 123 credits (125 charged)
 //   minimax-h3        15s x $0.13/s  = $1.95 -> x1.5 = $2.93  -> >= 35 credits (40 charged)
@@ -97,9 +97,13 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 // 9,608 tokens/s for 480p and 21,600 tokens/s for 720p — $0.104 and $0.231. It is roughly
 // 1.7x Wan per second, which is the price of one-pass 30s with role-tagged references.
 //
-// Wan costs more per clip because a Wan clip is THREE TIMES LONGER and arrives scored. The
-// tiers are separate entries rather than one premium one so the 30-second option is reachable
-// at 40 credits, not only at 155.
+// Wan's three prices came DOWN on 2026-08-29 (40/80/155 -> 30/55/110) and no negotiation was
+// involved: the old figures were derived from $0.068/$0.14/$0.28, the rate for
+// `wan3.0-video-prime` — an id absent from Alibaba's own model page. The documented model
+// `wan3.0-video` lists $0.05/$0.10/$0.20. Same arithmetic, corrected input, which is exactly
+// what this block is for: the numbers moved with the rate rather than sitting at a margin
+// nobody had chosen. The tiers stay separate entries so the 30-second option is reachable at
+// 30 credits and not only at 110.
 //
 // veo-2 was 30. A full 8-second clip cost $2.80 and earned about $2.70, so the platform paid
 // customers to use its most expensive model — and nothing surfaced it, because a flat fee is a
@@ -109,9 +113,9 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'veo-2':              50,
   'kling-v3.0':         20,
   'runway-gen4-turbo':  40,
-  'wan-3.0-480p':       40,
-  'wan-3.0-720p':       80,
-  'wan-3.0-1080p':      155,
+  'wan-3.0-480p':       30,
+  'wan-3.0-720p':       55,
+  'wan-3.0-1080p':      110,
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
   'minimax-h3':         40,
@@ -175,7 +179,12 @@ const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
   walkthrough:          'wan-3.0-720p',
   floorplan_flythrough: 'wan-3.0-720p',
   product_spotlight:    'kling-v3.0',
-  before_after:         'wan-3.0-720p',
+  // A before/after is a clip that must END on a specific image, and Ray3.2 is the only
+  // model here that interpolates first frame -> last frame. Everything else starts from
+  // the source and drifts, which is why `before_image_url` had nowhere to go: it was
+  // read by the Replicate branch alone, and `before_after` has not routed there in
+  // months. It now lands as the end frame on every native branch — see `endFrameUrl`.
+  before_after:         'ray-3.2-720p',
   // A reel is 15 seconds on a phone, not 30 on a monitor. MiniMax H3 gives that at
   // native 2K with stereo audio for 40 credits, where the 30-second model spent 80 to
   // produce twice the footage nobody watches. Wan stays one explicit `model` away.
@@ -305,9 +314,10 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     duration_seconds = 8,
     workspace_id,
     before_image_url,
-    // Wan-only. Extra images held CONSISTENT across the clip — the product itself,
-    // its finish, the room it goes in — which is the whole reason a generated
-    // interior is usable as a sales asset rather than a plausible lookalike.
+    // Extra images held CONSISTENT across the clip — the product itself, its finish,
+    // the room it goes in — which is the whole reason a generated interior is usable
+    // as a sales asset rather than a plausible lookalike. Wan, Seedance and MiniMax
+    // take them; Veo and Ray do not.
     reference_image_urls,
     last_frame_url,
     generate_audio,
@@ -351,6 +361,19 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       400,
     );
   }
+
+  // The clip's LAST frame, and the one place `before_image_url` becomes real.
+  //
+  // It was documented on the tool ("Required only for before_after type"), validated above,
+  // and then read by exactly one branch — Replicate's, which sets `image_end`. Every native
+  // branch reads `last_frame_url` instead, so from the moment `before_after` stopped routing
+  // to Replicate, the before image was accepted, SSRF-checked, and dropped. The caller got a
+  // generic clip with no transition and nothing said otherwise.
+  //
+  // Direction follows what the Replicate branch already did: the source image is the design
+  // and the "before" is where the clip ENDS.
+  const endFrameUrl: string | undefined =
+    last_frame_url || (video_type === 'before_after' ? before_image_url : undefined) || undefined;
 
   // Resolve model. `requestedModel` is client-supplied, so reject an unknown key
   // here rather than letting it flow on: CREDIT_COSTS[unknown] is undefined, which
@@ -529,16 +552,16 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       });
 
     } else if (WAN_RESOLUTION[resolvedModel]) {
-      // Wan3.0-Video-Prime — the only model here that can produce a 30-second clip
-      // and the only one that returns it scored. `reference_urls` are additional
-      // images held consistent across the clip, which is what keeps the ACTUAL
-      // product in frame instead of a plausible lookalike.
+      // Wan3.0 — 30 seconds, scored in the same pass. `reference_urls` hold a specific
+      // product in frame instead of a plausible lookalike, but wan3 will not accept them
+      // ALONGSIDE a source frame, so the shared client drops them and says how many:
+      // `references_dropped` below is that count, not a silence.
       const wanPrompt = prompt
         || 'Professional cinematic interior walkthrough, smooth continuous camera movement';
 
       const wanResult = await generateVideoWithWan(wanPrompt, {
         imageUrl: source_image_url,
-        lastFrameUrl: last_frame_url || undefined,
+        lastFrameUrl: endFrameUrl,
         references: referenceUrls.map((url) => ({ kind: 'image' as const, url })),
         durationSeconds,
         resolution: WAN_RESOLUTION[resolvedModel],
@@ -547,12 +570,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         task: 'interior_video_generation_v2',
         userId,
         workspaceId: workspace_id ?? undefined,
+        // `logVideoUsage` below owns this call's ai_usage_logs row. Before the move to
+        // the provider both wrote one, so every Wan clip was counted twice in cost.
+        logUsage: false,
       });
 
-      // Wan hands back a provider-hosted URL rather than bytes. `uploadVideoToStorage`
-      // already downloads a URL through `fetchBinaryGuarded` — SSRF guard, 200 MB cap,
-      // video/* content-type check — so pass the URL and let the one guarded path do it.
-      const videoUrl = await uploadVideoToStorage(supabase, wanResult.url, jobId, false, uploadCtx);
+      const videoUrl = await uploadVideoToStorage(supabase, wanResult.bytes, jobId, false, uploadCtx);
       await logVideoUsage(wanResult.durationSeconds);
 
       const { error: completeErr } = await supabase.from('generation_videos').update({
@@ -581,6 +604,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         video_type,
         duration_seconds: wanResult.durationSeconds,
         has_audio: wanResult.hasAudio,
+        references_dropped: wanResult.referencesDropped,
         status: 'completed',
       });
 
@@ -594,7 +618,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
       const seedanceResult = await generateVideoWithSeedance(seedancePrompt, {
         imageUrl: source_image_url,
-        lastFrameUrl: last_frame_url || undefined,
+        lastFrameUrl: endFrameUrl,
         referenceUrls: referenceUrls,
         durationSeconds,
         resolution: SEEDANCE_RESOLUTION[resolvedModel],
@@ -652,7 +676,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
       const rayResult = await generateVideoWithRay(rayPrompt, {
         imageUrl: source_image_url,
-        lastFrameUrl: last_frame_url || undefined,
+        lastFrameUrl: endFrameUrl,
         durationSeconds,
         resolution: RAY_RESOLUTION[resolvedModel],
         aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
@@ -706,7 +730,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
       const minimaxResult = await generateVideoWithMinimax(minimaxPrompt, {
         imageUrl: source_image_url,
-        lastFrameUrl: last_frame_url || undefined,
+        lastFrameUrl: endFrameUrl,
         referenceUrls: referenceUrls,
         durationSeconds,
         aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',

@@ -86,7 +86,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'generate-region-edit', label: 'generate-region-edit', sublabel: 'Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora' },
   { id: 'generate-social-content', label: 'generate-social-content', sublabel: 'Generate platform-optimised social media captions and hashtags via Claude' },
   { id: 'generate-social-image', label: 'generate-social-image', sublabel: 'Generate a social media image via Aurora, Gemini, or FLUX based on content type' },
-  { id: 'generate-social-video', label: 'generate-social-video', sublabel: 'Generate a short-form social video via Kling, Veo 2, Wan3.0 or Seedance 2.5' },
+  { id: 'generate-social-video', label: 'generate-social-video', sublabel: 'Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)' },
   { id: 'generate-virtual-staging', label: 'generate-virtual-staging', sublabel: 'AI virtual staging of an empty room via Replicate proplabs/virtual-staging' },
   { id: 'generate-vr-world', label: 'generate-vr-world', sublabel: 'Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble' },
   { id: 'gsc-api', label: 'gsc-api', sublabel: 'Google Search Console for connected websites (OAuth + performance sync)' },

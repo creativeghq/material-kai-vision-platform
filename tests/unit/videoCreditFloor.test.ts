@@ -41,11 +41,13 @@ const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   'veo-2': 0.35,
   'kling-v3.0': 0.10,
   'runway-gen4-turbo': 0.15,
-  // Wan3.0-Video-Prime, one row per resolution tier — the rate differs 4x across them,
-  // so a single averaged entry here would pass the floor for 1080p while underpricing it.
-  'wan-3.0-480p': 0.068,
-  'wan-3.0-720p': 0.14,
-  'wan-3.0-1080p': 0.28,
+  // Wan3.0 (model id wan3.0-video), one row per tier — the rate differs 4x across them, so a
+  // single averaged entry here would pass the floor for 1080p while underpricing it.
+  // Corrected 2026-08-29 from 0.068/0.14/0.28, which was the rate for wan3.0-video-prime — an
+  // id absent from Alibaba own model page. We had never been on the documented model.
+  'wan-3.0-480p': 0.05,
+  'wan-3.0-720p': 0.10,
+  'wan-3.0-1080p': 0.20,
   // Seedance 2.5 over BytePlus ModelArk. Ark bills by TOKEN — width x height x fps x
   // seconds / 1024, at $10.70/M with no video input — so these per-second rates are a
   // DERIVATION, not a quote: at 24fps, 480p is 9,608 tok/s and 720p is 21,600 tok/s.

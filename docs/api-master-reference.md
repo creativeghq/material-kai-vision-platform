@@ -68,7 +68,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `generate-social-content` | JWT | Generate platform-optimised social media captions and hashtags via Claude |
 | `generate-social-image` | JWT | Generate a social media image via Aurora, Gemini, or FLUX based on content type |
-| `generate-social-video` | JWT | Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 also selectable) |
+| `generate-social-video` | JWT | Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
 | `zernio-api` _(GET + POST)_ | JWT | Social media publishing, OAuth account management, and analytics via Zernio. |
 | `zernio-webhook-handler` | sig | Receives Zernio webhooks for social post events and WhatsApp messaging events. |
 

@@ -86,13 +86,12 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   // absent here while its siblings were present, so a DB outage silently dropped Veo's cost to
   // null while Kling and Runway kept theirs (#363 follow-up).
   'veo-2':                { cost_per_unit: 0.35,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
-  // The 30-second models, which are where the "most expensive clip" title actually sits:
-  // Wan 1080p bills $8.40 for a full clip against Veo's $2.80, and Seedance 720p $6.93.
-  // Both were missing here for exactly the reason the Veo note above describes, so a DB
-  // outage dropped the two priciest things this platform makes to a null cost.
-  'wan-3.0-480p':         { cost_per_unit: 0.068,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
-  'wan-3.0-720p':         { cost_per_unit: 0.14,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
-  'wan-3.0-1080p':        { cost_per_unit: 0.28,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  // The 30-second models. Seedance 720p bills $6.93 for a full clip and Wan 1080p $6.00,
+  // against Veo's $2.80. Both were missing here for exactly the reason the Veo note above
+  // describes, so a DB outage dropped the priciest things this platform makes to a null cost.
+  'wan-3.0-480p':         { cost_per_unit: 0.05,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'wan-3.0-720p':         { cost_per_unit: 0.10,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'wan-3.0-1080p':        { cost_per_unit: 0.20,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'seedance-2.5-480p':    { cost_per_unit: 0.104,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'seedance-2.5-720p':    { cost_per_unit: 0.232,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // The default model for social video — the one most likely to be running when the DB is not.

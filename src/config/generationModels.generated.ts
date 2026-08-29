@@ -530,15 +530,15 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
   },
   {
     "id": "wan-3.0-480p",
-    "display_name": "Wan3.0 Prime 480P",
+    "display_name": "Wan3.0 480P",
     "capability": "video",
     "sub_capability": "image-to-video",
     "provider": "alibaba",
-    "slug": "wan3.0-video-prime",
+    "slug": "wan3.0-video",
     "version": null,
-    "adapter": "dashscope",
+    "adapter": "alibaba",
     "input_requirements": {
-      "max_images": 20,
+      "max_images": 5,
       "min_images": 1,
       "image_roles": [
         "source",
@@ -555,15 +555,15 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
   },
   {
     "id": "wan-3.0-720p",
-    "display_name": "Wan3.0 Prime 720P",
+    "display_name": "Wan3.0 720P",
     "capability": "video",
     "sub_capability": "image-to-video",
     "provider": "alibaba",
-    "slug": "wan3.0-video-prime",
+    "slug": "wan3.0-video",
     "version": null,
-    "adapter": "dashscope",
+    "adapter": "alibaba",
     "input_requirements": {
-      "max_images": 20,
+      "max_images": 5,
       "min_images": 1,
       "image_roles": [
         "source",
@@ -580,15 +580,15 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
   },
   {
     "id": "wan-3.0-1080p",
-    "display_name": "Wan3.0 Prime 1080P",
+    "display_name": "Wan3.0 1080P",
     "capability": "video",
     "sub_capability": "image-to-video",
     "provider": "alibaba",
-    "slug": "wan3.0-video-prime",
+    "slug": "wan3.0-video",
     "version": null,
-    "adapter": "dashscope",
+    "adapter": "alibaba",
     "input_requirements": {
-      "max_images": 20,
+      "max_images": 5,
       "min_images": 1,
       "image_roles": [
         "source",
@@ -833,7 +833,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = 'ee6ad1998a9d8cffb4d21b9965c718f3';
+export const PROJECTION_FINGERPRINT = '65b66fce9f21ba75c10122febe9e7c32';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

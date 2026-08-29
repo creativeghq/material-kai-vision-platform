@@ -303,13 +303,13 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
 Video types and recommended models:
 - walkthrough: Veo 2.0 (50cr) — cinematic camera moves through a room
 - product_spotlight: Kling 3.0 (20cr) — focuses on a specific material/product with audio
-- before_after: Kling 3.0 (20cr) — transition between two room states (requires before_image_url)
+- before_after: Luma Ray3.2 (20cr) — interpolates from the room image to before_image_url, which is the only model here that can actually end on a given frame
 - floorplan_flythrough: Veo 2.0 (50cr) — aerial view flythrough
 - social_reel: MiniMax H3 (40cr) — 15s at native 2K with stereo audio, the reel format itself
 - premium: Runway Gen-4 Turbo (40cr) — highest quality for any type
 
 Long-form, with sound (the only models here that pass 10 seconds):
-- Wan3.0 480p/720p/1080p (40/80/155cr) — up to 30s, scored, up to 20 references
+- Wan3.0 480p/720p/1080p (30/55/110cr) — up to 30s, scored, up to 20 references
 - Seedance 2.5 480p/720p (60/125cr) — up to 30s in ONE pass, scored, references carry a
   role (first frame / last frame / reference image), which is what holds a specific
   product in shot for the whole clip
@@ -341,7 +341,7 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
           'minimax-h3',
           'ray-3.2-720p', 'ray-3.2-1080p',
         ]).optional()
-          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, minimax-h3 40cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
+          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 30cr, wan-3.0-720p 55cr, wan-3.0-1080p 110cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, minimax-h3 40cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
           .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),

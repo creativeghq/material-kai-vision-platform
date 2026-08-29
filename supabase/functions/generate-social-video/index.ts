@@ -97,9 +97,9 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   // Delegated like veo-2, so these are preflight-message values only — but they must
   // still equal generate-interior-video-v2's map, because a stale number here quotes
   // the customer a price nobody charges. Pinned by tests/unit/videoCreditFloor.test.ts.
-  'wan-3.0-480p':  40,
-  'wan-3.0-720p':  80,
-  'wan-3.0-1080p': 155,
+  'wan-3.0-480p':  30,
+  'wan-3.0-720p':  55,
+  'wan-3.0-1080p': 110,
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
   'minimax-h3':         40,
