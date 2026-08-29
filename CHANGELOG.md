@@ -4,6 +4,60 @@ All notable changes to the Material Kai Vision Platform.
 
 ---
 
+## [unreleased] - 2026-08
+
+**Design system replaced, Inbox becomes a conversational surface, SEO becomes a module, Claude 5 everywhere**
+
+The month's through-line is a rule that got applied in five unrelated places at once: **a metric is a
+value or a stated reason there is no value — never a hidden row, never a 0.** A collector that had
+never once succeeded looked identical to a site with nothing to report; 212 LLM probes that all
+returned HTTP 429 rendered as "0% AI visibility"; a rank outside the top 100 stored as position 101
+got averaged as though it were real. Each was a valid number, so no typecheck and no integrity probe
+could see any of them.
+
+- **A product-UI design system.** The marketing language (glass panels, a brand aurora behind every page, pill buttons that lifted on hover) was being applied to screens whose job is showing tables of money. Replaced with flat opaque surfaces, hairline separation, dense controls, underline tabs, one accent — `bg-background` → `bg-card` + `border-hairline` → `bg-surface-sunken` is the whole ladder. **847 pill buttons across 246 files** squared off; `rounded-full` is now avatars, dots and status pips only, because a filled pill is the exact silhouette of a primary button. The `--glass-*` tokens kept their names and now hold opaque values, which is why retiring glass did not need a 400-file sweep. Colour is unchanged: dark/light × green/blue, and every surface must work in all four.
+- **Responsive, finally.** `<main>` is `overflow-x-hidden`, so a table wider than the viewport was CLIPPED — no scrollbar, no swipe, and on a finance table the column that vanished was the money. 58 hand-rolled tables were in that state. A vertical rail on a phone is 11–19 full-width rows stacked above the content, so the section you selected rendered below the fold and the page read as empty. `.section-rail` is now one implementation, collapsing at `lg` in the CSS *and* the utilities.
+- **Inbox.** WhatsApp through Zernio (Meta Cloud API) with phone-number purchase, per-channel seats and monthly billing; Google Business reviews arrive and can be answered; per-message sentiment; a rendered 3D character avatar per contact (WhatsApp gives a business no customer profile picture — measured 0 of 100 conversations). **One agent**: customer conversations run JARVIS clamped to three tools, not a second assistant. A share link stopped being an identity (#357).
+- **Automations got an owner.** 115 seeded flows were all `is_global`, so Automations was structurally EMPTY for every workspace that has ever existed — while a global flow still emailed that workspace's members with no off switch. Fixed as an OVERLAY, never a per-workspace copy: `tenant_configurable` marks a default an owner may govern, `workspace_flow_preferences` records only the deviation, and reusing a default FORKS it (disabling the global in the same transaction, because both live means every notification twice). The tenant vocabulary was three lists that had drifted; it is now one.
+- **SEO is a module.** Rank tracking for the keywords a workspace chose (daily, capped at 60 SERP calls per run), competitors on the same metric and window, a site audit that reads the site rather than the homepage, Google Analytics beside Search Console on one grant, scheduled reports, and AI-visibility reporting that names the feed's health instead of dividing by probes that were never answered.
+- **Finance.** myDATA has two endpoints and we had only ever asked one; a document with no lines whose transaction had them; profit allocation as a first-class category; "Money out (by category)"; a party's margin taken across all their orders from their account rather than one order at a time.
+- **Models: the Claude 5 family, everywhere.** `claude-opus-4-8` was retired from the platform — and was still the model 36 live call sites in MIVAA passed to Anthropic (vision classifier, segmentation, OCR, product enrichment, the whole RAG synthesis path) while `config.py` had already moved its defaults to `claude-opus-5`. The defaults were right and the code never read them. The wrong Opus price ($15/$75, Opus-3-era, 3× the real rate) was found in **six** places. Guarded in both repos.
+- **Ops.** Every agent tool swept once so a broken one is found before a user finds it; 38 tables dropped that no code, no function and no FK could reach; a rule engine that shipped, was secured, and was never once used. **30 guard tests were silently reading source with the middle deleted** — they stripped block comments before line comments, so a `//` containing `/*` opened a block that closed hundreds of lines later. They passed by having nothing left to object to.
+- **API surface documented and guarded.** 115 undocumented edge-function actions added to the OpenAPI spec and 13 fictional ones removed (`mivaa-gateway` documented 36 of 116; `pinterest-api` advertised five actions whose code had been deleted). `docs/api/` retired — a hand-written copy of a generated spec only drifts — keeping the nine partner-facing guides no spec covers. Two generator bugs fixed that had shipped to the public spec: `[object Object]` responses on 20 functions, and every 📖 link rendering as `docs/docs/api/…`. New action-level parity guard, in both directions.
+
+---
+
+## [unreleased] - 2026-07
+
+**Real Estate module, orders as first-class records, Connected Websites, one units vocabulary**
+
+- **Real Estate.** Properties, lettings and tenancies, short-let bookings with channel iCal links, inspections, AML/KYC with a workspace policy, commission splits per sale, lead-routing rules, vendor reports, open houses, portal XML import, and tokenised tenant/buyer portals. Two paid sub-modules.
+- **Orders became the record everything hangs off.** Their own page; re-order at today's customer-aware prices with a preview; the purchase orders a sales order's stock cannot cover, raised from the shortfall; an order made from an expense that mirrors the document and puts the goods in stock; a full ERP-parity item form with every field wired to a real consumer. An order could hold many expenses but only ever be given one — fixed.
+- **myDATA sync matured.** Date-bounded pulls (ask for the period before pulling), a locked `myAADE` system category as the default for synced expenses, then a *learned* per-issuer default; issuer names resolved from ΓΕΜΗ; a supplier's myDATA documents on their CRM record; create the purchase order a myDATA document was always for.
+- **CRM.** Multiple named addresses and phone numbers per party; ΓΕΜΗ lookup chained after ΑΑΔΕ in onboarding; `country_code` derived from country at the database boundary; a Market tab with Gemini-grounded competitors, price intel and market position.
+- **Roles.** Every business function gets a workspace role — sales, HR, warehouse, marketing, accountant, real-estate agent — and none of them gets workspace administration. Before this the only way to let someone run HR was making them an `admin`, which handed over finance, pricing and the team. `sales`, `realestate_agent` and `employee` were invitable but not *storable*, so `redeem_workspace_invite` threw a CHECK violation on every one of those invites.
+- **SEO: Connected Websites as the organising unit.** Before this the SEO features were one-shot tools with no memory of *which site* they were about. Now a workspace connects a website once and every surface hangs off it — Search Console (server-side OAuth callback, because supabase-js was hijacking Google's `?code`), Site Health, Rankings & Links, research, articles, runs. Inter-link suggestions are inserted INTO the article; they used to be a list you copied out, which meant most were never applied.
+- **Units of measure: one canonical vocabulary, enforced at the database boundary.**
+- **Ops: silent-zero detection.** Activity happened in the window and the metric it should have produced is zero across the board — plus endpoints and crons below a **5%** success rate, not 0%, because real breakage is near-total and an exact-zero test reported the platform clean while two endpoints sat at 0.8% and 4.5%. Open integrity findings surface as a red count on the admin landing page. The test reaper that succeeded while doing nothing now has a probe on the mess it is supposed to clear.
+- **Catalog.** Per-factory grants, so `catalog_access` finally does something; detection when a dealer is about to duplicate a product the operator already carries.
+
+---
+
+## [unreleased] - 2026-06
+
+**Blueprint estimating, the supplier network, sourcing off the allocation ledger**
+
+- **Blueprint estimating (#242), five phases.** The engine, then options / good-better-best tiers with allowances and price refresh, then e-sign with an audit trail on the public quote, then a public `/tools/project-plan` estimator, then material lists and change orders from a plan. The public estimator leads with Full Home Renovation and works the plan up front — value first, no captcha — with non-Full-Home estimates behind sign-up and a save→import-after-signup path.
+- **The supplier network (#247).** ERP outbound as a `kai_*` partner API so a supplier's own system can list its inbound POs and post status back; a cross-workspace supplier portal with an inbound PO feed and write-back; and operator-gated identity claims, because a global supplier identity anyone could claim is not an identity.
+- **Sourcing (#237).** The Finance sourcing board reads the allocation ledger; "Send to supplier" on purchase orders, with the PO PDF and email; `purchase_order.sent` / `.received` triggers and default notify flows; a sales-scoped "My orders" toggle.
+- **Purchase sheets.** Single-item order / shop-drawing sheets, and an architectural elevation schedule (Schedule of Doors/Windows). Purchase Items for doors and windows wired through projects — tab, spec sheet, AI product shots, agent tools.
+- **Finance.** Order payments through the shared FX path with an audit trail; per-line cost total, profit and supplier; supplier-aware money out; supplier owe shown as cost + VAT = total incl. VAT; money received without a document (deposits / on-account); Daily cash flow and P&L by category reports.
+- **Agent.** Brand tools (`products_by_brand`, `brand_overview`), numeric range filters on `find_products_by_spec`, and `related_products` co-occurrence. The 19 orphan result chunks that reached the chat as raw JSON now render through a generic card.
+- **Per-workspace BYOK consolidated** into Profile → Keys. A tenant never falls back to the operator's master credentials.
+- **A warm glass-over-gradient design system** shipped this month — and was replaced in August by the product-UI language, for the reason above.
+
+---
+
 ## [unreleased] - 2026-05-23 / 2026-05-24
 
 **Role simplification, Solo/Business entity, Apply-for-Dealer/Factory flow, VIES + myAADE auto-fill**
