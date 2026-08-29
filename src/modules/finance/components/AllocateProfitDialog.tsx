@@ -178,7 +178,7 @@ export const AllocateProfitDialog: React.FC<{
             The cash does not move and nothing is issued to anyone. The order&rsquo;s revenue and cost are
             already in your P&amp;L and already net to this figure — this records that you have taken it.
             Reversible.
-          
+
           </p>
           <p className="text-[11px] text-muted-foreground">
             {/* Where the money actually leaves. Without this the dialog implies the cash has moved,
