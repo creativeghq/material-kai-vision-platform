@@ -46,6 +46,12 @@ const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   'wan-3.0-480p': 0.068,
   'wan-3.0-720p': 0.14,
   'wan-3.0-1080p': 0.28,
+  // Seedance 2.5 over BytePlus ModelArk. Ark bills by TOKEN — width x height x fps x
+  // seconds / 1024, at $10.70/M with no video input — so these per-second rates are a
+  // DERIVATION, not a quote: at 24fps, 480p is 9,608 tok/s and 720p is 21,600 tok/s.
+  // If the token rate moves, recompute; do not nudge these until the test passes.
+  'seedance-2.5-480p': 0.104,
+  'seedance-2.5-720p': 0.232,
 };
 
 /** `_shared/pricing-constants.ts` → MARKUP_MULTIPLIER. */

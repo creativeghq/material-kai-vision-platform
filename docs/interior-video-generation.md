@@ -14,13 +14,31 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 
 ## Models
 
-| Model | Credits | Speed | Best For |
-|---|---|---|---|
-| `veo-2` | 30 | ~2-3 min | Cinematic walkthroughs, floor-plan flythroughs |
-| `kling-v3.0` | 20 | ~60-90s | Product spotlights, before/after, social reels |
-| `runway-gen4-turbo` | 40 | ~2-3 min | Premium quality output |
+| Model | Credits | Max length | Audio | Best For |
+|---|---|---|---|---|
+| `veo-2` | 50 | 8s | no | Cinematic walkthroughs, floor-plan flythroughs |
+| `kling-v3.0` | 20 | 10s | yes | Product spotlights, before/after, short social reels |
+| `runway-gen4-turbo` | 40 | 10s | no | Premium quality output |
+| `wan-3.0-480p` | 40 | 30s | yes | Long clips on a budget; up to 20 references |
+| `wan-3.0-720p` | 80 | 30s | yes | The default long clip |
+| `wan-3.0-1080p` | 155 | 30s | yes | Long clips at full HD |
+| `seedance-2.5-480p` | 60 | 30s | yes | 30s in ONE pass, role-tagged references |
+| `seedance-2.5-720p` | 125 | 30s | yes | The same at 720p |
 
-Kling uses the native Kling SDK. Wan and Runway use Replicate. Veo-2 uses Google's API.
+Credit prices are floors, not preferences: each one covers the provider bill for a MAX-LENGTH
+clip of that model at the platform's declared 1.5x markup, checked by
+[tests/unit/videoCreditFloor.test.ts](../tests/unit/videoCreditFloor.test.ts).
+
+Routing per provider: Kling and Seedance go through the AI SDK inside `_shared/ai-client.ts`
+(`@ai-sdk/klingai`, `@ai-sdk/bytedance` — both pinned to their **spec-v3** major, which is the one
+`npm:ai@6` accepts). Wan goes to DashScope over raw REST because no AI SDK provider exists for it.
+Veo-2 uses Google's API. Runway is the only remaining Replicate model here.
+
+**Wan vs Seedance** — they overlap at 30 seconds with sound, and the difference is what happens to
+the references. Wan takes up to 20 of them as one set. Seedance tags each input with a ROLE
+(`first_frame`, `last_frame`, `reference_image`) and generates the whole clip in a single pass
+rather than extending, which is what holds a specific product in shot end to end. Wan is cheaper
+per second; Seedance is the one to reach for when the thing on screen has to be *the* thing.
 
 ---
 
@@ -30,11 +48,15 @@ If you pass `video_type` without `model`, the function auto-selects:
 
 | Video Type | Auto-Selected Model |
 |---|---|
-| `walkthrough` | `veo-2` |
-| `floorplan_flythrough` | `veo-2` |
+| `walkthrough` | `wan-3.0-720p` |
+| `floorplan_flythrough` | `wan-3.0-720p` |
 | `product_spotlight` | `kling-v3.0` |
-| `before_after` | `kling-v3.0` |
-| `social_reel` | `kling-v3.0` |
+| `before_after` | `wan-3.0-720p` |
+| `social_reel` | `wan-3.0-720p` |
+
+The three types that most needed length and sound default to a 30-second scored model; an
+8-second silent clip is not a walkthrough. Seedance is reachable by explicit `model` only —
+it costs about 1.7x Wan per second, so it is an ask, not a default.
 
 ---
 
@@ -151,7 +173,10 @@ For social-media-specific short videos, the separate `generate-social-video` edg
 
 | Model | Credits |
 |---|---|
-| `veo-2` (delegated to `generate-interior-video-v2`) | 30 |
+| `kling-3.0` (run here, via Replicate) | 20 |
+| `veo-2` (delegated to `generate-interior-video-v2`) | 50 |
+| `wan-3.0-480p` / `720p` / `1080p` (delegated) | 40 / 80 / 155 |
+| `seedance-2.5-480p` / `720p` (delegated) | 60 / 125 |
 
 ```
 POST /functions/v1/generate-social-video

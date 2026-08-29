@@ -670,10 +670,10 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'source_image_url', type: 'string', optional: false, description: 'Source image URL to animate or base the video on' },
       { name: 'video_type', type: 'enum', enum: ['walkthrough', 'product_spotlight', 'before_after', 'floorplan_flythrough', 'social_reel'], optional: false, description: 'Type of video to generate' },
-      { name: 'model', type: 'enum', enum: ['veo-2', 'kling-v3.0', 'runway-gen4-turbo'], optional: true, description: 'Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr (default: auto based on video_type)' },
+      { name: 'model', type: 'enum', enum: ['veo-2', 'kling-v3.0', 'runway-gen4-turbo', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p', 'seedance-2.5-480p', 'seedance-2.5-720p'], optional: true, description: 'Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr (default: auto based on video_type)' },
       { name: 'prompt', type: 'string', optional: true, description: 'Additional prompt for the video generation' },
       { name: 'aspect_ratio', type: 'enum', enum: ['16:9', '9:16', '1:1'], optional: true, description: '16:9 for standard video, 9:16 for social reels (default: 16:9)' },
-      { name: 'duration_seconds', type: 'number', optional: true, description: 'Duration in seconds (default: 8)' },
+      { name: 'duration_seconds', type: 'number', optional: true, description: 'Duration in seconds, clamped to the model ceiling (veo-2 8s, kling 10s, wan/seedance 30s). Default: 8' },
       { name: 'before_image_url', type: 'string', optional: true, description: 'Required only for before_after type: the "before" state image URL' },
     ],
   },

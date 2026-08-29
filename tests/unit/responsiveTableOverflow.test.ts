@@ -185,7 +185,11 @@ describe('wide tables are reachable on a phone', () => {
   });
 
   it('.table-scroll is defined once, in index.css', () => {
-    const css = readFileSync(join(SRC, 'index.css'), 'utf8');
+    // Newlines normalised: one assertion below finds the end of a media block by probing for
+    // `\n}\n\n`, which never matches on a Windows checkout (`core.autocrlf=true` writes CRLF).
+    // It failed there and passed in CI — the worst direction, because the person who can act
+    // on it is the one seeing the false red.
+    const css = readFileSync(join(SRC, 'index.css'), 'utf8').replace(/\r\n/g, '\n');
     expect(css).toContain('.table-scroll {');
     expect(css).toMatch(/\.table-scroll\s*\{[^}]*overflow-x:\s*auto/);
     // Headers on one line are half the fix: without it the browser resolves the overflow by
@@ -271,7 +275,11 @@ describe('a section rail is a strip on a phone, not a wall', () => {
     ).toEqual([]);
     expect(tabs).toContain('lg:data-[orientation=vertical]:flex-col');
 
-    const css = readFileSync(join(SRC, 'index.css'), 'utf8');
+    // Newlines normalised: one assertion below finds the end of a media block by probing for
+    // `\n}\n\n`, which never matches on a Windows checkout (`core.autocrlf=true` writes CRLF).
+    // It failed there and passed in CI — the worst direction, because the person who can act
+    // on it is the one seeing the false red.
+    const css = readFileSync(join(SRC, 'index.css'), 'utf8').replace(/\r\n/g, '\n');
     const marker = css.indexOf('[role="tablist"][aria-orientation="vertical"] > [role="tab"][data-state="active"]::after');
     expect(marker, 'the vertical active-marker rule has moved — re-check this guard').toBeGreaterThan(0);
     const before = css.slice(0, marker);
@@ -285,7 +293,11 @@ describe('a section rail is a strip on a phone, not a wall', () => {
   });
 
   it('.section-rail is defined once, and only below lg', () => {
-    const css = readFileSync(join(SRC, 'index.css'), 'utf8');
+    // Newlines normalised: one assertion below finds the end of a media block by probing for
+    // `\n}\n\n`, which never matches on a Windows checkout (`core.autocrlf=true` writes CRLF).
+    // It failed there and passed in CI — the worst direction, because the person who can act
+    // on it is the one seeing the false red.
+    const css = readFileSync(join(SRC, 'index.css'), 'utf8').replace(/\r\n/g, '\n');
     // Doubled class on purpose — Tailwind's utilities are emitted after this file, so a single
     // class ties and loses on order. See the comment on the rule.
     expect(css).toContain('.section-rail.section-rail {');

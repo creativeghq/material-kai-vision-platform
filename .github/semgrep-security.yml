@@ -91,7 +91,7 @@ rules:
     # but semgrepRuleset.test.ts asserts every non-taint rule carries one of
     # pattern/pattern-either/patterns, and a rule the guard cannot see is a rule nobody reviews.
     pattern-either:
-      - pattern-regex: ^\s*import\s[^;]*['"](?:https://esm\.sh/)?(?:npm:)?(?:@anthropic-ai/|@google/generative-ai|@ai-sdk/(?:anthropic|google|klingai|openai|xai)|openai[@/'"])[^'"]*['"]
+      - pattern-regex: ^\s*import\s[^;]*['"](?:https://esm\.sh/)?(?:npm:)?(?:@anthropic-ai/|@google/generative-ai|@ai-sdk/(?:anthropic|bytedance|google|klingai|openai|xai)|openai[@/'"])[^'"]*['"]
 
   # ── A · Auth (invariant 1/5) ────────────────────────────────────────────────
   - id: no-jwt-verification-disabled

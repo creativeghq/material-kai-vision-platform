@@ -71,7 +71,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // GET /v1/models — a read that needs no credit, so it is deleted upstream, not a symptom of
 // our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
 type VideoModel = 'kling-3.0' | 'veo-2'
-  | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p';
+  | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
+  | 'seedance-2.5-480p' | 'seedance-2.5-720p';
 
 // `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
 // generate-interior-video-v2, which debits its own CREDIT_COSTS. This entry is only read by the
@@ -87,6 +88,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'wan-3.0-480p':  40,
   'wan-3.0-720p':  80,
   'wan-3.0-1080p': 155,
+  'seedance-2.5-480p':  60,
+  'seedance-2.5-720p':  125,
 };
 
 //: Models handed to generate-interior-video-v2 rather than run here. A reel is the case
@@ -94,6 +97,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 //: could offer before.
 const DELEGATED_MODELS = new Set<string>([
   'veo-2', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
+  'seedance-2.5-480p', 'seedance-2.5-720p',
 ]);
 
 const REPLICATE_MODELS: Record<string, string> = {
@@ -247,7 +251,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
           source_image_url,
           prompt,
           aspect_ratio,
-          // The generator clamps per model (8s for veo-2, 30s for Wan). Clamping to 8
+          // The generator clamps per model (8s for veo-2, 30s for Wan and Seedance). Clamping to 8
           // here as well would have silently capped every Wan reel at 8 seconds — the
           // exact thing Wan was added to fix.
           duration_seconds,

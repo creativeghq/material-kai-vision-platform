@@ -2131,7 +2131,7 @@
     "name": "generate-interior-video-v2",
     "tag": "AI Generation",
     "summary": "Multi-model interior design video generation with async polling fallback",
-    "description": "Generates interior design videos via veo-2 (30cr), kling-v3.0 (20cr), or runway-gen4-turbo (40cr). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
+    "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (40/80/155cr, 30s with audio) or seedance-2.5-480p/720p (60/125cr, 30s one-pass with audio and role-tagged references). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
     "security": [
       "supabaseJwt"
     ],
@@ -2163,7 +2163,12 @@
           "enum": [
             "veo-2",
             "kling-v3.0",
-            "runway-gen4-turbo"
+            "runway-gen4-turbo",
+            "wan-3.0-480p",
+            "wan-3.0-720p",
+            "wan-3.0-1080p",
+            "seedance-2.5-480p",
+            "seedance-2.5-720p"
           ],
           "description": "Explicit model override; if omitted, auto-selected from video_type"
         },
@@ -2921,8 +2926,8 @@
   {
     "name": "generate-social-video",
     "tag": "Social",
-    "summary": "Generate a short-form social video via Kling or Veo-2",
-    "description": "Generates social media videos: kling-3.0 (20cr) via Replicate, or veo-2 (30cr) delegated to generate-interior-video-v2. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.",
+    "summary": "Generate a short-form social video via Kling, Veo 2, Wan3.0 or Seedance 2.5",
+    "description": "Generates a short-form social video: kling-3.0 (20cr) runs here via Replicate; veo-2 (50cr), wan-3.0-480p/720p/1080p (40/80/155cr) and seedance-2.5-480p/720p (60/125cr) are delegated to generate-interior-video-v2, which debits its own prices. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.",
     "security": [
       "supabaseJwt"
     ],
@@ -2945,7 +2950,12 @@
           "type": "string",
           "enum": [
             "kling-3.0",
-            "veo-2"
+            "veo-2",
+            "wan-3.0-480p",
+            "wan-3.0-720p",
+            "wan-3.0-1080p",
+            "seedance-2.5-480p",
+            "seedance-2.5-720p"
           ],
           "default": "kling-3.0"
         },

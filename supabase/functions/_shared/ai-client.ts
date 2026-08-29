@@ -24,6 +24,10 @@ const _AI_ENV_KEYS = [
   'KLINGAI_ACCESS_KEY',
   'KLINGAI_SECRET_KEY',
   'XAI_API_KEY',
+  // BytePlus ModelArk (Seedance 2.5). The ByteDance provider reads `ARK_API_KEY` from
+  // process.env when no explicit apiKey is passed; we pass one, but the sync keeps the
+  // two paths from disagreeing about which key is in force.
+  'ARK_API_KEY',
 ] as const;
 
 function _syncEnvIntoPolyfill() {
@@ -47,7 +51,22 @@ import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 // the resolved 4.0.17 and every deploy took whatever npm called latest that morning. That
 // is the exact shape that got the Python `anthropic` SDK removed (a pin trap broke the
 // `tools` kwarg) and that produced `fix(ai-client): AI SDK v4 API against a v6 pin`.
-import { createKlingAI } from 'npm:@ai-sdk/klingai@4';
+//
+// AND THE MAJOR IS 3, NOT 4 — the pin above was right about pinning and wrong about the
+// number. A provider package's major tracks the MODEL SPECIFICATION it implements, not the
+// model line it can reach: the whole `@ai-sdk/klingai@4` series depends on
+// `@ai-sdk/provider@4` (`specificationVersion: 'v4'`, the AI SDK 7 line), while `npm:ai@6`
+// resolves `@ai-sdk/provider@3` and its `resolveVideoModel` throws
+// `AI_UnsupportedModelVersionError` on anything that is not `'v3'`. That throw happens
+// BEFORE the network call, so with the @4 pin EVERY Kling generation failed 100% of the
+// time — credits refunded, nothing in `ai_usage_logs`, and a pin that reads deliberate.
+// 3.0.41 is the current v3-spec release and carries the identical `kling-v3.0-*` ids.
+// Upgrading `ai` to 7 is what unlocks the @4 line; do both together or neither.
+import { createKlingAI } from 'npm:@ai-sdk/klingai@3';
+// Seedance 2.5 (ByteDance) over BytePlus ModelArk. Major 1 for exactly the reason above:
+// `@ai-sdk/bytedance@2` is spec v4. 1.0.38 is spec v3 and speaks the same Ark
+// `/contents/generations/tasks` API.
+import { createByteDance } from 'npm:@ai-sdk/bytedance@1';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
@@ -1427,6 +1446,178 @@ export async function generateVideoWithWan(
   } catch (err) {
     void _logUnitCall({
       task: config?.task ?? 'wan_video_generation',
+      modelKey,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
+}
+
+// ── Seedance 2.5 (ByteDance, via BytePlus ModelArk) ────────────────────────
+//
+// Through the AI SDK, unlike Wan: `@ai-sdk/bytedance` exists, so the rule applies as
+// written — an edge function never reaches a provider directly, and this file uses the
+// SDK wherever there IS one.
+//
+// What Seedance buys over the existing roster: a 30-second clip generated in ONE pass
+// (Wan reaches 30s too, Veo stops at 8 and Kling at 10), native audio, and reference
+// inputs that carry an explicit ROLE — first frame, last frame, reference image — rather
+// than an undifferentiated bag of pictures. For a materials platform the role is the
+// point: "this exact tile, in this room, for the whole clip" is a different instruction
+// from "something like these".
+//
+// ARK IS TWO CONSOLES AND THE IDS ARE NOT INTERCHANGEABLE. BytePlus ModelArk
+// (international, USD, ark.ap-southeast.bytepluses.com) takes `dreamina-seedance-2-5-*`;
+// Volcano Engine Ark (mainland China, RMB, ark.cn-beijing.volces.com) takes
+// `doubao-seedance-2.5`. Crossing them fails as an AUTH error, which reads like a bad key
+// rather than a wrong endpoint, so both halves are pinned here together.
+const SEEDANCE_BASE_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3';
+const SEEDANCE_MODEL_ID = 'dreamina-seedance-2-5-260628';
+
+export type SeedanceResolution = '480P' | '720P';
+
+/**
+ * `ai_model_pricing.model_key` per tier. Ark bills Seedance by TOKEN, not by second:
+ * tokens = width x height x fps x seconds / 1024, at $10.70/M with no video input. At 24fps
+ * that is $0.104/s for 480p and $0.231/s for 720p — which is what the per-second rows hold,
+ * because every other video model in this platform is priced per second and one odd unit
+ * would break `logVideoUsage`'s `units = duration` contract at every call site.
+ */
+const SEEDANCE_PRICING_MODEL_ID: Record<SeedanceResolution, string> = {
+  '480P': 'seedance-2.5-480p',
+  '720P': 'seedance-2.5-720p',
+};
+
+/**
+ * The AI SDK takes `resolution` as `{width}x{height}` and the ByteDance provider maps it
+ * back onto Ark's tier string through its own table. These two sizes are IN that table;
+ * an unmapped size is forwarded verbatim and Ark rejects it. Orientation is carried by
+ * `ratio`, so one landscape size per tier is enough.
+ */
+const SEEDANCE_RESOLUTION_SIZE: Record<SeedanceResolution, string> = {
+  '480P': '864x480',
+  '720P': '1280x720',
+};
+
+export interface SeedanceVideoResult {
+  /** Raw bytes. 30s of 720p is ~20 MB — base64 would carry a third more for no reason. */
+  bytes: Uint8Array;
+  mimeType: string;
+  model: string;
+  durationSeconds: number;
+  resolution: SeedanceResolution;
+  hasAudio: boolean;
+}
+
+export async function generateVideoWithSeedance(
+  prompt: string,
+  config?: UnitBillingConfig & {
+    /** First frame. */
+    imageUrl?: string;
+    /** Optional last-frame guidance — Ark tags it `role: 'last_frame'`. */
+    lastFrameUrl?: string;
+    /** Extra images held consistent across the clip (`role: 'reference_image'`). */
+    referenceUrls?: string[];
+    /** 4-30. Clamped here AND by the caller, which is where the credit price is decided. */
+    durationSeconds?: number;
+    resolution?: SeedanceResolution;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    /** Seedance scores the clip in the same pass. Default true — a silent reel is the bug. */
+    generateAudio?: boolean;
+    pollTimeoutMs?: number;
+    /**
+     * Write the `ai_usage_logs` row from here. Default true, and every direct caller
+     * should leave it there.
+     *
+     * `false` exists for callers that write a RICHER row themselves — the video edge
+     * functions attach `credits_debited` and `video_type`, which this logger has no
+     * access to. Those callers log unconditionally, so without this flag the row would
+     * be written TWICE and every cost view would read double. That is not hypothetical:
+     * it is what the Veo, Kling and Wan branches of `generate-interior-video-v2` do
+     * today, because `generateVideoWith*` grew its own logging after they had theirs.
+     */
+    logUsage?: boolean;
+  },
+): Promise<SeedanceVideoResult> {
+  const _start = Date.now();
+  const resolution = config?.resolution ?? '720P';
+  const seconds = Math.max(4, Math.min(30, Math.round(config?.durationSeconds ?? 5)));
+  const modelKey = SEEDANCE_PRICING_MODEL_ID[resolution];
+  const withAudio = config?.generateAudio ?? true;
+
+  // Lazy, and via resolveSecret for the same reason Wan is: `Deno.env.set` is a no-op on
+  // Supabase edge, so a module-load capture reads undefined and an admin-configured key is
+  // never seen. Fails BEFORE the provider call, so an unset key costs nothing.
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'ARK_API_KEY')).value
+    : Deno.env.get('ARK_API_KEY');
+  if (!apiKey) {
+    throw new Error('ARK_API_KEY is not configured — cannot generate with Seedance 2.5');
+  }
+
+  const bytedance = createByteDance({ apiKey, baseURL: SEEDANCE_BASE_URL });
+
+  // Ark accepts a public URL verbatim (the SDK only data-URI-encodes bytes), so the source
+  // image is passed as a URL and never pulled into this function's memory.
+  const visionPrompt: any = config?.imageUrl
+    ? { image: config.imageUrl, text: prompt }
+    : prompt;
+
+  try {
+    const { video } = await generateVideo({
+      model: bytedance.video(SEEDANCE_MODEL_ID),
+      prompt: visionPrompt,
+      duration: seconds,
+      resolution: SEEDANCE_RESOLUTION_SIZE[resolution],
+      aspectRatio: config?.aspectRatio ?? '16:9',
+      generateAudio: withAudio,
+      providerOptions: {
+        bytedance: {
+          // Ark takes these as plain URLs with a role attached, which is the whole
+          // reason they are provider options rather than `inputReferences`: the generic
+          // path would data-URI every one of them into the request body.
+          ...(config?.lastFrameUrl ? { lastFrameImage: config.lastFrameUrl } : {}),
+          ...(config?.referenceUrls?.length
+            ? { referenceImages: config.referenceUrls.slice(0, 10) }
+            : {}),
+          // A watermarked clip is not a deliverable — this is sold output, not a demo.
+          watermark: false,
+        },
+      },
+      pollTimeoutMs: config?.pollTimeoutMs ?? 600_000,
+    } as any);
+
+    const bytes: Uint8Array = (video as any).uint8Array;
+    if (!bytes?.length) throw new Error('Seedance returned an empty video');
+
+    // Billed on the seconds we ASKED for: Ark charges for the clip it rendered, and a
+    // partial result we then reject is still a clip they rendered.
+    if (config?.logUsage !== false) void _logUnitCall({
+      task: config?.task ?? 'seedance_video_generation',
+      modelKey,
+      units: seconds,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      bytes,
+      mimeType: (video as any).mediaType ?? 'video/mp4',
+      model: SEEDANCE_MODEL_ID,
+      durationSeconds: seconds,
+      resolution,
+      hasAudio: withAudio,
+    };
+  } catch (err) {
+    // A FAILURE is always logged, even when the caller owns the success row: the caller
+    // refunds and returns, so a provider outage would otherwise leave no trace at all.
+    void _logUnitCall({
+      task: config?.task ?? 'seedance_video_generation',
       modelKey,
       units: 0,
       latencyMs: Date.now() - _start,

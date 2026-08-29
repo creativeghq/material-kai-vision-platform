@@ -118,9 +118,32 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "flux-2-pro",
     "tier": "premium",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 40
+  },
+  {
+    "id": "seedream-4",
+    "display_name": "Seedream 4",
+    "capability": "image",
+    "sub_capability": "text-or-image-to-image",
+    "provider": "replicate",
+    "slug": "bytedance/seedream-4",
+    "version": null,
+    "adapter": "seedream",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 0,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "seedream-4",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 45
   },
   {
     "id": "playground-v2.5",
@@ -138,9 +161,29 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "playground-v2.5",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 50
+  },
+  {
+    "id": "z-image-turbo",
+    "display_name": "Z-Image Turbo",
+    "capability": "image",
+    "sub_capability": "text-to-image",
+    "provider": "replicate",
+    "slug": "prunaai/z-image-turbo",
+    "version": null,
+    "adapter": "z_image",
+    "input_requirements": {
+      "max_images": 0,
+      "min_images": 0,
+      "needs_prompt": true
+    },
+    "pricing_key": "z-image-turbo",
+    "tier": "budget",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 55
   },
   {
     "id": "sd3",
@@ -181,7 +224,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "adirik-interior-design",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 70
   },
@@ -204,7 +247,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "comfyui-interior-remodel",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 80
   },
@@ -227,7 +270,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interior-v2",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 90
   },
@@ -250,7 +293,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interiorly-gen1-dev",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 100
   },
@@ -273,7 +316,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "designer-architecture",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 110
   },
@@ -319,7 +362,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interor-2",
     "tier": "budget",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 130
   },
@@ -342,7 +385,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "colourful-interiors",
     "tier": "budget",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 140
   },
@@ -365,9 +408,32 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "stable-interiors-v2-pb",
     "tier": "budget",
-    "status": "degraded",
-    "enabled": true,
+    "status": "dead",
+    "enabled": false,
     "sort_order": 150
+  },
+  {
+    "id": "stabledesign-interior",
+    "display_name": "StableDesign",
+    "capability": "image",
+    "sub_capability": "image-to-image",
+    "provider": "replicate",
+    "slug": "melgor/stabledesign_interiordesign",
+    "version": "5e13482ea317670bfc797bb18bace359860a721a39b5bbcaa1ffcd241d62bca0",
+    "adapter": "stabledesign",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 1,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "stabledesign-interior",
+    "tier": "budget",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 155
   },
   {
     "id": "stable-interiors-v2-yz",
@@ -388,7 +454,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "stable-interiors-v2-yz",
     "tier": "budget",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 160
   },
@@ -411,7 +477,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "interior-design-sdxl",
     "tier": "premium",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 170
   },
@@ -472,14 +538,14 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "version": null,
     "adapter": "dashscope",
     "input_requirements": {
-      "needs_prompt": true,
-      "min_images": 1,
       "max_images": 20,
+      "min_images": 1,
       "image_roles": [
         "source",
         "reference",
         "last_frame"
-      ]
+      ],
+      "needs_prompt": true
     },
     "pricing_key": "wan-3.0-480p",
     "tier": "budget",
@@ -497,14 +563,14 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "version": null,
     "adapter": "dashscope",
     "input_requirements": {
-      "needs_prompt": true,
-      "min_images": 1,
       "max_images": 20,
+      "min_images": 1,
       "image_roles": [
         "source",
         "reference",
         "last_frame"
-      ]
+      ],
+      "needs_prompt": true
     },
     "pricing_key": "wan-3.0-720p",
     "tier": "standard",
@@ -522,20 +588,70 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "version": null,
     "adapter": "dashscope",
     "input_requirements": {
-      "needs_prompt": true,
-      "min_images": 1,
       "max_images": 20,
+      "min_images": 1,
       "image_roles": [
         "source",
         "reference",
         "last_frame"
-      ]
+      ],
+      "needs_prompt": true
     },
     "pricing_key": "wan-3.0-1080p",
     "tier": "premium",
     "status": "active",
     "enabled": true,
     "sort_order": 194
+  },
+  {
+    "id": "seedance-2.5-480p",
+    "display_name": "Seedance 2.5 480P",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "bytedance",
+    "slug": "dreamina-seedance-2-5-260628",
+    "version": null,
+    "adapter": "seedance",
+    "input_requirements": {
+      "max_images": 10,
+      "min_images": 1,
+      "image_roles": [
+        "source",
+        "reference",
+        "last_frame"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "seedance-2.5-480p",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 196
+  },
+  {
+    "id": "seedance-2.5-720p",
+    "display_name": "Seedance 2.5 720P",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "bytedance",
+    "slug": "dreamina-seedance-2-5-260628",
+    "version": null,
+    "adapter": "seedance",
+    "input_requirements": {
+      "max_images": 10,
+      "min_images": 1,
+      "image_roles": [
+        "source",
+        "reference",
+        "last_frame"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "seedance-2.5-720p",
+    "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 198
   },
   {
     "id": "veo-2",
@@ -644,7 +760,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = 'b1f07b9577fae4e06b6180143419887e';
+export const PROJECTION_FINGERPRINT = '83ad7e6451132134573de36cbb395ba6';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

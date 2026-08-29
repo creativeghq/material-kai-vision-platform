@@ -11,6 +11,10 @@
  *   wan-3.0-480p/720p/1080p → 40/80/155 credits (Alibaba DashScope). The only models
  *     here that reach 30 seconds, return the clip SCORED, and hold up to 20 references
  *     consistent across it. Issue #394.
+ *   seedance-2.5-480p/720p → 60/125 credits (ByteDance, via BytePlus ModelArk). Also 30
+ *     seconds with audio, but generated in ONE pass and with references that carry an
+ *     explicit ROLE (first frame / last frame / reference image) rather than an
+ *     undifferentiated set — which is what keeps THIS tile in frame rather than one like it.
  *
  * Async handling: Replicate models can take 3-5 min. If polling times out
  * (55s), stores prediction_id in generation_videos and returns job_id for
@@ -20,7 +24,12 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { generateVideoWithVeo, generateVideoWithKling, generateVideoWithWan } from '../_shared/ai-client.ts';
+import {
+  generateVideoWithVeo,
+  generateVideoWithKling,
+  generateVideoWithWan,
+  generateVideoWithSeedance,
+} from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -41,7 +50,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // The budget tier stays vacant until `wan-video/wan-2.2-i2v-fast` can be verified against a
 // funded account (issue #4 Phase 5) — an unverified replacement would repeat the same bug.
 type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
-  | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p';
+  | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
+  | 'seedance-2.5-480p' | 'seedance-2.5-720p';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
@@ -58,6 +68,13 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 //   wan-3.0-480p      30s x $0.068/s = $2.04 -> x1.5 = $3.06  -> >= 36 credits (40 charged)
 //   wan-3.0-720p      30s x $0.14/s  = $4.20 -> x1.5 = $6.30  -> >= 75 credits (80 charged)
 //   wan-3.0-1080p     30s x $0.28/s  = $8.40 -> x1.5 = $12.60 -> >= 149 credits (155 charged)
+//   seedance-2.5-480p 30s x $0.104/s = $3.12 -> x1.5 = $4.68  -> >= 56 credits (60 charged)
+//   seedance-2.5-720p 30s x $0.231/s = $6.93 -> x1.5 = $10.40 -> >= 123 credits (125 charged)
+//
+// Seedance's rate is DERIVED, not quoted: BytePlus bills it by token at $10.70/M with no
+// video input, and tokens are width x height x fps x seconds / 1024. At 24fps that is
+// 9,608 tokens/s for 480p and 21,600 tokens/s for 720p — $0.104 and $0.231. It is roughly
+// 1.7x Wan per second, which is the price of one-pass 30s with role-tagged references.
 //
 // Wan costs more per clip because a Wan clip is THREE TIMES LONGER and arrives scored. The
 // tiers are separate entries rather than one premium one so the 30-second option is reachable
@@ -74,6 +91,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'wan-3.0-480p':       40,
   'wan-3.0-720p':       80,
   'wan-3.0-1080p':      155,
+  'seedance-2.5-480p':  60,
+  'seedance-2.5-720p':  125,
 };
 
 // Longest clip each model will produce.
@@ -92,6 +111,9 @@ const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   'wan-3.0-480p':       30,
   'wan-3.0-720p':       30,
   'wan-3.0-1080p':      30,
+  // Seedance's own floor is 4 seconds; the generator clamps up as well as down.
+  'seedance-2.5-480p':  30,
+  'seedance-2.5-720p':  30,
 };
 
 // Resolution tier per Wan model id. The id carries the tier because the RATE differs
@@ -100,6 +122,12 @@ const WAN_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P' | '1080P'>> = {
   'wan-3.0-480p':  '480P',
   'wan-3.0-720p':  '720P',
   'wan-3.0-1080p': '1080P',
+};
+
+/** Same shape, same reason: the tier IS the rate, so it cannot be a free parameter. */
+const SEEDANCE_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P'>> = {
+  'seedance-2.5-480p': '480P',
+  'seedance-2.5-720p': '720P',
 };
 
 // Auto-select model by video type
@@ -128,7 +156,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 async function uploadVideoToStorage(
   supabase: DbClient,
-  videoData: string | ArrayBuffer,
+  videoData: string | ArrayBuffer | Uint8Array,
   jobId: string,
   isBase64 = false,
   ctx: Partial<SessionPathCtx> = {},
@@ -513,6 +541,65 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         video_type,
         duration_seconds: wanResult.durationSeconds,
         has_audio: wanResult.hasAudio,
+        status: 'completed',
+      });
+
+    } else if (SEEDANCE_RESOLUTION[resolvedModel]) {
+      // Seedance 2.5 (ByteDance) — 30 seconds in one pass, scored, with role-tagged
+      // references. `last_frame_url` and `reference_urls` are the same inputs Wan takes;
+      // the difference is that Ark receives them TAGGED (first_frame / last_frame /
+      // reference_image) instead of as one undifferentiated list.
+      const seedancePrompt = prompt
+        || 'Professional cinematic interior walkthrough, smooth continuous camera movement';
+
+      const seedanceResult = await generateVideoWithSeedance(seedancePrompt, {
+        imageUrl: source_image_url,
+        lastFrameUrl: last_frame_url || undefined,
+        referenceUrls: referenceUrls,
+        durationSeconds,
+        resolution: SEEDANCE_RESOLUTION[resolvedModel],
+        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
+        generateAudio: generate_audio !== false,
+        task: 'interior_video_generation_v2',
+        userId,
+        workspaceId: workspace_id ?? undefined,
+        // `logVideoUsage` below writes the row for this call, with `credits_debited` and
+        // `video_type` attached. Letting the shared client write one too would put TWO
+        // rows in `ai_usage_logs` for one clip and double every cost view.
+        logUsage: false,
+      });
+
+      // Bytes, not base64: a 30-second 720p clip is ~20 MB and base64 carries a third
+      // more through an edge function that then has to decode it again.
+      const videoUrl = await uploadVideoToStorage(supabase, seedanceResult.bytes, jobId, false, uploadCtx);
+      await logVideoUsage(seedanceResult.durationSeconds);
+
+      const { error: completeErr } = await supabase.from('generation_videos').update({
+        status: 'completed',
+        video_url: videoUrl,
+        completed_at: new Date().toISOString(),
+      }).eq('id', jobId);
+      if (completeErr) throw completeErr;
+
+      emitFlowEvent('video_generation_completed', {
+        user_id: userId,
+        workspace_id,
+        type: 'video_ready',
+        title: 'Your video is ready!',
+        body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
+        job_id: jobId,
+        video_type,
+      }).catch(() => {});
+
+      return jsonResponse({
+        success: true,
+        job_id: jobId,
+        video_url: videoUrl,
+        model_used: resolvedModel,
+        credits_used: creditCost,
+        video_type,
+        duration_seconds: seedanceResult.durationSeconds,
+        has_audio: seedanceResult.hasAudio,
         status: 'completed',
       });
 

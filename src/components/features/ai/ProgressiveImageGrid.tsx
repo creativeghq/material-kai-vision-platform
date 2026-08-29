@@ -51,6 +51,10 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   { value: 'wan-3.0-480p', label: 'Wan3.0 480p', description: 'Wan3.0 — 30s with audio, 480p', credits: 40 },
   { value: 'wan-3.0-720p', label: 'Wan3.0 720p', description: 'Wan3.0 — 30s with audio, 720p', credits: 80 },
   { value: 'wan-3.0-1080p', label: 'Wan3.0 1080p', description: 'Wan3.0 — 30s with audio, 1080p', credits: 155 },
+  // Seedance reaches 30 seconds like Wan, but generates them in ONE pass and keeps a
+  // tagged first/last frame — the option to pick when the product itself has to stay put.
+  { value: 'seedance-2.5-480p', label: 'Seedance 2.5 480p', description: 'Seedance 2.5 — 30s one-take with audio, 480p', credits: 60 },
+  { value: 'seedance-2.5-720p', label: 'Seedance 2.5 720p', description: 'Seedance 2.5 — 30s one-take with audio, 720p', credits: 125 },
 ];
 
 interface ModelResult {

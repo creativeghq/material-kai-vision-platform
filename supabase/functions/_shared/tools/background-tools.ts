@@ -308,6 +308,12 @@ Video types and recommended models:
 - social_reel: Kling 3.0 (20cr) — 9:16 short-form video for social media with audio
 - premium: Runway Gen-4 Turbo (40cr) — highest quality for any type
 
+Long-form, with sound (the only models here that pass 10 seconds):
+- Wan3.0 480p/720p/1080p (40/80/155cr) — up to 30s, scored, up to 20 references
+- Seedance 2.5 480p/720p (60/125cr) — up to 30s in ONE pass, scored, references carry a
+  role (first frame / last frame / reference image), which is what holds a specific
+  product in shot for the whole clip
+
 Returns video_url when complete, or prediction_id if still processing (poll generate_3d_status).`,
       schema: z.object({
         source_image_url: z.string().describe('Source image URL to animate or base the video on'),
@@ -318,13 +324,25 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
         // were none of them, so any agent that took the description at its word got
         // a failed generation. 'wan2.1-i2v-720p' dropped 2026-08-12 (issue #4) — 404
         // upstream, so it was a fourth way to say the same thing.
-        model: z.enum(['veo-2', 'kling-v3.0', 'runway-gen4-turbo']).optional()
-          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr (default: auto based on video_type)'),
+        // The long-form models were live in the generator and in the UI picker for weeks
+        // before they were offered HERE, so an agent asked for a 30-second reel and got
+        // ten silent seconds from the auto-selection — the model existed, the tool just
+        // could not name it.
+        model: z.enum([
+          'veo-2', 'kling-v3.0', 'runway-gen4-turbo',
+          'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
+          'seedance-2.5-480p', 'seedance-2.5-720p',
+        ]).optional()
+          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
           .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),
-        duration_seconds: z.number().int().min(5).max(16).optional()
-          .describe('Duration in seconds (default: 8)'),
+        // 16 was the ceiling when nothing here could exceed 10 seconds. Wan and Seedance
+        // reach 30, and the generator clamps DOWN per model (8 for veo-2, 10 for Kling),
+        // so a wider range here cannot overspend — it can only stop capping the two
+        // models whose whole point is the long clip.
+        duration_seconds: z.number().int().min(4).max(30).optional()
+          .describe('Duration in seconds, clamped to the model ceiling (veo-2 8s, kling 10s, wan/seedance 30s). Default: 8'),
         before_image_url: z.string().optional()
           .describe('Required only for before_after type: the "before" state image URL'),
       }),
