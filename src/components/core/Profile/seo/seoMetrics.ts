@@ -94,6 +94,24 @@ export function statusPresentation(status: string): SeoStatusPresentation {
 export const isPresent = (m: SeoMetric | null | undefined): boolean =>
   !!m && m.status === 'ok' && m.value != null;
 
+/**
+ * The COLLECTOR's verdict words, translated into the same presentation vocabulary.
+ *
+ * `seo-domain-tracker` writes `seo_domain_snapshots.source_status` per source as
+ * `ok` | `no_data` | `failed`, which is nearly this vocabulary but not quite: it says `failed`
+ * where a metric says `collector_failed`. Translating that in a panel would put a second
+ * mapping next to this one, and the next panel would get it slightly differently — which is
+ * exactly how the SEO surfaces ended up disagreeing about whether a figure was real.
+ *
+ * Returns null when there is nothing to say: the source answered and the value is present, or
+ * the snapshot predates the tracker recording a verdict at all. A caller that gets null shows
+ * the number, or an em dash for genuinely unknown provenance — it must not invent a reason.
+ */
+export function sourceStatusPresentation(status: string | null | undefined): SeoStatusPresentation | null {
+  if (!status || status === 'ok') return null;
+  return statusPresentation(status === 'failed' ? 'collector_failed' : status);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Metric descriptors
 // ─────────────────────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { userWebsitesService, type UserWebsite, type DomainIntel } from '@/services/userWebsitesService';
 import { formatNumber } from '@/utils/decimal';
+import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 
 function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never';
@@ -16,6 +17,43 @@ function timeAgo(iso: string | null | undefined): string {
   return `${d}d ago`;
 }
 const fmt = (n: number | null | undefined) => (n == null ? '—' : formatNumber(Math.round(n)));
+
+/**
+ * A missing figure says WHY it is missing (CLAUDE.md rule 3).
+ *
+ * `seo-domain-tracker` records a verdict per source — `ok` | `no_data` | `failed` — precisely so
+ * a reader can tell "the backlink index has no record of this domain" from "the backlinks call
+ * failed". Every one of this site's snapshots has NULL backlinks; the recent ones say
+ * `backlinks: no_data`, which is a real answer and not a broken collector. The panel rendered
+ * both as `—`, which is the same defect it was already fixed for once: hiding the row and
+ * showing an em dash are the same statement, and neither is true.
+ *
+ * The words come from `seoMetrics.statusPresentation`, which every other SEO surface uses and
+ * which FAILS CLOSED on a status it does not recognise. Snapshots older than the tracker change
+ * carry no verdict at all, and unknown provenance keeps the em dash rather than inventing one.
+ */
+type SourceKey = 'overview' | 'backlinks' | 'ranked';
+
+function sourceVerdict(s: DomainIntel['latest'], key: SourceKey): string | null {
+  const raw = s?.source_status?.[key];
+  return raw ? String(raw) : null;
+}
+
+function MetricValue({ value, status }: { value: number | null | undefined; status: string | null }) {
+  if (value != null) return <>{fmt(value)}</>;
+  const p = sourceStatusPresentation(status);
+  // null = nothing to say: an old snapshot with no recorded verdict. An em dash is the honest
+  // answer there; inventing a reason would be the defect this fix is closing, inverted.
+  if (!p) return <>—</>;
+  return (
+    <span
+      className={`text-base font-medium ${p.tone === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}
+      title={p.explain}
+    >
+      {p.placeholder}
+    </span>
+  );
+}
 
 function Metric({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
@@ -107,17 +145,25 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
             </div>
           ) : s.error ? (
             <div className="text-xs text-[hsl(var(--error))]">{s.error}</div>
-          ) : (s.ranking_keywords == null && s.backlinks == null) ? (
+          ) : (s.ranking_keywords == null && s.backlinks == null
+                && sourceVerdict(s, 'overview') !== 'failed' && sourceVerdict(s, 'backlinks') !== 'failed') ? (
+            /* Both empty AND neither source failed — so this really is a site the index has
+               nothing on. If either FAILED we fall through to the tiles, which say so per
+               source rather than telling the reader their site has no visibility. */
             <div className="text-center py-6 text-sm text-muted-foreground">
               DataForSEO has no ranking or backlink data for <b>{website.url.replace(/^https?:\/\//, '')}</b> in {s.country_code}. This is normal for a new or low-traffic site — it fills in as the site gains search visibility.
             </div>
           ) : (
             <div className="space-y-5">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric label="Ranking keywords" value={fmt(s.ranking_keywords)} />
-                <Metric label="Est. monthly traffic" value={fmt(s.organic_traffic)} />
-                <Metric label="Backlinks" value={fmt(s.backlinks)} />
-                <Metric label="Referring domains" value={fmt(s.referring_domains)} sub={s.domain_rank != null ? `domain rank ${s.domain_rank}` : undefined} />
+                <Metric label="Ranking keywords" value={<MetricValue value={s.ranking_keywords} status={sourceVerdict(s, 'overview')} />} />
+                <Metric label="Est. monthly traffic" value={<MetricValue value={s.organic_traffic} status={sourceVerdict(s, 'overview')} />} />
+                <Metric label="Backlinks" value={<MetricValue value={s.backlinks} status={sourceVerdict(s, 'backlinks')} />} />
+                <Metric
+                  label="Referring domains"
+                  value={<MetricValue value={s.referring_domains} status={sourceVerdict(s, 'backlinks')} />}
+                  sub={s.domain_rank != null ? `domain rank ${s.domain_rank}` : undefined}
+                />
               </div>
 
               {(s.kw_up != null || s.kw_new != null) && (

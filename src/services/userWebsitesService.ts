@@ -174,6 +174,17 @@ export interface DomainSnapshot {
   backlinks: number | null; referring_domains: number | null; referring_main_domains: number | null;
   domain_rank: number | null; spam_score: number | null; broken_backlinks: number | null;
   error: string | null;
+  /**
+   * Per-source verdict, written by `seo-domain-tracker` and returned verbatim by
+   * `get_website_domain_intel` (it selects `to_jsonb(s)`).
+   *
+   * Keyed `overview` | `backlinks` | `ranked` with `ok` | `no_data` | `failed`. This is the
+   * difference between "DataForSEO has no backlink record for this domain" and "the backlinks
+   * call failed", which a NULL column cannot express — the distinction CLAUDE.md rule 3 exists
+   * for. Snapshots taken before the tracker recorded it carry `{}`, which reads as unknown.
+   */
+  source_status?: Record<string, string> | null;
+  source_errors?: Record<string, string> | null;
 }
 export interface DomainKeyword { keyword: string; position: number | null; search_volume: number | null; etv: number | null; url: string | null }
 export interface DomainTrendPoint { date: string; ranking_keywords: number | null; organic_traffic: number | null; backlinks: number | null; referring_domains: number | null }
