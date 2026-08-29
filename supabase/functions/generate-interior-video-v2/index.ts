@@ -392,9 +392,18 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   // (`Number('abc')` is NaN, and NaN silently defeats a bare Math.min). Everything downstream —
   // the provider call, the usage log, the stored record — uses this, never the raw body field.
   const requestedDuration = Number(duration_seconds);
-  const durationSeconds = Number.isFinite(requestedDuration) && requestedDuration > 0
+  const clampedDuration = Number.isFinite(requestedDuration) && requestedDuration > 0
     ? Math.min(Math.round(requestedDuration), MAX_DURATION_SECONDS[resolvedModel])
     : Math.min(8, MAX_DURATION_SECONDS[resolvedModel]);
+
+  // Ray takes 5 or 10 and nothing between — those are the two durations Luma publishes a
+  // price for — and the snap happens HERE rather than inside the shared client so that the
+  // number stored on `generation_videos.duration_s` and logged to `ai_usage_logs` is the
+  // clip that was actually made. Snapping downstream would have recorded the UI's default 8
+  // against a 10-second video: a plausible number, off by two, in the row an operator reads.
+  const durationSeconds = RAY_RESOLUTION[resolvedModel]
+    ? (clampedDuration > 7 ? 10 : 5)
+    : clampedDuration;
 
   // `ai_model_pricing` keys differ from the model ids this function uses: the price
   // table carries `kling-3.0`, here it is `kling-v3.0`. Identity map only — no prices
