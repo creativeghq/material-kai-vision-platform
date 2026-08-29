@@ -280,6 +280,25 @@ export interface GaSummary {
 
 export interface GaProperty { property: string; name: string; account: string }
 
+export interface SeoReportRow {
+  id: string;
+  name: string;
+  sections: string[];
+  cadence: 'none' | 'weekly' | 'monthly';
+  is_active: boolean;
+  last_sent_at: string | null;
+  next_due_at: string | null;
+}
+
+export interface SeoReportRunRow {
+  id: string;
+  generated_at: string;
+  period_start: string | null;
+  period_end: string | null;
+  status: 'ok' | 'failed';
+  error: string | null;
+}
+
 export interface CannibalItem {
   query: string;
   page_count: number;
@@ -833,6 +852,63 @@ export const userWebsitesService = {
     if (error) throw new Error(await edgeErrorMessage(error, 'Analytics sync failed'));
     if (!data?.ok) throw new Error(data?.error || 'Analytics sync failed');
     return data;
+  },
+
+  async listReports(websiteId: string): Promise<SeoReportRow[]> {
+    const { data, error } = await supabase
+      .from('seo_reports' as any)
+      .select('id, name, sections, cadence, is_active, last_sent_at, next_due_at')
+      .eq('website_id', websiteId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data as unknown as SeoReportRow[]) ?? [];
+  },
+
+  async listReportRuns(reportId: string, limit = 12): Promise<SeoReportRunRow[]> {
+    const { data, error } = await supabase
+      .from('seo_report_runs' as any)
+      .select('id, generated_at, period_start, period_end, status, error')
+      .eq('report_id', reportId)
+      .order('generated_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data as unknown as SeoReportRunRow[]) ?? [];
+  },
+
+  async createReport(
+    websiteId: string, workspaceId: string,
+    name: string, sections: string[], cadence: string,
+  ): Promise<void> {
+    const { error } = await supabase.from('seo_reports' as any).insert({
+      website_id: websiteId, workspace_id: workspaceId,
+      name: name.trim() || 'SEO report',
+      sections, cadence, is_active: true,
+      // Due immediately so the first one arrives without waiting a cycle — a report
+      // you set up and then cannot see for a month reads as broken.
+      next_due_at: cadence === 'none' ? null : new Date().toISOString(),
+    } as any);
+    if (error) throw error;
+  },
+
+  async deleteReport(id: string): Promise<void> {
+    const { error } = await supabase.from('seo_reports' as any).delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async runReport(reportId: string): Promise<{ run_id: string }> {
+    const { data, error } = await supabase.functions.invoke('seo-reports', {
+      body: { action: 'run', report_id: reportId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not build the report'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not build the report');
+    return data;
+  },
+
+  async reportRunPayload(runId: string): Promise<any | null> {
+    const { data, error } = await supabase
+      .from('seo_report_runs' as any).select('payload').eq('id', runId).maybeSingle();
+    if (error) throw error;
+    return (data as any)?.payload ?? null;
   },
 
   async cannibalisation(websiteId: string, days = 90, minImpressions = 10): Promise<CannibalReport | null> {

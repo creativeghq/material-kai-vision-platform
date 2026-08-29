@@ -438,6 +438,15 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'current', label: 'Current value', note: 'Value at this snapshot.' },
     { key: 'delta_pct', label: 'Change %', note: 'Percentage change week-over-week.' },
   ]),
+  'seo.report_ready': withStandard([
+    { key: 'website_id', label: 'Website ID', note: 'The connected website the report covers.' },
+    { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },
+    { key: 'report_name', label: 'Report name', note: 'What the operator called it.', example: 'Monthly SEO' },
+    { key: 'run_id', label: 'Run ID', note: 'The stored snapshot — open it to read the report.' },
+    { key: 'period_start', label: 'Period start', note: 'First day the report covers.' },
+    { key: 'period_end', label: 'Period end', note: 'Last day the report covers.' },
+    { key: 'headline', label: 'Headline', note: 'One line summarising the period.' },
+  ]),
   'seo.site_health_changed': withStandard([
     { key: 'website_id', label: 'Website ID', note: 'The connected website audited.' },
     { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },
@@ -529,6 +538,7 @@ export const TRIGGER_TITLES: Record<string, string> = {
   'seo.ranking_movement': 'SEO Rankings Moved',
   'seo.backlink_movement': 'SEO Backlinks Moved',
   'seo.site_health_changed': 'SEO Site Health Changed',
+  'seo.report_ready': 'SEO Report Ready',
   'seo.article_refresh_due': 'SEO Article Due for Refresh',
 };
 

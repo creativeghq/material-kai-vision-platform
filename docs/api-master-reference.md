@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (132)
+## 1. Supabase Edge Functions (133)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -250,6 +250,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `seo-content-freshness` | JWT | Content decay — raise generated articles that are past their own refresh cadence |
 | `seo-domain-tracker` | JWT | Weekly Rankings + Backlinks snapshots for a connected website |
 | `seo-rank-tracker` | JWT | Daily positions for the keywords a workspace chose to track |
+| `seo-reports` | JWT | Build a scheduled SEO report and hand it to Flows to deliver |
 | `seo-site-audit` | JWT | Site Health — homepage Lighthouse + on-page audit for a connected website |
 
 **Flows**

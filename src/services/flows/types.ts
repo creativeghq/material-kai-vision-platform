@@ -210,6 +210,10 @@ export type TriggerType =
   // Emitted by seo-content-freshness; payload-only. Nothing was ever revisited before
   // this existed — an article silently stopped being cited and nobody was told.
   | 'seo.article_refresh_due'
+  // A scheduled SEO report finished building. Payload carries the run id and a
+  // one-line summary, so a flow can mail it, post it, or notify — the report
+  // itself is stored, never re-derived by the delivery path.
+  | 'seo.report_ready'
   // A watched non-price page changed — supplier T&C, a regulatory notice, partner
   // API docs, a competitor page (#331). Fired by the Firecrawl monitoring webhook.
   | 'page_watch_changed'
@@ -231,6 +235,7 @@ export interface SeoRankingMovementTriggerConfig {}
 export interface SeoBacklinkMovementTriggerConfig {}
 export interface SeoSiteHealthChangedTriggerConfig {}
 export interface SeoArticleRefreshDueTriggerConfig {}
+export interface SeoReportReadyTriggerConfig {}
 export interface HrApplicantStageChangedTriggerConfig {}
 export interface HrEmployeeAddedTriggerConfig {}
 export interface HrAbsenceRequestedTriggerConfig {}
@@ -567,6 +572,7 @@ export type TriggerConfigMap = {
   'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
   'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;
   'seo.article_refresh_due': SeoArticleRefreshDueTriggerConfig;
+  'seo.report_ready': SeoReportReadyTriggerConfig;
   page_watch_changed: PageWatchChangedTriggerConfig;
   'asset.service_due': AssetServiceDueTriggerConfig;
   'asset.service_overdue': AssetServiceOverdueTriggerConfig;

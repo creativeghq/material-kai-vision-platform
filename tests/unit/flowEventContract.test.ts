@@ -243,7 +243,7 @@ describe('tenant flow vocabulary', () => {
     'social_post_published', 'social_post_failed', 'social_comment_received',
     'social_account_connected', 'social_account_disconnected',
     'whatsapp_number_status_changed', 'whatsapp_template_status_changed',
-    'seo.article_refresh_due', 'seo.site_health_changed',
+    'seo.article_refresh_due', 'seo.site_health_changed', 'seo.report_ready',
     'seo.ranking_movement', 'seo.backlink_movement',
     'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
   ];

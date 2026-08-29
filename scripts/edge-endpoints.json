@@ -2405,6 +2405,39 @@
     ]
   },
   {
+    "name": "seo-reports",
+    "tag": "SEO",
+    "summary": "Build a scheduled SEO report and hand it to Flows to deliver",
+    "description": "Composes the report from build_website_seo_report, which calls the same derivations the dashboard reads — it computes no figure itself, so a number in the report and the same number on screen cannot drift. Each run is stored as a FROZEN snapshot in seo_report_runs and read back verbatim; re-deriving on open would show today's numbers under an old date. A run that fails to build is still stored, because 'it failed' is a fact the operator needs and deleting the attempt leaves the list reading 'never run'. Delivery is not hardcoded: it emits seo.report_ready and a seeded tenant-configurable flow carries it, so an operator can retarget or silence it without a deploy. verify_jwt disabled so cron-run (x-cron-secret) works; the run action calls authenticate() + userCanAccessWorkspace() and asserts the seo-toolkit entitlement.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "run",
+        "description": "Generate one report now.",
+        "params": [
+          {
+            "name": "report_id",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{ ok, run_id, error? }"
+      },
+      {
+        "action": "cron-run",
+        "description": "x-cron-secret only - build every report whose next_due_at has passed.",
+        "params": [],
+        "response": "{ ok, sent, failed }"
+      }
+    ]
+  },
+  {
     "name": "seo-site-audit",
     "tag": "SEO",
     "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",

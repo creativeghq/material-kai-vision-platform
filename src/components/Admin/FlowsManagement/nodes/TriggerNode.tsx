@@ -152,6 +152,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'seo.ranking_movement': Search,
   'seo.backlink_movement': Search,
   'seo.site_health_changed': Search,
+  'seo.report_ready': Search,
   'seo.article_refresh_due': Search,
   page_watch_changed: FileText,
   'asset.service_due': Wrench,

@@ -4,7 +4,7 @@ import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles, Swords, Plus, Target,
+  LayoutDashboard, Sparkles, Swords, Plus, Target, FileBarChart,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -15,6 +15,7 @@ import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVis
 import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
+import { WebsiteReportsPanel } from '@/components/core/Profile/WebsiteReportsPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
 import { WebsiteCannibalisationPanel } from '@/components/core/Profile/WebsiteCannibalisationPanel';
@@ -196,6 +197,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
               domain-intel + backlinks tab below. Two tabs both called Rankings that
               answer different questions is worse than a slightly longer label. */}
           <TabsTrigger value="ranks" className="w-full justify-start gap-2"><Target className="w-3.5 h-3.5" /> Rank Tracker</TabsTrigger>
+          <TabsTrigger value="reports" className="w-full justify-start gap-2"><FileBarChart className="w-3.5 h-3.5" /> Reports</TabsTrigger>
           <TabsTrigger value="competitors" className="w-full justify-start gap-2"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
           <TabsTrigger value="articles" className="w-full justify-start gap-2"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
           <TabsTrigger value="research" className="w-full justify-start gap-2"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
@@ -230,6 +232,12 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
             only surface that answers "did what I care about move". */}
         <TabsContent value="ranks">
           <WebsiteRankTrackerPanel website={website} />
+        </TabsContent>
+
+        {/* Reports — a saved selection of the SAME derivations every other tab reads,
+            frozen per build so an old report still shows its own period. */}
+        <TabsContent value="reports">
+          <WebsiteReportsPanel website={website} />
         </TabsContent>
 
         {/* Competitors — your line beside theirs, same metric, same window. */}
