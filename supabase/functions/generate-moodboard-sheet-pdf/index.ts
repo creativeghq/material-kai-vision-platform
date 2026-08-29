@@ -79,6 +79,8 @@ import type {
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { createSheet, refundSheetCredits, type SheetType } from './create-sheet.ts';
 import { buildPropertyBrochurePdf } from './brochure-realestate.ts';
+import { snapshotSheetAssets } from '../_shared/sheets/asset-refs.ts';
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -103,7 +105,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
 
   try {
     const body = await req.json() as SheetPdfRequest & {
-      action?: 'create';
+      action?: 'create' | 'snapshot_assets';
       moodboard_id?: string;
       sheet_type?: SheetType;
       title?: string;
@@ -181,6 +183,44 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     sheetId = sheetId || body.sheet_id || '';
     if (!sheetId) {
       return jsonResponse({ success: false, error: 'Missing sheet_id or client_view_id' }, 400);
+    }
+
+    // Copy any still-external image into the sheet's private folder (#392).
+    //
+    // Separate from `create` because a sheet acquires images AFTER it exists: a canvas save can
+    // drag in a chip that still points at the public bucket, and the client cannot copy it there
+    // itself — writes to `sheet-assets` are service-role only, which is exactly what stops one
+    // person putting a file behind someone else's share boundary.
+    //
+    // Ownership is checked here rather than borrowed from the block below, because that block
+    // renders. This returns before it.
+    if (body.action === 'snapshot_assets') {
+      const { data: row } = await supabase
+        .from('moodboard_presentation_sheets')
+        .select('id, data, created_by')
+        .eq('id', sheetId)
+        .maybeSingle();
+      // 404, not 403 — the same enumeration rule the render path follows.
+      if (!row || (!auth.isService && auth.userId && row.created_by !== auth.userId)) {
+        return jsonResponse({ success: false, error: 'Sheet not found' }, 404);
+      }
+      const snap = await snapshotSheetAssets(supabase as any, sheetId, row.data ?? {}, fetchImageGuardedOrNull);
+      const copied = Object.keys(snap.report.copied).length;
+      if (copied > 0) {
+        const { error: writeError } = await supabase
+          .from('moodboard_presentation_sheets')
+          .update({ data: snap.data })
+          .eq('id', sheetId);
+        if (writeError) {
+          return jsonResponse({ success: false, error: writeError.message }, 500);
+        }
+      }
+      return jsonResponse({
+        success: true,
+        data: snap.data,
+        copied,
+        failed: snap.report.failed,
+      } as any);
     }
 
     const sheet = await fetchSheet(supabase, sheetId);

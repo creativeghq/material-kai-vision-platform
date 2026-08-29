@@ -1,6 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
+// #392 — a sheet stores refs to its OWN private copies of the images it shows. Resolution
+// happens here, at the four reads and the one write, so the ~30 render sites across the canvas
+// components never learn about it.
+import { resolveSheetAssets, toSheetAssetRefs } from './moodboards/sheetAssetUrls';
+
 // One source (#391). `SheetType` was declared here and in five other files; re-exported
 // so every existing `import { SheetType } from '.../moodboardSheetsService'` keeps working.
 export { SHEET_TYPES, SHEET_STATUSES, isSheetType, isSheetStatus } from './moodboards/sheetVocabulary';
@@ -105,7 +110,13 @@ class MoodboardSheetsService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []) as PresentationSheet[];
+    // One sign call per sheet rather than one for the page: a list is usually a handful of
+    // sheets, and batching across them would need a second pass to put the URLs back on the
+    // right rows for no measurable gain.
+    return await Promise.all(((data || []) as PresentationSheet[]).map(async (sheet) => ({
+      ...sheet,
+      data: await resolveSheetAssets(sheet.data),
+    })));
   }
 
   async get(sheetId: string): Promise<PresentationSheet | null> {
@@ -116,7 +127,9 @@ class MoodboardSheetsService {
       .maybeSingle();
 
     if (error) throw error;
-    return data as PresentationSheet | null;
+    if (!data) return null;
+    const sheet = data as PresentationSheet;
+    return { ...sheet, data: await resolveSheetAssets(sheet.data) };
   }
 
   async create(input: CreateSheetData): Promise<PresentationSheet> {
@@ -192,20 +205,56 @@ class MoodboardSheetsService {
       pdf_url: data.pdf_url,
       page_count: data.page_count,
       credits_charged: data.credits_charged,
-      initial_data: data.initial_data,
+      // The edge path snapshots the images into the sheet's folder before it returns, so what
+      // comes back holds refs — an interactive type hands this straight to a canvas.
+      initial_data: await resolveSheetAssets(data.initial_data),
     };
   }
 
   async update(sheetId: string, patch: UpdateSheetData): Promise<PresentationSheet> {
+    // Fold the signed URLs the canvas was rendering back into refs BEFORE the write (#392).
+    // Skipping this stores a one-hour URL where a permanent ref belongs: the sheet looks right
+    // all afternoon and is a page of dead images tomorrow.
+    const write = patch.data ? { ...patch, data: toSheetAssetRefs(patch.data) } : patch;
+
     const { data, error } = await supabase
       .from('moodboard_presentation_sheets')
-      .update(patch)
+      .update(write)
       .eq('id', sheetId)
       .select('*')
       .single();
 
     if (error) throw error;
-    return data as PresentationSheet;
+
+    // An edit can introduce an image the sheet does not own yet — a chip dragged in from the
+    // moodboard still points at the public bucket. Snapshot it the same way creation does; the
+    // copy is idempotent, so this is a no-op for the ordinary "moved a callout" save. Best
+    // effort: a sheet whose newest image is still public is worse than one that saved, not
+    // worse than one that refused to.
+    let saved = data as PresentationSheet;
+    if (write.data) {
+      try {
+        const fresh = await this.snapshotAssets(sheetId);
+        if (fresh) saved = { ...saved, data: fresh };
+      } catch (err) {
+        console.warn('[sheet-assets] snapshot after save failed:', err);
+      }
+    }
+    return { ...saved, data: await resolveSheetAssets(saved.data) };
+  }
+
+  /**
+   * Ask the server to copy any still-external image into the sheet's private folder, and return
+   * the rewritten payload. Server-side because the bucket is private and writes to it are
+   * service-role only — which is the point: a client that could upload there could put anything
+   * behind another sheet's share boundary.
+   */
+  private async snapshotAssets(sheetId: string): Promise<Record<string, any> | null> {
+    const { data, error } = await supabase.functions.invoke('generate-moodboard-sheet-pdf', {
+      body: { action: 'snapshot_assets', sheet_id: sheetId },
+    });
+    if (error || !data?.success) return null;
+    return (data.data ?? null) as Record<string, any> | null;
   }
 
   async remove(sheetId: string): Promise<void> {

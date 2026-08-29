@@ -21,6 +21,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
+import { SHEET_ASSET_BUCKET, sheetAssetPath } from '../_shared/sheetAssetRefs.generated.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -168,7 +169,10 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       const byId = new Map((rows || []).map((r: any) => [r.id, r]));
       const ordered = sheetIds.map((id) => byId.get(id)).filter(Boolean) as any[];
       sheets = ordered.map((r) => ({ id: r.id, sheet_type: r.sheet_type, title: r.title }));
-      lightingImageUrl = deriveLightingImage(ordered) || (view.cover?.cover_image_url ?? null);
+      lightingImageUrl = await signSheetAsset(
+        supabase,
+        deriveLightingImage(ordered) || (view.cover?.cover_image_url ?? null),
+      );
     }
 
     const pdf_url = await ensureDeliverablePdf(
@@ -403,6 +407,25 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     expired: false,
   });
 }));
+
+/**
+ * A sheet's own images live in a PRIVATE bucket now (#392), named `sheet-asset://<path>`.
+ *
+ * An anonymous viewer holds a token, not a session, so there is no client-side signer for them —
+ * a ref handed to the browser as-is renders as nothing. Mint it here, against a token this
+ * function has already checked is live and unexpired, which is the whole point of the change:
+ * the client's access to the imagery ends when the link does.
+ *
+ * Anything that is not a ref passes through: a legacy sheet, or the client view's own cover.
+ */
+async function signSheetAsset(supabase: DbClient, value: string | null): Promise<string | null> {
+  const path = sheetAssetPath(value);
+  if (!path) return value;
+  const { data } = await supabase.storage
+    .from(SHEET_ASSET_BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  return data?.signedUrl ?? null;
+}
 
 /** Pick a representative image for the client view's CSS lighting-mood preview. */
 function deriveLightingImage(orderedSheets: any[]): string | null {

@@ -7,9 +7,11 @@ import {
   rgb,
   RGB,
 } from 'pdf-lib';
+import { createClient } from '@supabase/supabase-js';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
+import { SHEET_ASSET_BUCKET, sheetAssetPath } from '../_shared/sheets/asset-refs.ts';
 // A3 landscape in points (1190.55 x 841.89)
 export const PAGE_W = 1190.55;
 export const PAGE_H = 841.89;
@@ -55,10 +57,45 @@ export async function embedImageBytes(
   }
 }
 
-/** One missing image must not abandon a whole sheet, so this still returns null —
- *  but it no longer fetches an arbitrary URL with no guard, no redirect policy and
- *  no size cap. Chip and backdrop URLs come from user-editable rows. */
+/**
+ * The ONE place a sheet image turns into bytes — eleven builders call it.
+ *
+ * Two kinds of value arrive here now (#392):
+ *
+ *   • `sheet-asset://<path>` — the sheet's own private copy, downloaded straight from storage
+ *     with the service client. No signed URL is minted: this runs server-side, so a URL would be
+ *     a round trip and a secret to leak for no benefit.
+ *   • an http(s) URL — a legacy sheet stored before snapshotting, or an image whose copy failed.
+ *     Still fetched through the SSRF guard, because those URLs come from user-editable rows.
+ *
+ * One missing image must not abandon a whole sheet, so this still returns null either way.
+ */
+let _storage: any = null;
+function storageClient(): any {
+  if (!_storage) {
+    // Lazy, not module-load: `bootstrapForFunction()` populates env at handler entry, so a
+    // capture at import time reads undefined (CLAUDE.md's secrets rule).
+    _storage = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+  }
+  return _storage;
+}
+
 export async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
+  const path = sheetAssetPath(url);
+  if (path) {
+    try {
+      const { data, error } = await storageClient().storage.from(SHEET_ASSET_BUCKET).download(path);
+      if (error || !data) throw new Error(error?.message || 'not found');
+      return new Uint8Array(await data.arrayBuffer());
+    } catch (e) {
+      console.warn(`[sheet-assets] ${path} → ${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    }
+  }
   const img = await fetchImageGuardedOrNull(url);
   return img?.bytes ?? null;
 }

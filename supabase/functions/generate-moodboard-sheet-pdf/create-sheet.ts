@@ -14,6 +14,8 @@ import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
+import { snapshotSheetAssets } from '../_shared/sheets/asset-refs.ts';
 
 // One source (#391) — the generated mirror of src/services/moodboards/sheetVocabulary.ts.
 export type { SheetType } from '../_shared/sheetVocabulary.generated.ts';
@@ -222,10 +224,42 @@ export async function createSheet(
     return { ok: false, status: 500, error: insertError?.message || 'Failed to create sheet' };
   }
 
+  // 3b. Snapshot the images into the sheet's own private folder (#392).
+  //
+  //     Runs AFTER the insert because the folder is keyed by sheet id, and after the credit
+  //     debit because it is not the expensive part — a failed copy leaves the source URL in
+  //     place, so this can never turn a paid-for sheet into a broken one. The row is written
+  //     twice as a result; that is deliberate and NOT the create-then-stamp shape rule 4
+  //     warns about, because the second write is idempotent: re-running the snapshot on a
+  //     payload that already holds refs copies nothing and rewrites nothing, so a retry (or
+  //     the next edit) repairs a half-copied sheet instead of duplicating anything.
+  const sheetId = (sheet as any).id as string;
+  const snapshot = await snapshotSheetAssets(supabase as any, sheetId, initial_data, fetchImageGuardedOrNull);
+  const copied = Object.keys(snapshot.report.copied).length;
+  const failed = Object.keys(snapshot.report.failed).length;
+  if (copied > 0) {
+    const { error: rewriteError } = await supabase
+      .from('moodboard_presentation_sheets')
+      .update({ data: snapshot.data })
+      .eq('id', sheetId);
+    if (rewriteError) {
+      // The sheet is intact — it still points at the sources it was created from. Say so
+      // rather than failing the create: a refunded sheet the operator has to make again is a
+      // worse outcome than one whose images are not yet private.
+      console.error(`[createSheet] ${sheetId}: asset refs not stored — ${rewriteError.message}`);
+    } else {
+      initial_data = snapshot.data as Record<string, any>;
+    }
+  }
+  if (failed > 0) {
+    console.warn(`[createSheet] ${sheetId}: ${failed}/${copied + failed} image(s) could not be copied `
+      + `and still point at their source: ${JSON.stringify(snapshot.report.failed)}`);
+  }
+
   return {
     ok: true,
     interactive: INTERACTIVE_TYPES.includes(sheet_type),
-    sheet_id: (sheet as any).id,
+    sheet_id: sheetId,
     sheet_type,
     title,
     initial_data,

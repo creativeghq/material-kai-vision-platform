@@ -75,14 +75,33 @@ export function createWorkflowEmitter(args: {
       });
     },
     /**
-     * Pause a step and ask the user for the values it needs.
+     * Pause a workflow STEP and ask for the values it needs.
      *
-     * AgentHub has handled `workflow_step_input_request` since it was written — it sets
-     * `awaiting_input_step_id` / `awaiting_input_schema` and renders the form from them — and
-     * NOTHING has ever emitted it. The form appeared only via the frontend-local boot path, when
-     * the picker launched a workflow and seeded the schema from the registry. So a workflow step
-     * declaring `awaits_user_input: true` (b2b-research's `search` step does) could not actually
-     * ask for anything once it was running server-side. This is the missing half.
+     * STATUS, stated plainly because the previous comment here did not: **nothing calls this.**
+     * It was added as "the missing half" of server-side input requests and no caller followed,
+     * which is the same shape as `generate_video`'s push site — a fix that stopped at the helper.
+     *
+     * It is kept rather than deleted, and that is a decision with a reason. There are two ways to
+     * ask the user something mid-turn and they are NOT interchangeable:
+     *
+     *   • `request_input` (#370) — an ad-hoc question the agent chooses to ask. It is a TOOL the
+     *     model calls, it is dismissible ("decide for me"), and it is the right instrument for
+     *     collecting scope. It has callers and works today.
+     *   • this — parks a specific workflow STEP. AgentHub sets `awaiting_input_step_id` and marks
+     *     that step `awaiting_input`, so the tracker stays coherent: the step shows as waiting
+     *     rather than running, and the answer is recorded as that step's `input`. `request_input`
+     *     cannot do that; it would leave the tracker claiming a step was running while a separate
+     *     card asked a question.
+     *
+     * So a tool that needs to park a step should use this. What it must NOT become is a reflex:
+     * `input-request-tools.ts` states the rule both share — ask only for parameters that
+     * genuinely change the work, never for one the tool would have defaulted. b2b-research's
+     * `search` step declares `awaits_user_input: true`, and pausing "find tile manufacturers in
+     * Greece" to ask for the industry and country the user just gave would be exactly that
+     * mistake, which is why it is not wired here.
+     *
+     * Today the step form is driven entirely client-side, from the registry: the picker seeds it
+     * at boot and `handleWizardSkip` advances it. That path works and is what users see.
      *
      * `schema` is the step's `input_schema` from workflowRegistry — the same shape the picker
      * uses, so the two paths render identically instead of drifting.
