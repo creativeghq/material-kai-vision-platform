@@ -160,8 +160,13 @@ async function alertOnDrops(supabase: any, website: { id: string; workspace_id: 
     });
     if (!dropped?.length) return;
     const names = dropped.slice(0, 5).map((d: any) => d.keyword).join(', ');
+    // `seo.ranking_movement`, not a new `seo.rank_drop`. The trigger already exists,
+    // is already in the tenant vocabulary, and already means "your rankings moved" —
+    // a second trigger for the same event would be one more copy of a vocabulary that
+    // is deliberately kept in one place, and flow-engine would match zero flows for it
+    // until all seven registration sites were updated. The payload carries the detail.
     await emitFlowEventToWorkspaceRoles(
-      website.workspace_id, ['owner', 'admin'], 'seo.rank_drop', (uid) => ({
+      website.workspace_id, ['owner', 'admin'], 'seo.ranking_movement', (uid) => ({
         user_id: uid, workspace_id: website.workspace_id,
         title: `${dropped.length} keyword${dropped.length === 1 ? '' : 's'} left the top 10`,
         body: `${names}${dropped.length > 5 ? ` and ${dropped.length - 5} more` : ''}.`,

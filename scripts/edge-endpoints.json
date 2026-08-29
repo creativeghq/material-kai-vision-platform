@@ -2282,6 +2282,39 @@
     ]
   },
   {
+    "name": "seo-rank-tracker",
+    "tag": "SEO",
+    "summary": "Daily positions for the keywords a workspace chose to track",
+    "description": "Checks each active row in seo_tracked_keywords against the live Google SERP and writes one seo_keyword_positions row per keyword per day. Distinct from seo-domain-tracker, which DISCOVERS what a domain happens to rank for and replaces that set weekly; this follows a fixed, user-picked set as a time series. Outside the top 100 stores position NULL with found=false — never a sentinel rank, which would be averaged and charted as real. A check that could not run stores `error` and is excluded from every figure: unknown, not unranked. One SERP call per keyword, so both paths are capped at 60 per invocation and ordered oldest-checked-first, turning a large set into a slower rotation rather than a larger bill. verify_jwt disabled so the daily cron-run (x-cron-secret) works; the run action calls authenticate() + userCanAccessWorkspace() and asserts the seo-toolkit entitlement before spending.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "run",
+        "description": "Check one website's tracked keywords now.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "response": "{ ok, checked, ranking, failed }"
+      },
+      {
+        "action": "cron-run",
+        "description": "x-cron-secret only - daily sweep of every active connected website.",
+        "params": [],
+        "response": "{ ok, checked, failed }"
+      }
+    ]
+  },
+  {
     "name": "seo-site-audit",
     "tag": "SEO",
     "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
