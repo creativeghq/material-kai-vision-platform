@@ -4,6 +4,7 @@ import { QuoteData, QuoteItemData, ClientData, TemplateConfig } from './types.ts
 import { HttpError } from '../_shared/api-logger.ts';
 
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
+import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
 /**
  * Fetch complete quote data including items with product details
  */
@@ -33,6 +34,7 @@ export async function fetchQuoteData(
       selected_size,
       selected_color,
       selected_attributes,
+      configured_options,
       unit_price,
       discounted_price,
       line_total,
@@ -152,7 +154,10 @@ export async function fetchQuoteData(
         : (product?.sku || metadata?.sku || null),
       selected_size: item.selected_size || null,
       selected_color: item.selected_color || null,
-      variant_label: variantLabels[item.id] ?? null,
+      // Variant AND configuration (#375). The configurator's choices are inside `unit_price` as
+      // deltas, so a quote that prints only the product name states a figure the customer cannot
+      // account for. Read from the line's frozen `configured_options`, never from a live lookup.
+      variant_label: lineDetailLabel(variantLabels[item.id] ?? null, item.configured_options) || null,
       quantity: item.quantity,
       unit: isCustom ? (item.custom_unit || 'pcs') : (metadata?.unit || 'pcs'),
       unit_price: parseFloat(item.unit_price) || 0,

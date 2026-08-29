@@ -1843,6 +1843,16 @@ export const ordersService = {
      * wrong threshold — the exact 1:1 assumption the UoM ladder exists to prevent.
      */
     quantity?: number | null; unit?: string | null;
+    /**
+     * The configurator choices on this line (#375).
+     *
+     * A configured line's price is base + the chosen deltas, and the base is the CHOSEN VARIANT's
+     * where there is one. Falling through to the standard resolver would silently drop every
+     * delta and re-price the line at the plain product price — a smaller number that is a
+     * perfectly valid one, so nothing raises and nobody notices until the margin is gone. The
+     * issue names this explicitly: do NOT let a configured line fall through.
+     */
+    optionValueIds?: string[] | null;
   }): Promise<LinePricing> {
     // `cost` is not selectable from `products` by the browser (#358) — it comes from the
     // sell-side-gated RPC. `supplier_company_id` still is, and is read here directly.
@@ -1898,6 +1908,46 @@ export const ordersService = {
         } catch { /* best-effort: a missing tier must never block pricing the line at cost */ }
       }
       return { unit_price: cost, unit_cost: cost, discount_pct: null, measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: null };
+    }
+    const optionIds = (opts.optionValueIds ?? []).filter(Boolean);
+    if (optionIds.length > 0) {
+      // The configured branch. `get_configured_product_price` is the ONE derivation of
+      // "what does this configuration cost" — it prices the variant, adds the validated deltas,
+      // and reports rule violations. Summing `price_delta` here instead would be a second
+      // derivation, which tests/unit/configuratorMoneyDerivation.test.ts fails the build on.
+      try {
+        const { data } = await supabase.rpc('get_configured_product_price', {
+          p_workspace_id: opts.workspaceId,
+          p_product_id: opts.productId,
+          p_option_value_ids: optionIds,
+          p_company_id: opts.companyId ?? null,
+          p_contact_id: opts.contactId ?? null,
+          p_audience: 'seller',
+          p_variant_key: variantKey(opts.selectedAttributes) ?? null,
+        });
+        const r = (data ?? {}) as {
+          configured_price?: number; cost_basis?: number; discount_pct?: number;
+          discount_source?: string; is_valid?: boolean;
+        };
+        // An invalid combination has no price. Returning the base price instead would put a
+        // sellable number on a line that cannot be built.
+        if (r.is_valid === false) {
+          return { unit_price: null, unit_cost: cost, discount_pct: null,
+                   measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: null };
+        }
+        return {
+          unit_price: r.configured_price != null ? Number(r.configured_price) : null,
+          unit_cost: r.cost_basis != null ? Number(r.cost_basis) : cost,
+          discount_pct: r.discount_pct != null ? Number(r.discount_pct) : null,
+          measurement_unit_code: unit, available, supplier_company_id: supplier,
+          discount_source: r.discount_source ?? null,
+        };
+      } catch {
+        // Refuse rather than fall through: the standard resolver would answer confidently with
+        // the unconfigured price, which is the failure this branch exists to prevent.
+        return { unit_price: null, unit_cost: cost, discount_pct: null,
+                 measurement_unit_code: unit, available, supplier_company_id: supplier, discount_source: null };
+      }
     }
     try {
       // Quantity + unit travel together or not at all — see the note on `opts.quantity`.

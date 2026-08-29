@@ -29,6 +29,7 @@ import {
   resolvePrintedCounterparty, applyAddressUnit, partyAddressLines,
 } from '../_shared/finance/invoice-party.ts';
 import { mydataExemptionLabel } from '../_shared/finance/vat-exemptions.ts';
+import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
 
 // Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
 // Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
@@ -65,10 +66,19 @@ async function attachVariantLabels(supabase: any, items: any[]): Promise<void> {
   } catch { /* the line still prints; it just says less */ }
 }
 
-/** The variant detail for a line: the full label when we have it, else the legacy two columns. */
+/**
+ * The identity detail for a line: its chosen VARIANT and its chosen CONFIGURATION.
+ *
+ * Both, because a product can have both — the variant is what it is, the configuration is what was
+ * added to it — and the deltas are already inside `unit_price`. A document that omits the options
+ * states a total the reader cannot account for (#375, rule 1c). The options come from the line's
+ * frozen `configured_options`, never from a live read of the option tables: renaming an option
+ * next spring must not rewrite an invoice issued last autumn.
+ */
 function variantOf(it: any): string {
-  return it?._variant_label
+  const variant = it?._variant_label
     || [it?.selected_color, it?.selected_size].filter(Boolean).join(' / ');
+  return lineDetailLabel(variant, it?.configured_options);
 }
 
 const FONT_URLS = {

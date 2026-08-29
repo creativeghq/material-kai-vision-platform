@@ -12056,6 +12056,8 @@ export type Database = {
           country_of_origin: string | null
           deductions_amount: number | null
           description: string | null
+          configured_options: Json | null
+          product_configuration_id: string | null
           discounted_price: number | null
           fees_amount: number | null
           fees_category: number | null
@@ -12097,6 +12099,8 @@ export type Database = {
           country_of_origin?: string | null
           deductions_amount?: number | null
           description?: string | null
+          configured_options?: Json | null
+          product_configuration_id?: string | null
           discounted_price?: number | null
           fees_amount?: number | null
           fees_category?: number | null
@@ -12138,6 +12142,8 @@ export type Database = {
           country_of_origin?: string | null
           deductions_amount?: number | null
           description?: string | null
+          configured_options?: Json | null
+          product_configuration_id?: string | null
           discounted_price?: number | null
           fees_amount?: number | null
           fees_category?: number | null
@@ -16555,6 +16561,8 @@ export type Database = {
           country_of_origin: string | null
           created_at: string
           description: string
+          configured_options: Json | null
+          product_configuration_id: string | null
           discount_pct: number
           id: string
           line_total: number
@@ -16586,6 +16594,8 @@ export type Database = {
           country_of_origin?: string | null
           created_at?: string
           description: string
+          configured_options?: Json | null
+          product_configuration_id?: string | null
           discount_pct?: number
           id?: string
           line_total?: number
@@ -16617,6 +16627,8 @@ export type Database = {
           country_of_origin?: string | null
           created_at?: string
           description?: string
+          configured_options?: Json | null
+          product_configuration_id?: string | null
           discount_pct?: number
           id?: string
           line_total?: number
@@ -24671,6 +24683,7 @@ export type Database = {
           custom_product_name: string | null
           custom_sku: string | null
           custom_unit: string | null
+          configured_options: Json | null
           delivery_date: string | null
           dimensions: string | null
           discounted_price: number | null
@@ -24705,6 +24718,7 @@ export type Database = {
           custom_product_name?: string | null
           custom_sku?: string | null
           custom_unit?: string | null
+          configured_options?: Json | null
           delivery_date?: string | null
           dimensions?: string | null
           discounted_price?: number | null
@@ -24739,6 +24753,7 @@ export type Database = {
           custom_product_name?: string | null
           custom_sku?: string | null
           custom_unit?: string | null
+          configured_options?: Json | null
           delivery_date?: string | null
           dimensions?: string | null
           discounted_price?: number | null
