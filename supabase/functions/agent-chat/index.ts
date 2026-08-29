@@ -2829,7 +2829,7 @@ async function executeAgent(
     }
     tools.push(createGeminiGenerationTool(userId, workspaceId, toolImages, conversationImages, onChunk, pinnedMaterialImages, generationMode, conversation_id ?? undefined));
     tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
-    tools.push(createGenerationStatusTool());
+    tools.push(createGenerationStatusTool(workspaceId ?? null));
   }
 
   // Lighting variants — re-render an existing room under a different lighting preset

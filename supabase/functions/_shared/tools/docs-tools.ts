@@ -115,6 +115,19 @@ export const createManageDocsTool = (userId: string, workspaceId: string, onChun
 
         if (action === 'suggest_edit') {
           if (!doc_id || !proposed_content) return JSON.stringify({ success: false, error: 'suggest_edit needs doc_id and proposed_content.' });
+          /**
+           * The doc has to be in THIS workspace (#395).
+           *
+           * `doc_id` is a model-supplied argument written into a service-role insert, and the
+           * suggestion carried the SESSION's workspace_id — so a suggestion could be attached to
+           * another tenant's doc, and the notification below then read that doc's title and
+           * `created_by` and mailed a stranger about an edit proposed inside a workspace they are
+           * not in. Checked before the write, and reported as "not found" rather than as a
+           * permission error, so an id cannot be probed (invariant 1).
+           */
+          const { data: target } = await supabase.from('workspace_docs')
+            .select('id').eq('id', String(doc_id)).eq('workspace_id', workspaceId).maybeSingle();
+          if (!target) return JSON.stringify({ success: false, error: 'That doc was not found in this workspace.' });
           const { error } = await supabase.from('workspace_doc_suggestions').insert({
             workspace_id: workspaceId, doc_id: String(doc_id), proposer_user_id: userId,
             proposed_content_markdown: String(proposed_content), rationale: reason ? String(reason) : null,
@@ -122,7 +135,8 @@ export const createManageDocsTool = (userId: string, workspaceId: string, onChun
           if (error) return JSON.stringify({ success: false, error: error.message });
           // Notify the doc owner (skip if they are the proposer) — the seeded doc_suggestion flow delivers it.
           try {
-            const { data: d } = await supabase.from('workspace_docs').select('title, created_by').eq('id', doc_id).maybeSingle();
+            const { data: d } = await supabase.from('workspace_docs')
+              .select('title, created_by').eq('id', doc_id).eq('workspace_id', workspaceId).maybeSingle();
             const ownerId = (d as any)?.created_by ?? null;
             if (ownerId && ownerId !== userId) {
               await emitFlowEvent('doc_suggestion_submitted', {

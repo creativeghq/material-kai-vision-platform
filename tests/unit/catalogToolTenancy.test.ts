@@ -33,6 +33,8 @@ const projectTools = read('supabase/functions/_shared/tools/project-tools.ts');
 const expenseTools = read('supabase/functions/_shared/tools/expense-tools.ts');
 const mentionTools = read('supabase/functions/_shared/tools/mention-tools.ts');
 const jobTools = read('supabase/functions/_shared/tools/job-research-tools.ts');
+const generationTools = read('supabase/functions/_shared/tools/generation-tools.ts');
+const docsTools = read('supabase/functions/_shared/tools/docs-tools.ts');
 const agentChat = read('supabase/functions/agent-chat/index.ts');
 
 describe('#395 — the catalog gate is bound to a workspace', () => {
@@ -194,5 +196,27 @@ describe('#395 — the same shape in two more user-owned tables', () => {
           .toMatch(new RegExp(`${factory}\\(userId, workspaceId`));
       }
     }
+  });
+});
+
+describe('#395 — the two tools that had no tenancy at all', () => {
+  it('the 3D status tool takes a workspace and filters on it', () => {
+    // It took NO identity: a service-role read of `generation_3d` by a model-supplied jobId,
+    // returning the job status and `models_results` — the generated model URLs.
+    expect(generationTools).toMatch(/export const createGenerationStatusTool = \(workspaceId: string \| null\)/);
+    const fn = generationTools.slice(generationTools.indexOf('export const createGenerationStatusTool'));
+    expect(fn.slice(0, 1500)).toMatch(/if \(workspaceId\) q = q\.eq\('workspace_id', workspaceId\);/);
+    expect(agentChat).toMatch(/createGenerationStatusTool\(workspaceId \?\? null\)/);
+  });
+
+  it('a doc suggestion lands on a doc in this workspace, and is checked before the write', () => {
+    const fn = docsTools.slice(docsTools.indexOf("if (action === 'suggest_edit')"));
+    const check = fn.indexOf("from('workspace_docs')");
+    const write = fn.indexOf("from('workspace_doc_suggestions').insert");
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(write);
+    expect(fn.slice(0, 1600)).toMatch(/was not found in this workspace/);
+    // …and the owner lookup that feeds the notification is scoped too, or it reads a stranger.
+    expect(fn.slice(0, 3000)).toMatch(/select\('title, created_by'\)\.eq\('id', doc_id\)\.eq\('workspace_id', workspaceId\)/);
   });
 });

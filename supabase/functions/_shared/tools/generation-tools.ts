@@ -727,8 +727,15 @@ Requires a room photo URL (from a previous generation or uploaded image). Ask th
  *
  * Allows agent to query the status of ongoing 3D generation jobs
  * Returns progress, completed/failed counts, and elapsed time
+ *
+ * TENANCY (#395). This factory took NO identity — not a user, not a workspace — and read
+ * `generation_3d` by a model-supplied `jobId` with a service-role client, returning the job's
+ * status AND `models_results`, which holds the generated model URLs. Any uuid returned any
+ * tenant's generation. It is the purest form of #352's pattern 2: a service-role client and an
+ * argument, with nothing in between. Scoped now to the caller's workspace, 404-style so an id
+ * cannot be probed for existence.
  */
-export const createGenerationStatusTool = () => {
+export const createGenerationStatusTool = (workspaceId: string | null) => {
   return tool(
     async ({ jobId }) => {
       try {
@@ -737,11 +744,12 @@ export const createGenerationStatusTool = () => {
         // Naming the phantom column made PostgREST reject the whole select, so `error` was
         // always truthy and this tool answered "Job not found" for EVERY job that exists,
         // telling users their in-flight generation had vanished.
-        const { data, error } = await supabase
+        let q = supabase
           .from('generation_3d')
           .select('generation_status, progress_percentage, models_results, created_at')
-          .eq('id', jobId)
-          .maybeSingle();
+          .eq('id', jobId);
+        if (workspaceId) q = q.eq('workspace_id', workspaceId);
+        const { data, error } = await q.maybeSingle();
 
         if (error) {
           return JSON.stringify({ success: false, error: `Could not read job status: ${error.message}` });
