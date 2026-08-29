@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Templates | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Templates</div>
+  <h1>Templates</h1>
+  <div class="routes"><span class="badge route">/templates</span></div>
+  <p class="lead">Templates is the one place that answers <strong>“what can I start from?”</strong> Instead of building the same invoice, quote or project from scratch each time, you <strong>save any record as a template</strong> and reuse it — or start from a <strong>platform starter</strong> we ship. It's a cross-cutting hub: one home for reusable starting points across invoices, quotes, orders, projects, moodboards, contracts and more, plus signposts to the per-feature template libraries that live elsewhere.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>Templates</strong> tile in the <a href="apps.html">App Launcher</a>, at <span class="badge route">/templates</span>. The record types you see depend on your role — you only get tabs for the things you can actually create.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/templates/templates.png" alt="The Templates hub">
+    <figcaption>Templates — a left rail (<strong>Add New</strong>, <strong>My Templates</strong>, <strong>Starters</strong>, a tab per record type, and <strong>Other libraries</strong>) and a grid of template tiles on the right.</figcaption>
+  </figure>
+
+  <h2>What's on the screen</h2>
+  <p>A left <strong>rail</strong> chooses what the grid shows; the <strong>grid</strong> holds the template tiles.</p>
+  <ul class="feat">
+    <li><strong>Add New</strong> — create a template from nothing: pick <em>what it makes</em> (a record type) and give it a name. (Until now every template had to be born from an existing record via <em>Save as template</em>; this is the blank-start path.)</li>
+    <li><strong>My Templates</strong> — the ones you've saved yourself, with a count. Each tile offers <strong>Use</strong>, <strong>Edit</strong> and delete.</li>
+    <li><strong>Starters</strong> — the ready-made examples the platform ships. A starter tile offers <strong>Use</strong> and <strong>Copy to edit</strong> (which drops a copy into <em>My Templates</em> so you can tweak it without touching the original).</li>
+    <li><strong>A tab per record type</strong> — Invoices, Quotes, Projects, Moodboards, Orders, Contracts, Expenses, Onboarding checklists, Listings and <strong>Customer terms</strong> (a ready set of payment/credit terms for a company, e.g. <em>“Retail customer — pay on order”</em> or <em>“Supplier — 30 days”</em>) — each with a count, filtering the grid to that type.</li>
+    <li><strong>Other libraries</strong> — link-outs to the per-feature template systems that live in their own areas (below).</li>
+  </ul>
+
+  <h2>Using a template — draft vs. prefill</h2>
+  <p>What <strong>Use</strong> does depends on the record type, and the difference is deliberate:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th><th>What “Use” does</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Quote, Project, Moodboard, Onboarding checklist, Listing</strong></td><td>Creates a <strong>draft record outright</strong> and drops you straight into it.</td></tr>
+      <tr><td><strong>Invoice, Order, Expense, Contract</strong></td><td>Opens a <strong>pre-filled create form</strong> — it does <em>not</em> conjure the document behind you.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><p><strong>Why money and legal documents only pre-fill.</strong> An invoice, order, expense or contract created silently from a template would skip the things that make it real — the sequential <a href="finance-einvoicing.html">numbering</a>, the buyer-risk and myDATA classification, the fiscal fields. So a template for one of those <strong>fills the form and hands it to you</strong>; you review and issue it the normal way. It's the same reasoning as “re-order” producing a prefill rather than a finished order.</p></div>
+
+  <h2>What a template captures (and what it never does)</h2>
+  <p>A template stores an <strong>allowlist</strong> of the reusable content — for an invoice, that's the line items, notes, payment terms, default VAT rate and myDATA document type; for a project, its structure; and so on. It deliberately <strong>never</strong> copies the things that must be unique to a real record: <strong>ids, status, share tokens, fiscal numbers</strong> or any <strong>derived total</strong>. That's not a nicety — a cloned legal number would be a fake document, and a cloned share token would hand a stranger the new record. So a template is a safe starting point, never a duplicate of the original's identity.</p>
+
+  <h2>Other libraries — templates that live elsewhere</h2>
+  <p>Some things are “templates” but belong to their own feature, with their own editor. The hub doesn't absorb them; it <strong>points to them</strong> under <strong>Other libraries</strong>:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Library</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><a href="projects-blueprints.html">Blueprints</a></td><td>Parametric scope-of-works that rescale from a few measurements and price from your services catalogue.</td></tr>
+      <tr><td>Transactional emails</td><td>The email bodies your workspace sends automatically (in the email settings).</td></tr>
+      <tr><td><a href="email-marketing.html">Marketing emails</a></td><td>Designed campaign templates for bulk sends.</td></tr>
+      <tr><td>WhatsApp messages</td><td>Approved WhatsApp / SMS message templates (in <a href="inbox.html">messaging</a> settings).</td></tr>
+      <tr><td>Catalog designs</td><td>Cover, background and accent styling for product catalogues.</td></tr>
+      <tr><td>Invoice &amp; PDF designs</td><td>How your invoices, quotes and sheets are laid out and branded — in <a href="finance-settings-documents.html">Finance → Settings</a>.</td></tr>
+      <tr><td>XML import mappings</td><td>Saved supplier-feed field mappings.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Each opens in its own place — so the kitchen zone/pricing model, for instance, is still edited in the <a href="projects-blueprints.html">Blueprint Library</a>, not here.</p>
+
+  <div class="callout tip"><p><strong>Worked example — a standard quote.</strong> Build a quote you send often, then <strong>Save as template</strong> from it. Later, open <strong>Templates</strong> → <strong>Quote</strong> → <strong>Use</strong> on it: a new draft quote opens, pre-populated with your usual lines and terms, ready to tailor and send. For a recurring <em>invoice</em>, <strong>Use</strong> instead opens the invoice form pre-filled — you give it a fresh number and issue it.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

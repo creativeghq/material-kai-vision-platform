@@ -41,16 +41,17 @@
   <div class="callout tip"><p>You can re-run the 5-page <strong>Preview</strong> any time from the row's action icons, and <strong>Recrawl now (full)</strong> forces a complete fresh index. <strong>Remove</strong> deletes the site and all its indexed pages.</p></div>
 
   <h2>The per-site SEO dashboard</h2>
-  <p>Click a site (or its <strong>Open SEO dashboard</strong> icon) to open its dashboard. The header shows the domain, page count and last-crawl time with a <strong>Recrawl</strong> button, then <strong>four headline counters</strong> — <strong>Articles</strong>, <strong>Keyword research</strong>, <strong>Toolkit runs</strong> and <strong>Tracked domains</strong> — over five tabs.</p>
+  <p>Click a site (or its <strong>Open SEO dashboard</strong> icon) to open its dashboard. The header shows the domain, page count and last-crawl time with a <strong>Recrawl</strong> button and <strong>four headline counters</strong> (Articles, Keyword research, Toolkit runs, Tracked domains). The dashboard is now a <strong>section rail</strong> that has grown well past the original five: <strong>Overview</strong>, <strong>AI Visibility</strong>, <strong>Rank Tracker</strong>, <strong>Competitors</strong>, <strong>Articles</strong>, <strong>Keyword Research</strong>, <strong>Toolkit Runs</strong>, <strong>Domain Audits</strong>, <strong>Search Performance</strong>, <strong>Rankings &amp; Links</strong>, <strong>Site Health</strong> and <strong>llms.txt</strong>. The main lists are:</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/website-dashboard.png" alt="The per-site SEO dashboard">
-    <figcaption>The per-site dashboard — headline counters plus the five tabs: Articles, Keyword Research, Toolkit Runs, Domain Audits and Search Performance.</figcaption>
+    <figcaption>The per-site dashboard — headline counters plus the section rail (Overview, AI Visibility, Rank Tracker, Competitors, Articles, Keyword Research, Toolkit Runs, Domain Audits, Search Performance, Rankings &amp; Links, Site Health, llms.txt).</figcaption>
   </figure>
 
   <div class="table-wrap"><table>
-    <thead><tr><th>Tab</th><th>What it lists</th></tr></thead>
+    <thead><tr><th>Section</th><th>What it shows</th></tr></thead>
     <tbody>
+      <tr><td><strong>Rank Tracker</strong></td><td>Daily Google positions for the keywords <em>you</em> chose to follow (see below).</td></tr>
       <tr><td><strong>Articles</strong></td><td>Every SEO article written for this site — title, target keyword, SEO score, word count, status. Click a row to open the full article viewer. (Empty until you ask the assistant to write one.)</td></tr>
       <tr><td><strong>Keyword Research</strong></td><td>Saved keyword-research runs — target keyword, topic, number of keywords, volume.</td></tr>
       <tr><td><strong>Toolkit Runs</strong></td><td>A log of the assistant's research/audit tool runs against this site — subject, kind, country, result.</td></tr>
@@ -86,6 +87,28 @@
   </figure>
 
   <div class="callout"><p><strong>Reporting lag.</strong> Google Search Console data lands a couple of days behind, so the most recent 2–3 days may look sparse — that's Google's lag, not a sync problem.</p></div>
+
+  <h2>Rank Tracker — the keywords you chose, followed daily</h2>
+  <p><strong>What it is —</strong> the <strong>Rank Tracker</strong> section follows a <em>fixed set of keywords you pick</em> and checks each one's <strong>Google organic position every day</strong>, building a trend over time. <strong>Why it matters —</strong> Search Console tells you how you're already doing; the domain-audit tools tell you what a domain ranks for right now; Rank Tracker is the one that answers <em>“are the keywords I care about moving up or down?”</em> — a stable list watched daily, not a snapshot. <span class="badge gated">Pro add-on</span> — it needs the <a href="seo-toolkit.html">SEO Toolkit</a> entitlement.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/rank-tracker.png" alt="The Rank Tracker section of the per-site SEO dashboard">
+    <figcaption>Rank Tracker — the <strong>Rankings</strong> card (<em>“The keywords you chose, followed daily”</em>) with <strong>Add keywords</strong> and <strong>Check now</strong>; once the daily check has run, the Visibility / Avg. position tiles, the distribution and the tracked-keywords table fill in.</figcaption>
+  </figure>
+
+  <h3>Adding keywords</h3>
+  <p>Click <strong>Add keywords</strong>, type them <strong>one per line or comma-separated</strong>, and <strong>Track these</strong>. They're checked <strong>daily in Greek results</strong> (desktop). Up to 200 can be added at once; <strong>Check now</strong> runs an immediate check instead of waiting for the nightly one, and the trash icon on a keyword stops tracking it.</p>
+
+  <h3>What it shows</h3>
+  <p>The <strong>Rankings</strong> card — <em>“The keywords you chose, followed daily”</em> — leads with four tiles:</p>
+  <ul class="feat">
+    <li><strong>Visibility</strong> — the share of your tracked keywords sitting in the <strong>top 10</strong>.</li>
+    <li><strong>Avg. position</strong> — averaged across the ones that actually rank.</li>
+    <li><strong>Ranking</strong> — how many rank, and how many are <em>outside the top 100</em>.</li>
+    <li><strong>Could not check</strong> — checks that failed. Crucially, a failed check is <strong>“unknown”, not “lost”</strong>, and a keyword outside the top 100 is <strong>not</strong> counted as position 101 — neither is allowed to poison the averages.</li>
+  </ul>
+  <p>Below: a <strong>Visibility over time</strong> sparkline, a <strong>“Where the tracked set sits”</strong> distribution across bands (<em>Top 3 · 4–10 · 11–30 · 31–100 · Not ranking</em>), and a <strong>Tracked keywords</strong> table — <em>best position first</em> — with each keyword's <strong>Position</strong>, its <strong>Change</strong> against the previous check (<strong>up means up the page</strong>), a per-keyword <strong>Trend</strong> sparkline, and the actual <strong>ranking page</strong> URL.</p>
+  <div class="callout"><p><strong>Drops are surfaced, not just recorded.</strong> When keywords fall out of the <strong>top 10</strong>, the platform raises a <a href="flows.html">Flow</a> event (“N keywords left the top 10”) to owners/admins — so a slide gets your attention instead of waiting to be noticed on the dashboard.</p></div>
 
   <h2>What it affects elsewhere</h2>
   <ul class="feat">

@@ -109,6 +109,7 @@
     ]},
     { title: "Business Apps", items: [
       { file: "apps.html", title: "Apps & Modules", icon: "🧩" },
+      { file: "templates.html", title: "Templates", icon: "🗂️" },
       { file: "hr.html", title: "HR", icon: "👥", children: [
         { file: "hr-employees.html", title: "Employees & org" },
         { file: "hr-attendance.html", title: "Attendance & clock-in" },
