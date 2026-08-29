@@ -57,6 +57,12 @@ const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   // to 2K, so 2K is what every call we make is billed at. A cheaper rate mirrored here
   // would pass a floor the provider invoice does not.
   'minimax-h3': 0.13,
+  // Luma Ray3.2. Luma prices per CLIP and the curve is not linear — 720p is $0.30 for
+  // 5s and $0.90 for 10s. These are the TEN-second per-second rates, which is what the
+  // floor has to be measured against: MAX_DURATION_SECONDS is 10, and the 5s rate
+  // ($0.06 / $0.24) would clear a floor the full-length clip does not.
+  'ray-3.2-720p': 0.09,
+  'ray-3.2-1080p': 0.36,
 };
 
 /** `_shared/pricing-constants.ts` → MARKUP_MULTIPLIER. */

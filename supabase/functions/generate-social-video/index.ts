@@ -83,7 +83,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 type VideoModel = 'kling-3.0' | 'veo-2'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
-  | 'minimax-h3';
+  | 'minimax-h3'
+  | 'ray-3.2-720p' | 'ray-3.2-1080p';
 
 // `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
 // generate-interior-video-v2, which debits its own CREDIT_COSTS. This entry is only read by the
@@ -102,6 +103,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
   'minimax-h3':         40,
+  'ray-3.2-720p':       20,
+  'ray-3.2-1080p':      70,
 };
 
 //: Models handed to generate-interior-video-v2 rather than run here. A reel is the case
@@ -111,6 +114,7 @@ const DELEGATED_MODELS = new Set<string>([
   'veo-2', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
   'seedance-2.5-480p', 'seedance-2.5-720p',
   'minimax-h3',
+  'ray-3.2-720p', 'ray-3.2-1080p',
 ]);
 
 const REPLICATE_MODELS: Record<string, string> = {

@@ -25,6 +25,8 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 | `seedance-2.5-480p` | 60 | 30s | yes | 30s in ONE pass, role-tagged references |
 | `seedance-2.5-720p` | 125 | 30s | yes | The same at 720p |
 | `minimax-h3` | 40 | 15s | yes (stereo) | Social reels — native 2K, the cheapest full clip |
+| `ray-3.2-720p` | 20 | 10s | no | First-to-last frame: ending on a specific image |
+| `ray-3.2-1080p` | 70 | 10s | no | The same at 1080p |
 
 Credit prices are floors, not preferences: each one covers the provider bill for a MAX-LENGTH
 clip of that model at the platform's declared 1.5x markup, checked by
@@ -36,6 +38,18 @@ pinned to its **spec-v3** major, which is the one `npm:ai@6` accepts; a spec-v4 
 `AI_UnsupportedModelVersionError` before the request is built). Wan goes to DashScope over raw
 REST because no AI SDK provider exists for it. Veo-2 uses Google's API. Runway is the only
 remaining Replicate model here.
+
+**Luma Ray3.2 is raw REST, and not because no provider exists.** `@ai-sdk/luma` exposes exactly
+two model ids — `photon-1` and `photon-flash-1` — which Luma's own model page says no longer
+exist as a product, and it carries no video model at all. Ray *is* reachable through
+`@ai-sdk/fal`, as `luma-ray-2` — the **deprecated** generation. An SDK path that reaches the
+wrong model is worse than none, so this one goes direct to `https://agents.lumalabs.ai/v1`.
+Version order does not sort numerically: Ray3 → Ray3.14 (Jan 2026) → **Ray3.2 (Jun 2026, current)**.
+
+**Luma prices per clip, not per second, and not linearly** — 10 seconds costs 3× 5 seconds
+($0.30 → $0.90 at 720p). The `ai_model_pricing` rows carry the **10-second** per-second rate,
+because that is the clip length the flat credit fee has to cover. The generator sends 5s or 10s
+and nothing between: those are the two durations Luma publishes a price for.
 
 **MiniMax H3 has two constraints that are the model's, not ours**, and the provider only *warns*
 about both — so `generateVideoWithMinimax` decides explicitly and reports back. It takes **either**

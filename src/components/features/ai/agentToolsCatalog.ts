@@ -2809,6 +2809,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'seedance-2.5-480p', label: 'Seedance 2.5 480p — 30s one-take, 60 credits' },
             { value: 'seedance-2.5-720p', label: 'Seedance 2.5 720p — 30s one-take, 125 credits' },
             { value: 'minimax-h3', label: 'MiniMax H3 — 15s at 2K with audio, 40 credits' },
+            { value: 'ray-3.2-720p', label: 'Luma Ray3.2 720p — first-to-last frame, 20 credits' },
+            { value: 'ray-3.2-1080p', label: 'Luma Ray3.2 1080p — first-to-last frame, 70 credits' },
           ] },
           { key: 'aspect_ratio', label: 'Aspect ratio', kind: 'select', default: '16:9', options: [
             { value: '16:9', label: '16:9 — standard' },

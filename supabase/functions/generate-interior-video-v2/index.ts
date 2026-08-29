@@ -18,6 +18,9 @@
  *   minimax-h3      → 40 credits (MiniMax Hailuo 3.0). 5-15s at native 2K with stereo
  *     audio — the reel format, at half the credits of a 30-second clip. Default for
  *     `social_reel`. Will not take a frame image and references together.
+ *   ray-3.2-720p/1080p → 20/70 credits (Luma Ray3.2). 5 or 10 seconds, first-to-last
+ *     frame interpolation — the one model here that takes you from THIS room to THAT
+ *     room rather than wherever the camera drifts. Silent.
  *
  * Async handling: Replicate models can take 3-5 min. If polling times out
  * (55s), stores prediction_id in generation_videos and returns job_id for
@@ -33,6 +36,7 @@ import {
   generateVideoWithWan,
   generateVideoWithSeedance,
   generateVideoWithMinimax,
+  generateVideoWithRay,
 } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -56,7 +60,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
-  | 'minimax-h3';
+  | 'minimax-h3'
+  | 'ray-3.2-720p' | 'ray-3.2-1080p';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
@@ -76,6 +81,12 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 //   seedance-2.5-480p 30s x $0.104/s = $3.12 -> x1.5 = $4.68  -> >= 56 credits (60 charged)
 //   seedance-2.5-720p 30s x $0.231/s = $6.93 -> x1.5 = $10.40 -> >= 123 credits (125 charged)
 //   minimax-h3        15s x $0.13/s  = $1.95 -> x1.5 = $2.93  -> >= 35 credits (40 charged)
+//   ray-3.2-720p      10s x $0.09/s  = $0.90 -> x1.5 = $1.35  -> >= 16 credits (20 charged)
+//   ray-3.2-1080p     10s x $0.36/s  = $3.60 -> x1.5 = $5.40  -> >= 64 credits (70 charged)
+//
+// Ray's per-second rates are the TEN-second ones on purpose: Luma prices per clip and a
+// 10s clip costs 3x a 5s clip, not 2x, so the 5s rate would under-price exactly the
+// full-length clip these fees have to cover.
 //
 // MiniMax is the cheapest CLIP here despite a mid-table per-second rate, because its
 // ceiling is 15 seconds — which is the length of a reel. Half the credits of Wan 720p
@@ -104,6 +115,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
   'minimax-h3':         40,
+  'ray-3.2-720p':       20,
+  'ray-3.2-1080p':      70,
 };
 
 // Longest clip each model will produce.
@@ -127,6 +140,11 @@ const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   'seedance-2.5-720p':  30,
   // H3's own range is 5-15s. Not a limitation for a reel — it is the format.
   'minimax-h3':         15,
+  // Ray3.2 generates longer, but 10s is the longest clip Luma PUBLISHES A PRICE FOR,
+  // and an unpriced duration is one we cannot charge for honestly. The generator sends
+  // 5 or 10 and nothing between, for the same reason.
+  'ray-3.2-720p':       10,
+  'ray-3.2-1080p':      10,
 };
 
 // Resolution tier per Wan model id. The id carries the tier because the RATE differs
@@ -141,6 +159,12 @@ const WAN_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P' | '1080P'>> = {
 const SEEDANCE_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P'>> = {
   'seedance-2.5-480p': '480P',
   'seedance-2.5-720p': '720P',
+};
+
+/** And again for Ray, where 720p -> 1080p is a 4x jump in rate. */
+const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
+  'ray-3.2-720p':  '720p',
+  'ray-3.2-1080p': '1080p',
 };
 
 // Auto-select model by video type
@@ -616,6 +640,57 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         video_type,
         duration_seconds: seedanceResult.durationSeconds,
         has_audio: seedanceResult.hasAudio,
+        status: 'completed',
+      });
+
+    } else if (RAY_RESOLUTION[resolvedModel]) {
+      // Luma Ray3.2 — first/last frame interpolation and per-frame direction. Hands
+      // back a presigned URL that expires in about an hour, so it goes straight into
+      // `uploadVideoToStorage`, which is the one guarded download path.
+      const rayPrompt = prompt
+        || 'Professional cinematic interior walkthrough, smooth continuous camera movement';
+
+      const rayResult = await generateVideoWithRay(rayPrompt, {
+        imageUrl: source_image_url,
+        lastFrameUrl: last_frame_url || undefined,
+        durationSeconds,
+        resolution: RAY_RESOLUTION[resolvedModel],
+        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
+        task: 'interior_video_generation_v2',
+        userId,
+        workspaceId: workspace_id ?? undefined,
+        // `logVideoUsage` below owns this call's ai_usage_logs row.
+        logUsage: false,
+      });
+
+      const videoUrl = await uploadVideoToStorage(supabase, rayResult.url, jobId, false, uploadCtx);
+      await logVideoUsage(rayResult.durationSeconds);
+
+      const { error: completeErr } = await supabase.from('generation_videos').update({
+        status: 'completed',
+        video_url: videoUrl,
+        completed_at: new Date().toISOString(),
+      }).eq('id', jobId);
+      if (completeErr) throw completeErr;
+
+      emitFlowEvent('video_generation_completed', {
+        user_id: userId,
+        workspace_id,
+        type: 'video_ready',
+        title: 'Your video is ready!',
+        body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
+        job_id: jobId,
+        video_type,
+      }).catch(() => {});
+
+      return jsonResponse({
+        success: true,
+        job_id: jobId,
+        video_url: videoUrl,
+        model_used: resolvedModel,
+        credits_used: creditCost,
+        video_type,
+        duration_seconds: rayResult.durationSeconds,
         status: 'completed',
       });
 

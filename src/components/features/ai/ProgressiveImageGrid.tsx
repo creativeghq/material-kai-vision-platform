@@ -57,6 +57,10 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   { value: 'seedance-2.5-720p', label: 'Seedance 2.5 720p', description: 'Seedance 2.5 — 30s one-take with audio, 720p', credits: 125 },
   // The reel model, and the cheapest full clip on the list — 15s is the format, not a limit.
   { value: 'minimax-h3', label: 'MiniMax H3', description: 'Hailuo 3.0 — 15s at 2K with stereo audio', credits: 40 },
+  // Ray is the only one that interpolates between a first and a LAST frame — this room
+  // to that room, rather than wherever the camera wanders.
+  { value: 'ray-3.2-720p', label: 'Ray3.2 720p', description: 'Luma Ray3.2 — 5 or 10s, first-to-last frame', credits: 20 },
+  { value: 'ray-3.2-1080p', label: 'Ray3.2 1080p', description: 'Luma Ray3.2 — the same at 1080p', credits: 70 },
 ];
 
 interface ModelResult {

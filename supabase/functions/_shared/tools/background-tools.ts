@@ -316,6 +316,9 @@ Long-form, with sound (the only models here that pass 10 seconds):
 - MiniMax H3 (40cr) — 5-15s at native 2K with stereo audio. The cheapest full clip here
   and the default for social_reel. It takes EITHER a source image OR reference images,
   never both, and with a source image the aspect ratio comes from that image.
+- Luma Ray3.2 720p/1080p (20/70cr) — 5 or 10 seconds, silent, and the only model that
+  interpolates from a first frame to a LAST frame: use it when the clip has to end on a
+  specific image (before/after reveals), not just start from one.
 
 Returns video_url when complete, or prediction_id if still processing (poll generate_3d_status).`,
       schema: z.object({
@@ -336,8 +339,9 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
           'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
           'seedance-2.5-480p', 'seedance-2.5-720p',
           'minimax-h3',
+          'ray-3.2-720p', 'ray-3.2-1080p',
         ]).optional()
-          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, minimax-h3 40cr (default: auto based on video_type)'),
+          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, minimax-h3 40cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
           .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),

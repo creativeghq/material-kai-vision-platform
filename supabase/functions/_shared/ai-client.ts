@@ -30,6 +30,8 @@ const _AI_ENV_KEYS = [
   'ARK_API_KEY',
   // MiniMax (Hailuo H3 video). Same arrangement as ARK_API_KEY above.
   'MINIMAX_API_KEY',
+  // Luma (Ray3.2 video). Raw REST rather than a provider — see the note on generateVideoWithRay.
+  'LUMA_API_KEY',
 ] as const;
 
 function _syncEnvIntoPolyfill() {
@@ -1631,6 +1633,164 @@ export async function generateVideoWithSeedance(
     // refunds and returns, so a provider outage would otherwise leave no trace at all.
     void _logUnitCall({
       task: config?.task ?? 'seedance_video_generation',
+      modelKey,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
+}
+
+// ── Luma Ray3.2 (video) ────────────────────────────────────────────────────
+//
+// Raw REST, and this one is NOT the Wan situation. `@ai-sdk/luma` exists and is
+// useless to us: it exposes exactly two model ids, `photon-1` and `photon-flash-1`,
+// and Luma's own model page says Photon "no longer exists as a separate product".
+// It has no video model at all, so Ray has never been reachable through it. Ray2 is
+// reachable through `@ai-sdk/fal` — but Ray2 is the DEPRECATED generation, which is
+// the trap: an SDK path exists, it is just to the wrong model.
+//
+// Ray3.2 (June 2026) is the current one. Sequence, because the numbers do not sort:
+// Ray3 -> Ray3.14 (January) -> Ray3.2 (June). 3.2 is the LATEST despite reading
+// smaller than 3.14 — Luma's own LLM-facing page states it outright, which is the
+// only reason we can be sure.
+//
+// PRICING IS NOT LINEAR IN DURATION and that matters more than it looks: a 10s clip
+// costs THREE times a 5s clip, not two. Luma's rate card is per clip (720p: 100
+// credits/5s, 300 credits/10s, at $0.003 a credit = $0.30 and $0.90). Every video
+// model in this platform is priced per SECOND, so these rows carry the WORST-CASE
+// per-second rate — the 10-second one. A 5s clip is then over-reported by a third,
+// which is the safe direction: over-stating a cost can only make a sale look less
+// profitable than it is, while the linear-looking 5s rate would under-report the
+// full-length clip we actually let people buy.
+const LUMA_BASE_URL = 'https://agents.lumalabs.ai/v1';
+const LUMA_MODEL_ID = 'ray-3.2';
+
+export type RayResolution = '720p' | '1080p';
+
+/** `ai_model_pricing.model_key` per tier — the rate differs 4x across them. */
+const RAY_PRICING_MODEL_ID: Record<RayResolution, string> = {
+  '720p': 'ray-3.2-720p',
+  '1080p': 'ray-3.2-1080p',
+};
+
+export interface RayVideoResult {
+  /** Presigned Luma URL, valid ~1 hour. Callers re-host it through the SSRF guard. */
+  url: string;
+  mimeType: string;
+  model: string;
+  durationSeconds: number;
+  resolution: RayResolution;
+}
+
+export async function generateVideoWithRay(
+  prompt: string,
+  config?: UnitBillingConfig & {
+    /** First frame (`video.start_frame`). Omit for text-to-video. */
+    imageUrl?: string;
+    /** Last frame (`video.end_frame`) — Ray interpolates between the two. */
+    lastFrameUrl?: string;
+    /** 5 or 10. Clamped here; 10 is the longest duration Luma publishes a price for. */
+    durationSeconds?: number;
+    resolution?: RayResolution;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    pollTimeoutMs?: number;
+    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
+    logUsage?: boolean;
+  },
+): Promise<RayVideoResult> {
+  const _start = Date.now();
+  const resolution = config?.resolution ?? '720p';
+  // 5 or 10 and nothing between: those are the two durations on the rate card, and a
+  // duration we cannot price is a duration we cannot sell.
+  const seconds = (config?.durationSeconds ?? 5) > 7 ? 10 : 5;
+  const modelKey = RAY_PRICING_MODEL_ID[resolution];
+
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'LUMA_API_KEY')).value
+    : Deno.env.get('LUMA_API_KEY');
+  if (!apiKey) {
+    throw new Error('LUMA_API_KEY is not configured — cannot generate with Ray3.2');
+  }
+
+  // `ImageRef` is `{ url }` OR `{ data, media_type }`, never both — the shape the
+  // official `luma-agents` SDK declares. URLs are passed through, so the source frame
+  // never lands in this isolate's memory.
+  const video: Record<string, unknown> = {
+    resolution,
+    duration: `${seconds}s`,
+  };
+  if (config?.imageUrl) video.start_frame = { url: config.imageUrl };
+  if (config?.lastFrameUrl) video.end_frame = { url: config.lastFrameUrl };
+
+  try {
+    const submit = await fetch(`${LUMA_BASE_URL}/generations`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: LUMA_MODEL_ID,
+        type: 'video',
+        prompt,
+        aspect_ratio: config?.aspectRatio ?? '16:9',
+        video,
+      }),
+    });
+    if (!submit.ok) {
+      throw new Error(`Luma submit ${submit.status}: ${(await submit.text()).slice(0, 300)}`);
+    }
+    const generationId = (await submit.json())?.id;
+    if (!generationId) throw new Error('Luma returned no generation id');
+
+    const deadline = Date.now() + (config?.pollTimeoutMs ?? 600_000);
+    for (;;) {
+      if (Date.now() > deadline) throw new Error(`Luma generation ${generationId} timed out`);
+      await new Promise((r) => setTimeout(r, 3_000));
+      const poll = await fetch(`${LUMA_BASE_URL}/generations/${generationId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!poll.ok) {
+        throw new Error(`Luma poll ${poll.status}: ${(await poll.text()).slice(0, 300)}`);
+      }
+      const body = await poll.json();
+      const state = body?.state;
+      if (state === 'completed') {
+        const url = body?.output?.[0]?.url;
+        if (!url) throw new Error('Luma completed but returned no output URL');
+        if (config?.logUsage !== false) void _logUnitCall({
+          task: config?.task ?? 'ray_video_generation',
+          modelKey,
+          units: seconds,
+          latencyMs: Date.now() - _start,
+          userId: config?.userId,
+          workspaceId: config?.workspaceId,
+        });
+        return {
+          url,
+          mimeType: 'video/mp4',
+          model: LUMA_MODEL_ID,
+          durationSeconds: seconds,
+          resolution,
+        };
+      }
+      if (state === 'failed') {
+        // `failure_code` is a machine-readable enum (content_moderated, budget_exhausted,
+        // rate_limited, ...). Carried into the message because "generation failed" alone
+        // cannot tell an operator whether to retry, re-prompt or top up.
+        throw new Error(
+          `Luma generation ${generationId} failed [${body?.failure_code ?? 'unknown'}]: ` +
+          `${body?.failure_reason ?? 'no detail'}`,
+        );
+      }
+    }
+  } catch (err) {
+    void _logUnitCall({
+      task: config?.task ?? 'ray_video_generation',
       modelKey,
       units: 0,
       latencyMs: Date.now() - _start,

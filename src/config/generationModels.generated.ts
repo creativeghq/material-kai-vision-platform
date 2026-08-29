@@ -702,6 +702,54 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 200
   },
   {
+    "id": "ray-3.2-720p",
+    "display_name": "Luma Ray3.2 720p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "luma",
+    "slug": "ray-3.2",
+    "version": null,
+    "adapter": "luma",
+    "input_requirements": {
+      "needs_prompt": true,
+      "min_images": 0,
+      "max_images": 2,
+      "image_roles": [
+        "source",
+        "last_frame"
+      ]
+    },
+    "pricing_key": "ray-3.2-720p",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 201
+  },
+  {
+    "id": "ray-3.2-1080p",
+    "display_name": "Luma Ray3.2 1080p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "luma",
+    "slug": "ray-3.2",
+    "version": null,
+    "adapter": "luma",
+    "input_requirements": {
+      "needs_prompt": true,
+      "min_images": 0,
+      "max_images": 2,
+      "image_roles": [
+        "source",
+        "last_frame"
+      ]
+    },
+    "pricing_key": "ray-3.2-1080p",
+    "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 202
+  },
+  {
     "id": "kling-v3.0",
     "display_name": "Kling 3.0",
     "capability": "video",
@@ -785,7 +833,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '4f57ba8c797ec6859a33dcac2c106b29';
+export const PROJECTION_FINGERPRINT = 'ee6ad1998a9d8cffb4d21b9965c718f3';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
