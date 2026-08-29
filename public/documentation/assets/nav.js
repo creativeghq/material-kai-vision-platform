@@ -296,7 +296,12 @@
     if (pager) content.appendChild(pager);
     var foot = document.createElement("div");
     foot.className = "docfoot";
-    foot.textContent = "MaterialsHub — User Documentation · Screenshots captured from the live application at app.materialshub.gr.";
+    foot.innerHTML =
+      '<div class="docfoot-api">API reference: ' +
+        '<a href="api-mivaa.html">MIVAA API</a> · ' +
+        '<a href="api-supabase.html">Supabase API</a>' +
+      "</div>" +
+      '<div class="docfoot-tag">MaterialsHub — User Documentation · Screenshots captured from the live application at app.materialshub.gr.</div>';
     content.appendChild(foot);
 
     layout.appendChild(sidebar);
