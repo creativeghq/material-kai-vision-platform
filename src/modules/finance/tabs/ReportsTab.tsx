@@ -129,23 +129,8 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
    */
   const [drawdown, setDrawdown] = useState<Awaited<ReturnType<typeof financeService.getProfitDrawdown>> | null>(null);
 
-  /**
-   * Most of these reports have no currency column: they sum across currencies and the formatter
-   * defaults to EUR. Rather than let that pass as a confident number, the tab says so when it is
-   * true. Empty (or a failed read) warns about nothing — an invented caveat is its own defect.
-   */
-  const [moneyCurrencies, setMoneyCurrencies] = useState<string[]>([]);
-  useEffect(() => {
-    if (!workspaceId) return;
-    let cancelled = false;
-    financeService.workspaceMoneyCurrencies(workspaceId)
-      .then((c) => { if (!cancelled) setMoneyCurrencies(c); })
-      .catch(() => { if (!cancelled) setMoneyCurrencies([]); });
-    return () => { cancelled = true; };
-  }, [workspaceId]);
-  // The two reports that DO carry a currency per row are exempt: theirs are already split.
-  const currencyBlind = moneyCurrencies.length > 1
-    && report !== 'cash_out_per_category' && report !== 'profit_taken';
+  // Every report carries the currency its money is in, so there is no cross-currency total left to
+  // warn about: the rows format themselves and `computeTotals` splits per currency.
 
   const runReport = async () => {
     try {
@@ -368,16 +353,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           ) : sorted.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">No data for this report and period.</div>
           ) : (
-            <>
-              {currencyBlind && (
-                <p className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
-                  This workspace holds money in {moneyCurrencies.join(', ')}. This report has no
-                  currency column, so the figures below add them together — read them as indicative,
-                  not as a total in any one currency.
-                </p>
-              )}
-              {renderReport(report, sorted, totalsShown, page, setPage)}
-            </>
+            renderReport(report, sorted, totalsShown, page, setPage)
           )}
         </CardContent>
       </Card>
@@ -451,49 +427,70 @@ function primarySortKey(report: ReportKind): string {
   }
 }
 
+/**
+ * Sum money columns PER CURRENCY.
+ *
+ * Every report now returns the currency its money is in, so a total across them is never produced:
+ * a sum of euros and dollars is a confident figure in no currency at all, and that is precisely the
+ * kind of wrong number nothing downstream can catch. A single-currency workspace - the common case -
+ * gets exactly one group and a display identical to before this existed.
+ *
+ * Reports that carry no currency column (the VAT ones, myDATA reconciliation, open tasks) fall back
+ * to one 'EUR' group, which is what the formatter was doing for them already.
+ */
+function groupMoney(rows: any[], keys: string[]): Array<[string, Record<string, number>]> {
+  const m = new Map<string, Record<string, number>>();
+  for (const r of rows) {
+    const ccy = String(r.currency || 'EUR');
+    const cur = m.get(ccy) ?? Object.fromEntries(keys.map((k) => [k, 0]));
+    for (const k of keys) cur[k] = (cur[k] ?? 0) + Number(r[k] || 0);
+    m.set(ccy, cur);
+  }
+  return [...m].sort(([a], [b]) => a.localeCompare(b));
+}
+
+/** One labelled total per currency. The currency is named only when there is more than one. */
+function moneyTotals(rows: any[], key: string, label: string): { label: string; value: string }[] {
+  const g = groupMoney(rows, [key]);
+  if (g.length === 0) return [{ label, value: formatMoney(0) }];
+  return g.map(([ccy, v]) => ({ label: g.length > 1 ? label + ' (' + ccy + ')' : label, value: formatMoney(v[key], ccy) }));
+}
+
 function computeTotals(report: ReportKind, rows: any[]): { label: string; value: string }[] {
   switch (report) {
     case 'cashflow_per_day': {
-      let inAmt = 0, outAmt = 0;
-      for (const r of rows) { inAmt += Number(r.receipts || 0); outAmt += Number(r.payments || 0); }
-      return [
-        { label: 'Receipts (in)', value: formatMoney(inAmt) },
-        { label: 'Payments (out)', value: formatMoney(outAmt) },
-        { label: 'Net movement', value: formatMoney(inAmt - outAmt) },
-      ];
+      const g = groupMoney(rows, ['receipts', 'payments']);
+      const many = g.length > 1;
+      return g.flatMap(([ccy, v]) => [
+        { label: many ? `Receipts in (${ccy})` : 'Receipts (in)', value: formatMoney(v.receipts, ccy) },
+        { label: many ? `Payments out (${ccy})` : 'Payments (out)', value: formatMoney(v.payments, ccy) },
+        { label: many ? `Net (${ccy})` : 'Net movement', value: formatMoney(v.receipts - v.payments, ccy) },
+      ]);
     }
     case 'cash_out_per_category': {
-      // Per currency, never one number: the rows are already split that way because two currencies
-      // in one category do not add up, and a total that re-merges them undoes the point.
-      const byCcy = new Map<string, number>();
       let payments = 0;
-      for (const r of rows) {
-        const ccy = String(r.currency || 'EUR');
-        byCcy.set(ccy, (byCcy.get(ccy) ?? 0) + Number(r.total_paid || 0));
-        payments += Number(r.payment_count || 0);
-      }
+      for (const r of rows) payments += Number(r.payment_count || 0);
       return [
         { label: 'Payments', value: String(payments) },
-        ...[...byCcy].sort(([a], [b]) => a.localeCompare(b))
-          .map(([ccy, amt]) => ({ label: byCcy.size > 1 ? `Out (${ccy})` : 'Money out', value: formatMoney(amt, ccy) })),
+        ...moneyTotals(rows, 'total_paid', 'Money out'),
       ];
     }
     case 'profit_taken': {
-      let amount = 0, orders = 0;
-      for (const r of rows) { amount += Number(r.amount || 0); orders += Number(r.order_count || 0); }
+      let orders = 0;
+      for (const r of rows) orders += Number(r.order_count || 0);
       return [
         { label: 'Orders drawn from', value: String(orders) },
-        { label: 'Profit taken', value: formatMoney(amount) },
+        ...moneyTotals(rows, 'amount', 'Profit taken'),
       ];
     }
     case 'pnl_per_category': {
-      let income = 0, expenses = 0, net = 0;
-      for (const r of rows) { income += Number(r.income || 0); expenses += Number(r.expenses || 0); net += Number(r.net || 0); }
-      return [
-        { label: 'Income', value: formatMoney(income) },
-        { label: 'Expenses', value: formatMoney(expenses) },
-        { label: 'Net', value: formatMoney(net) },
-      ];
+      const g = groupMoney(rows, ['income', 'expenses', 'net']);
+      const many = g.length > 1;
+      return g.flatMap(([ccy, v]) => [
+        { label: many ? `Income (${ccy})` : 'Income', value: formatMoney(v.income, ccy) },
+        { label: many ? `Expenses (${ccy})` : 'Expenses', value: formatMoney(v.expenses, ccy) },
+        { label: many ? `Net (${ccy})` : 'Net', value: formatMoney(v.net, ccy) },
+      ]);
     }
     case 'sales_per_day':
     case 'sales_per_customer':
@@ -501,63 +498,56 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
     case 'sales_per_category':
     case 'sales_per_factory':
     case 'sales_per_designer': {
-      let revenue = 0, margin = 0;
-      for (const r of rows) { revenue += Number(r.revenue_net || 0); margin += Number(r.gross_margin || 0); }
-      const pct = revenue > 0 ? (margin / revenue) * 100 : null;
-      return [
-        { label: 'Revenue net', value: formatMoney(revenue) },
-        { label: 'Margin', value: formatMoney(margin) },
-        { label: 'Margin %', value: formatPct(pct) },
-      ];
+      const g = groupMoney(rows, ['revenue_net', 'gross_margin']);
+      const many = g.length > 1;
+      // Margin % is a RATIO over one currency's revenue, so it is emitted per group too - a single
+      // percentage over mixed money would be arithmetic on nothing.
+      return g.flatMap(([ccy, v]) => [
+        { label: many ? `Revenue net (${ccy})` : 'Revenue net', value: formatMoney(v.revenue_net, ccy) },
+        { label: many ? `Margin (${ccy})` : 'Margin', value: formatMoney(v.gross_margin, ccy) },
+        { label: many ? `Margin % (${ccy})` : 'Margin %', value: formatPct(v.revenue_net > 0 ? (v.gross_margin / v.revenue_net) * 100 : null) },
+      ]);
     }
     case 'purchases_per_product':
     case 'receipts_per_product': {
-      let qty = 0, cost = 0;
-      for (const r of rows) { qty += Number(r.total_quantity || 0); cost += Number(r.total_cost || 0); }
+      let qty = 0;
+      for (const r of rows) qty += Number(r.total_quantity || 0);
       return [
         { label: 'Total quantity', value: qty.toFixed(2) },
-        { label: 'Total cost', value: formatMoney(cost) },
+        ...moneyTotals(rows, 'total_cost', 'Total cost'),
       ];
     }
     case 'spend_per_supplier': {
-      let billed = 0, paid = 0, outstanding = 0;
-      for (const r of rows) { billed += Number(r.billed_total || 0); paid += Number(r.paid_total || 0); outstanding += Number(r.outstanding || 0); }
-      return [
-        { label: 'Billed', value: formatMoney(billed) },
-        { label: 'Paid', value: formatMoney(paid) },
-        { label: 'Outstanding', value: formatMoney(outstanding) },
-      ];
+      const g = groupMoney(rows, ['billed_total', 'paid_total', 'outstanding']);
+      const many = g.length > 1;
+      return g.flatMap(([ccy, v]) => [
+        { label: many ? `Billed (${ccy})` : 'Billed', value: formatMoney(v.billed_total, ccy) },
+        { label: many ? `Paid (${ccy})` : 'Paid', value: formatMoney(v.paid_total, ccy) },
+        { label: many ? `Outstanding (${ccy})` : 'Outstanding', value: formatMoney(v.outstanding, ccy) },
+      ]);
     }
     case 'payments_out_per_counterparty': {
-      let total = 0;
-      for (const r of rows) total += Number(r.total_paid || 0);
       return [
         { label: 'Suppliers paid', value: String(rows.length) },
-        { label: 'Total sent', value: formatMoney(total) },
+        ...moneyTotals(rows, 'total_paid', 'Total sent'),
       ];
     }
     case 'payments_in_per_counterparty': {
-      let total = 0;
-      for (const r of rows) total += Number(r.total_received || 0);
       return [
         { label: 'Customers paying', value: String(rows.length) },
-        { label: 'Total received', value: formatMoney(total) },
+        ...moneyTotals(rows, 'total_received', 'Total received'),
       ];
     }
     case 'top_customer_outstanding': {
-      let total = 0;
-      for (const r of rows) total += Number(r.outstanding || 0);
       return [
         { label: 'Customers with open balance', value: String(rows.length) },
-        { label: 'Total AR outstanding', value: formatMoney(total) },
+        ...moneyTotals(rows, 'outstanding', 'Total AR outstanding'),
       ];
     }
     case 'top_supplier_outstanding': {
-      let total = 0;
-      for (const r of rows) total += Number(r.outstanding || 0);
       return [
         { label: 'Suppliers with open balance', value: String(rows.length) },
-        { label: 'Total AP outstanding', value: formatMoney(total) },
+        ...moneyTotals(rows, 'outstanding', 'Total AP outstanding'),
       ];
     }
     case 'vat_return': {
@@ -622,7 +612,7 @@ function renderReport(
   if (report === 'cashflow_per_day') {
     return (
       <Table headers={['Date', 'Receipts', 'Payments', 'Difference']} totals={totals} rows={rows.map((r: any) => [
-        r.period, formatMoney(Number(r.receipts || 0)), formatMoney(Number(r.payments || 0)), formatMoney(Number(r.difference || 0)),
+        r.period, formatMoney(Number(r.receipts || 0), r.currency || 'EUR'), formatMoney(Number(r.payments || 0), r.currency || 'EUR'), formatMoney(Number(r.difference || 0), r.currency || 'EUR'),
       ])} />
     );
   }
@@ -652,48 +642,48 @@ function renderReport(
     return (
       <Table headers={['Category', 'Income', 'Cust. credits', 'Expenses', 'Suppl. credits', 'Net', 'VAT in', 'VAT out']} totals={totals} rows={rows.map((r: any) => [
         r.category_name,
-        formatMoney(Number(r.income || 0)),
-        formatMoney(Number(r.customer_credits || 0)),
-        formatMoney(Number(r.expenses || 0)),
-        formatMoney(Number(r.supplier_credits || 0)),
-        formatMoney(Number(r.net || 0)),
-        formatMoney(Number(r.vat_income || 0)),
-        formatMoney(Number(r.vat_expense || 0)),
+        formatMoney(Number(r.income || 0), r.currency || 'EUR'),
+        formatMoney(Number(r.customer_credits || 0), r.currency || 'EUR'),
+        formatMoney(Number(r.expenses || 0), r.currency || 'EUR'),
+        formatMoney(Number(r.supplier_credits || 0), r.currency || 'EUR'),
+        formatMoney(Number(r.net || 0), r.currency || 'EUR'),
+        formatMoney(Number(r.vat_income || 0), r.currency || 'EUR'),
+        formatMoney(Number(r.vat_expense || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'sales_per_day') {
     return (
       <Table headers={['Date', 'Invoices', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
-        r.period, String(r.invoice_count ?? 0), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+        r.period, String(r.invoice_count ?? 0), formatMoney(Number(r.revenue_net || 0), r.currency || 'EUR'), formatMoney(Number(r.gross_margin || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'sales_per_customer') {
     return (
       <Table headers={['Customer', 'Type', 'Invoices', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, r.party_type, String(r.invoice_count ?? 0), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+        r.display_name, r.party_type, String(r.invoice_count ?? 0), formatMoney(Number(r.revenue_net || 0), r.currency || 'EUR'), formatMoney(Number(r.gross_margin || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'sales_per_product') {
     return (
       <Table headers={['Product', 'SKU', 'Quantity', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
-        r.product_name, r.sku ?? '—', String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+        r.product_name, r.sku ?? '—', String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0), r.currency || 'EUR'), formatMoney(Number(r.gross_margin || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'sales_per_category') {
     return (
       <Table headers={['Category', 'Lines', 'Quantity', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
-        r.category_name, String(r.line_count ?? 0), String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+        r.category_name, String(r.line_count ?? 0), String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0), r.currency || 'EUR'), formatMoney(Number(r.gross_margin || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'purchases_per_product' || report === 'receipts_per_product') {
     return (
       <Table headers={['Product', 'SKU', 'Quantity', 'Cost']} totals={totals} rows={rows.map((r: any) => [
-        r.product_name, r.sku ?? '—', String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.total_cost || 0)),
+        r.product_name, r.sku ?? '—', String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.total_cost || 0), r.currency || 'EUR'),
       ])} />
     );
   }
@@ -723,7 +713,7 @@ function renderReport(
       <Table headers={['VAT cat', 'Rate', 'Classification type', 'Classification category', 'Net', 'VAT', 'Lines']} totals={totals} rows={rows.map((r: any) => [
         r.vat_category == null ? '—' : String(r.vat_category), fmtRate(r.vat_rate),
         r.income_classification_type ?? '—', r.income_classification_category ?? '—',
-        formatMoney(Number(r.net || 0)), formatMoney(Number(r.vat || 0)), String(r.line_count ?? 0),
+        formatMoney(Number(r.net || 0), r.currency || 'EUR'), formatMoney(Number(r.vat || 0), r.currency || 'EUR'), String(r.line_count ?? 0),
       ])} />
     );
   }
@@ -734,7 +724,7 @@ function renderReport(
     return (
       <Table headers={['Flow', 'Counterparty', 'VAT no.', 'Docs', 'Net', 'VAT', 'Gross']} totals={totals} rows={rows.map((r: any) => [
         r.direction === 'sales' ? 'Sales' : 'Purchases', r.counterparty_name, r.vat_number ?? '—',
-        String(r.doc_count ?? 0), formatMoney(Number(r.net || 0)), formatMoney(Number(r.vat || 0)), formatMoney(Number(r.gross || 0)),
+        String(r.doc_count ?? 0), formatMoney(Number(r.net || 0), r.currency || 'EUR'), formatMoney(Number(r.vat || 0), r.currency || 'EUR'), formatMoney(Number(r.gross || 0), r.currency || 'EUR'),
       ])} />
     );
   }
@@ -753,49 +743,49 @@ function renderReport(
   if (report === 'sales_per_factory') {
     return (
       <Table headers={['Brand', 'Lines', 'Quantity', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
-        r.factory_name, String(r.line_count ?? 0), String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+        r.factory_name, String(r.line_count ?? 0), String(Number(r.total_quantity ?? 0)), formatMoney(Number(r.revenue_net || 0), r.currency || 'EUR'), formatMoney(Number(r.gross_margin || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'sales_per_designer') {
     return (
       <Table headers={['Designer', 'Invoices', 'Accepted quotes', 'Revenue', 'Margin']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, String(r.invoice_count ?? 0), String(r.accepted_quote_count ?? 0), formatMoney(Number(r.revenue_net || 0)), formatMoney(Number(r.gross_margin || 0)),
+        r.display_name, String(r.invoice_count ?? 0), String(r.accepted_quote_count ?? 0), formatMoney(Number(r.revenue_net || 0), r.currency || 'EUR'), formatMoney(Number(r.gross_margin || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'spend_per_supplier') {
     return (
       <Table headers={['Supplier', 'Bills', 'Billed', 'Paid', 'Outstanding']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, String(r.bill_count ?? 0), formatMoney(Number(r.billed_total || 0)), formatMoney(Number(r.paid_total || 0)), formatMoney(Number(r.outstanding || 0)),
+        r.display_name, String(r.bill_count ?? 0), formatMoney(Number(r.billed_total || 0), r.currency || 'EUR'), formatMoney(Number(r.paid_total || 0), r.currency || 'EUR'), formatMoney(Number(r.outstanding || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'payments_out_per_counterparty') {
     return (
       <Table headers={['Supplier', 'Payments', 'Total sent']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, String(r.payment_count ?? 0), formatMoney(Number(r.total_paid || 0)),
+        r.display_name, String(r.payment_count ?? 0), formatMoney(Number(r.total_paid || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'payments_in_per_counterparty') {
     return (
       <Table headers={['Customer', 'Payments', 'Total received']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, String(r.payment_count ?? 0), formatMoney(Number(r.total_received || 0)),
+        r.display_name, String(r.payment_count ?? 0), formatMoney(Number(r.total_received || 0), r.currency || 'EUR'),
       ])} />
     );
   }
   if (report === 'top_customer_outstanding') {
     return (
       <Table headers={['Customer', 'Open invoices', 'Outstanding', 'Oldest due', 'Max overdue']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, String(r.open_invoice_count ?? 0), formatMoney(Number(r.outstanding || 0)), r.oldest_due_at ?? '—', r.max_days_overdue > 0 ? `${r.max_days_overdue}d` : '—',
+        r.display_name, String(r.open_invoice_count ?? 0), formatMoney(Number(r.outstanding || 0), r.currency || 'EUR'), r.oldest_due_at ?? '—', r.max_days_overdue > 0 ? `${r.max_days_overdue}d` : '—',
       ])} />
     );
   }
   if (report === 'top_supplier_outstanding') {
     return (
       <Table headers={['Supplier', 'Open bills', 'Outstanding', 'Oldest due', 'Max overdue']} totals={totals} rows={rows.map((r: any) => [
-        r.display_name, String(r.open_bill_count ?? 0), formatMoney(Number(r.outstanding || 0)), r.oldest_due_at ?? '—', r.max_days_overdue > 0 ? `${r.max_days_overdue}d` : '—',
+        r.display_name, String(r.open_bill_count ?? 0), formatMoney(Number(r.outstanding || 0), r.currency || 'EUR'), r.oldest_due_at ?? '—', r.max_days_overdue > 0 ? `${r.max_days_overdue}d` : '—',
       ])} />
     );
   }

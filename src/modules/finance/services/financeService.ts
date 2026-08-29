@@ -3308,11 +3308,19 @@ export interface FinanceSettings {
   updated_at: string;
 }
 
-export interface SalesPerDayRow { period: string; invoice_count: number; revenue_net: number; gross_margin: number }
+/**
+ * Report rows carry the CURRENCY their money is in, and the reports group by it.
+ *
+ * They used to sum across currencies and return one number, which the formatter then labelled with
+ * its default of euro. Nothing was wrong in a single-currency workspace and everything was wrong the
+ * day it was not — silently, because a mislabelled sum is still a valid number. Grouping splits the
+ * rows instead, so a total in no currency at all cannot be produced.
+ */
+export interface SalesPerDayRow { period: string; invoice_count: number; revenue_net: number; gross_margin: number; currency: string }
 /** Daily cash movements (Oxygen "Εισπράξεις/Πληρωμές"): settled cash in vs out per day. */
-export interface CashflowPerDayRow { period: string; receipts: number; payments: number; difference: number; payment_count: number }
+export interface CashflowPerDayRow { period: string; receipts: number; payments: number; difference: number; payment_count: number; currency: string }
 /** P&L per finance category (Oxygen "Αναφορά ανά Επ. Κατηγορία"). */
-export interface PnlPerCategoryRow { category_id: string | null; category_name: string; income: number; customer_credits: number; expenses: number; supplier_credits: number; net: number; vat_income: number; vat_expense: number }
+export interface PnlPerCategoryRow { category_id: string | null; category_name: string; income: number; customer_credits: number; expenses: number; supplier_credits: number; net: number; vat_income: number; vat_expense: number; currency: string }
 /**
  * `reverse_charge_*` are the two legs of an intra-EU acquisition (myDATA 13.x/14.x): the VAT we
  * self-assess and the identical amount we reclaim in the same filing. They net to zero, and BOTH
@@ -3335,7 +3343,7 @@ export interface PartyLedgerRow {
 }
 export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed' | 'not_transmitted';
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
-export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
+export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number; currency: string }
 /** One Intrastat declaration line: commodity code x partner country x country of origin. */
 export interface IntrastatRow {
   cn8: string;
@@ -3348,15 +3356,15 @@ export interface IntrastatRow {
   lines: number;
 }
 
-export interface MyfRow { direction: 'sales' | 'purchases'; counterparty_name: string; vat_number: string | null; doc_count: number; net: number; vat: number; gross: number }
-export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
-export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null; on_hand: number }
-export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
-export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number }
+export interface MyfRow { direction: 'sales' | 'purchases'; counterparty_name: string; vat_number: string | null; doc_count: number; net: number; vat: number; gross: number; currency: string }
+export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number; currency: string }
+export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null; on_hand: number; currency: string }
+export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number; currency: string }
+export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number; currency: string }
 export interface OpenTaskRow { quote_id: string; quote_label: string; kind: string; scheduled_for: string; days_until: number; body: string | null; owner_user_id: string | null }
 
-export interface SalesPerFactoryRow { factory_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number }
-export interface SpendPerSupplierRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; bill_count: number; billed_total: number; paid_total: number; outstanding: number }
+export interface SalesPerFactoryRow { factory_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number; currency: string }
+export interface SpendPerSupplierRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; bill_count: number; billed_total: number; paid_total: number; outstanding: number; currency: string }
 export interface CashOutPerCategoryRow {
   category_id: string | null;
   /** 'Uncategorised' when the payment named none — a row, never an omission. */
@@ -3368,9 +3376,9 @@ export interface CashOutPerCategoryRow {
   total_paid: number;
 }
 
-export interface PaymentsPerCounterpartyOutRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_paid: number }
-export interface PaymentsPerCounterpartyInRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_received: number }
-export interface SalesPerDesignerRow { user_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number; accepted_quote_count: number }
+export interface PaymentsPerCounterpartyOutRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_paid: number; currency: string }
+export interface PaymentsPerCounterpartyInRow { party_type: 'company'|'contact'; party_id: string | null; display_name: string; payment_count: number; total_received: number; currency: string }
+export interface SalesPerDesignerRow { user_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number; accepted_quote_count: number; currency: string }
 export interface TopOutstandingRow {
   party_type: 'company'|'contact';
   party_id: string | null;
@@ -3380,6 +3388,9 @@ export interface TopOutstandingRow {
   outstanding: number;
   oldest_due_at: string | null;
   max_days_overdue: number;
+  /** The currency this party's open balance is denominated in. */
+  currency: string;
+
 }
 
 // v2 method bundle — merged into financeService below so callers see one symbol.
