@@ -17,6 +17,7 @@ import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompet
 import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
+import { WebsiteCannibalisationPanel } from '@/components/core/Profile/WebsiteCannibalisationPanel';
 import { HubEmptyState, HubStatGrid, HubStatTile } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
@@ -571,6 +572,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         <TabsContent value="gsc" className="space-y-4">
           <WebsiteGscPanel website={website} />
           <WebsiteAnalyticsPanel website={website} />
+          {/* Cannibalisation lives here because it is derived entirely from Search
+              Console's query+page pair — the same feed, read a different way. */}
+          <WebsiteCannibalisationPanel website={website} />
         </TabsContent>
 
         {/* Rankings & Links (DataForSEO domain intel) */}

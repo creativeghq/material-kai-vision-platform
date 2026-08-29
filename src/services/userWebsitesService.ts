@@ -280,6 +280,27 @@ export interface GaSummary {
 
 export interface GaProperty { property: string; name: string; account: string }
 
+export interface CannibalItem {
+  query: string;
+  page_count: number;
+  impressions: number;
+  clicks: number;
+  best_position: number | null;
+  pages: { page: string; impressions: number; clicks: number; position: number | null }[];
+  /** False when Google's preferred page is NOT the one earning the clicks. */
+  leader_is_best_converter: boolean;
+  severity: 'high' | 'medium' | 'low';
+}
+
+export interface CannibalReport {
+  status: 'ok' | 'not_connected' | 'not_collected' | string;
+  window_days: number;
+  min_impressions?: number;
+  queries_checked?: number;
+  items: CannibalItem[];
+  note: string | null;
+}
+
 export interface TrackedKeywordRow {
   id: string;
   keyword: string;
@@ -812,6 +833,15 @@ export const userWebsitesService = {
     if (error) throw new Error(await edgeErrorMessage(error, 'Analytics sync failed'));
     if (!data?.ok) throw new Error(data?.error || 'Analytics sync failed');
     return data;
+  },
+
+  async cannibalisation(websiteId: string, days = 90, minImpressions = 10): Promise<CannibalReport | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_cannibalisation' as any,
+      { p_website_id: websiteId, p_days: days, p_min_impressions: minImpressions } as any,
+    );
+    if (error) throw error;
+    return (data as CannibalReport) ?? null;
   },
 
   async rankSummary(websiteId: string, days = 90): Promise<RankSummary | null> {
