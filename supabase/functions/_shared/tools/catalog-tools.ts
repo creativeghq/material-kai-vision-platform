@@ -118,7 +118,25 @@ async function ensureUniqueSlug(supabase: any, base: string): Promise<string> {
   return `${base}-${Date.now()}`;
 }
 
-async function loadCatalog(supabase: any, catalogId: string, ownerId: string) {
+/**
+ * The gate for nine catalog tools — and it did not know about workspaces (#395).
+ *
+ * `catalog_id` is a model-supplied argument, the client here is SERVICE-ROLE, and the only check
+ * was `owner_user_id === userId`. That is a USER identity, not a tenancy binding: a catalog you
+ * own in workspace B was fully readable, editable and publishable from a workspace-A session, so
+ * one agent turn could pull another tenant's catalogue body into this workspace's work. CLAUDE.md
+ * invariant 1 asks for both — derive the workspace from the verified JWT, and prove the target
+ * belongs to it. The sibling path 130 lines below already does exactly that for source PDFs, with
+ * a comment calling it a BOLA guard; this one was simply never given the workspace.
+ *
+ * The owner check STAYS. Removing it would widen access to every teammate, which is a product
+ * decision about who may edit a colleague's catalogue, not a security fix — and widening access
+ * while closing a hole is how a fix becomes a second finding.
+ *
+ * A catalog with NO workspace (`create_catalog` accepts a null one) stays reachable by its owner:
+ * it belongs to no tenant, so there is no tenant to leak it across.
+ */
+async function loadCatalog(supabase: any, catalogId: string, ownerId: string, workspaceId: string | null) {
   const { data, error } = await supabase
     .from('presentation_catalogs')
     .select('*')
@@ -126,6 +144,10 @@ async function loadCatalog(supabase: any, catalogId: string, ownerId: string) {
     .maybeSingle();
   if (error || !data) return { error: error?.message || 'Catalog not found' };
   if (data.owner_user_id !== ownerId) return { error: 'Not authorized for this catalog' };
+  // 404-style on a tenancy mismatch, so an id cannot be probed for existence.
+  if (workspaceId && data.workspace_id && data.workspace_id !== workspaceId) {
+    return { error: 'Catalog not found' };
+  }
   return { catalog: data };
 }
 
@@ -247,14 +269,14 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. attach_catalog_pdfs
 // ─────────────────────────────────────────────────────────────────────────────
-export const createAttachCatalogPdfsTool = (userId: string, onChunk: ChunkSink) => {
+export const createAttachCatalogPdfsTool = (userId: string, workspaceId: string | null, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
     async (input: { catalog_id: string; source_pdf_ids: string[] }) => {
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'attach', status: 'running', status_line: 'Linking source PDFs…' });
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) {
           emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'attach', status: 'failed', error_message: error });
           return JSON.stringify({ error });
@@ -334,7 +356,7 @@ export const createAttachCatalogPdfsTool = (userId: string, onChunk: ChunkSink) 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. extract_from_catalog_pdfs
 // ─────────────────────────────────────────────────────────────────────────────
-export const createExtractFromCatalogPdfsTool = (userId: string, userJwt: string | undefined, onChunk: ChunkSink) => {
+export const createExtractFromCatalogPdfsTool = (userId: string, workspaceId: string | null, userJwt: string | undefined, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
@@ -347,7 +369,7 @@ export const createExtractFromCatalogPdfsTool = (userId: string, userJwt: string
       const maxResults = input.max_results ?? 12;
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'extract', status: 'running', status_line: `Vision-extracting "${input.query}"…` });
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) {
           emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'extract', status: 'failed', error_message: error });
           return JSON.stringify({ error });
@@ -512,6 +534,11 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
       template_id?: string;
     }) => {
       try {
+        // Scoped to THIS workspace as well as this uploader (#395). `attach_catalog_pdfs` already
+        // filters source PDFs by `catalog.workspace_id` — under a comment naming it a BOLA guard —
+        // and this path, which pulls a PDF's whole translated content into a new catalog, checked
+        // only who uploaded it. A PDF you uploaded in another workspace was extractable into this
+        // one, which moves a tenant's document across the boundary in a single agent turn.
         const { data: pdf, error: pdfErr } = await supabase
           .from('catalog_source_pdfs')
           .select('*')
@@ -519,6 +546,9 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
           .maybeSingle();
         if (pdfErr || !pdf) return JSON.stringify({ error: pdfErr?.message || 'Source PDF not found' });
         if (pdf.uploaded_by !== userId) return JSON.stringify({ error: 'Not authorized for this PDF' });
+        if (workspaceId && pdf.workspace_id && pdf.workspace_id !== workspaceId) {
+          return JSON.stringify({ error: 'Source PDF not found' });
+        }
 
         let catalogId = input.target_catalog_id;
         if (!catalogId) {
@@ -550,7 +580,7 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
           if (createErr || !created) return JSON.stringify({ error: createErr?.message || 'Failed to create target catalog' });
           catalogId = created.id;
         } else {
-          const { catalog, error: loadErr } = await loadCatalog(supabase, catalogId, userId);
+          const { catalog, error: loadErr } = await loadCatalog(supabase, catalogId, userId, workspaceId);
           if (loadErr || !catalog) return JSON.stringify({ error: loadErr });
           if (!catalog.source_pdf_ids?.includes(input.source_pdf_id)) {
             await supabase
@@ -646,7 +676,7 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. add_material_to_catalog
 // ─────────────────────────────────────────────────────────────────────────────
-export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSink) => {
+export const createAddMaterialToCatalogTool = (userId: string, workspaceId: string | null, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
@@ -667,7 +697,7 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
       };
     }) => {
       try {
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) return JSON.stringify({ error });
 
         const body = catalog.body_data || { sections: [] };
@@ -834,7 +864,7 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. find_image_for_material
 // ─────────────────────────────────────────────────────────────────────────────
-export const createFindImageForMaterialTool = (userId: string, onChunk: ChunkSink) => {
+export const createFindImageForMaterialTool = (userId: string, workspaceId: string | null, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
@@ -849,7 +879,7 @@ export const createFindImageForMaterialTool = (userId: string, onChunk: ChunkSin
       const maxCandidates = input.max_candidates ?? 6;
       const searchDbFirst = input.search_db_first !== false;
       try {
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) return JSON.stringify({ error });
 
         const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
@@ -923,14 +953,14 @@ export const createFindImageForMaterialTool = (userId: string, onChunk: ChunkSin
 // ─────────────────────────────────────────────────────────────────────────────
 // 7. generate_catalog_pdf
 // ─────────────────────────────────────────────────────────────────────────────
-export const createGenerateCatalogPdfTool = (userId: string, onChunk: ChunkSink) => {
+export const createGenerateCatalogPdfTool = (userId: string, workspaceId: string | null, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
     async (input: { catalog_id: string; regenerate?: boolean; layout?: 'list' | 'grid'; proforma?: boolean; vat_rate?: number }) => {
       try {
         emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'generate', status: 'running', status_line: 'Rendering A4 PDF…' });
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) {
           emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'generate', status: 'failed', error_message: error });
           return JSON.stringify({ error });
@@ -1007,14 +1037,14 @@ export const createGenerateCatalogPdfTool = (userId: string, onChunk: ChunkSink)
 // ─────────────────────────────────────────────────────────────────────────────
 // 8. adjust_catalog_pricing — proportional re-price to a target (no invented numbers)
 // ─────────────────────────────────────────────────────────────────────────────
-export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSink) => {
+export const createAdjustCatalogPricingTool = (userId: string, workspaceId: string | null, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
   return tool(
     async (input: { catalog_id: string; mode: 'target_total' | 'delta' | 'percent' | 'per_item'; amount: number; basis?: 'payable' | 'net' }) => {
       try {
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) return JSON.stringify({ error: error || 'Catalog not found' });
 
         const body = catalog.body_data || {};
@@ -1174,7 +1204,7 @@ export const createAdjustCatalogPricingTool = (userId: string, onChunk: ChunkSin
 // ─────────────────────────────────────────────────────────────────────────────
 // 9. publish_catalog
 // ─────────────────────────────────────────────────────────────────────────────
-export const createPublishCatalogTool = (userId: string, onChunk: ChunkSink) => {
+export const createPublishCatalogTool = (userId: string, workspaceId: string | null, onChunk: ChunkSink) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   return tool(
@@ -1183,7 +1213,7 @@ export const createPublishCatalogTool = (userId: string, onChunk: ChunkSink) => 
         if (!input.unpublish) {
           emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'publish', status: 'running', status_line: 'Minting public slug…' });
         }
-        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId);
+        const { catalog, error } = await loadCatalog(supabase, input.catalog_id, userId, workspaceId);
         if (error || !catalog) {
           emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'publish', status: 'failed', error_message: error });
           return JSON.stringify({ error });

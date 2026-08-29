@@ -2985,28 +2985,28 @@ async function executeAgent(
       tools.push(createCreateCatalogTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('attach_catalog_pdfs') && createAttachCatalogPdfsTool) {
-      tools.push(createAttachCatalogPdfsTool(userId, onChunk));
+      tools.push(createAttachCatalogPdfsTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('extract_from_catalog_pdfs') && createExtractFromCatalogPdfsTool) {
-      tools.push(createExtractFromCatalogPdfsTool(userId, userJwt, onChunk));
+      tools.push(createExtractFromCatalogPdfsTool(userId, workspaceId, userJwt, onChunk));
     }
     if (config.tools.includes('translate_pdf_to_catalog') && createTranslatePdfToCatalogTool) {
       tools.push(createTranslatePdfToCatalogTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('add_material_to_catalog') && createAddMaterialToCatalogTool) {
-      tools.push(createAddMaterialToCatalogTool(userId, onChunk));
+      tools.push(createAddMaterialToCatalogTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('find_image_for_material') && createFindImageForMaterialTool) {
-      tools.push(createFindImageForMaterialTool(userId, onChunk));
+      tools.push(createFindImageForMaterialTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('adjust_catalog_pricing') && createAdjustCatalogPricingTool) {
-      tools.push(createAdjustCatalogPricingTool(userId, onChunk));
+      tools.push(createAdjustCatalogPricingTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('generate_catalog_pdf') && createGenerateCatalogPdfTool) {
-      tools.push(createGenerateCatalogPdfTool(userId, onChunk));
+      tools.push(createGenerateCatalogPdfTool(userId, workspaceId, onChunk));
     }
     if (config.tools.includes('publish_catalog') && createPublishCatalogTool) {
-      tools.push(createPublishCatalogTool(userId, onChunk));
+      tools.push(createPublishCatalogTool(userId, workspaceId, onChunk));
     }
   }
 
