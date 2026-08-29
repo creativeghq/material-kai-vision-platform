@@ -69,7 +69,15 @@ export const accountingExportService = {
   /** Sales journal — issued invoices/receipts + customer credit notes in the period. */
   async salesJournal(workspaceId: string, from: string, to: string): Promise<JournalRow[]> {
     const r = inRange(from, to);
-    const [{ data: invoices }, { data: creditNotes }] = await Promise.all([
+    /**
+     * BOTH reads are checked (#351 S6).
+     *
+     * This destructured `data` only. If the `invoices` read failed while `credit_notes` succeeded,
+     * a month with €10,000 of sales exported as €0 of sales plus whatever credits existed — and it
+     * was handed to an accountant as a complete journal. A short export is indistinguishable from
+     * a quiet month.
+     */
+    const [invRes, cnRes] = await Promise.all([
       supabase.from('invoices')
         .select('document_type, internal_number, legal_number, series, customer_company_id, customer_contact_id, subtotal_net, vat_amount, total, fiscal_mark, fiscal_status, status, issued_at')
         .eq('workspace_id', workspaceId).not('issued_at', 'is', null)
@@ -80,13 +88,18 @@ export const accountingExportService = {
         .gte('issued_at', r.gte).lte('issued_at', r.lte),
     ]);
 
-    const inv = invoices ?? [];
-    const cns = creditNotes ?? [];
+    if (invRes.error) throw new Error(`Sales journal: the invoices could not be read (${invRes.error.message}). Nothing was exported.`);
+    if (cnRes.error) throw new Error(`Sales journal: the credit notes could not be read (${cnRes.error.message}). Nothing was exported.`);
+    const inv = invRes.data ?? [];
+    const cns = cnRes.data ?? [];
     // Credit notes carry no direct counterpart — resolve via their source invoice.
     const invoiceById = new Map<string, any>();
     const srcIds = [...new Set(cns.map((c: any) => c.invoice_id).filter(Boolean))];
     if (srcIds.length) {
-      const { data: src } = await supabase.from('invoices').select('id, customer_company_id, customer_contact_id').in('id', srcIds);
+      // Checked too (#351 S6): a credit note whose source invoice could not be read loses its
+      // counterparty, and an unnamed party on a VAT journal is a row an accountant cannot post.
+      const { data: src, error: srcErr } = await supabase.from('invoices').select('id, customer_company_id, customer_contact_id').in('id', srcIds);
+      if (srcErr) throw new Error(`Sales journal: a credit note's source invoice could not be read (${srcErr.message}). Nothing was exported.`);
       for (const s of src ?? []) invoiceById.set((s as any).id, s);
     }
 
@@ -125,7 +138,9 @@ export const accountingExportService = {
   /** Purchases journal — supplier bills + supplier credit notes in the period. */
   async purchasesJournal(workspaceId: string, from: string, to: string): Promise<JournalRow[]> {
     const r = inRange(from, to);
-    const [{ data: bills }, { data: scns }] = await Promise.all([
+    // Same rule as the sales journal above (#351 S6): a purchase journal missing its bills is a
+    // VAT return missing its input tax.
+    const [billRes, scnRes] = await Promise.all([
       supabase.from('supplier_bills')
         .select('supplier_bill_number, supplier_company_id, supplier_contact_id, subtotal_net, vat_amount, total, status, issued_at')
         .eq('workspace_id', workspaceId).not('issued_at', 'is', null)
@@ -136,7 +151,9 @@ export const accountingExportService = {
         .gte('issued_at', r.gte).lte('issued_at', r.lte),
     ]);
 
-    const b = bills ?? [], s = scns ?? [];
+    if (billRes.error) throw new Error(`Purchases journal: the supplier bills could not be read (${billRes.error.message}). Nothing was exported.`);
+    if (scnRes.error) throw new Error(`Purchases journal: the supplier credit notes could not be read (${scnRes.error.message}). Nothing was exported.`);
+    const b = billRes.data ?? [], s = scnRes.data ?? [];
     const parties = await buildPartyLookup([
       ...b.map((x: any) => ({ company_id: x.supplier_company_id, contact_id: x.supplier_contact_id })),
       ...s.map((x: any) => ({ company_id: x.supplier_company_id, contact_id: x.supplier_contact_id })),

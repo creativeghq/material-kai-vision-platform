@@ -3818,6 +3818,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       `coverPaid` and so does this. Rendering the un-netted figure here once put
                       "Paid to suppliers 600 / Net cash 400" a few centimetres above "Cash in bank
                       now 1,000" on one screen. One derivation, or the screen argues with itself. */}
+                  {coverSettlementUnknown && (
+                    /* Say it (#351 A3). A covering order whose settlement could not be read is
+                       excluded from `coverPaid`, so this figure is a best case — and a best case
+                       presented as a fact is how the last settlement bug read. */
+                    <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                      One covering purchase order&apos;s settlement could not be read — the figure below may be higher than the real one.
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-border/50 pt-1 font-medium"><span>Cash in bank now</span><span className={`tabular-nums ${fin.received - fin.paid_out - coverPaid >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.received - fin.paid_out - coverPaid, order.currency)}</span></div>
                   <p className="text-[10px] text-muted-foreground pt-0.5">Profit is earned when you sell; cash is what's actually landed. The difference is unpaid balances plus VAT you're holding for the tax office — not lost money.</p>
                 </div>

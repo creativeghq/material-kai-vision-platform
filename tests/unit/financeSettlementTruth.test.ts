@@ -136,3 +136,55 @@ describe('#351 D3 — report periods are local days', () => {
     }
   });
 });
+
+describe('#351 S6/A3/A2 — a money read that failed is not a small number', () => {
+  const exportService = read('src/modules/finance/services/accountingExportService.ts');
+
+  it('both journals check both of their reads', () => {
+    // These destructured `data` only. If the invoices read failed while credit notes succeeded, a
+    // month with EUR 10,000 of sales exported as EUR 0 of sales plus whatever credits existed —
+    // and it went to an accountant as a complete journal.
+    for (const marker of [
+      'Sales journal: the invoices could not be read',
+      'Sales journal: the credit notes could not be read',
+      'Purchases journal: the supplier bills could not be read',
+      'Purchases journal: the supplier credit notes could not be read',
+    ]) {
+      expect(exportService, marker).toContain(marker);
+    }
+  });
+
+  it('a short export is refused outright, never handed over as complete', () => {
+    const throws = exportService.match(/Nothing was exported/g) ?? [];
+    expect(throws.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("the credit note's source-invoice read is checked too", () => {
+    // An unnamed counterparty on a VAT journal is a row an accountant cannot post.
+    expect(exportService).toMatch(/const \{ data: src, error: srcErr \}/);
+  });
+
+  it('a covering PO with an unread settlement is null, not zero', () => {
+    // `settled: 0` / `outstanding: total` is a local re-derivation — the comment right above it
+    // warns that would be "the sixth implementation of a money quantity". A fully-paid PO showed
+    // as still owed, so the menu offered "Mark the supplier paid" for goods already paid.
+    expect(ordersPanel).toMatch(/settled: number \| null; outstanding: number \| null;/);
+    expect(ordersPanel).toMatch(/settled: bal \? Number\(bal\.get\(r\.id\)\?\.settled \?\? 0\) : null/);
+    expect(ordersPanel, 'the zero fallback is back')
+      .not.toMatch(/settled: Number\(bal\.get\(r\.id\)\?\.settled \?\? 0\),/);
+  });
+
+  it('and the screen says the cash figure may be too high', () => {
+    expect(ordersPanel).toMatch(/coverSettlementUnknown/);
+    expect(raw('src/modules/finance/components/OrdersPanel.tsx'))
+      .toMatch(/may be higher than the real one/);
+  });
+
+  it('a failed document issue is reported, and does not also claim success', () => {
+    expect(recordPayment).toMatch(/let issueDocError: string \| null = null;/);
+    expect(recordPayment).toMatch(/document NOT issued/);
+    // The plain success line only on a clean run — otherwise the operator gets both toasts.
+    expect(recordPayment).toMatch(/\} else if \(!issueDocError\) \{/);
+    expect(recordPayment, 'the empty catch is back').not.toMatch(/catch \{ \/\* issue separately from Actions \*\/ \}/);
+  });
+});

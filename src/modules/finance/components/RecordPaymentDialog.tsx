@@ -496,7 +496,33 @@ export const RecordPaymentDialog: React.FC<{
       });
       // Order-attached: also create the order's receipt/invoice when asked (best-effort — the
       // payment is already recorded; a doc-issue hiccup shouldn't roll it back).
-      if (issuesFiscal && onIssueDoc) { try { await onIssueDoc(pickedFiscalKind); } catch { /* issue separately from Actions */ } }
+      /**
+       * The payment stands whatever happens to the document — but SAY so (#351 A2).
+       *
+       * This was `catch { }` with no toast, directly above a block that reports
+       * `creditNoteFiscalError` properly. The current caller happens to show its own destructive
+       * toast, so the failure is visible today; the operator just gets a success toast beside it.
+       * An empty catch is a trap for the next `onIssueDoc` that throws instead of handling.
+       *
+       * Best-effort is right — the money is recorded and a doc hiccup must not roll it back. What
+       * is not right is silence.
+       */
+      let issueDocError: string | null = null;
+      if (issuesFiscal && onIssueDoc) {
+        try {
+          await onIssueDoc(pickedFiscalKind);
+        } catch (docErr) {
+          issueDocError = docErr instanceof Error ? docErr.message : String(docErr);
+          console.error('[payments] the document could not be issued', docErr);
+        }
+      }
+      if (issueDocError) {
+        toast({
+          title: kind === 'refund' ? 'Refund recorded — document NOT issued' : 'Payment recorded — document NOT issued',
+          description: `${issueDocError} Issue it from the order's Actions menu.`,
+          variant: 'destructive',
+        });
+      }
       if (creditNoteFiscalError) {
         // Cash-out logged + credit note created, but myDATA transmission failed —
         // don't pretend it's filed. Operator must retransmit from the credit-note list.
@@ -505,7 +531,10 @@ export const RecordPaymentDialog: React.FC<{
           description: `The credit note was created and the cash-out logged, but it was NOT accepted by myDATA: ${creditNoteFiscalError}. Retransmit it from the credit notes list.`,
           variant: 'destructive',
         });
-      } else {
+      } else if (!issueDocError) {
+        // Only a clean run gets the plain success line. The document-failure toast above already
+        // says the payment was recorded, so adding a bare "Payment recorded" beside it is the
+        // confusing pair the audit describes.
         toast({
           title: kind === 'refund' ? 'Refund recorded' : 'Payment recorded',
           description: creditNoteRef ? 'Credit note issued to myDATA and the cash-out logged.' : undefined,
