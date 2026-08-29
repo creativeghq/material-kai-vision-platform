@@ -27,12 +27,11 @@
  * configured breaks never once reached a document.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
+import { readSource, strippedSource } from '../helpers/sourceIndex';
 
 const ROOT = process.cwd();
-const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
 
 /**
@@ -66,11 +65,6 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Strip comments so prose describing the old bug doesn't count as the bug. */
-function stripComments(src: string): string {
-  return sharedStripComments(src);
-}
-
 const FILES = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)))
   .filter((f) => posix(f) !== 'src/integrations/supabase/types.ts');
 
@@ -80,7 +74,7 @@ describe('pricing_rules.scope', () => {
   });
 
   it('the TypeScript union matches the constraint vocabulary exactly', () => {
-    const src = read(SCOPE_TYPE_FILE);
+    const src = readSource(SCOPE_TYPE_FILE);
     const m = /export type PricingRuleScope\s*=\s*([^;]+);/.exec(src);
     expect(m, `PricingRuleScope is not declared in ${SCOPE_TYPE_FILE}`).toBeTruthy();
     const declared = [...(m![1].matchAll(/'([a-z_]+)'/g))].map((x) => x[1]).sort();
@@ -91,7 +85,7 @@ describe('pricing_rules.scope', () => {
 
   it.each(ALLOWED_SCOPES.filter((s) => AUTHORING_UI[s]))('%s can be authored in the UI', (scope) => {
     const file = AUTHORING_UI[scope]!;
-    const ui = stripComments(read(file));
+    const ui = strippedSource(file);
     expect(
       ui.includes(`'${scope}'`) || ui.includes(`"${scope}"`),
       `scope '${scope}' is allowed by the CHECK but ${file} cannot create it`,
@@ -109,7 +103,7 @@ describe('pricing_rules.scope', () => {
     const WRITE = /(?:upsertPricingRule|from\(['"]pricing_rules['"]\))[\s\S]{0,400}?scope:\s*'([a-z_]+)'/g;
     const offenders: string[] = [];
     for (const f of FILES) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const m of src.matchAll(WRITE)) {
         if (!(ALLOWED_SCOPES as readonly string[]).includes(m[1])) {
           offenders.push(`${posix(f)}: scope: '${m[1]}'`);
@@ -132,7 +126,7 @@ describe('pricing_rules.scope', () => {
   it('every authoring card is mounted somewhere', () => {
     // A card nobody renders is as inert as a rule nothing resolves — the same failure one layer
     // up, and exactly how `price_my_spec` stayed unreachable behind a perfect push site.
-    const all = FILES.map((f) => stripComments(readFileSync(f, 'utf8'))).join('\n');
+    const all = FILES.map((f) => strippedSource(f)).join('\n');
     for (const scope of ALLOWED_SCOPES) {
       const file = AUTHORING_UI[scope];
       if (!file) continue;
@@ -169,7 +163,7 @@ describe('one markup derivation', () => {
     const READS_POLICY = /select\(\s*['"][^'"]*\b(?:default_markup_pct|margin_pct)\b/;
     const offenders: string[] = [];
     for (const f of FILES) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       if (!READS_POLICY.test(src)) continue;
       for (const [i, line] of src.split('\n').entries()) {
         if (APPLIES.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
@@ -209,9 +203,7 @@ describe('one markup derivation', () => {
    * number.
    */
   it('the intake preview passes the maker and the material category, not just the cost', () => {
-    const src = stripComments(readFileSync(
-      join(ROOT, 'src/services/warehouseService.ts'), 'utf8',
-    ));
+    const src = strippedSource(join(ROOT, 'src/services/warehouseService.ts'));
     const call = /rpc\(\s*['"]preview_pending_item_sell_price['"][\s\S]{0,400}?\)/.exec(src)?.[0] ?? '';
     expect(call, 'the preview call was not found at all').not.toBe('');
     for (const arg of ['p_material_category', 'p_manufacturer']) {
@@ -222,9 +214,7 @@ describe('one markup derivation', () => {
       ).toBe(true);
     }
     // And the caller has to actually supply them rather than hardcode null at the next layer up.
-    const card = stripComments(readFileSync(
-      join(ROOT, 'src/modules/finance/components/PendingProductsCard.tsx'), 'utf8',
-    ));
+    const card = strippedSource(join(ROOT, 'src/modules/finance/components/PendingProductsCard.tsx'));
     expect(
       /previewIntakeSellPrice\([\s\S]{0,300}?materialCategory:[\s\S]{0,120}?manufacturer:/.test(card),
       'PendingProductsCard calls the preview without the category and the maker it has on screen',
@@ -243,7 +233,7 @@ describe('one markup derivation', () => {
     'preview_pending_item_sell_price',
     'preview_markup_ladder_price',
   ])('the client actually CALLS %s', (fn) => {
-    const all = FILES.map((f) => stripComments(readFileSync(f, 'utf8'))).join('\n');
+    const all = FILES.map((f) => strippedSource(f)).join('\n');
     const CALL = new RegExp(`rpc\\(\\s*['"]${fn}['"]`);
     expect(
       CALL.test(all),
@@ -260,7 +250,7 @@ describe('one markup derivation', () => {
   it('nothing reads the dropped finance_categories.margin_pct', () => {
     const offenders: string[] = [];
     for (const f of FILES) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       // `margin_pct` is a real, live column on blueprint items and project plans, so merely
       // mentioning it is fine. Only a read or write against `finance_categories` is the defect.
       const RE = /from\(['"]finance_categories['"]\)[\s\S]{0,300}?\bmargin_pct\b/;
@@ -293,7 +283,7 @@ describe('quantity and unit travel together', () => {
     const PRICING = /get_product_price_for_workspace|get_product_price_break|get_supplier_price_break/;
     const offenders: string[] = [];
     for (const f of FILES) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       if (!PRICING.test(src)) continue;
       for (const m of src.matchAll(/p_quantity\s*:/g)) {
         // The pair is always written inside one object literal; 240 chars is comfortably wider
@@ -330,7 +320,7 @@ describe('quantity and unit travel together', () => {
     'supabase/functions/_shared/order-intake/price.ts',
     'supabase/functions/finance-customer-documents/index.ts',
   ])('%s passes quantity to the resolver', (file) => {
-    const src = stripComments(read(file));
+    const src = strippedSource(file);
     expect(
       /p_quantity/.test(src),
       `${file} prices catalog lines but never passes p_quantity, so product_price_breaks cannot ` +

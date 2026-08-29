@@ -31,9 +31,9 @@
  * it there — a green `npm test` says nothing about it.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
+import { readSource, strippedSource } from '../helpers/sourceIndex';
 
 const ROOT = process.cwd();
 const FINANCE_DIRS = [
@@ -50,11 +50,6 @@ function walk(dir: string, out: string[] = []): string[] {
     else if (/\.tsx?$/.test(e)) out.push(p);
   }
   return out;
-}
-
-/** Strip comments so prose describing the old bug doesn't trip the scanner. */
-function stripComments(src: string): string {
-  return sharedStripComments(src);
 }
 
 describe('order settlement has exactly one derivation', () => {
@@ -77,7 +72,7 @@ describe('order settlement has exactly one derivation', () => {
     const HALF = String.raw`(?:\bsettled_(?:in|out)\b|\bsettled(?:In|Out)\b|[?.]\s*\b(?:in|out)\b\s*\?\?)`;
     const RE = new RegExp(`order_type[^\\n]*${HALF}|${HALF}[^\\n]*order_type`);
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         if (RE.test(line)) offenders.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       }
@@ -106,7 +101,7 @@ describe('order settlement has exactly one derivation', () => {
     // it returned. No leading \b now, so orderSettled / totalPaid / netSettled all count.
     const RE = /\btotal\b[^\n]{0,40}[-−]\s*[A-Za-z_$.]*(settled|paid|net)/i;
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         if (RE.test(line)) offenders.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       }
@@ -135,7 +130,7 @@ describe('order settlement has exactly one derivation', () => {
     // `const outstanding[: type] = ...` up to the end of the line.
     const DECL = /\b(?:const|let|var)\s+outstanding\s*(?::[^=]+)?=\s*(.+)$/;
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         const m = DECL.exec(line);
         if (!m) continue;
@@ -162,7 +157,7 @@ describe('order settlement has exactly one derivation', () => {
   it('reads settlement only through ordersService.orderBalances / get_order_settlements', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       // A direct allocation query joined to payment direction = a private settlement derivation.
       if (/from\(['"]payment_allocations['"]\)[\s\S]{0,200}payments?\s*\([^)]*direction/.test(src)) {
         offenders.push(relative(ROOT, f));
@@ -199,7 +194,7 @@ describe('order settlement has exactly one derivation', () => {
     // `balanceById.get(r.id)?.…`, `settlement.payment_status`.
     const DERIVED = /\b(fin|balance|balances|balanceById|settlement|settled|derived)\w*\s*[?.]/i;
     for (const f of walk(join(ROOT, 'src'))) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         for (const m of line.matchAll(SITE)) {
           const idx = m[1];
@@ -275,7 +270,7 @@ describe('quote totals have exactly one derivation', () => {
     const RE = /(net|taxable|aftercash|afterdiscount|priceafter)\w*\s*\*\s*\(?\s*\w*vat\w*\s*\/\s*100/i;
     for (const f of files) {
       if (posix(f) === QUOTE_TOTALS_SOURCE) continue;
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         if (RE.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       }
@@ -292,7 +287,7 @@ describe('quote totals have exactly one derivation', () => {
     const offenders: string[] = [];
     for (const f of files) {
       if (posix(f) === CASH_DISCOUNT_SOURCE) continue;
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       // A copy of the pricing_custom_rules lookup = a second definition of the discount input.
       if (/from\(['"]pricing_custom_rules['"]\)[\s\S]{0,300}cash_payment/.test(src)) {
         offenders.push(posix(f));
@@ -309,7 +304,7 @@ describe('quote totals have exactly one derivation', () => {
   it('saves quote pricing only through the atomic RPC', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       // Writing the cached totals directly bypasses the derivation AND the drift check.
       if (/from\(['"]quotes['"]\)[\s\S]{0,200}\.update\(\{[\s\S]{0,300}grand_total/.test(src)) {
         offenders.push(posix(f));
@@ -345,7 +340,7 @@ describe('quote totals have exactly one derivation', () => {
   it('nothing that inserts a quote line also prices a configuration itself', () => {
     const offenders: string[] = [];
     for (const f of QUOTE_ITEM_WRITERS) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       const writesLines = /from\(['"]quote_items['"]\)[\s\S]{0,200}\.(insert|upsert)\(/.test(src);
       if (writesLines && src.includes('get_configured_product_price')) offenders.push(posix(f));
     }
@@ -360,7 +355,7 @@ describe('quote totals have exactly one derivation', () => {
   it('the agent can still carry a configuration onto a quote', () => {
     // The other half of the same rule. Without this, "route it through the RPC" is satisfied just
     // as well by dropping the capability again — which is the state that produced the bug.
-    const src = readFileSync(join(ROOT, 'supabase/functions/_shared/tools/quote-tools.ts'), 'utf8');
+    const src = readSource(join(ROOT, 'supabase/functions/_shared/tools/quote-tools.ts'));
     expect(src, 'create_quote must accept a configuration_id line').toContain('configuration_id');
     expect(src, 'configured lines must be inserted by the RPC').toContain('add_configuration_to_quote');
   });
@@ -414,7 +409,7 @@ describe('rent settlement has exactly one derivation', () => {
     const RE = /\.filter\([^\n]*status\s*===?\s*['"](?:paid|waived)['"][^\n]*\)[^\n]*\.reduce\(/;
     for (const f of files) {
       if (posix(f) === RENT_SETTLEMENT_SOURCE) continue; // holds the documented fallback
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         if (RE.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       }
@@ -436,7 +431,7 @@ describe('rent settlement has exactly one derivation', () => {
     const DECL = /\b(?:const|let|var)\s+(?:rentReceived|rent_received|rentSettled|rentOutstanding|rent_outstanding)\s*(?::[^=]+)?=\s*(.+)$/;
     for (const f of files) {
       if (posix(f) === RENT_SETTLEMENT_SOURCE) continue;
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         const m = DECL.exec(line);
         if (!m) continue;
@@ -458,7 +453,7 @@ describe('rent settlement has exactly one derivation', () => {
     const offenders: string[] = [];
     for (const f of files) {
       if (posix(f) === RENT_SETTLEMENT_SOURCE) continue;
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       if (/from\(['"]payment_allocations['"]\)/.test(src)) offenders.push(posix(f));
     }
     expect(
@@ -530,7 +525,7 @@ describe('project job cost has exactly one derivation', () => {
   it('assigns P&L figures only by reading the derivation', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         const m = PNL_DECL.exec(line);
         if (!m) continue;
@@ -549,7 +544,7 @@ describe('project job cost has exactly one derivation', () => {
   it('never re-sums time_entries for labor cost in the projects module', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       if (RAW_INPUT_QUERY.test(src)) offenders.push(posix(f));
     }
     expect(
@@ -606,7 +601,7 @@ describe('asset book value has exactly one derivation', () => {
   it('assigns book value only by reading the derivation', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         const m = DECL.exec(line);
         if (!m) continue;
@@ -666,7 +661,7 @@ describe('the line sell price has exactly one derivation', () => {
   it('only the authoring surfaces touch pricing_custom_rules at all', () => {
     const offenders = files
       .filter((f) => !AUTHORING.includes(posix(f)))
-      .filter((f) => /pricing_custom_rules/.test(stripComments(readFileSync(f, 'utf8'))))
+      .filter((f) => /pricing_custom_rules/.test(strippedSource(f)))
       .map(posix);
     expect(
       offenders,
@@ -682,7 +677,7 @@ describe('the line sell price has exactly one derivation', () => {
     // applies is applying policy; the CRUD above merely lists rows for an editor.
     const LOOKUP = /\.eq\(\s*['"]rule_type['"]/;
     const offenders = files
-      .filter((f) => LOOKUP.test(stripComments(readFileSync(f, 'utf8'))))
+      .filter((f) => LOOKUP.test(strippedSource(f)))
       .map(posix);
     expect(
       offenders,
@@ -696,7 +691,7 @@ describe('the line sell price has exactly one derivation', () => {
 
   it('does not reintroduce a Layer-B style factor', () => {
     const offenders = files
-      .filter((f) => stripComments(readFileSync(f, 'utf8')).includes('layerBFactor'))
+      .filter((f) => strippedSource(f).includes('layerBFactor'))
       .map(posix);
     expect(
       offenders,
@@ -708,7 +703,7 @@ describe('the line sell price has exactly one derivation', () => {
     const SCALE = /\b(suggested_sell|final_sell|unitPrice|recomputed)\b[^\n;]*\*\s*factor\b/;
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         if (SCALE.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       }
@@ -775,7 +770,7 @@ describe('the product catalog price has one derivation and one upsert target', (
   it('never writes or derives discount_price in TypeScript', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const [i, line] of src.split('\n').entries()) {
         if (/\bdiscount_price\b/.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       }
@@ -811,7 +806,7 @@ describe('the product catalog price has one derivation and one upsert target', (
   it('every product_prices upsert names the full unique-index tuple', () => {
     const offenders: string[] = [];
     for (const f of files) {
-      const src = stripComments(readFileSync(f, 'utf8'));
+      const src = strippedSource(f);
       for (const u of productPriceUpserts(src)) {
         if (u.target !== 'workspace_id,product_id,variant_key') {
           // A missing onConflict is not a lucky escape: it infers the primary key `id`, which a

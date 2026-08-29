@@ -20,9 +20,9 @@
  * drifted precisely because convention was the only thing holding them together.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { stripComments as sharedStripComments } from '../helpers/stripComments';
+import { readSource, strippedSource } from '../helpers/sourceIndex';
 import {
   buildMarketScope,
   resolveMarket,
@@ -30,7 +30,6 @@ import {
 } from '../../supabase/functions/_shared/vocabularies.ts';
 
 const ROOT = process.cwd();
-const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 
 /** Source files we scan: the app + the edge functions, skipping build output and vendored deps. */
 function sourceFiles(): string[] {
@@ -103,7 +102,7 @@ describe('country vocabularies are data, not constants', () => {
     const offenders: string[] = [];
     for (const f of files) {
       if (exempt.has(relative(ROOT, f))) continue;
-      const code = sharedStripComments(read(f));
+      const code = strippedSource(f);
       // Count distinct market names that appear as quoted string literals.
       const quoted = new Set<string>();
       for (const name of MARKET_NAMES) {
@@ -121,7 +120,7 @@ describe('country vocabularies are data, not constants', () => {
   });
 
   it('the constants this replaced are gone, not merely unused', () => {
-    const all = files.map((f) => sharedStripComments(read(f))).join('\n');
+    const all = files.map((f) => strippedSource(f)).join('\n');
     // Named individually rather than by a generic pattern: `COUNTRY_CODES` is deliberately NOT on
     // this list, because two unrelated and legitimate vocabularies use that name — phone dial
     // codes in ProfileTab, and the EU VAT prefix set in vies-validate / role-upgrade-requests,
@@ -138,21 +137,23 @@ describe('country vocabularies are data, not constants', () => {
   });
 
   it('both runtimes have a resolver, and neither restates a vocabulary', () => {
-    const edge = read(join(ROOT, 'supabase/functions/_shared/vocabularies.ts'));
-    const app = read(join(ROOT, 'src/services/vocabularies.ts'));
-    for (const [name, src] of [['edge', edge], ['frontend', app]] as const) {
-      expect(src.includes('reference_vocabularies'), `${name} resolver must read the table`).toBe(true);
+    const resolvers = [
+      ['edge', 'supabase/functions/_shared/vocabularies.ts'],
+      ['frontend', 'src/services/vocabularies.ts'],
+    ] as const;
+    for (const [name, file] of resolvers) {
+      expect(readSource(file).includes('reference_vocabularies'), `${name} resolver must read the table`).toBe(true);
       // A resolver that silently substitutes a default is the failure this change removes.
       expect(
-        /\bPoland\b|\bTurkey\b|\bSerbia\b/.test(sharedStripComments(src)),
+        /\bPoland\b|\bTurkey\b|\bSerbia\b/.test(strippedSource(file)),
         `${name} resolver contains market names — it must READ the vocabulary, never carry one`,
       ).toBe(false);
     }
   });
 
   it('the scope clause has ONE derivation, shared by both callers', () => {
-    const b2b = sharedStripComments(read(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts')));
-    const flow = sharedStripComments(read(join(ROOT, 'supabase/functions/flow-engine/index.ts')));
+    const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'));
+    const flow = strippedSource(join(ROOT, 'supabase/functions/flow-engine/index.ts'));
     expect(b2b.includes('buildMarketScope('), 'b2b-tools must use buildMarketScope').toBe(true);
     expect(flow.includes('buildMarketScope('), 'flow-engine must use buildMarketScope').toBe(true);
     // flow-engine's own copy said "across Europe and major global manufacturing hubs" for a bare
@@ -164,7 +165,7 @@ describe('country vocabularies are data, not constants', () => {
   });
 
   it('region is a real enum built from the vocabulary, not a free string', () => {
-    const b2b = sharedStripComments(read(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts')));
+    const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'));
     expect(
       /region:\s*z\.enum\(groupKeys\(markets\)/.test(b2b),
       'b2b_manufacturer_search.region must be z.enum(groupKeys(markets)) — as a bare string, an ' +
@@ -264,8 +265,8 @@ describe('resolveMarket — a country string resolves to the market row it means
   });
 
   it('the aliases are read off the row — no source file carries a second list of them', () => {
-    const edge = sharedStripComments(read(join(ROOT, 'supabase/functions/_shared/vocabularies.ts')));
-    const app = sharedStripComments(read(join(ROOT, 'src/services/vocabularies.ts')));
+    const edge = strippedSource(join(ROOT, 'supabase/functions/_shared/vocabularies.ts'));
+    const app = strippedSource(join(ROOT, 'src/services/vocabularies.ts'));
     expect(/aliases/.test(edge), 'the edge resolver must read metadata.aliases').toBe(true);
     for (const [name, src] of [['edge', edge], ['frontend', app]] as const) {
       expect(
@@ -277,7 +278,7 @@ describe('resolveMarket — a country string resolves to the market row it means
   });
 
   it('the b2b search resolves its country instead of matching the name exactly', () => {
-    const b2b = sharedStripComments(read(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts')));
+    const b2b = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'));
     expect(
       b2b.includes('resolveMarket('),
       'b2b-tools must resolve `country` through resolveMarket — an exact match on `value` dropped ' +

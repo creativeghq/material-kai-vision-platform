@@ -36,9 +36,9 @@
  * destination rather than quietly vouching for it.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
-import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
+import { readSource, strippedSource, blankedSource } from '../helpers/sourceIndex';
 import {
   ordersLink, quotesLink, receivablesLink, payablesLink, companiesLink,
   receivablesBucketLink, CRM_KIND, PROJECTS_LINK, INBOX_LINK,
@@ -46,7 +46,6 @@ import {
 import { readFilterParam } from '../../src/components/core/filters/filterUrl';
 
 const ROOT = process.cwd();
-const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 const rel = (p: string) => relative(ROOT, p).replace(/\\/g, '/');
 
 /**
@@ -63,11 +62,6 @@ function walk(dir: string, out: string[] = []): string[] {
     else if (/\.tsx?$/.test(e)) out.push(p);
   }
   return out;
-}
-
-/** Blank out comments while PRESERVING line numbers, so a documented example URL is not a link. */
-function blankComments(src: string): string {
-  return sharedBlankComments(src);
 }
 
 const SOURCE_ROOTS = ['src', 'supabase/functions'];
@@ -87,7 +81,7 @@ function resolveSpec(spec: string, fromFile: string, name?: string): string | nu
 /** `index.tsx` is often just `export { Page } from './Page'` — follow it to the real component. */
 function followBarrel(file: string, name?: string, hops = 0): string {
   if (hops > 3) return file;
-  const src = read(file);
+  const src = readSource(file);
   if (src.split('\n').filter((l) => l.trim()).length > 6) return file;
   for (const m of src.matchAll(/export\s+\{([^}]+)\}\s+from\s+'([^']+)'/g)) {
     const names = m[1].split(',').map((s) => s.trim().split(/\s+as\s+/).pop()!.trim());
@@ -101,7 +95,7 @@ function followBarrel(file: string, name?: string, hops = 0): string {
 }
 
 function importMap(file: string): Map<string, string> {
-  const src = read(file);
+  const src = readSource(file);
   const map = new Map<string, string>();
   for (const m of src.matchAll(/import\s+(?:\{([^}]+)\}|([A-Za-z0-9_]+))\s+from\s+'([^']+)'/g)) {
     if (m[2]) map.set(m[2], m[3]);
@@ -122,7 +116,7 @@ function routeTable(): { patterns: Set<string>; pageFor: Map<string, string> } {
   const pageFor = new Map<string, string>();
 
   const appFile = join(ROOT, 'src/App.tsx');
-  const app = read(appFile);
+  const app = readSource(appFile);
   const appImports = importMap(appFile);
   for (const m of app.matchAll(/path="([^"]+)"/g)) patterns.add(m[1]);
   // The page is the LEAF of the guard/layout nest — the self-closing element. Wrappers
@@ -142,7 +136,7 @@ function routeTable(): { patterns: Set<string>; pageFor: Map<string, string> } {
   for (const dir of readdirSync(join(ROOT, 'src/modules'))) {
     const file = join(ROOT, 'src/modules', dir, 'index.ts');
     if (!existsSync(file)) continue;
-    const src = read(file);
+    const src = readSource(file);
     const imports = importMap(file);
     for (const m of src.matchAll(/path:\s*'([^']+)'/g)) patterns.add(m[1]);
     for (const m of src.matchAll(/path:\s*'([^']+)'[\s\S]{0,200}?component:\s*([A-Za-z0-9_]+)/g)) {
@@ -189,7 +183,7 @@ const constCache = new Map<string, Map<string, Map<string, string>>>();
 function constMembers(file: string): Map<string, Map<string, string>> {
   if (constCache.has(file)) return constCache.get(file)!;
   const out = new Map<string, Map<string, string>>();
-  const src = blankComments(read(file));
+  const src = blankedSource(file);
   for (const m of src.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*\{([\s\S]*?)\}\s*as\s+const/g)) {
     const members = new Map<string, string>();
     for (const f of m[2].matchAll(/([A-Za-z0-9_]+)\s*:\s*'([^']*)'/g)) members.set(f[1], f[2]);
@@ -211,7 +205,7 @@ function resolveConstRef(file: string, name: string, member: string): string | u
 function tabKeys(file: string, depth = 0, seen = new Set<string>(), followDelegation = true): Set<string> {
   if (seen.has(file) || depth > 2) return new Set();
   seen.add(file);
-  const src = read(file);
+  const src = readSource(file);
   const keys = new Set<string>();
   for (const m of src.matchAll(/<TabsContent\s+[^>]*value="([^"]+)"/g)) keys.add(m[1]);
   // A pane whose key comes from a shared constant: <TabsContent value={FINANCE_TAB.orders}>.
@@ -274,7 +268,7 @@ interface Site { file: string; line: number; }
 function scan(re: RegExp): Map<string, Site[]> {
   const hits = new Map<string, Site[]>();
   for (const file of sourceFiles) {
-    blankComments(read(file)).split('\n').forEach((line, i) => {
+    blankedSource(file).split('\n').forEach((line, i) => {
       for (const m of line.matchAll(re)) {
         const key = m.slice(1).join('|');
         if (!hits.has(key)) hits.set(key, []);
@@ -318,7 +312,7 @@ describe('the route table itself', () => {
   it('never names the /admin/finance prefix in source — it has never been a route', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles) {
-      blankComments(read(file)).split('\n').forEach((line, i) => {
+      blankedSource(file).split('\n').forEach((line, i) => {
         if (line.includes('/admin/finance')) offenders.push(`${rel(file)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       });
     }
@@ -348,7 +342,7 @@ describe('the route table itself', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles) {
       if (ALLOWED.includes(rel(file))) continue;
-      blankComments(read(file)).split('\n').forEach((line, i) => {
+      blankedSource(file).split('\n').forEach((line, i) => {
         // `/admin/crm/users` is the one surface that legitimately stays under /admin.
         const hits = line.split('/admin/crm').length - 1;
         const users = line.split('/admin/crm/users').length - 1;
@@ -393,7 +387,7 @@ describe('the route table itself', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles) {
       if (ALLOWED(rel(file))) continue;
-      blankComments(read(file)).split('\n').forEach((line, i) => {
+      blankedSource(file).split('\n').forEach((line, i) => {
         // A redirect DECLARATION has to name the address it retires; everything else is a link.
         if (line.includes('<Navigate to=')) return;
         for (const prefix of MOVED) {
@@ -478,7 +472,7 @@ describe('notification action_url', () => {
     // motivating case.
     const seed = /[?&](?:q|prompt)=([^"`&\n]*)/g;
     for (const file of sourceFiles) {
-      blankComments(read(file)).split('\n').forEach((line, i) => {
+      blankedSource(file).split('\n').forEach((line, i) => {
         for (const m of line.matchAll(seed)) {
           // `<something>_id <value>` — naming an id column in text a person will read.
           if (/\b\w*_id\b\s*[:=]?\s*(\$\{|[0-9a-f]{8}-)/.test(m[1]) || /\b(tracked_job_id|workspace_id|conversation_id|run_id)\b/.test(m[1])) {
@@ -499,9 +493,9 @@ describe('notification action_url', () => {
    * the bell must never hand `action_url` straight to `navigate()` again.
    */
   it('the bell resolves action_url instead of navigating to it raw', () => {
-    const bell = read(join(ROOT, 'src/modules/notifications/components/NotificationsPanel.tsx'));
-    expect(sharedStripComments(bell)).not.toMatch(/navigate\(\s*n\.action_url\s*\)/);
-    expect(bell).toContain('resolveNotificationTarget');
+    const bell = 'src/modules/notifications/components/NotificationsPanel.tsx';
+    expect(strippedSource(bell)).not.toMatch(/navigate\(\s*n\.action_url\s*\)/);
+    expect(readSource(bell)).toContain('resolveNotificationTarget');
   });
 });
 
@@ -587,11 +581,11 @@ describe('My Office block destinations', () => {
   /** `const NAME = 'literal'` as declared in `file`, or in the module `file` imports it from. */
   function constLiteral(file: string, name: string): string | undefined {
     const re = new RegExp(`const\\s+${name}\\s*=\\s*'([^']+)'`);
-    const own = blankComments(read(file)).match(re);
+    const own = blankedSource(file).match(re);
     if (own) return own[1];
     const spec = importMap(file).get(name);
     const target = spec && resolveSpec(spec, file, name);
-    const decl = target && blankComments(read(target)).match(re);
+    const decl = target && blankedSource(target).match(re);
     return decl ? decl[1] : undefined;
   }
 
@@ -647,7 +641,7 @@ describe('My Office block destinations', () => {
       // The whole expression after `urlKey:`, not just a bare token — OrdersPanel writes
       // `urlKey: embedded ? undefined : ORDERS_FILTER_KEY`, and a scan that only accepted a
       // literal would report that key as read by nobody and blame the link for it.
-      for (const m of blankComments(read(file)).matchAll(/urlKey:\s*([^,}\n]+)/g)) {
+      for (const m of blankedSource(file).matchAll(/urlKey:\s*([^,}\n]+)/g)) {
         const expr = m[1];
         for (const lit of expr.matchAll(/'([^']+)'/g)) declared.add(lit[1]);
         for (const ref of expr.matchAll(/\b([A-Z][A-Z0-9_]{2,})\b/g)) {
@@ -682,7 +676,7 @@ describe('My Office block destinations', () => {
   it('every field it filters on is declared by some filter-group definition', () => {
     const fieldKeys = new Set<string>();
     for (const file of sourceFiles) {
-      const src = blankComments(read(file));
+      const src = blankedSource(file);
       if (!src.includes('FilterGroupDef')) continue;
       for (const m of src.matchAll(/key:\s*'([A-Za-z0-9_]+)'/g)) fieldKeys.add(m[1]);
       // A field keyed by a shared constant: `key: OVERDUE_KEY`.

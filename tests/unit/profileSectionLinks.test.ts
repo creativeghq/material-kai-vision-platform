@@ -25,13 +25,12 @@
  * rather than passing quietly: an unresolvable destination is a hole in the check, not a pass.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { blankComments } from '../helpers/stripComments';
+import { blankedSource } from '../helpers/sourceIndex';
 import { APP_DESTINATIONS } from '@/config/appDestinations';
 
 const ROOT = process.cwd();
-const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 const rel = (p: string) => relative(ROOT, p).replace(/\\/g, '/');
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -58,7 +57,7 @@ const sourceFiles = ['src', 'supabase/functions'].flatMap((r) => walk(join(ROOT,
  * failure than the one being guarded against.
  */
 function idsFromSource(file: string, re: RegExp): Set<string> {
-  const src = blankComments(read(join(ROOT, file)));
+  const src = blankedSource(join(ROOT, file));
   const m = src.match(re);
   if (!m) return new Set();
   return new Set([...m[1].matchAll(/'([a-z0-9-]+)'/g)].map((x) => x[1]));
@@ -102,7 +101,7 @@ function sectionLinks(): Map<string, Site[]> {
   const hits = new Map<string, Site[]>();
   const re = /\?tab=([A-Za-z0-9_-]+)&section=([A-Za-z0-9_-]+)/g;
   for (const file of sourceFiles) {
-    blankComments(read(file)).split('\n').forEach((line, i) => {
+    blankedSource(file).split('\n').forEach((line, i) => {
       for (const m of line.matchAll(re)) {
         const key = `${m[1]}|${m[2]}`;
         if (!hits.has(key)) hits.set(key, []);
@@ -163,7 +162,7 @@ describe('?section= deep links', () => {
 
     // The fallback has to BE one of them, or an unknown ?section= normalises the URL to a pane
     // that does not exist and the rail renders `undefined`.
-    const src = blankComments(read(join(ROOT, RAILS.schedule.file)));
+    const src = blankedSource(join(ROOT, RAILS.schedule.file));
     const def = src.match(/DEFAULT_SCHEDULE_SECTION: ScheduleSectionId = '([a-z-]+)'/);
     expect(def, 'SchedulePanel has no default section').toBeTruthy();
     expect(RAILS.schedule.ids.has(def![1])).toBe(true);
@@ -184,7 +183,7 @@ describe('?section= deep links', () => {
    * redirect them, and the redirect has to point at a section that exists.
    */
   it('every retired profile tab redirects to a section that exists', () => {
-    const src = blankComments(read(join(ROOT, 'src/pages/UserProfilePage.tsx')));
+    const src = blankedSource(join(ROOT, 'src/pages/UserProfilePage.tsx'));
     const block = src.match(/const RETIRED_TABS: Record<string, string> = \{([\s\S]*?)\n\};/);
     expect(block, 'RETIRED_TABS is gone — old notification links now land on a blank pane').toBeTruthy();
 
