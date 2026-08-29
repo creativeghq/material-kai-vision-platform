@@ -17857,6 +17857,27 @@
                       }
                     },
                     "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "submission_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-cancel"
+                        ],
+                        "description": "Withdraw a submitted document at Ergani and release the entity so it can be filed again. Only a `submitted` row with a protocol and a submit date can be cancelled. On a successful cancellation whose LOCAL write then fails, returns ok with `local_write_failed` and a warning naming what did not save — the cancellation DID reach Ergani, so a retry would cancel it twice. Requires hr.manage."
+                      },
+                      "submission_id": {
+                        "type": "string",
+                        "description": "A submitted hr_ergani_submissions row in the caller's workspace"
+                      }
+                    },
+                    "description": "Returns: { ok, cancelled, message, local_write_failed?, warning? }"
                   }
                 ],
                 "discriminator": {
