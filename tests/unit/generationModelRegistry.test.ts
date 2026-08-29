@@ -28,7 +28,11 @@ import {
 } from '../../src/config/generationModels.generated';
 
 const ROOT = join(__dirname, '..', '..');
-const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+// Newlines normalised: the shape assertion below probes for a literal `\n`, which never matches
+// on a Windows checkout (`core.autocrlf=true` writes CRLF). It passed while the file came from a
+// local generator run and failed the moment git checked the same file back out — red locally,
+// green in CI, which is the direction that wastes the most time.
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 
 /**
  * Model ids these files offer to a user or bill against. Each entry names the file and the way ids
