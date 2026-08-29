@@ -736,7 +736,22 @@ export const ordersService = {
   async orderBalances(orderIds: string[]): Promise<Map<string, OrderBalance>> {
     const out = new Map<string, OrderBalance>();
     if (orderIds.length === 0) return out;
-    const { data } = await supabase.rpc('get_order_settlements', { p_order_ids: orderIds });
+    /**
+     * THROW (#351 S1). This destructured `data` only, so on failure it returned an EMPTY MAP —
+     * indistinguishable from "this order has no settlements". Callers then fall back to
+     * `settled: 0` / `outstanding: total` / the cached `payment_status`, which is not "unknown",
+     * it is a wrong number: a fully-paid €1,000 sales order renders as unpaid and still owing
+     * €1,000, and `hasCash()` returns false so drafts with real cash vanish from AR/AP entirely.
+     *
+     * Three call sites already wrote `.catch(() => new Map())` — the authors expected this to
+     * throw. Swallowing the error inside made that catch dead code, which is why nobody noticed.
+     *
+     * The trigger is not permission (the function is SECURITY INVOKER, granted to `authenticated`):
+     * it is a transport failure, a statement timeout on a large `p_order_ids`, or a rename
+     * returning PGRST202.
+     */
+    const { data, error } = await supabase.rpc('get_order_settlements', { p_order_ids: orderIds });
+    if (error) throw new Error(`Could not read order settlements: ${error.message}`);
     for (const r of (data ?? []) as OrderBalance[]) {
       out.set(r.order_id, {
         ...r,
@@ -1388,6 +1403,24 @@ export const ordersService = {
         .select('id, payment_id, payment:payments(amount, currency, paid_at, counterparty_company_id, counterparty_contact_id)')
         .eq('order_id', orderId),
     ]);
+    /**
+     * EVERY read here is checked (#351 S1).
+     *
+     * All six destructured `.data` only, so a failure on any one of them produced an empty array
+     * and this function returned a confident, wrong money position: invoices missing means the
+     * order looks uninvoiced, payments missing means it looks unpaid, and the settlement RPC
+     * missing means `settled: 0` / `outstanding: total`.
+     *
+     * None of those is "unknown" — they are numbers a person acts on. Throwing hands the caller a
+     * failure it can show, which is the only honest answer.
+     */
+    for (const [what, res] of [
+      ['invoices', inv], ['supplier bills', bills], ['payments', pay],
+      ['allocations', alloc], ['settlement', settlement], ['credit blocks', blocks],
+    ] as Array<[string, { error?: { message?: string } | null }]>) {
+      if (res?.error) throw new Error(`Could not read the order's ${what}: ${res.error.message ?? 'unknown error'}`);
+    }
+
     const rawPayments = (pay.data ?? []) as unknown as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null; allocations: SettlementEmbed[] | null }>;
     type AllocRow = { id: string; amount: number; payment_id: string; payments: { direction: 'in' | 'out'; order_id: string | null; currency: string; amount: number; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
     const allocRows = (alloc.data ?? []) as unknown as AllocRow[];

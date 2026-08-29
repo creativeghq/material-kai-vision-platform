@@ -3721,7 +3721,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   {supplierOwed > 0.005 && (
                     <div className="flex justify-between"><span className="text-muted-foreground">— you still owe suppliers</span><span className="tabular-nums text-red-400">{formatMoney(supplierOwed, order.currency)}</span></div>
                   )}
-                  <div className="flex justify-between border-t border-border/50 pt-1 font-medium"><span>Cash in bank now</span><span className={`tabular-nums ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</span></div>
+                  {/* THE SAME NETTING AS THE TILE ABOVE (#351 A4).
+                      `fin.profit` is `received - paid_out` and misses the covering order's cash —
+                      the tile beside it already nets `coverPaid`, and the comment there says so.
+                      Rendering the raw figure here put "Paid to suppliers 600 / Net cash 400" a
+                      few centimetres above "Cash in bank now 1,000" on one screen. One derivation,
+                      or the screen argues with itself. */}
+                  <div className="flex justify-between border-t border-border/50 pt-1 font-medium"><span>Cash in bank now</span><span className={`tabular-nums ${fin.received - fin.paid_out - coverPaid >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.received - fin.paid_out - coverPaid, order.currency)}</span></div>
                   <p className="text-[10px] text-muted-foreground pt-0.5">Profit is earned when you sell; cash is what's actually landed. The difference is unpaid balances plus VAT you're holding for the tax office — not lost money.</p>
                 </div>
               );

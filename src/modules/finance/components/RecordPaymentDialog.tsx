@@ -672,7 +672,13 @@ export const RecordPaymentDialog: React.FC<{
                           <SelectItem key={o.id} value={`ord:${o.id}`}>
                             {o.order_number ?? o.id.slice(0, 8)}{o.party_name ? ` · ${o.party_name}` : ''}
                             {b ? ` — ${formatMoney(b.outstanding, b.currency)} outstanding` : ` — ${formatMoney(Number(o.total), o.currency)}`}
-                            {o.payment_status === 'partial' ? ' · part-paid' : ''}
+                            {/* DERIVED, not the cached column (#351 A5). This read
+                                `o.payment_status` — the `orders.payment_status` cache — and
+                                printed it beside `b.outstanding`, which comes from
+                                `get_order_settlements`. That is exactly the drift pair
+                                `finance.order_payment_status_drift` exists to catch, rendered
+                                side by side in one line of text. */}
+                            {b?.payment_status === 'partial' ? ' · part-paid' : ''}
                           </SelectItem>
                         );
                       })}

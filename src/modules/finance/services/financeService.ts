@@ -1028,8 +1028,27 @@ const _financeServiceCore = {
     return data as { invoice_id: string; invoice: Invoice | null };
   },
 
-  async markInvoiceIssued(invoiceId: string): Promise<void> {
-    const { error } = await supabase.rpc('mark_invoice_issued', { p_invoice_id: invoiceId });
+  /**
+   * Issue a draft invoice, on the date the operator chose (#351 B3).
+   *
+   * `issuedOn` is a local `YYYY-MM-DD` — the day the operator picked on screen. It is converted
+   * here, on the CLIENT, because that is the only place that knows the operator's calendar day:
+   * the DB session runs in UTC, so deriving it there would be the same defect one layer down
+   * (CLAUDE.md rule 1b). NOON on the chosen day, so no timezone offset or DST transition can push
+   * the instant onto the day before or after.
+   *
+   * Omitted means "now", which is what every existing caller gets and what the RPC did before.
+   */
+  async markInvoiceIssued(invoiceId: string, issuedOn?: string | null): Promise<void> {
+    let issuedAt: string | null = null;
+    if (issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(issuedOn)) {
+      const [y, m, d] = issuedOn.split('-').map(Number);
+      issuedAt = new Date(y, m - 1, d, 12, 0, 0).toISOString();
+    }
+    const { error } = await supabase.rpc('mark_invoice_issued', {
+      p_invoice_id: invoiceId,
+      p_issued_at: issuedAt,
+    });
     if (error) throw error;
     // Notify the workspace + email the customer via the seeded flow (fire-and-forget).
     void emitDocumentIssuedEvent(invoiceId);

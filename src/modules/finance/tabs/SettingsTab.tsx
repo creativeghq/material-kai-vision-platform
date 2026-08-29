@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, type FinanceSettings } from '@/modules/finance/services/financeService';
+import { EDITABLE_SETTING_KEYS } from './settingsKeys';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { PaymentRoutingCard } from '@/modules/finance/components/PaymentRoutingCard';
 import { PaymentProvidersCard } from '@/modules/payments/components/PaymentProvidersCard';
@@ -66,6 +67,7 @@ const ProviderKeysNote: React.FC = () => (
     </span>
   </div>
 );
+
 
 export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged }) => {
   const { toast } = useToast();
@@ -137,34 +139,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
     if (!settings) return;
     try {
       setSaving(true);
-      const updated = await financeService.updateSettings(workspaceId, {
-        statements_enabled: settings.statements_enabled,
-        statement_email_subject: settings.statement_email_subject,
-        statement_email_body: settings.statement_email_body,
-        default_payment_terms_days: settings.default_payment_terms_days,
-        default_vat_rate: settings.default_vat_rate,
-        default_markup_pct: settings.default_markup_pct,
-        auto_statement_enabled: settings.auto_statement_enabled,
-        auto_statement_frequency: settings.auto_statement_frequency,
-        auto_statement_interval_days: settings.auto_statement_interval_days,
-        auto_statement_day_of_week: settings.auto_statement_day_of_week,
-        auto_statement_day_of_month: settings.auto_statement_day_of_month,
-        auto_statement_hour_utc: settings.auto_statement_hour_utc,
-        auto_statement_only_outstanding: settings.auto_statement_only_outstanding,
-        auto_statement_min_balance: settings.auto_statement_min_balance,
-        auto_statement_side: settings.auto_statement_side,
-        risk_block_inactive_vat: settings.risk_block_inactive_vat,
-        risk_block_unvalidated_vat: settings.risk_block_unvalidated_vat,
-        risk_warn_over_credit_limit: settings.risk_warn_over_credit_limit,
-        risk_block_over_credit_limit: settings.risk_block_over_credit_limit,
-        min_order_value: settings.min_order_value,
-        default_credit_limit: settings.default_credit_limit,
-        risk_block_min_order: settings.risk_block_min_order,
-        risk_block_unpaid_invoice: settings.risk_block_unpaid_invoice,
-        negative_margin_policy: settings.negative_margin_policy,
-        sales_can_see_cost: settings.sales_can_see_cost,
-        trip_expense_reimbursement_mode: settings.trip_expense_reimbursement_mode,
-      });
+      const updated = await financeService.updateSettings(
+        workspaceId,
+        Object.fromEntries(EDITABLE_SETTING_KEYS.map((k) => [k, settings[k]])) as Partial<FinanceSettings>,
+      );
       setSettings(updated);
       onSettingsChanged(updated);
       toast({ title: 'Settings saved' });

@@ -882,7 +882,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
       // Issue now → allocate the gapless legal_number + issued_at + due_at via
       // the same RPC the quote flow uses. (Draft stays unnumbered.)
-      if (issueNow) await financeService.markInvoiceIssued(invoice.id);
+      // The date the operator picked, not today (#351 B3). It was offered, honoured in the
+      // preview, and then thrown away — so revenue and VAT could land in a different period than
+      // the one approved on screen.
+      if (issueNow) await financeService.markInvoiceIssued(invoice.id, issueDate || null);
 
       // Optional post-create actions chosen on the form.
       if (submitNow && issueNow) {

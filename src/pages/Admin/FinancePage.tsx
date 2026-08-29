@@ -189,6 +189,8 @@ const FinancePage: React.FC = () => {
   const [recentOrders, setRecentOrders] = useState<OrderListRow[]>([]);
   /** Derived settlement for the rows this card shows — the payment word never comes off the cache. */
   const [recentOrderBalances, setRecentOrderBalances] = useState<Map<string, OrderBalance>>(new Map());
+  /** True when the settlement read FAILED — distinct from an order simply having no cash. */
+  const [recentBalancesUnknown, setRecentBalancesUnknown] = useState(false);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
@@ -290,9 +292,27 @@ const FinancePage: React.FC = () => {
       // orders list follows — reading `OrderListRow.payment_status` is reading the cached column.
       // Only the handful the card actually renders are fetched.
       const shown = orders.slice(0, RECENT_ORDERS_SHOWN);
-      setRecentOrderBalances(shown.length
-        ? await ordersService.orderBalances(shown.map((o) => o.id)).catch(() => new Map<string, OrderBalance>())
-        : new Map<string, OrderBalance>());
+      /**
+       * A failed settlement read is UNKNOWN, not unpaid (#351 S1).
+       *
+       * `orderBalances` throws now, so this catch is live rather than the dead code it used to be
+       * — and what it must not do is fall through to a value that looks like an answer. The flag
+       * lets the card show "—" instead of the cached `payment_status`, which is the exact drift
+       * pair `finance.order_payment_status_drift` exists to catch.
+       */
+      if (shown.length) {
+        try {
+          setRecentOrderBalances(await ordersService.orderBalances(shown.map((o) => o.id)));
+          setRecentBalancesUnknown(false);
+        } catch (err) {
+          console.error('[finance] recent-order settlements unavailable', err);
+          setRecentOrderBalances(new Map<string, OrderBalance>());
+          setRecentBalancesUnknown(true);
+        }
+      } else {
+        setRecentOrderBalances(new Map<string, OrderBalance>());
+        setRecentBalancesUnknown(false);
+      }
     } catch { /* insights are best-effort — the core dashboard still renders */ }
     finally { setInsightsLoading(false); }
   };
@@ -796,7 +816,7 @@ const FinancePage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <RecentOrdersCard rows={recentOrders} balances={recentOrderBalances} onViewAll={() => onTabChange('doc_orders')} />
+              <RecentOrdersCard rows={recentOrders} balances={recentOrderBalances} balancesUnknown={recentBalancesUnknown} onViewAll={() => onTabChange('doc_orders')} />
               <TopOutstandingCard rows={topOutstanding} onViewAll={() => onTabChange('ar')} />
             </div>
           </TabsContent>
@@ -1885,7 +1905,13 @@ const TopProductsCard: React.FC<{ rows: SalesPerProductRow[]; onViewAll?: () => 
 const RECENT_ORDERS_SHOWN = 6;
 
 /** Most recent sales orders with fulfilment + payment status. */
-const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; balances: Map<string, OrderBalance>; onViewAll?: () => void }> = ({ rows, balances, onViewAll }) => {
+const RecentOrdersCard: React.FC<{
+  rows: OrderListRow[];
+  balances: Map<string, OrderBalance>;
+  /** The settlement read failed — say so rather than showing the cached word (#351 S1/A5). */
+  balancesUnknown?: boolean;
+  onViewAll?: () => void;
+}> = ({ rows, balances, balancesUnknown, onViewAll }) => {
   const recent = useMemo(() => rows.slice(0, RECENT_ORDERS_SHOWN), [rows]);
   return (
     <InsightCard title="Recent orders" icon={ShoppingCart} onViewAll={onViewAll} isEmpty={recent.length === 0} empty="No sales orders yet.">
@@ -1905,8 +1931,23 @@ const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; balances: Map<string, O
                   {/* DERIVED, never `OrderListRow.payment_status` (the cached column) — see the
                       same rule in the orders list and the order detail header. */}
                   {(() => {
-                    const paid = balances.get(o.id)?.payment_status ?? o.payment_status;
-                    return <span className={`text-[10px] ${statusTone(paid)}`}>{ORDER_PAYMENT_LABEL[paid]}</span>;
+                    const derived = balances.get(o.id)?.payment_status;
+                    if (!derived) {
+                      // Unknown, not "whatever the cache says". Falling back to
+                      // `o.payment_status` here is what put a derived Outstanding next to a
+                      // cached "Paid" on the same row.
+                      return (
+                        <span
+                          className="text-[10px] text-muted-foreground"
+                          title={balancesUnknown
+                            ? 'The settlement could not be read just now — this is unknown, not unpaid.'
+                            : 'No settlement position for this order yet.'}
+                        >
+                          —
+                        </span>
+                      );
+                    }
+                    return <span className={`text-[10px] ${statusTone(derived)}`}>{ORDER_PAYMENT_LABEL[derived]}</span>;
                   })()}
                 </div>
                 <div className="text-sm font-medium">{formatMoney(Number(o.total || 0), o.currency)}</div>
