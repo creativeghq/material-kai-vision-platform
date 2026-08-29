@@ -118,6 +118,16 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
   useEffect(() => { void runReport(); }, [report, period, customFrom, customTo, workspaceId]);
 
+  /**
+   * Claimed against actually drawn, for the Profit taken report only.
+   *
+   * The report itself lists what was CLAIMED. On its own that reads as money taken out of the
+   * business, and it is not: allocating moves nothing, the cash leaves only on a money-out payment
+   * in the "Profit allocation" category. The two figures belong next to each other or the report
+   * answers a question nobody asked.
+   */
+  const [drawdown, setDrawdown] = useState<Awaited<ReturnType<typeof financeService.getProfitDrawdown>> | null>(null);
+
   const runReport = async () => {
     try {
       setLoading(true);
@@ -128,7 +138,11 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
         case 'pnl_per_category':
           data = await financeService.reportPnlPerCategory(workspaceId, range.from, range.to); break;
         case 'profit_taken':
-          data = await financeService.reportProfitTaken(workspaceId, range.from, range.to); break;
+          data = await financeService.reportProfitTaken(workspaceId, range.from, range.to);
+          // A failed read leaves it null, which renders no drawdown line at all — never a
+          // confident "nothing drawn", which is the answer that would let somebody double-draw.
+          setDrawdown(await financeService.getProfitDrawdown(workspaceId, range.from, range.to).catch(() => null));
+          break;
         case 'sales_per_day':
           data = await financeService.reportSalesPerDay(workspaceId, range.from, range.to); break;
         case 'sales_per_customer':
@@ -205,6 +219,27 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
   }, [rows, report, sortDir]);
 
   const totals = useMemo(() => computeTotals(report, rows), [report, rows]);
+
+  /**
+   * "Profit taken" lists what was CLAIMED, which on its own reads as money that has left the
+   * business. It has not: allocating margin moves nothing, and the cash goes only when a money-out
+   * payment is recorded in the "Profit allocation" category. These two lines are the difference,
+   * and they belong beside the total rather than on a screen of their own.
+   */
+  const totalsShown = useMemo(() => {
+    if (report !== 'profit_taken' || !drawdown) return totals;
+    if (drawdown.mixed_currency) {
+      // Claims and withdrawals in different currencies do not subtract. Saying so beats a number.
+      return [...totals, { label: 'Drawn from the bank', value: 'mixed currencies — see payments' }];
+    }
+    return [
+      ...totals,
+      { label: 'Drawn from the bank', value: formatMoney(drawdown.drawn, drawdown.currency) },
+      drawdown.over_drawn > 0.005
+        ? { label: 'Drawn ahead of claims', value: formatMoney(drawdown.over_drawn, drawdown.currency) }
+        : { label: 'Claimed, still in the bank', value: formatMoney(drawdown.undrawn, drawdown.currency) },
+    ];
+  }, [report, totals, drawdown]);
 
   // Only the two DOCUMENT-level reports page (myDATA reconciliation lists one row per document,
   // open tasks one row per task). The rest are aggregate summaries — one row per day/customer/
@@ -312,7 +347,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           ) : sorted.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">No data for this report and period.</div>
           ) : (
-            renderReport(report, sorted, totals, page, setPage)
+            renderReport(report, sorted, totalsShown, page, setPage)
           )}
         </CardContent>
       </Card>

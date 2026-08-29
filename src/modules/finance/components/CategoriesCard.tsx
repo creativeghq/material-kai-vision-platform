@@ -11,6 +11,17 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { humanizeLabel } from '@/utils/humanize';
 import { HubEmptyState } from '@/components/core/hub';
 
+/**
+ * What each built-in category is for. A map rather than a ternary chain: the ternary silently
+ * described every future system category as "Orders", which is the shape that made a third one
+ * arrive mislabelled.
+ */
+const SYSTEM_CATEGORY_HELP: Record<string, string> = {
+  orders: 'Built-in "Orders" category — every workspace has one; auto-attached to order costs. Cannot be renamed or deleted.',
+  myaade: 'Built-in "myAADE" category — every workspace has one; the default landing category for expenses synced from myDATA. Cannot be renamed or deleted.',
+  profit_allocation: 'Built-in "Profit allocation" category — put it on the money-out payment that takes claimed profit out of the bank. Deliberately left OUT of the P&L: the margin it draws is already in there as revenue less cost, so counting it as an expense would subtract the same money twice. Cannot be renamed or deleted.',
+};
+
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<FinanceCategory[]>([]);
@@ -86,9 +97,7 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
               <div key={c.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
                 <span>{c.name}</span>
                 <div className="flex items-center gap-3">
-                  {c.is_system && <span className="text-[10px] text-muted-foreground" title={c.system_key === 'myaade'
-                    ? 'Built-in "myAADE" category — every workspace has one; the default landing category for expenses synced from myDATA. Can\'t be renamed or deleted.'
-                    : 'Built-in "Orders" category — every workspace has one; auto-attached to order costs. Can\'t be renamed or deleted.'}>System</span>}
+                  {c.is_system && <span className="text-[10px] text-muted-foreground" title={SYSTEM_CATEGORY_HELP[c.system_key ?? ''] ?? SYSTEM_CATEGORY_HELP.orders}>System</span>}
                   <span className="text-[10px] capitalize text-muted-foreground">{humanizeLabel(c.kind)}</span>
                   {c.is_system
                     ? <span className="w-3.5" aria-hidden />

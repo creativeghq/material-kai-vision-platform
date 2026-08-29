@@ -1838,6 +1838,40 @@ const _financeServiceCore = {
     return (data ?? []) as ProfitTakenRow[];
   },
 
+  /**
+   * Claimed against actually drawn — the two halves of taking profit, side by side.
+   *
+   * Allocating margin is a RECORD and moves nothing; the cash leaves only on a money-out payment.
+   * Both facts existed and nothing compared them, so the one question an operator has at this point
+   * — how much of what I have claimed is still sitting in the bank — had no answer anywhere.
+   *
+   * `drawn` counts money-out payments in the system "Profit allocation" category. A bill in that
+   * category with no payment against it is an intention, not a drawing.
+   */
+  async getProfitDrawdown(workspaceId: string, from?: string | null, to?: string | null): Promise<{
+    category_id: string | null; claimed: number; drawn: number; undrawn: number;
+    /** Drawn beyond what has been claimed — an advance against future margin, not a negative balance. */
+    over_drawn: number;
+    currency: string;
+    /** Claims and withdrawals in more than one currency: the comparison is not meaningful, say so. */
+    mixed_currency: boolean;
+  }> {
+    const { data, error } = await (supabase as any).rpc('get_profit_drawdown', {
+      p_workspace_id: workspaceId, p_from: from ?? null, p_to: to ?? null,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      category_id: (r.category_id as string | null) ?? null,
+      claimed: Number(r.claimed ?? 0),
+      drawn: Number(r.drawn ?? 0),
+      undrawn: Number(r.undrawn ?? 0),
+      over_drawn: Number(r.over_drawn ?? 0),
+      currency: String(r.currency ?? 'EUR'),
+      mixed_currency: !!r.mixed_currency,
+    };
+  },
+
   /** Profit already taken off an order (newest first) — the audit trail + undo list. */
   async listProfitAllocations(workspaceId: string, opts: { orderId?: string | null } = {}): Promise<ProfitAllocation[]> {
     let q = supabase.from('finance_profit_allocations').select('*')

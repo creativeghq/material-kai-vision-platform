@@ -217,6 +217,13 @@ export const AllocatePartyProfitDialog: React.FC<{
             The cash does not move and nothing is issued to anyone. The orders&rsquo; revenue and cost are
             already in your P&amp;L and already net to this figure — this records that you have taken it.
             Each order&rsquo;s share is reversible on its own.
+          
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {/* Where the money actually leaves. Without this the dialog implies the cash has moved,
+                which is the single thing it does not do. */}
+            To take it out of the bank, record a money-out payment in the <strong>Profit allocation</strong>{' '}
+            category. Reports then show what you have claimed against what you have actually drawn.
           </p>
         </div>
         )}

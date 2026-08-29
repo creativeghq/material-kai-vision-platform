@@ -10,9 +10,14 @@ export interface FinanceCategory {
   /** Protected built-in: every workspace has one of each; can't be renamed/re-kinded/deactivated/
    *  deleted. Enforced by the guard_system_finance_category DB trigger. */
   is_system: boolean;
-  /** Which built-in this is, when is_system: 'orders' (auto-attached to order costs) or
-   *  'myaade' (default landing category for myDATA-synced expenses). Null for user categories. */
-  system_key: 'orders' | 'myaade' | string | null;
+  /**
+   * Which built-in this is, when is_system: 'orders' (auto-attached to order costs), 'myaade'
+   * (default landing category for myDATA-synced expenses), or 'profit_allocation' (the money-out
+   * that draws claimed margin out of the bank — an appropriation, deliberately excluded from the
+   * P&L by `report_pnl_per_category`, because the margin it draws is already in there).
+   * Null for user categories.
+   */
+  system_key: 'orders' | 'myaade' | 'profit_allocation' | string | null;
 }
 
 export const financeCategoriesService = {
