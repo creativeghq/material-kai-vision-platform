@@ -128,6 +128,21 @@ export const VOCABULARIES = [
     'src/services/documentDeliveryTypes.ts',
     'supabase/functions/_shared/documentDeliveryTypes.generated.ts',
   ],
+  [
+    // #395 — NOT a vocabulary: a DERIVATION, hand-copied. `calculator-tools.ts` carried a
+    // second implementation of the heat-pump sizing model under a header reading "keep the
+    // two in sync", which is the mechanism this script exists to replace. The constants
+    // happened to still agree; nothing held them there.
+    'src/lib/calculators/heatPumpSizing.ts',
+    'supabase/functions/_shared/calculators/heatPumpSizing.generated.ts',
+  ],
+  [
+    // #395 — the same, and this pair had ALREADY diverged: the tool's copy hardcoded the
+    // calorific values and efficiencies the canonical version accepts as overrides, so the
+    // web page could be told "our oil is 10.2 kWh/L" and the agent could not.
+    'src/lib/calculators/heatingCostComparison.ts',
+    'supabase/functions/_shared/calculators/heatingCostComparison.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

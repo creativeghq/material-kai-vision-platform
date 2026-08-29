@@ -240,6 +240,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'wood_price_per_kg', type: 'number', optional: true, description: '€/kg firewood (default 0.54).' },
       { name: 'heat_pump_cop', type: 'number', optional: true, description: 'Heat-pump seasonal COP (default 4).' },
       { name: 'ac_type', type: 'enum', enum: ['inverter', 'simple'], optional: true, description: 'A/C type: inverter (COP 3) or simple (COP 2). Default inverter.' },
+      { name: 'distribution_factor', type: 'number', optional: true, description: 'Distribution/emission losses multiplier on useful demand (default 1.16286).' },
+      { name: 'oil_calorific_kwh_per_litre', type: 'number', optional: true, description: 'Heating-oil calorific value in kWh/litre (default 10.71).' },
+      { name: 'wood_calorific_kwh_per_kg', type: 'number', optional: true, description: 'Raw firewood calorific value in kWh/kg (default 6.0101).' },
+      { name: 'energy_fireplace_efficiency', type: 'number', optional: true, description: 'Energy-fireplace efficiency, 0–1 (default 0.85).' },
+      { name: 'open_fireplace_efficiency', type: 'number', optional: true, description: 'Open-fireplace efficiency, 0–1 (default 0.3).' },
     ],
   },
   {

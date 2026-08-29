@@ -1,13 +1,19 @@
 /**
  * Calculator tools — deterministic, free, no upstream API.
  *
- * calculate_heat_pump_sizing: first-pass heat-pump capacity estimate. The math
- * here is a MIRROR of the canonical frontend module
- * src/lib/calculators/heatPumpSizing.ts (Deno can't import across the Vite
- * boundary — same manual-sync pattern as TOOLKITS_INDEX in toolkit-tools.ts).
- * Keep the two in sync when tuning constants.
+ * THE MATH IS NOT HERE. Both models are imported from GENERATED mirrors of the canonical
+ * frontend modules (`src/lib/calculators/*.ts`), produced by `npm run vocab:mirror` and held
+ * byte-identical by tests/unit/vocabularyMirrors.test.ts.
  *
- * Emits a `heat_pump_sizing` chunk so AgentHub can render an inline result card.
+ * This file used to carry a second implementation of each, under a header reading "keep the two
+ * in sync" — a convention, which is precisely what the mirror script exists to replace. The
+ * heat-pump constants happened to still agree; the heating-cost pair had already diverged, with
+ * the tool hardcoding the calorific values and efficiencies the canonical version accepts as
+ * overrides, so `/tools/heat-pump` could be told "our oil is 10.2 kWh/L" and the agent could not.
+ * A duplicated DERIVATION is the same defect shape as a duplicated vocabulary and worse to
+ * detect: both answers are plausible numbers (#395).
+ *
+ * Each tool emits its result chunk so AgentHub can render an inline card.
  */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
@@ -27,92 +33,13 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 
 import { computeBlueprint, resolveSelection } from '../blueprint/compute.ts';
+import {
+  computeHeatPumpSizing,
+  type ClimateZone, type EmitterType, type GlazingExposure, type InsulationLevel,
+} from '../calculators/heatPumpSizing.generated.ts';
+import { computeHeatingCostComparison, type AcType } from '../calculators/heatingCostComparison.generated.ts';
 
 type ChunkSink = ((chunk: any) => void) | undefined;
-
-type InsulationLevel = 'none' | 'medium' | 'modern' | 'passive';
-type ClimateZone = 'A' | 'B' | 'C' | 'D';
-type EmitterType = 'underfloor' | 'fan_coil' | 'low_temp_radiator' | 'high_temp_radiator';
-type GlazingExposure = 'low' | 'normal' | 'high';
-
-const INDOOR_DESIGN_TEMP_C = 20;
-const REFERENCE_CEILING_M = 2.7;
-
-const BASE_W_PER_M2: Record<InsulationLevel, number> = { none: 90, medium: 70, modern: 50, passive: 25 };
-const ZONE_FACTOR: Record<ClimateZone, number> = { A: 0.8, B: 0.9, C: 1.0, D: 1.15 };
-const ZONE_DESIGN_TEMP_C: Record<ClimateZone, number> = { A: 2, B: 0, C: -2, D: -6 };
-const REFERENCE_DELTA_T = INDOOR_DESIGN_TEMP_C - ZONE_DESIGN_TEMP_C.C; // 22
-const GLAZING_FACTOR: Record<GlazingExposure, number> = { low: 0.95, normal: 1.0, high: 1.12 };
-const EMITTER: Record<EmitterType, { flowTempC: number; note: string }> = {
-  underfloor: { flowTempC: 35, note: 'Underfloor heating runs at ~35 °C — the lowest flow temp, so the heat pump achieves its best COP. Ideal pairing.' },
-  fan_coil: { flowTempC: 45, note: 'Fan coils run at ~45 °C. Good COP and fast response; works well with most air-to-water units.' },
-  low_temp_radiator: { flowTempC: 50, note: 'Low-temperature radiators need ~50 °C. Acceptable COP; make sure the radiators are sized for low-temp operation.' },
-  high_temp_radiator: { flowTempC: 60, note: 'Existing high-temperature radiators need ~60 °C, which lowers COP. Consider a high-temperature heat pump or upsizing the radiators.' },
-};
-const DHW_KW_PER_OCCUPANT = 0.25;
-const round1 = (n: number) => Math.round(n * 10) / 10;
-
-function computeHeatPumpSizing(input: {
-  floorAreaM2: number;
-  ceilingHeightM?: number;
-  insulationLevel: InsulationLevel;
-  climateZone?: ClimateZone;
-  designOutdoorTempC?: number;
-  emitter: EmitterType;
-  glazingExposure?: GlazingExposure;
-  includeDhw?: boolean;
-  occupants?: number;
-}) {
-  const area = Math.max(1, input.floorAreaM2 || 0);
-  const ceiling = input.ceilingHeightM && input.ceilingHeightM > 0 ? input.ceilingHeightM : REFERENCE_CEILING_M;
-  const baseW = BASE_W_PER_M2[input.insulationLevel];
-  const glazingFactor = GLAZING_FACTOR[input.glazingExposure ?? 'normal'];
-  const volumeFactor = ceiling / REFERENCE_CEILING_M;
-
-  let zoneFactor: number;
-  let climateBasis: string;
-  if (typeof input.designOutdoorTempC === 'number') {
-    const deltaT = INDOOR_DESIGN_TEMP_C - input.designOutdoorTempC;
-    zoneFactor = Math.max(0.4, deltaT / REFERENCE_DELTA_T);
-    climateBasis = `Design outdoor temperature ${round1(input.designOutdoorTempC)} °C (ΔT ${round1(deltaT)} K vs indoor ${INDOOR_DESIGN_TEMP_C} °C).`;
-  } else {
-    const zone = input.climateZone ?? 'C';
-    zoneFactor = ZONE_FACTOR[zone];
-    climateBasis = `Greek climate zone ${zone} (≈ ${ZONE_DESIGN_TEMP_C[zone]} °C design outdoor). Relative factor ${zoneFactor.toFixed(2)} vs zone C baseline.`;
-  }
-
-  const spaceHeatingKW = round1((baseW * area * volumeFactor * zoneFactor * glazingFactor) / 1000);
-  const dhwKW = input.includeDhw ? round1(Math.max(1, input.occupants ?? 1) * DHW_KW_PER_OCCUPANT) : 0;
-  const totalDesignKW = round1(spaceHeatingKW + dhwKW);
-  const emitter = EMITTER[input.emitter];
-
-  return {
-    spaceHeatingKW,
-    dhwKW,
-    totalDesignKW,
-    recommendedRange: { minKW: round1(totalDesignKW * 1.0), maxKW: round1(totalDesignKW * 1.15) },
-    effectiveWattsPerM2: round1((spaceHeatingKW * 1000) / area),
-    flowTempC: emitter.flowTempC,
-    emitterNote: emitter.note,
-    climateBasis,
-    assumptions: {
-      indoorTempC: INDOOR_DESIGN_TEMP_C,
-      ceilingHeightM: ceiling,
-      baseWattsPerM2: baseW,
-      zoneFactor: round1(zoneFactor),
-      glazingFactor,
-      volumeFactor: round1(volumeFactor),
-    },
-    caveats: [
-      'This is a first-pass estimate, not a substitute for a thermal-loss study per ΕΛΟΤ ΕΝ 12831 / ΤΟΤΕΕ 20701.',
-      'Size close to the design load — oversizing a heat pump hurts COP and causes short-cycling.',
-      input.includeDhw
-        ? 'DHW is shown as a combined allowance; in practice it is usually handled by priority switching plus a cylinder, not added to peak space-heating output.'
-        : 'Domestic hot water is not included — add a cylinder/allowance if the unit must also cover DHW.',
-      'Confirm the emitter circuit can deliver the load at the listed flow temperature before final selection.',
-    ],
-  };
-}
 
 export const createHeatPumpSizingTool = (onChunk: ChunkSink) => {
   return tool(
@@ -182,60 +109,6 @@ export const createHeatPumpSizingTool = (onChunk: ChunkSink) => {
 };
 
 // ── Heating-cost comparison ───────────────────────────────────────────────
-// MIRROR of src/lib/calculators/heatingCostComparison.ts — keep in sync.
-
-type AcType = 'inverter' | 'simple';
-const HEATING_METHOD_LABELS: Record<string, string> = {
-  oil: 'Heating oil',
-  gas: 'Natural gas',
-  ac: 'A/C',
-  heat_pump: 'Heat pump',
-  energy_fireplace: 'Energy fireplace',
-  non_energy_fireplace: 'Open fireplace',
-};
-
-function computeHeatingCostComparison(input: {
-  floorAreaM2: number;
-  specificEnergyKwhM2Yr: number;
-  electricityPricePerKwh: number;
-  oilPricePerLitre: number;
-  gasPricePerKwh: number;
-  woodPricePerKg: number;
-  heatPumpCop: number;
-  acType: AcType;
-}) {
-  const area = Math.max(1, input.floorAreaM2 || 0);
-  const specific = Math.max(0, input.specificEnergyKwhM2Yr || 0);
-  const distributionFactor = 1.16286;
-  const oilCalorific = 10.71;
-  const woodRawCalorific = 6.0101;
-  const woodFactor = 1.34;
-  const acCop = input.acType === 'simple' ? 2 : 3;
-
-  const usefulDemandKwh = specific * area;
-  const E = usefulDemandKwh * distributionFactor;
-  const r2 = (n: number) => Math.round(n * 100) / 100;
-
-  const raw = [
-    { key: 'oil', label: HEATING_METHOD_LABELS.oil, units: E / oilCalorific, unitLabel: 'L', price: input.oilPricePerLitre },
-    { key: 'gas', label: HEATING_METHOD_LABELS.gas, units: E, unitLabel: 'kWh', price: input.gasPricePerKwh },
-    { key: 'ac', label: input.acType === 'simple' ? 'A/C (basic)' : 'A/C (inverter)', units: E / acCop, unitLabel: 'kWh', price: input.electricityPricePerKwh },
-    { key: 'heat_pump', label: HEATING_METHOD_LABELS.heat_pump, units: E / Math.max(0.1, input.heatPumpCop || 4), unitLabel: 'kWh', price: input.electricityPricePerKwh },
-    { key: 'energy_fireplace', label: HEATING_METHOD_LABELS.energy_fireplace, units: (E / (0.85 * woodRawCalorific)) * woodFactor, unitLabel: 'kg', price: input.woodPricePerKg },
-    { key: 'non_energy_fireplace', label: HEATING_METHOD_LABELS.non_energy_fireplace, units: (E / (0.3 * woodRawCalorific)) * woodFactor, unitLabel: 'kg', price: input.woodPricePerKg },
-  ].map((m) => ({ key: m.key, label: m.label, unitsPerYear: r2(m.units), unitLabel: m.unitLabel, annualCostEur: r2(m.units * m.price) }));
-
-  const sorted = raw.sort((a, b) => a.annualCostEur - b.annualCostEur);
-  const cheapest = sorted[0].annualCostEur;
-  const methods = sorted.map((m, i) => ({
-    ...m,
-    rank: i + 1,
-    pctVsCheapest: cheapest > 0 ? Math.round(((m.annualCostEur - cheapest) / cheapest) * 100) : 0,
-  }));
-
-  return { usefulDemandKwh: r2(usefulDemandKwh), deliveredEnergyKwh: r2(E), methods, cheapest: methods[0] };
-}
-
 export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
   return tool(
     async (input: {
@@ -247,7 +120,15 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
       wood_price_per_kg?: number;
       heat_pump_cop?: number;
       ac_type?: AcType;
+      distribution_factor?: number;
+      oil_calorific_kwh_per_litre?: number;
+      wood_calorific_kwh_per_kg?: number;
+      energy_fireplace_efficiency?: number;
+      open_fireplace_efficiency?: number;
     }) => {
+      // The canonical model owns the defaults AND the physical constants; passing an
+      // `undefined` through is what lets it keep owning them. The old copy re-declared every
+      // default here, which is how the two started answering differently.
       const result = computeHeatingCostComparison({
         floorAreaM2: input.floor_area_m2,
         specificEnergyKwhM2Yr: input.specific_energy_kwh_m2_yr,
@@ -257,6 +138,13 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
         woodPricePerKg: input.wood_price_per_kg ?? 0.54,
         heatPumpCop: input.heat_pump_cop ?? 4,
         acType: input.ac_type ?? 'inverter',
+        // Physical constants the ΠΕΑ may state differently for a given building. The web
+        // calculator has always accepted these; the agent silently could not.
+        distributionFactor: input.distribution_factor,
+        oilCalorificKwhPerLitre: input.oil_calorific_kwh_per_litre,
+        woodRawCalorificKwhPerKg: input.wood_calorific_kwh_per_kg,
+        energyFireplaceEfficiency: input.energy_fireplace_efficiency,
+        nonEnergyFireplaceEfficiency: input.open_fireplace_efficiency,
       });
 
       try {
@@ -283,6 +171,11 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
         wood_price_per_kg: z.number().optional().describe('€/kg firewood (default 0.54).'),
         heat_pump_cop: z.number().optional().describe('Heat-pump seasonal COP (default 4).'),
         ac_type: z.enum(['inverter', 'simple']).optional().describe('A/C type: inverter (COP 3) or simple (COP 2). Default inverter.'),
+        distribution_factor: z.number().optional().describe('Distribution/emission losses multiplier on useful demand (default 1.16286).'),
+        oil_calorific_kwh_per_litre: z.number().optional().describe('Heating-oil calorific value in kWh/litre (default 10.71).'),
+        wood_calorific_kwh_per_kg: z.number().optional().describe('Raw firewood calorific value in kWh/kg (default 6.0101).'),
+        energy_fireplace_efficiency: z.number().optional().describe('Energy-fireplace efficiency, 0–1 (default 0.85).'),
+        open_fireplace_efficiency: z.number().optional().describe('Open-fireplace efficiency, 0–1 (default 0.3).'),
       }),
     },
   );

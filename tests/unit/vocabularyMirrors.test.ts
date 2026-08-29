@@ -38,6 +38,29 @@ describe('vocabulary mirrors are generated, not hand-kept', () => {
     ).toBe(expectedMirror(source));
   });
 
+  /**
+   * The calculators are DERIVATIONS, not vocabularies (#395).
+   *
+   * `calculator-tools.ts` carried a second implementation of each under a header reading "keep
+   * the two in sync". The heat-pump constants still agreed; the heating-cost pair had already
+   * diverged — the tool hardcoded the calorific values and efficiencies the canonical version
+   * accepts as overrides, so the web page could be told "our oil is 10.2 kWh/L" and the agent
+   * could not. A duplicated derivation is harder to spot than a duplicated vocabulary, because
+   * both copies return a plausible number.
+   */
+  it('the agent calculators use the mirror and keep no copy of the math', () => {
+    const tools = readFileSync('supabase/functions/_shared/tools/calculator-tools.ts', 'utf8');
+    expect(tools).toContain("from '../calculators/heatPumpSizing.generated.ts'");
+    expect(tools).toContain("from '../calculators/heatingCostComparison.generated.ts'");
+    for (const constant of [
+      'BASE_W_PER_M2', 'ZONE_FACTOR', 'GLAZING_FACTOR', 'DHW_KW_PER_OCCUPANT',
+      'distributionFactor =', 'oilCalorific =', 'woodRawCalorific =',
+    ]) {
+      expect(tools, `${constant} is back — the math has been re-copied into the tool`)
+        .not.toContain(constant);
+    }
+  });
+
   it('every source stays import-free so the copy can be a byte copy', () => {
     // One `import` makes the module unresolvable in the other runtime, which turns the mirror
     // from a byte copy into a translation — and a translation is a second implementation
