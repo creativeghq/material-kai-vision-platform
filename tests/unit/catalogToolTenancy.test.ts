@@ -165,8 +165,9 @@ describe('#395 — the same shape in two more user-owned tables', () => {
   });
 
   it('and a product id from the model is proven before it reaches MIVAA', () => {
-    // `callMivaa` sends the SERVICE-ROLE key when no user JWT is passed, so an unchecked uuid
-    // travelled upstream under service-role authority.
+    // MIVAA enforces ownership on the USER axis and rejects a service-role bearer, so the old
+    // code was not an authority bypass — it was a path built from an id this side had not
+    // established, failing as someone else's 401. The workspace axis exists only here.
     const fn = mentionTools.slice(mentionTools.indexOf('async function resolveSubjectBase'), mentionTools.indexOf('async function callMivaa'));
     const check = fn.indexOf("from('products')");
     const build = fn.indexOf('/api/v1/mention-monitoring/products/');

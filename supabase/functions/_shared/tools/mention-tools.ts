@@ -231,10 +231,18 @@ async function resolveSubjectBase(
     /**
      * A product id from the MODEL is proven to be in this workspace first (#395).
      *
-     * This branch used to build the MIVAA path straight from the argument with no check at all,
-     * and `callMivaa` sends the SERVICE-ROLE key as the bearer when no user JWT is passed — so an
-     * arbitrary uuid reached MIVAA under service-role authority. Whether MIVAA gates it is the
-     * half of #395 nobody has read yet; on this side the tool has to prove it (invariant 1).
+     * This branch used to build the MIVAA path straight from the argument with no check at all.
+     *
+     * MIVAA has since been read (#395): its mention routes DO enforce ownership — `row.user_id !=
+     * caller` → 403 — and a service-role bearer is rejected outright, because `_validate_token`
+     * accepts an `mk_` key, a Supabase JWT with `aud=authenticated`, or a MIVAA JWT with a `sub`,
+     * and a service-role key is none of those. So the old code was not an authority bypass; it
+     * failed as a 401/403 from another service instead of saying what was wrong.
+     *
+     * The check still belongs here, for two reasons. Invariant 1 asks the CALLER to prove the
+     * object it names, whatever the callee does. And MIVAA's check is on the USER axis only —
+     * there is no workspace check anywhere in its mention routes — so the workspace axis exists
+     * only at this line.
      */
     if (workspaceId) {
       const { data: prod } = await sb
