@@ -154,7 +154,7 @@ export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website 
 
         {/* A failed section is stated. Silence here would read as "nothing found". */}
         {failedSections.length > 0 && (
-          <div className="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
+          <div className="flex items-start gap-2 rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
               {failedSections.length} check{failedSections.length === 1 ? '' : 's'} could not be fetched

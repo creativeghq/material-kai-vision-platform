@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { timeAgo } from '@/utils/datetime';
 import {
   Globe, Plus, Trash2, RefreshCw, Loader2, ExternalLink, Star,
-  AlertTriangle, CheckCircle2, Pencil,
+  AlertTriangle, CheckCircle2, Pencil, MoreHorizontal,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -20,22 +20,40 @@ import {
   type UserWebsite,
   type PreviewResult,
 } from '@/services/userWebsitesService';
-import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
+import { Search, FileSearch } from 'lucide-react';
 import { formatNumber } from '@/utils/decimal';
-import { HubEmptyState } from '@/components/core/hub';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
+import {
+  HubCellEmpty, HubCellLink, HubDataTable, HubEmptyState, type HubColumn,
+} from '@/components/core/hub';
 
 
-function statusOf(w: UserWebsite): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode } {
+/**
+ * Four states, and they are NOT four shades of the same thing — which is why the page count
+ * moved out of this label and into its own column. "384 pages indexed" as a solid accent badge
+ * put a number inside a status, so the two could not be scanned separately and the badge carried
+ * the weight of a button in every row (design system: status is a TINTED tag, never a fill).
+ *
+ * "Crawled — no pages" is the one that has to stay distinct from "not crawled": the crawler ran
+ * and found nothing, which is a finding, not an absence of one.
+ */
+function statusOf(w: UserWebsite): {
+  label: string;
+  variant: 'success' | 'warning' | 'error' | 'neutral';
+  icon: React.ReactNode;
+} {
   if (w.last_crawl_error) {
-    return { label: 'Error', variant: 'destructive', icon: <AlertTriangle className="w-3 h-3" /> };
+    return { label: 'Crawl failed', variant: 'error', icon: <AlertTriangle className="h-3 w-3" /> };
   }
   if (w.last_crawled_at && w.page_count > 0) {
-    return { label: `${w.page_count} pages indexed`, variant: 'default', icon: <CheckCircle2 className="w-3 h-3" /> };
+    return { label: 'Indexed', variant: 'success', icon: <CheckCircle2 className="h-3 w-3" /> };
   }
   if (w.last_crawled_at) {
-    return { label: 'Crawled — no pages', variant: 'secondary', icon: <AlertTriangle className="w-3 h-3" /> };
+    return { label: 'No pages found', variant: 'warning', icon: <AlertTriangle className="h-3 w-3" /> };
   }
-  return { label: 'Not crawled yet', variant: 'outline', icon: <Globe className="w-3 h-3" /> };
+  return { label: 'Not crawled', variant: 'neutral', icon: <Globe className="h-3 w-3" /> };
 }
 
 export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void }> = ({ onOpen }) => {
@@ -203,6 +221,129 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
     }
   };
 
+  /**
+   * The list was a stack of bordered rows, each carrying a name, two badges, a URL, a crawl
+   * time, a sitemap and FIVE icon-only ghost buttons — everything at the same weight, so there
+   * was nothing to scan down. It is a list of records with a status and two numbers, which is
+   * what `HubDataTable` is: one accent entry point per row, right-aligned figures, an em dash
+   * where a value genuinely does not exist yet.
+   *
+   * `page_count` is `—` until the site has actually been crawled. A crawl that ran and found
+   * nothing renders `0`, which is a finding; a crawl that never ran must not.
+   */
+  const columns: HubColumn<UserWebsite>[] = [
+    {
+      id: 'website',
+      header: 'Website',
+      cell: (w) => (
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <HubCellLink>{w.display_name || w.url.replace(/^https?:\/\//, '')}</HubCellLink>
+            {w.is_default && (
+              <Badge variant="neutral" className="gap-1 text-[10px]">
+                <Star className="h-2.5 w-2.5" /> Default
+              </Badge>
+            )}
+          </div>
+          {/* A raw URL is unbreakable, so without min-w-0/truncate its min-content width blew
+              past the card and gave the whole Profile tab horizontal scroll at 390px. */}
+          <a
+            href={w.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-0.5 flex min-w-0 max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <span className="truncate">{w.url}</span>
+            <ExternalLink className="h-3 w-3 shrink-0" />
+          </a>
+          {/* The reason the status says "Crawl failed". A status you cannot act on is a status
+              that sends the reader back to support. */}
+          {w.last_crawl_error && (
+            <p className="mt-1 flex items-start gap-1 text-xs text-[hsl(var(--error))]">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+              <span className="break-all">{w.last_crawl_error}</span>
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (w) => {
+        const s = statusOf(w);
+        return <Badge variant={s.variant} className="gap-1">{s.icon}{s.label}</Badge>;
+      },
+    },
+    {
+      id: 'pages',
+      header: 'Pages',
+      align: 'right',
+      hideBelow: 'sm',
+      cell: (w) => (w.last_crawled_at ? formatNumber(w.page_count) : <HubCellEmpty />),
+    },
+    {
+      id: 'crawled',
+      header: 'Last crawl',
+      align: 'right',
+      hideBelow: 'md',
+      cell: (w) => (w.last_crawled_at ? timeAgo(w.last_crawled_at) : <HubCellEmpty />),
+    },
+    {
+      id: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      align: 'right',
+      width: 'w-px',
+      // Recrawl stays on the row because it is the one you press repeatedly. The other three
+      // are occasional, and four more icon-only ghost buttons per row is how the old list ended
+      // up with no scannable shape at all.
+      // The wrapper is a propagation boundary, not a control: the row navigates, and pressing
+      // Recrawl or opening the menu must not also open the dashboard. `role="presentation"` says
+      // exactly that — no semantics of its own, and no keyboard focus to strand anyone on.
+      cell: (w) => (
+        <div
+          role="presentation"
+          className="flex items-center justify-end gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Recrawl now (full)"
+            onClick={() => handleCrawl(w)}
+            disabled={!!crawling[w.id]}
+          >
+            {crawling[w.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            <span className="sr-only">Recrawl</span>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" title="More">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">More actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handlePreview(w)} disabled={!!previewing[w.id]}>
+                {previewing[w.id]
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <FileSearch className="mr-2 h-4 w-4" />}
+                Preview (sample 5 pages)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openEdit(w)}>
+                <Pencil className="mr-2 h-4 w-4" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleRemove(w)} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" /> Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
 
@@ -222,144 +363,23 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
             Add website
           </Button>
         </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : sites.length === 0 ? (
-            <HubEmptyState
-              icon={Globe}
-              title="No websites connected yet"
-              description="Connect a site's sitemap and generated SEO articles can link to pages you already have, instead of inventing URLs."
-              action={<Button size="sm" onClick={openAdd}><Plus /> Add website</Button>}
-            />
-          ) : (
-            <div className="space-y-2">
-              {sites.map((w) => {
-                const status = statusOf(w);
-                return (
-                  <div
-                    key={w.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Globe className="w-4 h-4 text-primary" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {onOpen ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpen(w)}
-                            className="text-sm font-medium truncate inline-flex items-center gap-1 hover:text-primary text-left"
-                            title="Open SEO dashboard"
-                          >
-                            {w.display_name || w.url.replace(/^https?:\/\//, '')}
-                            <ChevronRight className="w-3.5 h-3.5 opacity-60" />
-                          </button>
-                        ) : (
-                          <span className="text-sm font-medium truncate">
-                            {w.display_name || w.url.replace(/^https?:\/\//, '')}
-                          </span>
-                        )}
-                        {w.is_default && (
-                          <Badge variant="secondary" className="text-[10px] gap-1">
-                            <Star className="w-2.5 h-2.5" />
-                            Default
-                          </Badge>
-                        )}
-                        <Badge variant={status.variant} className="text-[10px] gap-1">
-                          {status.icon}
-                          {status.label}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                        <a
-                          href={w.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          // A raw URL is unbreakable, so without min-w-0/truncate
-                          // its min-content width blew past the card and gave the
-                          // whole Profile tab horizontal scroll at 390px.
-                          className="flex min-w-0 max-w-full items-center gap-1 hover:text-foreground"
-                        >
-                          <span className="truncate">{w.url}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                        <span>·</span>
-                        <span>Last crawl: {timeAgo(w.last_crawled_at)}</span>
-                        {w.sitemap_url && (
-                          <>
-                            <span>·</span>
-                            <span className="truncate max-w-[280px]">Sitemap: {w.sitemap_url}</span>
-                          </>
-                        )}
-                      </div>
-                      {w.last_crawl_error && (
-                        <div className="mt-1 text-xs text-red-500 flex items-start gap-1">
-                          <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                          <span className="break-all">{w.last_crawl_error}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {onOpen && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Open SEO dashboard"
-                          onClick={() => onOpen(w)}
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Preview (sample 5 pages)"
-                        onClick={() => handlePreview(w)}
-                        disabled={!!previewing[w.id]}
-                      >
-                        {previewing[w.id] ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FileSearch className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Recrawl now (full)"
-                        onClick={() => handleCrawl(w)}
-                        disabled={!!crawling[w.id]}
-                      >
-                        {crawling[w.id] ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Edit" onClick={() => openEdit(w)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Remove"
-                        onClick={() => handleRemove(w)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <CardContent className="p-0">
+          <HubDataTable
+            rows={sites}
+            columns={columns}
+            rowId={(w) => w.id}
+            loading={loading}
+            onRowClick={onOpen}
+            className="rounded-none border-0"
+            empty={
+              <HubEmptyState
+                icon={Globe}
+                title="No websites connected yet"
+                description="Connect a site's sitemap and generated SEO articles can link to pages you already have, instead of inventing URLs."
+                action={<Button size="sm" onClick={openAdd}><Plus /> Add website</Button>}
+              />
+            }
+          />
         </CardContent>
       </Card>
 
@@ -480,8 +500,8 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
               )}
 
               {previewResult.result.pages_discovered > previewResult.website.max_pages && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 text-xs">
-                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-[hsl(var(--warning-bg))] border border-[hsl(var(--warning)/0.25)] text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--warning))] mt-0.5 flex-shrink-0" />
                   <p>
                     Your sitemap has {formatNumber(previewResult.result.pages_discovered)} URLs but the cap for this site is {previewResult.website.max_pages}.
                     The crawler picks the first {previewResult.website.max_pages} sitemap entries. Raise the cap (max 1000) or use a topic-scoped sitemap URL if needed.
@@ -500,9 +520,9 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
                     <div key={i} className="p-2 border rounded-lg space-y-0.5">
                       <div className="flex items-center gap-2">
                         {s.ok ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--success))] flex-shrink-0" />
                         ) : (
-                          <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                          <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--warning))] flex-shrink-0" />
                         )}
                         <span className="text-sm font-medium truncate">
                           {s.title || <span className="italic text-muted-foreground">no title</span>}

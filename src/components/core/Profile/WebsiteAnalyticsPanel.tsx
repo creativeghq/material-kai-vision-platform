@@ -160,7 +160,7 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
         {summary?.note && (
           <div className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-xs leading-snug ${
             summary.status === 'collector_failed' || summary.status === 'needs_reauth'
-              ? 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300'
+              ? 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] text-amber-800 dark:text-amber-300'
               : 'border-hairline bg-surface-sunken text-muted-foreground'
           }`}>
             {(summary.status === 'collector_failed' || summary.status === 'needs_reauth') && (

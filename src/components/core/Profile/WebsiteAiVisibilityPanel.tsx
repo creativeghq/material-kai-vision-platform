@@ -94,7 +94,7 @@ function MonitoringBanner({
   const needsOwnBrand = !state.own_brand_tracked && !state.own_brand_subject_id;
 
   return (
-    <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 p-3">
+    <div className="rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] p-3">
       <div className="flex items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
         <div className="min-w-0 flex-1 space-y-2">
@@ -299,7 +299,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             />
           )}
           {failedShare >= 10 && (
-            <div className="flex items-start gap-2 rounded-sm border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-sm border border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] px-3 py-2 text-xs leading-snug text-amber-800 dark:text-amber-300">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
                 {compact(t.failed)} of {compact(t.probes)} probes ({failedShare}%) failed and were excluded from

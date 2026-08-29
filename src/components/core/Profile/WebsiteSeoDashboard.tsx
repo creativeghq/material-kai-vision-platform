@@ -16,7 +16,7 @@ import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearch
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
-import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubEmptyState, HubStatGrid, HubStatTile } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -40,23 +40,13 @@ import { formatNumber } from '@/utils/decimal';
 
 const STATUS_COLOR: Record<string, string> = {
   completed: 'text-emerald-600 dark:text-emerald-400',
-  failed: 'text-red-500',
+  failed: 'text-[hsl(var(--error))]',
   researching: 'text-amber-600 dark:text-amber-400',
   writing: 'text-amber-600 dark:text-amber-400',
   planning: 'text-amber-600 dark:text-amber-400',
   analyzing: 'text-amber-600 dark:text-amber-400',
 };
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <Card className="dashboard-card">
-      <CardContent className="p-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-2xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
 
 export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void; initialTab?: string }> = ({ website, onBack, initialTab }) => {
   const { toast } = useToast();
@@ -169,34 +159,49 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
       </div>
 
       {website.last_crawl_error && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-xs">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-[hsl(var(--error-bg))] border border-[hsl(var(--error)/0.25)] text-xs">
+          <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--error))] mt-0.5 flex-shrink-0" />
           <span className="break-all">{website.last_crawl_error}</span>
         </div>
       )}
 
-      {/* Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Articles" value={loading ? '—' : overview?.articles.total ?? 0} />
-        <Stat label="Keyword research" value={loading ? '—' : overview?.keyword_research.total ?? 0} />
-        <Stat label="Toolkit runs" value={loading ? '—' : overview?.toolkit_runs.total ?? 0} />
-        <Stat label="Tracked domains" value={loading ? '—' : overview?.tracked_domains.total ?? 0} />
-      </div>
+      {/* Four counters, each of which names a section of this page — so each one opens it.
+          `HubStatGrid` auto-fits rather than hard-coding four columns (no orphan tile), and
+          `HubStatTile` puts the figures on a `tabular-nums` grid so the column can be compared
+          down the page instead of read one at a time. */}
+      <HubStatGrid>
+        <HubStatTile label="Articles" value={loading ? '—' : overview?.articles.total ?? 0} onClick={() => setTab('articles')} />
+        <HubStatTile label="Keyword research" value={loading ? '—' : overview?.keyword_research.total ?? 0} onClick={() => setTab('research')} />
+        <HubStatTile label="Toolkit runs" value={loading ? '—' : overview?.toolkit_runs.total ?? 0} onClick={() => setTab('runs')} />
+        <HubStatTile label="Tracked domains" value={loading ? '—' : overview?.tracked_domains.total ?? 0} onClick={() => setTab('domains')} />
+      </HubStatGrid>
 
-      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <TabsList className="bg-muted">
-          <TabsTrigger value="overview" className="gap-1"><LayoutDashboard className="w-3.5 h-3.5" /> Overview</TabsTrigger>
-          <TabsTrigger value="ai" className="gap-1"><Sparkles className="w-3.5 h-3.5" /> AI Visibility</TabsTrigger>
-          <TabsTrigger value="competitors" className="gap-1"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
-          <TabsTrigger value="articles" className="gap-1"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
-          <TabsTrigger value="research" className="gap-1"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
-          <TabsTrigger value="runs" className="gap-1"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
-          <TabsTrigger value="domains" className="gap-1"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
-          <TabsTrigger value="gsc" className="gap-1"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
-          <TabsTrigger value="rankings" className="gap-1"><TrendingUp className="w-3.5 h-3.5" /> Rankings &amp; Links</TabsTrigger>
-          <TabsTrigger value="health" className="gap-1"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
-          <TabsTrigger value="llms" className="gap-1"><Bot className="w-3.5 h-3.5" /> llms.txt</TabsTrigger>
+      {/* Eleven sections. That is a RAIL, not a tab row — the same call SocialHubPanel made at
+          the same count. Eleven triggers in one horizontal strip is a row nobody can scan, and
+          `bg-muted` on the list put them in a filled padding box, which is the one thing the tab
+          treatment is defined not to be (see TabsList in components/core/ui/tabs.tsx).
+          `.section-rail` collapses it back to a single swipeable strip below `lg`. */}
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+        orientation="vertical"
+        className="flex flex-col gap-4 lg:flex-row lg:items-start"
+      >
+        <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
+          <TabsTrigger value="overview" className="w-full justify-start gap-2"><LayoutDashboard className="w-3.5 h-3.5" /> Overview</TabsTrigger>
+          <TabsTrigger value="ai" className="w-full justify-start gap-2"><Sparkles className="w-3.5 h-3.5" /> AI Visibility</TabsTrigger>
+          <TabsTrigger value="competitors" className="w-full justify-start gap-2"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
+          <TabsTrigger value="articles" className="w-full justify-start gap-2"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
+          <TabsTrigger value="research" className="w-full justify-start gap-2"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
+          <TabsTrigger value="runs" className="w-full justify-start gap-2"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
+          <TabsTrigger value="domains" className="w-full justify-start gap-2"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
+          <TabsTrigger value="gsc" className="w-full justify-start gap-2"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
+          <TabsTrigger value="rankings" className="w-full justify-start gap-2"><TrendingUp className="w-3.5 h-3.5" /> Rankings &amp; Links</TabsTrigger>
+          <TabsTrigger value="health" className="w-full justify-start gap-2"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
+          <TabsTrigger value="llms" className="w-full justify-start gap-2"><Bot className="w-3.5 h-3.5" /> llms.txt</TabsTrigger>
         </TabsList>
+
+        <div className="min-w-0 flex-1 space-y-4">
 
         {/*
           Overview — the derived metric strip. Everything on it comes from
@@ -476,7 +481,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                         <TableCell className="font-medium max-w-[240px] truncate">{r.label || r.subject}</TableCell>
                         <TableCell className="text-muted-foreground">{r.kind}</TableCell>
                         <TableCell className="text-muted-foreground">{r.country_code || '—'}</TableCell>
-                        <TableCell className={r.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}>
+                        <TableCell className={r.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-[hsl(var(--error))]'}>
                           {r.success ? 'success' : 'failed'}
                         </TableCell>
                         <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
@@ -573,6 +578,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         <TabsContent value="llms">
           <WebsiteLlmsTxtPanel website={website} />
         </TabsContent>
+        </div>
       </Tabs>
 
       {/* Keyword-research reader — the full captured SERP, not the 5-column summary. */}

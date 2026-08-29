@@ -106,7 +106,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
               No snapshot yet. Take one to pull ranking keywords, traffic and backlinks — or the weekly tracker will populate it.
             </div>
           ) : s.error ? (
-            <div className="text-xs text-red-500">{s.error}</div>
+            <div className="text-xs text-[hsl(var(--error))]">{s.error}</div>
           ) : (s.ranking_keywords == null && s.backlinks == null) ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
               DataForSEO has no ranking or backlink data for <b>{website.url.replace(/^https?:\/\//, '')}</b> in {s.country_code}. This is normal for a new or low-traffic site — it fills in as the site gains search visibility.
@@ -123,7 +123,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
               {(s.kw_up != null || s.kw_new != null) && (
                 <div className="flex flex-wrap gap-4 text-xs">
                   <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><ArrowUp className="w-3 h-3" /> {fmt(s.kw_up)} up</span>
-                  <span className="inline-flex items-center gap-1 text-red-500"><ArrowDown className="w-3 h-3" /> {fmt(s.kw_down)} down</span>
+                  <span className="inline-flex items-center gap-1 text-[hsl(var(--error))]"><ArrowDown className="w-3 h-3" /> {fmt(s.kw_down)} down</span>
                   <span className="inline-flex items-center gap-1 text-primary"><Sparkles className="w-3 h-3" /> {fmt(s.kw_new)} new</span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">{fmt(s.kw_lost)} lost</span>
                   {s.spam_score != null && <span className="inline-flex items-center gap-1 text-muted-foreground"><Link2 className="w-3 h-3" /> spam score {s.spam_score}</span>}

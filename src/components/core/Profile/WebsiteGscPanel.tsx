@@ -128,7 +128,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
               You'll be sent to Google to grant read-only access to your Search Console data for <span className="text-foreground font-medium">{website.url.replace(/^https?:\/\//, '')}</span>. Nothing is published or changed on your site.
             </div>
             {status?.last_sync_error && (
-              <div className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{status.last_sync_error}</div>
+              <div className="text-xs text-[hsl(var(--error))] flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{status.last_sync_error}</div>
             )}
             <Button onClick={connect} disabled={connecting}>
               {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -187,7 +187,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="w-4 h-4 text-emerald-500" />Search Performance</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" />Search Performance</CardTitle>
             <CardDescription>
               {status.property} · {status.google_email} · last sync {timeAgo(status.last_sync_at)}
               {summary ? <> · last {summary.days} days</> : null}
@@ -202,7 +202,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
         </CardHeader>
         <CardContent>
           {status.last_sync_error && (
-            <div className="mb-3 text-xs text-red-500 flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5" /><span className="break-all">{status.last_sync_error}</span></div>
+            <div className="mb-3 text-xs text-[hsl(var(--error))] flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5" /><span className="break-all">{status.last_sync_error}</span></div>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Metric label="Clicks" value={fmt(t?.clicks ?? 0)} />

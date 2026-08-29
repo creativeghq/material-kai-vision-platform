@@ -13,7 +13,7 @@ const scoreColor = (s: number | null) =>
   s == null ? 'text-muted-foreground'
     : s >= 90 ? 'text-emerald-600 dark:text-emerald-400'
     : s >= 50 ? 'text-amber-600 dark:text-amber-400'
-    : 'text-red-500';
+    : 'text-[hsl(var(--error))]';
 
 function Gauge100({ label, score }: { label: string; score: number | null }) {
   const s = score ?? 0;
@@ -88,8 +88,8 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
               No Site Health check yet. Run one to score the homepage — or the nightly audit will populate it.
             </div>
           ) : health.status === 'error' ? (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-xs">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-[hsl(var(--error-bg))] border border-[hsl(var(--error)/0.25)] text-xs">
+              <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--error))] mt-0.5 flex-shrink-0" />
               <span className="break-all">{health.error || 'Audit failed'}</span>
             </div>
           ) : (
@@ -156,7 +156,7 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
                         <div
                           key={check.key}
                           className={`flex items-start gap-2 rounded-sm border p-2 ${
-                            passed ? 'border-hairline bg-surface-sunken' : 'border-amber-500/30 bg-amber-500/10'
+                            passed ? 'border-hairline bg-surface-sunken' : 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))]'
                           }`}
                         >
                           {passed
