@@ -43,7 +43,7 @@ PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0: Product Discovery & Metafield Identification (0-15%)   │
-│ AI Model: Claude Opus 4.7 / GPT-4o                           │
+│ AI Model: Claude Opus 5 / GPT-4o                           │
 │ Purpose: Identify products and metafield types                 │
 │ Output: Product catalog with metafield types                   │
 └─────────────────────────────────────────────────────────────────┘
@@ -63,14 +63,14 @@ PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 3: Image Processing & Visual Metafield Extraction (50-70%)│
-│ AI: Claude Opus 4.7 vision_analysis (Anthropic tool use) + SLIG│
+│ AI: Claude Opus 5 vision_analysis (Anthropic tool use) + SLIG│
 │ Purpose: Extract images, analyze for visual metafields         │
 │ Output: Images with detected colors, texture, finish           │
 └─────────────────────────────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 4: Product Creation & Metafield Consolidation (70-90%)   │
-│ AI: Claude Haiku 4.5 → Claude Opus 4.7                         │
+│ AI: Claude Haiku 4.5 → Claude Opus 5                         │
 │ Purpose: Create products, consolidate all metafields           │
 │ Output: Product records with consolidated metafields           │
 └─────────────────────────────────────────────────────────────────┘
@@ -89,7 +89,7 @@ PDF Upload
 ## 🔍 Stage 0: Product Discovery - Initial Metafield Identification
 
 ### AI Model & Process
-**Claude Opus 4.7 / GPT-4o**
+**Claude Opus 5 / GPT-4o**
 
 The AI analyzes the entire PDF to:
 1. **Identify product boundaries** - Detect where each product starts/ends
@@ -169,7 +169,7 @@ Each chunk stores its `product_name`, `page_range`, and a `metafields` dictionar
 ## 🖼️ Stage 3: Image Processing & Visual Metafield Extraction
 
 ### AI Models & Process
-- **Claude Opus 4.7 vision_analysis**: Sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (Anthropic tool use). Pre;
+- **Claude Opus 5 vision_analysis**: Sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (Anthropic tool use). Pre;
 - **SLIG (SigLIP2)**: Image embeddings (768D) for visual similarity. Note: pre-2026 docs referenced 512D CLIP; the platform migrated to 768D SLIG and dropped legacy CLIP columns in 2026-04.
 
 The AI extracts images and analyzes them for visual metafields:
@@ -223,7 +223,7 @@ The AI extracts images and analyzes them for visual metafields:
 
 ### AI Models & Process
 - **Claude Haiku 4.5**: Initial product creation from chunks
-- **Claude Opus 4.7**: Validation, enrichment, and consolidation
+- **Claude Opus 5**: Validation, enrichment, and consolidation
 
 The AI creates product records and consolidates metafields from all sources:
 
@@ -440,10 +440,10 @@ Metafield values are inserted into `product_metafield_values`, `chunk_metafield_
 
 | Stage | AI Model | Input | Process | Output | Accuracy |
 |-------|----------|-------|---------|--------|----------|
-| **0** | Claude Opus 4.7 / GPT-4o | Full PDF | Identify products & metafield types | Product catalog with metafield types | 88%+ |
+| **0** | Claude Opus 5 / GPT-4o | Full PDF | Identify products & metafield types | Product catalog with metafield types | 88%+ |
 | **2** | Anthropic Claude | Product pages | Create chunks, preserve metafields | Chunks with metafield metadata | 88%+ |
-| **3** | Claude Opus 4.7 vision_analysis (Anthropic tool use) + SLIG (SigLIP2) | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
-| **4** | Claude Haiku 4.5 → Opus 4.7 | Chunks + Images | Consolidate metafields | Product records with consolidated metafields | 95%+ |
+| **3** | Claude Opus 5 vision_analysis (Anthropic tool use) + SLIG (SigLIP2) | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
+| **4** | Claude Haiku 4.5 → Opus 5 | Chunks + Images | Consolidate metafields | Product records with consolidated metafields | 95%+ |
 | **12** | Extract & Link | Product metadata | Create database records, link to products/chunks/images | metafield_values linked | 100% |
 
 ### Key Metrics
@@ -491,7 +491,7 @@ Metafield values are inserted into `product_metafield_values`, `chunk_metafield_
 **Material Identification**:
 1. **Stage 0**: Claude identifies material types from PDF (e.g., "White Body Tile", "Ceramic")
 2. **Stage 2**: Chunks preserve material information in metadata
-3. **Stage 3**: Claude Opus 4.7 vision_analysis (Anthropic tool use, sole vision pass post-2026-05-01) analyzes material appearance (texture, finish, gloss)
+3. **Stage 3**: Claude Opus 5 vision_analysis (Anthropic tool use, sole vision pass post-2026-05-01) analyzes material appearance (texture, finish, gloss)
 4. **Stage 4**: Claude consolidates material data from all sources
 5. **Stage 12**: Material metafield linked to product, chunks, and images
 

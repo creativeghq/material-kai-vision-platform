@@ -366,8 +366,8 @@ SELECT cron.schedule('price-monitoring-hourly', '0 * * * *', $$ ... $$);
 ## Related Documentation
 
 - [Price Monitoring System](./price-monitoring-system.md)
-- [Price Monitoring API (external)](api/price-monitoring-api.md)
-- [Cron API](api/price-monitoring-cron-api.md)
+- [Price Monitoring API (external)](price-monitoring-api.md)
+- [Cron API](price-monitoring-system.md)
 - Edge function: the price-monitoring cron was consolidated into `supabase/functions/monitoring-cron`.
 - [CLAUDE.md → Price Monitoring](../CLAUDE.md)
 

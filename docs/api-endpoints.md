@@ -26,7 +26,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 **Previous Updates (v2.5.0 - December 30, 2025):**
 - **IMAGE RE-CLASSIFICATION:** 1 new endpoint for AI-powered image re-classification
   - `POST /api/images/reclassify/{image_id}` - Re-run material vs non-material classification
-  - Force validation via Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
+  - Force validation via Claude Opus 5 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
   - Real-time database updates with new classification results
   - Confidence scoring and reasoning
 
@@ -84,7 +84,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 7. [Products Routes](#7-products-routes) - Product management
 8. [Images Routes](#8-images-routes) - Image processing
 9. [Embeddings Routes](#9-embeddings-routes) - Embedding generation
-10. Vision (segmentation, classification, vision_analysis, material analysis) consolidated onto Claude Opus 4.7 via Anthropic tool use;
+10. Vision (segmentation, classification, vision_analysis, material analysis) consolidated onto Claude Opus 5 via Anthropic tool use;
 11. [Anthropic Routes](#11-anthropic-routes) - Anthropic integration
 12. [Monitoring Routes](#12-monitoring-routes) - System monitoring
 13. [AI Metrics Routes](#13-ai-metrics-routes) - AI performance metrics
@@ -363,7 +363,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 1. Stage 0 (0-15%): Product Discovery - Claude/GPT analyzes entire PDF
 2. Stage 1 (15-30%): Focused Extraction - Extract only product pages
 3. Stage 2 (30-50%): Chunking - Create chunks for vector DB
-4. Stage 3 (50-70%): Image Processing - Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) + SLIG embeddings. Pre;
+4. Stage 3 (50-70%): Image Processing - Claude Opus 5 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) + SLIG embeddings. Pre;
 5. Stage 4 (70-90%): Product Creation - Create product records
 6. Stage 5 (90-100%): Quality Enhancement - Claude validation (async)
 
@@ -711,7 +711,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 **Used In:** Model-specific analytics
 **Flow:** Fetch job → Filter by model → Return model-specific data
 
-**Request:** `GET /api/rag/job/{job_id}/ai-tracking/model/claude-opus-4-7`
+**Request:** `GET /api/rag/job/{job_id}/ai-tracking/model/claude-opus-5`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** AIUsagePanel.tsx (model filter)
@@ -1713,7 +1713,7 @@ All endpoints return JSON with fields: `success` (boolean), `data` (object), `er
 
 **Features:**
 - XML parsing with field detection
-- AI-powered field mapping (Claude Opus 4.7)
+- AI-powered field mapping (Claude Opus 5)
 - Fallback rule-based mapping (multi-language support)
 - Preview mode for field detection only
 - Stores products in job metadata for Python API
@@ -1770,7 +1770,7 @@ All endpoints return JSON with fields: `success` (boolean), `data` (object), `er
 
 **Required secrets:** `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET` (configured at `/admin/modules/social-media → Settings` or as Supabase Edge Function secrets)
 
-For the full endpoint inventory, action parameters, database tables, and webhook payload shapes see **[docs/api/messaging-api.md](./api/messaging-api.md)**.
+For the full endpoint inventory, action parameters, database tables, and webhook payload shapes see **[docs/inbox-system.md](./inbox-system.md)**.
 
 ### Key Actions (POST /functions/v1/messaging-api)
 

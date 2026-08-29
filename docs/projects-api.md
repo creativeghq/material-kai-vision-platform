@@ -2,7 +2,7 @@
 
 External Project Workspace API — create projects, attach rooms, manage tasks (with subtasks), invite read-only collaborators by email, and read the timeline. Mirror of the price / mention / job tracking patterns: `Authorization: Bearer kai_*` API key auth, per-call partner credit metering for the few writes that incur platform cost.
 
-For the module overview (architecture, RLS model, triggers, frontend), see [docs/projects.md](../projects.md).
+For the module overview (architecture, RLS model, triggers, frontend), see [docs/projects.md](projects.md).
 
 **Host**: `https://v1api.materialshub.gr`
 **OpenAPI tag**: `Project Workspace (Public API)`
@@ -538,9 +538,9 @@ Webhook push is on the roadmap once enough partners ask for it.
 
 ## See also
 
-- [docs/projects.md](../projects.md) — full module architecture.
+- [docs/projects.md](projects.md) — full module architecture.
 - [docs/api/README.md](README.md) — full API index.
-- [docs/api/mention-monitoring-api.md](mention-monitoring-api.md) — sister Public API with the same auth + credit pattern.
-- [docs/api/job-research-api.md](job-research-api.md) — same.
-- [docs/api/price-monitoring-api.md](price-monitoring-api.md) — same.
-- [mivaa-pdf-extractor/app/api/project_tracking_routes.py](../../mivaa-pdf-extractor/app/api/project_tracking_routes.py) — source.
+- [docs/mention-monitoring-api.md](mention-monitoring-api.md) — sister Public API with the same auth + credit pattern.
+- [docs/job-research-api.md](job-research-api.md) — same.
+- [docs/price-monitoring-api.md](price-monitoring-api.md) — same.
+- [mivaa-pdf-extractor/app/api/project_tracking_routes.py](../mivaa-pdf-extractor/app/api/project_tracking_routes.py) — source.

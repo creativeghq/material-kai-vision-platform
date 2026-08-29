@@ -54,4 +54,4 @@ Only orders that have actually been **placed** (status `confirmed` / `partially_
 ## Notes
 - The interactive equivalent is the **supplier portal** (`/supplier-portal`) — same data, same write-backs, for humans.
 - Backed by service-role RPCs `get_supplier_inbound_orders_svc` / `supplier_update_inbound_order_svc` (the api-key is the auth; the claimed-identity gate is enforced in-RPC).
-- Related: [docs/sourcing-fulfillment.md](../sourcing-fulfillment.md), #247, #237.
+- Related: [docs/sourcing-fulfillment.md](sourcing-fulfillment.md), #247, #237.

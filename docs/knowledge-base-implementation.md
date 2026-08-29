@@ -130,7 +130,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
    - Supabase performs vector similarity search using pgvector
    - Returns ranked results with similarity scores
 
-**See also:** [Pricing API](./api/pricing-api.md) for the admin-only flow that ingests docs under a "Pricing" category with `price_doc_type` sub-types and retrieves them via either the `price_lookup` agent tool (AI reasoning mode) or `search_knowledge_base` gateway action (quick-pick direct mode).
+**See also:** [Pricing API](./units-and-quantity-pricing.md) for the admin-only flow that ingests docs under a "Pricing" category with `price_doc_type` sub-types and retrieves them via either the `price_lookup` agent tool (AI reasoning mode) or `search_knowledge_base` gateway action (quick-pick direct mode).
 
 #### Categories (2 endpoints)
 

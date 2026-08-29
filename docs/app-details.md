@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
@@ -92,12 +92,12 @@ The platform's core differentiator is not a single AI model — it is the orches
 
 | Provider | Model | Role | Cost |
 |----------|-------|------|------|
-| Anthropic | Claude Opus 4.7 | Jarvis agent, deep product analysis, metadata extraction, B2B research | $15 input / $75 output per 1M tokens |
+| Anthropic | Claude Opus 5 | Jarvis agent, deep product analysis, metadata extraction, B2B research | $15 input / $75 output per 1M tokens |
 | Anthropic | Claude Haiku 4.5 | Fast classification, content detection, B2B web search | $0.80 input / $4 output per 1M tokens |
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
 | Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
-| Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
+| Anthropic | Claude Opus 5 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
 | Modal | PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) | Layout + OCR backbone (sole engine post-2026-06-13) — two-stage parser (PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), run as Stage 1 before discovery. Per-attempt metrics in `paddleocr_metrics`. Failure marker: `OCRResult.method='paddleocr_failed'`; `ocr_engine='paddleocr'`. Replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). | Modal endpoint (GPU L4, scale-to-zero) |
 | Modal | SLIG SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Modal endpoint (scale-to-zero; moved off HuggingFace 2026-06-14) |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
@@ -140,7 +140,7 @@ The primary ingest path. A supplier uploads a product catalog PDF. The platform 
 3. Semantic chunking via Anthropic API (800 token max, 100 overlap)
 4. Generates text + understanding embeddings via Voyage AI
 5. Extracts all images from product pages
-6. Runs Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre;
+6. Runs Claude Opus 5 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre;
 7. Generates all 5 SigLIP2 visual embedding types per image
 8. Extracts 200+ metadata fields per product (dimensions, material composition, certifications, weight, finish, slip resistance, etc.)
 9. PaddleOCR-VL layout detection + OCR (Modal-hosted, structure-first Stage 1) localizes regions, labels them, predicts reading order, and reads text/tables→markdown/formulas→LaTeX inside each region
@@ -188,7 +188,7 @@ After retrieval, a secondary AI re-ranking pass scores results on visual, unders
 The Agent Hub (`/agent-hub`) is the conversational AI interface with memory, multi-turn context, image uploads, and tool-use.
 
 **Jarvis — Primary Material Intelligence Agent**
-Model: Claude Opus 4.7 | LangGraph + Supabase checkpointer (conversations resume across sessions)
+Model: Claude Opus 5 | LangGraph + Supabase checkpointer (conversations resume across sessions)
 
 Tools available to all authenticated users:
 - `material_search` — 7-vector fusion search across the catalog, with **Explainable Search Spec** (structured interpretation of query across color/material/style/texture/specification dimensions, displayed as a collapsible card above results)
@@ -207,7 +207,7 @@ Tools gated to Admin/Owner only:
 - Sub-agents: `research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis`
 
 **Interior Designer Agent**
-Model: Claude Opus 4.7 | Focused on spatial design and visualization
+Model: Claude Opus 5 | Focused on spatial design and visualization
 
 - Analyzes room photos: layout, dimensions, natural light, spatial relationships, accessibility compliance
 - Generates interior design images (text prompt or image reference) — see Feature 4
@@ -644,7 +644,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 4.7 tool use.
+- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 5 tool use.
 - Modal (PaddleOCR-VL): layout + OCR backbone (GPU L4, scale-to-zero → $0 idle, `max_containers=4`). Replaced the Surya-2 backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
 - Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
 
@@ -692,7 +692,7 @@ This analytics layer is a significant standalone upsell — providing market int
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
 | API endpoints | 170+ |
-| AI models integrated | Anthropic (Opus 4.7 / Sonnet 4.6 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
+| AI models integrated | Anthropic (Opus 5 / Sonnet 4.6 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
 | Edge functions deployed | 60+ |
 | Database tables | 40+ |
 
@@ -704,7 +704,7 @@ This analytics layer is a significant standalone upsell — providing market int
 Most platforms use one or two embedding types. Fusing 7 specialized vectors with dynamic per-query weight profiles requires custom ML infrastructure, tuned weight profiles per query intent, and deep integration between the vision analysis pipeline and the search layer. This compound in value as more products are added.
 
 **2. Understanding Embeddings (Novel Architecture)**
-Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
+Claude Opus 5 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
 
 **3. Full Vertical Integration**
 Ingestion + enrichment + search + design generation + VR visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.

@@ -162,9 +162,44 @@ the company the same way.
   them / settled)"*.
 - **Cash in bank** — Finance dashboard KPI = Σ payments in − out.
 
+## Taking the margin, and holding a customer's money — two different facts (2026-08-28/29)
+
+Both are money with a button next to them, and stacking them on one screen made them read as one
+story in two steps: *"this order made €823.00"* above *"holding €446.34"* invites exactly one
+conclusion — that 446.34 is the part of 823.00 you may actually take. It is not. They are
+unrelated quantities about different things, so they now live on different screens.
+
+**Point 1 — an order allocates the ORDER; the party account allocates across all of them.**
+
+| Quantity | Derivation | Where the button lives |
+|---|---|---|
+| **Takeable margin on ONE order** | `get_order_profit_positions(uuid[])` — `revenue_net`, `cogs`, `margin`, `allocated`, `available` | the order screen |
+| **Takeable margin across ALL a party's sales orders** | `get_party_profit_position(workspace, company\|contact)` — an **aggregation of the same per-order derivation**, never a second answer | the party's finance record |
+| **Customer credit we are holding** | a PARTY fact — an overpayment, a bank charge, money sent ahead — settled across every order they have | the party's finance record, and only there |
+
+`get_order_profit_positions` is the ONE derivation: the dialog's cap, the button's visibility, the
+panel's figures and `allocate_order_profit`'s own guard all read it, so **the number offered and the
+number enforced cannot drift apart**. Never recompute margin beside it (rule 1, one derivation per
+money quantity).
+
+- **`get_party_profit_position` REFUSES (`22000`) when the party's orders span more than one currency.** A cross-currency sum is a confident number in no currency at all, and the per-order door is denominated.
+- **It is NOT `getCustomerProfitability().profit_unallocated`.** That one is the P&L view (invoice lines plus uninvoiced orders); this one is the ALLOCATION cap. Showing one beside a button enforcing the other puts two answers to the same question on one screen.
+- **A party-wide take writes one `finance_profit_allocations` row PER ORDER**, spread oldest-first and capped per order by the same derivation — never a single party-level row. Each order has to keep telling the truth about itself afterwards, and each share stays separately reversible from the order it came off.
+- **`p_allocated_on` is the OPERATOR's local day and is required by the RPC.** The DB session is UTC, so a server-stamped date reads *yesterday* for a Greek operator before 03:00 (rule 1b).
+- **Releasing credit was moved OFF the order screen entirely.** Whether to keep a customer's overpayment is a party-wide decision, and offering it from inside one sale asks the operator to make it from a screen that can only see a single order. The `customer_credit_releasable` notification already deep-links to the party's record, so nothing lost its way in.
+
+**A payment says what it settled, and a self-allocation is not an allocation.** "Record payment"
+books cash where "Add expense" books a bill, so money-out rows allocated straight onto the order
+were being printed as though allocated to nothing. Self-order allocation is filtered out of the
+printed list, and the payment row names what it settled — which is what makes it findable in the
+bank.
+
 ## RPCs
 `generate_order_from_quote(uuid)` · `generate_order_from_invoice(uuid, boolean)` ·
-`recompute_order_payment_status(uuid)` · `create_order_from_thread_intake(uuid)` (#342).
+`recompute_order_payment_status(uuid)` · `create_order_from_thread_intake(uuid)` (#342) ·
+`get_order_settlements(uuid[])` (the ONE settlement derivation — see CLAUDE.md rule 1) ·
+`get_order_profit_positions(uuid[])` · `allocate_order_profit(...)` ·
+`get_party_profit_position(workspace, company, contact)` · `allocate_party_profit(...)`.
 
 **Order totals are derived in one place, behind two doors.** `_recompute_order_totals_core` holds
 the arithmetic and is REVOKEd from every client role; `recompute_order_totals` is the public entry
@@ -182,8 +217,7 @@ triggers/RPCs above — there is **no `orders` edge function**, so orders do not
 OpenAPI (`public/api/openapi-edge.json`).
 
 ## Known follow-ups (not yet built)
-- "Record payment / issue Receipt" action **on the order** (today payments are recorded elsewhere and
-  linked; the order shows them).
+- ~~"Record payment / issue Receipt" action **on the order**~~ — **done 2026-08-28**: the order records a payment and each row names what it settled.
 - AR / AP tabs grouped **by order** (received-vs-owed + profit per order).
 - Planning: per-customer expected payments by due-day with tick-when-paid, linked to the settling payment.
 - ~~Honoring `order_items.update_warehouse` inside the dispatch stock-matching~~ — **done 2026-07-26**: dispatch routes through `deliver_order_line`, which honors it.

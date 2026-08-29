@@ -312,7 +312,7 @@ Token usage is accumulated across all iterations using the sum reducers on `inpu
 ## Related Documentation
 
 - [Agent System Architecture](agent-system.md) - High-level agent overview
-- [API: Agent Chat](api/agent-chat-api.md) - API reference
+- [API: Agent Chat](agent-system.md) - API reference
 - [AI Models Guide](ai-models-guide.md) - Model configurations
 
 ---

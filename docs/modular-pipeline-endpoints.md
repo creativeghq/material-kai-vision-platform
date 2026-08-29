@@ -45,10 +45,10 @@ The `ai_config` object accepts the following optional fields:
 - `text_embedding_model` — Default: "voyage-4"
 - `text_embedding_dimensions` — Default: 1024
 - `text_embedding_input_type` — Default: "document"
-- `classification_primary_model` — Default: "claude-opus-4-7"
-- `classification_validation_model` — Default: "claude-opus-4-7"
+- `classification_primary_model` — Default: "claude-opus-5"
+- `classification_validation_model` — Default: "claude-opus-5"
 - `classification_confidence_threshold` — Default: 0.7
-- `discovery_model` — Default: "claude-opus-4-7"
+- `discovery_model` — Default: "claude-opus-5" (Literal: `claude-opus-5` | `claude-haiku-4-5`)
 - `metadata_extraction_model` — Default: "claude"
 - `chunking_model` — Default: "gpt-4o"
 - `discovery_temperature` — Default: 0.1
@@ -62,10 +62,10 @@ The `ai_config` object accepts the following optional fields:
 
 **DEFAULT_AI_CONFIG** (Balanced):
 - Best overall accuracy and reliability
-- Uses Claude Opus 4.7 for discovery and metadata
+- Uses Claude Opus 5 for discovery and metadata
 - Uses SLIG (SigLIP2) for visual embeddings (768D, Modal endpoint)
 - Uses Voyage AI voyage-4 for text embeddings (1024D)
-- Uses Claude Opus 4.7 via Anthropic tool use for vision classification (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
+- Uses Claude Opus 5 via Anthropic tool use for vision classification (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
 
 **FAST_CONFIG** (Speed Optimized):
 - Uses GPT-4o instead of Claude for faster processing
@@ -116,7 +116,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 **AI Processing**:
 
 - **Single Stage — Claude Vision (Schema-locked)**:
-  - Model: `claude-opus-4-7` (Anthropic) via Anthropic tool use
+  - Model: `claude-opus-5` (Anthropic) via Anthropic tool use
   - Schema: `VisionAnalysis` Pydantic model in `app/models/vision_analysis.py` enforced by `VISION_ANALYSIS_TOOL` — no JSON regex recovery; hard guarantee of schema adherence
   - Classifies images into 3 categories:
     - `material_closeup`: Close-up of material texture/surface/pattern
@@ -234,7 +234,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 **AI Processing**:
 - **Model**: Configurable via `ai_config.metadata_extraction_model`
-  - Default: `claude` (Claude Opus 4.7)
+  - Default: `claude` (Claude Opus 5)
   - Alternative: `gpt` (GPT-4o or GPT-5)
 - **Temperature**: Configurable via `ai_config.metadata_temperature` (default: 0.1)
 - **Max Tokens**: Configurable via `ai_config.metadata_max_tokens` (default: 4096)
@@ -358,8 +358,8 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - `all`: Process entire PDF (disables focused extraction)
 
 ### AI Models Used
-1. **Product Discovery**: Claude Opus 4.7 or GPT-5 (configurable)
-2. **Image Classification**: Claude Opus 4.7 via Anthropic tool use (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
+1. **Product Discovery**: Claude Opus 5 or GPT-5 (configurable)
+2. **Image Classification**: Claude Opus 5 via Anthropic tool use (sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
 3. **Visual Embeddings**: SLIG (SigLIP2) via Modal Endpoint - 5 types per image, 768D each
 4. **Text Embeddings**: Voyage AI voyage-4 (1024D) — sole provider (updated 2026-04)
 
@@ -398,7 +398,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 ### What Each Endpoint Does
 
-1. **classify-images**: AI classification via Claude Opus 4.7 Anthropic tool use to filter material vs non-material images
+1. **classify-images**: AI classification via Claude Opus 5 Anthropic tool use to filter material vs non-material images
 2. **upload-images**: Upload material images to Supabase Storage (receives pre-filtered list)
 3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SLIG 768D via Modal endpoint)
 4. **create-chunks**: Semantic chunking + text embeddings (Voyage AI voyage-4 1024D)

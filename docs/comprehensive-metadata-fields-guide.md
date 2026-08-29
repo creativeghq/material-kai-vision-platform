@@ -33,7 +33,7 @@ The MIVAA platform extracts **200+ metadata fields** from PDF catalogs using AI-
 
 ### 🤖 AI Models Used
 
-- **Primary**: Claude Opus 4.7 (`claude-opus-4-7`)
+- **Primary**: Claude Opus 5 (`claude-opus-5`)
 - **Alternative**: GPT-4o (`gpt-4o`)
 - **Temperature**: 0.1 (low for consistent extraction)
 - **Max Tokens**: 8000 (comprehensive responses)

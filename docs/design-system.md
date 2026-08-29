@@ -468,10 +468,10 @@ re-implementation of either, not even in a demo page.
 
 ## 11. Image optimization
 
-All Supabase Storage image URLs should be passed through [`getOptimizedImageUrl()`](../src/utils/imageOptimization.ts) before rendering. This appends Supabase imgproxy query params (`width`, `quality`, `format=origin`) so the storage layer returns a transformed image instead of the full original.
+All Supabase Storage image URLs should be passed through [`getOptimizedImageUrl()`](../src/utils/imageUrl.ts) before rendering. This appends Supabase imgproxy query params (`width`, `quality`, `format=origin`) so the storage layer returns a transformed image instead of the full original.
 
 ```ts
-import { getOptimizedImageUrl } from '@/utils/imageOptimization';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 
 // Thumbnail / list view
 <img src={getOptimizedImageUrl(product.image_url, { width: 400, quality: 80 })} />
@@ -516,4 +516,4 @@ Used by: `ProductCard`, `SearchResultCard`, `MoodBoardDetailPage`, `ProgressiveI
 | [src/components/shared/SectionHeader.tsx](../src/components/shared/SectionHeader.tsx) | Section lead-in |
 | [src/pages/DesignSystemPage.tsx](../src/pages/DesignSystemPage.tsx) | The live specimen sheet |
 | [tests/unit/designSystem.test.ts](../tests/unit/designSystem.test.ts) | The guard — what would silently undo this |
-| [src/utils/imageOptimization.ts](../src/utils/imageOptimization.ts) | `getOptimizedImageUrl` (§11) |
+| [src/utils/imageUrl.ts](../src/utils/imageUrl.ts) | `getOptimizedImageUrl` + `IMAGE_PRESETS` (§11) |

@@ -709,7 +709,7 @@ All errors return:
 
 ## Costs
 
-External-API partner billing is documented in [JOB_OP_CREDIT_COST](../../mivaa-pdf-extractor/app/services/integrations/job_cost_logger.py). For internal flow, **no credits are debited per call** — everything is metered into `ai_usage_logs` with `module_slug='job-research'` for cost-attribution dashboards but not charged through the credit system. Typical per-refresh cost: **$0.005–0.010** on a stable search (most candidates hit the verdict cache; only a handful trigger Haiku).
+External-API partner billing is documented in [JOB_OP_CREDIT_COST](../mivaa-pdf-extractor/app/services/integrations/job_cost_logger.py). For internal flow, **no credits are debited per call** — everything is metered into `ai_usage_logs` with `module_slug='job-research'` for cost-attribution dashboards but not charged through the credit system. Typical per-refresh cost: **$0.005–0.010** on a stable search (most candidates hit the verdict cache; only a handful trigger Haiku).
 
 ---
 

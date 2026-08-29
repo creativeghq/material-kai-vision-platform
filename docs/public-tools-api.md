@@ -294,7 +294,7 @@ Both keys live in the `platform_secrets` table as **platform-wide** entries (no 
 
 2. **`/admin/operations → Keys`** — paste values into the secrets manager UI. The Python backend's `platform_secret_resolver.py` reads the DB row with a 30s cache, so changes take effect within 30 seconds without a redeploy. Use this for emergency rotation when a redeploy isn't immediately practical.
 
-Both keys are consumed exclusively by the **Python MIVAA backend**, not by Supabase edge functions. The Turnstile widget script is loaded directly from `https://challenges.cloudflare.com/turnstile/v0/api.js` on the frontend; the `siteverify` call is made server-side by [turnstile_verifier.py](../../mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py).
+Both keys are consumed exclusively by the **Python MIVAA backend**, not by Supabase edge functions. The Turnstile widget script is loaded directly from `https://challenges.cloudflare.com/turnstile/v0/api.js` on the frontend; the `siteverify` call is made server-side by [turnstile_verifier.py](../mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py).
 
 **To obtain the keys:**
 
@@ -379,14 +379,14 @@ The visitor pays nothing on the free tier. Authenticated users who exceed 2/day 
 
 ## Implementation files
 
-- **Route**: [`mivaa-pdf-extractor/app/api/public_tools_routes.py`](../../mivaa-pdf-extractor/app/api/public_tools_routes.py)
-- **Quota + cache service**: [`mivaa-pdf-extractor/app/services/integrations/public_lookup_service.py`](../../mivaa-pdf-extractor/app/services/integrations/public_lookup_service.py)
-- **Turnstile verifier**: [`mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py`](../../mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py)
-- **Env-first / DB-fallback secret resolver**: [`mivaa-pdf-extractor/app/services/integrations/platform_secret_resolver.py`](../../mivaa-pdf-extractor/app/services/integrations/platform_secret_resolver.py)
-- **Frontend service**: [`src/services/publicToolsService.ts`](../../src/services/publicToolsService.ts)
-- **Frontend page**: [`src/pages/Tools/PublicToolsPage.tsx`](../../src/pages/Tools/PublicToolsPage.tsx)
-- **Turnstile widget**: [`src/components/features/turnstile/TurnstileWidget.tsx`](../../src/components/features/turnstile/TurnstileWidget.tsx)
-- **Route registration**: [`src/App.tsx`](../../src/App.tsx) — outside `<AuthGuard>`
+- **Route**: [`mivaa-pdf-extractor/app/api/public_tools_routes.py`](../mivaa-pdf-extractor/app/api/public_tools_routes.py)
+- **Quota + cache service**: [`mivaa-pdf-extractor/app/services/integrations/public_lookup_service.py`](../mivaa-pdf-extractor/app/services/integrations/public_lookup_service.py)
+- **Turnstile verifier**: [`mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py`](../mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py)
+- **Env-first / DB-fallback secret resolver**: [`mivaa-pdf-extractor/app/services/integrations/platform_secret_resolver.py`](../mivaa-pdf-extractor/app/services/integrations/platform_secret_resolver.py)
+- **Frontend service**: [`src/services/publicToolsService.ts`](../src/services/publicToolsService.ts)
+- **Frontend pages**: [`src/pages/Tools/ToolsHubPage.tsx`](../src/pages/Tools/ToolsHubPage.tsx) (the hub), [`PriceScanPage.tsx`](../src/pages/Tools/PriceScanPage.tsx), [`MentionScanPage.tsx`](../src/pages/Tools/MentionScanPage.tsx). The single `PublicToolsPage.tsx` this doc originally named was split into one page per tool.
+- **Turnstile widget**: [`src/components/features/turnstile/TurnstileWidget.tsx`](../src/components/features/turnstile/TurnstileWidget.tsx)
+- **Route registration**: [`src/App.tsx`](../src/App.tsx) — outside `<AuthGuard>`
 
 ---
 

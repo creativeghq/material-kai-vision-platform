@@ -38,14 +38,14 @@ All three MUST be updated together.
 ### 2. **Anthropic Models (Claude)**
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
-  - Claude Opus 4.7 (with prompt caching)
+  - Claude Opus 5 (with prompt caching)
   - Claude Haiku 4.5
 - **Special Features**:
   - Prompt caching support (reduced cost for cached tokens)
 - **Cost Calculation**: USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price) + (cached_tokens / 1M × cached_price). Platform Credits = USD Cost × 100.
 
 ### 3. **~~HuggingFace Endpoint Vision~~ — RETIRED**
-- **Status**: HuggingFace hosts nothing. Vision runs on Anthropic Claude Opus 4.7 via tool use and is billed under section 2 (Anthropic); the GPU endpoints that remain are Modal-hosted (sections 3a and 4).
+- **Status**: HuggingFace hosts nothing. Vision runs on Anthropic Claude Opus 5 via tool use and is billed under section 2 (Anthropic); the GPU endpoints that remain are Modal-hosted (sections 3a and 4).
 
 ### 3a. **Modal Endpoint OCR (PaddleOCR-VL)**
 - **Pricing Unit**: Modal GPU (L4) usage, billed per second of container runtime (scale-to-zero when idle: `min_containers=0`, $0 idle)
@@ -68,7 +68,7 @@ All three MUST be updated together.
 - **Pricing Unit**: Per image
 - **Models Tracked**:
   - GPT-4o vision
-  - Claude Opus 4.7 vision
+  - Claude Opus 5 vision
 - **Cost Calculation**: USD Cost = image_count × price_per_image. Platform Credits = USD Cost × 100.
 
 ### 6. **Firecrawl Web Scraping**
@@ -106,13 +106,13 @@ All three MUST be updated together.
 ## Database Schema
 
 ### `ai_usage_logs` Table
-Tracks all AI API calls with detailed cost breakdown. The table stores the following fields: a UUID primary key, `user_id` referencing `auth.users`, `model_name` (e.g., `"gpt-4o"`, `"claude-opus-4-7"`), `provider` (e.g., `"openai"`, `"anthropic"`, `"firecrawl"`), `operation_type` (e.g., `"chat"`, `"embedding"`, `"scrape"`), `input_tokens`, `output_tokens`, `cached_tokens`, `total_tokens`, `firecrawl_credits` (Firecrawl-specific), `cost_usd` (DECIMAL 10,6 — cost in USD), `platform_credits` (integer — cost in platform credits, i.e., USD × 100), `request_metadata` (JSONB), `response_metadata` (JSONB), and `created_at` timestamp.
+Tracks all AI API calls with detailed cost breakdown. The table stores the following fields: a UUID primary key, `user_id` referencing `auth.users`, `model_name` (e.g., `"gpt-4o"`, `"claude-opus-5"`), `provider` (e.g., `"openai"`, `"anthropic"`, `"firecrawl"`), `operation_type` (e.g., `"chat"`, `"embedding"`, `"scrape"`), `input_tokens`, `output_tokens`, `cached_tokens`, `total_tokens`, `firecrawl_credits` (Firecrawl-specific), `cost_usd` (DECIMAL 10,6 — cost in USD), `platform_credits` (integer — cost in platform credits, i.e., USD × 100), `request_metadata` (JSONB), `response_metadata` (JSONB), and `created_at` timestamp.
 
 ---
 
 ## Usage Examples
 
-### Example 1: Claude Opus 4.7 API Call (with markup)
+### Example 1: Claude Opus 5 API Call (with markup)
 
 For 1,000 input tokens at $15.00/1M and 500 output tokens at $75.00/1M:
 - Raw USD cost = (1,000/1,000,000 × $15.00) + (500/1,000,000 × $75.00) = $0.015 + $0.0375 = $0.0525

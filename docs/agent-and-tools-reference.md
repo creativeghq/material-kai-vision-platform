@@ -105,9 +105,44 @@ the agent runtime.
 - `business_analysis` — business sub-agent
 - `product_analysis` — product sub-agent
 
+### Web Research (all users, `alwaysOn`)
+
+Toolkit `web-research`. **Both halves are present on purpose**: `web_search` finds a URL, `web_fetch`
+reads it. An agent with only the first learns that a page exists and cannot open it — which is what
+sent it inventing workarounds (Wayback CDX, the WordPress REST API, `site:` queries) for tools it did
+not have.
+
+- `web_search` — search the open web with sources. `max_searches` is the depth dial (default 6, up to 15). Returns a `validation_id`.
+- `web_fetch` — read any page in full.
+- `web_research_validate` — **the second-source lane (#394)**. Pass the `validation_id` a prior `web_search` returned; it asks the SAME question of a different provider (QwenCloud, with its own search index) and compares the two.
+
+**Three rungs, and depth is the second one — not a second provider:**
+
+| Rung | What it is |
+|---|---|
+| normal | one provider, 6 searches — right for the single-answer lookups that are most of `web_search`'s traffic |
+| deep | one provider, up to 15 — **already exists** as `max_searches`. Searching harder helps every question at a fraction of a second provider's cost, so a normal/pro split on DEPTH would have re-invented what we have |
+| second-source | two providers, sources compared |
+
+A second provider confirming that Greek VAT is 24% is not "pro", it is paying twice for an answer one
+search already had. What it buys is a different search **index**, and that only matters for coverage
+questions — *find me all of X* — not lookups. The tool description says so, so the model routes on it.
+
+**What is compared, and what deliberately is not.** Not the prose: two paragraphs cannot be scored
+objectively, and an LLM judge would report which model WRITES better, not which one FOUND more — the
+subjective trap the approach exists to avoid. The **sources** are compared instead: which hosts each
+cited, how many resolve, where they overlap. **Distinct hosts, not URLs** — five pages from one site
+is one perspective. This is weaker than the b2b lane's company-domain check and the code says so out
+loud: a live source proves the citation is real, not that the claim it supports is true.
+
+Same shape as the b2b lane: `web_search` records its own run cheaply (it has already been paid for)
+and returns the `validation_id`; `web_research_validate` completes the pair. Re-running the incumbent
+inside the validation would pay twice to learn nothing new about it. A null `validation_id` means the
+pair could not be recorded and validation is unavailable for that run — stated, not silently absent.
+
 ### B2B Research (admin/owner only)
 
-- `b2b_manufacturer_search` — find manufacturers via web search (Anthropic web_search)
+- `b2b_manufacturer_search` — find manufacturers via web search (Anthropic `web_search_20250305`, `claude-opus-5` at `effort:low` — pinned, see [agent-system.md](agent-system.md#b2b-research-system))
 - `company_website_scrape` — Firecrawl a company website
 - `company_enrichment` — Apollo.io company data
 - `contact_discovery` — find + verify decision-maker emails
@@ -143,12 +178,11 @@ the agent runtime.
 
 ## Saved searches — what's actually available
 
-**Important**: The platform's `saved_searches` table is for **material/product searches** (used by the search filter UI). It is **not** mounted on any user-visible route today — `SavedSearchesPanel` is referenced only by `EnhancedRAGInterface`, which itself isn't wired into a route.
+**Important**: The platform's `saved_searches` table is for **material/product searches**. It has **no frontend reader at all** — `SaveSearchModal`, `SavedSearchesPanel` and the `EnhancedRAGInterface` that was their only caller have since been deleted from `src/`, so what used to be an unmounted component is now an absent one.
 
 **Where users save a search today**:
 
-- The `SaveSearchModal` exists at [`src/components/features/search/SaveSearchModal.tsx`](../src/components/features/search/SaveSearchModal.tsx) but is **also only used by the unmounted `EnhancedRAGInterface`**.
-- **In practice, users currently cannot save a search via the UI.** This is a latent feature.
+- **Nowhere.** The table is live, RLS-scoped and written by nothing; saving a material search is not reachable from the UI. Treat `saved_searches` as an unbuilt feature with a schema, not a wired one.
 
 **SEO research history** is a separate concern, lives in the `seo_research_runs` table, and is exposed via:
 
@@ -166,8 +200,8 @@ the agent runtime.
 | ProductDetailModal SEO tab | per-product modal | admin/owner | ✓ shipped earlier |
 | CompanyDetailPage SEO tab | `/admin/crm/companies/{id}` | CRM access | ✓ shipped earlier |
 | PinterestImportModal SEO bridge | moodboard import | moodboard users | ✓ shipped earlier |
-| `SavedSearchesPanel` | NONE | — | not mounted |
-| `SaveSearchModal` | NONE | — | not mounted |
+| `SavedSearchesPanel` | NONE | — | deleted from `src/` |
+| `SaveSearchModal` | NONE | — | deleted from `src/` |
 
 ## To add a new tool
 

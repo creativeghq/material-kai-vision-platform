@@ -11,7 +11,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
-| **Anthropic** | Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
+| **Anthropic** | Claude Opus 5, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
 | **Google (Modal)** | SigLIP2 base (768D) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
 | **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV2 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
@@ -39,7 +39,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ DISCOVERY: Product Discovery                                            │
-│ Model: Claude Opus 4.7 OR GPT-5                                         │
+│ Model: Claude Opus 5 OR GPT-5                                         │
 │ Purpose: Identify products, count pages, map image-to-product           │
 │ Reads PaddleOCR reading-order text from the Stage 1 cache (not raw text) │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -55,9 +55,9 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ VISION: Image Classification + Vision Analysis (per image)              │
-│ Primary: Claude Opus 4.7 (Anthropic tool use)                           │
+│ Primary: Claude Opus 5 (Anthropic tool use)                           │
 │ Validation pass: confidence < threshold OR primary failure → re-run     │
-│   on classification_validation_model (default: claude-opus-4-7)         │
+│   on classification_validation_model (default: claude-opus-5)           │
 │   Profiles: FAST/COST_OPTIMIZED use claude-haiku-4-5 for validation     │
 │ Schema: app.models.vision_analysis.VisionAnalysis (Pydantic)            │
 │ Tool:   VISION_ANALYSIS_TOOL                                            │
@@ -125,18 +125,18 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ SEARCH: 7-vector RAG (Claude Opus 4.7 + Multi-Vector)                   │
+│ SEARCH: 7-vector RAG (Claude Opus 5 + Multi-Vector)                   │
 │ Models:                                                                 │
 │   - Text embeddings: Voyage AI voyage-4 (1024D)                         │
 │   - Visual embeddings: 5× SLIG specialized (768D each)                  │
 │   - Understanding: Voyage AI 1024D (from VisionAnalysis JSON)           │
-│   - Synthesis LLM: Claude Opus 4.7 (200K context)                       │
+│   - Synthesis LLM: Claude Opus 5 (200K context)                       │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ AGENTS: Agent Hub                                                    │
 │ Models Available:                                                       │
-│   - Claude Opus 4.7 (kai default)                                       │
+│   - Claude Opus 5 (kai default)                                       │
 │   - Claude Haiku 4.5 (demo agent, fast responses)                       │
 │   - GPT-5 (advanced reasoning, optional)                                │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -146,13 +146,13 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 
 ## 🔍 Detailed Model Breakdown
 
-### 1. **Claude Opus 4.7 — Vision Analysis (PRIMARY)** 🎨
+### 1. **Claude Opus 5 — Vision Analysis (PRIMARY)** 🎨
 
 **Files**:
 - `mivaa-pdf-extractor/app/models/vision_analysis.py` — Pydantic schema (`VisionAnalysis` + `VISION_ANALYSIS_TOOL`)
 - `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
-The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool schema is the `VisionAnalysis` Pydantic model — Anthropic's tool-use enforcement guarantees the response matches the schema, eliminating fragile JSON regex recovery and protecting the understanding-embedding space from drift.
+The vision pipeline calls `claude-opus-5` via Anthropic tool use. The tool schema is the `VisionAnalysis` Pydantic model — Anthropic's tool-use enforcement guarantees the response matches the schema, eliminating fragile JSON regex recovery and protecting the understanding-embedding space from drift.
 
 **Used for**:
 - Image classification (material vs non-material)
@@ -294,10 +294,10 @@ The `VisionProvider.vision_provider` still validate. No code path produces new r
 | Stage | Default Model | Alternative |
 |-------|---------------|-------------|
 | Layout + Page OCR + figure boxes (Stage 1, before discovery) | PaddleOCR-VL 1.6 (Modal) | — |
-| Discovery | Claude Opus 4.7 | GPT-5 |
+| Discovery | Claude Opus 5 | GPT-5 |
 | Chunking | Claude Sonnet 4.6 | — |
-| Vision (primary) | Claude Opus 4.7 (tool use) | — |
-| Vision (validation, low-confidence) | Claude Opus 4.7 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
+| Vision (primary) | Claude Opus 5 (tool use) | — |
+| Vision (validation, low-confidence) | Claude Opus 5 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
 | Phase 3 OCR (per-image) | PaddleOCR-VL block OCR | — |
 | Visual Embeddings | SLIG (SigLIP2 base 768D, 5×768D) | — |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | — |
@@ -305,7 +305,7 @@ The `VisionProvider.vision_provider` still validate. No code path produces new r
 
 ### Search & Agents
 
-7-vector RAG uses Voyage AI voyage-4 for text + understanding (1024D), 5× SLIG specialized 768D for visual, and Claude Opus 4.7 for synthesis. The Agent Hub supports Claude Opus 4.7 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
+7-vector RAG uses Voyage AI voyage-4 for text + understanding (1024D), 5× SLIG specialized 768D for visual, and Claude Opus 5 for synthesis. The Agent Hub supports Claude Opus 5 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
 
 ---
 
@@ -318,15 +318,15 @@ These numbers are the source of truth; Doc #4's profile cost lines reference thi
 | Model | Usage | Cost |
 |-------|-------|------|
 | **PaddleOCR-VL 1.6** | Stage 1 layout + page OCR (100 pages, before discovery) | Modal GPU (scale-to-zero) |
-| **Claude Opus 4.7** | Product discovery (1 call) | ~$0.08 |
+| **Claude Opus 5** | Product discovery (1 call) | ~$0.08 |
 | **Claude Sonnet 4.6** | Chunking (~500 chunks) | ~$0.10 |
-| **Claude Opus 4.7** | Vision analysis (50 images, tool use) | ~$0.13 |
+| **Claude Opus 5** | Vision analysis (50 images, tool use) | ~$0.13 |
 | **PaddleOCR-VL 1.6** | Phase 3 per-image OCR (text-bearing only) | Modal GPU (scale-to-zero) |
 | **SLIG** | Visual embeddings (250 total, 5× per image) | endpoint |
 | **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.05 |
 | **TOTAL** | Per PDF | **~$0.36** |
 
-The pre-migration documented estimate (~$0. Today's number reflects honest accounting at Opus 4.7's current $5/$25 pricing.
+The pre-migration documented estimate (~$0. Today's number reflects honest accounting at Opus 5's current $5/$25 pricing.
 
 ### Per Search Query
 
@@ -334,7 +334,7 @@ The pre-migration documented estimate (~$0. Today's number reflects honest accou
 |-------|-------|------|
 | **Voyage AI voyage-4** | Query embedding | ~$0.001 |
 | **SLIG + Voyage** | 7-way parallel search | endpoint |
-| **Claude Opus 4.7** | Answer synthesis | ~$0.02 |
+| **Claude Opus 5** | Answer synthesis | ~$0.02 |
 | **TOTAL** | Per query | **~$0.02** |
 
 ---

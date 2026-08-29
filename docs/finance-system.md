@@ -5,7 +5,7 @@
 
 The finance module is the platform's multi-tenant accounting and e-invoicing layer for Greek businesses. It issues legally-compliant documents to **AADE/myDATA** through the **Novus** provider connector, tracks AR/AP, and produces the reports a Greek business needs for VAT filing and bookkeeping. It replaced a removed legacy third-party ERP connector (see [§10](#10-removed-the-legacy-erp-connector)).
 
-Related docs: [Orders](orders-system.md) · [POS / Retail](pos-retail-system.md) · [Online Storefront](online-storefront.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Warehouse & Billing](warehouse-and-billing.md) · [Finance API reference](api/finance-api.md) · [myAADE module](../src/modules/myaade/README.md).
+Related docs: [Orders](orders-system.md) · [POS / Retail](pos-retail-system.md) · [Online Storefront](online-storefront.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Warehouse & Billing](warehouse-and-billing.md) · [Finance API reference](finance-system.md) · [myAADE module](../src/modules/myaade/README.md).
 
 ---
 
@@ -35,7 +35,7 @@ Edge functions enforce tenancy via `userCanAccessWorkspace()` / `listUserWorkspa
 
 ## 2. Edge functions
 
-All live under `supabase/functions/`. Full request/response detail in [api/finance-api.md](api/finance-api.md).
+All live under `supabase/functions/`. Full request/response detail in [finance-system.md](finance-system.md).
 
 | Function | Auth | Purpose |
 |---|---|---|

@@ -17,7 +17,7 @@ Zernio      → zernio-webhook-handler → reconcile social_posts / social_accou
 Admin Panel → /admin/social-media/* → Direct DB queries (social_posts, social_accounts)
 ```
 
-`zernio-api` is one edge function; the `action` field selects the handler (oauth / publish / analytics). Full request/response contract: [api/zernio-social-api.md](api/zernio-social-api.md).
+`zernio-api` is one edge function; the `action` field selects the handler (oauth / publish / analytics). Full request/response contract: [social-media-system.md](social-media-system.md).
 
 ---
 

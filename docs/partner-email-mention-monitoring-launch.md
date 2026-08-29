@@ -108,6 +108,6 @@ Best,
 ## Notes for the sender
 
 - Replace `{first_name}`, `{your_name}`, `{your_signature}`, `{LINK_TO_DOCS}` before sending.
-- For the docs link: either link to the public version of `docs/api/mention-monitoring-api.md` once you publish it, or attach the markdown file.
+- For the docs link: either link to the public version of `docs/mention-monitoring-api.md` once you publish it, or attach the markdown file.
 - Skip this email for keys with `allowed_endpoints` restricted to non-mention paths — they'll need a key reissue, which is a separate conversation.
 - This template uses the same admin email broadcast endpoint pattern as `/api/v1/price-monitoring/broadcast-api-announcement` — if you want to send it through the platform (idempotent + tracked in `email_send_log`), seed it as `email_templates` slug `api_broadcast.mention_tracking_v1` first.

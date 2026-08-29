@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings (SLIG on Modal), and PaddleOCR-VL structural layout + OCR backbone (on Modal).
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings (SLIG on Modal), and PaddleOCR-VL structural layout + OCR backbone (on Modal).
 
 ---
 
@@ -13,7 +13,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **AI stack**: Anthropic-only vision (Claude Opus 4.7 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on Modal), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
+- **AI stack**: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on Modal), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
 - **170+ API endpoints** across 20 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
@@ -66,7 +66,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 30+ Edge Functions (TypeScript/Deno)
 
 **AI Services**:
-- Anthropic (Claude Opus 4.7 vision-via-tool-use + chunking via Sonnet 4.6 + Haiku 4.5 classifiers + built-in web_search_20250305)
+- Anthropic (Claude Opus 5 vision-via-tool-use + chunking via Sonnet 4.6 + Haiku 4.5 classifiers + built-in web_search_20250305)
 - Voyage AI (voyage-4, sole text + understanding embedder, 1024D)
 - SigLIP2 (SLIG) via Modal Endpoint (5 visual embedding types, 768D each)
 - PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone (replaced Surya-2 2026-06-13)
@@ -94,7 +94,7 @@ MIVAA API (FastAPI) → Creates background job
   3. Semantic Chunking (Anthropic)
   4. Text Embeddings (Voyage AI voyage-4, 1024D)
   5. Image Extraction
-  6. Image Analysis (Claude Opus 4.7 vision tool use → `VisionAnalysis` JSON → understanding embeddings via Voyage AI; per-image OCR via PaddleOCR-VL)
+  6. Image Analysis (Claude Opus 5 vision tool use → `VisionAnalysis` JSON → understanding embeddings via Voyage AI; per-image OCR via PaddleOCR-VL)
   7-10. Multi-Vector SigLIP2 Embeddings (768D halfvec: visual, color, texture, style, material)
   11. Product Creation & Entity Linking
   12. Entity Relationship Mapping
@@ -113,7 +113,7 @@ Real-time updates → Frontend displays results
 
 #### 1. Anthropic Claude Models
 
-**Claude Opus 4.7** (Vision + Deep Analysis):
+**Claude Opus 5** (Vision + Deep Analysis):
 - **Use Cases**: Material image analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`), deep product analysis, quality validation, JARVIS agent
 - **Context**: 200,000 tokens
 - **Vision**: Sole vision engine post-2026-05-01. Sends base64 images with `tool_choice={'type':'tool','name':...}` forcing structured `VisionAnalysis` JSON output. Pre. The migration made the architecture honest.
@@ -167,7 +167,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 
 1. **Text Embeddings** (1024D) - Voyage AI voyage-4 (primary)
 2. **Visual Embeddings** (768D) - SigLIP2 via SLIG Modal Endpoint
-3. **Understanding Embeddings** (1024D) - Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text` (enables spec-based search). Provenance (`embedding_model`, `schema_version`) persisted per row.
+3. **Understanding Embeddings** (1024D) - Voyage AI from Claude Opus 5 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text` (enables spec-based search). Provenance (`embedding_model`, `schema_version`) persisted per row.
 4. **Color Embeddings** (1024D) - Voyage AI from `VisionAnalysis.colors[]` (v2, post-2026-05-04; legacy was 768D SigLIP2)
 5. **Texture Embeddings** (1024D) - Voyage AI from `VisionAnalysis.textures[] + finish` (v2)
 6. **Style Embeddings** (1024D) - Voyage AI from `VisionAnalysis.style + surface_pattern + applications` (v2)
@@ -200,7 +200,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 **Stage 4: Product Discovery (AI)**
 - **Claude Haiku 4.5**: Fast product identification (5-15 seconds)
 - Identify product count and page ranges
-- **Claude Opus 4.7**: Validate and enrich metadata (10-30 seconds)
+- **Claude Opus 5**: Validate and enrich metadata (10-30 seconds)
 - Extract product names, dimensions, variants, designers
 - **Output**: Product list with page ranges (95%+ accuracy)
 
@@ -230,7 +230,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - **Checkpoint**: IMAGES_EXTRACTED
 
 **Stage 9: Image Analysis (AI)**
-- Claude Opus 4.7 vision via Anthropic tool use (3-8s per image, schema-locked via `VisionAnalysis`)
+- Claude Opus 5 vision via Anthropic tool use (3-8s per image, schema-locked via `VisionAnalysis`)
 - Extract material properties
 - Quality scoring (0-100)
 - Classify image type (product, detail, mood, diagram)
@@ -255,7 +255,7 @@ The platform generates **7 types of embeddings** stored as `halfvec` (float16, 5
 - Link to chunks, products, images
 
 **Stage 13: Quality Enhancement (Async)**
-- Claude Opus 4.7: Validate low-scoring images
+- Claude Opus 5: Validate low-scoring images
 - Enhanced metadata extraction
 - Note: Legacy 256D/512D/2048D specialized embedding columns were dropped in 2026-04. All embeddings now in VECS collections (SLIG 768D visual + Voyage 1024D understanding/aspect).
 
@@ -538,5 +538,5 @@ The platform uses **7 embedding types** for comprehensive search:
 - ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
 - ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
 - ✨ 7-vector fusion search with query-adaptive weight profiles
-- ✨ Understanding embeddings — Claude Opus 4.7 vision_analysis (tool-use schema-locked) → Voyage AI 1024D embedding
+- ✨ Understanding embeddings — Claude Opus 5 vision_analysis (tool-use schema-locked) → Voyage AI 1024D embedding
 - ✨ B2B web search powered by Anthropic built-in web_search tool

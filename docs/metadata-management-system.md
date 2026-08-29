@@ -10,7 +10,7 @@ The MIVAA Metadata Management System provides comprehensive, AI-powered extracti
 
 1. **DynamicMetadataExtractor** - AI-powered extraction of comprehensive metadata (200+ fields)
    - Integrated into Product Discovery Service (Stage 0)
-   - Uses Claude Opus 4.7 or GPT-4o
+   - Uses Claude Opus 5 or GPT-4o
    - Extracts metadata across 9 functional categories
    - Supports both critical fields and dynamic discovery
 

@@ -129,7 +129,7 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 
 ### Database
 
-#### [`supabase/migrations/20260502_moodboard_presentation_sheets.sql`](../supabase/migrations/20260502_moodboard_presentation_sheets.sql)
+#### `supabase/migrations/20260502_moodboard_presentation_sheets.sql`
 
 Creates two enums (`moodboard_sheet_type`, `moodboard_sheet_status`), the `moodboard_presentation_sheets` table, indexes (by moodboard, by user, by type+status), an `updated_at` BEFORE-UPDATE trigger, and RLS policies (owner-of-moodboard read/write + public-moodboard-readable). The original migration also created a `moodboard-sheets` storage bucket — that bucket was retired on 2026-05-23; sheet PDFs now live under `pdf-documents/moodboard-output/` with the consolidated RLS policy.
 
@@ -140,7 +140,7 @@ Creates two enums (`moodboard_sheet_type`, `moodboard_sheet_status`), the `moodb
 - `credits_used`, `ai_log_ids[]` — cost mirror.
 - `error_message` — populated on `failed`.
 
-#### [`supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql`](../supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql)
+#### `supabase/migrations/20260502_kai_prompt_presentation_sheets_addendum.sql`
 
 Idempotently appends a guidance block to the `kai` and `interior-designer` agent prompts. Uses a marker (`--END_PRESENTATION_SHEETS_ADDENDUM--`) to skip if already applied. The block tells the agent how to choose a sheet type, what inputs each one needs, when to ask the user vs proceed, and that interactive types should not be re-prompted after the canvas opens.
 
@@ -413,6 +413,33 @@ Deliberately mirrors the quote PDF/share pattern and is **folded into the existi
 - **Cleanup** mirrors quotes: `_cleanup_client_view_pdf_storage()` AFTER DELETE trigger + `build_storage_reference_set()` extended with `project_client_views.pdf_storage_path` (orphan cron never reaps a live deliverable). `increment_client_view_count(uuid)` bumps the counter.
 
 **Frontend**: [clientViewsService.ts](../src/services/clientViewsService.ts) (list/get/create/update/remove/generatePdf/refreshPdfUrl/share/revokeShare/listFeedback/listVrWorlds) + a **Client View tab** on the project detail page ([ClientViewTab.tsx](../src/modules/projects/components/tabs/ClientViewTab.tsx), owner-only — pick + order sheets, toggle embeds, choose FF&E quote + 3D world, generate PDF, copy/disable share link, read feedback inline).
+
+---
+
+## A published BOARD has an address you can revoke (#360 CB-15, 2026-08-28)
+
+Separate from Client Views: this is the moodboard itself, shared publicly.
+
+The public read used to be `is_public = true` for role `public`, keyed on **the board's own id**.
+Two consequences, and the second is the one that bites: the share never expired, and it could not be
+**rotated** — the URL was the board's identity, so revoking one recipient's link meant un-publishing
+for everybody, which is why nobody ever did it.
+
+The pattern already existed twice in this codebase, including inside this very feature
+(`moodboard_sheets.public_share_token`, and `inbox_thread_tokens` with its 30-day TTL). The board was
+the odd one out.
+
+- **`public_share_token` is the address; `is_public` stays the CONSENT.** A token on an unpublished board opens nothing.
+- **`public_share_expires_at` defaults to NULL** — an expiry is a choice the owner makes, not something that happens to them.
+- **`moodboard_by_share_token(p_token)` is the only anonymous read, and it PROJECTS.** `user_id`, the client links, the dormancy fields and the keep-active token are not in it — and the client does not invent an owner either (`userId: ''`). A public viewer is not told whose board it is.
+- **`rotate_moodboard_share_token(p_moodboard_id)`** gives the board a new address, revoking every outstanding link. Owner-only, enforced in SQL; returns the new token so the caller can show the new link without re-reading a row it just changed.
+
+> **The old policy survived its own DROP, and that is worth recording** — it would have made all of
+> the above decoration. The policy's stored name is `consolidated_moodboards_SELECT_public`, with
+> SELECT in **capitals**. An unquoted `DROP POLICY IF EXISTS` folds the identifier to lower case,
+> matches nothing, and `IF EXISTS` makes that silent: the migration reported success while leaving
+> the permissive rule in place beside the new one. Quote a mixed-case policy identifier, and verify
+> the drop rather than trusting the exit code.
 
 ---
 

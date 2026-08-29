@@ -6,7 +6,7 @@
 
 Complete reference of all AI models used across the Material KAI Vision Platform.
 
-> **Big change (2026-05-01)**: Vision is now **Anthropic-only**.7s for months and silently falling through to Claude — the migration just made it honest). All segmentation, image classification, vision_analysis, and material analysis runs on `claude-opus-4-7` via Anthropic tool use, with hard schema guarantees via the `VisionAnalysis` Pydantic model.
+> **Big change (2026-05-01)**: Vision is now **Anthropic-only**.7s for months and silently falling through to Claude — the migration just made it honest). All segmentation, image classification, vision_analysis, and material analysis runs on `claude-opus-5` via Anthropic tool use, with hard schema guarantees via the `VisionAnalysis` Pydantic model.
 
 ---
 
@@ -15,7 +15,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | Model | Provider | Purpose | Capability | Cost (per 1M tokens) |
 |-------|----------|---------|-----------|---------------------|
 | **Text Generation** |
-| Claude Opus 4.7 | Anthropic | **Vision (PRIMARY, tool use)**, product discovery, enrichment, complex reasoning | Highest accuracy + schema-locked vision | $5 input / $25 output |
+| Claude Opus 5 | Anthropic | **Vision (PRIMARY, tool use)**, product discovery, enrichment, complex reasoning | Highest accuracy + schema-locked vision | $5 input / $25 output |
 | Claude Sonnet 4.6 | Anthropic | **Chunking (PRIMARY)**, mid-tier reasoning | Quality ceiling for chunking | $3 input / $15 output |
 | Claude Haiku 4.5 | Anthropic | Fast classification, demo agent, price-monitoring identity, vision validation pass (FAST/COST_OPTIMIZED profiles) | Real-time | $1 input / $5 output |
 | GPT-4o | OpenAI | Alternative discovery (not vision) | 94%+ accuracy | $2.50 input / $10 output |
@@ -36,7 +36,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ## Model Details
 
-### 1. Claude Opus 4.7 (Anthropic) — PRIMARY VISION MODEL
+### 1. Claude Opus 5 (Anthropic) — PRIMARY VISION MODEL
 
 **Purpose**: Schema-locked vision analysis + complex reasoning
 
@@ -109,7 +109,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 **NOT used for vision** post-2026-05-01 — vision is Anthropic-only.
 
 **Capabilities**:
-- Product discovery (alternative to Claude Opus 4.7)
+- Product discovery (alternative to Claude Opus 5)
 - Agent Hub (optional)
 
 **Performance**:
@@ -153,7 +153,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 **Aspect Embeddings**
 
-The four aspect collections are now Voyage `voyage-4` (1024D) text embeddings of deterministic strings derived from `VisionAnalysis` (Claude Opus 4.7's structured output):
+The four aspect collections are now Voyage `voyage-4` (1024D) text embeddings of deterministic strings derived from `VisionAnalysis` (Claude Opus 5's structured output):
 
 | Collection | Aspect text source | Producer key (v2) |
 |---|---|---|
@@ -164,7 +164,7 @@ The four aspect collections are now Voyage `voyage-4` (1024D) text embeddings of
 
 Pre-v2 these collections held 768D SLIG-blend vectors (computed as `0.7-0.9 × base_image + 0.1-0.3 × fixed_global_text_for_aspect`). The pre-v2 vectors carried near-zero independent signal because the text portion was the same fixed string for every image regardless of content — they were ~80% identical to `image_slig_embeddings` and to each other. Producer keys `color_slig_768` / `texture_slig_768` / `style_slig_768` / `material_slig_768` were legacy keys from this pre-v2 path — **removed** in the v2 rollout cleanup. The producer no longer emits them; consumers no longer accept them.
 
-Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `vision_analysis` JSON) → `image_understanding_embeddings`.
+Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 5 `vision_analysis` JSON) → `image_understanding_embeddings`.
 
 **Hardening (2026-05-01)**:
 - 3-attempt retry on dim-mismatch (was silent abort — single wrong-dim response caused mass data loss)
@@ -210,7 +210,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 
 ---
 
-### 12. 7-Vector Search RAG (Claude Opus 4.7)
+### 12. 7-Vector Search RAG (Claude Opus 5)
 
 **Purpose**: Retrieval-Augmented Generation with multi-vector search
 
@@ -223,7 +223,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 6. Material (Voyage 1024D, was SLIG 768D pre-v2) — `image_material_embeddings`
 7. Understanding (Voyage 1024D) — `image_understanding_embeddings`
 
-**Synthesis**: Claude Opus 4.7 (200K context)
+**Synthesis**: Claude Opus 5 (200K context)
 
 **Performance**:
 - Retrieval latency: 300-500ms (parallel execution)
@@ -236,8 +236,8 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 | Stage | Primary Model | Notes |
 |-------|---------------|-------|
 | Layout + Page OCR + figure boxes (Stage 1) | **PaddleOCR-VL 1.6** (Modal) | structure-first — runs BEFORE discovery |
-| Discovery | Claude Opus 4.7 (or GPT-5) | reads PaddleOCR reading-order text from the Stage 1 cache |
-| Vision (validation pass) | Claude Opus 4.7 *or* Claude Haiku 4.5 | fires when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY → Opus; FAST/COST_OPTIMIZED → Haiku. Set via `classification_validation_model`. |
+| Discovery | Claude Opus 5 (or GPT-5) | reads PaddleOCR reading-order text from the Stage 1 cache |
+| Vision (validation pass) | Claude Opus 5 *or* Claude Haiku 4.5 | fires when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY → Opus; FAST/COST_OPTIMIZED → Haiku. Set via `classification_validation_model`. |
 | Phase 3 per-image OCR | **PaddleOCR-VL block OCR** | text-bearing images only; runs AFTER vision |
 | Visual Embeddings | SLIG (SigLIP2 base 768D, 5 types, 768D) | |
 | Understanding Embedding | Voyage AI voyage-4 (1024D) | from Claude vision_analysis JSON, parallel with Visual Embeddings |
@@ -254,7 +254,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 4. **SLIG Modal endpoint with scale-to-zero** — pay-as-you-process
 5. **PaddleOCR-VL on Modal scales to zero** — $0 idle; cold start (~90s) paid once per job at warmup, then ~1-3s/page warm
 
-**Example Cost per PDF** (recomputed at current Anthropic pricing — Opus 4.7 at $5/$25, Haiku 4.5 at $1/$5):
+**Example Cost per PDF** (recomputed at current Anthropic pricing — Opus 5 at $5/$25, Haiku 4.5 at $1/$5):
 - Small PDF (10 pages): $0.10-$0.25
 - Medium PDF (50 pages, 25 images): $0.20-$0.40
 - Large PDF (200 pages, 100 images): $1.00-$2.50
@@ -277,9 +277,9 @@ The canonical 100-page / 50-image reference workload lands at ~$0.36 — see the
 > **Removed (2026.
 
 The model configuration maps each task to its designated model:
-- `discovery` → `claude-opus-4-7`
-- `chunking` → `claude-sonnet-4-6`
-- `vision` → `claude-opus-4-7` (with `VISION_ANALYSIS_TOOL`)
+- `discovery` → `claude-opus-5` (`AIModelConfig.discovery_model`; `claude-haiku-4-5` in FAST_CONFIG / COST_OPTIMIZED_CONFIG)
+- `chunking` → `claude-sonnet-4-6` (`Settings.chunking_primary_model`) / `claude-haiku-4-5` (`AIModelConfig.chunking_model`)
+- `vision` → `claude-opus-5` (with `VISION_ANALYSIS_TOOL`)
 - `validation` → `claude-haiku-4-5`
 - `text_embeddings` → `voyage-4`
 - `understanding_embeddings` → `voyage-4`
@@ -315,7 +315,7 @@ The model configuration maps each task to its designated model:
 ## Model Selection Guide
 
 ### Vision Analysis
-1. **Claude Opus 4.7 with tool use** (PRIMARY, sole) — schema-locked via `VisionAnalysis`
+1. **Claude Opus 5 with tool use** (PRIMARY, sole) — schema-locked via `VisionAnalysis`
    - No fallback. Anthropic-only post-2026-05-01.
 
 ### Chunking
@@ -336,7 +336,7 @@ The model configuration maps each task to its designated model:
 3. Skip + flag if all fail
 
 ### Text Generation
-1. **Claude Opus 4.7** — Vision, complex reasoning, JARVIS agent
+1. **Claude Opus 5** — Vision, complex reasoning, JARVIS agent
 2. **Claude Sonnet 4.6** — Chunking, mid-tier
 3. **Claude Haiku 4.5** — Fast classification, demo agent
 4. **GPT-4o / GPT-5** — Alternative discovery (not vision)

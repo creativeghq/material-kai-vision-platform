@@ -2,7 +2,7 @@
 
 Property listings, leads, viewings, offers, sales, lettings and investments — a paid add-on module (#249, sub-modules #281) built on the platform's module/entitlement framework.
 
-**API reference:** [docs/api/real-estate-api.md](api/real-estate-api.md) — every action, param and gate.
+**API reference:** [docs/real-estate-system.md](real-estate-system.md) — every action, param and gate.
 **Frontend:** [`src/modules/real-estate/`](../src/modules/real-estate/) · sub-modules [`real-estate-management`](../src/modules/real-estate-management/) and [`real-estate-investments`](../src/modules/real-estate-investments/).
 
 ---

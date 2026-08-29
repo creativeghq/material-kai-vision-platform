@@ -10,7 +10,7 @@
 
 ### 1. Anthropic (Claude) — PRIMARY VISION + CHUNKING + AGENTS
 
-#### Claude Opus 4.7
+#### Claude Opus 5
 - **Use Cases**:
   - **Vision analysis (PRIMARY)** — segmentation, image classification, material analysis, vision_analysis JSON via Anthropic tool use
   - Product discovery from PDFs (Stage 0)
@@ -52,7 +52,7 @@
   - Text chunk embeddings (`text_embedding_1024`)
   - Product text embeddings (name + description + metadata)
   - Semantic search query embeddings
-  - **Understanding embeddings** — embeds `serialize_vision_analysis_to_text(VisionAnalysis)` from Claude Opus 4.7 vision pass
+  - **Understanding embeddings** — embeds `serialize_vision_analysis_to_text(VisionAnalysis)` from Claude Opus 5 vision pass
 - **Dimensions**: 1024D (stored as halfvec in VECS — gives storage parity across every embedding column in the platform)
 - **Dict key**: `text_1024`
 - **Cost**: $0.06 per 1M tokens
@@ -89,7 +89,7 @@ The four aspect collections (color/texture/style/material) are Voyage `voyage-4`
 4. **Style** (1024D Voyage) → `image_style_embeddings` (producer key `style_aspect_1024`) — `VisionAnalysis.style + surface_pattern + applications`
 5. **Material** (1024D Voyage) → `image_material_embeddings` (producer key `material_aspect_1024`) — `VisionAnalysis.material_type + category + subcategory`
 
-Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `vision_analysis` JSON) → `image_understanding_embeddings` for spec-based semantic search.
+Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 5 `vision_analysis` JSON) → `image_understanding_embeddings` for spec-based semantic search.
 
 #### PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) — STRUCTURAL-PASS BACKBONE (layout + OCR + figure boxes)
 A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-DETR detector + pointer network) gives per-region bboxes + labels + reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). **Replaced Surya-2 (2026-06-13)** — tighter RT-DETR crop boxes + dedicated reading order; validated ~1-3s/page warm, near-perfect Greek, figure boxes within ~8px. (Surya-2 had earlier replaced YOLO + Chandra + `merge_layout`.)
@@ -109,7 +109,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 
 #### GPT-5
 - **Use Cases**:
-  - Product discovery (alternative to Claude Opus 4.7)
+  - Product discovery (alternative to Claude Opus 5)
   - Conversational AI agents (optional)
 - **Cost**: TBD
 
@@ -165,20 +165,20 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 
 ### PDF Processing Pipeline (named stages — numbers retired)
 - **Layout + Page OCR + figure boxes (Stage 1, structure-first)**: **PaddleOCR-VL** structural pass — one call per page, runs BEFORE discovery
-- **Discovery**: Claude Opus 4.7 or GPT-5 — reads PaddleOCR's reading-order text from the cache (not raw `get_text`)
+- **Discovery**: Claude Opus 5 or GPT-5 — reads PaddleOCR's reading-order text from the cache (not raw `get_text`)
 - **Chunking**: **Claude Sonnet 4.6**
-- **Vision (primary)**: **Claude Opus 4.7 via tool use**
-- **Vision (validation pass)**: triggered when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY profiles use Claude Opus 4.7; FAST/COST_OPTIMIZED profiles use Claude Haiku 4.5. Driven by `classification_validation_model` in `ai_config`.
+- **Vision (primary)**: **Claude Opus 5 via tool use**
+- **Vision (validation pass)**: triggered when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY profiles use Claude Opus 5; FAST/COST_OPTIMIZED profiles use Claude Haiku 4.5. Driven by `classification_validation_model` in `ai_config`.
 - **Phase 3 OCR (per-image)**: **PaddleOCR-VL** block OCR, runs AFTER vision. Consumed by icon-metadata extraction + image-search labels (NOT by chunker, NOT a vision_analysis prompt input).
 - **Visual Embeddings**: SLIG (SigLIP2 base 768D, 5×768D)
 - **Understanding Embedding**: Voyage AI voyage-4 (1024D, parallel with Visual Embeddings)
 - **Text Embeddings**: Voyage AI voyage-4 (1024D, sole embedder)
 
 ### Web Scraping Integration
-- **Product Discovery**: Claude Opus 4.7 (default), GPT-5, or Claude Haiku 4.5
+- **Product Discovery**: Claude Opus 5 (default), GPT-5, or Claude Haiku 4.5
 
 ### XML Import
-- **Field Mapping**: Claude Opus 4.7
+- **Field Mapping**: Claude Opus 5
 
 ### Interior Design Generation
 - **Text-to-Image**: 7 Replicate models (FLUX, SDXL, etc.)
@@ -207,9 +207,9 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - **Visual embeddings**: SLIG Modal endpoint (scale-to-zero)
 
 ### High-Accuracy Operations (Use Premium Models)
-- **Vision analysis**: Claude Opus 4.7 (tool-use schema-locked)
-- **Product discovery**: Claude Opus 4.7
-- **Metadata extraction**: Claude Opus 4.7
+- **Vision analysis**: Claude Opus 5 (tool-use schema-locked)
+- **Product discovery**: Claude Opus 5
+- **Metadata extraction**: Claude Opus 5
 
 ### Parallel Processing
 - **Interior Design**: 3 models concurrently
@@ -220,7 +220,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 
 ## 🎯 Model Selection Guidelines
 
-### When to Use Claude Opus 4.7
+### When to Use Claude Opus 5
 - Vision analysis (tool-use schema enforcement)
 - Complex reasoning, high accuracy
 - Detailed metadata extraction
@@ -251,8 +251,8 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 
 | Model | Use Case | Speed | Accuracy | Cost/Operation |
 |-------|----------|-------|----------|----------------|
-| Claude Opus 4.7 | Vision analysis (tool use) | 3-8s | schema-locked | $0.02-0.05 |
-| Claude Opus 4.7 | Product discovery | 3-5s | 95%+ | $0.02-0.05 |
+| Claude Opus 5 | Vision analysis (tool use) | 3-8s | schema-locked | $0.02-0.05 |
+| Claude Opus 5 | Product discovery | 3-5s | 95%+ | $0.02-0.05 |
 | Claude Sonnet 4.6 | Chunking | 2-4s | quality ceiling | $0.01-0.04 |
 | Claude Haiku 4.5 | Classification | 0.5-1s | 90%+ | $0.001-0.006 |
 | GPT-4o | Discovery | 2-4s | 93%+ | $0.04-0.12 |
@@ -266,11 +266,11 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 ## 🔄 Model Fallback Strategy
 
 ### Vision Analysis
-1. **Claude Opus 4.7 via tool use** (PRIMARY — schema-locked)
+1. **Claude Opus 5 via tool use** (PRIMARY — schema-locked)
 2. No fallback — Anthropic-only post-2026-05-01
 
 ### Product Discovery
-1. Claude Opus 4.7 (primary)
+1. Claude Opus 5 (primary)
 2. GPT-5 / GPT-4o (alternative)
 3. Claude Haiku 4.5 (tertiary, lower accuracy)
 
@@ -295,7 +295,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 **2026-05-01
 
 .py` deleted; all `Settings.
-- ✅ Vision moved to **Claude Opus 4.7 via Anthropic tool use** (`VisionAnalysis` Pydantic schema)
+- ✅ Vision moved to **Claude Opus 5 via Anthropic tool use** (`VisionAnalysis` Pydantic schema)
 .6**
 - ✅ Voyage drift detection: `embedding_model` + `schema_version` on every understanding-embedding row; the OpenAI fallback is gone entirely (2026-08-08), so provenance now tracks MODEL changes rather than provider substitutions
 - ✅ `VisionProvider.
@@ -314,7 +314,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - ✅ Voyage `voyage-4` replaced OpenAI `text-embedding-3-small` (1536D → 1024D)
 
 **Earlier (2025-12)**:
-- ✅ Upgraded to Claude Opus 4.7
+- ✅ Upgraded to Claude Opus 5
 - ✅ Upgraded to Claude Haiku 4.5
 - ✅ SigLIP added as primary visual embedder
 

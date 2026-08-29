@@ -27,7 +27,7 @@ The Data Import System enables ingesting products from multiple sources includin
 
 ### Key Features
 
-- Dynamic XML field mapping with AI suggestions (Claude Opus 4.7)
+- Dynamic XML field mapping with AI suggestions (Claude Opus 5)
 - Reusable mapping templates
 - Manual re-run functionality
 - Cron-based scheduling for recurring imports
@@ -79,7 +79,7 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 ┌─────────────────────────────────────────────────────────────┐
 │ EDGE FUNCTION (xml-import-orchestrator)                     │
 │ ├─ Parse XML and detect fields                              │
-│ ├─ AI-powered field mapping (Claude Opus 4.7)             │
+│ ├─ AI-powered field mapping (Claude Opus 5)             │
 │ ├─ Create data_import_jobs record                           │
 │ └─ Call Python API (non-blocking)                           │
 └─────────────────────────────────────────────────────────────┘
@@ -107,7 +107,7 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
    ↓
 2. Edge Function parses XML and detects fields
    ↓
-3. AI suggests field mappings (Claude Opus 4.7)
+3. AI suggests field mappings (Claude Opus 5)
    ↓
 4. User reviews and confirms mappings
    ↓
@@ -190,7 +190,7 @@ Configure cron schedules for recurring imports:
 
 **Response (import):** `job_id`, `total_products`, `dropped_count`, `message`.
 
-Full API reference: [xml-import-orchestrator-api.md](./api/xml-import-orchestrator-api.md). Operator-facing overview: [xml-import-orchestrator.md](./xml-import-orchestrator.md).
+Full API reference: [xml-import-orchestrator-api.md](./xml-import-orchestrator.md). Operator-facing overview: [xml-import-orchestrator.md](./xml-import-orchestrator.md).
 
 #### scheduled-import-runner (`supabase/functions/scheduled-import-runner/index.ts`)
 
@@ -268,7 +268,7 @@ See [API Reference](#api-reference) for detailed documentation.
 
 #### POST /xml-import-orchestrator
 
-Three-mode endpoint — see [xml-import-orchestrator-api.md](./api/xml-import-orchestrator-api.md) for full request/response schemas.
+Three-mode endpoint — see [xml-import-orchestrator-api.md](./xml-import-orchestrator.md) for full request/response schemas.
 
 **Request Body parameters:** workspace_id (UUID), category (required for import mode — job-level material_category), xml_content (base64-encoded XML), optional `preview_only` (run dictionary + AI residual, return coverage stats), optional `generate_preview` (apply mappings + manual_values to one product, return sample + per-field value sources), optional `field_mappings` (XML tag → target), optional `manual_values` (per-target job-level fallback applied when mapped tag is empty for a row), optional `mapping_template_id`, and optional `parent_job_id` (for re-runs).
 

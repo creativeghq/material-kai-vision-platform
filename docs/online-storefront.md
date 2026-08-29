@@ -4,7 +4,7 @@ Part of the [Finance module](finance-system.md). A public mini-store that lets a
 
 Edge function: `supabase/functions/finance-storefront/index.ts`. Public page: `src/pages/PublicStorefrontPage.tsx`. Route `/store/:slug` is registered **outside** `<AuthGuard>` in `src/App.tsx` (same pattern as `/board/:id`, `/c/:slug`).
 
-Related: [Finance system](finance-system.md) · [Finance API](api/finance-api.md).
+Related: [Finance system](finance-system.md) · [Finance API](finance-system.md).
 
 ---
 

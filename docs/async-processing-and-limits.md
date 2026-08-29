@@ -219,7 +219,7 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 **Services**: `slig_client`, `paddleocr_endpoint_manager`
 
 > **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). Both SLIG and PaddleOCR-VL run on **Modal**; HuggingFace hosts nothing.
-> **Note (2026. Vision moved to Anthropic Claude Opus 4.7 via tool use.
+> **Note (2026. Vision moved to Anthropic Claude Opus 5 via tool use.
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
@@ -270,7 +270,7 @@ Shared limits across all methods (post-2026-06-13): 2 concurrent Claude vision r
 Generates 6 embedding types written directly to VECS:
 - `image_slig_embeddings` (visual, **768D** SigLIP2 via SLIG cloud endpoint)
 - `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, `image_material_embeddings` (aspect embeddings, **1024D** Voyage AI from deterministic per-image `VisionAnalysis` field serializations — post-2026-05-04; pre-v2 these were 768D SLIG-blend vectors)
-- `image_understanding_embeddings` (**1024D** Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text`)
+- `image_understanding_embeddings` (**1024D** Voyage AI from Claude Opus 5 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text`)
 
 Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped. Updated 2026.7 tool use.
 

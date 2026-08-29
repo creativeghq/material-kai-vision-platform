@@ -29,7 +29,7 @@ The Understanding embedding enables searching by technical specifications:
 - "Fire-rated fabric Class 1"
 - "3mm thickness vinyl plank"
 
-This works because the platform embeds Claude Opus 4.7's structured `VisionAnalysis` of each image (material type, dimensions, finishes, properties) via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI.
+This works because the platform embeds Claude Opus 5's structured `VisionAnalysis` of each image (material type, dimensions, finishes, properties) via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI.
 
 ### Natural Language Search
 

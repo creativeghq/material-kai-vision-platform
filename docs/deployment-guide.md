@@ -90,7 +90,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
 | `VISION_GUIDED_ENABLED` | Public | Server ENV | Enable Vision AI Layer 3 for image extraction | `false` (default), `true` |
 | `VISION_GUIDED_PROVIDER` | Public | Server ENV | Vision AI provider (uses existing API keys) | `anthropic`, `openai`, `together` |
-| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis (post-2026-05-01: Anthropic-only) | `claude-opus-4-7` (default + recommended) |
+| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis (post-2026-05-01: Anthropic-only) | `claude-opus-5` (default + recommended) |
 | `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
 | `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | No longer needed for SLIG — SLIG moved to Modal 2026-06-14. HuggingFace hosts nothing now; this deploy-workflow secret can be removed. | `hf_xxxxxxxxxxxxxxxx` |
@@ -198,7 +198,7 @@ modal app stop paddleocr-vl     # tear down
 
 ### **Messaging Service API Keys (WhatsApp via Zernio)**
 
-> Twilio (SMS + WhatsApp) was removed 2026-06-08. Messaging now runs on **Zernio** (WhatsApp via Meta Cloud API), sharing keys with the social-media module. SMS is no longer supported. See [api/messaging-api.md](api/messaging-api.md).
+> Twilio (SMS + WhatsApp) was removed 2026-06-08. Messaging now runs on **Zernio** (WhatsApp via Meta Cloud API), sharing keys with the social-media module. SMS is no longer supported. See [inbox-system.md](inbox-system.md).
 
 | Service | Secret Name | Where Used | How to Get | Required? |
 |---------|------------|------------|------------|-----------|
@@ -293,7 +293,7 @@ modal app stop paddleocr-vl     # tear down
 **SEO Pipeline Credit Costs** (1 credit = $0.01, 50% markup on raw API cost):
 - Research: 18 credits (DataForSEO: 5 API calls ~$0.117 raw)
 - Planning: 2 credits (Gemini 3 Flash: ~3K in/3K out ~$0.01 raw)
-- Writing: 20 credits (Claude Opus 4.7: ~4K in/8K out ~$0.66 raw)
+- Writing: 20 credits (Claude Opus 5: ~4K in/8K out ~$0.66 raw)
 - Analysis: 2 credits (Gemini 3 Flash: ~6K in/3K out ~$0.01 raw, GEO scoring is regex-free)
 - Auto-fix: 5 credits per iteration (Gemini 3 Flash: ~10K in/8K out ~$0.03 raw)
 - **Total per article: 42 credits (no fix) — 57 credits (max 3 fixes)**
@@ -717,7 +717,7 @@ All deployment results are displayed on the main GitHub Action page with:
 - **Database**: Supabase PostgreSQL with vector extensions
 - **AI Integration**: OpenAI, Anthropic, Voyage AI, Modal GPU Endpoints (SLIG + PaddleOCR-VL)
 - **Visual Embeddings**: SLIG (SigLIP2) via Modal Endpoint (768D, 5 specialized types)
-- **Vision Models**: Claude Opus 4.7 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked)
+- **Vision Models**: Claude Opus 5 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked)
 - **Layout + OCR (structural pass)**: PaddleOCR-VL on Modal (replaced Surya-2, YOLO, and Chandra; pytesseract + EasyOCR removed)
 - **Monitoring**: Sentry error tracking and structured logging
 - **Security**: JWT authentication and environment-based secrets
@@ -1117,7 +1117,7 @@ This section covers all third-party services used by the platform, their pricing
 
 | Model | Input | Output | Used For |
 |-------|-------|--------|---------|
-| Claude Opus 4.7 | $15/M tokens | $75/M tokens | JARVIS agent, SEO writing, complex reasoning |
+| Claude Opus 5 | $15/M tokens | $75/M tokens | JARVIS agent, SEO writing, complex reasoning |
 | Claude Haiku 4.5 | $0.80/M tokens | $4/M tokens | Demo agent, B2B web search |
 
 ---
@@ -1210,7 +1210,7 @@ This section covers all third-party services used by the platform, their pricing
 
 ### ⚡ Modal GPU Endpoints
 
-**Role**: GPU-accelerated visual embeddings (SigLIP2 via SLIG) and the PDF layout+OCR structural pass (PaddleOCR-VL). Both run on **Modal** — HuggingFace hosts nothing in this platform anymore. SLIG moved off HuggingFace to Modal on 2026-06-14; the structural pass moved to Modal earlier; vision moved off HF on 2026-05-01 to Anthropic Claude Opus 4.7 via tool use.
+**Role**: GPU-accelerated visual embeddings (SigLIP2 via SLIG) and the PDF layout+OCR structural pass (PaddleOCR-VL). Both run on **Modal** — HuggingFace hosts nothing in this platform anymore. SLIG moved off HuggingFace to Modal on 2026-06-14; the structural pass moved to Modal earlier; vision moved off HF on 2026-05-01 to Anthropic Claude Opus 5 via tool use.
 
 **Dashboard**: https://modal.com
 **Pricing**: https://modal.com/pricing

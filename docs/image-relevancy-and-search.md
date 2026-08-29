@@ -43,9 +43,9 @@ This ensures that when you search or browse, you see all relevant images for eac
 
 ### AI-Powered Analysis
 
-The platform uses Claude Opus 4.7 vision_analysis via Anthropic tool use as the **sole vision pass** post-2026-05-01:
+The platform uses Claude Opus 5 vision_analysis via Anthropic tool use as the **sole vision pass** post-2026-05-01:
 
-**Schema-locked Vision Analysis** — Claude Opus 4.7 via Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (in `app/models/vision_analysis.py`).
+**Schema-locked Vision Analysis** — Claude Opus 5 via Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (in `app/models/vision_analysis.py`).
 - Identifies material types, colors, and textures
 - Provides quality scores for each analysis
 - Tool use eliminates JSON regex recovery and provides a hard guarantee of schema adherence — the only path that protects Voyage's understanding-embedding space from drift.
@@ -59,7 +59,7 @@ The platform uses a sophisticated **7-embedding fusion system** that combines mu
 **Embedding Types & Default Weights (Balanced Profile):**
 - **Text Embedding (15%)** - Semantic understanding from product names, descriptions, and metadata
 - **Visual Embedding (15%)** - General visual similarity using SigLIP 768D embeddings
-- **Understanding Embedding (20%)** - Spec-based search from Claude Opus 4.7 vision_analysis (Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D). Pre; Provenance fields `embedding_model` + `schema_version` persisted on every row.
+- **Understanding Embedding (20%)** - Spec-based search from Claude Opus 5 vision_analysis (Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D). Pre; Provenance fields `embedding_model` + `schema_version` persisted on every row.
 - **Color Embedding (12.5%)** - Specialized color palette matching
 - **Texture Embedding (12.5%)** - Surface pattern and texture recognition
 - **Style Embedding (12.5%)** - Design aesthetic and style matching

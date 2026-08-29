@@ -2,7 +2,7 @@
 
 **Last Updated**: 2026-05-03
 
-This document provides practical examples of how to use the dynamic AI model configuration system in the MIVAA PDF processing pipeline. All cost figures use current Anthropic pricing (Opus 4.7 at $5/$25 per 1M, Haiku 4.5 at $1/$5 per 1M, Sonnet 4.6 at $3/$15 per 1M). Per-PDF totals are reconciled against the canonical 100-page / 50-image workload in [AI Models Architecture](./ai-models-architecture.md).
+This document provides practical examples of how to use the dynamic AI model configuration system in the MIVAA PDF processing pipeline. All cost figures use current Anthropic pricing (Opus 5 at $5/$25 per 1M, Haiku 4.5 at $1/$5 per 1M, Sonnet 4.6 at $3/$15 per 1M). Per-PDF totals are reconciled against the canonical 100-page / 50-image workload in [AI Models Architecture](./ai-models-architecture.md).
 
 ---
 
@@ -31,10 +31,10 @@ If you don't provide `ai_config`, the system uses these defaults:
 
 **Defaults Used**:
 - Visual Embeddings: SLIG (SigLIP2 base, `siglip2-base-patch16-512`, native 768D) — Modal endpoint (768D)
-- Classification (primary): Claude Opus 4.7 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
-- Classification (validation pass): same as primary in DEFAULT_AI_CONFIG (`claude-opus-4-7`); fires when primary confidence < `classification_confidence_threshold` (default 0.7) OR primary fails. FAST_CONFIG and COST_OPTIMIZED_CONFIG override this to `claude-haiku-4-5`.
-- Discovery: Claude Opus 4.7
-- Metadata: Claude (claude-opus-4-7)
+- Classification (primary): Claude Opus 5 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
+- Classification (validation pass): same as primary in DEFAULT_AI_CONFIG (`claude-opus-5`); fires when primary confidence < `classification_confidence_threshold` (default 0.7) OR primary fails. FAST_CONFIG and COST_OPTIMIZED_CONFIG override this to `claude-haiku-4-5`.
+- Discovery: Claude Opus 5
+- Metadata: Claude (claude-opus-5)
 - Text Embeddings: Voyage AI voyage-4 (1024D, sole production embedder) → in-code 1024D-pinned legacy fallback (not invoked on the understanding path)
 
 ### Custom Configuration
@@ -155,10 +155,10 @@ For high-value catalogs requiring maximum accuracy:
 These align with the [AI Models Architecture](./ai-models-architecture.md) cost table — same workload, same assumptions, single source of truth.
 
 **DEFAULT_AI_CONFIG**:
-- Discovery (Claude Opus 4.7, 1 call): ~$0.08
-- Classification primary (Claude Opus 4.7 tool use, 50 images): ~$0.13
-- Classification validation pass (Claude Opus 4.7, fires only on low-conf primary): ~$0.03
-- Metadata (Claude Opus 4.7, inline with vision): rolled into classification line
+- Discovery (Claude Opus 5, 1 call): ~$0.08
+- Classification primary (Claude Opus 5 tool use, 50 images): ~$0.13
+- Classification validation pass (Claude Opus 5, fires only on low-conf primary): ~$0.03
+- Metadata (Claude Opus 5, inline with vision): rolled into classification line
 - Chunking (Claude Sonnet 4.6, ~500 chunks): ~$0.10
 - Visual Embeddings (SLIG endpoint): endpoint-metered (Modal, scale-to-zero)
 - Phase 3 OCR (PaddleOCR-VL on Modal): runtime-metered (scale-to-zero)
@@ -167,29 +167,29 @@ These align with the [AI Models Architecture](./ai-models-architecture.md) cost 
 
 **FAST_CONFIG** (Haiku for discovery + validation; smaller token caps):
 - Discovery (Claude Haiku 4.5): ~$0.02
-- Classification primary (Claude Opus 4.7): ~$0.13
+- Classification primary (Claude Opus 5): ~$0.13
 - Classification validation pass (Claude Haiku 4.5): ~$0.01
 - Chunking (Claude Sonnet 4.6): ~$0.10
 - Visual + OCR + Voyage: same as above
 - **Total**: ~$0.31 per PDF (≈20% saving over DEFAULT)
 
 **HIGH_ACCURACY_CONFIG** (Opus everywhere, threshold raised to 0.8 → more validation calls fire):
-- Discovery (Claude Opus 4.7, more tokens): ~$0.13
-- Classification primary (Claude Opus 4.7): ~$0.13
-- Classification validation pass (Claude Opus 4.7, fires more often at threshold 0.8): ~$0.10
+- Discovery (Claude Opus 5, more tokens): ~$0.13
+- Classification primary (Claude Opus 5): ~$0.13
+- Classification validation pass (Claude Opus 5, fires more often at threshold 0.8): ~$0.10
 - Chunking (Claude Sonnet 4.6): ~$0.10
 - Visual + OCR + Voyage: same as above
 - **Total**: ~$0.51 per PDF (≈30% more than DEFAULT)
 
 **COST_OPTIMIZED_CONFIG** (Haiku for discovery + validation; threshold lowered to 0.6 → fewer validation calls fire):
 - Discovery (Claude Haiku 4.5): ~$0.02
-- Classification primary (Claude Opus 4.7 — primary stays Opus by default): ~$0.13
+- Classification primary (Claude Opus 5 — primary stays Opus by default): ~$0.13
 - Classification validation pass (Claude Haiku 4.5, threshold 0.6 → rare): ~$0.01
 - Chunking (Claude Sonnet 4.6): ~$0.10
 - Visual + OCR + Voyage: same as above
 - **Total**: ~$0.31 per PDF (≈20% saving over DEFAULT)
 
-> **Note on the cost-optimized profile**: at current Anthropic pricing (Opus 4.7 = $5/$25, Haiku 4.5 = $1/$5), COST_OPTIMIZED only saves ≈20% over DEFAULT versus the ≈45% it saved at pre-correction pricing. If you want a meaningful cost reduction beyond this, the lever is swapping the **primary** classification model — not just validation. That tradeoff is not currently exposed as a profile because the primary-model swap has direct implications for the understanding-embedding space's schema-version provenance.
+> **Note on the cost-optimized profile**: at current Anthropic pricing (Opus 5 = $5/$25, Haiku 4.5 = $1/$5), COST_OPTIMIZED only saves ≈20% over DEFAULT versus the ≈45% it saved at pre-correction pricing. If you want a meaningful cost reduction beyond this, the lever is swapping the **primary** classification model — not just validation. That tradeoff is not currently exposed as a profile because the primary-model swap has direct implications for the understanding-embedding space's schema-version provenance.
 
 ---
 
@@ -249,7 +249,7 @@ Test two configurations side-by-side by submitting separate jobs with different 
 
 **Problem**: Too many false positives/negatives in image classification.
 
-**Solution**: Increase confidence threshold and use Claude Opus for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-opus-4-7` in your `ai_config`.
+**Solution**: Increase confidence threshold and use Claude Opus for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-opus-5` in your `ai_config`.
 
 ### Slow Processing
 

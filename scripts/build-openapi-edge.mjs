@@ -30,6 +30,9 @@ const OUTS = [join(ROOT, 'public', 'api', 'openapi-edge.json')];
 
 const fns = JSON.parse(readFileSync(SRC, 'utf8'));
 
+/** Where a `docs` pointer resolves from the HOSTED Swagger UI (not from the repo). */
+const DOCS_BASE = 'https://github.com/creativeghq/material-kai-vision-platform/blob/main';
+
 // ---- security schemes ----
 const securitySchemes = {
   supabaseJwt: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Supabase user session JWT — `Authorization: Bearer <token>`.' },
@@ -95,8 +98,19 @@ function descriptionFor(fn) {
   if (Array.isArray(fn.actions) && !isRestStyle(fn) && fn.actions.some((a) => a.response)) {
     // responses documented per-action in the oneOf branches' descriptions
   }
-  if (fn.response) d += `\n\n**Response:** \`${fn.response}\``;
-  if (fn.docs) d += `\n\n📖 [docs/${fn.docs}](${fn.docs.replace(/^api\//, '')})`;
+  // `response` is either a shape string or a {content_type, description} object. Interpolating the
+  // object rendered `[object Object]` into the published spec for 20 functions.
+  if (fn.response) {
+    const r = typeof fn.response === 'string'
+      ? `\`${fn.response}\``
+      : [fn.response.description, fn.response.content_type ? `(\`${fn.response.content_type}\`)` : ''].filter(Boolean).join(' ');
+    if (r) d += `\n\n**Response:** ${r}`;
+  }
+  // Absolute, because this description is read from the hosted Swagger UI at
+  // app.materialshub.gr/api/edge-swagger.html — a repo-relative link resolves against /api/ and 404s.
+  // `fn.docs` is repo-root-relative (`docs/x.md`); it used to be a mix of `docs/…` and `api/…`, which
+  // is how every link came out as `docs/docs/api/…`.
+  if (fn.docs) d += `\n\n📖 [${fn.docs}](${DOCS_BASE}/${fn.docs})`;
   return d.trim();
 }
 

@@ -1,7 +1,7 @@
 # Mention Monitoring — system reference
 
 > Extracted from CLAUDE.md 2026-07-29.
-> API reference: [docs/api/mention-monitoring-api.md](api/mention-monitoring-api.md) · Deployment: [docs/mention-monitoring-deployment-guide.md](mention-monitoring-deployment-guide.md).
+> API reference: [docs/mention-monitoring-api.md](mention-monitoring-api.md) · Deployment: [docs/mention-monitoring-deployment-guide.md](mention-monitoring-deployment-guide.md).
 
 
 Mirror of price-monitoring v3 for tracking subject mentions across **news, blogs, RSS, YouTube, and LLM responses**. Two flow shapes (same `tracked_mentions` row, distinguished by which FK is set):
@@ -22,7 +22,7 @@ Mirror of price-monitoring v3 for tracking subject mentions across **news, blogs
 9. Persist `mention_history` rows. Update denormalized cache on `tracked_mentions`. Update volatility cadence (24h → 48h → 72h → 168h on stable subjects, 6h on active ones).
 10. Detect alerts → dispatch via the `mention-monitoring-notifications` module.
 
-**LLM mention probes** ([mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py](mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py)) — weekly cadence. 4 probe templates (generic recommendation / use-case / comparison / direct lookup) × 4 cheap models (`claude-haiku-4-5`, `gpt-4o-mini`, `gemini-2.0-flash`, `sonar`) = 16 calls/subject/week ≈ $0.008. Each response post-processed by Haiku tool use (`record_mention`) to extract: `mentioned`, `position`, `sentiment`, `competitors_mentioned[]`, `context_snippet`. Snapshot exposed via `/llm-visibility` endpoint with share-of-voice + avg-rank + top co-mentioned competitors.
+**LLM mention probes** ([mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py](../mivaa-pdf-extractor/app/services/integrations/llm_mention_probe_service.py)) — weekly cadence. 4 probe templates (generic recommendation / use-case / comparison / direct lookup) × 4 cheap models (`claude-haiku-4-5`, `gpt-4o-mini`, `gemini-2.0-flash`, `sonar`) = 16 calls/subject/week ≈ $0.008. Each response post-processed by Haiku tool use (`record_mention`) to extract: `mentioned`, `position`, `sentiment`, `competitors_mentioned[]`, `context_snippet`. Snapshot exposed via `/llm-visibility` endpoint with share-of-voice + avg-rank + top co-mentioned competitors.
 
 **What the probe measures (2026-08-23, #349 A1–A4).** Four things it captured and could not report,
 each of which returned a plausible number rather than failing:
@@ -75,7 +75,7 @@ rollup no test can exercise. Guarded by
 - RSS + YouTube are free; DataForSEO News is the cheapest paid source.
 - Typical refresh: ~$0.005–0.010 on a stable subject.
 
-**Tables** ([supabase/migrations/20260503_mention_monitoring_module.sql](supabase/migrations/20260503_mention_monitoring_module.sql)):
+**Tables** (`supabase/migrations/20260503_mention_monitoring_module.sql`):
 - `tracked_mentions` — subject. Includes denormalized snapshot (`current_mention_count_7d`, `current_sentiment_avg`, `current_top_outlets`).
 - `mention_history` — append-only mention rows. `(tracked_mention_id, canonical_url, refresh_run_id)` unique to prevent double-insert per run.
 - `llm_mention_probes` — per-(template × model) probe attempts.
@@ -89,8 +89,8 @@ rollup no test can exercise. Guarded by
 
 **Backend surface** — two routers, two auth styles:
 
-- **Public Tracking API** ([mivaa-pdf-extractor/app/api/mention_tracking_routes.py](mivaa-pdf-extractor/app/api/mention_tracking_routes.py)) — external integrations, `Authorization: Bearer kai_*` (api_keys). Mounted at `/api/v1/mentions/track/*`. Endpoint inventory: `POST /` (create), `GET /` (list), `GET|PUT|DELETE /{id}`, `POST /{id}/refresh`, `GET /{id}/feed|history|summary|llm-visibility|exclusions`, `POST /{id}/probe-llm|exclude|include`. Mirror of `/api/v1/prices/track/*`.
-- **Internal flow** ([mivaa-pdf-extractor/app/api/mention_monitoring_routes.py](mivaa-pdf-extractor/app/api/mention_monitoring_routes.py)) — session JWT, used by the Material KAI web app.
+- **Public Tracking API** ([mivaa-pdf-extractor/app/api/mention_tracking_routes.py](../mivaa-pdf-extractor/app/api/mention_tracking_routes.py)) — external integrations, `Authorization: Bearer kai_*` (api_keys). Mounted at `/api/v1/mentions/track/*`. Endpoint inventory: `POST /` (create), `GET /` (list), `GET|PUT|DELETE /{id}`, `POST /{id}/refresh`, `GET /{id}/feed|history|summary|llm-visibility|exclusions`, `POST /{id}/probe-llm|exclude|include`. Mirror of `/api/v1/prices/track/*`.
+- **Internal flow** ([mivaa-pdf-extractor/app/api/mention_monitoring_routes.py](../mivaa-pdf-extractor/app/api/mention_monitoring_routes.py)) — session JWT, used by the Material KAI web app.
 
 Internal product flow (session JWT):
 - `POST /api/v1/mention-monitoring/products/{id}/track` — find-or-create + first refresh
@@ -116,7 +116,7 @@ Cross-flow: `/classifier-correction`, `/cron-refresh`, `/cron-probe-llm` (latter
 - `llm-mention-probe-daily` (`0 3 * * *`) → **`monitoring-cron?task=mention-probe`** → MIVAA `/cron-probe-llm`
 - `mention-classifier-cache-prune` (`0 4 * * *`) → DELETE expired cache rows
 
-**Notification dispatcher** ([mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py](mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py)):
+**Notification dispatcher** ([mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py](../mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py)):
 
 Four alert types, opt-in per subject:
 - `mention_spike` — today's count ≥ 2× trailing 7d daily-average
@@ -127,12 +127,12 @@ Four alert types, opt-in per subject:
 Channels (CHANNEL_CREDIT_COST): bell (0 cr), email (1 cr via `email-api` edge function with templates `mention_alert.{spike,negative_sentiment,new_outlet,llm_visibility_change}`), webhook (0 cr, per-subject `alert_webhook_url`). 24h dedupe per `(alert_type, tracked_mention_id, outlet_domain)`. Module-gated on `mention-monitoring-notifications`.
 
 **Frontend**:
-- [src/services/mentionMonitoringApi.ts](src/services/mentionMonitoringApi.ts) — single client with product-scoped + subject-scoped helpers.
-- [src/components/business/mention-monitoring/MentionMonitorTab.tsx](src/components/business/mention-monitoring/MentionMonitorTab.tsx) — per-product tab on the product detail modal (admin-only, mounted alongside the Price Monitor tab).
-- [src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx](src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx) — admin cross-catalog view at `/admin/mention-monitoring`.
+- [src/services/mentionMonitoringApi.ts](../src/services/mentionMonitoringApi.ts) — single client with product-scoped + subject-scoped helpers.
+- [src/components/business/mention-monitoring/MentionMonitorTab.tsx](../src/components/business/mention-monitoring/MentionMonitorTab.tsx) — per-product tab on the product detail modal (admin-only, mounted alongside the Price Monitor tab).
+- [src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx](../src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx) — admin cross-catalog view at `/admin/mention-monitoring`.
 - Module folders [src/modules/mention-monitoring/](src/modules/mention-monitoring/) and [src/modules/mention-monitoring-notifications/](src/modules/mention-monitoring-notifications/) for the registry.
 
-**Agent tools** ([supabase/functions/_shared/tools/mention-tools.ts](supabase/functions/_shared/tools/mention-tools.ts)) — registered on the JARVIS agent:
+**Agent tools** ([supabase/functions/_shared/tools/mention-tools.ts](../supabase/functions/_shared/tools/mention-tools.ts)) — registered on the JARVIS agent:
 - `track_product_mentions` — start/stop tracking (0 cr)
 - `get_mention_summary` — pull rolling snapshot (0 cr)
 - `check_llm_visibility` — read latest snapshot or fire fresh probe with `force_run=true` (2 cr)
@@ -144,7 +144,7 @@ the `mentions` cluster and in none of the nine SEO ones, so someone doing SEO wo
 one tool that measures how the brand shows up in AI answers (#349 A8). The tools stay in their
 original clusters too; a toolkit is a view, not ownership.
 
-Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types streamed back to AgentHub: `mention_summary`, `llm_visibility_result`, `mention_feed`, `mention_tracking_started`. Each renders as an inline card in chat (handlers in [src/components/features/ai/AgentHub.tsx](src/components/features/ai/AgentHub.tsx) — `mentionSummaryData` / `llmVisibilityData` / `mentionFeedData` message data fields).
+Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types streamed back to AgentHub: `mention_summary`, `llm_visibility_result`, `mention_feed`, `mention_tracking_started`. Each renders as an inline card in chat (handlers in [src/components/features/ai/AgentHub.tsx](../src/components/features/ai/AgentHub.tsx) — `mentionSummaryData` / `llmVisibilityData` / `mentionFeedData` message data fields).
 
 **Required secrets** (MIVAA backend):
 - `ANTHROPIC_API_KEY`, `PERPLEXITY_API_KEY`, `DATAFORSEO_BASE64`, `OPENAI_API_KEY`, `CRON_SECRET` — already configured.
@@ -163,5 +163,5 @@ Each tool checks `is_module_enabled('mention-monitoring')` first. Chunk types st
 - YouTube transcripts (deferred to v2 — opt-in per subject)
 - Firecrawl body fetch on every URL (current pipeline ships title+excerpt to classifier; body fetch is a v2 quality lever)
 
-Full reference: [docs/api/mention-monitoring-api.md](api/mention-monitoring-api.md) (versioned changelog at top). Auto-generated OpenAPI spec at `https://v1api.materialshub.gr/openapi.json`; interactive Swagger UI at `https://v1api.materialshub.gr/docs` (filter by tag: `Mention Tracking (Public API)` for the partner endpoints, `Mention Monitoring` for the internal-flow endpoints).
+Full reference: [docs/mention-monitoring-api.md](mention-monitoring-api.md) (versioned changelog at top). Auto-generated OpenAPI spec at `https://v1api.materialshub.gr/openapi.json`; interactive Swagger UI at `https://v1api.materialshub.gr/docs` (filter by tag: `Mention Tracking (Public API)` for the partner endpoints, `Mention Monitoring` for the internal-flow endpoints).
 

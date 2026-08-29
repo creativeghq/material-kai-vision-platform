@@ -49,7 +49,7 @@ A buyer inquiry never adds the buyer to the seller's workspace. The `inbox-api` 
 4. Adds the buyer as a customer participant and the seller's owners/admins as member participants.
 5. Posts the buyer's opening message and links the thread back onto the inquiry (`inbox_thread_id`).
 
-Both parties then converse in the seller's shared Inbox (see [api/messaging-api.md](./api/messaging-api.md) and the `inbox-api` entry in [public/api/openapi-edge.json](../public/api/openapi-edge.json)). The frontend navigates the buyer to `/inbox?thread={thread_id}`.
+Both parties then converse in the seller's shared Inbox (see [inbox-system.md](./inbox-system.md) and the `inbox-api` entry in [public/api/openapi-edge.json](../public/api/openapi-edge.json)). The frontend navigates the buyer to `/inbox?thread={thread_id}`.
 
 ## Notifications & lifecycle automation
 

@@ -165,7 +165,7 @@ Stored at `workspaces.settings.inbox_agent = { auto_respond, allow_account_data 
 
 ## 5. WhatsApp channel
 
-WhatsApp threads (`channel='whatsapp'`) store **and** relay through Zernio (Meta Cloud API). See [social-media-system.md](social-media-system.md) / [messaging-api.md](api/messaging-api.md) for the Zernio connection model.
+WhatsApp threads (`channel='whatsapp'`) store **and** relay through Zernio (Meta Cloud API). See [social-media-system.md](social-media-system.md) / [messaging-api.md](inbox-system.md) for the Zernio connection model.
 
 - **Reply capture (inbound).** The shared [`zernio-webhook-handler`](../supabase/functions/zernio-webhook-handler/index.ts) handles `message.received`: it resolves the owning workspace from the receiving WABA account, matches-or-creates a CRM contact from the sender phone, finds-or-creates the `whatsapp` customer thread, and **assigns it on first reply** to the campaign owner (or workspace owner) as the `owner` member participant. STOP/START opt-out keywords are applied to `messaging_optouts`. Then it fires `inbox.message_received` to members and calls `inbox-api` `internal_agent_reply` so the AI can respond. `message.delivered|read|failed` update `messaging_logs` / delivery status by `wamid`.
 - **Outbound relay.** In [`insertMessageAndNotify()`](../supabase/functions/inbox-api/index.ts), a `text`/`agent` message on a `whatsapp` thread is relayed via `sendWhatsAppReply({ accountId, conversationId, message })` using the `zernio_account_id` / `zernio_conversation_id` in thread metadata; the relay result is stored on the message. **Notes never leave the inbox.**

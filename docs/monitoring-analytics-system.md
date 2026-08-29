@@ -99,7 +99,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 **Time Periods**: 24h, 7d, 30d, 90d
 
 **Models Tracked**:
-- Claude Opus 4.7
+- Claude Opus 5
 - Claude Haiku 4.5
 - GPT-4o
 - GPT-5
@@ -233,7 +233,7 @@ All stages integrate with Sentry for exception capture. Any exception raised dur
 ### AI Model Costs
 
 **Per Model Pricing**:
-- Claude Opus 4.7: $15.00 / 1M input tokens, $75.00 / 1M output tokens
+- Claude Opus 5: $15.00 / 1M input tokens, $75.00 / 1M output tokens
 - Claude Haiku 4.5: $0.80 / 1M input tokens, $4.00 / 1M output tokens
 - GPT-4o: $2.50 / 1M input tokens, $10.00 / 1M output tokens
 - Voyage AI voyage-4: $0.06 / 1M tokens (sole production text embedder as of 2026-04)

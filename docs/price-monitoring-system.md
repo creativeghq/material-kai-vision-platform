@@ -137,7 +137,7 @@ Single chokepoint for both flows. Methods of interest:
 
 ### Edge Function — `supabase/functions/price-monitoring-cron/index.ts`
 
-Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/refresh` for each row. Service-role auth. Does NOT touch external API tracked queries. See [docs/api/price-monitoring-cron-api.md](api/price-monitoring-cron-api.md).
+Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/refresh` for each row. Service-role auth. Does NOT touch external API tracked queries. See [docs/price-monitoring-system.md](price-monitoring-system.md).
 
 ## Cost Optimizations (apply to BOTH flows after consolidation)
 
@@ -179,14 +179,14 @@ Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/re
 
 1. **Database migrations** — `supabase db push` (or apply via `mcp__supabase__apply_migration`). The 2026-05-01 consolidation migration is `consolidate_price_monitoring_into_tracked_queries`.
 2. **Edge function** — `supabase functions deploy price-monitoring-cron`.
-3. **Cron schedule** — see [docs/api/price-monitoring-cron-api.md](api/price-monitoring-cron-api.md).
+3. **Cron schedule** — see [docs/price-monitoring-system.md](price-monitoring-system.md).
 4. **Backend secrets** — set on the MIVAA `systemd` unit's `Environment=` lines.
 
 ## Related
 
 - [CLAUDE.md → Price Monitoring](../CLAUDE.md)
-- [Price Monitoring API (external consumers)](api/price-monitoring-api.md)
-- [Cron API](api/price-monitoring-cron-api.md)
+- [Price Monitoring API (external consumers)](price-monitoring-api.md)
+- [Cron API](price-monitoring-system.md)
 - Edge function: the price-monitoring cron was consolidated into `supabase/functions/monitoring-cron`.
 - [CHANGELOG](../CHANGELOG.md)
 
@@ -208,7 +208,7 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **Denormalized cache on `tracked_queries`** (populated by every refresh, replaces the old `competitor_sources.current_*` cache): `current_price`, `current_currency`, `current_availability`, `current_original_price`, `current_price_verified`, `current_metadata jsonb`, `current_price_updated_at`. Cheapest non-anomaly verified hit wins. Lets summary cards / KPI counters read one row instead of joining history.
 
-**Backend surface** ([mivaa-pdf-extractor/app/api/price_monitoring_routes.py](mivaa-pdf-extractor/app/api/price_monitoring_routes.py)):
+**Backend surface** ([mivaa-pdf-extractor/app/api/price_monitoring_routes.py](../mivaa-pdf-extractor/app/api/price_monitoring_routes.py)):
 
 - `POST /api/v1/price-monitoring/products/{id}/track` — get-or-create internal tracked_query + run first refresh
 - `DELETE /api/v1/price-monitoring/products/{id}/track` — soft delete (deactivate, history preserved)
@@ -222,9 +222,9 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 - Cross-flow: `/market-check`, `/classifier-correction`, `/promote-family-row`, `/demote-to-family`, `/tracked-queries/cron-refresh`, `/broadcast-api-announcement`
 - Legacy aliases (`/start`, `/stop`, `/check-now`, `/discover`, `/sources/{id}`, `/history/{id}`, `/status/{id}`) kept short-term, marked deprecated.
 
-**Internal cron** ([supabase/functions/price-monitoring-cron/index.ts](supabase/functions/price-monitoring-cron/index.ts)): every hour calls `get_internal_tracked_queries_due()` (RPC) which returns rows where `api_key_id IS NULL AND product_id IS NOT NULL AND next_check_at < now()`, then POSTs to `/products/{id}/refresh` for each. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
+**Internal cron** ([supabase/functions/price-monitoring-cron/index.ts](../supabase/functions/monitoring-cron/index.ts)): every hour calls `get_internal_tracked_queries_due()` (RPC) which returns rows where `api_key_id IS NULL AND product_id IS NOT NULL AND next_check_at < now()`, then POSTs to `/products/{id}/refresh` for each. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
 
-**Service entry points** ([mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py](mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py)):
+**Service entry points** ([mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py](../mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py)):
 
 - `find_or_create_for_product()` — internal flow get-or-create + optional first refresh
 - `find_for_product()`, `list_internal()`, `list_url_only_for_product()`
@@ -233,13 +233,13 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **Cost optimizations apply to BOTH flows** (the duplication that motivated this consolidation): `force_full_discovery` flag (Tier-skip), brand-retailer cache seeding, sonar/sonar-pro model selection, classifier verdict cache, rule-based pre-classifier, volatility-based `next_check_at` cadence, recipe-driven httpx fallback. Internal product refreshes inherit all of these for free now.
 
-**Notification dispatcher** ([mivaa-pdf-extractor/app/modules/price_monitoring_notifications/service.py](mivaa-pdf-extractor/app/modules/price_monitoring_notifications/service.py)): now `tracked_query_id`-only. The dispatcher resolves `(user_id, product_id)` from `tracked_queries` so alerts still carry product_id when internal-flow.
+**Notification dispatcher** ([mivaa-pdf-extractor/app/modules/price_monitoring_notifications/service.py](../mivaa-pdf-extractor/app/modules/price_monitoring_notifications/service.py)): now `tracked_query_id`-only. The dispatcher resolves `(user_id, product_id)` from `tracked_queries` so alerts still carry product_id when internal-flow.
 
 **Frontend**:
 
-- [src/services/priceMonitoringApi.ts](src/services/priceMonitoringApi.ts) — single client. Exports `TrackedQuery` + `RetailerRow` types, product-scoped helpers (`trackProduct`, `untrackProduct`, `getProductMonitoring`, `refreshProduct`, `getProductSources`, `getProductHistory`, `verifyProductSources`, `addUrlOnly`, `listUrlOnlyForProduct`), exclusion helpers, classifier feedback, market-check, promote/demote.
-- [src/components/business/price-monitoring/PriceMonitoringDashboard.tsx](src/components/business/price-monitoring/PriceMonitoringDashboard.tsx) reads from `tracked_queries` directly (api_key_id IS NULL filter).
-- [src/components/business/price-monitoring/ProductMonitorTab.tsx](src/components/business/price-monitoring/ProductMonitorTab.tsx) wires through the new client. Internally adapts `RetailerRow` → the legacy `CompetitorSource` shape so the existing render code (badges, anomaly banner, retailer table) stays intact.
+- [src/services/priceMonitoringApi.ts](../src/services/priceMonitoringApi.ts) — single client. Exports `TrackedQuery` + `RetailerRow` types, product-scoped helpers (`trackProduct`, `untrackProduct`, `getProductMonitoring`, `refreshProduct`, `getProductSources`, `getProductHistory`, `verifyProductSources`, `addUrlOnly`, `listUrlOnlyForProduct`), exclusion helpers, classifier feedback, market-check, promote/demote.
+- [src/components/business/price-monitoring/PriceMonitoringDashboard.tsx](../src/components/business/price-monitoring/PriceMonitoringDashboard.tsx) reads from `tracked_queries` directly (api_key_id IS NULL filter).
+- [src/components/business/price-monitoring/ProductMonitorTab.tsx](../src/components/business/price-monitoring/ProductMonitorTab.tsx) wires through the new client. Internally adapts `RetailerRow` → the legacy `CompetitorSource` shape so the existing render code (badges, anomaly banner, retailer table) stays intact.
 - Anomaly Trust/Dismiss buttons write directly to `tracked_query_price_history` via supabase client (admin-only via RLS).
 
 **Tables that survived the consolidation** (still in use):
@@ -292,8 +292,8 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 - Anomaly override UI: rows where `is_anomaly=true` render with a yellow left border + an inline banner showing the rejected reading, the trailing 7d median, and (admin only) two buttons:
   - **Trust this reading**: flips the latest anomaly row's `manual_override=true` AND back-fills `competitor_sources.current_price` with the rejected price. Use when the retailer genuinely changed price by >3× (rare but legitimate — clearance sales, wholesaler-to-retail conversion).
   - **Dismiss**: clears `is_anomaly=false` so the banner disappears + the data point joins the median window from the next refresh onward. Use when the reading was a transient bug that's already resolved.
-  - Implemented inline in `RetailerTable` ([ProductMonitorTab.tsx](src/components/business/price-monitoring/ProductMonitorTab.tsx)). Uses direct Supabase client writes — no API round-trip needed since these are admin-only writes governed by RLS.
-- Classifier correction UI: admin sees a `Wrong match` button (thumbs-down icon) on every classified row. Click prompts for a reason, POSTs to `/api/v1/price-monitoring/classifier-correction` with `corrected_match_kind: 'should_drop'`. The next classify call (5min cache) prepends the most recent corrections as few-shot examples to the system prompt. Service helper at [priceMonitoringApi.ts → submitClassifierCorrection](src/services/priceMonitoringApi.ts).
+  - Implemented inline in `RetailerTable` ([ProductMonitorTab.tsx](../src/components/business/price-monitoring/ProductMonitorTab.tsx)). Uses direct Supabase client writes — no API round-trip needed since these are admin-only writes governed by RLS.
+- Classifier correction UI: admin sees a `Wrong match` button (thumbs-down icon) on every classified row. Click prompts for a reason, POSTs to `/api/v1/price-monitoring/classifier-correction` with `corrected_match_kind: 'should_drop'`. The next classify call (5min cache) prepends the most recent corrections as few-shot examples to the system prompt. Service helper at [priceMonitoringApi.ts → submitClassifierCorrection](../src/services/priceMonitoringApi.ts).
 
 ## Price Monitoring v2 (2026-04-26 — sanity bands, alerts, discrepancies, adaptive discovery)
 
@@ -391,5 +391,5 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **UI**: `src/components/business/price-monitoring/ProductMonitorTab.tsx` — per-product view: toggle + admin Refresh → chart → discovered retailers (Perplexity) → Custom Monitoring (Firecrawl). Admin role gated via `user_profiles.role_id → roles.name IN ('admin', 'super_admin')`.
 
-**External API docs**: `docs/api/price-monitoring-api.md` — full reference for consumers integrating from other projects.
+**External API docs**: `docs/price-monitoring-api.md` — full reference for consumers integrating from other projects.
 

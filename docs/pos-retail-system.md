@@ -4,7 +4,7 @@ Part of the [Finance module](finance-system.md). A lightweight B2C walk-in point
 
 Route `/pos` — `AuthGuard` + `CapabilityGuard capability="invoice.issue"` (`src/App.tsx`). Page: `src/modules/finance/pages/PosPage.tsx`.
 
-Related: [Finance system](finance-system.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Finance API](api/finance-api.md).
+Related: [Finance system](finance-system.md) · [Capabilities & Tenancy](capabilities-and-tenancy.md) · [Finance API](finance-system.md).
 
 ---
 

@@ -38,7 +38,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 │  - _shared/skills/ (domain playbooks)                       │
 │  - Loads prompts from database                              │
 │  - LangGraph StateGraph orchestration                       │
-│  - Claude Opus 4.7 (Jarvis) / Claude Haiku 4.5 (Demo)       │
+│  - Claude Opus 5 (Jarvis) / Claude Haiku 4.5 (Demo)         │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -60,7 +60,7 @@ There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) ar
 **Agent ID**: `kai`
 **Legacy aliases**: `search`, `insights`, `seo` (all resolve to `kai`)
 **Access**: All users for core tools; admin/owner only for B2B, SEO, and sub-agent tools
-**Model**: Claude Opus 4.7
+**Model**: Claude Opus 5
 **DB prompt key**: `kai` in `prompts` table (`prompt_type='agent'`, `category='kai'`)
 
 **Purpose**: Primary user-facing agent combining material search, knowledge base queries, visual search, B2B manufacturer discovery, SEO analysis, and general material intelligence.
@@ -87,7 +87,7 @@ There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) ar
 
 **Agent ID**: `interior-designer`
 **Access**: All users (viewer, member, admin, owner)
-**Model**: Claude Opus 4.7
+**Model**: Claude Opus 5
 
 **Purpose**: AI-powered interior design with spatial analysis, material matching, and 3D/VR visualization.
 
@@ -133,7 +133,16 @@ Existing saved flows using `search`, `insights`, or `seo` continue to work witho
 
 ### How It Works
 
-The `b2b_manufacturer_search` tool uses Anthropic's built-in `web_search_20250305` tool (beta header `web-search-2025-03-05`). No separate Perplexity or search API key is needed — it uses `ANTHROPIC_API_KEY`. The model is Claude Haiku 4.5 for web searches.
+The `b2b_manufacturer_search` tool uses Anthropic's built-in `web_search_20250305` tool (beta header `web-search-2025-03-05`). No separate Perplexity or search API key is needed — it uses `ANTHROPIC_API_KEY`.
+
+**The model is `claude-opus-5` at `effort:low`, and it is PINNED** (`SEARCH_MODEL` / `ANALYSIS_MODEL` in `_shared/tools/b2b-tools.ts`). Measured against Sonnet 5 on an identical 6-company Polish sweep:
+
+| Model | Time | Searches | Input tokens | Domains found | Sources/record | Cost |
+|---|---|---|---|---|---|---|
+| `opus-5` | 52s | 8 | 35k | 100% | 1.2 | $0.21 |
+| `sonnet-5` | 65s | 19 | 89k | 100% | 0.0 | $0.31 |
+
+Opus wins on **every axis including price** — Sonnet burned 19 searches and 89k tokens getting less, and returned the household names you would find without a tool at all where Opus surfaced small specialist factories. The cheaper-tier intuition is backwards for this task, so the choice is pinned rather than left to a "use the cheap model for tool calls" reflex.
 
 **Flow:**
 1. A natural language query is constructed with country/region scope and product category
@@ -356,7 +365,7 @@ All requests require:
 ## Related Documentation
 
 - **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, checkpointing, memory
-- **[api/agent-chat-api.md](api/agent-chat-api.md)** - Full API reference
+- **[agent-system.md](agent-system.md)** - Full API reference
 - **[ai-models-guide.md](ai-models-guide.md)** - Model configurations
 - **[vr-world-generation.md](vr-world-generation.md)** - VR World generation
 

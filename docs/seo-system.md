@@ -2,7 +2,7 @@
 
 Keyword research, article generation, and per-website intelligence — Search Console performance, site health, and rank/backlink tracking.
 
-**API reference:** [docs/api/seo-api.md](api/seo-api.md).
+**API reference:** [`public/api/openapi-edge.json`](../public/api/openapi-edge.json) — `seo-api`, `seo-rank-tracker`, `seo-domain-tracker`, `seo-site-audit`, `seo-content-freshness`, `gsc-api` (browse via [`edge-swagger.html`](../public/api/edge-swagger.html)).
 **Modules:** `seo-toolkit` (research / write / audit) and `seo-interlinking` (internal-link suggestions), both `price_tier='pro'`.
 
 ---
@@ -18,6 +18,7 @@ Home is **Profile → Websites** (`ConnectedWebsitesTab` → `WebsiteSeoDashboar
 | **GSC** | `gsc-api` → `gsc_performance`, `gsc_breakdown` | Clicks, impressions, CTR, position; broken down by query, page, **device, country and search appearance**, plus the trend line. |
 | **Health** | `seo-site-audit` → `website_health_audits` | On-page audit score + issue list; Lighthouse gauges when the async run has returned. |
 | **Rankings** | `seo-domain-tracker` → `seo_domain_snapshots`, `seo_domain_keywords` | Tracked DataForSEO ranked keywords, positions, movement. |
+| **Rank tracking** | `seo-rank-tracker` → `seo_tracked_keywords`, `seo_keyword_positions` | Daily position for the keywords the workspace CHOSE (§4.1). |
 | **Domains** | `seo_tracked_domains`, `seo_domain_audit_history` | Which domains are tracked and their audit history. |
 | **Research** | `seo-api` `research` → `seo_keyword_research` | Saved keyword research. |
 | **Articles** | `seo-api` `write` → `seo_articles` | Generated articles + the viewer. |
@@ -59,6 +60,48 @@ The first version rendered Lighthouse gauges as the headline, so a site with a p
 ## 4. Rankings & Links
 
 `seo-domain-tracker` takes a weekly DataForSEO snapshot per connected website: ranked keywords, positions and backlink profile, into `seo_domain_snapshots` + `seo_domain_keywords`. Week-over-week movement is turned into **workspace-scoped alerts routed through the Flows engine** rather than a hardcoded email — an operator can retarget, mute or extend the alert without a deploy. Scheduled Mondays 03:30 UTC.
+
+### 4.1 Rank tracking — the keywords YOU chose, followed daily (2026-08-29)
+
+`seo-domain-tracker` answers *what does this domain happen to rank for*, discovers that set, and
+**replaces it wholesale every week**. It cannot answer *did the forty keywords I care about move*,
+which is the daily loop of every rank tracker on the market. `seo-rank-tracker` is that second
+question: a fixed, user-picked set followed as a **time series**.
+
+| Piece | What it is |
+|---|---|
+| `seo_tracked_keywords` | The chosen set — unique on `(website_id, keyword, country_code, device)`. Up to 200 added per paste, de-duplicated and lower-cased client-side so a pasted list with blanks and repeats is not N−1 unique-violation round trips. |
+| `seo_keyword_positions` | One row per keyword per day. Retained ~760 days (the summary RPC's own ceiling is 730). |
+| `get_website_rank_summary(p_website_id, p_days)` | **SQL derives the number AND the verdict.** Returns the series, the averages and the movement already inverted. |
+| `WebsiteRankTrackerPanel` | The Rank tracking tab — formats what the RPC returns, derives nothing. |
+
+**Three arithmetic rules, which are one rule in three costumes** — all of them the "a metric is a
+value or a stated reason there is no value" rule from CLAUDE.md:
+
+- **Not ranking is not position 101.** Outside the top 100 stores `position NULL` with `found=false` and is EXCLUDED from the average. A sentinel rank gets averaged and charted as though it were real, so dropping your worst keyword would read as an improvement.
+- **A failed check is unknown, not lost.** A check that could not run stores `error`, is excluded from every figure and counted separately. Announcing "you left the top 10" off a timed-out request is worse than saying nothing.
+- **Up is good.** Position 3 beats position 30, so the RPC inverts the raw delta **once** and no consumer has to remember which way round it is.
+
+**Cost is the real constraint** — one SERP call per keyword per run, the only cron here whose bill
+scales with what a user types. Both paths cap at **60 keywords per invocation**, ordered
+oldest-checked-first, so a large set becomes a slower rotation rather than a larger bill.
+`last_checked_at` is stamped **even on failure**, or one broken keyword sits at the head of the
+queue forever and starves everything behind it.
+
+**Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
+trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a
+muted alert cannot warn about anything. (The first cut emitted `seo.rank_drop`, which is in no
+`TriggerType` union: flow-engine matched zero flows and returned `{triggered: 0}` without error —
+an alert that silently never arrives.)
+
+**DataForSEO parameter traps, verified against the live SERP before the collector was written:**
+the endpoint takes `country_code` and maps it to `location_code` itself — passing the mapped name
+is a hard 400; and `rank_group` is the organic position while `rank_absolute` counts every block,
+which would report a place or two below what Search Console and every other tracker says.
+
+`verify_jwt` is disabled so the daily `cron-run` (`x-cron-secret`) works; the user-facing `run`
+action calls `authenticate()` + `userCanAccessWorkspace()` and asserts the `seo-toolkit`
+entitlement **before** spending (invariant 10).
 
 ---
 
@@ -179,6 +222,6 @@ allow-set so the two files cannot contradict each other again.
 
 ## 7. Related
 
-- [docs/api/seo-api.md](api/seo-api.md) — endpoint reference
+- [docs/seo-system.md](seo-system.md) — endpoint reference
 - [docs/seo-pipeline-mention-monitoring-integration.md](seo-pipeline-mention-monitoring-integration.md) — how SEO and mention monitoring share discovery
 - [docs/flows-notification-system.md](flows-notification-system.md) — where the movement alerts are delivered

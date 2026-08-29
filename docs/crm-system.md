@@ -24,7 +24,7 @@ The CRM provides workspace admins with a unified view of contacts, companies, an
 - `stripe` — Subscription and credit billing (see [billing-credits-system.md](billing-credits-system.md))
 
 **API Docs:**
-- [api/crm-api.md](api/crm-api.md)
+- [crm-system.md](crm-system.md)
 
 ---
 

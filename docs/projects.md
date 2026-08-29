@@ -18,7 +18,7 @@ Before Projects, moodboards and quotes were standalone objects scoped to one use
 
 **Module folder:** [`src/modules/projects/`](../src/modules/projects/) — manifest, ModuleDefinition, service, pages, components.
 
-**External API:** [docs/api/projects-api.md](api/projects-api.md) (`/api/v1/projects/*` — Bearer `kai_*` partner integrations).
+**External API:** [docs/projects-api.md](projects-api.md) (`/api/v1/projects/*` — Bearer `kai_*` partner integrations).
 
 **JARVIS agent surface:** four tools on the `kai` + `interior-designer` agents — `create_project`, `list_my_projects`, `find_project`, `add_task`. See [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts).
 
@@ -280,7 +280,7 @@ A JARVIS prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--
 
 ## See also
 
-- [docs/api/projects-api.md](api/projects-api.md) — full external API reference (Bearer `kai_*` partner endpoints).
+- [docs/projects-api.md](projects-api.md) — full external API reference (Bearer `kai_*` partner endpoints).
 - [src/modules/projects/](../src/modules/projects/) — frontend source.
 - [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts) — JARVIS agent tools.
 - [mivaa-pdf-extractor/app/api/project_tracking_routes.py](../mivaa-pdf-extractor/app/api/project_tracking_routes.py) — Python MIVAA wrapper.

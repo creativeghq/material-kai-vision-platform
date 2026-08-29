@@ -36,7 +36,7 @@
 
   <h2>Edge functions — the platform's actions</h2>
   <p>Most things the app <em>does</em> (rather than just reads) run through an edge function at <code>/functions/v1/&lt;name&gt;</code> — issuing an invoice, sending email, the agent chat, the careers board, and so on. They take a JSON body and are authenticated with the same session JWT (a few are deliberately public, like the <a href="api-jobs.html">Jobs API</a>).</p>
-  <div class="callout"><p><strong>Per-function references</strong> for the main ones (agent chat, CRM, finance, email, flow engine, generation endpoints and more) live in the repository's <code>docs/api/</code> folder — one Markdown reference per function, with request/response shapes.</p></div>
+  <div class="callout"><p><strong>The per-function contract is the OpenAPI spec</strong>, not prose: every one of the 132 functions and all 584 of their actions are in <code>public/api/openapi-edge.json</code>, browsable at <a href="/api/edge-swagger.html">/api/edge-swagger.html</a>. The hand-written <code>docs/api/</code> folder was removed — a second copy of a generated spec only drifts. The partner-facing guides it held (auth recipes, credit costs, error codes, FAQ) live in <code>docs/</code>.</p></div>
 
   <h2>Realtime</h2>
   <p>Tables the platform streams (job progress, inbox messages, agent runs) can be subscribed to over Supabase <strong>realtime</strong>, so an integration can react to changes instead of polling.</p>

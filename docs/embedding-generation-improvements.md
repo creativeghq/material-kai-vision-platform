@@ -159,7 +159,7 @@ The improved method is automatically used in the PDF processing pipeline at **St
 
 The service can also be called directly for reprocessing existing documents. After calling `save_images_and_generate_clips`, inspect the returned dict for `clip_embeddings_generated`, `images_saved`, and `failed_images` counts.
 
-## Understanding Embeddings (Claude Opus 4.7 vision_analysis → Voyage AI)
+## Understanding Embeddings (Claude Opus 5 vision_analysis → Voyage AI)
 
 ### Overview
 
@@ -167,7 +167,7 @@ Understanding embeddings capture the structured knowledge from the vision_analys
 
 ### How It Works (post-2026-05-01)
 
-1. **Claude Opus 4.7 Vision Analysis** (Anthropic tool use) → Produces a `VisionAnalysis` Pydantic payload with material type, colors, textures, properties, OCR-aware fields. Schema-locked via `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`) — no JSON regex recovery needed.
+1. **Claude Opus 5 Vision Analysis** (Anthropic tool use) → Produces a `VisionAnalysis` Pydantic payload with material type, colors, textures, properties, OCR-aware fields. Schema-locked via `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`) — no JSON regex recovery needed.
 2. **JSON → Text Conversion** → `serialize_vision_analysis_to_text(VisionAnalysis)` produces a deterministic descriptive string (e.g., `"Material: porcelain tile. Colors: white, grey. Texture: matte. Dimensions: 60x120cm."`)
 3. **Voyage AI Embedding** → Embeds the text via `voyage-4` with `input_type="document"` → 1024D vector
 4. **VECS Storage** → Stored in `image_understanding_embeddings` collection (1024D halfvec, HNSW index)
@@ -189,7 +189,7 @@ There is **no fallback embedder** (deleted 2026-08-08), so two providers' vector
 ### Pipeline Integration (updated 2026-05)
 
 - **Phase 1 image pipeline (inline)**: Generates the understanding embedding directly after Claude vision_analysis, in the same pass that writes SLIG embeddings to VECS. The former asynchronous "Phase 2 background processor" (`background_image_processor.py`) was deleted in 2026-04 — it was silently broken and produced no output.
-- **Backfill endpoint**: `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Claude Opus 4.7 + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
+- **Backfill endpoint**: `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Claude Opus 5 + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
 - **Clip Job Service** (legacy name): Generates understanding embedding for images with existing vision_analysis; despite the "CLIP" name, it now uses Voyage AI
 - **Regeneration Endpoint**: Includes understanding in embedding regeneration
 

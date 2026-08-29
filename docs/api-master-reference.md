@@ -2,13 +2,13 @@
 
 Single source of truth for every API surface in the platform. Two layers:
 
-1. **Supabase Edge Functions** (Deno/TypeScript) — 88 functions, base URL `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{name}`
+1. **Supabase Edge Functions** (Deno/TypeScript) — 132 functions, base URL `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{name}`
 2. **MIVAA Python API** (FastAPI) — 140+ endpoints, base URL `https://v1api.materialshub.gr`
 
-For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoints.md`](api-endpoints.md) (Python).
+The per-endpoint contract for the edge layer is the OpenAPI spec below, not prose — `docs/api/` was removed because a hand-written copy of a generated spec only drifts (it had, badly). The nine partner-facing guides it held that no spec covers moved up into `docs/`: [agent-chat-partner-api](agent-chat-partner-api.md), [price-monitoring-api](price-monitoring-api.md), [price-monitoring-v3-partner-update](price-monitoring-v3-partner-update.md), [mention-monitoring-api](mention-monitoring-api.md), [job-research-api](job-research-api.md), [projects-api](projects-api.md), [supplier-orders-api](supplier-orders-api.md), [public-tools-api](public-tools-api.md) and [slig-inference](slig-inference.md). For the Python layer see [`docs/api-endpoints.md`](api-endpoints.md).
 
 **Machine-readable specs / Swagger:**
-- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 107). Repo: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (writes both `docs/api/` and `public/api/`).
+- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 132, 584 documented actions). Repo: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `npm run openapi:edge` — it writes `public/api/openapi-edge.json` AND the auto-index in this file from that one source, so the spec and the human index cannot drift apart.
 - **MIVAA Python** → FastAPI-generated `https://v1api.materialshub.gr/openapi.json` + Swagger UI at `https://v1api.materialshub.gr/docs`. (Edge functions are a separate runtime and are **not** in that spec.)
 
 ---
@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (131)
+## 1. Supabase Edge Functions (132)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -227,7 +227,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `pinterest-api` | JWT | Pinterest pin import and OAuth board browsing for moodboard population. |
+| `pinterest-api` | JWT | Import Pinterest pins into the catalogue by URL |
 
 **Notifications**
 
@@ -249,6 +249,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `seo-api` | JWT / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
 | `seo-content-freshness` | JWT | Content decay — raise generated articles that are past their own refresh cadence |
 | `seo-domain-tracker` | JWT | Weekly Rankings + Backlinks snapshots for a connected website |
+| `seo-rank-tracker` | JWT | Daily positions for the keywords a workspace chose to track |
 | `seo-site-audit` | JWT | Site Health — homepage Lighthouse + on-page audit for a connected website |
 
 **Flows**
@@ -357,7 +358,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `agent-chat` | POST (SSE) | JWT | Unified multi-agent chat (kai / interior-designer / demo). RBAC-gated tools, multimodal, skills. | [agent-chat-api](api/agent-chat-api.md), [agent-system](agent-system.md) |
+| `agent-chat` | POST (SSE) | JWT | Unified multi-agent chat (kai / interior-designer / demo). RBAC-gated tools, multimodal, skills. | [agent-chat-api](agent-system.md), [agent-system](agent-system.md) |
 | `agent-chat-debug` | POST | public | Dev-only echo/debug stub | — |
 | `background-agent-runner` | POST | JWT or service-role | Universal executor for `kai-task`, `product-enrichment`, `material-tagger`, `factory-enrichment`, `social-analytics-sync`, `social-insights-sync`. Accepts `?catalog=1` GET for type listing. | [background-agents](background-agents.md) |
 
@@ -365,10 +366,10 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Method | Auth | Purpose | Credits | Deep docs |
 |----------|--------|------|---------|---------|-----------|
-| `generate-interior-gemini` | POST | JWT | 4 modes: text-to-image / image-edit / floor-plan-render / floor-plan-text. Two-step style-transfer pipeline. | 6 (flash) / 15 (pro) | [generate-interior-gemini-api](api/generate-interior-gemini-api.md) |
-| `generate-interior-video-v2` | POST | JWT | Auto-routes by video type to Veo-2, Kling v3.0, Wan 2.1, Runway Gen4. Async polling. | 12–40 | [generate-interior-video-v2-api](api/generate-interior-video-v2-api.md) |
-| `generate-virtual-staging` | POST | JWT | Furnishes empty room photos (Replicate proplabs, 8 room types × 8 styles). | 20 | [generate-virtual-staging-api](api/generate-virtual-staging-api.md) |
-| `generate-region-edit` | POST | JWT | Masked inpainting with Grok Aurora. SAM 2 auto-mask + Pillow fallback. | 20 | [generate-region-edit-api](api/generate-region-edit-api.md) |
+| `generate-interior-gemini` | POST | JWT | 4 modes: text-to-image / image-edit / floor-plan-render / floor-plan-text. Two-step style-transfer pipeline. | 6 (flash) / 15 (pro) | [generate-interior-gemini-api](interior-design-models.md) |
+| `generate-interior-video-v2` | POST | JWT | Auto-routes by video type to Veo-2, Kling v3.0, Wan 2.1, Runway Gen4. Async polling. | 12–40 | [generate-interior-video-v2-api](interior-video-generation.md) |
+| `generate-virtual-staging` | POST | JWT | Furnishes empty room photos (Replicate proplabs, 8 room types × 8 styles). | 20 | [generate-virtual-staging-api](virtual-staging.md) |
+| `generate-region-edit` | POST | JWT | Masked inpainting with Grok Aurora. SAM 2 auto-mask + Pillow fallback. | 20 | [generate-region-edit-api](segmentation-inpainting.md) |
 | `generate-vr-world` | POST | JWT | WorldLabs Marble → 3D Gaussian Splat worlds (model: `marble-1.1`). Stored in `vr_worlds`. | 190 | [vr-world-generation](vr-world-generation.md) |
 | ~~`generate-pbr-maps`~~ | — | — | **REMOVED 2026-08-11.** Never existed as source; wrote a `pbr_maps` value 0 times. Replaced by `generate-interior-gemini` `mode: material-texture` → `product_material_maps`. | — | — |
 | `generate-quote-pdf` | POST | JWT | Branded quote PDFs with cover/backcover templates from `quote-templates` storage bucket. | — | — |
@@ -401,7 +402,7 @@ Reference: the JARVIS agent exposes `seo_*` sub-agent tools that call these.
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `ai-rerank` | POST | JWT | Claude-powered re-ordering of search results. Opus/Haiku model choice, optional per-item explanations. | [ai-rerank-api](api/ai-rerank-api.md) |
+| `ai-rerank` | POST | JWT | Claude-powered re-ordering of search results. Opus/Haiku model choice, optional per-item explanations. | [ai-rerank-api](ai-reranking.md) |
 
 ### 1.6 Background agents & cron jobs
 
@@ -429,7 +430,7 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 
 | Function | Methods | Purpose | Deep docs |
 |----------|---------|---------|-----------|
-| `crm-api` | GET/POST/PATCH/DELETE | **Consolidated CRM router** — `companies` / `contacts` / `users` / `stripe` by first path segment (the former separate `crm-*-api` functions were merged) | [crm-api](api/crm-api.md) |
+| `crm-api` | GET/POST/PATCH/DELETE | **Consolidated CRM router** — `companies` / `contacts` / `users` / `stripe` by first path segment (the former separate `crm-*-api` functions were merged) | [crm-api](crm-system.md) |
 
 ### 1.8 Stripe / billing
 
@@ -437,7 +438,7 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 |----------|--------|------|---------|
 | `stripe-checkout` | POST | JWT | Create checkout session for credit packages and subscription plans |
 | `stripe-customer-portal` | POST | JWT | Create customer portal session (subscription / payment method mgmt) |
-| `stripe-webhooks` | POST | signature | Handle Stripe events — sub created/updated/cancelled, invoice paid, payment failed. See [stripe-webhooks-api](api/stripe-webhooks-api.md) |
+| `stripe-webhooks` | POST | signature | Handle Stripe events — sub created/updated/cancelled, invoice paid, payment failed. See [stripe-webhooks-api](payments-stripe.md) |
 
 ### 1.9 Messaging (email / WhatsApp)
 
@@ -445,17 +446,17 @@ WhatsApp moved from Twilio (SMS+WA) to **Zernio** (WhatsApp via Meta Cloud API) 
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `email-api` | POST | JWT | Send transactional email via Resend. Templates, analytics, domain management. | [email-api](api/email-api.md) |
-| `messaging-api` | POST | JWT | Send WhatsApp via Zernio. Actions: `send`, `create-campaign`, `connect-whatsapp`, `sync-channels`, conversation/reply ops. | [messaging-api](api/messaging-api.md) |
+| `email-api` | POST | JWT | Send transactional email via Resend. Templates, analytics, domain management. | [email-api](email-system.md) |
+| `messaging-api` | POST | JWT | Send WhatsApp via Zernio. Actions: `send`, `create-campaign`, `connect-whatsapp`, `sync-channels`, conversation/reply ops. | [messaging-api](inbox-system.md) |
 | `messaging-processor` | POST | service-role | WhatsApp campaign batch dispatcher (cron-invoked, see §1.6) | — |
-| `zernio-webhook-handler` | POST | signature (Zernio) | One webhook for social `post.*` + WhatsApp `message.*` (delivery + reply capture) | [zernio-social-api](api/zernio-social-api.md) |
+| `zernio-webhook-handler` | POST | signature (Zernio) | One webhook for social `post.*` + WhatsApp `message.*` (delivery + reply capture) | [zernio-social-api](social-media-system.md) |
 | `email-webhook` | POST | signature (Resend) | Campaign email events (delivered/bounced/opened/clicked) | — |
 | `email-webhooks` | POST | signature (Svix/Resend) | Transactional email events | — |
 | `ses-webhook` | POST | signature (SNS) | Legacy/deprecated — Amazon SES decommissioned 2026-03-11; email now via Resend (`email-webhooks`) | — |
 
 ### 1.9b Finance (Greek e-invoicing, AADE/myDATA)
 
-Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitlement. 2 credits per myDATA transmission (root free). Full reference: [finance-api](api/finance-api.md) · architecture [finance-system](finance-system.md), [pos-retail-system](pos-retail-system.md), [online-storefront](online-storefront.md).
+Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitlement. 2 credits per myDATA transmission (root free). Full reference: [finance-api](finance-system.md) · architecture [finance-system](finance-system.md), [pos-retail-system](pos-retail-system.md), [online-storefront](online-storefront.md).
 
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
@@ -474,13 +475,13 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 
 | Function | Methods | Auth | Purpose | Deep docs |
 |----------|---------|------|---------|-----------|
-| `quotes-api` | GET/POST/PATCH/DELETE | JWT | Quote CRUD + proposal lifecycle + FF&E fields (room, dimensions, installation, delivery) + pricing audit fields on `quote_items` (`price_source`, `price_lookup_call_id`). Actions: `list`, `create`, `update`, `delete`, `addItem`, `addCustomItem`. | [quotes-api](api/quotes-api.md) |
+| `quotes-api` | GET/POST/PATCH/DELETE | JWT | Quote CRUD + proposal lifecycle + FF&E fields (room, dimensions, installation, delivery) + pricing audit fields on `quote_items` (`price_source`, `price_lookup_call_id`). Actions: `list`, `create`, `update`, `delete`, `addItem`, `addCustomItem`. | [quotes-api](quotes-system-architecture.md) |
 
 ### 1.10.1 Pricing (admin-only, 2026-04)
 
 | Surface | Method | Auth | Purpose | Deep docs |
 |---------|--------|------|---------|-----------|
-| `agent-chat` tool `price_lookup` | POST (SSE) | JWT (admin/owner) | AI-mode price composition from the KB "Pricing" category. Emits `tool_call_ids`, `price_lookup_matches`, `price_proposal` chunks. | [pricing-api](api/pricing-api.md) |
+| `agent-chat` tool `price_lookup` | POST (SSE) | JWT (admin/owner) | AI-mode price composition from the KB "Pricing" category. Emits `tool_call_ids`, `price_lookup_matches`, `price_proposal` chunks. | [pricing-api](units-and-quantity-pricing.md) |
 | `mivaa-gateway` action `search_knowledge_base` + `category_slug:"pricing"` | POST | JWT (admin) | Quick-pick direct semantic search — no LLM cost | ↑ |
 | PostgREST `/rest/v1/product_prices` | POST / PATCH | JWT (admin/owner via RLS) | Commit confirmed prices with source doc IDs and `price_lookup_call_id` audit link | ↑ |
 | PostgREST `/rest/v1/quote_items` | PATCH | JWT (admin/owner via RLS) | Writes `unit_price` + `price_source` + `price_lookup_call_id` for auditable quote pricing | ↑ |
@@ -489,7 +490,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `zernio-api` | GET/POST | JWT | Unified router; `action` selects handler — oauth (`connect`/`callback`/`disconnect`/`list`), publish (`publish_now`/`schedule`), analytics (`get_post_analytics`/`get_account_insights`/`get_best_time`). Publishes to 8 platforms via Zernio. | [zernio-social-api](api/zernio-social-api.md) |
+| `zernio-api` | GET/POST | JWT | Unified router; `action` selects handler — oauth (`connect`/`callback`/`disconnect`/`list`), publish (`publish_now`/`schedule`), analytics (`get_post_analytics`/`get_account_insights`/`get_best_time`). Publishes to 8 platforms via Zernio. | [zernio-social-api](social-media-system.md) |
 | `zernio-webhook-handler` | POST | signature (`X-Zernio-Signature`) | Receives `post.published` / `post.partial` / `post.failed` / `post.cancelled` / `post.scheduled` / `account.disconnected` | ↑ |
 | `generate-social-content` | POST | JWT | 3 caption variants + hashtags per platform | ↑ |
 | `generate-social-image` | POST | JWT | Routes to best image model (Aurora / Gemini / FLUX) by content type | ↑ |
@@ -519,13 +520,13 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `POST /api/v1/price-monitoring/market-check` | POST | User JWT (admin) | Stateless one-shot market scan used by the KB-price drawer. Reuses the monitoring snapshot when the product is already enrolled and ≤6h old (`from_monitoring_cache=true`, 0 credits). Returns `stats {min, median, max, count, verified_count, currency}` computed over exact matches only. |
 | `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` | POST | `x-cron-secret` | Internal cron: refreshes all due `tracked_queries` rows. Called hourly from `monitoring-cron?task=price-refresh`. |
 
-**Full external-API reference**: [docs/api/price-monitoring-api.md](api/price-monitoring-api.md) — auth, schemas, error codes, curl/TypeScript/Python recipes.
+**Full external-API reference**: [docs/price-monitoring-api.md](price-monitoring-api.md) — auth, schemas, error codes, curl/TypeScript/Python recipes.
 
 ### 1.14 Data import & scraping
 
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `xml-import-orchestrator` | POST | JWT | Intelligent XML imports with AI field mapping. See [xml-import-orchestrator-api](api/xml-import-orchestrator-api.md) |
+| `xml-import-orchestrator` | POST | JWT | Intelligent XML imports with AI field mapping. See [xml-import-orchestrator-api](xml-import-orchestrator.md) |
 | `scheduled-import-runner` | POST | service-role | Cron runner (see §1.6) |
 | `scrape-preview` | POST | JWT | Preview materials from URL before full import |
 | `scrape-single-page` | POST | JWT | Extract materials from a single URL with custom schema |
@@ -533,13 +534,13 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `firecrawl-webhook` | POST | signature | Receive async crawl results from Firecrawl |
 | `field-templates` | GET/POST/PATCH | JWT | Field-mapping template CRUD (reusable across imports) |
 | `suggest-fields` | POST | JWT | AI-suggested field mappings by analyzing website HTML |
-| `pdf-batch-process` | POST | JWT | Batch PDF upload → MIVAA extraction. See [pdf-batch-process-api](api/pdf-batch-process-api.md) |
+| `pdf-batch-process` | POST | JWT | Batch PDF upload → MIVAA extraction. See [pdf-batch-process-api](pdf-processing-pipeline.md) |
 
 ### 1.15 Flows
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `flow-engine` | POST | JWT | Execute / test / dry-run flows. Template variable resolution. | [flow-engine-api](api/flow-engine-api.md) |
+| `flow-engine` | POST | JWT | Execute / test / dry-run flows. Template variable resolution. | [flow-engine-api](flow-engine.md) |
 | `flow-scheduler-cron` | POST | service-role | Cron runner (see §1.6) | ↑ |
 | `flow-webhook` | POST | signature | Routes external HTTP webhooks to matching flows | ↑ |
 
@@ -552,7 +553,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `batch-update-sessions` | POST | JWT + admin key | Admin bulk-update of scraping sessions |
 | `trigger-factory-enrichment` | POST | service-role | Propagate factory data, queue enrichment job if needed |
 | `notification-dispatcher` | POST | JWT | Send push notifications + webhook deliveries |
-| `mivaa-gateway` | POST | JWT or API key | Thin auth-passthrough to MIVAA Python backend (see §2). See [mivaa-gateway-api](api/mivaa-gateway-api.md) |
+| `mivaa-gateway` | POST | JWT or API key | Thin auth-passthrough to MIVAA Python backend (see §2). See [mivaa-gateway-api](api-master-reference.md) |
 
 ---
 
@@ -586,7 +587,7 @@ Full endpoint-by-endpoint reference: [api-endpoints.md](api-endpoints.md) (1940 
 | Agents (Python) | `/api/agents/*` | Backend agent execution — edge `background-agent-runner` delegates here via `DelegateToMivaaError` for >25s tasks |
 | Internal | `/api/internal/*` | Admin observability. Incl. `GET /api/internal/document-extraction-status/{document_id}` (Document Health panel) and `POST /api/internal/run-catalog-knowledge/{document_id}?force=true` (re-run Layer 1/2) |
 | Data Import | `/api/import/*` | XML import with AI field mapping, web scraping, field templates |
-| Finance | `/api/v1/...` (edge) | Greek e-invoicing / AADE myDATA via Novus, AR/AP, POS, storefront — see §1.9b + [finance-api](api/finance-api.md) |
+| Finance | `/api/v1/...` (edge) | Greek e-invoicing / AADE myDATA via Novus, AR/AP, POS, storefront — see §1.9b + [finance-api](finance-system.md) |
 | Modules | `/api/v1/modules/*` | Module-system control + per-module routers — see §2.1 below |
 
 ### 2.1 Module system
@@ -677,12 +678,13 @@ const res = await fetch(`${MIVAA_GATEWAY_URL}/api/agents/run`, {
 
 ## 4. Related docs
 
-- [api/README.md](api/README.md) — per-edge-function deep docs index
+- [`public/api/openapi-edge.json`](../public/api/openapi-edge.json) — the edge endpoint contract (browse via [`edge-swagger.html`](../public/api/edge-swagger.html))
 - [api-endpoints.md](api-endpoints.md) — MIVAA Python endpoint-by-endpoint reference
 - [api-docs.md](api-docs.md) — MIVAA search-strategy focused reference
-- [api/swagger.md](api/swagger.md) — OpenAPI/Swagger export
+- Partner-facing guides: [agent-chat-partner-api.md](agent-chat-partner-api.md), [price-monitoring-api.md](price-monitoring-api.md), [mention-monitoring-api.md](mention-monitoring-api.md), [job-research-api.md](job-research-api.md), [projects-api.md](projects-api.md), [supplier-orders-api.md](supplier-orders-api.md), [public-tools-api.md](public-tools-api.md)
+- [slig-inference.md](slig-inference.md) — the Modal SLIG service: a THIRD runtime, in neither OpenAPI spec
 - [agent-system.md](agent-system.md), [background-agents.md](background-agents.md), [flow-engine.md](flow-engine.md), [deployment-guide.md](deployment-guide.md)
 
 ---
 
-**Last Updated:** April 15, 2026
+**Last Updated:** August 29, 2026

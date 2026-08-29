@@ -56,7 +56,7 @@ All three methods converge into a shared storage and search layer. Each method f
 - `image_texture_embeddings` (1024D Voyage from `VisionAnalysis.textures[] + finish`)
 - `image_material_embeddings` (1024D Voyage from `VisionAnalysis.material_type + category + subcategory`)
 - `image_style_embeddings` (1024D Voyage from `VisionAnalysis.style + surface_pattern + applications`)
-- `image_understanding_embeddings` (1024D — Voyage AI from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre; Provenance fields `embedding_model` + `schema_version` persisted on every row.)
+- `image_understanding_embeddings` (1024D — Voyage AI from Claude Opus 5 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre; Provenance fields `embedding_model` + `schema_version` persisted on every row.)
 
 **Unified Search**: A user query is embedded, then searched in parallel across all 6 collections. Results from PDF, web, and XML sources are merged and ranked together.
 

@@ -12,7 +12,7 @@ This module is the platform's accounting and AADE/myDATA e-invoicing layer. Full
 - **[docs/warehouse-and-billing.md](../../../docs/warehouse-and-billing.md)** — inventory, time-tracking, project billing.
 - **[docs/sales-and-marketplace.md](../../../docs/sales-and-marketplace.md)** — sales portal, catalog access, procurement routing.
 - **[docs/capabilities-and-tenancy.md](../../../docs/capabilities-and-tenancy.md)** — `finance.manage`/`invoice.issue` capabilities + `sales-finance` entitlement.
-- **[docs/api/finance-api.md](../../../docs/api/finance-api.md)** — `finance-*` edge function reference.
+- **[docs/finance-system.md](../../../docs/finance-system.md)** — `finance-*` edge function reference.
 
 ## Layout (`src/modules/finance/`)
 - `pages/` — `DocumentsPage` (Invoices / Receipts / Credit Notes / Payments / Expenses inbox / Dispatch board / Delivery Notes / Cheques), `PosPage`.

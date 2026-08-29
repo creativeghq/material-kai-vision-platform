@@ -18,7 +18,7 @@
 > **Reading note:** older sub-sections below still carry YOLO/Chandra wording inline — wherever
 > this doc says "YOLO detects regions" or "Chandra OCRs the page", that is the **retired** design;
 > read "PaddleOCR-VL does both in one structural pass on Modal". The remaining stages (vision
-> analysis = Claude Opus 4.7, embeddings, chunking = Sonnet 4.6, products) are unchanged.
+> analysis = Claude Opus 5, embeddings, chunking = Sonnet 4.6, products) are unchanged.
 
 14-stage intelligent pipeline for transforming material catalogs into searchable knowledge.
 
@@ -35,14 +35,14 @@
 
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0A: Product Discovery (0-10%)                             │
-│ AI Model: Claude Opus 4.7 / GPT-4o                           │
+│ AI Model: Claude Opus 5 / GPT-4o                           │
 │ Purpose: Extract products with ALL metadata (inseparable)      │
 │ Output: Products with metadata JSONB (factory, specs, etc.)    │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0B: Document Entity Discovery (10-15%) - OPTIONAL         │
-│ AI Model: Claude Opus 4.7 / GPT-4o                           │
+│ AI Model: Claude Opus 5 / GPT-4o                           │
 │ Purpose: Extract certificates, logos, specifications           │
 │ Output: Document entities stored separately with relationships │
 └─────────────────────────────────────────────────────────────────┘
@@ -168,7 +168,7 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 6: AI Classification (70-75%) - URL-BASED PROCESSING      │
-│ Model: Claude Opus 4.7 (Anthropic tool use)                    │
+│ Model: Claude Opus 5 (Anthropic tool use)                    │
 │ Schema: VisionAnalysis Pydantic + VISION_ANALYSIS_TOOL          │
 │ Process: Download from Supabase URLs → Classify → Delete       │
 │ Output: Material vs non-material classification                │
@@ -176,7 +176,7 @@
 │ 🚀 URL-BASED ARCHITECTURE:                                     │
 │   1. Download image from Supabase URL to RAM                  │
 │   2. Convert to base64 on-the-fly                             │
-│   3. Classify with Claude Opus 4.7 (schema-locked tool call)  │
+│   3. Classify with Claude Opus 5 (schema-locked tool call)  │
 │   4. Delete from RAM immediately                               │
 │   5. Delete non-material images from Supabase                 │
 │                                                                 │
@@ -206,7 +206,7 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 8: Vision Analysis (85-90%) - URL-BASED PROCESSING       │
-│ Model: Claude Opus 4.7 (Anthropic tool use)                    │
+│ Model: Claude Opus 5 (Anthropic tool use)                    │
 │ Schema: VisionAnalysis Pydantic + VISION_ANALYSIS_TOOL          │
 │ Process: Download from Supabase URLs → Analyze → Delete       │
 │ Output: Quality scores, material properties, confidence        │
@@ -214,7 +214,7 @@
 │ 🚀 ON-DEMAND DOWNLOAD ARCHITECTURE:                           │
 │   1. Download image from Supabase URL to RAM                  │
 │   2. Convert to base64 on-the-fly                             │
-│   3. Analyze with Claude Opus 4.7 (schema-locked tool call)   │
+│   3. Analyze with Claude Opus 5 (schema-locked tool call)   │
 │   4. Delete from RAM immediately                               │
 │   5. Batch cleanup after every 10 images                       │
 │                                                                 │
@@ -225,7 +225,7 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 9: Product Creation (90-95%)                              │
-│ Models: Claude Haiku 4.5 → Claude Opus 4.7                     │
+│ Models: Claude Haiku 4.5 → Claude Opus 5                     │
 │ Output: Product records with relationships                     │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -316,7 +316,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Purpose**: Extract products with ALL metadata (Products + Metadata = Inseparable)
 
-**AI Model**: Claude Opus 4.7 or GPT-4o
+**AI Model**: Claude Opus 5 or GPT-4o
 
 **Process**:
 1. Extract full PDF text
@@ -343,7 +343,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Purpose**: Extract certificates, logos, specifications as separate knowledge base
 
-**AI Model**: Claude Opus 4.7 or GPT-4o
+**AI Model**: Claude Opus 5 or GPT-4o
 
 **Process**:
 1. Analyze PDF for document entities
@@ -774,14 +774,14 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Claude Opus 4.7 via Anthropic tool use
+**Model**: Claude Opus 5 via Anthropic tool use
 
 **Schema enforcement**: `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`). Tool-use guarantees the response matches the schema, so Voyage's understanding-embedding space stays clean.
 
 **Process (Per Image)**:
 1. **Download image from Supabase URL to RAM**
 2. Convert to base64 on-the-fly (no disk I/O)
-3. Classify with Claude Opus 4.7 (schema-locked tool call: material vs non-material)
+3. Classify with Claude Opus 5 (schema-locked tool call: material vs non-material)
 4. **Delete from RAM immediately**
 5. Delete non-material images from Supabase Storage
 
@@ -846,14 +846,14 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Claude Opus 4.7 via Anthropic tool use (post-2026-05-01)
+**Model**: Claude Opus 5 via Anthropic tool use (post-2026-05-01)
 
 **Schema enforcement**: `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL`. The tool-use mechanism guarantees schema adherence — eliminates fragile JSON regex recovery, protects Voyage's understanding-embedding space from drift.
 
 **Process (Per Image)**:
 1. **Download image from Supabase URL to RAM**
 2. Convert to base64 on-the-fly
-3. Analyze with Claude Opus 4.7 (tool call → `VisionAnalysis` payload: quality, material properties, OCR-aware fields)
+3. Analyze with Claude Opus 5 (tool call → `VisionAnalysis` payload: quality, material properties, OCR-aware fields)
 4. **Delete from RAM immediately**
 5. **Batch cleanup after every 10 images**
 
@@ -876,7 +876,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 
 ### Stage 6 (alternate): Image Analysis (80-85%) - ASYNC JOB
 
-**Model**: Claude Opus 4.7 via Anthropic tool use
+**Model**: Claude Opus 5 via Anthropic tool use
 
 **Process**:
 1. Runs as background job (non-blocking)
@@ -898,7 +898,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 
 ### Stage 7 (alternate): Product Creation (85-92%)
 
-**Models**: Claude Haiku 4.5 → Claude Opus 4.7
+**Models**: Claude Haiku 4.5 → Claude Opus 5
 
 **Two-Stage Validation**:
 
@@ -958,7 +958,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 3. **CHUNKS_CREATED** - Text chunking complete
 4. **TEXT_EMBEDDINGS_GENERATED** - Text embeddings complete
 5. **IMAGES_EXTRACTED** - Images uploaded to Supabase Storage ✅ UPDATED
-6. **IMAGE_EMBEDDINGS_GENERATED** - SLIG 768D embeddings + Claude Opus 4.7 vision_analysis (tool use) + Voyage understanding 1024D complete ✅ UPDATED
+6. **IMAGE_EMBEDDINGS_GENERATED** - SLIG 768D embeddings + Claude Opus 5 vision_analysis (tool use) + Voyage understanding 1024D complete ✅ UPDATED
 7. **PRODUCTS_DETECTED** - Products identified
 8. **PRODUCTS_CREATED** - Product creation complete
 9. **COMPLETED** - All processing complete
@@ -967,7 +967,7 @@ Pre-v2: SLIG produced all 5 vectors via the blend trick (4 fixed global text pro
 
 **Note**:
 - Stage 5 (IMAGES_EXTRACTED): All images uploaded to Supabase Storage, 0 local files
-- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): 1× SLIG visual (768D) + 4× Voyage aspect embeddings (1024D: color/texture/style/material) + Claude Opus 4.7 vision_analysis (tool use) + understanding embedding (1024D Voyage from VisionAnalysis JSON) complete
+- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): 1× SLIG visual (768D) + 4× Voyage aspect embeddings (1024D: color/texture/style/material) + Claude Opus 5 vision_analysis (tool use) + understanding embedding (1024D Voyage from VisionAnalysis JSON) complete
 - Recovery uses Supabase URLs for all subsequent processing (no local files needed)
 
 ---
@@ -1011,7 +1011,7 @@ The pipeline has been refactored from a monolithic 2900+ line function into modu
 ### Service Layer
 
 **ImageProcessingService** (`app/services/image_processing_service.py`)
-- `classify_images()` - Claude Opus 4.7 via Anthropic tool use (schema-locked)
+- `classify_images()` - Claude Opus 5 via Anthropic tool use (schema-locked)
 - `upload_images_to_storage()` - Upload to Supabase Storage
 - `save_images_and_generate_clips()` - DB save + SLIG 768D embeddings (name retained for backwards compat; writes directly to VECS)
 

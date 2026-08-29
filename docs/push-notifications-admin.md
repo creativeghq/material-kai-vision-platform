@@ -180,6 +180,6 @@ Track push notification performance:
 ## Related Documentation
 
 - [Flows Notification System](./flows-notification-system.md) - how notifications are delivered
-- [Messaging API](./api/messaging-api.md) - WhatsApp / messaging channels
+- [Messaging API](./inbox-system.md) - WhatsApp / messaging channels
 - [Deployment Guide](./deployment-guide.md) - VAPID configuration
 - [System Architecture](./system-architecture.md) - edge functions (notification-dispatcher)

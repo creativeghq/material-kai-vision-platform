@@ -149,7 +149,7 @@ Common issues and solutions for Material Kai Vision Platform.
 
 **Symptoms**:
 - "Image analysis failed"
-- Anthropic API errors on Claude Opus 4.7 vision_analysis (sole vision pass post-2026-05-01)
+- Anthropic API errors on Claude Opus 5 vision_analysis (sole vision pass post-2026-05-01)
 - Quality score 0
 
 **Solutions**:

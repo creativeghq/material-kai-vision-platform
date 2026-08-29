@@ -60,7 +60,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[data-import-system.md](data-import-system.md)** - Data import system ✨ NEW
 - XML import with AI-powered field mapping
-- Dynamic field mapping (Claude Opus 4.7)
+- Dynamic field mapping (Claude Opus 5)
 - Batch processing (10 products at a time)
 - Concurrent image downloads (5 parallel)
 - Cron-based scheduling for recurring imports
@@ -234,7 +234,7 @@ Complete documentation for Material Kai Vision Platform.
 - 200+ metadata fields across 9 categories
 - Material Properties, Dimensions, Appearance, Performance
 - Application, Compliance, Design, Manufacturing, Commercial
-- AI-powered dynamic extraction (Claude Opus 4.7 / GPT-4o)
+- AI-powered dynamic extraction (Claude Opus 5 / GPT-4o)
 - Complete field reference with examples
 - API usage and frontend display
 - Step-by-step extraction process
@@ -249,7 +249,7 @@ Complete documentation for Material Kai Vision Platform.
 - Four personas (operator / broker / agent / member); ownership failures return **404**, never 403
 - Public surface is a separate edge function: `/p/:token` listing page, `/buyer/:token` portal, cross-workspace discovery, and Kyero / OpenImmo / generic portal syndication
 - Anonymous lead writes require GDPR consent and are capped at 8/hour/IP (hashed)
-- API: [api/real-estate-api.md](api/real-estate-api.md)
+- API: [real-estate-system.md](real-estate-system.md)
 
 **[seo-system.md](seo-system.md)** — SEO & Content ✨ NEW (2026-07)
 - **Connected Websites** is the organising unit — GSC, Site Health, Rankings, research and articles all scope to a site
@@ -397,7 +397,7 @@ Complete documentation for Material Kai Vision Platform.
 ### 🤖 AI & Processing
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
-- Anthropic: Claude Opus 4.7 (vision via tool use), Sonnet 4.6 (chunking), Haiku 4.5 (classifiers)
+- Anthropic: Claude Opus 5 (vision via tool use, agent turns), Sonnet 4.6 (`Settings.chunking_primary_model`), Haiku 4.5 (classifiers, rerank, semantic chunking)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
 - Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
 - Modal: SLIG SigLIP2 (5 visual embedding types, 768D each — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
@@ -455,9 +455,9 @@ Complete documentation for Material Kai Vision Platform.
 - Stage 3: Image Extraction — product crops sourced from PaddleOCR `IMAGE`/`FIGURE`/`chart` regions
 - Stage 4: Product Creation
 - Stage 5: Entity Linking
-- Stage 6: AI Classification — Claude Opus 4.7 via Anthropic tool use
+- Stage 6: AI Classification — Claude Opus 5 via Anthropic tool use
 - Stage 7: SLIG Embeddings — SigLIP2 cloud endpoint, 5×768D specialized
-- Stage 8: Vision Analysis — Claude Opus 4.7 schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`
+- Stage 8: Vision Analysis — Claude Opus 5 schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`
 - **Structure-first chunking** ✨
   - Uses the PaddleOCR-VL layout cache for intelligent chunking
   - Respects region boundaries
@@ -536,7 +536,7 @@ Complete documentation for Material Kai Vision Platform.
 - resolve → commit (draft POs) → send-to-supplier (PDF+email) → receive (reserve) → Finance Sourcing board; `purchase_order.sent/.received` Flows triggers
 - Built on `orders(order_type='purchase')`; legacy `purchase_orders` tables retired
 - KAI sourcing tools + `/admin/monitoring` shell + market-intel on quotes; marketplace sourcing (inquiry→accept→materialize)
-- **Workstream F** — global supplier identity (`platform_suppliers`) + operator-gated claim (`/admin/supplier-claims`) + supplier portal (`/supplier-portal`) + ERP API ([supplier-orders-api](api/supplier-orders-api.md))
+- **Workstream F** — global supplier identity (`platform_suppliers`) + operator-gated claim (`/admin/supplier-claims`) + supplier portal (`/supplier-portal`) + ERP API ([supplier-orders-api](supplier-orders-api.md))
 
 **[pos-retail-system.md](pos-retail-system.md)** - POS / retail ✨ NEW (2026-06)
 - vPOS shifts + cash drawer + X/Z reports; Law 5155 card/IRIS signature flow; EFT-POS registry; thermal receipt
@@ -611,11 +611,11 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🔌 API Reference
 
-**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 107 Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / real estate / SEO / KB / CRM / finance / stock / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns. The edge-function index is regenerated from `scripts/edge-endpoints.json` so it cannot drift from the OpenAPI spec.
+**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 132 Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / real estate / SEO / KB / CRM / finance / stock / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns. The edge-function index is regenerated from `scripts/edge-endpoints.json` so it cannot drift from the OpenAPI spec.
 
-**[api/README.md](api/README.md)** — Per-edge-function deep docs index (30 dedicated function pages).
+**Partner-facing API guides** — the surfaces an OpenAPI spec cannot express (auth recipes, credit debits, permission locks, error codes, FAQ): [agent-chat-partner-api.md](agent-chat-partner-api.md), [price-monitoring-api.md](price-monitoring-api.md), [price-monitoring-v3-partner-update.md](price-monitoring-v3-partner-update.md), [mention-monitoring-api.md](mention-monitoring-api.md), [job-research-api.md](job-research-api.md), [projects-api.md](projects-api.md), [supplier-orders-api.md](supplier-orders-api.md), [public-tools-api.md](public-tools-api.md). Plus [slig-inference.md](slig-inference.md) — the Modal SLIG service, a third runtime in neither spec. (The old `docs/api/` per-function folder was removed: it duplicated the generated spec and had drifted to advertising 5 deleted Pinterest actions while missing 115 live ones.)
 
-**[../public/api/openapi-edge.json](../public/api/openapi-edge.json)** — machine-readable OpenAPI 3.0.3 for **all 107** edge functions; Swagger UI at [`/api/edge-swagger.html`](../public/api/edge-swagger.html). A CI guard ([`tests/unit/edgeEndpointsCoverage.test.ts`](../tests/unit/edgeEndpointsCoverage.test.ts)) fails the build when a function exists without a spec entry, or a spec entry without a function.
+**[../public/api/openapi-edge.json](../public/api/openapi-edge.json)** — machine-readable OpenAPI 3.0.3 for **all 132** edge functions (584 documented actions); Swagger UI at [`/api/edge-swagger.html`](../public/api/edge-swagger.html). A CI guard ([`tests/unit/edgeEndpointsCoverage.test.ts`](../tests/unit/edgeEndpointsCoverage.test.ts)) fails the build when a function exists without a spec entry, or a spec entry without a function.
 
 **[api-endpoints.md](api-endpoints.md)** - Complete MIVAA Python API reference
 - 114 endpoints across 14 categories
@@ -722,7 +722,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude (Opus 4.7 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 5 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 
@@ -778,12 +778,11 @@ All documentation follows these standards:
 **Maintainer**: Development Team
 
 **Recent Changes (2026-07-29):**
-- ✨ **NEW**: [real-estate-system.md](real-estate-system.md) + [api/real-estate-api.md](api/real-estate-api.md) — the Real Estate module and its two paid sub-modules
+- ✨ **NEW**: [real-estate-system.md](real-estate-system.md) + [real-estate-system.md](real-estate-system.md) — the Real Estate module and its two paid sub-modules
 - ✨ **NEW**: [seo-system.md](seo-system.md) — Connected Websites, Google Search Console, Site Health, Rankings & Links
 - ✨ **NEW**: [data-integrity-framework.md](data-integrity-framework.md) — the nightly detect/heal registry and the silent-zero probe
 - ✨ **NEW**: [company-assets.md](company-assets.md), [units-and-measures.md](units-and-measures.md)
 - ✨ **UPDATED**: OpenAPI edge spec now covers **all 107** edge functions (was 98). `KNOWN_UNDOCUMENTED` is empty and the CI parity guard keeps it there
-- ✨ **UPDATED**: [api/README.md](api/README.md) — Real Estate / Stock / Contracts sections, rebuilt cron table from the live `cron.job` schedule, removed the dead `field-templates` / `suggest-fields` entries
 - ✨ **NEW**: public [`/changelog`](https://app.materialshub.gr/changelog) page, backed by `changelog_entries`
 
 **Recent Changes (2026-04-25):**

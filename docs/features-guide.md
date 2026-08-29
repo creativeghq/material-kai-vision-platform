@@ -51,7 +51,7 @@ Complete reference of all platform features and capabilities.
 **3. Multi-Vector Search** ✅
 - 7-vector fusion: text (1024D, Voyage AI), visual (768D, SigLIP2), understanding (1024D, Voyage AI), color, texture, style, material (768D each, SigLIP2)
 - All vectors stored as **halfvec** (float16) — 50% storage savings, zero accuracy loss
-- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D. Pre;
+- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Claude Opus 5 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D. Pre;
 - **Query-adaptive weight profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected based on query intent
 - GPT-4o-mini parses query → selects optimal weights → adjusts fusion scoring per search
 - Response time: <200ms
@@ -386,7 +386,7 @@ Complete reference of all platform features and capabilities.
 ## 🔄 Integration Features
 
 **External Services**:
-- Anthropic (Claude Opus 4.7 / Haiku 4.5 + built-in web search for B2B)
+- Anthropic (Claude Opus 5 / Haiku 4.5 + built-in web search for B2B)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4 text + understanding embeddings)
 - Modal Endpoint — PaddleOCR-VL layout+OCR backbone (post-2026-06-13; replaced Surya-2, which had replaced Chandra v2; pytesseract + EasyOCR removed).
@@ -709,7 +709,7 @@ Complete reference of all platform features and capabilities.
 
 **Status:** ✅ Complete (Production Ready)
 
-**API Docs**: [api/generate-interior-gemini-api.md](api/generate-interior-gemini-api.md)
+**API Docs**: [interior-design-models.md](interior-design-models.md)
 
 | Mode | Description | Credits |
 |---|---|---|
@@ -729,7 +729,7 @@ Complete reference of all platform features and capabilities.
 
 **Status:** ✅ Complete (Production Ready)
 
-**Documentation**: [social-media-system.md](social-media-system.md) | **API**: [api/zernio-social-api.md](api/zernio-social-api.md)
+**Documentation**: [social-media-system.md](social-media-system.md) | **API**: [social-media-system.md](social-media-system.md)
 
 **Content Generation:**
 - ✅ Caption generation (3 variants) for Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads — 2 credits
@@ -753,7 +753,7 @@ Complete reference of all platform features and capabilities.
 
 **Status:** ✅ Complete (Production Ready)
 
-**Documentation**: [billing-credits-system.md](billing-credits-system.md) | **API**: [api/crm-api.md](api/crm-api.md) (stripe resource)
+**Documentation**: [billing-credits-system.md](billing-credits-system.md) | **API**: [crm-system.md](crm-system.md) (stripe resource)
 
 - ✅ Subscription plans with monthly/annual billing (`subscription_plans` table)
 - ✅ Credit packages for top-up purchases (`credit_packages` table)

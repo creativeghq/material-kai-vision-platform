@@ -196,5 +196,5 @@ Anonymous lead-gen, same family as the other [public tools](#related):
 
 - [projects.md](projects.md) — the Plan tab lives on the project detail page
 - [quotes-system-architecture.md](quotes-system-architecture.md) — where `create-quote-from-plan` lands
-- [public-tools-api.md](api/public-tools-api.md) — the shared Turnstile + `public_lookup_log` quota model
-- [pricing-api.md](api/pricing-api.md) — service/product rates the engine prices against
+- [public-tools-api.md](public-tools-api.md) — the shared Turnstile + `public_lookup_log` quota model
+- [pricing-api.md](units-and-quantity-pricing.md) — service/product rates the engine prices against

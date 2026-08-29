@@ -242,6 +242,6 @@ Comprehensive error tracking and performance monitoring using Sentry transaction
 ## Related Documentation
 
 - [Data Import System](./data-import-system.md)
-- [XML Import Orchestrator API](./api/xml-import-orchestrator-api.md)
-- [Database Schema](../supabase/migrations/20251110_create_data_import_tables.sql)
+- [XML Import Orchestrator API](./xml-import-orchestrator.md)
+- `../supabase/migrations/20251110_create_data_import_tables.sql`
 - [Unified Product Generation Flow](./unified-product-generation-flow.md) - Complete production hardening details

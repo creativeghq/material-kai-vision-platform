@@ -69,7 +69,7 @@ Env always wins over DB rows ([`_shared/secrets.ts → resolveSecret`](../supaba
 | Function | Path | What it does |
 |---|---|---|
 | `stripe-api` | [`supabase/functions/stripe-api/`](../supabase/functions/stripe-api/) | Unified action-dispatch endpoint. Body `{action: 'checkout' \| 'customer_portal', ...}`. Creates Checkout sessions for credit purchases + subscriptions, opens Stripe's customer billing portal. Auth: JWT or admin key. |
-| `stripe-webhooks` | [`supabase/functions/stripe-webhooks/`](../supabase/functions/stripe-webhooks/) | Handles `payment_intent.succeeded`, `checkout.session.completed`, `customer.subscription.*`, `invoice.payment_failed`. Auth: HMAC signature against `STRIPE_WEBHOOK_SECRET`. Kept separate from `stripe-api` for security boundary + Stripe Dashboard URL stability (see [stripe-api.md](api/stripe-api.md) for rationale). |
+| `stripe-webhooks` | [`supabase/functions/stripe-webhooks/`](../supabase/functions/stripe-webhooks/) | Handles `payment_intent.succeeded`, `checkout.session.completed`, `customer.subscription.*`, `invoice.payment_failed`. Auth: HMAC signature against `STRIPE_WEBHOOK_SECRET`. Kept separate from `stripe-api` for security boundary + Stripe Dashboard URL stability (see [stripe-api.md](payments-stripe.md) for rationale). |
 | `finance-pay-invoice` | [`supabase/functions/finance-pay-invoice/`](../supabase/functions/finance-pay-invoice/) | Mints invoice pay-tokens (admin auth) + creates Checkout sessions for customer-initiated invoice payment (public token auth). Webhook reconciles back to `payments` + `payment_allocations`. |
 
 The edge functions stay co-located under `supabase/functions/` rather than moving into the module folder — they're deployed via Supabase's per-function deploy command, referenced from `deploy.yml` / `main.py` / `agent-chat`, and relocating them would be churn for zero behavior change.
@@ -124,5 +124,5 @@ See [docs/payments.md → Migration history](payments.md#migration-history) for 
 - [docs/payments.md](payments.md) — parent module + provider registry + ERP routing
 - [docs/billing-credits-system.md](billing-credits-system.md) — subscription + credit purchase flows (Stripe Checkout details)
 - [src/modules/payments-stripe/components/StripeConfigPanel.tsx](../src/modules/payments-stripe/components/StripeConfigPanel.tsx) — panel source
-- [supabase/functions/stripe-checkout/index.ts](../supabase/functions/stripe-checkout/index.ts) — Checkout session creation
+- [supabase/functions/stripe-checkout/index.ts](../supabase/functions/stripe-api/handlers/checkout.ts) — Checkout session creation
 - [supabase/functions/stripe-webhooks/index.ts](../supabase/functions/stripe-webhooks/index.ts) — webhook handler

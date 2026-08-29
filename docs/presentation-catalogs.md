@@ -132,7 +132,7 @@ Both cards are wired into [AgentHub.tsx](../src/components/features/ai/AgentHub.
 
 ## Database schema
 
-Migration: [supabase/migrations/20260508_presentation_catalogs_module.sql](../supabase/migrations/20260508_presentation_catalogs_module.sql) + view-events extension [20260508_catalog_view_events.sql](../supabase/migrations/20260508_catalog_view_events.sql).
+Migration: `../supabase/migrations/20260508_presentation_catalogs_module.sql` + view-events extension `../supabase/migrations/20260508_catalog_view_events.sql`.
 
 ### Tables
 
@@ -417,9 +417,9 @@ After pulling the branch:
 
 ### Database
 
-- [supabase/migrations/20260508_presentation_catalogs_module.sql](../supabase/migrations/20260508_presentation_catalogs_module.sql) — 5 tables + 4 enums + RLS + 5 storage buckets + `is_admin_user()` helper + module entry + default template seed.
-- [supabase/migrations/20260508_kai_prompt_catalogs_addendum.sql](../supabase/migrations/20260508_kai_prompt_catalogs_addendum.sql) — appends catalog tool guidance to the `kai` prompt row. Idempotent via `--END_PRESENTATION_CATALOGS_ADDENDUM--` marker.
-- [supabase/migrations/20260508_catalog_view_events.sql](../supabase/migrations/20260508_catalog_view_events.sql) — `catalog_view_events` table + enum + 2 atomic RPCs + `catalog_operations_summary` view.
+- `../supabase/migrations/20260508_presentation_catalogs_module.sql` — 5 tables + 4 enums + RLS + 5 storage buckets + `is_admin_user()` helper + module entry + default template seed.
+- `../supabase/migrations/20260508_kai_prompt_catalogs_addendum.sql` — appends catalog tool guidance to the `kai` prompt row. Idempotent via `--END_PRESENTATION_CATALOGS_ADDENDUM--` marker.
+- `../supabase/migrations/20260508_catalog_view_events.sql` — `catalog_view_events` table + enum + 2 atomic RPCs + `catalog_operations_summary` view.
 
 ### Backend (edge functions)
 

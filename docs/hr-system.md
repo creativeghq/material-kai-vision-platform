@@ -139,7 +139,7 @@ The `analytics` action returns headcount, active, on-leave-today, absence totals
 
 ## Credit metering
 
-All HR AI operations flow through [ai-meter.ts](../supabase/functions/hr-api/ai-meter.ts) so they are both **logged** to `ai_usage_logs` (`module_slug='hr'`, real model + token counts + raw/billed cost) and **charged usage-based credits** — not a fixed price. The model defaults to `claude-sonnet-4-6` (`HR_JOB_AI_MODEL` override); credits are `provider cost × markup ÷ $0.01/credit`.
+All HR AI operations flow through [ai-meter.ts](../supabase/functions/hr-api/ai-meter.ts) so they are both **logged** to `ai_usage_logs` (`module_slug='hr'`, real model + token counts + raw/billed cost) and **charged usage-based credits** — not a fixed price. The model defaults to `claude-sonnet-5` (`HR_JOB_AI_MODEL` override); credits are `provider cost × markup ÷ $0.01/credit`.
 
 Per security invariant #10, the flow is **reserve-before-spend**: each op pre-checks the balance against a conservative ceiling (job description 12, CV screening 20, accounting analyze/prepare 25), `reserveHrCredits()` debits that ceiling *before* the Claude call (serialising concurrent requests), and `meterHrAi()` afterwards refunds `reserved − actual` (or debits a small remainder if actual exceeded the ceiling). On AI/read failure the reservation is fully refunded via `refundHrCredits()`. `credits_used` is returned on each response.
 
