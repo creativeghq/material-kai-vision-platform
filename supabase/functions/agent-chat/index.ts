@@ -2039,8 +2039,21 @@ async function executeAgent(
   // would have died on `createQueryDatabaseTool()` rather than gaining the tool. Nothing
   // caught it because no AGENT_CONFIGS entry declares them, which made the whole branch
   // dead in both directions.
-  const needsOps = config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
-  const needsDb = config.tools.includes('queryDatabase');
+  /**
+   * `&& isAdmin` — the gate the comment beside these tools in AGENT_CONFIGS already CLAIMED (#395).
+   *
+   * That comment reads "`needsOps` / `needsDb` gate on this list AND on isAdmin at injection, so a
+   * non-admin never receives them". Neither line mentioned `isAdmin`, and neither did the three
+   * push sites below — unlike `needsPrice`, `needsTechRadar` and `needsCatalog`, which all do.
+   *
+   * It stopped being theoretical when `queryDatabase` was added to the JARVIS list: that agent is
+   * every user's, and `query_database` is a service-role reader with no tenancy of its own — the
+   * 20 most recent `background_jobs` platform-wide, `document_chunks` by any id, raw counts. A
+   * comment asserting a gate that does not exist is worse than no comment, because it is what the
+   * next reader checks instead of the code.
+   */
+  const needsOps = isAdmin && config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
+  const needsDb = isAdmin && config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'b2b_research_validate', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
@@ -3011,13 +3024,16 @@ async function executeAgent(
   }
 
   // --- Legacy/utility tools ---
-  if (config.tools.includes('queryDatabase')) {
+  // Admin-only at the push as well as at the module load (#395). Gating only the import would
+  // leave the factories undefined for a non-admin, which is a crash rather than a refusal — and
+  // one of these three reads across every tenant.
+  if (isAdmin && config.tools.includes('queryDatabase') && createQueryDatabaseTool) {
     tools.push(createQueryDatabaseTool());
   }
-  if (config.tools.includes('checkServerHealth')) {
+  if (isAdmin && config.tools.includes('checkServerHealth') && createCheckServerHealthTool) {
     tools.push(createCheckServerHealthTool());
   }
-  if (config.tools.includes('querySentry')) {
+  if (isAdmin && config.tools.includes('querySentry') && createQuerySentryTool) {
     tools.push(createQuerySentryTool());
   }
   // `estimate_cost` was registered here and listed by no AGENT_CONFIGS entry, so it was

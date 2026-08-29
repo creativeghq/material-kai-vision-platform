@@ -220,3 +220,16 @@ describe('#395 — the two tools that had no tenancy at all', () => {
     expect(fn.slice(0, 3000)).toMatch(/select\('title, created_by'\)\.eq\('id', doc_id\)\.eq\('workspace_id', workspaceId\)/);
   });
 });
+
+describe('#395 — the ops/db tools are admin-only, as their own comment claimed', () => {
+  it('both gates and all three push sites check isAdmin', () => {
+    // The AGENT_CONFIGS comment said "needsOps / needsDb gate on this list AND on isAdmin at
+    // injection, so a non-admin never receives them". Neither did. `queryDatabase` is on the
+    // JARVIS list — every user's agent — and reads across every tenant with no scoping of its own.
+    expect(agentChat).toMatch(/const needsOps = isAdmin && config\.tools\.some/);
+    expect(agentChat).toMatch(/const needsDb = isAdmin && config\.tools\.includes\('queryDatabase'\)/);
+    for (const t of ['queryDatabase', 'checkServerHealth', 'querySentry']) {
+      expect(agentChat, t).toContain(`if (isAdmin && config.tools.includes('${t}')`);
+    }
+  });
+});
