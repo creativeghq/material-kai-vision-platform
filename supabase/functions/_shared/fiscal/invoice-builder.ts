@@ -7,6 +7,7 @@
 
 import type { FiscalInvoiceInput, FiscalLine, FiscalParty } from './types.ts';
 import { isUnnamedLineName } from './types.ts';
+import { movePurposeLabel, isMydataMovePurpose } from './fiscalVocabulary.generated.ts';
 import { resolveContactBillingSource } from '../crm/party-inheritance.ts';
 
 /**
@@ -79,6 +80,58 @@ export interface FiscalOverrides {
    *  the payment method is forced to this type with the terminal id + NSP so Novus returns a
    *  provider signature (skipSignature=false) instead of transmitting straight to AADE. */
   posPayment?: { type: number; terminalId: string; posNspId: number };
+}
+
+/**
+ * Third parties on a movement, read off the document's `correlated_entities` jsonb.
+ *
+ * Stored jsonb is untrusted input, so this builds an ALLOWLISTED shape rather than spreading
+ * the column into the envelope (invariant 8). An entry with no VAT number identifies nobody
+ * and is dropped rather than transmitted blank.
+ */
+function correlatedEntitiesFrom(raw: unknown): FiscalInvoiceInput['header']['otherCorrelatedEntities'] {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out = raw.flatMap((e: any) => {
+    const vatNumber = String(e?.vatNumber ?? e?.vat_number ?? '').trim();
+    if (!vatNumber) return [];
+    const a = e?.address ?? {};
+    const address = [a.street, a.number, a.postalCode ?? a.postal_code, a.city].some((v: unknown) => String(v ?? '').trim())
+      ? {
+          street: String(a.street ?? ''), number: String(a.number ?? ''),
+          postalCode: String(a.postalCode ?? a.postal_code ?? ''), city: String(a.city ?? ''),
+        }
+      : undefined;
+    return [{
+      vatNumber,
+      country: String(e?.country ?? e?.country_code ?? 'GR'),
+      branch: Number(e?.branch ?? e?.branch_code ?? 0) || 0,
+      ...(e?.name ? { name: String(e.name) } : {}),
+      ...(address ? { address } : {}),
+    }];
+  });
+  return out.length ? out : undefined;
+}
+
+/**
+ * The stated purpose of a movement, or a refusal.
+ *
+ * Both movement builders used to read `move_purpose ? parseInt(...) || 1 : 1`, so an unset or
+ * unparseable purpose became **1 = Πώληση**. A movement document filed as a sale when it was a
+ * transfer, a return or a repair is a valid document making a false statement, and the code is
+ * the field an audit reads first. Refusing is recoverable; a wrong purpose on a registered
+ * document is not — the same reasoning as the unnamed-line and uncoded-unit guards in
+ * `novus.ts`.
+ */
+function assertMovePurpose(raw: unknown, subject: string): number {
+  const n = parseInt(String(raw ?? ''), 10);
+  if (!isMydataMovePurpose(n)) {
+    throw new Error(
+      `Refusing to transmit ${subject}: it carries no valid myDATA move purpose ` +
+        `(got ${JSON.stringify(raw)}). Set the purpose — use 19 "Other transfers" with a title ` +
+        `when the table has no exact match — before transmitting.`,
+    );
+  }
+  return n;
 }
 
 /** Inverse: the VAT percent myDATA expects for each category. 8 = without-VAT/exempt → 0. */
@@ -356,13 +409,22 @@ export async function buildInvoiceInputFromDb(
   // block so myDATA receives the transport details, same shape as a standalone 9.3.
   const movement = inv.has_shipping
     ? (() => {
-        const mp = inv.move_purpose ? parseInt(String(inv.move_purpose), 10) || 1 : 1;
+        // NO DEFAULT. `move_purpose ? ... : 1` filed every movement nobody classified as a
+        // SALE — a valid code, silently wrong, and the one purpose an auditor reads hardest.
+        const mp = assertMovePurpose(inv.move_purpose, `invoice ${invoiceId}`);
         return {
           dispatchDate: inv.transport_date ? String(inv.transport_date).slice(0, 10) : issueDate,
           dispatchTime: inv.transport_time || undefined,
           vehicleNumber: inv.vehicle_number || undefined,
           movePurpose: mp,
-          movePurposeLabel: MOVE_PURPOSE_LABELS[mp],
+          movePurposeLabel: movePurposeLabel(mp),
+          ...(inv.other_move_purpose_title ? { otherMovePurposeTitle: String(inv.other_move_purpose_title) } : {}),
+          // Goods leave the establishment that ISSUED the document unless told otherwise; they
+          // arrive at one of ours only on an internal transfer, so that end stays unset by
+          // default rather than guessing the issuing branch at both ends.
+          loadingBranch: inv.ship_from_branch_code ?? Number(inv.branch_code ?? 0) ?? 0,
+          ...(inv.ship_to_branch_code != null ? { deliveryBranch: Number(inv.ship_to_branch_code) } : {}),
+          ...(correlatedEntitiesFrom(inv.correlated_entities) ? { otherCorrelatedEntities: correlatedEntitiesFrom(inv.correlated_entities) } : {}),
           loadingAddress: {
             street: inv.ship_from || issuer.address?.street || '',
             number: issuer.address?.number ?? '', postalCode: issuer.address?.postalCode ?? '', city: issuer.address?.city ?? '',
@@ -597,11 +659,6 @@ export async function buildCreditNoteInputFromDb(
   };
 }
 
-const MOVE_PURPOSE_LABELS: Record<number, string> = {
-  1: 'SALES', 2: 'SALES_ON_BEHALF', 3: 'SAMPLING', 4: 'EXHIBITION',
-  5: 'RETURN', 6: 'INTER_BRANCH', 7: 'CONSIGNMENT',
-};
-
 /**
  * Build a myDATA 9.3 delivery-note (movement document) FiscalInvoiceInput from a
  * `delivery_notes` row + items. Movement docs carry no value — lines are netValue 0,
@@ -657,7 +714,7 @@ export async function buildDeliveryNoteInputFromDb(
     vatAmount: 0,
   }));
 
-  const movePurpose = dn.move_purpose ? parseInt(String(dn.move_purpose), 10) || 1 : 1;
+  const movePurpose = assertMovePurpose(dn.move_purpose, `delivery note ${deliveryNoteId}`);
   // Optional sub-units chosen as the loading / delivery point.
   const [fromUnit, toUnit] = await Promise.all([
     loadAddressUnit(supabase, dn.ship_from_address_unit_id),
@@ -692,7 +749,11 @@ export async function buildDeliveryNoteInputFromDb(
       dispatchTime: dn.transport_time || undefined,
       vehicleNumber: dn.vehicle_number || undefined,
       movePurpose,
-      movePurposeLabel: MOVE_PURPOSE_LABELS[movePurpose],
+      movePurposeLabel: movePurposeLabel(movePurpose),
+      ...(dn.other_move_purpose_title ? { otherMovePurposeTitle: String(dn.other_move_purpose_title) } : {}),
+      loadingBranch: dn.ship_from_branch_code ?? Number(dn.branch_code ?? 0) ?? 0,
+      ...(dn.ship_to_branch_code != null ? { deliveryBranch: Number(dn.ship_to_branch_code) } : {}),
+      ...(correlatedEntitiesFrom(dn.correlated_entities) ? { otherCorrelatedEntities: correlatedEntitiesFrom(dn.correlated_entities) } : {}),
       loadingAddress,
       deliveryAddress,
     },

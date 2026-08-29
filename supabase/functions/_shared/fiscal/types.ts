@@ -172,10 +172,35 @@ export interface FiscalInvoiceInput {
     dispatchDate?: string;   // YYYY-MM-DD
     dispatchTime?: string;   // HH:MM:SS
     vehicleNumber?: string;
-    movePurpose?: number;    // 1=sale, 2=sale-on-behalf, 3=sampling, 4=exhibition, 5=return, 6=inter-premises, 7=consignment
+    /** AADE Σκοπός Διακίνησης, 1..20 — `MYDATA_MOVE_PURPOSES` in the fiscal vocabulary is the
+     *  one table. The comment that used to sit here named 6 as "inter-premises" and 7 as
+     *  "consignment"; both are wrong (6 = storage, 7 = processing, and inter-premises is 8),
+     *  which is exactly why the codes are no longer described in prose at their use site. */
+    movePurpose?: number;
     movePurposeLabel?: string;
+    /** Required by AADE when `movePurpose` is 19 (Λοιπές Διακινήσεις) — the free-text name of
+     *  a purpose the table cannot express. Naming it is the alternative to approximating it
+     *  with a neighbouring code. */
+    otherMovePurposeTitle?: string;
     loadingAddress?: { street: string; number: string; postalCode: string; city: string };
     deliveryAddress?: { street: string; number: string; postalCode: string; city: string };
+    /** The ISSUER's establishment the goods are loaded from / delivered to
+     *  (`startShippingBranch` / `completeShippingBranch`). 0 = headquarters. Both were
+     *  HARDCODED to 0 in the connector while `finance_branches.branch_code` sat unused, so a
+     *  transfer between two of the operator's own premises was filed as HQ→HQ. */
+    loadingBranch?: number;
+    deliveryBranch?: number;
+    /** Third parties involved in the movement that are neither issuer nor counterpart — the
+     *  drop-ship case: goods leaving a supplier's warehouse for our customer. myDATA calls
+     *  this `otherCorrelatedEntities` inside `otherDeliveryNoteHeader`. Emitted only when
+     *  present, so the envelope shape is unchanged for an ordinary movement. */
+    otherCorrelatedEntities?: {
+      vatNumber: string;
+      country: string;
+      branch: number;
+      name?: string;
+      address?: { street: string; number: string; postalCode: string; city: string };
+    }[];
   };
   /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
   correlatedInvoices?: number[];

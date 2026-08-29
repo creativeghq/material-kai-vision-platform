@@ -170,6 +170,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
 import {
   type PaymentMethod, isPaymentMethod, mydataPaymentLabel,
 } from '../_shared/paymentVocabulary.generated.ts';
+import { movePurposeLabel } from '../_shared/fiscal/fiscalVocabulary.generated.ts';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
@@ -1300,7 +1301,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
       inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
       inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
       inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
-      inv.move_purpose ? `${L.purpose}: ${inv.move_purpose}` : '',
+      // The NAME, not the bare code — the twin of the same line in renderData.ts.
+      inv.move_purpose ? `${L.purpose}: ${movePurposeLabel(inv.move_purpose, lang)}` : '',
     ].filter(Boolean);
     for (const m of mv) { text(m, M, y, 8.5, font, MUTED); y -= 11; }
     y -= 4;

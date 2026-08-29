@@ -56,6 +56,27 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     );
   }
 
+  // A MOVEMENT DOCUMENT NEEDS REAL ADDRESSES. myDATA requires a complete loading and delivery
+  // address the moment a document carries transport details, and the builders reach them through
+  // a fallback chain (per-note fields → sub-unit → issuer/counterpart) whose last step is `''`.
+  // So a customer with no address on file produced a 9.3 with a blank delivery point — and the
+  // counterpart block below fills a missing postcode with '0' and a missing city with 'NONE',
+  // which is worse than blank: it is a plausible-looking placeholder on a registered document.
+  // Blocking is recoverable; a movement filed to nowhere is not.
+  if (header.movePurpose != null) {
+    const incomplete = ([['loading', header.loadingAddress], ['delivery', header.deliveryAddress]] as const)
+      .filter(([, a]) => !a || !String(a.street ?? '').trim() || !String(a.city ?? '').trim() || !String(a.postalCode ?? '').trim())
+      .map(([which]) => which);
+    if (incomplete.length) {
+      throw new Error(
+        `Refusing to transmit a movement document: the ${incomplete.join(' and ')} address ` +
+          `${incomplete.length > 1 ? 'are' : 'is'} incomplete. myDATA needs a street, postal code ` +
+          `and city at both ends — fill them in on the document (or on the party it defaults to) ` +
+          `before transmitting.`,
+      );
+    }
+  }
+
   const invoiceDetails = lines.map((l) => ({
     lineNumber: l.lineNumber,
     lineCode: l.code ?? undefined,
@@ -141,11 +162,23 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
                 otherDeliveryNoteHeader: {
                   ...(header.loadingAddress ? { loadingAddress: header.loadingAddress } : {}),
                   ...(header.deliveryAddress ? { deliveryAddress: header.deliveryAddress } : {}),
-                  startShippingBranch: 0,
-                  completeShippingBranch: 0,
+                  // The ISSUER's establishments. Both were hardcoded 0 while
+                  // `finance_branches.branch_code` existed, so an Ενδοδιακίνηση between two of
+                  // the operator's own premises was filed as headquarters → headquarters.
+                  startShippingBranch: header.loadingBranch ?? 0,
+                  completeShippingBranch: header.deliveryBranch ?? 0,
+                  // Third parties on the movement (drop-ship: goods leaving a supplier's
+                  // warehouse for our customer). Omitted entirely when there are none, so the
+                  // envelope is byte-identical to before for an ordinary movement — the same
+                  // arrangement as the B2G block.
+                  ...(header.otherCorrelatedEntities?.length
+                    ? { otherCorrelatedEntities: header.otherCorrelatedEntities }
+                    : {}),
                 },
                 movePurpose: header.movePurpose,
                 ...(header.movePurposeLabel ? { movePurposeLabel: header.movePurposeLabel } : {}),
+                // AADE requires the free-text name when the purpose is 19 (Λοιπές Διακινήσεις).
+                ...(header.otherMovePurposeTitle ? { otherMovePurposeTitle: header.otherMovePurposeTitle } : {}),
               }
             : {}),
         },

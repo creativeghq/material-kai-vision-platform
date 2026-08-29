@@ -11,6 +11,7 @@ import { resolvePrintedCounterparty, applyAddressUnit, partyAddressLines } from 
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
+import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 
 export interface BuildRenderInput {
   invoice: Record<string, any>;
@@ -244,7 +245,9 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
       inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
       inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
-      inv.move_purpose ? `${L.purpose}: ${inv.move_purpose}` : '',
+      // The NAME, not the bare code. "Purpose: 7" tells the reader of a movement document
+      // nothing; the driver and the inspector holding it need the words.
+      inv.move_purpose ? `${L.purpose}: ${movePurposeLabel(inv.move_purpose, lang)}` : '',
     ].filter(Boolean) as string[];
     if (sr.length) shipping = { rows: sr };
   }

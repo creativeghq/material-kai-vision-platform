@@ -37,6 +37,7 @@ import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { MYDATA_PAYMENT_CODE } from '@/modules/finance/paymentVocabulary';
+import { SELECTABLE_MOVE_PURPOSES } from '@/services/fiscal/fiscalVocabulary';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import { projectIdentity, variantKey, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
@@ -139,10 +140,6 @@ const DETAIL_TYPE_DOC_CODES = new Set(['1.5']);
 // The four document types offered as quick-pick chips; everything else lives in the "More types" dropdown.
 const COMMON_DOC_CODES = ['1.1', '2.1', '11.1', '9.3'];
 
-const MOVE_PURPOSES: [string, string][] = [
-  ['1', 'Sale'], ['2', 'Sale on behalf of third party'], ['3', 'Sampling'], ['4', 'Exhibition'],
-  ['5', 'Return'], ['6', 'Movement between premises'], ['7', 'Consignment'],
-];
 
 /** A myDATA tax-category reference row (withholding / fees / other taxes / stamp duty). */
 type TaxRef = { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' };
@@ -1312,7 +1309,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     <Label className="text-[10px] text-muted-foreground">Purpose</Label>
                     <Select value={movePurpose} onValueChange={setMovePurpose}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{MOVE_PURPOSES.map(([v, lbl]) => <SelectItem key={v} value={v}>{v} — {lbl}</SelectItem>)}</SelectContent>
+                      <SelectContent>{SELECTABLE_MOVE_PURPOSES.map((p) => <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>

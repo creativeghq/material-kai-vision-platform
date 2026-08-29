@@ -25,6 +25,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
+import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
@@ -33,15 +34,6 @@ import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentD
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { formatDate } from '@/utils/datetime';
 
-const MOVE_PURPOSE_LABELS: Record<string, string> = {
-  '1': 'Sale',
-  '2': 'Sale on behalf of third party',
-  '3': 'Sampling',
-  '4': 'Exhibition',
-  '5': 'Return',
-  '6': 'Movement between premises',
-  '7': 'Consignment',
-};
 
 const InvoiceDetailPage: React.FC = () => {
   const { invoiceId } = useParams<{ invoiceId: string }>();
@@ -453,7 +445,7 @@ const InvoiceDetailPage: React.FC = () => {
               ['Time', (invoice as any).transport_time],
               ['Vehicle no.', (invoice as any).vehicle_number],
               ['Responsible', (invoice as any).responsible],
-              ['Purpose', MOVE_PURPOSE_LABELS[(invoice as any).move_purpose as string] ?? (invoice as any).move_purpose],
+              ['Purpose', movePurposeLabel((invoice as any).move_purpose)],
             ].map(([label, value]) => (
               <div key={label as string} className="flex justify-between gap-3">
                 <span className="text-muted-foreground">{label}</span>
