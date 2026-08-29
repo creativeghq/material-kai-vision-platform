@@ -70,7 +70,18 @@ export const CreditReleasesCard: React.FC<{
   // record would be noise on hundreds of them.
   if (!loading && rows.length === 0) return null;
 
-  const total = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
+  /**
+   * One total PER CURRENCY, never one number.
+   *
+   * The rows each print their own currency and the header printed a bare sum, which `formatMoney`
+   * labels EUR by default — so a party with a dollar release and a euro release got the two added
+   * together and stamped with the wrong symbol, under the words "Kept as income". A cross-currency
+   * sum is a confident figure in no currency at all, and nothing about it looks wrong.
+   */
+  const totalsByCurrency = [...rows.reduce((m, r) => {
+    const ccy = r.currency || 'EUR';
+    return m.set(ccy, (m.get(ccy) ?? 0) + Number(r.amount || 0));
+  }, new Map<string, number>())].sort(([a], [b]) => a.localeCompare(b));
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? 'Uncategorized';
 
   return (
@@ -81,7 +92,9 @@ export const CreditReleasesCard: React.FC<{
         </CardTitle>
         {/* The number the operator actually asked for: how much of this party's money ended up as
             profit, in one figure, next to the individual acts that produced it. */}
-        <span className="text-sm font-semibold text-emerald-500 tabular-nums">{formatMoney(total)}</span>
+        <span className="flex items-baseline gap-2 text-sm font-semibold text-emerald-500 tabular-nums">
+          {totalsByCurrency.map(([ccy, amount]) => <span key={ccy}>{formatMoney(amount, ccy)}</span>)}
+        </span>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (

@@ -1333,7 +1333,10 @@ export const ordersService = {
 
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
-    supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
+    supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string;
+      // Who the bill is FROM — needed to compare it against what this order's lines say that
+      // supplier's goods cost. Without it the two records of one cost cannot be reconciled at all.
+      supplier_company_id: string | null; supplier_name: string | null }>;
     payments: Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null;
       /**
        * The documents this cash actually settled, read from `payment_allocations` — the link the
@@ -1354,7 +1357,6 @@ export const ordersService = {
       settled_on_order: number }>;
     received: number;
     paid_out: number;
-    profit: number;
     // Canonical settlement from `get_order_settlements` — the same definition that drives
     // `payment_status` and the drift check. Unlike `received`/`paid_out` (which only see cash
     // whose `payments.order_id` = this order) it also counts credit re-homed onto the order from
@@ -1387,7 +1389,7 @@ export const ordersService = {
   }> {
     const [inv, bills, pay, alloc, settlement, blocks] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
+      supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency, supplier_company_id, supplier_name').eq('order_id', orderId),
       // The allocations come with the payment: the target is whichever *_id FK is set, and each
       // one is embedded so the row can NAME what it settled without a second lookup.
       supabase.from('payments').select(`id, direction, amount, currency, paid_at, method, reference, notes, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name,
@@ -1473,8 +1475,14 @@ export const ordersService = {
     const b = ((settlement.data ?? []) as OrderBalance[])[0];
     return {
       invoices: (inv.data ?? []) as Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
-      supplierBills: (bills.data ?? []) as Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
-      payments, received, paid_out, profit: received - paid_out,
+      supplierBills: (bills.data ?? []) as Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string; supplier_company_id: string | null; supplier_name: string | null }>,
+      // `profit: received - paid_out` was here and is DELETED, not renamed. It was cash wearing
+      // the word profit, with no readers left — both would-be call sites already recompute it
+      // netting the covering order's cash. A field named profit that holds cash only has to be
+      // rendered once to become a lie on screen, and the type is a stronger guard than the
+      // regex that was watching for it. Net cash is `received - paid_out - coverPaid`, and it
+      // is a PANEL quantity: only the panel knows about the covering order.
+      payments, received, paid_out,
       settled_in: Number(b?.settled_in ?? 0), settled_out: Number(b?.settled_out ?? 0),
       settled: Number(b?.settled ?? 0), outstanding: Number(b?.outstanding ?? 0),
       payment_status: (b?.payment_status ?? 'unpaid') as OrderPaymentStatus,
@@ -2202,6 +2210,89 @@ export const ordersService = {
         paid: p, owed: Math.round((gross - p) * 100) / 100,
       };
     });
+  },
+
+  /**
+   * Purchase orders that look like they were placed to fulfil THIS sale, but say nothing about it.
+   *
+   * `covers_order_id` is the link, and it is only ever written when the purchase is raised FROM the
+   * sale. Buy the goods first — the ordinary way round when a supplier has stock — and the two
+   * halves of one trade sit on separate screens with nothing connecting them: the sale reports that
+   * no cost is booked against it while the money sits, paid, on the purchase order. Nothing is
+   * wrong with either record, which is why it stays that way indefinitely.
+   *
+   * A candidate is deliberately narrow: same workspace, same currency, not cancelled, covering
+   * nothing yet, and bought from a supplier this sale's own lines name. That last condition is what
+   * keeps it a suggestion rather than a list of every purchase order you have ever placed.
+   *
+   * Returns what the operator needs to judge it — the PO's total against what this sale's lines say
+   * that supplier's goods cost — and never links anything by itself. Two orders from one supplier
+   * in the same week are not necessarily the same trade, and only a person knows.
+   */
+  async suggestCoveringOrders(salesOrderId: string): Promise<Array<{
+    id: string; order_number: string | null; status: string; total: number; currency: string;
+    supplier_company_id: string; supplier_name: string;
+    /** What this SALE's lines say that supplier's goods cost, VAT-inclusive — the comparison. */
+    line_cost: number;
+    created_at: string;
+  }>> {
+    const { data: sale } = await supabase.from('orders')
+      .select('id, workspace_id, currency, order_type').eq('id', salesOrderId).maybeSingle();
+    const o = sale as { id: string; workspace_id: string; currency: string; order_type: string } | null;
+    if (!o || o.order_type !== 'sales') return [];
+
+    const [{ data: items }, costs] = await Promise.all([
+      supabase.from('order_items').select('id, supplier_company_id, quantity, vat_percent').eq('order_id', salesOrderId),
+      this.orderItemCosts([salesOrderId]).catch(() => new Map<string, number>()),
+    ]);
+    const costBySupplier = new Map<string, number>();
+    for (const it of (items ?? []) as Array<{ id: string; supplier_company_id: string | null; quantity: number; vat_percent: number | null }>) {
+      if (!it.supplier_company_id) continue;
+      const unit = costs.get(it.id);
+      if (unit == null) continue;
+      const net = Number(unit) * Number(it.quantity);
+      const gross = net * (1 + (Number(it.vat_percent ?? 0) || 0) / 100);
+      costBySupplier.set(it.supplier_company_id, (costBySupplier.get(it.supplier_company_id) ?? 0) + gross);
+    }
+    if (costBySupplier.size === 0) return [];
+
+    const { data: pos } = await supabase.from('orders')
+      .select('id, order_number, status, total, currency, supplier_company_id, created_at')
+      .eq('workspace_id', o.workspace_id)
+      .eq('order_type', 'purchase')
+      .eq('currency', o.currency)
+      .neq('status', 'cancelled')
+      .is('covers_order_id', null)
+      .in('supplier_company_id', [...costBySupplier.keys()])
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const rows = (pos ?? []) as Array<{
+      id: string; order_number: string | null; status: string; total: number; currency: string;
+      supplier_company_id: string; created_at: string;
+    }>;
+    if (rows.length === 0) return [];
+    const names = await this.getCompanyNames(rows.map((r) => r.supplier_company_id)).catch(() => new Map<string, string>());
+    return rows.map((r) => ({
+      ...r,
+      total: Number(r.total),
+      supplier_name: names.get(r.supplier_company_id) ?? 'Supplier',
+      line_cost: Math.round((costBySupplier.get(r.supplier_company_id) ?? 0) * 100) / 100,
+    }));
+  },
+
+  /**
+   * Record that a purchase order was placed to fulfil a sale. Writes the same column
+   * `raise_cover_purchase_orders` writes, so everything downstream — the sale's "Covered by" block,
+   * the supplier-owed figure that defers to the purchase's own settlement — starts working with no
+   * further change. Pass `null` to unlink.
+   */
+  async setCoveringOrder(purchaseOrderId: string, salesOrderId: string | null): Promise<void> {
+    const { error } = await supabase.from('orders')
+      .update({ covers_order_id: salesOrderId, updated_at: new Date().toISOString() })
+      .eq('id', purchaseOrderId)
+      .eq('order_type', 'purchase');
+    if (error) throw error;
   },
 
   /** Batch list-price lookup for a set of products (order detail shows discount-vs-list). */

@@ -41,6 +41,7 @@ import {
   type SalesDocumentKind,
 } from '@/modules/finance/utils/salesDocumentKind';
 import { statusTone } from '@/modules/finance/utils/statusTone';
+import { auditOrderCosts, describeCostFinding } from '@/modules/finance/utils/orderCostAudit';
 import { splitByVatRate, splitGrossLikeTotals } from '@/modules/finance/utils/vatSplit';
 import { warehouseService } from '@/services/warehouseService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -1975,9 +1976,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    * been writing `covers_order_id` since it shipped and nothing ever displayed it, so the POs it
    * created looked unrelated to the sale that caused them.
    */
+  /** Bumped after linking a covering purchase order, so both effects below re-read. */
+  const [reloadCovers, setReloadCovers] = useState(0);
   const [coveredBy, setCoveredBy] = useState<Array<{
     id: string; order_number: string | null; status: string; total: number; currency: string;
-    supplier_company_id: string | null; settled: number; outstanding: number;
+    supplier_company_id: string | null;
+    /** null = the settlement could not be read. NOT zero — see the read below (#351 A3). */
+    settled: number | null; outstanding: number | null;
   }>>([]);
   useEffect(() => {
     let cancelled = false;
@@ -1991,17 +1996,52 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       // How much of that purchase is actually settled comes from `orderBalances` —
       // `get_order_settlements`, the one derivation. Re-summing allocations here would be the
       // sixth implementation of a money quantity that already has an answer.
-      const bal = rows.length ? await ordersService.orderBalances(rows.map((r) => r.id)).catch(() => new Map()) : new Map();
+      /**
+       * A settlement that could not be read is UNKNOWN, not zero (#351 A3).
+       *
+       * The old fallback was `settled: 0` / `outstanding: total` — which is not "we do not know",
+       * it is a local re-derivation, and the comment directly above warns that re-summing here
+       * "would be the sixth implementation of a money quantity". A fully-paid covering PO rendered
+       * as still owed, so the line menu offered "Mark the supplier paid" for goods already paid.
+       */
+      let bal: Map<string, { settled: number; outstanding: number }> | null = null;
+      if (rows.length) {
+        try {
+          bal = await ordersService.orderBalances(rows.map((r) => r.id));
+        } catch (balErr) {
+          console.error('[orders] covering-PO settlement unavailable', balErr);
+          bal = null;
+        }
+      } else {
+        bal = new Map();
+      }
       if (!cancelled) {
         setCoveredBy(rows.map((r) => ({
           ...r,
-          settled: Number(bal.get(r.id)?.settled ?? 0),
-          outstanding: Number(bal.get(r.id)?.outstanding ?? Number(r.total)),
+          // `null` means "not known", and the renderers below say so rather than printing a figure.
+          settled: bal ? Number(bal.get(r.id)?.settled ?? 0) : null,
+          outstanding: bal ? Number(bal.get(r.id)?.outstanding ?? Number(r.total)) : null,
         })));
       }
     })();
     return () => { cancelled = true; };
-  }, [order?.id, order?.order_type]);
+  }, [order?.id, order?.order_type, reloadCovers]);
+
+  /**
+   * Purchase orders that look like they bought the goods for this sale but say so nowhere. Only
+   * fetched when NOTHING already covers the sale — once the link exists the question is answered,
+   * and a panel that keeps suggesting more is noise.
+   */
+  const [coverSuggestions, setCoverSuggestions] = useState<Awaited<ReturnType<typeof ordersService.suggestCoveringOrders>>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order || order.order_type !== 'sales' || coveredBy.length > 0) { setCoverSuggestions([]); return; }
+      const rows = await ordersService.suggestCoveringOrders(order.id).catch(() => []);
+      if (!cancelled) setCoverSuggestions(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.order_type, coveredBy.length, reloadCovers]);
 
   /**
    * The tabs, in reading order. EVERY tab an order of this type can have is offered, whether or
@@ -2085,7 +2125,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    */
   const supplierOwedAfterCover = useCallback((s: { supplier_company_id: string; owed: number }) => {
     const po = coveredBy.find((c) => c.supplier_company_id === s.supplier_company_id);
-    return { po, owed: Math.max(0, po ? po.outstanding : s.owed) };
+    // An unread settlement falls back to the LINE's own owed figure rather than to `total` — the
+    // covering PO's outstanding is unknown, so deferring to it would state a number we do not
+    // have (#351 A3).
+    return { po, owed: Math.max(0, po && po.outstanding != null ? po.outstanding : s.owed) };
   }, [coveredBy]);
 
   // The customer's standing exemption cause. Read from whichever party the sale is with, in the
@@ -2665,6 +2708,31 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    * stop agreeing.
    */
   const anyCost = items.some((it) => it.unit_cost != null);
+  /**
+   * Does the order's costing agree with what has been booked against it? The rules live in
+   * `orderCostAudit` so this panel and its guard test cannot answer differently.
+   *
+   * Cheap to compute and it needs both halves in scope at once, which is only true here: the lines
+   * carry the costing the margin is built from, `fin.supplierBills` carries the payables. Nothing
+   * downstream can compare them, because each half is individually valid.
+   */
+  const costFindings = useMemo(() => {
+    if (!order || order.order_type !== 'sales') return [];
+    return auditOrderCosts({
+      lines: items.map((it) => ({
+        supplier_company_id: it.supplier_company_id ?? null,
+        quantity: it.quantity, unit_cost: it.unit_cost, vat_percent: it.vat_percent,
+        net_value: it.net_value, line_total: it.line_total, description: it.description,
+      })),
+      bills: (fin?.supplierBills ?? []).map((b) => ({
+        id: b.id, supplier_company_id: b.supplier_company_id ?? null,
+        total: b.total, amount_due: b.amount_due, status: b.status,
+        supplier_label: b.supplier_name ?? null,
+      })),
+      supplierNames,
+    });
+  }, [order, items, fin?.supplierBills, supplierNames]);
+
   const orderMargin = order && anyCost
     ? items.reduce((a, it) => a + (Number(it.net_value) || 0) - ((Number(it.unit_cost) || 0) * (Number(it.quantity) || 0)), 0)
     : null;
@@ -2802,7 +2870,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    * money OUT). This only ADDS UP answers the derivation gave; it does not re-derive one, and it
    * cannot double-count — a payment carries a single `order_id`.
    */
-  const coverPaid = coveredBy.reduce((a, c) => a + c.settled, 0);
+  /**
+   * Cash paid on the covering orders. `null` settlements are EXCLUDED and flagged rather than
+   * counted as 0 (#351 A3) — a covering PO whose settlement we could not read would otherwise
+   * make "net cash" look better than it is.
+   */
+  const coverPaid = coveredBy.reduce((a, c) => a + (c.settled ?? 0), 0);
+  const coverSettlementUnknown = coveredBy.some((c) => c.settled == null);
 
   // The CRM record this order is with — same derivation the name fetch used.
   const party = order ? orderPartyRef(order) : null;
@@ -3640,6 +3714,24 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     </Button>
                   )}
                 </div>
+                {/* The margin figure is only as good as the costing behind it, and this is the one
+                    screen where the money actually gets taken — so a disagreement between the two
+                    records of cost has to be visible HERE, not only on the tab where it is fixed.
+                    Says the figure may be wrong; never blocks the take, because the operator may
+                    well know the costing is right. */}
+                {costFindings.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('expenses')}
+                    className="flex w-full items-center gap-1.5 rounded-sm border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-left text-[11px] text-amber-700 hover:bg-amber-500/15 dark:text-amber-400"
+                  >
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    <span>
+                      {costFindings.length === 1 ? 'One cost on this order does not add up' : `${costFindings.length} costs on this order do not add up`}
+                      {' '}— this figure may be too high. Check them.
+                    </span>
+                  </button>
+                )}
                 {/* The trail, with the undo beside it. Without this an allocation is a number that
                     changed for reasons the next person cannot see. */}
                 {profitAllocs.map((a) => (
@@ -3691,12 +3783,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   <div className="rounded-md border border-border/60 p-2">
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                       Net cash (in − out)
-                      <span title="Cash in the bank now. It differs from Profit because part of the profit is still unpaid (customer / suppliers) and because VAT you've collected sits here until you remit it to the tax office.">ⓘ</span>
+                      <span title="What this order has left in the bank: money in less money out. Not profit — it still contains VAT you owe the tax office, and any of the customer's money that is not settled against anything.">ⓘ</span>
                     </div>
-                    {/* `fin.profit` is received − paid_out and so misses the covering order's cash
-                        exactly as the tile beside it did. Netting the two figures SHOWN here keeps
-                        the row internally consistent — a net cash that disagrees with the two
-                        halves printed next to it is how the last settlement bug read. */}
+                    {/* Netting the two figures SHOWN here keeps the row internally consistent — a
+                        net cash that disagrees with the two halves printed next to it is how the
+                        last settlement bug read. (The service used to expose a ready-made
+                        `profit: received - paid_out` that missed the covering order's cash; it has
+                        been deleted rather than renamed, so there is nothing left to render.) */}
                     <div className={`text-sm font-semibold ${fin.received - fin.paid_out - coverPaid >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.received - fin.paid_out - coverPaid, order.currency)}</div>
                   </div>
                 )}
@@ -3721,12 +3814,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   {supplierOwed > 0.005 && (
                     <div className="flex justify-between"><span className="text-muted-foreground">— you still owe suppliers</span><span className="tabular-nums text-red-400">{formatMoney(supplierOwed, order.currency)}</span></div>
                   )}
-                  {/* THE SAME NETTING AS THE TILE ABOVE (#351 A4).
-                      `fin.profit` is `received - paid_out` and misses the covering order's cash —
-                      the tile beside it already nets `coverPaid`, and the comment there says so.
-                      Rendering the raw figure here put "Paid to suppliers 600 / Net cash 400" a
-                      few centimetres above "Cash in bank now 1,000" on one screen. One derivation,
-                      or the screen argues with itself. */}
+                  {/* THE SAME NETTING AS THE TILE ABOVE (#351 A4). The tile beside it nets
+                      `coverPaid` and so does this. Rendering the un-netted figure here once put
+                      "Paid to suppliers 600 / Net cash 400" a few centimetres above "Cash in bank
+                      now 1,000" on one screen. One derivation, or the screen argues with itself. */}
                   <div className="flex justify-between border-t border-border/50 pt-1 font-medium"><span>Cash in bank now</span><span className={`tabular-nums ${fin.received - fin.paid_out - coverPaid >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.received - fin.paid_out - coverPaid, order.currency)}</span></div>
                   <p className="text-[10px] text-muted-foreground pt-0.5">Profit is earned when you sell; cash is what's actually landed. The difference is unpaid balances plus VAT you're holding for the tax office — not lost money.</p>
                 </div>
@@ -3869,6 +3960,112 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </TabsContent>
 
               <TabsContent value="expenses" className="mt-3 space-y-3">
+            {/* Does the costing agree with what has been booked? An order records its cost twice —
+                on the lines (which is the ONLY thing the margin reads) and as expense documents
+                (which is the payable) — and until this block nothing compared them. Each half is
+                individually valid, so a disagreement produced no error anywhere: a duplicated
+                expense reads as a live debt already settled through its twin, and a cost booked
+                only as an expense leaves the margin overstated by its whole amount.
+
+                Stated, never auto-corrected. Two identical instalments are a real thing; only the
+                operator can tell them from one cost entered twice. */}
+            {costFindings.length > 0 && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5">
+                <div className="flex items-center gap-1.5 border-b border-amber-500/30 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Costs to check ({costFindings.length})
+                </div>
+                {costFindings.map((f, i) => (
+                  <div key={`${f.kind}-${i}`} className="border-t border-amber-500/20 px-3 py-2 text-xs first:border-t-0">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-medium">
+                        {f.kind === 'duplicate_expense' && 'Possible duplicate expense'}
+                        {f.kind === 'cost_outside_margin' && 'Cost the margin does not include'}
+                        {f.kind === 'line_without_cost' && 'Lines with no cost'}
+                      </span>
+                      <span className="tabular-nums shrink-0 text-amber-700 dark:text-amber-400">
+                        {f.kind === 'line_without_cost'
+                          ? `${formatMoney(f.revenue, order.currency)} of revenue`
+                          : formatMoney(f.amount, order.currency)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-muted-foreground">{describeCostFinding(f)}</p>
+                    {/* The bills it is talking about, openable right here — a warning naming
+                        documents you cannot reach is a warning nobody acts on. */}
+                    {f.kind !== 'line_without_cost' && (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        {f.billIds.map((id) => {
+                          const b = fin?.supplierBills.find((x) => x.id === id);
+                          return (
+                            <button key={id} type="button"
+                              className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
+                              onClick={() => setPaymentsExpenseId(id)}>
+                              {b?.supplier_bill_number ?? id.slice(0, 8)}
+                              {b ? ` · ${humanizeLabel(b.status)}` : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* A purchase that looks like it bought the goods for this sale and says so nowhere.
+                The link is only ever written when the purchase is raised FROM the sale, so buying
+                first — the ordinary way round when a supplier has stock — leaves the two halves of
+                one trade on separate screens with nothing connecting them. Neither record is wrong,
+                which is why it stays that way: the sale reports no cost booked against it while the
+                money sits, paid, on the other order.
+
+                Offered, never applied automatically. Two orders from one supplier in the same week
+                are not necessarily the same trade. */}
+            {coverSuggestions.length > 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  Bought for this sale? — purchase orders from the same suppliers, covering nothing
+                </div>
+                {coverSuggestions.map((po) => (
+                  <div key={po.id} className="flex flex-wrap items-center gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                    <span className="min-w-0">
+                      <Link to={`${financeBase}/orders/${po.id}`} className="font-medium hover:underline">
+                        {po.order_number ?? po.id.slice(0, 8)}
+                      </Link>
+                      <span className="text-muted-foreground"> · {po.supplier_name} · {humanizeLabel(po.status)}</span>
+                      {/* The two figures side by side ARE the judgement: a purchase whose total
+                          matches what this sale's lines say those goods cost is almost certainly
+                          the same trade, and one that does not is almost certainly not. */}
+                      <span className="block text-[11px] text-muted-foreground">
+                        {formatMoney(po.total, po.currency)} bought · {formatMoney(po.line_cost, order.currency)} is what this sale says those goods cost
+                      </span>
+                    </span>
+                    <Button
+                      size="sm" variant="outline" className="ml-auto h-7 text-[11px]"
+                      disabled={saving}
+                      onClick={async () => {
+                        setSaving(true);
+                        try {
+                          await ordersService.setCoveringOrder(po.id, order.id);
+                          toast({
+                            title: 'Linked',
+                            description: `${po.order_number ?? 'That purchase order'} now covers this sale. What we owe ${po.supplier_name} is read from it.`,
+                          });
+                          setReloadCovers((n) => n + 1);
+                          await load(order.id);
+                          onChanged();
+                        } catch (err: unknown) {
+                          toast({ title: 'Could not link', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                        } finally { setSaving(false); }
+                      }}
+                    >
+                      <Link2 className="h-3 w-3 mr-1" /> It covers this sale
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* The purchase orders raised to cover this sale. It lives with the expenses because
                 that is what it is — the cost side of this order, alongside the bills booked on it —
                 rather than a loose block wedged between the order's own summary and its lines.
