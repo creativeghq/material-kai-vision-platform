@@ -175,7 +175,12 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
           <div className="space-y-3">
             <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1"><Smartphone className="h-3.5 w-3.5" /> Public kiosk</div>
             <Row label="Enable public clock-in page" hint="Employees clock in by VAT number at /{workspace}/clockin"><Switch checked={s.kiosk_enabled} onCheckedChange={(v) => set('kiosk_enabled', v)} /></Row>
-            <Row label="Require a PIN" hint="Second factor on top of the VAT number (set per employee)"><Switch checked={s.kiosk_require_pin} onCheckedChange={(v) => set('kiosk_require_pin', v)} /></Row>
+            {/* A PIN is mandatory as of #354 HR-6 — the kiosk is an anonymous endpoint writing a
+                statutory attendance record, and a VAT number is not a secret (it is on every
+                payslip). The switch stays visible so the requirement is stated where operators
+                look for it, but it is not a switch any more: one that no longer changes anything
+                is the same defect this audit filed against the finance digest. */}
+            <Row label="Require a PIN" hint="Always on — a VAT number alone is not proof of identity. Set each employee's PIN in HR → Employees."><Switch checked disabled /></Row>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label className="text-xs">Timezone</Label><Input value={s.timezone} onChange={(e) => set('timezone', e.target.value)} className="font-mono text-sm" /></div>
               <div className="space-y-1"><Label className="text-xs">Late grace (min)</Label><Input type="number" min={0} value={s.late_grace_minutes} onChange={(e) => set('late_grace_minutes', Number(e.target.value) || 0)} /></div>

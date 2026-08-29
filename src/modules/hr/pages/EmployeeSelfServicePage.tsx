@@ -30,7 +30,15 @@ export default function EmployeeSelfServicePage() {
   const [absences, setAbsences] = useState<SelfAbsence[]>([]);
   const [docs, setDocs] = useState<SelfDocument[]>([]);
   const [punches, setPunches] = useState<SelfPunch[]>([]);
-  const [currentlyIn, setCurrentlyIn] = useState(false);
+  /**
+   * null = we could not read it (#354 HR-13).
+   *
+   * The punch read was caught into `{ punches: [], clocked_in: false }`, so an employee who IS
+   * clocked in saw "You are clocked out" and a Clock-in button — and pressing it inserts a second
+   * arrival, which is exactly the out-of-order pair that makes the day's hours wrong. An unknown
+   * state offers no action; it offers a retry.
+   */
+  const [currentlyIn, setCurrentlyIn] = useState<boolean | null>(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -38,7 +46,10 @@ export default function EmployeeSelfServicePage() {
     if (!ws) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [p, o, t, d, pu] = await Promise.all([hrService.selfProfile(ws), hrService.selfOnboarding(ws), hrService.selfTimeoff(ws), hrService.selfDocuments(ws), hrService.selfPunches(ws).catch(() => ({ punches: [] as SelfPunch[], clocked_in: false }))]);
+      const [p, o, t, d, pu] = await Promise.all([hrService.selfProfile(ws), hrService.selfOnboarding(ws), hrService.selfTimeoff(ws), hrService.selfDocuments(ws), hrService.selfPunches(ws).catch((err) => {
+        console.error('[hr] could not read your punches', err);
+        return { punches: [] as SelfPunch[], clocked_in: null as boolean | null };
+      })]);
       setProfile(p.profile); setTasks(o.tasks); setAbsences(t.absences); setDocs(d.documents); setPunches(pu.punches); setCurrentlyIn(pu.clocked_in);
     } catch (e) { toast({ title: 'Could not load your HR info', description: (e as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
@@ -93,9 +104,16 @@ export default function EmployeeSelfServicePage() {
             <Card>
               <CardContent className="flex flex-col items-center gap-4 py-8">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className={`h-2.5 w-2.5 rounded-full ${currentlyIn ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
-                  {currentlyIn ? 'You are clocked in' : 'You are clocked out'}
+                  <span className={`h-2.5 w-2.5 rounded-full ${currentlyIn === null ? 'bg-amber-500' : currentlyIn ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
+                  {currentlyIn === null
+                    ? 'We could not read your punches — your clock state is unknown'
+                    : currentlyIn ? 'You are clocked in' : 'You are clocked out'}
                 </div>
+                {currentlyIn === null ? (
+                  <Button size="lg" className="h-16 w-56 text-base" variant="outline" onClick={() => void load()}>
+                    <Loader2 className="h-5 w-5 mr-2" /> Try again
+                  </Button>
+                ) : (
                 <Button
                   size="lg"
                   className="h-16 w-56 text-base"
@@ -106,6 +124,7 @@ export default function EmployeeSelfServicePage() {
                   {busy === 'clock' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : currentlyIn ? <LogOut className="h-5 w-5 mr-2" /> : <LogIn className="h-5 w-5 mr-2" />}
                   {currentlyIn ? 'Clock out' : 'Clock in'}
                 </Button>
+                )}
                 <p className="text-xs text-muted-foreground text-center max-w-xs">
                   Records your arrival/departure and files the Digital Work Card to Ergani when your employer has it configured.
                 </p>

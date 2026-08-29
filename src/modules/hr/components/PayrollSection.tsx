@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Plus, Loader2, Wallet, ChevronLeft, CheckCircle2, Banknote, ArrowUpRight, Settings2, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -138,26 +138,40 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
     try { await hrService.updatePayrollItem(workspaceId, item.id, { gross }); load(); }
     catch (e) { toast({ title: 'Save failed', description: (e as Error).message, variant: 'destructive' }); }
   };
+  /**
+   * One click is one side effect (#354 HR-8).
+   *
+   * `disabled={busy}` is React state, so it takes effect a render later — every one of these calls
+   * files a government document or schedules money, and two of them are a duplicate E3 and a
+   * duplicate finance posting. The ref closes the window synchronously.
+   */
+  const actingRef = useRef(false);
+  const claim = () => { if (actingRef.current) return false; actingRef.current = true; return true; };
+  const release = () => { actingRef.current = false; };
+
   const setStatus = async (status: PayrollStatus) => {
+    if (!claim()) return;
     setBusy(true);
     try { const r = await hrService.setPayrollStatus(workspaceId, runId, status); setRun(r.run); toast({ title: `Run ${status}` }); }
     catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
+    finally { release(); setBusy(false); }
   };
   const postFinance = async () => {
+    if (!claim()) return;
     setBusy(true);
     try {
       const { posted } = await hrService.postPayrollToFinance(workspaceId, runId);
       toast({ title: 'Posted to Finance', description: `${posted.net_payment_ids.length} net payment(s)${posted.income_tax_payment_id ? ' + income tax' : ''}${posted.efka_payment_id ? ' + EFKA' : ''} scheduled.` });
       load();
     } catch (e) { toast({ title: 'Posting failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
+    finally { release(); setBusy(false); }
   };
   const makePayslips = async () => {
+    if (!claim()) return;
     setBusy(true);
     try { const r = await hrService.generatePayslips(workspaceId, runId); toast({ title: 'Payslips generated', description: `${r.payslips} payslip(s) filed — employees can see them in My HR → Documents.` }); }
     catch (e) { toast({ title: 'Payslip generation failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
+    finally { release(); setBusy(false); }
   };
 
   if (loading || !run) return <Skeleton className="h-64 w-full" />;
@@ -260,14 +274,19 @@ function NewRunDialog({ workspaceId, onDone }: { workspaceId: string; onDone: ()
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [period, setPeriod] = useState('');
 
   const submit = async () => {
     if (!/^\d{4}-\d{2}$/.test(period)) { toast({ title: 'Pick a month', variant: 'destructive' }); return; }
+    // A second run for the same period is refused by a unique index, but the first click's insert
+    // may not have committed when the second lands (#354 HR-8).
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try { const r = await hrService.createPayrollRun(workspaceId, { period }); toast({ title: 'Payroll run created', description: `${r.items} employee item(s), deductions computed.` }); setOpen(false); setPeriod(''); onDone(); }
     catch (e) { toast({ title: 'Could not create', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setSaving(false); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   return (

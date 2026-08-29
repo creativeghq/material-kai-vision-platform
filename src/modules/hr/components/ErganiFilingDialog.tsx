@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
@@ -51,18 +51,36 @@ export function ErganiFilingDialog({
     } finally { setLoading(false); }
   };
 
+  /**
+   * One click is one side effect (#354 HR-8).
+   *
+   * `disabled={busy}` is React state, so it takes effect a render later — every one of these calls
+   * files a government document or schedules money, and two of them are a duplicate E3 and a
+   * duplicate finance posting. The ref closes the window synchronously.
+   */
+  const filingRef = useRef(false);
+
   const file = async () => {
     let parsed: unknown;
     try { parsed = JSON.parse(doc); } catch { toast({ title: 'Invalid JSON', description: 'Fix the document before filing.', variant: 'destructive' }); return; }
+    if (filingRef.current) return;
+    filingRef.current = true;
     setFiling(true);
     try {
       const res = await submit(parsed);
       const protocol = 'result' in res ? res.result.protocol : '';
-      toast({ title: 'Filed to Ergani', description: protocol ? `Protocol ${protocol}` : undefined });
+      // The server reports a filing whose local bookkeeping failed rather than pretending it was
+      // clean (#354 HR-2) — say so, because the operator must NOT re-file it.
+      const warning = (res as { warning?: string }).warning;
+      toast({
+        title: warning ? 'Filed to Ergani — but not fully recorded' : 'Filed to Ergani',
+        description: warning ?? (protocol ? `Protocol ${protocol}` : undefined),
+        variant: warning ? 'destructive' : undefined,
+      });
       setOpen(false); onDone();
     } catch (e) {
       toast({ title: 'Ergani filing failed', description: (e as Error).message, variant: 'destructive' });
-    } finally { setFiling(false); }
+    } finally { filingRef.current = false; setFiling(false); }
   };
 
   return (

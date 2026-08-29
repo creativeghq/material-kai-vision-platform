@@ -105,15 +105,76 @@ function assertHrObjectPath(path: unknown, workspaceId: string): string {
 
 /** Working (Mon–Fri) days in a 'YYYY-MM' month. */
 function businessDaysInMonth(period: string): number {
+  return businessDaysInWindow(period, null, null);
+}
+
+/**
+ * Weekdays of `period` that fall inside the employment window [from, to] (#354 HR-4).
+ *
+ * `businessDaysInMonth` never read `start_date`, so a monthly employee who started on the 16th was
+ * paid the whole month: €2,200 where 12 of July 2026's 23 weekdays are worked is €1,147.83, an
+ * overpayment of €1,052.17 gross before tax and EFKA — and payroll is the one domain where the
+ * number is also a bank transfer and a filing. An `end_date` in the period is the mirror case: a
+ * leaver paid to the end of the month.
+ */
+function businessDaysInWindow(period: string, from: string | null, to: string | null): number {
   const [y, m] = period.split('-').map(Number);
   if (!y || !m) return 0;
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const iso = (d: number) => `${period}-${String(d).padStart(2, '0')}`;
   let count = 0;
   for (let d = 1; d <= last; d++) {
     const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-    if (dow !== 0 && dow !== 6) count++;
+    if (dow === 0 || dow === 6) continue;
+    const day = iso(d);
+    if (from && day < from) continue;
+    if (to && day > to) continue;
+    count++;
   }
   return count;
+}
+
+interface PayrollBasis {
+  basis: 'monthly' | 'hourly';
+  gross: number;
+  rate: number;
+  hoursPerDay: number | null;
+  daysWorked: number;
+  monthDays: number;
+}
+
+/**
+ * A payroll line's gross, derived ONCE (#354 HR-4).
+ *
+ * Two concrete wrong results lived here, and the second is the more insidious:
+ *
+ *  • No proration. `start_date` and `end_date` were never read, so a mid-month joiner or leaver was
+ *    paid the full month on the monthly basis and the full month's weekdays on the hourly one.
+ *
+ *  • Hours rounded BEFORE multiplying. `round2(weekly_hours / 5)` turned 37.33h/week into 7.47h/day
+ *    and then multiplied by the rate and the day count: €2,199.17 where the honest figure is
+ *    €2,197.99. Same family as the invoice-footing defect in #351 — round at the END, at the
+ *    quantity the document actually states.
+ *
+ * `hours_per_day` is stored UNROUNDED for the same reason: the payslip prints
+ * `rate/h × hours_per_day × days`, and a reader must be able to multiply the printed line out and
+ * arrive at the printed gross.
+ */
+function derivePayrollBasis(e: any, period: string): PayrollBasis {
+  const monthDays = businessDaysInMonth(period);
+  const daysWorked = businessDaysInWindow(period, e.start_date ?? null, e.end_date ?? null);
+  if (e.pay_basis === 'hourly') {
+    const hoursPerDay = e.weekly_hours ? Number(e.weekly_hours) / 5 : 8;
+    const rate = Number(e.hourly_rate ?? 0);
+    return { basis: 'hourly', rate, hoursPerDay, daysWorked, monthDays, gross: round2(rate * hoursPerDay * daysWorked) };
+  }
+  const rate = Number(e.monthly_salary ?? 0);
+  // A full month is the salary itself, not salary × days ÷ days — so an employee present all month
+  // is paid exactly what their contract says, with no rounding artefact from the ratio.
+  const gross = (monthDays > 0 && daysWorked < monthDays)
+    ? round2(rate * daysWorked / monthDays)
+    : round2(rate);
+  return { basis: 'monthly', rate, hoursPerDay: null, daysWorked, monthDays, gross };
 }
 import { round2 } from '../_shared/money.ts';
 import { loadPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
@@ -723,33 +784,26 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: run, error } = await supabase.from('hr_payroll_runs')
         .insert({ workspace_id: workspaceId, period, status: 'draft', currency: body?.currency ?? 'EUR', created_by: userId }).select('*').single();
       if (error) { if ((error as any).code === '23505') return json({ error: `A payroll run for ${period} already exists.` }, 409); throw new HttpError(400, error.message); }
-      // Auto-populate items from active employees. Gross depends on pay basis:
-      //  • monthly → the fixed monthly_salary
-      //  • hourly  → hourly_rate × hours/day × working days in the run month
-      //             (hours/day derived from weekly_hours ÷ 5, default 8)
-      const workingDays = businessDaysInMonth(period);
+      // Auto-populate items from active employees. `derivePayrollBasis` is the ONE place a gross is
+      // derived from a contract — prorated by the employment window, hours never rounded before
+      // they are multiplied (#354 HR-4).
       const settings = await getPayrollSettings(supabase, workspaceId);
       const { data: emps } = await supabase.from('hr_employees')
-        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours, dependent_children, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( date_of_birth )')
+        .select('id, monthly_salary, salary_currency, pay_basis, hourly_rate, weekly_hours, dependent_children, start_date, end_date, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( date_of_birth )')
         .eq('workspace_id', workspaceId).eq('status', 'active');
-      const items = (emps ?? []).map((e: any) => {
-        const basis = e.pay_basis === 'hourly' ? 'hourly' : 'monthly';
-        let gross = 0, rate = 0;
-        let hoursPerDay: number | null = null;
-        if (basis === 'hourly') {
-          hoursPerDay = e.weekly_hours ? round2(Number(e.weekly_hours) / 5) : 8;
-          rate = Number(e.hourly_rate ?? 0);
-          gross = round2(rate * hoursPerDay * workingDays);
-        } else {
-          rate = Number(e.monthly_salary ?? 0);
-          gross = rate;
-        }
-        const b = computePayroll(gross, Number(e.dependent_children ?? 0), settings, ageFromDob(e.contact?.date_of_birth));
+      const items = (emps ?? [])
+        // Someone who had not started yet, or had already left, works no day of this period — and a
+        // zero-day line on a payroll run is not a line, it is noise on a filing.
+        .map((e: any) => ({ e, d: derivePayrollBasis(e, period) }))
+        .filter((x: { e: any; d: PayrollBasis }) => x.d.daysWorked > 0)
+        .map(({ e, d }: { e: any; d: PayrollBasis }) => {
+        const b = computePayroll(d.gross, Number(e.dependent_children ?? 0), settings, ageFromDob(e.contact?.date_of_birth));
         return {
-          workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross,
+          workspace_id: workspaceId, run_id: run.id, employee_id: e.id, gross: d.gross,
           deductions: b.deductions, net: b.net, employee_contributions: b.employee_contributions,
           income_tax: b.income_tax, employer_contributions: b.employer_contributions, employer_cost: b.employer_cost,
-          currency: e.salary_currency ?? run.currency, basis, days_worked: workingDays, hours_per_day: hoursPerDay, rate,
+          currency: e.salary_currency ?? run.currency, basis: d.basis, days_worked: d.daysWorked,
+          hours_per_day: d.hoursPerDay, rate: d.rate,
         };
       });
       if (items.length) await supabase.from('hr_payroll_items').insert(items);
@@ -783,9 +837,16 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       // Recompute the statutory breakdown from the rules on the new gross (rules-driven). A manual
       // `deductions` override wins only when auto-rules are off (country_code='none').
       const { data: cur } = await supabase.from('hr_payroll_items')
-        .select('run_id, employee:hr_employees!hr_payroll_items_employee_id_fkey ( dependent_children, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( date_of_birth ) )')
+        .select('run_id, run:hr_payroll_runs!hr_payroll_items_run_id_fkey ( status ), employee:hr_employees!hr_payroll_items_employee_id_fkey ( dependent_children, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( date_of_birth ) )')
         .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!cur) return json({ error: 'not found' }, 404);
+      // #354 HR-5 — an approved run is the basis of a bank transfer and a filing; a paid one has
+      // already been both. Editing a line after either leaves no fixed record of what was paid, and
+      // the payslip in the employee's hands stops matching the run behind it.
+      const runStatus = String((cur as any).run?.status ?? 'draft');
+      if (runStatus !== 'draft') {
+        return json({ error: `This payroll run is ${runStatus}. Re-open it as a draft before changing a line.` }, 409);
+      }
       const settings = await getPayrollSettings(supabase, workspaceId);
       let patch: any;
       if (settings.country_code === 'none' && body?.deductions !== undefined) {
@@ -831,6 +892,25 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const id = String(body?.run_id ?? '');
       const status = String(body?.status ?? '');
       if (!id || !['approved', 'paid', 'draft'].includes(status)) return json({ error: 'run_id and a valid status are required' }, 400);
+      /**
+       * `paid` is terminal, and a posted run cannot be re-opened (#354 HR-5).
+       *
+       * Any status could previously be set from any other, so a paid run could be dropped back to
+       * draft, its lines rewritten and its payslips regenerated over the ones the employees already
+       * hold — with nothing recording what was actually paid. Re-opening an APPROVED run is still
+       * allowed, because approval is a review step and correcting a mistake before the money moves
+       * is the point of having one; re-opening a run whose payments are already scheduled in
+       * Finance is not, because those postings would stay behind.
+       */
+      const { data: currentRun } = await supabase.from('hr_payroll_runs')
+        .select('status, posted_finance_ref').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!currentRun) return json({ error: 'not found' }, 404);
+      if (currentRun.status === 'paid' && status !== 'paid') {
+        return json({ error: 'This run is marked paid. A paid payroll run cannot be changed — correct it with a new run.' }, 409);
+      }
+      if (status === 'draft' && currentRun.posted_finance_ref) {
+        return json({ error: 'This run is already posted to Finance. Reverse the posting before re-opening it.' }, 409);
+      }
       const patch: any = { status };
       if (status === 'approved') patch.approved_at = new Date().toISOString();
       if (status === 'paid') patch.paid_at = new Date().toISOString();
@@ -988,9 +1068,14 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: emps } = await supabase.from('hr_employees')
         .select('id, work_start_time, work_end_time, work_days, status, clock_pin_hash, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name )')
         .eq('workspace_id', workspaceId);
+      // Yesterday is included so a shift that began at 23:30 still reads as OPEN this morning
+      // (#354 HR-9) — the board's "who is in right now" comes from each employee's LAST punch, and
+      // scoping the read to today answered it with a different day's data.
+      const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+        .format(new Date(Date.now() - 86_400_000));
       const { data: punches } = await supabase.from('hr_time_punches')
         .select('employee_id, punch_type, punched_at, is_late, status, ergani_protocol')
-        .eq('workspace_id', workspaceId).eq('reference_date', today).order('punched_at', { ascending: false });
+        .eq('workspace_id', workspaceId).gte('reference_date', yesterday).order('punched_at', { ascending: false });
       const latest = new Map<string, any>();
       for (const p of (punches ?? [])) if (!latest.has(p.employee_id)) latest.set(p.employee_id, p);
       const rows = (emps ?? []).map((e: any) => {

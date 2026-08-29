@@ -390,13 +390,24 @@ const sb = supabase as any;
 
 class HrService {
   async listEmployees(workspaceId: string): Promise<{ employees: Employee[] }> {
-    const [{ data: emps, error }, { data: sums }] = await Promise.all([
+    const [{ data: emps, error }, { data: sums, error: sumErr }] = await Promise.all([
       sb.from('hr_employees')
         .select('*, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( id, name, first_name, last_name, email, phone, mobile, position, department, date_of_birth, vat_number ), manager:crm_contacts!hr_employees_manager_contact_id_fkey ( id, name )')
         .eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
       sb.from('vw_hr_employee_absence_summary').select('*').eq('workspace_id', workspaceId),
     ]);
     if (error) throw error;
+    /**
+     * The absence summary is not optional (#354 HR-10).
+     *
+     * Only the employees read was checked. When the summary read failed, `sums` was null, the map
+     * was empty, and every fallback below produced a plausible wrong number: 0 absence days taken,
+     * nobody on leave today, and — worst — `remaining_leave_days` falling back to the FULL annual
+     * allowance. Maria with 20 days and an approved 5-day absence reads 20 remaining, and someone
+     * approves leave she does not have. A swallowed read that yields a believable number is worse
+     * than one that yields an empty screen.
+     */
+    if (sumErr) throw sumErr;
     const byId = new Map((sums ?? []).map((s: any) => [s.employee_id, s]));
     const employees = (emps ?? []).map((e: any) => {
       const s: any = byId.get(e.id) ?? {};
@@ -405,6 +416,8 @@ class HrService {
         total_absence_days: Number(s.total_absence_days ?? 0),
         days_by_type: s.days_by_type ?? {},
         on_leave_today: !!s.on_leave_today,
+        // An employee with no summary ROW has taken no absence — the view only carries employees
+        // that have some. That is a real answer; a failed READ is handled above.
         remaining_leave_days: s.remaining_leave_days ?? e.annual_leave_allowance_days ?? 0,
       };
     });

@@ -231,6 +231,63 @@ function finish(document: unknown, report: FillReport): BuiltDocument {
 // submitDate back as dd/mm/yyyy in RESPONSES, but that is not the request format — do not "fix"
 // this by reformatting outbound dates without a rejected submission proving it.
 
+/**
+ * Overlay a caller-supplied document onto the one WE built, taking the caller's value ONLY for
+ * template keys we could not fill ourselves (#354 HR-1).
+ *
+ * The preview → complete → submit workflow is real: `unfilled` exists precisely so an operator can
+ * supply the Ergani-specific codes no convention can derive. What was NOT acceptable is that a
+ * supplied `document` bypassed the builder entirely, so the identity and money in the filing came
+ * from the request body while the audit row described the employee named by `employee_id`. An
+ * audit trail that can be made to disagree with what was filed is worse than none, because it is
+ * believed: file Bob's ΑΦΜ and €2,400 under Alice's id and `hr_ergani_submissions` says Alice.
+ *
+ * So: everything the server knows (ΑΦΜ, ΑΜΚΑ, name, salary, dates) is server-owned and cannot be
+ * overridden from the body; everything it could not recognise stays the operator's to complete.
+ * Both lists come back so the response can say exactly which keys the caller supplied.
+ *
+ * Structure is taken from the BUILT document throughout — the supplied one is only ever read at a
+ * matching path, so a caller cannot add rows, add keys, or reshape the envelope.
+ */
+export interface MergeReport {
+  /** Unfilled keys the caller supplied a value for. */
+  applied: string[];
+  /** Keys the caller tried to set that we had already filled — ignored, and reported. */
+  ignored: string[];
+}
+
+export function mergeUnfilledKeys(
+  built: unknown, supplied: unknown, unfilled: string[],
+): { document: unknown; applied: string[]; ignored: string[] } {
+  const allowed = new Set(unfilled);
+  const report: MergeReport = { applied: [], ignored: [] };
+  const document = mergeNode(built, supplied, allowed, report);
+  return { document, applied: [...new Set(report.applied)], ignored: [...new Set(report.ignored)] };
+}
+
+function mergeNode(built: any, supplied: any, allowed: Set<string>, report: MergeReport): any {
+  if (Array.isArray(built)) {
+    // Length comes from OUR document: one row per employee / shift / overtime block, as loaded.
+    if (!Array.isArray(supplied)) return built;
+    return built.map((n, i) => mergeNode(n, supplied[i], allowed, report));
+  }
+  if (built && typeof built === 'object') {
+    const src = (supplied && typeof supplied === 'object' && !Array.isArray(supplied)) ? supplied as any : {};
+    const out: any = {};
+    for (const [k, val] of Object.entries(built)) {
+      if (val !== null && typeof val === 'object') { out[k] = mergeNode(val, src[k], allowed, report); continue; }
+      const given = src[k];
+      const offered = given !== undefined && given !== null && given !== '';
+      if (!offered) { out[k] = val; continue; }
+      if (allowed.has(k)) { out[k] = given; report.applied.push(k); }
+      else if (given !== val) { out[k] = val; report.ignored.push(k); }
+      else { out[k] = val; }
+    }
+    return out;
+  }
+  return built;
+}
+
 /** 'HH:MM[:SS]' → 'HH:MM'. */
 export function toErganiTime(t: string | null | undefined): string {
   const m = /^(\d{1,2}):(\d{2})/.exec(String(t ?? ''));

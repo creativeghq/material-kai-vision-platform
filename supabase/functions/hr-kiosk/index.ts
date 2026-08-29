@@ -5,7 +5,8 @@
 // SECURITY POSTURE (deliberate speed/security trade-off, opt-in):
 //  • Kiosk is OFF by default — a workspace must set hr_settings.kiosk_enabled=true.
 //  • Identity = VAT (the employee must already exist as an active employee of THIS workspace).
-//  • Optional second factor: hr_settings.kiosk_require_pin → a per-employee 4–8 digit PIN.
+//  • Second factor, ALWAYS: a per-employee 4–8 digit PIN. It used to be optional
+//    (hr_settings.kiosk_require_pin) — see the `requirePin` constant for why it no longer is.
 //  • Returns minimal data (name + in/out state); never other employees, salary, or ids.
 //  • The punch is recorded and filed to Ergani (WRKCardSE) when the workspace has it configured.
 import { createClient } from '@supabase/supabase-js';
@@ -38,12 +39,21 @@ async function findEmployeeByVat(supabase: any, workspaceId: string, vat: string
   return { id: emp.id, name: contact.name ?? '', work_start_time: emp.work_start_time ?? null, clock_pin_hash: emp.clock_pin_hash ?? null };
 }
 
-/** Was the employee last seen clocked in today? */
-async function currentlyIn(supabase: any, workspaceId: string, employeeId: string, tz: string): Promise<boolean> {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+/**
+ * Is the employee clocked in — as of their LAST punch, whenever it was (#354 HR-9).
+ *
+ * This used to look only at punches whose `reference_date` is today in workspace time. Clock in at
+ * 23:30 and at 00:10 the kiosk searched a different day, found nothing, showed "clocked out" and
+ * accepted a second arrival while the first shift stayed open. Night shifts are ordinary in
+ * several of the industries this serves. A shift is a span, not a calendar day, so the state comes
+ * from the last punch full stop — which is also exactly what the table's sequence guard enforces.
+ *
+ * `tz` is no longer needed and the parameter is gone; the two callers passed the same value.
+ */
+async function currentlyIn(supabase: any, workspaceId: string, employeeId: string): Promise<boolean> {
   const { data } = await supabase
     .from('hr_time_punches').select('punch_type').eq('workspace_id', workspaceId).eq('employee_id', employeeId)
-    .eq('reference_date', today).order('punched_at', { ascending: false }).limit(1).maybeSingle();
+    .order('punched_at', { ascending: false }).limit(1).maybeSingle();
   return data?.punch_type === 'arrival';
 }
 
@@ -67,10 +77,22 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   if (!ws) return json({ error: 'not found' }, 404);
 
   const { data: settings } = await supabase
-    .from('hr_settings').select('kiosk_enabled, kiosk_require_pin, timezone').eq('workspace_id', ws.id).maybeSingle();
+    .from('hr_settings').select('kiosk_enabled, kiosk_require_pin').eq('workspace_id', ws.id).maybeSingle();
   const kioskEnabled = !!settings?.kiosk_enabled;
-  const requirePin = !!settings?.kiosk_require_pin;
-  const tz = settings?.timezone || 'Europe/Athens';
+  /**
+   * A PIN is ALWAYS required (#354 HR-6).
+   *
+   * This endpoint is `verify_jwt = false` and identified the employee by ΑΦΜ alone whenever
+   * `kiosk_require_pin` was off. An ΑΦΜ is not a secret — it is on every payslip and contract and
+   * known to colleagues — so slug + ΑΦΜ was enough to punch someone else's attendance, which is
+   * buddy-punching: the precise fraud a kiosk exists to prevent. The QR scanner does not help
+   * either: it reads the ΑΦΜ out of clear text, so the code is an encoding, not an authenticator.
+   *
+   * `hr_settings.kiosk_require_pin` stays in the schema and the admin screen still shows it, but
+   * an anonymous endpoint that writes a statutory attendance record does not get a switch that
+   * turns its only authenticator off.
+   */
+  const requirePin = true;
 
   // Public metadata — lets the page render the workspace name + whether a PIN is needed.
   if (action === 'resolve') {
@@ -96,6 +118,14 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   if (!emp) return json({ error: 'not_recognized', message: 'VAT number not recognized for this workspace.' }, 404);
   if (requirePin) {
     if (!pin) return json({ error: 'pin_required', message: 'A PIN is required.' }, 401);
+    // An employee with no PIN set cannot be authenticated at all, and must not fall through to
+    // being authenticated by ΑΦΜ. Say what has to happen instead of failing anonymously.
+    if (!emp.clock_pin_hash) {
+      return json({
+        error: 'pin_not_set',
+        message: 'No clock-in PIN has been set for you yet. Ask your manager to set one in HR → Employees.',
+      }, 401);
+    }
     // Per-(workspace, VAT) PIN lockout: blunts distributed brute-force that the per-IP limit misses
     // (a 4-digit PIN is only 10⁴). Lock the subject after PIN_MAX_FAILS failures in the window.
     const subject = await sha256hex(`vat:${ws.id}:${vat}`);
@@ -111,7 +141,7 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   }
 
   if (action === 'lookup') {
-    return json({ name: emp.name, clocked_in: await currentlyIn(supabase, ws.id, emp.id, tz), work_start_time: emp.work_start_time });
+    return json({ name: emp.name, clocked_in: await currentlyIn(supabase, ws.id, emp.id), work_start_time: emp.work_start_time });
   }
 
   if (action === 'clock') {

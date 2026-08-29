@@ -1,4 +1,5 @@
 import { resolveSecret } from './secrets.ts';
+import { getTrustedClientIp } from './client-ip.ts';
 import type { DbClient } from './supabase-client.ts';
 
 /**
@@ -54,14 +55,19 @@ export async function verifyTurnstile(
 }
 
 /**
- * The caller's IP for Turnstile's `remoteip` and for rate limiting.
+ * The caller's IP for Turnstile's `remoteip` and for rate limiting (#354 HR-12).
  *
- * FIRST hop of x-forwarded-for. On Supabase edge the header is appended by the trusted proxy, so
- * the left-most entry is the real client. Never read a raw client-controlled header (invariant 10
- * says the quota IP comes from the trusted proxy hop) — a caller who picks their own IP defeats
- * any per-IP limit by rotating it.
+ * This used to take the FIRST hop of `x-forwarded-for`, citing invariant 10 while doing the exact
+ * thing invariant 10 forbids. `_shared/client-ip.ts` — written for the same rule — says the
+ * opposite and is right: Cloudflare APPENDS the connecting IP to whatever XFF the caller sent, so
+ * the left-most entry is the attacker's prefix and the right-most is the proxy's. Two shared
+ * helpers for one rule, disagreeing, and the wrong one was the one the public forms imported: a
+ * caller rotating that header minted a fresh rate-limit bucket per request, which is unlimited
+ * applications on the careers form and unlimited attempts on every other public surface.
+ *
+ * There is now one implementation. `cf-connecting-ip` is preferred where present because
+ * Cloudflare overwrites it and it cannot be forged.
  */
 export function clientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for') || '';
-  return xff.split(',')[0].trim() || '0.0.0.0';
+  return getTrustedClientIp(req);
 }

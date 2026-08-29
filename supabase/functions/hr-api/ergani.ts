@@ -12,18 +12,21 @@
 //    only the fields whose key names match documented Ergani conventions (_shared/ergani/document.ts).
 //    Every one supports `preview: true`, which returns the built document plus the list of keys we
 //    could NOT fill, so the operator reviews and completes it before anything reaches the Ministry.
-//    A fully-built `document` may always be passed to bypass the builder entirely.
+//    A caller MAY pass `document` back on submit to complete those keys — but only those: the
+//    document is always rebuilt server-side from the loaded employee/absence/separation, and the
+//    supplied one is overlaid ONLY onto keys we could not fill (#354 HR-1). Identity, salary and
+//    dates come from the database, so what is filed and what the audit row says cannot diverge.
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import {
   resolveErganiCredentials, listSubmissions, getDocumentSchema, submitDocument,
-  getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
+  getSubmittedPdf, executeService, cancelDocument, ErganiApiError, type ErganiCredentials,
 } from '../_shared/ergani/client.ts';
 import { fileWorkcardPunch, toHttp } from '../_shared/ergani/workcard.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
-import { buildErganiDocument, splitName, toErganiTime, type ErganiValues } from '../_shared/ergani/document.ts';
+import { buildErganiDocument, mergeUnfilledKeys, splitName, toErganiTime, type ErganiValues } from '../_shared/ergani/document.ts';
 
 export interface ErganiCtx {
   supabase: any;
@@ -99,6 +102,96 @@ async function recordAudit(supabase: any, workspaceId: string, userId: string, r
   } catch (_e) { return null; }
 }
 const audit = (ctx: ErganiCtx, row: AuditRow) => recordAudit(ctx.supabase, ctx.workspaceId, ctx.userId, row);
+
+/**
+ * Refuse a second filing of the same document for the same record (#354 HR-2 / HR-3).
+ *
+ * Three of the six filing paths had no duplicate guard at all — hire, leave and the generic
+ * submit — while separation, overtime and schedule checked their own `status === 'submitted'`
+ * column. That column is the weaker check anyway: it is written AFTER the ministry accepts the
+ * filing, and that write can fail, leaving a document filed under protocol P123 and a local row
+ * still reading `draft` for the next operator to file again.
+ *
+ * `hr_ergani_submissions` is written as part of the success path, so it is what the guard reads.
+ * A cancelled submission does not block — that is what `ergani-cancel` is for.
+ */
+async function assertNotAlreadyFiled(
+  ctx: ErganiCtx, code: string, entityType: string, entityId: string | null,
+): Promise<void> {
+  if (!entityId) return;
+  const { data } = await ctx.supabase
+    .from('hr_ergani_submissions')
+    .select('protocol, submit_date')
+    .eq('workspace_id', ctx.workspaceId)
+    .eq('submission_type', code)
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+    .eq('status', 'submitted')
+    .limit(1)
+    .maybeSingle();
+  if (data) {
+    throw new HttpError(
+      409,
+      `already_filed: this ${entityType} was filed to Ergani as ${code}` +
+      `${data.protocol ? ` under protocol ${data.protocol}` : ''}` +
+      `${data.submit_date ? ` on ${data.submit_date}` : ''}. ` +
+      'Cancel that submission before filing it again.',
+    );
+  }
+}
+
+/**
+ * A local write that follows a SUCCESSFUL ministry filing (#354 HR-2).
+ *
+ * These were all unchecked. The filing cannot be undone, so a failure here must not be reported as
+ * a failure — the operator would re-file. It must not be reported as a plain success either, which
+ * is what happened: `{ ok: true }` while the row stayed `draft`. So the failure is recorded on the
+ * audit row (which already holds the protocol) and returned to the caller as `local_write_failed`.
+ * The duplicate guard reads that same audit row, so the stale local status cannot cause a second
+ * filing either way.
+ */
+async function stampAfterFiling(
+  ctx: ErganiCtx, auditId: string | null, what: string,
+  write: () => PromiseLike<{ error: unknown }>,
+): Promise<string | null> {
+  let message: string | null = null;
+  try {
+    const { error } = await write();
+    if (error) message = (error as any)?.message ?? String(error);
+  } catch (e) {
+    message = e instanceof Error ? e.message : String(e);
+  }
+  if (!message) return null;
+  const note = `filed_but_not_recorded: ${what}: ${message}`;
+  console.error('[ergani]', note, { workspace: ctx.workspaceId, audit: auditId });
+  if (auditId) {
+    try {
+      await ctx.supabase.from('hr_ergani_submissions')
+        .update({ error: note }).eq('id', auditId).eq('workspace_id', ctx.workspaceId);
+    } catch { /* the console line and the response are the remaining record */ }
+  }
+  return note;
+}
+
+/** The shape every filing route returns, so a partial success is never dressed as a clean one. */
+function filedResponse(
+  out: { result: { id: string; protocol: string; submitDate: string }; auditId: string | null },
+  localErrors: (string | null)[],
+  extra: Record<string, unknown> = {},
+): Response {
+  const problems = localErrors.filter(Boolean) as string[];
+  if (!problems.length && out.auditId) return json({ ok: true, result: out.result, ...extra });
+  return json({
+    ok: true,
+    result: out.result,
+    ...extra,
+    local_write_failed: true,
+    warning: (out.auditId ? [] : ['The submission audit row could not be written.'])
+      .concat(problems)
+      .concat([`The filing DID reach Ergani${out.result.protocol ? ` (protocol ${out.result.protocol})` : ''} — do not file it again.`])
+      .join(' '),
+  });
+}
 
 interface LoadedEmployee {
   id: string; amka: string | null; afm: string | null; name: string;
@@ -188,35 +281,64 @@ interface FilingSpec {
 }
 type FilingOutcome =
   | { kind: 'preview'; response: Response }
-  | { kind: 'submitted'; result: { id: string; protocol: string; submitDate: string }; document: unknown };
+  | {
+      kind: 'submitted';
+      result: { id: string; protocol: string; submitDate: string };
+      document: unknown;
+      /** null = the filing happened and the audit row did NOT — see `fileDocument`. */
+      auditId: string | null;
+    };
 
 async function fileDocument(ctx: ErganiCtx, creds: ErganiCredentials, spec: FilingSpec): Promise<FilingOutcome> {
   const preview = ctx.body?.preview === true;
-  let document = ctx.body?.document;
-  let filled: string[] = [];
-  let unfilled: string[] = [];
 
-  if (document === undefined || document === null) {
-    let template: any;
-    try { template = await getDocumentSchema(creds, ctx.workspaceId, spec.code); }
-    catch (e) { throw toHttp(e); }
-    const built = buildErganiDocument(template, spec.header, spec.rows);
-    document = built.document; filled = built.filled; unfilled = built.unfilled;
+  /**
+   * ALWAYS built from `spec` (#354 HR-1).
+   *
+   * `spec` is loaded from this workspace's own rows; a caller-supplied `document` used to replace
+   * it wholesale, so the ΑΦΜ, ΑΜΚΑ and salary that reached the Ministry came from the request body
+   * while `hr_ergani_submissions` recorded the employee named by `employee_id`. The completion
+   * workflow is preserved — see `mergeUnfilledKeys` — but the identity and the money are the
+   * database's, not the caller's.
+   */
+  let template: any;
+  try { template = await getDocumentSchema(creds, ctx.workspaceId, spec.code); }
+  catch (e) { throw toHttp(e); }
+  const built = buildErganiDocument(template, spec.header, spec.rows);
+  let document: unknown = built.document;
+  const filled = built.filled;
+  const unfilled = built.unfilled;
+  let applied: string[] = [];
+  let ignored: string[] = [];
+
+  const supplied = ctx.body?.document;
+  if (supplied !== undefined && supplied !== null) {
+    const merged = mergeUnfilledKeys(built.document, supplied, unfilled);
+    document = merged.document; applied = merged.applied; ignored = merged.ignored;
   }
 
   if (preview) {
-    return { kind: 'preview', response: json({ preview: true, code: spec.code, document, filled, unfilled }) };
+    return { kind: 'preview', response: json({ preview: true, code: spec.code, document, filled, unfilled, applied, ignored }) };
   }
 
   try {
     const result = await submitDocument(creds, ctx.workspaceId, spec.code, document);
-    await audit(ctx, {
+    // The audit row IS the record that this was filed — including for the duplicate guard, which
+    // reads it rather than the local status column precisely because that column's write can fail
+    // after a successful filing (#354 HR-2/HR-3). A null id means we filed and did not record it.
+    const auditId = await audit(ctx, {
       submission_type: spec.code, entity_type: spec.entityType, entity_id: spec.entityId,
       employee_id: spec.employeeId, environment: creds.environment, status: 'submitted',
       protocol: result.protocol, ergani_id: result.id, submit_date: result.submitDate,
       request: document, response: result,
     });
-    return { kind: 'submitted', result, document };
+    if (!auditId) {
+      console.error('[ergani] FILED BUT NOT AUDITED', {
+        workspace: ctx.workspaceId, code: spec.code, protocol: result.protocol,
+        entity: `${spec.entityType}:${spec.entityId ?? ''}`,
+      });
+    }
+    return { kind: 'submitted', result, document, auditId };
   } catch (e) {
     const he = toHttp(e);
     await audit(ctx, {
@@ -291,6 +413,9 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const creds = await client(ctx);
       assertIdentity(creds, emp);
       const code = await resolveCode(creds, workspaceId, 'leave');
+      // #354 HR-3 — leave had no duplicate guard at all: it wrote back `ergani_leave_code` and
+      // never a submitted state, so nothing stopped the same absence being declared twice.
+      if (body?.preview !== true) await assertNotAlreadyFiled(ctx, code, 'absence', absenceId);
       const note = abs.note ? String(abs.note) : '';
 
       const out = await fileDocument(ctx, creds, {
@@ -302,9 +427,10 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
         }],
       });
       if (out.kind === 'preview') return out.response;
-      await supabase.from('hr_absences').update({ ergani_leave_code: leaveCode })
-        .eq('id', absenceId).eq('workspace_id', workspaceId);
-      return json({ ok: true, result: out.result });
+      const leaveStamp = await stampAfterFiling(ctx, out.auditId, 'hr_absences.ergani_leave_code', () =>
+        supabase.from('hr_absences').update({ ergani_leave_code: leaveCode })
+          .eq('id', absenceId).eq('workspace_id', workspaceId));
+      return filedResponse(out, [leaveStamp]);
     }
 
     // ── Ε3 — hire announcement, prefilled from the employee record ────────────
@@ -319,6 +445,9 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       if (!emp.startDate) return json({ error: 'Set the employee’s start date before filing the Ε3 hire announcement.' }, 400);
       const creds = await client(ctx);
       assertIdentity(creds, emp);
+      // #354 HR-3 — the Ε3 hire path had no prior-submission check, so a double-click (HR-8) or a
+      // retry filed two hire announcements for one employee.
+      if (body?.preview !== true) await assertNotAlreadyFiled(ctx, 'E3', 'employee', employeeId);
       const comments = String(body?.comments ?? '');
 
       const out = await fileDocument(ctx, creds, {
@@ -331,7 +460,7 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
         }],
       });
       if (out.kind === 'preview') return out.response;
-      return json({ ok: true, result: out.result });
+      return filedResponse(out, []);
     }
 
     // ── Ε5 / Ε6 / Ε7 — voluntary departure / termination / fixed-term expiry ──
@@ -349,6 +478,9 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const emp = await loadEmployee(ctx, sep.employee_id);
       const creds = await client(ctx);
       assertIdentity(creds, emp);
+      // The row's own status is checked above; this catches the case that status write FAILED
+      // after a successful filing (#354 HR-2), which leaves it reading `draft` forever.
+      if (body?.preview !== true) await assertNotAlreadyFiled(ctx, code, 'separation', separationId);
       const note = sep.note ? String(sep.note) : '';
 
       const out = await fileDocument(ctx, creds, {
@@ -364,14 +496,16 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       });
       if (out.kind === 'preview') return out.response;
 
-      await supabase.from('hr_separations')
-        .update({ status: 'submitted', ergani_protocol: out.result.protocol })
-        .eq('id', separationId).eq('workspace_id', workspaceId);
+      const sepStamp = await stampAfterFiling(ctx, out.auditId, 'hr_separations.status', () =>
+        supabase.from('hr_separations')
+          .update({ status: 'submitted', ergani_protocol: out.result.protocol })
+          .eq('id', separationId).eq('workspace_id', workspaceId));
       // The filing is the moment the departure becomes official — reflect it on the employee.
-      await supabase.from('hr_employees')
-        .update({ status: 'terminated', end_date: sep.effective_date })
-        .eq('id', sep.employee_id).eq('workspace_id', workspaceId);
-      return json({ ok: true, result: out.result });
+      const empStamp = await stampAfterFiling(ctx, out.auditId, 'hr_employees.status', () =>
+        supabase.from('hr_employees')
+          .update({ status: 'terminated', end_date: sep.effective_date })
+          .eq('id', sep.employee_id).eq('workspace_id', workspaceId));
+      return filedResponse(out, [sepStamp, empStamp]);
     }
 
     // ── Ε8 — overtime. One filing may carry several entries (Ergani batches them). ──
@@ -390,6 +524,10 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       if (entries.length !== ids.length) return json({ error: 'one or more overtime entries were not found in this workspace' }, 404);
       const already = entries.find((e: any) => e.status === 'submitted');
       if (already) return json({ error: 'One of the selected entries has already been filed to Ergani.' }, 409);
+      if (body?.preview !== true) {
+        // Same reason as the separation path: a failed status write leaves `draft` behind (#354 HR-2).
+        for (const id of ids) await assertNotAlreadyFiled(ctx, 'E8', 'overtime', id);
+      }
 
       const creds = await client(ctx);
       // Distinct employees only — load each once even when an employee has several blocks.
@@ -419,10 +557,11 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       });
       if (out.kind === 'preview') return out.response;
 
-      await supabase.from('hr_overtime')
-        .update({ status: 'submitted', ergani_protocol: out.result.protocol })
-        .eq('workspace_id', workspaceId).in('id', ids);
-      return json({ ok: true, result: out.result, filed: ids.length });
+      const otStamp = await stampAfterFiling(ctx, out.auditId, 'hr_overtime.status', () =>
+        supabase.from('hr_overtime')
+          .update({ status: 'submitted', ergani_protocol: out.result.protocol })
+          .eq('workspace_id', workspaceId).in('id', ids));
+      return filedResponse(out, [otStamp], { filed: ids.length });
     }
 
     // ── Ε4 — work-time schedule (WTOWeek / WTODaily), or a change (WKChgWK) ───
@@ -444,6 +583,7 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const creds = await client(ctx);
       assertIdentity(creds, emp);
       const code = await resolveCode(creds, workspaceId, kind);
+      if (body?.preview !== true) await assertNotAlreadyFiled(ctx, code, 'schedule', scheduleId);
 
       const shifts: any[] = Array.isArray(sched.details) ? sched.details : [];
       const working = shifts.filter((s) => !s?.off);
@@ -469,10 +609,11 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       });
       if (out.kind === 'preview') return out.response;
 
-      await supabase.from('hr_work_schedules')
-        .update({ status: 'submitted', ergani_protocol: out.result.protocol })
-        .eq('id', scheduleId).eq('workspace_id', workspaceId);
-      return json({ ok: true, result: out.result });
+      const schedStamp = await stampAfterFiling(ctx, out.auditId, 'hr_work_schedules.status', () =>
+        supabase.from('hr_work_schedules')
+          .update({ status: 'submitted', ergani_protocol: out.result.protocol })
+          .eq('id', scheduleId).eq('workspace_id', workspaceId));
+      return filedResponse(out, [schedStamp]);
     }
 
     // ── Generic submit for any code (E3, WTOWeek, WTODaily, WKChgWK) ───────────
@@ -485,24 +626,34 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       if (!code) return json({ error: 'code is required' }, 400);
       if (document === undefined || document === null) return json({ error: 'document (payload) is required' }, 400);
       const creds = await client(ctx);
+      // #356 `RE-4` generalised: `employee_id` is a body-supplied FK into hr_employees and is
+      // stored on the ΕΡΓΑΝΗ submission audit row, which is later joined for display. The sibling
+      // module (labour.ts) already proves the employee with `assertEmployee`; this path did not.
+      // Moved BEFORE the filing (#354 HR-3): it validates the request, and validating it after the
+      // ministry has the document means rejecting something already filed.
+      await assertSameWorkspace(supabase, 'hr_employees', body?.employee_id, workspaceId, 'employee');
+      // This route accepts an arbitrary code + document, so it is the one path where the caller
+      // states what is being filed. When they name the record it belongs to, that naming is what
+      // the duplicate guard reads.
+      if (body?.entity_type && body?.entity_id) {
+        await assertNotAlreadyFiled(ctx, code, String(body.entity_type), String(body.entity_id));
+      }
       try {
         const res = await submitDocument(creds, workspaceId, code, document);
-        // If tied to a persisted schedule row, flip it to submitted.
-        if (body?.schedule_id) {
-          await supabase.from('hr_work_schedules')
-            .update({ status: 'submitted', ergani_protocol: res.protocol })
-            .eq('id', String(body.schedule_id)).eq('workspace_id', workspaceId);
-        }
-        // #356 `RE-4` generalised: `employee_id` is a body-supplied FK into hr_employees and is
-        // stored on the ΕΡΓΑΝΗ submission audit row, which is later joined for display. The sibling
-        // module (labour.ts) already proves the employee with `assertEmployee`; this path did not.
-        await assertSameWorkspace(supabase, 'hr_employees', body?.employee_id, workspaceId, 'employee');
-        await audit(ctx, {
+        const auditId = await audit(ctx, {
           submission_type: code, entity_type: body?.entity_type ?? null, entity_id: body?.entity_id ?? null,
           employee_id: body?.employee_id ?? null, environment: creds.environment, status: 'submitted',
           protocol: res.protocol, ergani_id: res.id, submit_date: res.submitDate, request: document, response: res,
         });
-        return json({ ok: true, result: res });
+        // If tied to a persisted schedule row, flip it to submitted — checked, like every other
+        // post-filing write (#354 HR-2).
+        const stamp = body?.schedule_id
+          ? await stampAfterFiling(ctx, auditId, 'hr_work_schedules.status', () =>
+              supabase.from('hr_work_schedules')
+                .update({ status: 'submitted', ergani_protocol: res.protocol })
+                .eq('id', String(body.schedule_id)).eq('workspace_id', workspaceId))
+          : null;
+        return filedResponse({ result: res, auditId }, [stamp]);
       } catch (e) {
         const he = toHttp(e);
         await audit(ctx, { submission_type: code, entity_type: body?.entity_type ?? null, entity_id: body?.entity_id ?? null, employee_id: body?.employee_id ?? null, environment: creds.environment, status: 'failed', request: document, error: he.message });
@@ -521,6 +672,59 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       catch (e) { throw toHttp(e); }
     }
 
+    // ── Cancel a submitted document, and release the record it belongs to ─────
+    //
+    // `cancelDocument` has existed in the client since this module shipped and the header comment
+    // above claimed cancel was implemented — no route ever called it. That gap became load-bearing
+    // with the duplicate guard (#354 HR-3): "this record was already filed, cancel it first" is not
+    // an instruction anyone could follow while cancelling was unreachable.
+    //
+    // Cancelling releases BOTH records that could block a re-file: the audit row (what the guard
+    // reads) and the entity's own status column (what the route-level checks read). Leaving either
+    // behind would mean a cancelled filing that still cannot be re-filed.
+    case 'ergani-cancel': {
+      requireManage();
+      const id = String(body?.submission_id ?? '');
+      if (!id) return json({ error: 'submission_id is required' }, 400);
+      const { data: row } = await supabase
+        .from('hr_ergani_submissions').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+      if (!row) return json({ error: 'submission not found' }, 404);
+      if (row.status !== 'submitted') return json({ error: 'only a submitted document can be cancelled' }, 400);
+      if (!row.protocol || !row.submit_date) {
+        return json({ error: 'this submission has no protocol / submitted date to cancel at Ergani' }, 400);
+      }
+      const creds = await client(ctx);
+      // Ergani wants yyyymmdd; the stored value may be a date or an ISO timestamp.
+      const submittedDate = String(row.submit_date).replace(/[^0-9]/g, '').slice(0, 8);
+      try {
+        const res = await cancelDocument(creds, workspaceId, {
+          typeOfDocument: row.submission_type, protocol: row.protocol, submittedDate,
+        });
+        const auditStamp = await stampAfterFiling(ctx, id, 'hr_ergani_submissions.status', () =>
+          supabase.from('hr_ergani_submissions')
+            .update({ status: 'cancelled' }).eq('id', id).eq('workspace_id', workspaceId));
+
+        // Release the entity so it can be filed again. `draft` is the only pre-filing state each
+        // of these tables has (their CHECK is draft | submitted | failed).
+        const RELEASE: Record<string, string> = {
+          separation: 'hr_separations', overtime: 'hr_overtime', schedule: 'hr_work_schedules',
+        };
+        const table = row.entity_type ? RELEASE[String(row.entity_type)] : undefined;
+        const entityStamp = table && row.entity_id
+          ? await stampAfterFiling(ctx, id, `${table}.status`, () =>
+              supabase.from(table).update({ status: 'draft', ergani_protocol: null })
+                .eq('id', row.entity_id).eq('workspace_id', workspaceId))
+          : null;
+
+        const problems = [auditStamp, entityStamp].filter(Boolean) as string[];
+        if (!problems.length) return json({ ok: true, cancelled: true, message: res.message });
+        return json({
+          ok: true, cancelled: true, message: res.message, local_write_failed: true,
+          warning: `${problems.join(' ')} The cancellation DID reach Ergani — do not cancel it again.`,
+        });
+      } catch (e) { throw toHttp(e); }
+    }
+
     // ── Retry a failed submission using its stored request payload ────────────
     case 'ergani-retry': {
       requireManage();
@@ -534,11 +738,15 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const creds = await client(ctx);
       try {
         const res = await submitDocument(creds, workspaceId, row.submission_type, row.request);
-        await supabase.from('hr_ergani_submissions').update({
-          status: 'submitted', protocol: res.protocol, ergani_id: res.id, submit_date: res.submitDate,
-          response: res, error: null, environment: creds.environment,
-        }).eq('id', id).eq('workspace_id', workspaceId);
-        return json({ ok: true, result: res });
+        // Unchecked, this was the worst instance of #354 HR-2: the row that says "failed" is the
+        // ONLY record, and a retry that files successfully then leaves it saying failed — so the
+        // next operator retries again, and the ministry gets a third copy.
+        const retryStamp = await stampAfterFiling(ctx, id, 'hr_ergani_submissions.status', () =>
+          supabase.from('hr_ergani_submissions').update({
+            status: 'submitted', protocol: res.protocol, ergani_id: res.id, submit_date: res.submitDate,
+            response: res, error: null, environment: creds.environment,
+          }).eq('id', id).eq('workspace_id', workspaceId));
+        return filedResponse({ result: res, auditId: id }, [retryStamp]);
       } catch (e) {
         const he = toHttp(e);
         await supabase.from('hr_ergani_submissions').update({ error: he.message }).eq('id', id).eq('workspace_id', workspaceId);

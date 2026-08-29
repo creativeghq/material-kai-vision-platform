@@ -88,13 +88,36 @@ export async function fileWorkcardPunch(
   const eventAt = args.at ? new Date(String(args.at)) : new Date();
   const referenceDate = dateInTz(eventAt, tz);
 
-  // Debounce: ignore an identical punch type for the same employee within 60s (double-taps / spam).
+  // The last punch, whenever it was — NOT today's (#354 HR-9). A shift that starts at 23:30 ends
+  // the next calendar day, and scoping this read to `reference_date` is how a still-open shift
+  // read as "clocked out" after midnight.
   const { data: recent } = await supabase.from('hr_time_punches')
     .select('id, punch_type, punched_at, status, is_late')
     .eq('workspace_id', workspaceId).eq('employee_id', args.employeeId)
     .order('punched_at', { ascending: false }).limit(1).maybeSingle();
+  // Debounce: ignore an identical punch type for the same employee within 60s (double-taps / spam).
   if (recent && recent.punch_type === args.punchType && (eventAt.getTime() - new Date(recent.punched_at).getTime()) < 60_000) {
     return { punch: recent, filed: false, reason: 'debounced', isLate: recent.is_late ?? undefined };
+  }
+
+  /**
+   * The state machine, stated here so the caller gets a sentence (#354 HR-7).
+   *
+   * The authority is the `hr_time_punches_sequence_guard` trigger — it holds an advisory lock per
+   * employee, so it is the only thing that can settle two concurrent punches, and it covers every
+   * writer including ones added later. This check exists so the ordinary case returns
+   * "you are already clocked in" rather than a raw `check_violation` from Postgres.
+   */
+  if (!recent && args.punchType !== 'arrival') {
+    throw new HttpError(409, 'There is no arrival to clock out from.');
+  }
+  if (recent && recent.punch_type === args.punchType) {
+    throw new HttpError(409, args.punchType === 'arrival'
+      ? 'You are already clocked in.'
+      : 'You are not clocked in.');
+  }
+  if (recent && eventAt.getTime() < new Date(recent.punched_at).getTime()) {
+    throw new HttpError(409, 'This punch is earlier than the last one recorded. Ask an administrator to correct it.');
   }
 
   // Lateness (arrival only): actual wall-clock vs expected start + grace.

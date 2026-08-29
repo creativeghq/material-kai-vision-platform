@@ -11,6 +11,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { emitApplicantStage } from '../_shared/hr/applicant-events.ts';
+import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 
 
 /** Board (GET) responses are public + pollable, so let aggregators/CDNs cache them briefly. */
@@ -21,25 +22,22 @@ function jsonCached(body: any, status = 200): Response {
   });
 }
 
-async function verifyTurnstile(secret: string | null, token: string, ip: string): Promise<boolean> {
-  // The secret is resolved by the CALLER via resolveSecret (env-first, then platform_secrets).
-  // Deno.env.get alone is not enough: bootstrapForFunction() copies platform_secrets into env
-  // with Deno.env.set, which this runtime denies (the bootstrap swallows the throw), so an
-  // admin-saved key never reaches env and this check silently failed OPEN.
-  if (!secret) return true; // genuinely not configured → fail-open (careers form still works)
-  const body = new URLSearchParams({ secret, response: token, remoteip: ip });
-  const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });
-  const out = await r.json().catch(() => ({ success: false }));
-  return !!out.success;
-}
-
-function clientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for') || '';
-  return xff.split(',')[0].trim() || '0.0.0.0';
-}
+// Turnstile verification and the quota IP come from the shared helpers (#354 HR-12). The local
+// copies were the fifth implementation of the first and a SPOOFABLE version of the second: the IP
+// was the left-most `x-forwarded-for` hop, which the caller controls, so rotating that header gave
+// unlimited applications. See `_shared/turnstile.ts` for why the unconfigured case still fails
+// open — that is a deliberate platform-wide ruling for public forms, not an oversight here.
 
 const CAREERS_MAX_PER_WINDOW = 8;              // applications per IP per window
 const CAREERS_WINDOW_MS = 10 * 60_000;
+/**
+ * A ceiling that does NOT depend on the IP being honest.
+ *
+ * Per-IP limiting is only as good as the IP; this one bounds how many applications a single
+ * workspace's board can take in a window whatever the caller claims to be. Set well above real
+ * hiring volume — a busy posting takes a few an hour — so it only ever catches a flood.
+ */
+const CAREERS_MAX_PER_WORKSPACE_WINDOW = 60;
 const HR_DOC_BUCKET = 'pdf-documents';         // same private bucket the admin ATS signs from
 const RESUME_MAX_BYTES = 8_000_000;            // 8 MB — public callers, keep it tight
 
@@ -204,6 +202,14 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
       await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_rl' });
       return json({ error: 'Too many applications from this network. Please try again later.' }, 429);
     }
+    // …and the same window across the whole board, so the cap survives an IP we cannot trust.
+    const { count: recentWs } = await supabase.from('hr_kiosk_attempts')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', ws.id).eq('outcome', 'careers_apply').gte('created_at', rlSince);
+    if ((recentWs ?? 0) >= CAREERS_MAX_PER_WORKSPACE_WINDOW) {
+      await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_rl' });
+      return json({ error: 'This careers page is receiving too many applications right now. Please try again shortly.' }, 429);
+    }
     await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_apply' });
 
     // Job must be live + in this workspace (never trust a body-supplied workspace).
@@ -229,10 +235,8 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     // throttle, résumé type/size) are cheap and side-effect-free, so a malformed or flooding
     // request never burns a Turnstile verification — and they stay observable to an automated
     // caller that cannot mint a challenge token.
-    const secretRes = await resolveSecret(supabase, 'TURNSTILE_SECRET_KEY').catch(() => ({ value: null }));
-    if (!(await verifyTurnstile((secretRes as any)?.value || null, String(body?.turnstile_token ?? ''), clientIp(req)))) {
-      return json({ error: 'Bot check failed — please retry.' }, 400);
-    }
+    const bot = await verifyTurnstile(supabase, String(body?.turnstile_token ?? ''), ip);
+    if (!bot.ok) return json({ error: 'Bot check failed — please retry.' }, 400);
 
     // Reuse an existing candidate (same email in this workspace) else create one.
     const profile = {

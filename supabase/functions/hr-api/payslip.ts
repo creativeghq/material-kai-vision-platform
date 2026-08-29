@@ -81,6 +81,22 @@ export async function generatePayslips(supabase: any, workspaceId: string, userI
   const { data: run } = await supabase.from('hr_payroll_runs').select('*').eq('id', runId).eq('workspace_id', workspaceId).maybeSingle();
   if (!run) return json({ error: 'not found' }, 404);
   if (run.status === 'draft') return json({ error: 'Approve the run before generating payslips.' }, 400);
+  /**
+   * A payslip for a PAID run is issued once (#354 HR-5).
+   *
+   * Every payslip uploads to a fixed path with `upsert: true`, so regenerating replaces the
+   * document the employee already holds with whatever the items say now — and nothing anywhere
+   * records what the first one said. Before the money moves, regenerating is a correction; after
+   * it, it is a rewrite of a paid record.
+   */
+  if (run.status === 'paid') {
+    const { count } = await supabase.from('hr_documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('doc_type', 'payslip').eq('name', `Payslip ${run.period}`);
+    if ((count ?? 0) > 0) {
+      return json({ error: `Payslips for ${run.period} were already issued and this run is marked paid. Correct it with a new run rather than replacing them.` }, 409);
+    }
+  }
 
   const { data: ws } = await supabase.from('workspaces').select('name').eq('id', workspaceId).maybeSingle();
   // Employer identity = finance_settings business identity (the SAME source invoices,
