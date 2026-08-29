@@ -29,6 +29,7 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').re
 const panel = read('src/components/core/Profile/WebsiteDomainIntelPanel.tsx');
 const tracker = read('supabase/functions/seo-domain-tracker/index.ts');
 const service = read('src/services/userWebsitesService.ts');
+const gscPanel = read('src/components/core/Profile/WebsiteGscPanel.tsx');
 
 describe('#395 — the collector verdict reaches the reader', () => {
   it('nothing to say when the source answered, or when there is no verdict at all', () => {
@@ -89,5 +90,29 @@ describe('#395 — the collector verdict reaches the reader', () => {
   it('and the client type carries it, so it cannot be dropped in the service layer', () => {
     expect(service).toMatch(/source_status\?: Record<string, string> \| null;/);
     expect(service).toMatch(/source_errors\?: Record<string, string> \| null;/);
+  });
+});
+
+describe('#395 — Search Console figures are a value or a stated reason', () => {
+  it('the panel asks the RPC whether the totals mean anything', () => {
+    // Before: `t?.clicks ?? 0` over an RPC that coalesced to zero, so a never-synced site read
+    // "0 clicks, 0 impressions, 0.0% CTR, Avg position 0.0" — and position 0.0 is better than
+    // first place.
+    expect(gscPanel).toMatch(/sourceStatusPresentation/);
+    for (const label of ['Clicks', 'Impressions', 'Avg CTR', 'Avg position']) {
+      expect(gscPanel, label).toContain(`<GscMetric label="${label}"`);
+    }
+    expect(gscPanel, 'a raw zero-defaulted metric is back')
+      .not.toMatch(/<Metric label="Avg position" value=\{\(t\?\.position \?\? 0\)/);
+  });
+
+  it('every one of the four is given the verdict, not just some', () => {
+    const uses = gscPanel.match(/status=\{summary\?\.status\}/g) ?? [];
+    expect(uses).toHaveLength(4);
+  });
+
+  it('the type carries the verdict so the service cannot drop it', () => {
+    expect(service).toMatch(/status\?: 'ok' \| 'no_data' \| 'not_collected' \| string;/);
+    expect(service).toMatch(/rows\?: number;/);
   });
 });

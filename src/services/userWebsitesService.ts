@@ -506,6 +506,20 @@ export interface GscSummary {
   days: number;
   from: string;
   to: string;
+  /**
+   * The SQL's verdict on whether `totals` means anything (CLAUDE.md rule 3).
+   *
+   * `ok` — rows were stored for this window, so the figures are real, zeros included.
+   * `no_data` — the sync works and this period genuinely had nothing.
+   * `not_collected` — nothing has ever been stored for this site.
+   *
+   * `totals` still coalesces to zero for back-compat, which is exactly why this exists: a
+   * never-synced site and a real week of nothing both produced `0 clicks · 0 impressions ·
+   * 0.0% CTR · position 0.0`, and position 0.0 reads as better than first place.
+   */
+  status?: 'ok' | 'no_data' | 'not_collected' | string;
+  /** Source rows behind the window — the evidence for `status`. */
+  rows?: number;
   totals: { clicks: number; impressions: number; ctr: number; position: number };
   trend: GscTrendPoint[];
   top_queries: GscRow[];

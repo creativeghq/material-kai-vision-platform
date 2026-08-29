@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { HubSegmented } from '@/components/core/hub';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { formatNumber } from '@/utils/decimal';
 import {
   userWebsitesService, type UserWebsite, type GscStatus, type GscSummary,
@@ -15,6 +16,36 @@ import {
 
 
 const fmt = (n: number) => formatNumber((n ?? 0));
+
+/**
+ * Search Console figures are a VALUE or a stated REASON (CLAUDE.md rule 3).
+ *
+ * These four were `t?.clicks ?? 0`, `(t?.position ?? 0).toFixed(1)` and so on, and
+ * `get_gsc_summary` coalesced to zero underneath them — so a site that had never synced showed
+ * `0 clicks · 0 impressions · 0.0% CTR · Avg position 0.0`. The last one is the worst: position
+ * 1 is the best result there is, so 0.0 reads as better than first place while meaning "we have
+ * no idea", on the panel a site owner trusts most.
+ *
+ * The RPC now returns the verdict and this only formats it, through the same vocabulary every
+ * other SEO surface uses — which fails closed on a status it does not recognise.
+ */
+function GscMetric({ label, value, status }: { label: string; value: string; status: string | undefined }) {
+  const p = sourceStatusPresentation(status === 'ok' ? null : status);
+  if (!p) return <Metric label={label} value={value} />;
+  return (
+    <Metric
+      label={label}
+      value={
+        <span
+          className={`text-base font-medium ${p.tone === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}
+          title={p.explain}
+        >
+          {p.placeholder}
+        </span>
+      }
+    />
+  );
+}
 
 /**
  * The "Search Performance" tab — Google Search Console for one connected website.
@@ -205,10 +236,10 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             <div className="mb-3 text-xs text-[hsl(var(--error))] flex items-start gap-1"><AlertTriangle className="w-3 h-3 mt-0.5" /><span className="break-all">{status.last_sync_error}</span></div>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Metric label="Clicks" value={fmt(t?.clicks ?? 0)} />
-            <Metric label="Impressions" value={fmt(t?.impressions ?? 0)} />
-            <Metric label="Avg CTR" value={`${(t?.ctr ?? 0).toFixed(1)}%`} />
-            <Metric label="Avg position" value={(t?.position ?? 0).toFixed(1)} />
+            <GscMetric label="Clicks" value={fmt(t?.clicks ?? 0)} status={summary?.status} />
+            <GscMetric label="Impressions" value={fmt(t?.impressions ?? 0)} status={summary?.status} />
+            <GscMetric label="Avg CTR" value={`${(t?.ctr ?? 0).toFixed(1)}%`} status={summary?.status} />
+            <GscMetric label="Avg position" value={(t?.position ?? 0).toFixed(1)} status={summary?.status} />
           </div>
           {trend.length > 1 && (
             <div className="mt-4">
