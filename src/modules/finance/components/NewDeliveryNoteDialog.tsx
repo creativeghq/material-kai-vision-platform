@@ -14,6 +14,7 @@ import { Loader2, Trash2, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { deliveryNotesService, type WarehousePick, type DeliveryLineInput } from '@/modules/finance/services/deliveryNotesService';
+import { SELECTABLE_MOVE_PURPOSES } from '@/services/fiscal/fiscalVocabulary';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 
@@ -105,7 +106,33 @@ export const NewDeliveryNoteDialog: React.FC<{
         shipToPostal: toAddr.postal || undefined, shipToCity: toAddr.city || undefined,
         shipToAddressUnitId: toUnitId,
       });
-      if (issue) await deliveryNotesService.issue(id);
+      if (issue) {
+        try {
+          await deliveryNotesService.issue(id);
+        } catch (issErr: any) {
+          /**
+           * The draft EXISTS (#351 C4).
+           *
+           * Create and issue are two awaits with no transaction between them, and the old catch
+           * said only "Failed" and left the form armed — so the header that had just been written
+           * was invisible, and saving again cut a second one. `issue_delivery_note` allocates the
+           * legal number and moves stock, so it is the half that can genuinely fail (a line with
+           * no catalog product, a closed period, an RLS rejection) long after the note is saved.
+           *
+           * Say which half succeeded, refresh the list so the draft is visible, and close —
+           * issuing it again belongs on that row, where the operator can see what they are
+           * issuing. Re-arming this form would only offer to duplicate it.
+           */
+          onCreated();
+          onOpenChange(false);
+          toast({
+            title: 'Saved as a draft — NOT issued',
+            description: `${issErr?.message ?? 'The note could not be issued.'} It is in the list as a draft; issue it from there once the problem is fixed.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
       toast({ title: issue ? 'Delivery note issued' : 'Draft saved' });
       onCreated();
       onOpenChange(false);
@@ -182,13 +209,9 @@ export const NewDeliveryNoteDialog: React.FC<{
               <Select value={movePurpose} onValueChange={setMovePurpose}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 — Sale</SelectItem>
-                  <SelectItem value="2">2 — Sale on behalf of third party</SelectItem>
-                  <SelectItem value="3">3 — Sampling</SelectItem>
-                  <SelectItem value="4">4 — Exhibition</SelectItem>
-                  <SelectItem value="5">5 — Return</SelectItem>
-                  <SelectItem value="6">6 — Movement between premises</SelectItem>
-                  <SelectItem value="7">7 — Consignment</SelectItem>
+                  {SELECTABLE_MOVE_PURPOSES.map((p) => (
+                    <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

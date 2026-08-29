@@ -17,7 +17,7 @@
  *    subtracts from totals) or kept as customer credit. The original payment is left in
  *    place (a transmitted document is never silently removed).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -185,24 +185,57 @@ const ReturnPaymentDialog: React.FC<{
   const [method, setMethod] = useState<PaymentMethod>((payment.method as PaymentMethod) ?? 'bank_transfer');
   const [busy, setBusy] = useState(false);
 
+  /**
+   * What this return has already done (#351 A1).
+   *
+   * A return is a LOOP of credit notes followed by a refund, with nothing recording which of them
+   * succeeded. A failure on the third of four invoices, or on the refund, showed one generic
+   * "Return failed" and left the whole flow retryable — and a retry re-issued the credit notes
+   * that already existed. With "Transmit to myDATA" on, those are transmitted legal documents,
+   * and the customer's account is credited twice for one return.
+   *
+   * `issue_credit_note` now caps cumulative credit at the invoice total (#351 B4), so the second
+   * copy would be refused rather than issued — but "refused" reaches the operator as a raw error
+   * on a flow that half-worked, which is not a recovery. This is: each leg is remembered, a retry
+   * resumes at the first one that has not happened, and the toast says exactly where it stopped.
+   *
+   * A ref, not state: it must be correct on the very next click, not on the next render.
+   */
+  const doneRef = useRef<{ credited: Set<string>; refunded: boolean }>({ credited: new Set(), refunded: false });
+  const busyRef = useRef(false);
+
   const confirm = async () => {
     if (!reason.trim()) { toast({ title: 'Reason required', variant: 'destructive' }); return; }
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       // 1) Reverse each transmitted invoice with a correlated credit note.
       for (const a of allocs) {
-        await financeService.createCreditNote({
-          workspaceId: payment.workspace_id,
-          invoiceId: a.invoice_id,
-          amount: a.amount,
-          currency: a.currency ?? payment.currency,
-          reason: reason.trim(),
-          correlated: !!a.fiscal_mark,
-          submitFiscal,
-        });
+        if (doneRef.current.credited.has(a.invoice_id)) continue;
+        try {
+          await financeService.createCreditNote({
+            workspaceId: payment.workspace_id,
+            invoiceId: a.invoice_id,
+            amount: a.amount,
+            currency: a.currency ?? payment.currency,
+            reason: reason.trim(),
+            correlated: !!a.fiscal_mark,
+            submitFiscal,
+          });
+        } catch (cnErr: unknown) {
+          const doneCount = doneRef.current.credited.size;
+          toast({
+            title: doneCount > 0 ? `Return stopped after ${doneCount} of ${allocs.length} credit notes` : 'Return failed',
+            description: `${a.internal_number ?? 'An invoice'} could not be credited: ${cnErr instanceof Error ? cnErr.message : String(cnErr)}. ${doneCount > 0 ? 'The notes already issued stay issued — pressing Confirm again resumes from this one and will not repeat them.' : 'Nothing was issued.'}`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        doneRef.current.credited.add(a.invoice_id);
       }
       // 2) Refund the received cash (money out) — subtracts from totals — or keep as credit.
-      if (refund) {
+      if (refund && !doneRef.current.refunded) {
         await financeService.recordPayment({
           workspaceId: payment.workspace_id,
           direction: 'out',
@@ -216,12 +249,20 @@ const ReturnPaymentDialog: React.FC<{
           bankAccountId: bankAccountId || null,
           allocations: [],
         });
+        doneRef.current.refunded = true;
       }
       toast({ title: refund ? 'Return issued + refund recorded' : 'Return issued — kept as customer credit' });
       onDone();
     } catch (err: any) {
-      toast({ title: 'Return failed', description: err?.message, variant: 'destructive' });
-    } finally { setBusy(false); }
+      // Reached only by the refund leg now — the credit notes report their own position above.
+      toast({
+        title: doneRef.current.credited.size > 0 ? 'Credit notes issued — refund NOT recorded' : 'Return failed',
+        description: doneRef.current.credited.size > 0
+          ? `${err?.message ?? 'The refund could not be recorded.'} The credit notes stand; pressing Confirm again records the refund only.`
+          : err?.message,
+        variant: 'destructive',
+      });
+    } finally { busyRef.current = false; setBusy(false); }
   };
 
   return (

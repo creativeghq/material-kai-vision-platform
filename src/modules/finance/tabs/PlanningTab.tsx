@@ -143,14 +143,29 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
     return buckets;
   }, [filtered]);
 
+  /**
+   * One set of totals PER CURRENCY, never one number (#351 D5).
+   *
+   * The rows each carry their own currency and print it, and creation offers EUR/USD/GBP — but
+   * these three tiles summed every row into one figure and handed it to `formatMoney` with no
+   * currency, which labels it EUR. A dollar payable and a euro payable were added together and
+   * stamped with the wrong symbol under the words "Planned out". A cross-currency sum is a
+   * confident figure in no currency at all, and nothing about it looks wrong.
+   *
+   * Same shape as `CreditReleasesCard`, which had the identical defect.
+   */
   const totals = useMemo(() => {
-    let inSum = 0, outSum = 0;
+    const byCurrency = new Map<string, { inSum: number; outSum: number }>();
     for (const r of filtered) {
       if (r.status !== 'planned' && r.status !== 'overdue') continue;
-      if (r.direction === 'in') inSum += Number(r.amount);
-      else outSum += Number(r.amount);
+      const ccy = r.currency || 'EUR';
+      const e = byCurrency.get(ccy) ?? { inSum: 0, outSum: 0 };
+      if (r.direction === 'in') e.inSum += Number(r.amount);
+      else e.outSum += Number(r.amount);
+      byCurrency.set(ccy, e);
     }
-    return { inSum, outSum, net: inSum - outSum };
+    return [...byCurrency].sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, e]) => ({ currency, ...e, net: e.inSum - e.outSum }));
   }, [filtered]);
 
   const markPaid = async (row: PlannedPayment) => {
@@ -197,15 +212,26 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
       <div className="grid grid-cols-3 gap-3">
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">Expected in</div>
-          <div className="text-lg font-semibold text-emerald-500">{formatMoney(totals.inSum)}</div>
+          <div className="text-lg font-semibold text-emerald-500">
+            {totals.length === 0 ? formatMoney(0)
+              : totals.map((t) => <div key={t.currency}>{formatMoney(t.inSum, t.currency)}</div>)}
+          </div>
         </CardContent></Card>
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">Planned out</div>
-          <div className="text-lg font-semibold text-red-400">{formatMoney(totals.outSum)}</div>
+          <div className="text-lg font-semibold text-red-400">
+            {totals.length === 0 ? formatMoney(0)
+              : totals.map((t) => <div key={t.currency}>{formatMoney(t.outSum, t.currency)}</div>)}
+          </div>
         </CardContent></Card>
         <Card className="dashboard-card border-0"><CardContent className="p-3">
           <div className="text-xs text-muted-foreground">Net planned</div>
-          <div className={`text-lg font-semibold ${totals.net < 0 ? 'text-destructive' : ''}`}>{formatMoney(totals.net)}</div>
+          <div className="text-lg font-semibold">
+            {totals.length === 0 ? formatMoney(0)
+              : totals.map((t) => (
+                <div key={t.currency} className={t.net < 0 ? 'text-destructive' : ''}>{formatMoney(t.net, t.currency)}</div>
+              ))}
+          </div>
         </CardContent></Card>
       </div>
 

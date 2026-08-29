@@ -25,6 +25,17 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
  *     `amount` with no currency check, producing a figure in no currency at all.
  *  5. `amount_paid` is CASH; credit-note relief lands in `amount_credited`; `amount_due` nets
  *     both — so a credit-noted invoice neither reads as "paid in cash" nor reappears in aging.
+ *  6. `issue_credit_note` caps CUMULATIVE credit at the invoice total (#351 B4). It used to check
+ *     the request in front of it and nothing else, so crediting 6 of 10 and reopening the form —
+ *     which defaulted back to all 10 — produced EUR 198.40 of transmitted legal documents against
+ *     a EUR 124 invoice.
+ *  7. `pos_issue_receipt` is idempotent on its client token (#351 C1). A retry after a dropped
+ *     connection returned a SECOND receipt with its own legal number, its own payment and its own
+ *     stock movement.
+ *  8. `bill_time_entries_to_invoice` / `bill_trip_expenses_to_invoice` are ONE transaction and
+ *     apply the filters their callers' doc comments always claimed (#351 S4/S2/S3). The TypeScript
+ *     they replaced wrote the invoice, its lines and the source stamps as three separate calls, so
+ *     a failure on the last one left the work billed and still marked unbilled.
  */
 const suite = hasCreds ? describe : describe.skip;
 
@@ -305,5 +316,150 @@ suite('fiscal derivations · quote → invoice → receipt → settlement', () =
     const { data: aging } = await svc.from('vw_ar_aging')
       .select('id').eq('id', inv.data.id).gt('amount_due', 0);
     expect(aging ?? []).toHaveLength(0);
+  });
+
+  // ── 6. cumulative credit cannot exceed the invoice (#351 B4) ───────────────
+  it('issue_credit_note refuses to credit more than the invoice is worth, cumulatively', async () => {
+    const inv = await svc.from('invoices').insert({
+      workspace_id: ws, internal_number: `INV-B4-${rid}`, invoice_kind: 'full',
+      customer_contact_id: contact, status: 'draft', currency: 'EUR',
+      subtotal_net: 100, vat_rate: 24, vat_amount: 24, total: 124,
+      payment_terms_days: 30, created_by: A.id, issued_at: new Date().toISOString(),
+    }).select('id').single();
+    if (inv.error) throw new Error(`seed invoice: ${inv.error.message}`);
+    // Lines go on while it is still a draft — `invoice_items_immutability_guard` closes the door
+    // the moment it is issued.
+    const item = await svc.from('invoice_items').insert({
+      invoice_id: inv.data.id, description: 'widget', quantity: 10, unit_price: 10,
+      net_value: 100, vat_amount: 24, line_total: 124,
+    }).select('id').single();
+    if (item.error) throw new Error(`seed item: ${item.error.message}`);
+    await svc.from('invoices').update({ status: 'issued' }).eq('id', inv.data.id);
+
+    const line = (qty: number, net: number, vat: number) => [{
+      source_invoice_item_id: item.data.id, description: 'widget',
+      quantity: qty, unit_price: 10, net_value: net, vat_amount: vat,
+    }];
+
+    // Credit 6 of 10 → 74.40.
+    const first = await A.client.rpc('issue_credit_note', {
+      p_invoice_id: inv.data.id, p_lines: line(6, 60, 14.40), p_reason: 'partial return', p_correlated: true,
+    });
+    expect(first.error).toBeNull();
+
+    // The form reopens and offers all 10 again. THIS is the finding: it used to succeed, leaving
+    // 198.40 of credit against a 124 invoice.
+    const second = await A.client.rpc('issue_credit_note', {
+      p_invoice_id: inv.data.id, p_lines: line(10, 100, 24), p_reason: 'second full return', p_correlated: true,
+    });
+    expect(second.error).not.toBeNull();
+    expect(second.error!.message).toContain('credit_exceeds_invoice');
+
+    // …and the remaining 4 still credit, so the cap is a cap and not a one-note-per-invoice rule.
+    const rest = await A.client.rpc('issue_credit_note', {
+      p_invoice_id: inv.data.id, p_lines: line(4, 40, 9.60), p_reason: 'rest', p_correlated: true,
+    });
+    expect(rest.error).toBeNull();
+
+    const { data: after } = await svc.from('invoices')
+      .select('amount_credited, status').eq('id', inv.data.id).single();
+    expect(Number(after!.amount_credited)).toBe(124);
+    expect(after!.status).toBe('credit_noted');
+  });
+
+  // ── 7. a retried POS sale is the same sale (#351 C1) ───────────────────────
+  it('pos_issue_receipt returns the SAME receipt for a repeated client token', async () => {
+    const token = `probe-${rid}`;
+    const args = {
+      p_workspace_id: ws, p_session_id: posSession, p_doc_code: '11.1', p_branch_code: 0,
+      p_items: [
+        { product_id: null, description: 'A', quantity: 3, unit_price: 9.99, vat_rate: 24, vat_category: 1 },
+        { product_id: null, description: 'B', quantity: 1, unit_price: 7.77, vat_rate: 6, vat_category: 3 },
+      ],
+      p_vat_inclusive: true, p_currency: 'EUR', p_payment_method_code: 3,
+      p_customer_company_id: null, p_customer_contact_id: null,
+      p_has_shipping: false, p_vehicle_number: null, p_ship_to: null, p_move_purpose: null,
+      p_client_token: token,
+    };
+    const before = await svc.from('invoices').select('id', { count: 'exact', head: true }).eq('workspace_id', ws);
+
+    const one = await A.client.rpc('pos_issue_receipt', args);
+    const two = await A.client.rpc('pos_issue_receipt', args);
+    expect(one.error).toBeNull();
+    expect(two.error).toBeNull();
+    const r1 = Array.isArray(one.data) ? one.data[0] : one.data;
+    const r2 = Array.isArray(two.data) ? two.data[0] : two.data;
+
+    // Same document, same legal number — and the replayed answer is derived from what was STORED,
+    // so the register can print from it exactly as it prints a first issue.
+    expect(r2.invoice_id).toBe(r1.invoice_id);
+    expect(r2.internal_number).toBe(r1.internal_number);
+    expect(Number(r2.net)).toBe(Number(r1.net));
+    expect(Number(r2.vat)).toBe(Number(r1.vat));
+    expect(r2.by_rate).toEqual(r1.by_rate);
+
+    const after = await svc.from('invoices').select('id', { count: 'exact', head: true }).eq('workspace_id', ws);
+    expect((after.count ?? 0) - (before.count ?? 0)).toBe(1);
+
+    // A different basket with its own token is a different sale — the token must not swallow the
+    // next customer.
+    const three = await A.client.rpc('pos_issue_receipt', { ...args, p_client_token: `${token}-b` });
+    expect(three.error).toBeNull();
+    const r3 = Array.isArray(three.data) ? three.data[0] : three.data;
+    expect(r3.invoice_id).not.toBe(r1.invoice_id);
+  });
+
+  // ── 8. billing logged work is one transaction, and filtered (#351 S4/S2/S3) ─
+  it('bill_time_entries_to_invoice bills only billable, unbilled, same-customer entries — once', async () => {
+    const co = await svc.from('crm_companies').insert({ workspace_id: ws, name: `S4 co ${rid}` }).select('id').single();
+    const other = await svc.from('crm_companies').insert({ workspace_id: ws, name: `S4 other ${rid}` }).select('id').single();
+    if (co.error || other.error) throw new Error('seed companies');
+
+    const entry = async (minutes: number, billable: boolean, company: string) => {
+      const r = await svc.from('time_entries').insert({
+        workspace_id: ws, user_id: A.id, work_date: new Date().toISOString().slice(0, 10),
+        minutes, hourly_rate: 50, description: 'work', is_billable: billable,
+        customer_company_id: company,
+      }).select('id').single();
+      if (r.error) throw new Error(`seed entry: ${r.error.message}`);
+      return r.data.id as string;
+    };
+    const billable = await entry(90, true, co.data.id);
+    const notBillable = await entry(60, false, co.data.id);
+    const elsewhere = await entry(60, true, other.data.id);
+
+    // An entry logged against another customer stops the whole call rather than being billed to
+    // whoever the operator happened to select.
+    const wrong = await A.client.rpc('bill_time_entries_to_invoice', {
+      p_workspace_id: ws, p_customer_company_id: co.data.id, p_customer_contact_id: null,
+      p_entry_ids: [billable, elsewhere], p_vat_rate: 24,
+    });
+    expect(wrong.error).not.toBeNull();
+    expect(wrong.error!.message).toContain('attributed_to_another_customer');
+
+    const ok = await A.client.rpc('bill_time_entries_to_invoice', {
+      p_workspace_id: ws, p_customer_company_id: co.data.id, p_customer_contact_id: null,
+      p_entry_ids: [billable, notBillable], p_vat_rate: 24,
+    });
+    expect(ok.error).toBeNull();
+
+    // 1.5h x 50 = 75 — the non-billable hour is not in it, and its row is untouched.
+    const { data: created } = await svc.from('invoices')
+      .select('subtotal_net, vat_amount, total').eq('id', ok.data as string).single();
+    expect(Number(created!.subtotal_net)).toBe(75);
+    expect(Number(created!.vat_amount)).toBe(18);
+    const { data: lines } = await svc.from('invoice_items').select('id').eq('invoice_id', ok.data as string);
+    expect(lines).toHaveLength(1);
+    const { data: untouched } = await svc.from('time_entries')
+      .select('billed_invoice_id').eq('id', notBillable).single();
+    expect(untouched!.billed_invoice_id).toBeNull();
+
+    // The retry — the actual finding. The stamp is inside the same transaction, so there is
+    // nothing left unbilled for a second invoice to pick up.
+    const retry = await A.client.rpc('bill_time_entries_to_invoice', {
+      p_workspace_id: ws, p_customer_company_id: co.data.id, p_customer_contact_id: null,
+      p_entry_ids: [billable, notBillable], p_vat_rate: 24,
+    });
+    expect(retry.error).not.toBeNull();
   });
 });

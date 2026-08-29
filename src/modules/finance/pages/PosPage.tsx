@@ -5,7 +5,7 @@
  * Υπηρεσιών) — records the cash/card/IRIS payment and prints. Reuses the existing
  * invoice + fiscal-submit + payment + cashier-shift (X/Z) machinery.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Loader2, Trash2, Search, Printer, CheckCircle2, Wrench, Package,
   Delete, User, Wifi, CreditCard, ScanLine, X as XIcon, Plus, Minus,
@@ -129,6 +129,21 @@ const PosPage: React.FC = () => {
   const [movVehicle, setMovVehicle] = useState('');
   const [movShipTo, setMovShipTo] = useState('');
   const [issuing, setIssuing] = useState(false);
+  /**
+   * A sale is issued ONCE (#351 C1).
+   *
+   * `disabled={issuing}` is React state, so it takes effect a frame later — a touchscreen bounce
+   * or a stuck button lands the second call inside that window, and two calls meant two receipts,
+   * two payments and two stock reductions, each carrying its own legal AADE number.
+   *
+   * The ref closes the window synchronously. It cannot close the OTHER half: a connection dropped
+   * after the transaction committed shows the cashier an error for a receipt that exists, and
+   * pressing the button again is the natural thing to do. So the register also mints a token per
+   * BASKET and `pos_issue_receipt` returns the same receipt for it — a retry of this sale is the
+   * same sale, while the next customer's identical basket is a new one.
+   */
+  const issuingRef = useRef(false);
+  const [saleToken, setSaleToken] = useState(() => crypto.randomUUID());
   const [session, setSession] = useState<PosSession | null>(null);
   const [zReport, setZReport] = useState<PosReport | null>(null);
   const [result, setResult] = useState<{
@@ -391,6 +406,8 @@ const PosPage: React.FC = () => {
 
   const issue = async () => {
     if (!activeWorkspaceId || cart.length === 0) return;
+    if (issuingRef.current) return;
+    issuingRef.current = true;
     setIssuing(true);
     try {
       // ONE round trip, ONE transaction: allocate the legal ΑΑΔΕ number, write the header, write
@@ -429,6 +446,9 @@ const PosPage: React.FC = () => {
         p_vehicle_number: movementDoc ? (movVehicle || null) : null,
         p_ship_to: movementDoc ? (movShipTo || null) : null,
         p_move_purpose: movementDoc ? '1' : null,
+        // Same basket, same receipt — see `saleToken`. Cleared by `resetSale`, so the token
+        // belongs to THIS sale and not to the register.
+        p_client_token: saleToken,
       });
       if (issErr) throw issErr;
       const invoice = Array.isArray(issued) ? issued[0] : issued;
@@ -481,10 +501,16 @@ const PosPage: React.FC = () => {
       await finalizeSale(snapshot.invoiceId, snapshot, method, mark);
     } catch (err: any) {
       toast({ title: 'Failed to issue receipt', description: err?.message, variant: 'destructive' });
-    } finally { setIssuing(false); }
+    } finally { issuingRef.current = false; setIssuing(false); }
   };
 
-  const resetSale = () => { setCart([]); setMovementDoc(false); setMovVehicle(''); setMovShipTo(''); setCustomer(null); setDisplay(''); setPendingQty(null); };
+  const resetSale = () => {
+    setCart([]); setMovementDoc(false); setMovVehicle(''); setMovShipTo(''); setCustomer(null); setDisplay(''); setPendingQty(null);
+    // A new basket is a new sale, so it gets its own idempotency token (#351 C1). Minting it here
+    // rather than on success also means an ABANDONED sale — cleared without issuing — cannot have
+    // its token replayed onto the next one.
+    setSaleToken(crypto.randomUUID());
+  };
 
   const finalizeSale = async (
     invoiceId: string,

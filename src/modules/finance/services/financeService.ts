@@ -2445,7 +2445,9 @@ const _financeServiceCore = {
    * is that call, so the party-name / Inbox enrichment below has exactly one implementation.
    * `inboxOnly` narrows to expenses created from a received document; `unlinkedOnly` narrows to
    * expenses not yet matched to an order — what the order's "Attach an existing expense" picker
-   * offers, so an already-attached cost can never be double-counted onto a second order.
+   * offers, so an already-attached cost can never be double-counted onto a second order. "Matched"
+   * means EITHER link: `order_id` (part of that purchase) or `covers_order_id` (the cost of that
+   * sale).
    */
   async listPayableExpenses(
     workspaceId: string,
@@ -2458,7 +2460,13 @@ const _financeServiceCore = {
       .eq('workspace_id', workspaceId)
       .order('issued_at', { ascending: false, nullsFirst: false });
     if (opts.ids) q = q.in('id', opts.ids);
-    if (opts.unlinkedOnly) q = q.is('order_id', null);
+    // BOTH order links, not one of them (#351 C2). An expense reaches an order two ways —
+    // `order_id` (the purchase it is part of) and `covers_order_id` (the sales order whose cost it
+    // is) — and this filter only ever looked at the first, while the comment above promised "an
+    // already-attached cost can never be double-counted onto a second order". A bill attached via
+    // `covers_order_id` read as unlinked and could take an `order_id` too, so one cost landed on
+    // two orders' roll-ups.
+    if (opts.unlinkedOnly) q = q.is('order_id', null).is('covers_order_id', null);
     if (!opts.includeSettled) q = q.not('status', 'in', '("void","paid")').gt('amount_due', 0);
     const { data, error } = await q;
     if (error) throw error;

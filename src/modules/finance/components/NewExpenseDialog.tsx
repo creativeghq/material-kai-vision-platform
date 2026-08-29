@@ -491,17 +491,25 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           recurringError = recErr?.message ?? 'the recurring template could not be created';
         }
       }
+      // The payment leg is best-effort for the same reason the two below are: the bill is
+      // committed, so a failure after it must not read as "nothing happened" (#351 C3). Reported
+      // FIRST because it is the one that leaves money unaccounted for.
+      const paidText = paidNow && !created.paymentError;
       toast({
-        title: recurringError
-          ? (paidNow ? 'Expense recorded & paid — repeat NOT set up' : 'Expense recorded — repeat NOT set up')
-          : (paidNow ? 'Expense recorded & paid' : 'Expense recorded as payable'),
-        variant: recurringError ? 'destructive' : undefined,
+        title: created.paymentError
+          ? 'Expense recorded — payment NOT recorded'
+          : (recurringError
+            ? (paidText ? 'Expense recorded & paid — repeat NOT set up' : 'Expense recorded — repeat NOT set up')
+            : (paidText ? 'Expense recorded & paid' : 'Expense recorded as payable')),
+        variant: (recurringError || created.paymentError) ? 'destructive' : undefined,
         description: [
-          recurringError
+          created.paymentError
+            ? `The bill is saved and open in Payables: ${created.paymentError}. Mark it paid from there — do NOT save this form again or you will book the cost twice.`
+            : recurringError
             ? `This expense is saved. The repeat schedule was not created: ${recurringError}. Set it up from Recurring expenses — do NOT save this form again or you will book it twice.`
             : (repeat !== 'none'
               ? `Recurring ${repeat} — the next one generates automatically.`
-              : (paidNow ? 'Booked as a paid cost — visible in Payables and Payments.' : 'Open in Payables (AP) until you mark it paid.')),
+              : (paidText ? 'Booked as a paid cost — visible in Payables and Payments.' : 'Open in Payables (AP) until you mark it paid.')),
           linkNote,
         ].filter(Boolean).join(' '),
       });

@@ -33978,6 +33978,26 @@ export type Database = {
         Args: { limit_rows?: number }
         Returns: number
       }
+      bill_time_entries_to_invoice: {
+        Args: {
+          p_customer_company_id: string | null
+          p_customer_contact_id: string | null
+          p_entry_ids: string[]
+          p_vat_rate: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      bill_trip_expenses_to_invoice: {
+        Args: {
+          p_customer_company_id: string | null
+          p_customer_contact_id: string | null
+          p_item_ids: string[]
+          p_vat_rate: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       brand_overview: {
         Args: { p_company_id: string; p_workspace_id: string }
         Returns: Json
@@ -37366,6 +37386,7 @@ export type Database = {
       pos_issue_receipt: {
         Args: {
           p_branch_code: number
+          p_client_token?: string
           p_currency: string
           p_customer_company_id?: string
           p_customer_contact_id?: string

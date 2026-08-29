@@ -14,9 +14,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { formatMoney } from '@/modules/finance/services/financeService';
-import { round2 } from '@/utils/decimal';
-import { vatOf } from '@/modules/finance/lib/vatMath';
 import { todayLocalISO } from '@/utils/datetime';
+import { billingErrorMessage } from '@/modules/finance/services/timeTrackingService';
 
 export type TripStatus =
   | 'draft' | 'submitted' | 'partially_approved' | 'approved' | 'rejected' | 'reimbursed';
@@ -402,52 +401,28 @@ export const tripExpenseService = {
     vatRate = 24,
   ): Promise<string> {
     if (itemIds.length === 0) throw new Error('No expenses selected');
-    const { data: items, error: selErr } = await supabase
-      .from('trip_expense_items').select('*')
-      .in('id', itemIds).eq('workspace_id', workspaceId)
-      .eq('billable', true).is('billed_invoice_id', null);
-    if (selErr) throw selErr;
-    const rows = (items ?? []) as TripExpenseItem[];
-    if (rows.length === 0) throw new Error('Selected expenses are already billed or not billable');
-
-    const totalNet = round2(rows.reduce((s, r) => s + Number(r.amount), 0));
-    const vatAmount = vatOf(totalNet, vatRate);
-
-    const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
-    if (numErr) throw numErr;
-
-    const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
-      workspace_id: workspaceId,
-      internal_number: draftNumber as string,
-      customer_company_id: customer.type === 'company' ? customer.id : null,
-      customer_contact_id: customer.type === 'contact' ? customer.id : null,
-      status: 'draft',
-      currency: rows[0]?.currency ?? 'EUR',
-      subtotal_net: totalNet, vat_rate: vatRate, vat_amount: vatAmount, total: round2(totalNet + vatAmount),
-      document_type: customer.type === 'company' ? '1.1' : '11.1',
-      payment_terms_days: 30,
-      notes: 'Generated from billable trip expenses',
-      issued_at: null, due_at: null,
-    } as any).select().single();
-    if (insErr) throw insErr;
-
-    const itemsPayload = rows.map((r) => ({
-      invoice_id: (invoice as any).id,
-      description: [r.category, r.vendor, r.description].filter(Boolean).join(' · ') || 'Expense',
-      quantity: 1,
-      unit_price: Number(r.amount),
-      net_value: Number(r.amount),
-      line_total: Number(r.amount),
-    }));
-    const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
-    if (itErr) throw itErr;
-
-    const { error: stampErr } = await supabase.from('trip_expense_items')
-      .update({ billed_invoice_id: (invoice as any).id, billed_at: new Date().toISOString() })
-      .in('id', rows.map((r) => r.id));
-    if (stampErr) throw stampErr;
-
-    return (invoice as any).id as string;
+    /**
+     * ONE transaction (#351 S4), and it bills what the comment above says it bills.
+     *
+     * Create → lines → stamp were three separate writes; a failure on the stamp left the claims
+     * reading unbilled beside an invoice that already carried them, so retrying billed the
+     * client twice for the same receipts.
+     *
+     * `approval_status = 'approved'` is applied server-side now (#351 S3) — only `billable` was
+     * ever checked here, while the panel filtered approval and the doc comment claimed it. And
+     * a selection spanning two currencies is refused rather than summed into whichever currency
+     * happened to be first.
+     */
+    const { data, error } = await supabase.rpc('bill_trip_expenses_to_invoice', {
+      p_workspace_id: workspaceId,
+      p_customer_company_id: customer.type === 'company' ? customer.id : null,
+      p_customer_contact_id: customer.type === 'contact' ? customer.id : null,
+      p_item_ids: itemIds,
+      p_vat_rate: vatRate,
+    });
+    if (error) throw new Error(billingErrorMessage(error.message));
+    if (!data) throw new Error('The invoice was not created');
+    return data as string;
   },
 
   // -------- Workflow (RPCs) --------

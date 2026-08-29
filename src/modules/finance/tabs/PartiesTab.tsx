@@ -510,8 +510,30 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const totalDebit = ledgerWithBalance.length ? ledgerWithBalance[ledgerWithBalance.length - 1].progrDebit : 0;
   const totalCredit = ledgerWithBalance.length ? ledgerWithBalance[ledgerWithBalance.length - 1].progrCredit : 0;
   const ledgerClosing = opening + totalDebit - totalCredit;
-  const ledgerCurrency = ledger.find((r) => r.currency)?.currency ?? undefined;
+  /**
+   * A running balance across currencies is not a balance (#351 D5).
+   *
+   * Every figure below — the progressive totals, the closing, the printed Kartela — was summed
+   * across whatever currencies the party's documents happened to carry, and then formatted with
+   * the currency of the FIRST row that had one. Adding dollars to euros produces a confident
+   * number in no currency at all, and the one artefact this screen exports is handed to the
+   * counterparty as a statement of their account.
+   *
+   * So a mixed ledger states the reason instead of the number: the per-row amounts still print in
+   * their own currency (which they always should have), the derived columns show nothing, and the
+   * export is refused rather than issued wrong.
+   */
+  const ledgerCurrencies = useMemo(
+    () => [...new Set(ledger.map((r) => r.currency).filter(Boolean) as string[])].sort(),
+    [ledger],
+  );
+  const ledgerCurrency = ledgerCurrencies[0];
+  const mixedCurrency = ledgerCurrencies.length > 1;
   const m = (n: number) => formatMoney(n, ledgerCurrency);
+  /** A derived figure: shown only when it is one currency's worth of money. */
+  const md = (n: number) => (mixedCurrency ? '—' : formatMoney(n, ledgerCurrency));
+  /** A row's own amount, in the currency the row is actually in. */
+  const mr = (n: number, ccy?: string | null) => formatMoney(n, ccy ?? ledgerCurrency);
   /** Same tone rule as the account-balance tile above, so one position never reads two ways. */
   const closingTone = ledgerClosing > 0 ? 'text-emerald-600 dark:text-emerald-400'
     : ledgerClosing < 0 ? 'text-destructive' : 'text-muted-foreground';
@@ -540,6 +562,16 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     // document.write — CRM party name/email + ledger doc fields (attacker-influenced via
     // counterparty/import data) MUST be escaped or an <img onerror> in a party name runs
     // in the app origin and can read the Supabase session token from localStorage.
+    // A statement of account with a cross-currency balance is worse than no statement — this one
+    // leaves the building (#351 D5).
+    if (mixedCurrency) {
+      toast({
+        title: 'This ledger spans more than one currency',
+        description: `Entries are in ${ledgerCurrencies.join(', ')}. A single running balance across currencies is not a real figure, so the Kartela cannot be printed. Narrow the date range to a single-currency period.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
     const sideLabel = ledgerSide === 'customer' ? 'Πελάτης / Customer' : 'Προμηθευτής / Supplier';
     const rowsHtml = ledgerWithBalance.map((r) => `
@@ -1098,7 +1130,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                           {ledgerPage === 1 && (
                             <tr className="border-b border-border/30 bg-muted/30">
                               <td colSpan={7} className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Opening balance</td>
-                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(opening)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{md(opening)}</td>
                             </tr>
                           )}
                           {ledgerWithBalance.length === 0 ? (
@@ -1123,11 +1155,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                                   </button>
                                 ) : docLabel}
                               </td>
-                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? m(Number(r.debit)) : ''}</td>
-                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? m(Number(r.credit)) : ''}</td>
-                              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrDebit)}</td>
-                              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{m(r.progrCredit)}</td>
-                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{m(r.balance)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? mr(Number(r.debit), r.currency) : ''}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.credit) ? mr(Number(r.credit), r.currency) : ''}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{md(r.progrDebit)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{md(r.progrCredit)}</td>
+                              <td className="px-3 py-1.5 text-right tabular-nums font-medium">{md(r.balance)}</td>
                             </tr>
                             );
                           })}
@@ -1135,11 +1167,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                         <tfoot>
                           <tr className="border-t-2 border-border">
                             <td colSpan={3} className="px-3 py-2 text-xs font-semibold">Totals</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalDebit)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(totalCredit)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{m(ledgerClosing)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{md(totalDebit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{md(totalCredit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{md(totalDebit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{md(totalCredit)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{md(ledgerClosing)}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -1160,11 +1192,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                     {!ledgerLoading && (
                       <div className="flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5 border-t border-border/60 px-3 py-2">
                         <span className="text-xs text-muted-foreground">
-                          Account balance · {netPositionDirection(ledgerClosing)}
+                          {mixedCurrency ? 'Account balance' : <>Account balance &middot; {netPositionDirection(ledgerClosing)}</>}
                           {' · '}{includeOrders ? 'incl. un-invoiced orders' : 'documents only'}
                         </span>
                         <span className={`text-base font-semibold tabular-nums ${closingTone}`}>
-                          {m(Math.abs(ledgerClosing))}
+                          {md(Math.abs(ledgerClosing))}
                         </span>
                       </div>
                     )}
