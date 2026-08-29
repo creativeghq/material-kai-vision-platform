@@ -24,15 +24,26 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 | `wan-3.0-1080p` | 155 | 30s | yes | Long clips at full HD |
 | `seedance-2.5-480p` | 60 | 30s | yes | 30s in ONE pass, role-tagged references |
 | `seedance-2.5-720p` | 125 | 30s | yes | The same at 720p |
+| `minimax-h3` | 40 | 15s | yes (stereo) | Social reels — native 2K, the cheapest full clip |
 
 Credit prices are floors, not preferences: each one covers the provider bill for a MAX-LENGTH
 clip of that model at the platform's declared 1.5x markup, checked by
 [tests/unit/videoCreditFloor.test.ts](../tests/unit/videoCreditFloor.test.ts).
 
-Routing per provider: Kling and Seedance go through the AI SDK inside `_shared/ai-client.ts`
-(`@ai-sdk/klingai`, `@ai-sdk/bytedance` — both pinned to their **spec-v3** major, which is the one
-`npm:ai@6` accepts). Wan goes to DashScope over raw REST because no AI SDK provider exists for it.
-Veo-2 uses Google's API. Runway is the only remaining Replicate model here.
+Routing per provider: Kling, Seedance and MiniMax go through the AI SDK inside
+`_shared/ai-client.ts` (`@ai-sdk/klingai@3`, `@ai-sdk/bytedance@1`, `@ai-sdk/minimax@2` — each
+pinned to its **spec-v3** major, which is the one `npm:ai@6` accepts; a spec-v4 package throws
+`AI_UnsupportedModelVersionError` before the request is built). Wan goes to DashScope over raw
+REST because no AI SDK provider exists for it. Veo-2 uses Google's API. Runway is the only
+remaining Replicate model here.
+
+**MiniMax H3 has two constraints that are the model's, not ours**, and the provider only *warns*
+about both — so `generateVideoWithMinimax` decides explicitly and reports back. It takes **either**
+a source frame **or** reference images, never both (`references_dropped` in the response is the
+count the model never saw). And with a source frame the **aspect ratio comes from that image** —
+a 9:16 request over a landscape photo returns landscape; a vertical reel needs a vertical source.
+Only 2K is reachable: the provider validates `resolution` against a one-value enum, so the
+published 768P rate ($0.08/s vs $0.13/s) cannot be requested through it.
 
 **Wan vs Seedance** — they overlap at 30 seconds with sound, and the difference is what happens to
 the references. Wan takes up to 20 of them as one set. Seedance tags each input with a ROLE
@@ -52,11 +63,13 @@ If you pass `video_type` without `model`, the function auto-selects:
 | `floorplan_flythrough` | `wan-3.0-720p` |
 | `product_spotlight` | `kling-v3.0` |
 | `before_after` | `wan-3.0-720p` |
-| `social_reel` | `wan-3.0-720p` |
+| `social_reel` | `minimax-h3` |
 
-The three types that most needed length and sound default to a 30-second scored model; an
-8-second silent clip is not a walkthrough. Seedance is reachable by explicit `model` only —
-it costs about 1.7x Wan per second, so it is an ask, not a default.
+The types that most needed length and sound default to a 30-second scored model; an 8-second
+silent clip is not a walkthrough. A **reel** is the exception and goes to MiniMax H3: 15 seconds
+at 2K with stereo audio for 40 credits, against 80 for twice the footage nobody watches on a
+phone. Seedance is reachable by explicit `model` only — about 1.7x Wan per second, so an ask,
+not a default.
 
 ---
 
@@ -173,6 +186,7 @@ For social-media-specific short videos, the separate `generate-social-video` edg
 
 | Model | Credits |
 |---|---|
+| `minimax-h3` (delegated) — **the default** | 40 |
 | `kling-3.0` (run here, via Replicate) | 20 |
 | `veo-2` (delegated to `generate-interior-video-v2`) | 50 |
 | `wan-3.0-480p` / `720p` / `1080p` (delegated) | 40 / 80 / 155 |

@@ -95,6 +95,8 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'wan-3.0-1080p':        { cost_per_unit: 0.28,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'seedance-2.5-480p':    { cost_per_unit: 0.104,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'seedance-2.5-720p':    { cost_per_unit: 0.232,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  // The default model for social video — the one most likely to be running when the DB is not.
+  'minimax-h3':           { cost_per_unit: 0.13,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'social-caption':       { cost_per_unit: 0.002,  unit: 'generation',  markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
 };

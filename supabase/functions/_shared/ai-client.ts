@@ -28,6 +28,8 @@ const _AI_ENV_KEYS = [
   // process.env when no explicit apiKey is passed; we pass one, but the sync keeps the
   // two paths from disagreeing about which key is in force.
   'ARK_API_KEY',
+  // MiniMax (Hailuo H3 video). Same arrangement as ARK_API_KEY above.
+  'MINIMAX_API_KEY',
 ] as const;
 
 function _syncEnvIntoPolyfill() {
@@ -67,6 +69,10 @@ import { createKlingAI } from 'npm:@ai-sdk/klingai@3';
 // `@ai-sdk/bytedance@2` is spec v4. 1.0.38 is spec v3 and speaks the same Ark
 // `/contents/generations/tasks` API.
 import { createByteDance } from 'npm:@ai-sdk/bytedance@1';
+// MiniMax H3 (Hailuo 3.0) video. Major 2 — `@ai-sdk/minimax@3` is spec v4. Checked the
+// same way as the two above: `npm view @ai-sdk/minimax@^2 dependencies.@ai-sdk/provider`
+// answers 3.0.15, which is the major `npm:ai@6` itself carries.
+import { createMiniMax } from 'npm:@ai-sdk/minimax@2';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
@@ -1295,11 +1301,18 @@ export async function generateVideoWithKling(
 
 // ── Wan3.0-Video-Prime (Alibaba, via DashScope) ────────────────────────────
 //
-// Raw REST rather than the AI SDK: there is no `@ai-sdk/dashscope` provider, and
-// DashScope's video endpoint is asynchronous (submit a task, poll for it). It lives
-// HERE rather than in the calling edge function precisely because this module is the
-// chokepoint — the rule is that edge functions never reach a provider directly, not
-// that this file only ever uses the SDK.
+// Raw REST rather than the AI SDK, and DashScope's video endpoint is asynchronous
+// (submit a task, poll for it). It lives HERE rather than in the calling edge function
+// precisely because this module is the chokepoint — the rule is that edge functions
+// never reach a provider directly, not that this file only ever uses the SDK.
+//
+// UPDATED 2026-08-29: there IS a provider now, and it is not called dashscope — it is
+// `@ai-sdk/alibaba` (major 1 for spec v3), whose video ids include `wan3.0-video`
+// alongside the 2.6/2.7 t2v/i2v/r2v line. This code was written when that did not exist.
+// Not migrated yet on purpose: the id it exposes is `wan3.0-video`, ours is
+// `wan3.0-video-prime`, and the parameter names below (`img_url`, `ref_images`,
+// `X-DashScope-Async`) are this endpoint's, not the provider's — so it is a rewrite plus
+// a re-verification against a funded key, not a swap. Worth doing; do it deliberately.
 //
 // What Wan buys over the existing roster: 30 seconds against Veo's 8 and Kling's 10,
 // audio generated with the picture in the same pass (our video has always been
@@ -1619,6 +1632,158 @@ export async function generateVideoWithSeedance(
     void _logUnitCall({
       task: config?.task ?? 'seedance_video_generation',
       modelKey,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
+}
+
+// ── MiniMax H3 / Hailuo 3.0 (video) ────────────────────────────────────────
+//
+// The short-form specialist, and the reason it earns a place next to Wan and Seedance
+// is not length — it is the SHAPE of a social clip. Native 2K at 24fps with STEREO
+// audio, 5-15 seconds, which is the whole of a reel; the 30-second models cost 2-4x
+// as much per clip for a duration nobody watches on a phone. It is the default for
+// `social_reel` for that reason.
+//
+// TWO CONSTRAINTS THAT ARE THE MODEL'S, NOT OURS, and both fail QUIETLY at the
+// provider (a warning on the response, which nothing reads) rather than raising:
+//
+//   1. Frame images and reference inputs are MUTUALLY EXCLUSIVE. Give it a first
+//      frame and every reference is dropped. Our video callers pass both routinely,
+//      so this function chooses explicitly and REPORTS the choice back — see
+//      `referencesDropped` — instead of letting the references evaporate.
+//   2. With a frame image, the aspect ratio comes from THAT IMAGE. Asking for 9:16
+//      over a landscape room photo returns a landscape clip. So the ratio is only
+//      sent when there is no frame to derive it from, and a caller that needs a
+//      vertical reel needs a vertical source frame.
+//
+// 768P ($0.08/s against 2K's $0.13/s) is NOT reachable here: the provider package
+// validates `resolution` against a single-value enum and hardcodes the default, so
+// every call is 2K and that is what the pricing row says. If a 768P tier is wanted,
+// it needs the raw MiniMax API, not this provider — do not "save money" by passing a
+// value the enum rejects, which fails validation rather than downgrading.
+const MINIMAX_MODEL_ID = 'MiniMax-H3';
+/** `ai_model_pricing.model_key`. One tier because the provider exposes one. */
+const MINIMAX_PRICING_MODEL_ID = 'minimax-h3';
+
+export interface MinimaxVideoResult {
+  /** Raw bytes, like Seedance — a 15s 2K clip is large and base64 adds a third. */
+  bytes: Uint8Array;
+  mimeType: string;
+  model: string;
+  durationSeconds: number;
+  hasAudio: boolean;
+  /**
+   * References were supplied AND a frame image was used, so the model never saw
+   * them. Callers surface this; a silently ignored reference is how "why does the
+   * clip not show the product" becomes unanswerable.
+   */
+  referencesDropped: number;
+}
+
+export async function generateVideoWithMinimax(
+  prompt: string,
+  config?: UnitBillingConfig & {
+    /** First frame. Omit for text-to-video, which is the only way to control the ratio. */
+    imageUrl?: string;
+    /** Last-frame guidance. Ignored by the model unless a first frame is present. */
+    lastFrameUrl?: string;
+    /** Reference images — used ONLY when no frame image is given (max 9). */
+    referenceUrls?: string[];
+    /** 5-15. Clamped here and by the caller, which is where the credit price is decided. */
+    durationSeconds?: number;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    /** H3 always scores the clip; kept for signature parity with the other generators. */
+    generateAudio?: boolean;
+    pollTimeoutMs?: number;
+    /** See the note on `generateVideoWithSeedance` — false when the caller logs its own row. */
+    logUsage?: boolean;
+  },
+): Promise<MinimaxVideoResult> {
+  const _start = Date.now();
+  const seconds = Math.max(5, Math.min(15, Math.round(config?.durationSeconds ?? 10)));
+
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'MINIMAX_API_KEY')).value
+    : Deno.env.get('MINIMAX_API_KEY');
+  if (!apiKey) {
+    throw new Error('MINIMAX_API_KEY is not configured — cannot generate with MiniMax H3');
+  }
+
+  const minimax = createMiniMax({ apiKey });
+
+  const usesFrame = Boolean(config?.imageUrl);
+  const references = config?.referenceUrls ?? [];
+  // Constraint 1, decided here rather than discovered downstream.
+  const referencesDropped = usesFrame ? references.length : 0;
+  if (referencesDropped > 0) {
+    console.warn(
+      `[ai-client] MiniMax H3: ${referencesDropped} reference image(s) ignored — the model ` +
+      'cannot combine a frame image with references. Drop the source image to use them.',
+    );
+  }
+
+  const visionPrompt: any = config?.imageUrl
+    ? { image: config.imageUrl, text: prompt }
+    : prompt;
+
+  try {
+    const { video } = await generateVideo({
+      model: minimax.video(MINIMAX_MODEL_ID),
+      prompt: visionPrompt,
+      duration: seconds,
+      // Constraint 2: only meaningful without a frame image, and the provider warns
+      // (and discards) rather than erroring when both are present.
+      ...(usesFrame ? {} : { aspectRatio: config?.aspectRatio ?? '9:16' }),
+      ...(usesFrame && config?.lastFrameUrl
+        ? { frameImages: [
+            { image: config.imageUrl, frameType: 'first_frame' },
+            { image: config.lastFrameUrl, frameType: 'last_frame' },
+          ] }
+        : {}),
+      ...(!usesFrame && references.length
+        ? { inputReferences: references.slice(0, 9).map((url) => ({ data: new URL(url), mediaType: 'image/jpeg' })) }
+        : {}),
+      providerOptions: {
+        minimax: {
+          resolution: '2K',
+          // Sold output, not a demo.
+          aigcWatermark: false,
+        },
+      },
+      pollTimeoutMs: config?.pollTimeoutMs ?? 600_000,
+    } as any);
+
+    const bytes: Uint8Array = (video as any).uint8Array;
+    if (!bytes?.length) throw new Error('MiniMax H3 returned an empty video');
+
+    if (config?.logUsage !== false) void _logUnitCall({
+      task: config?.task ?? 'minimax_video_generation',
+      modelKey: MINIMAX_PRICING_MODEL_ID,
+      units: seconds,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      bytes,
+      mimeType: (video as any).mediaType ?? 'video/mp4',
+      model: MINIMAX_MODEL_ID,
+      durationSeconds: seconds,
+      hasAudio: true,
+      referencesDropped,
+    };
+  } catch (err) {
+    // Always logged, even when the caller owns the success row — see the Seedance note.
+    void _logUnitCall({
+      task: config?.task ?? 'minimax_video_generation',
+      modelKey: MINIMAX_PRICING_MODEL_ID,
       units: 0,
       latencyMs: Date.now() - _start,
       errorMessage: err instanceof Error ? err.message : String(err),

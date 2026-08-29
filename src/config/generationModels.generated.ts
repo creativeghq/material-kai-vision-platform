@@ -654,6 +654,31 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 198
   },
   {
+    "id": "minimax-h3",
+    "display_name": "MiniMax H3 (Hailuo 3.0)",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "minimax",
+    "slug": "MiniMax-H3",
+    "version": null,
+    "adapter": "minimax",
+    "input_requirements": {
+      "needs_prompt": true,
+      "min_images": 0,
+      "max_images": 9,
+      "image_roles": [
+        "source",
+        "reference",
+        "last_frame"
+      ]
+    },
+    "pricing_key": "minimax-h3",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 199
+  },
+  {
     "id": "veo-2",
     "display_name": "Veo 2",
     "capability": "video",
@@ -760,7 +785,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '83ad7e6451132134573de36cbb395ba6';
+export const PROJECTION_FINGERPRINT = '4f57ba8c797ec6859a33dcac2c106b29';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

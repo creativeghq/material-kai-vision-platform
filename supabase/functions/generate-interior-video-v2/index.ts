@@ -15,6 +15,9 @@
  *     seconds with audio, but generated in ONE pass and with references that carry an
  *     explicit ROLE (first frame / last frame / reference image) rather than an
  *     undifferentiated set — which is what keeps THIS tile in frame rather than one like it.
+ *   minimax-h3      → 40 credits (MiniMax Hailuo 3.0). 5-15s at native 2K with stereo
+ *     audio — the reel format, at half the credits of a 30-second clip. Default for
+ *     `social_reel`. Will not take a frame image and references together.
  *
  * Async handling: Replicate models can take 3-5 min. If polling times out
  * (55s), stores prediction_id in generation_videos and returns job_id for
@@ -29,6 +32,7 @@ import {
   generateVideoWithKling,
   generateVideoWithWan,
   generateVideoWithSeedance,
+  generateVideoWithMinimax,
 } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -51,7 +55,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // funded account (issue #4 Phase 5) — an unverified replacement would repeat the same bug.
 type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
-  | 'seedance-2.5-480p' | 'seedance-2.5-720p';
+  | 'seedance-2.5-480p' | 'seedance-2.5-720p'
+  | 'minimax-h3';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
@@ -70,6 +75,11 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 //   wan-3.0-1080p     30s x $0.28/s  = $8.40 -> x1.5 = $12.60 -> >= 149 credits (155 charged)
 //   seedance-2.5-480p 30s x $0.104/s = $3.12 -> x1.5 = $4.68  -> >= 56 credits (60 charged)
 //   seedance-2.5-720p 30s x $0.231/s = $6.93 -> x1.5 = $10.40 -> >= 123 credits (125 charged)
+//   minimax-h3        15s x $0.13/s  = $1.95 -> x1.5 = $2.93  -> >= 35 credits (40 charged)
+//
+// MiniMax is the cheapest CLIP here despite a mid-table per-second rate, because its
+// ceiling is 15 seconds — which is the length of a reel. Half the credits of Wan 720p
+// for native 2K with stereo audio, and that is why `social_reel` routes to it.
 //
 // Seedance's rate is DERIVED, not quoted: BytePlus bills it by token at $10.70/M with no
 // video input, and tokens are width x height x fps x seconds / 1024. At 24fps that is
@@ -93,6 +103,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'wan-3.0-1080p':      155,
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
+  'minimax-h3':         40,
 };
 
 // Longest clip each model will produce.
@@ -114,6 +125,8 @@ const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   // Seedance's own floor is 4 seconds; the generator clamps up as well as down.
   'seedance-2.5-480p':  30,
   'seedance-2.5-720p':  30,
+  // H3's own range is 5-15s. Not a limitation for a reel — it is the format.
+  'minimax-h3':         15,
 };
 
 // Resolution tier per Wan model id. The id carries the tier because the RATE differs
@@ -139,7 +152,10 @@ const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
   floorplan_flythrough: 'wan-3.0-720p',
   product_spotlight:    'kling-v3.0',
   before_after:         'wan-3.0-720p',
-  social_reel:          'wan-3.0-720p',
+  // A reel is 15 seconds on a phone, not 30 on a monitor. MiniMax H3 gives that at
+  // native 2K with stereo audio for 40 credits, where the 30-second model spent 80 to
+  // produce twice the footage nobody watches. Wan stays one explicit `model` away.
+  social_reel:          'minimax-h3',
 };
 
 // Replicate model identifiers (Kling now uses native SDK, not Replicate)
@@ -600,6 +616,62 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         video_type,
         duration_seconds: seedanceResult.durationSeconds,
         has_audio: seedanceResult.hasAudio,
+        status: 'completed',
+      });
+
+    } else if (resolvedModel === 'minimax-h3') {
+      // MiniMax H3 (Hailuo 3.0) — the reel model: 5-15s, native 2K, stereo audio.
+      //
+      // It will not take a frame image AND references in the same call, so the client
+      // is told which one it got rather than left to wonder: `references_dropped` in
+      // the response is the count the model never saw. Same for the ratio — with a
+      // source frame the model derives it, so a vertical reel needs a vertical source.
+      const minimaxPrompt = prompt
+        || 'Professional cinematic interior reel, smooth continuous camera movement';
+
+      const minimaxResult = await generateVideoWithMinimax(minimaxPrompt, {
+        imageUrl: source_image_url,
+        lastFrameUrl: last_frame_url || undefined,
+        referenceUrls: referenceUrls,
+        durationSeconds,
+        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
+        task: 'interior_video_generation_v2',
+        userId,
+        workspaceId: workspace_id ?? undefined,
+        // `logVideoUsage` below owns this call's ai_usage_logs row.
+        logUsage: false,
+      });
+
+      const videoUrl = await uploadVideoToStorage(supabase, minimaxResult.bytes, jobId, false, uploadCtx);
+      await logVideoUsage(minimaxResult.durationSeconds);
+
+      const { error: completeErr } = await supabase.from('generation_videos').update({
+        status: 'completed',
+        video_url: videoUrl,
+        completed_at: new Date().toISOString(),
+      }).eq('id', jobId);
+      if (completeErr) throw completeErr;
+
+      emitFlowEvent('video_generation_completed', {
+        user_id: userId,
+        workspace_id,
+        type: 'video_ready',
+        title: 'Your video is ready!',
+        body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
+        job_id: jobId,
+        video_type,
+      }).catch(() => {});
+
+      return jsonResponse({
+        success: true,
+        job_id: jobId,
+        video_url: videoUrl,
+        model_used: resolvedModel,
+        credits_used: creditCost,
+        video_type,
+        duration_seconds: minimaxResult.durationSeconds,
+        has_audio: minimaxResult.hasAudio,
+        references_dropped: minimaxResult.referencesDropped,
         status: 'completed',
       });
 

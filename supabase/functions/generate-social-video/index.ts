@@ -1,9 +1,19 @@
 /**
  * Generate Social Video Edge Function
  *
- * Generates short-form social media videos via Replicate:
- *   kling-3.0      → 20 credits (fast, cinematic reels with audio)
- *   veo-2          → 30 credits (premium quality via generate-interior-video-v2)
+ * Generates short-form social media videos.
+ *
+ * DEFAULT: minimax-h3 → 40 credits (MiniMax Hailuo 3.0). 5-15 seconds at native 2K with
+ * stereo audio — the reel format itself, and the only model here designed for it. It is
+ * delegated to generate-interior-video-v2 like every other model below.
+ *
+ * Also selectable, all delegated: veo-2 (50), wan-3.0-480p/720p/1080p (40/80/155, 30s),
+ * seedance-2.5-480p/720p (60/125, 30s one-pass).
+ *
+ * kling-3.0 (20) is the ONE model still run here, through Replicate, and it is the reason
+ * the default moved: Replicate has been answering `auth_failed` to every probe, so the
+ * previous default could not produce a video at all. Everything delegated runs on its
+ * provider's own key and is unaffected.
  *
  * Credits are debited upfront and are non-refundable.
  * Uses async polling pattern: returns prediction_id if generation exceeds 50s.
@@ -72,7 +82,8 @@ const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 // our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
 type VideoModel = 'kling-3.0' | 'veo-2'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
-  | 'seedance-2.5-480p' | 'seedance-2.5-720p';
+  | 'seedance-2.5-480p' | 'seedance-2.5-720p'
+  | 'minimax-h3';
 
 // `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
 // generate-interior-video-v2, which debits its own CREDIT_COSTS. This entry is only read by the
@@ -90,6 +101,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'wan-3.0-1080p': 155,
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
+  'minimax-h3':         40,
 };
 
 //: Models handed to generate-interior-video-v2 rather than run here. A reel is the case
@@ -98,6 +110,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 const DELEGATED_MODELS = new Set<string>([
   'veo-2', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
   'seedance-2.5-480p', 'seedance-2.5-720p',
+  'minimax-h3',
 ]);
 
 const REPLICATE_MODELS: Record<string, string> = {
@@ -163,7 +176,11 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     // Wan-only, forwarded to the generator, which is where they are SSRF-checked —
     // this function never fetches them itself.
     reference_image_urls,
-    model = 'kling-3.0' as VideoModel,
+    // Was 'kling-3.0', which runs on the Replicate path below — and Replicate answers
+    // auth_failed to every call, so the DEFAULT model was the one model here that
+    // cannot currently produce anything. MiniMax H3 is delegated, runs on its own key,
+    // and is the right shape for a reel besides.
+    model = 'minimax-h3' as VideoModel,
     aspect_ratio = '9:16',
     duration_seconds = 10,
     workspace_id,

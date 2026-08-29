@@ -55,6 +55,8 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   // tagged first/last frame — the option to pick when the product itself has to stay put.
   { value: 'seedance-2.5-480p', label: 'Seedance 2.5 480p', description: 'Seedance 2.5 — 30s one-take with audio, 480p', credits: 60 },
   { value: 'seedance-2.5-720p', label: 'Seedance 2.5 720p', description: 'Seedance 2.5 — 30s one-take with audio, 720p', credits: 125 },
+  // The reel model, and the cheapest full clip on the list — 15s is the format, not a limit.
+  { value: 'minimax-h3', label: 'MiniMax H3', description: 'Hailuo 3.0 — 15s at 2K with stereo audio', credits: 40 },
 ];
 
 interface ModelResult {

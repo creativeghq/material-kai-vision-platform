@@ -4579,7 +4579,7 @@
         ],
         "summary": "Multi-model interior design video generation with async polling fallback",
         "operationId": "post_generate_interior_video_v2",
-        "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (40/80/155cr, 30s with audio) or seedance-2.5-480p/720p (60/125cr, 30s one-pass with audio and role-tagged references). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.\n\n**Response:** (`application/json`)\n\n📖 [docs/interior-video-generation.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/interior-video-generation.md)",
+        "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (40/80/155cr, 30s with audio), seedance-2.5-480p/720p (60/125cr, 30s one-pass) or minimax-h3 (40cr, 15s at native 2K with stereo audio). Model is auto-selected from video_type when not specified; social_reel routes to minimax-h3. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.\n\n**Response:** (`application/json`)\n\n📖 [docs/interior-video-generation.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/interior-video-generation.md)",
         "security": [
           {
             "supabaseJwt": []
@@ -5979,9 +5979,9 @@
         "tags": [
           "Social"
         ],
-        "summary": "Generate a short-form social video via Kling, Veo 2, Wan3.0 or Seedance 2.5",
+        "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 also selectable)",
         "operationId": "post_generate_social_video",
-        "description": "Generates a short-form social video: kling-3.0 (20cr) runs here via Replicate; veo-2 (50cr), wan-3.0-480p/720p/1080p (40/80/155cr) and seedance-2.5-480p/720p (60/125cr) are delegated to generate-interior-video-v2, which debits its own prices. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.\n\n**Response:** (`application/json`)",
+        "description": "Generates a short-form social video. DEFAULT minimax-h3 (40cr): 5-15s at native 2K with stereo audio, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (40/80/155cr) and seedance-2.5-480p/720p (60/125cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundable.\n\n**Response:** (`application/json`)",
         "security": [
           {
             "supabaseJwt": []

@@ -305,7 +305,7 @@ Video types and recommended models:
 - product_spotlight: Kling 3.0 (20cr) — focuses on a specific material/product with audio
 - before_after: Kling 3.0 (20cr) — transition between two room states (requires before_image_url)
 - floorplan_flythrough: Veo 2.0 (50cr) — aerial view flythrough
-- social_reel: Kling 3.0 (20cr) — 9:16 short-form video for social media with audio
+- social_reel: MiniMax H3 (40cr) — 15s at native 2K with stereo audio, the reel format itself
 - premium: Runway Gen-4 Turbo (40cr) — highest quality for any type
 
 Long-form, with sound (the only models here that pass 10 seconds):
@@ -313,6 +313,9 @@ Long-form, with sound (the only models here that pass 10 seconds):
 - Seedance 2.5 480p/720p (60/125cr) — up to 30s in ONE pass, scored, references carry a
   role (first frame / last frame / reference image), which is what holds a specific
   product in shot for the whole clip
+- MiniMax H3 (40cr) — 5-15s at native 2K with stereo audio. The cheapest full clip here
+  and the default for social_reel. It takes EITHER a source image OR reference images,
+  never both, and with a source image the aspect ratio comes from that image.
 
 Returns video_url when complete, or prediction_id if still processing (poll generate_3d_status).`,
       schema: z.object({
@@ -332,8 +335,9 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
           'veo-2', 'kling-v3.0', 'runway-gen4-turbo',
           'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
           'seedance-2.5-480p', 'seedance-2.5-720p',
+          'minimax-h3',
         ]).optional()
-          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr (default: auto based on video_type)'),
+          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 40cr, wan-3.0-720p 80cr, wan-3.0-1080p 155cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, minimax-h3 40cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
           .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),
@@ -342,7 +346,7 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
         // so a wider range here cannot overspend — it can only stop capping the two
         // models whose whole point is the long clip.
         duration_seconds: z.number().int().min(4).max(30).optional()
-          .describe('Duration in seconds, clamped to the model ceiling (veo-2 8s, kling 10s, wan/seedance 30s). Default: 8'),
+          .describe('Duration in seconds, clamped to the model ceiling (veo-2 8s, kling 10s, minimax-h3 15s, wan/seedance 30s). Default: 8'),
         before_image_url: z.string().optional()
           .describe('Required only for before_after type: the "before" state image URL'),
       }),

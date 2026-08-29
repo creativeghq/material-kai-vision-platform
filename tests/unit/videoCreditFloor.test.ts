@@ -52,6 +52,11 @@ const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   // If the token rate moves, recompute; do not nudge these until the test passes.
   'seedance-2.5-480p': 0.104,
   'seedance-2.5-720p': 0.232,
+  // MiniMax H3 at 2K. The published 768P rate ($0.08/s) is deliberately NOT the number
+  // here: `@ai-sdk/minimax` validates `resolution` against a one-value enum and defaults
+  // to 2K, so 2K is what every call we make is billed at. A cheaper rate mirrored here
+  // would pass a floor the provider invoice does not.
+  'minimax-h3': 0.13,
 };
 
 /** `_shared/pricing-constants.ts` → MARKUP_MULTIPLIER. */
