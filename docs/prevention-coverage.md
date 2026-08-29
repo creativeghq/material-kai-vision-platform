@@ -1004,6 +1004,49 @@ prompt nobody reads. Here the prompt is claimed by a call site in `used_in` and 
 
 ---
 
+### `ops.silent_zero` cron-metering arm — the exemption list nobody extends
+
+**Fired on `seo-toolkit-audit` every night, and it was a false positive.** `seo_tracked_domains` is
+empty, so the audit loop iterates nothing and correctly charges nothing; the €/$ the probe
+attributed to the module came from the OTHER `seo-toolkit` work, because the module slug is shared
+and the cron key is not.
+
+The probe already anticipates exactly this and asks `cron_has_internal_subjects(cron_key)` first.
+That helper is a `CASE` over **four** cron keys with `ELSE true` — strict by default, which is the
+right default, and precisely why a metered cron whose subject table it has never heard of reports
+forever. `seo-toolkit-audit` was the fifth and nobody added it.
+
+- **The rule:** registering a cron in `cron_billing_registry` with an `expected_module_slug` is
+  only half the job. If its work comes from a subject table that can legitimately be empty, it
+  needs a `WHEN` clause in `cron_has_internal_subjects` in the same change.
+- **Why it matters more than one wrong row:** a nightly finding that is always there is the thing
+  real findings hide underneath. This one sat at CRITICAL-adjacent alongside the genuine
+  `ops.provider_credit_exhausted` entries.
+- **Fixed 2026-08-29**, and verified both ways: the cron-metering arm now returns 0 findings, an
+  unknown key still answers `true`, and `ops.silent_zero_probe_missing` still reports 0 — so the
+  edit added a branch without dropping a probe.
+- **Blind spot:** nothing checks the helper's coverage against the registry. The metered crons with
+  a NULL `expected_module_slug` are exempt from that arm by design, so today the list is complete;
+  the next metered cron with a module slug will need the same clause and nothing will say so.
+
+### `ops_upsert_arbiter_uninferable` — and the index this session's own fix added
+
+Three unique indexes were partial on nothing but their own column's nullability
+(`seo_articles_idempotency_key_uniq`, `blueprint_items_option_key_unique`,
+`crm_deal_types_workspace_key_uniq`). A b-tree unique index already treats NULLs as distinct, so
+the predicate enforces the same pairs and buys nothing — while making `ON CONFLICT (a, b)`
+impossible to infer, so an upsert naming those columns raises 42P10 on every row and names an
+index its author has never heard of. No caller named them, so nothing had broken yet.
+
+**The detail worth recording is what happened next.** Recreating them non-partially cleared all
+three — and the detector immediately reported a FOURTH: `invoices_pos_client_token_uniq`, created
+hours earlier by the POS idempotency work in #351 C1, with the identical `WHERE … IS NOT NULL`.
+
+- **Proven to fire, on the same day, against a change made by the person reading it.** That is the
+  strongest evidence this table asks for, and it arrived unprompted.
+- Fixed the same way. The trade is index size — every invoice gets an entry rather than only the
+  POS ones — against a silent write failure for the next author.
+
 ## Not defects — checked, and deliberately left alone
 
 Recording these so they are not re-raised every time an advisor runs.
