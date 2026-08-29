@@ -4,7 +4,7 @@ import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles, Swords, Plus,
+  LayoutDashboard, Sparkles, Swords, Plus, Target,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -14,6 +14,7 @@ import { WebsiteSeoOverviewPanel } from '@/components/core/Profile/WebsiteSeoOve
 import { WebsiteAiVisibilityPanel } from '@/components/core/Profile/WebsiteAiVisibilityPanel';
 import { KeywordResearchDetail } from '@/components/core/Profile/KeywordResearchDetail';
 import { WebsiteCompetitorsPanel } from '@/components/core/Profile/WebsiteCompetitorsPanel';
+import { WebsiteRankTrackerPanel } from '@/components/core/Profile/WebsiteRankTrackerPanel';
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
 import { HubEmptyState, HubStatGrid, HubStatTile } from '@/components/core/hub';
@@ -190,6 +191,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
           <TabsTrigger value="overview" className="w-full justify-start gap-2"><LayoutDashboard className="w-3.5 h-3.5" /> Overview</TabsTrigger>
           <TabsTrigger value="ai" className="w-full justify-start gap-2"><Sparkles className="w-3.5 h-3.5" /> AI Visibility</TabsTrigger>
+          {/* "Rank Tracker", not "Rankings" — `rankings` is already taken by the
+              domain-intel + backlinks tab below. Two tabs both called Rankings that
+              answer different questions is worse than a slightly longer label. */}
+          <TabsTrigger value="ranks" className="w-full justify-start gap-2"><Target className="w-3.5 h-3.5" /> Rank Tracker</TabsTrigger>
           <TabsTrigger value="competitors" className="w-full justify-start gap-2"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
           <TabsTrigger value="articles" className="w-full justify-start gap-2"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
           <TabsTrigger value="research" className="w-full justify-start gap-2"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
@@ -217,6 +222,13 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* AI Visibility — what assistants say about you (llm_mention_probes). */}
         <TabsContent value="ai">
           <WebsiteAiVisibilityPanel website={website} />
+        </TabsContent>
+
+        {/* Rankings — the keywords the operator CHOSE, followed daily. Everything
+            else in this module is discovery ("what do we rank for"); this is the
+            only surface that answers "did what I care about move". */}
+        <TabsContent value="ranks">
+          <WebsiteRankTrackerPanel website={website} />
         </TabsContent>
 
         {/* Competitors — your line beside theirs, same metric, same window. */}

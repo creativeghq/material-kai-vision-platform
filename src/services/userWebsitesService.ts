@@ -280,6 +280,49 @@ export interface GaSummary {
 
 export interface GaProperty { property: string; name: string; account: string }
 
+export interface TrackedKeywordRow {
+  id: string;
+  keyword: string;
+  country_code: string;
+  device: string;
+  tags: string[];
+  /** NULL = not in the top 100. Never a sentinel rank. */
+  position: number | null;
+  found: boolean;
+  url: string | null;
+  error: string | null;
+  search_volume: number | null;
+  serp_features: string[];
+  previous: number | null;
+  /** Positive = moved UP the page (position decreased). */
+  change: number | null;
+  entered: boolean;
+  lost: boolean;
+  series: { date: string; v: number }[];
+}
+
+export interface RankSummary {
+  status: 'ok' | 'not_collected' | 'collector_failed' | string;
+  tracked: number;
+  window_days: number;
+  note: string | null;
+  summary?: {
+    captured_at: string;
+    previous_at: string | null;
+    checked: number;
+    answered: number;
+    failed: number;
+    ranking: number;
+    not_ranking: number;
+    avg_position: number | null;
+    /** Share of tracked keywords in the top 10, over probes that answered. */
+    visibility: number | null;
+    distribution: Record<string, number>;
+  };
+  keywords?: TrackedKeywordRow[];
+  visibility_trend?: { date: string; v: number }[];
+}
+
 export interface CrawlIssueGroup {
   issue_type: string;
   severity: 'error' | 'warning' | 'notice';
@@ -768,6 +811,50 @@ export const userWebsitesService = {
     });
     if (error) throw new Error(await edgeErrorMessage(error, 'Analytics sync failed'));
     if (!data?.ok) throw new Error(data?.error || 'Analytics sync failed');
+    return data;
+  },
+
+  async rankSummary(websiteId: string, days = 90): Promise<RankSummary | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_rank_summary' as any, { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as RankSummary) ?? null;
+  },
+
+  async addTrackedKeywords(
+    websiteId: string, workspaceId: string, keywords: string[],
+    countryCode: string, languageCode: string,
+  ): Promise<number> {
+    // De-duplicated and trimmed here so a pasted list with blank lines and repeats
+    // does not become N-1 unique-violation round trips.
+    const clean = [...new Set(
+      keywords.map((k) => k.trim().toLowerCase()).filter((k) => k.length > 1),
+    )].slice(0, 200);
+    if (clean.length === 0) throw new Error('Enter at least one keyword.');
+    const { error } = await supabase.from('seo_tracked_keywords' as any).upsert(
+      clean.map((keyword) => ({
+        website_id: websiteId, workspace_id: workspaceId, keyword,
+        country_code: countryCode, language_code: languageCode,
+        device: 'desktop', is_active: true,
+      })) as any,
+      { onConflict: 'website_id,keyword,country_code,device', ignoreDuplicates: true },
+    );
+    if (error) throw error;
+    return clean.length;
+  },
+
+  async removeTrackedKeyword(id: string): Promise<void> {
+    const { error } = await supabase.from('seo_tracked_keywords' as any).delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async runRankCheck(websiteId: string): Promise<{ checked: number; ranking: number; failed: number }> {
+    const { data, error } = await supabase.functions.invoke('seo-rank-tracker', {
+      body: { action: 'run', website_id: websiteId },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Rank check failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Rank check failed');
     return data;
   },
 
