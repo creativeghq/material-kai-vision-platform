@@ -557,6 +557,75 @@ populated column. Both were found by a person clicking the bell.
 
 ---
 
+### 18. Half-finished flow with a retryable button — the write committed, the screen says Failed
+
+The dominant shape of the finance and HR audits: **eight findings across #351 and #354 were one
+sentence.** A create-then-stamp pair with no transaction; the first write commits, the second
+fails, the screen says `Failed`, and the operator does the only thing offered — presses it again.
+
+| Where | The second copy |
+|---|---|
+| `billToInvoice` / `billToClient` (#351 S4) | the same hours, billed twice |
+| `createExpense` (#351 C3) | a second supplier bill AND a second payment for one cost |
+| `NewDeliveryNoteDialog` (#351 C4) | a second delivery-note header, the first invisible |
+| `ReturnPaymentDialog` (#351 A1) | credit notes re-issued — transmitted legal documents |
+| `pos_issue_receipt` (#351 C1) | two receipts, two payments, two stock reductions |
+| ΕΡΓΑΝΗ separation / overtime / schedule / retry (#354 HR-2) | a second declaration to the ministry |
+
+**Why nothing catches it.** Each half works. The types check, the tests pass, the error is
+reported — accurately, for the half that failed. What is wrong is the *pair*, and the tell is not
+in either statement: it is that the failure message and the button do not agree about what
+happened. `uncheckedSupabaseWrites` cannot see it, because every write here IS checked.
+
+**Three fixes, and the choice between them is the finding.**
+
+1. **One transaction** where the work is naturally atomic — the CLAUDE.md prescription, a SQL RPC.
+   `bill_time_entries_to_invoice` and `bill_trip_expenses_to_invoice` are the shape: the stamp is
+   also the CLAIM (`billed_invoice_id is null` in the WHERE plus a count check), so a lost race
+   aborts instead of double-billing.
+2. **An idempotency key** where a retry is legitimate and the work is not repeatable — `pos_issue_receipt`
+   takes a token minted per BASKET and replays the stored receipt for it. The client latch is not
+   enough on its own: it closes the double-tap and cannot close the dropped connection, which is
+   the case where the operator has an error message for a document that exists.
+3. **Resumable and honest** where the second half cannot be rolled back — a filing to a ministry
+   has happened whatever the local row says. Each leg records that it ran, the retry resumes at
+   the first one that did not, and the toast names the half that failed. Reporting it as a failure
+   makes the operator re-file; reporting it as a clean success means nobody repairs the record.
+
+**The rule that falls out of it:** an action that cannot be undone must never be reported as
+either a plain success or a plain failure when only half of it happened. And a duplicate guard
+must read the record written on the SUCCESS path, not the local status column written after it —
+that column is precisely the one that can be missing.
+
+- **Guarded by:** [tests/unit/financeAtomicity.test.ts](../tests/unit/financeAtomicity.test.ts) (20 cases) and [tests/unit/hrFilingIntegrity.test.ts](../tests/unit/hrFilingIntegrity.test.ts) (27 cases). Both check the ORDER of things — the latch before the first `await`, the guard before the settle, the punch read before the credit debit — because a check that exists after the side effect is not a check.
+- **Proven to fire:** 2026-08-29 — every marker confirmed absent at the pre-fix commit, and the negative assertions target code that still existed there (`settled: 0` fallback, `const requirePin = !!settings…`, `round2(weekly_hours / 5)`, the empty `catch { }`).
+- **The SQL half is invisible to both.** `pos_issue_receipt`'s token, `issue_credit_note`'s cumulative cap and the `hr_time_punches` sequence trigger live in `pg_proc`, where no repo-file test can see them; they are asserted in [tests/integration/fiscal-derivations.test.ts](../tests/integration/fiscal-derivations.test.ts) and were verified against the live database with rolled-back fixtures.
+- **Blind spot:** both guards are per-file and per-finding. The shape is available to every "create then stamp" pair in the codebase, and neither test would notice a NEW one. The cheap search is a `await` that writes, followed by another `await` that writes, inside one `try` whose `catch` shows a single generic toast.
+
+### 19. One rule, two shared helpers, and the wrong one is imported
+
+`_shared/client-ip.ts` says never key a rate limit on the leftmost `x-forwarded-for` hop, because
+Cloudflare APPENDS the connecting IP and the left end is whatever the caller prefixed.
+`_shared/turnstile.ts` exported a `clientIp` that took the leftmost hop — **citing the same
+invariant, in a comment asserting the opposite fact**. Both are shared helpers, both look
+canonical, and the public forms imported the second: the careers board, the storefront, the embed
+and products-3d all keyed their per-IP limits on a value the caller chooses. Rotating one header
+minted a fresh bucket per request.
+
+This is shape 15 (two files, one policy) with the contradiction moved up a level: not two call
+sites disagreeing, two *canonical helpers* disagreeing, so the fix everyone reaches for — "use the
+shared helper" — was already what both sides had done.
+
+- **The tell:** two exports with the same NAME in different shared modules. `escapeHtml` has three
+  copies and is safe only because [tests/unit/escapeHtmlParity.test.ts](../tests/unit/escapeHtmlParity.test.ts) holds them byte-equivalent — which is the mechanism this needed and did not have.
+- **Fixed by deletion, not by a parity test:** `turnstile.ts`'s copy now delegates to
+  `getTrustedClientIp`. One implementation cannot disagree with itself.
+- **Not yet guarded.** The parity-test approach fits a family that must stay separate for runtime
+  reasons; two helpers in the SAME runtime should simply be one, and a test that pins two
+  implementations together would legitimise the duplicate. The check worth writing is different:
+  a shared module exporting a name another shared module already exports.
+
+
 ## Mechanism inventory
 
 | Mechanism | Runs | Enforces | Self-proving? |
