@@ -206,3 +206,112 @@ function stripDomains<T extends { domains: Set<string> }>(s: T): Omit<T, 'domain
   const { domains: _drop, ...rest } = s;
   return rest;
 }
+
+// ── General web research: compare the SOURCES, not the prose ────────────────
+//
+// The B2B lane above compares structured company records, and it works because a
+// domain either resolves or it does not — an objective check with no judgement in it.
+//
+// General research returns PROSE plus citations, and two paragraphs cannot be
+// compared objectively. Scoring them needs an LLM judge, which is the subjective
+// thing this whole approach exists to avoid: a judge that prefers the better-written
+// answer tells you which model writes well, not which one found more.
+//
+// So the prose is NOT scored. What is scored is the evidence underneath it — which
+// sources each provider actually surfaced, how many resolve, and where they overlap.
+// That is weaker than the B2B case and the weakness is worth stating plainly: a
+// source existing does not prove the claim it was cited for. It does prove the model
+// did not invent the citation, which is the failure that matters most here.
+
+export interface SourceSideStats {
+  /** Distinct source URLs cited. */
+  cited: number;
+  /** Distinct hosts behind them — five pages from one site is one perspective. */
+  distinct_hosts: number;
+  /** Hosts that actually resolved. */
+  hosts_resolve: number;
+  /** Hosts this side cited and the other did not. */
+  unique_hosts: string[];
+}
+
+export interface SourceComparison {
+  incumbent: SourceSideStats;
+  challenger: SourceSideStats;
+  /** Hosts both cited — corroboration, the strongest evidence in the run. */
+  overlap_hosts: string[];
+  union_hosts: number;
+  challenger_ran: boolean;
+  notes: string[];
+}
+
+function hostsOf(urls: string[]): { hosts: Set<string>; cited: number } {
+  const hosts = new Set<string>();
+  const seenUrls = new Set<string>();
+  for (const u of urls) {
+    if (!u) continue;
+    seenUrls.add(u);
+    const h = normaliseDomain(u);
+    if (h) hosts.add(h);
+  }
+  return { hosts, cited: seenUrls.size };
+}
+
+export async function compareResearchSources(
+  incumbentUrls: string[],
+  challengerUrls: string[],
+  opts: { challengerRan: boolean; verify?: (d: string) => Promise<boolean> },
+): Promise<SourceComparison> {
+  const verify = opts.verify ?? ((d: string) => domainResolves(d));
+
+  const inc = hostsOf(incumbentUrls);
+  const cha = opts.challengerRan ? hostsOf(challengerUrls) : { hosts: new Set<string>(), cited: 0 };
+
+  const [incVerdicts, chaVerdicts] = await Promise.all([
+    Promise.all([...inc.hosts].map(verify)),
+    Promise.all([...cha.hosts].map(verify)),
+  ]);
+
+  const overlap = [...inc.hosts].filter((h) => cha.hosts.has(h)).sort();
+  const notes: string[] = [];
+
+  if (!opts.challengerRan) {
+    notes.push(
+      'The challenger did not run, so this is a single-provider record and not a comparison.',
+    );
+  } else {
+    const incDead = inc.hosts.size - incVerdicts.filter(Boolean).length;
+    const chaDead = cha.hosts.size - chaVerdicts.filter(Boolean).length;
+    if (incDead) notes.push(`Incumbent cited ${incDead} host(s) that did not resolve.`);
+    if (chaDead) notes.push(`Challenger cited ${chaDead} host(s) that did not resolve.`);
+    if (!overlap.length && inc.hosts.size && cha.hosts.size) {
+      notes.push(
+        'The two providers cited entirely different sources. That is either genuinely '
+        + 'complementary coverage or a sign they answered different questions — read both '
+        + 'answers before treating it as breadth.',
+      );
+    }
+    notes.push(
+      'Sources are compared, not the answers. A resolving source proves the citation is '
+      + 'real, not that the claim it supports is correct.',
+    );
+  }
+
+  return {
+    incumbent: {
+      cited: inc.cited,
+      distinct_hosts: inc.hosts.size,
+      hosts_resolve: incVerdicts.filter(Boolean).length,
+      unique_hosts: [...inc.hosts].filter((h) => !cha.hosts.has(h)).sort(),
+    },
+    challenger: {
+      cited: cha.cited,
+      distinct_hosts: cha.hosts.size,
+      hosts_resolve: chaVerdicts.filter(Boolean).length,
+      unique_hosts: [...cha.hosts].filter((h) => !inc.hosts.has(h)).sort(),
+    },
+    overlap_hosts: overlap,
+    union_hosts: new Set([...inc.hosts, ...cha.hosts]).size,
+    challenger_ran: opts.challengerRan,
+    notes,
+  };
+}

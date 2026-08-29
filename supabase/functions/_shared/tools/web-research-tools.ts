@@ -41,6 +41,8 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const { researchWithQwen } = await import('../ai-client.ts');
+const { compareResearchSources } = await import('../research-validation.ts');
 
 import { debitOrRefuse } from '../credit-utils.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
@@ -168,6 +170,7 @@ export const createWebSearchTool = (
           ? { blocked_domains: blocked_domains.slice(0, 64) }
           : {};
 
+      const _searchStartedAt = Date.now();
       const searchBudget = Math.min(15, Math.max(3, max_searches ?? 6));
 
       onProgress?.(`Searching the web: ${query.slice(0, 80)}...`);
@@ -254,9 +257,41 @@ export const createWebSearchTool = (
 
       const deduped = Array.from(new Map(sources.map((s) => [s.url, s])).values());
 
+      // Record the INCUMBENT half of a validation pair (#394). Same reasoning as the
+      // b2b lane: this search has already run and been paid for, so recording it costs
+      // one insert, while re-running it inside a validation would pay for it twice to
+      // learn nothing new about the incumbent.
+      let validationId: string | null = null;
+      try {
+        const { data: vRow } = await supabase
+          .from('research_validations')
+          .insert({
+            kind: 'web',
+            workspace_id: workspaceId,
+            user_id: userId,
+            query: { query, max_searches: searchBudget, allowed_domains, blocked_domains },
+            incumbent_provider: 'anthropic',
+            incumbent_model: SEARCH_MODEL,
+            // The SOURCES are the half a second provider can be checked against.
+            // The prose answer is stored alongside so a human can read both, but it
+            // is never scored — see research-validation.ts.
+            incumbent_results: { answer, sources: deduped },
+            incumbent_ms: Date.now() - _searchStartedAt,
+          })
+          .select('id')
+          .single();
+        validationId = vRow?.id ?? null;
+      } catch (vErr) {
+        console.warn('[web_search] validation row insert failed:', vErr);
+      }
+
       return JSON.stringify({
         success: true,
         query,
+        // Pass to `web_research_validate` to re-run this question on a second provider
+        // and compare which SOURCES each found. Null means the pair could not be
+        // recorded and validation is unavailable for this run.
+        validation_id: validationId,
         // The model's own words about what it found — already grounded, so this is not fenced as
         // untrusted the way raw page text is. The SOURCES below are the checkable half.
         answer,
@@ -506,5 +541,165 @@ export const createWebFetchTool = (
           .describe('Character offset to resume from, when a previous call came back truncated. Use the next_offset it gave you.'),
       }),
     },
+  );
+};
+
+/**
+ * Web Research Tool: second-source validation (issue #394)
+ *
+ * The "pro" rung of the research ladder, and deliberately the THIRD rung rather than
+ * the second. The ladder is:
+ *
+ *   normal        one provider, 6 searches        — the default, and right for the
+ *                                                   single-answer lookups that make up
+ *                                                   most web_search traffic
+ *   deep          one provider, up to 15          — already exists as `max_searches`;
+ *                                                   searching harder helps every
+ *                                                   question at a fraction of the cost
+ *                                                   of a second provider
+ *   second-source two providers, sources compared — THIS, and only worth it on
+ *                                                   COVERAGE questions
+ *
+ * A second provider confirming that Greek VAT is 24% is not "pro", it is paying twice
+ * for an answer one search already had. What a second provider actually buys is a
+ * different search INDEX, and that only matters when the question is "find me all of
+ * X" rather than "what is X".
+ *
+ * WHAT IS COMPARED. Not the prose — two paragraphs cannot be scored objectively, and
+ * an LLM judge would tell us which model writes better, not which one found more. The
+ * SOURCES are compared: which hosts each cited, how many resolve, where they overlap.
+ * Weaker than the b2b lane's domain check, and worth saying so — a live source proves
+ * the citation is real, not that the claim it supports is true.
+ */
+export const createWebResearchValidateTool = (
+  userId: string,
+  workspaceId: string | null,
+  onProgress?: (status: string) => void,
+) => {
+  return tool(
+    async ({ validation_id }: { validation_id: string }) => {
+      try {
+        const { data: row, error: loadErr } = await supabase
+          .from('research_validations')
+          .select('id, kind, workspace_id, query, incumbent_results')
+          .eq('id', validation_id)
+          .single();
+
+        if (loadErr || !row || row.kind !== 'web') {
+          return JSON.stringify({
+            success: false,
+            error: `No recorded web research run with id ${validation_id}. Run web_search first and pass the validation_id it returns.`,
+          });
+        }
+        // Service-role client, so the row's workspace is checked rather than trusted.
+        if (row.workspace_id && workspaceId && row.workspace_id !== workspaceId) {
+          return JSON.stringify({ success: false, error: `No recorded web research run with id ${validation_id}.` });
+        }
+
+        const q = (row.query ?? {}) as { query?: string };
+        const incumbent = (row.incumbent_results ?? {}) as { answer?: string; sources?: { url: string }[] };
+        const incumbentUrls = (incumbent.sources ?? []).map((s) => s.url).filter(Boolean);
+
+        onProgress?.('Asking a second provider the same question...');
+
+        let challengerAnswer = '';
+        let challengerUrls: string[] = [];
+        let challengerError: string | null = null;
+        let challengerModel: string | null = null;
+        let challengerMs: number | null = null;
+
+        const t0 = Date.now();
+        try {
+          const out = await researchWithQwen<{ answer: string; sources: string[] }>({
+            system:
+              'You are a research assistant. Search the web and answer the question. '
+              + 'Record your answer and EVERY source URL you actually used with the '
+              + 'record_research function. Never cite a URL you did not read.',
+            prompt: q.query ?? '',
+            fn: {
+              name: 'record_research',
+              description: 'Record the answer and the source URLs it came from.',
+              parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  answer: { type: 'string', description: 'The answer, in prose.' },
+                  sources: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Every source URL actually used. Never a URL you did not read.',
+                  },
+                },
+                required: ['answer', 'sources'],
+              },
+            },
+            task: 'web_research_validation_challenger',
+            userId,
+            workspaceId: workspaceId ?? undefined,
+          });
+          challengerAnswer = out.data?.answer ?? '';
+          challengerUrls = Array.isArray(out.data?.sources) ? out.data.sources : [];
+          // The provider also reports what its own search surfaced; union it in so a
+          // model that answers well but under-cites is not scored as under-searching.
+          for (const r of (out.searchResults ?? []) as { url?: string }[]) {
+            if (r?.url) challengerUrls.push(r.url);
+          }
+          challengerModel = out.model;
+          challengerMs = Date.now() - t0;
+        } catch (e) {
+          challengerError = e instanceof Error ? e.message : String(e);
+          challengerMs = Date.now() - t0;
+        }
+
+        onProgress?.('Checking which cited sources actually resolve...');
+        const comparison = await compareResearchSources(incumbentUrls, challengerUrls, {
+          challengerRan: challengerError === null,
+        });
+
+        await supabase
+          .from('research_validations')
+          .update({
+            challenger_provider: 'qwencloud',
+            challenger_model: challengerModel,
+            challenger_results: { answer: challengerAnswer, sources: challengerUrls },
+            challenger_ms: challengerMs,
+            challenger_error: challengerError,
+            comparison,
+          })
+          .eq('id', validation_id);
+
+        return JSON.stringify({
+          success: true,
+          validation_id,
+          question: q.query,
+          challenger_ran: challengerError === null,
+          challenger_error: challengerError,
+          comparison,
+          // Both answers, so a person can read them side by side. Neither is scored.
+          incumbent_answer: incumbent.answer ?? '',
+          challenger_answer: challengerAnswer,
+        });
+      } catch (error) {
+        console.error('web_research_validate error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'validation failed',
+        });
+      }
+    },
+    {
+      name: 'web_research_validate',
+      description:
+        'Second-source a web_search that already ran. Pass the `validation_id` it returned; this '
+        + 'asks the SAME question of a different provider (QwenCloud, with its own search index) '
+        + 'and compares which sources each one cited and how many of those actually resolve. '
+        + 'Use it for COVERAGE questions - "find me all the X", competitor or market sweeps, '
+        + 'what are we missing - not for single-answer lookups, where a second provider just '
+        + 'pays twice for the same fact. It compares SOURCES, not answers: it will not tell you '
+        + 'which answer is better, and does not claim to.',
+      schema: z.object({
+        validation_id: z.string().describe('The `validation_id` returned by a prior web_search call.'),
+      }),
+    }
   );
 };

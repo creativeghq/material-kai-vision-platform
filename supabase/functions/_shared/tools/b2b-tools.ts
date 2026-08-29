@@ -624,8 +624,9 @@ export const createB2BManufacturerSearchTool = (
         let validationId: string | null = null;
         try {
           const { data: vRow } = await supabase
-            .from('b2b_research_validations')
+            .from('research_validations')
             .insert({
+              kind: 'b2b',
               workspace_id: workspaceId,
               user_id: userId,
               query: { country, region, category, limit },
@@ -2655,7 +2656,7 @@ export const createB2BResearchValidateTool = (
     async ({ validation_id }: { validation_id: string }) => {
       try {
         const { data: row, error: loadErr } = await supabase
-          .from('b2b_research_validations')
+          .from('research_validations')
           .select('id, workspace_id, query, incumbent_provider, incumbent_model, incumbent_results, challenger_error')
           .eq('id', validation_id)
           .single();
@@ -2719,7 +2720,7 @@ export const createB2BResearchValidateTool = (
         });
 
         await supabase
-          .from('b2b_research_validations')
+          .from('research_validations')
           .update({
             challenger_provider: 'qwencloud',
             challenger_model: challengerModel,

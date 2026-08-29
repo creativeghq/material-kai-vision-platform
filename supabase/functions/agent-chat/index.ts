@@ -1194,7 +1194,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // surcharge, fetch is one Firecrawl unit). JARVIS is the agent people actually reach, and
       // it had no way to look anything up outside the workspace: the platform's only web reach
       // was sealed inside b2b_manufacturer_search, which returns manufacturers or nothing.
-      'web_search', 'web_fetch',
+      'web_search', 'web_fetch', 'web_research_validate',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
@@ -1323,7 +1323,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // questions to, and until 2026-08-25 it could reach a URL only through the company
       // profiler — so "list this competitor's brands and say who represents each in Greece"
       // had no path through the tool set at all.
-      'web_search', 'web_fetch',
+      'web_search', 'web_fetch', 'web_research_validate',
       'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
       'related_products', 'find_products_by_spec', 'products_in_project', 'projects_using_product',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
@@ -1359,7 +1359,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'research_analysis', 'analytics_analysis',
       // The open web. Every SEO tool here answers about a domain from an index; none of them can
       // read the page. A competitor content question needs both.
-      'web_search', 'web_fetch',
+      'web_search', 'web_fetch', 'web_research_validate',
       // Email marketing — compose drafts + confirm-gated send (Edith is the marketing agent)
       'manage_email_campaign',
     ],
@@ -2044,7 +2044,7 @@ async function executeAgent(
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'b2b_research_validate', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsMatScrape = config.tools.some((t: string) => ['scrape_materials_from_url', 'suggest_extraction_fields'].includes(t));
-  const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch'].includes(t));
+  const needsWebResearch = config.tools.some((t: string) => ['web_search', 'web_fetch', 'web_research_validate'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
   // SEO agent toolkit (conversational research surface — separate from the article pipeline)
   const SEO_AGENT_TOOL_NAMES = [
@@ -2170,6 +2170,7 @@ async function executeAgent(
   const createMaterialScrapeTool = matScrapeMod?.createMaterialScrapeTool;
   const createFieldSuggestTool = matScrapeMod?.createFieldSuggestTool;
   const createWebSearchTool = webResearchMod?.createWebSearchTool;
+  const createWebResearchValidateTool = webResearchMod?.createWebResearchValidateTool;
   const createWebFetchTool = webResearchMod?.createWebFetchTool;
   const createCompanyEnrichmentTool = b2bMod?.createCompanyEnrichmentTool;
   const createCompanyRegistryLookupTool = b2bMod?.createCompanyRegistryLookupTool;
@@ -2921,6 +2922,9 @@ async function executeAgent(
     if (config.tools.includes('web_search')) {
       tools.push(createWebSearchTool(userId, workspaceId ?? null, sendProgress));
     }
+    if (config.tools.includes('web_research_validate')) {
+      tools.push(createWebResearchValidateTool(userId, workspaceId ?? null, sendProgress));
+    }
     if (config.tools.includes('web_fetch')) {
       tools.push(createWebFetchTool(userId, workspaceId ?? null, sendProgress));
     }
@@ -3276,7 +3280,7 @@ async function executeAgent(
    * budget to where TIME becomes the binding constraint, and `finalize` is what makes hitting
    * either one produce an answer instead of an apology.
    */
-  const RESEARCH_TOOLS = ['web_search', 'web_fetch', 'b2b_manufacturer_search', 'company_website_scrape', 'scrape_materials_from_url'];
+  const RESEARCH_TOOLS = ['web_search', 'web_fetch', 'web_research_validate', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'scrape_materials_from_url'];
   const hasResearchTools = tools.some((t: any) => RESEARCH_TOOLS.includes(t?.name));
   const stepBudget = hasResearchTools ? 20 : 10;
 

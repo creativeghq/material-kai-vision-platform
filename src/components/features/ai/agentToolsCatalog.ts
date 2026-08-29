@@ -1375,7 +1375,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Search the open web and read any page in full. Use for competitor and brand questions, distributor / "where to buy" lookups, sitemaps and product indexes — anything the workspace database does not already know.',
     icon: 'Globe',
     alwaysOn: true,
-    tool_ids: ['web_search', 'web_fetch'],
+    tool_ids: ['web_search', 'web_fetch', 'web_research_validate'],
     quick_starts: [
       {
         label: 'Search the web', description: 'Answer a question from the open web, with sources', icon: 'Search',

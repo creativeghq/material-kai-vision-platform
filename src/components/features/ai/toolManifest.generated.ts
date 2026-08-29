@@ -2232,6 +2232,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'web_research_validate',
+    file: 'supabase/functions/_shared/tools/web-research-tools.ts',
+    factory: 'createWebResearchValidateTool',
+    description: 'Second-source a web_search that already ran.',
+    params: [
+      { name: 'validation_id', type: 'string', optional: false, description: 'The `validation_id` returned by a prior web_search call.' },
+    ],
+  },
+  {
     name: 'web_search',
     file: 'supabase/functions/_shared/tools/web-research-tools.ts',
     factory: 'createWebSearchTool',

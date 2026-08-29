@@ -25,7 +25,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'web-research': {
     alwaysOn: true,
-    tool_ids: ['web_search', 'web_fetch'],
+    tool_ids: ['web_search', 'web_fetch', 'web_research_validate'],
   },
   'calculators': {
     alwaysOn: true,
