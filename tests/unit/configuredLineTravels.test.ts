@@ -31,7 +31,7 @@ import { stripComments } from '../helpers/stripComments';
 import {
   configuredOptionsLabel,
   lineDetailLabel,
-} from '../../supabase/functions/_shared/finance/configured-options';
+} from '../../src/modules/finance/invoice-templates/configuredOptions';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -40,6 +40,7 @@ const src = (p: string) => stripComments(read(p));
 const ORDERS = 'src/modules/finance/services/ordersService.ts';
 const INVOICE_PDF = 'supabase/functions/finance-invoice-pdf/index.ts';
 const QUOTE_FETCHER = 'supabase/functions/generate-quote-pdf/data-fetcher.ts';
+const SOURCE = 'src/modules/finance/invoice-templates/configuredOptions.ts';
 
 describe('#375 — what the line prints', () => {
   it('renders the frozen snapshot, group by group', () => {
@@ -72,6 +73,26 @@ describe('#375 — what the line prints', () => {
     // (`variant_label`), which is why neither needed a change at its render sites.
     expect(src(INVOICE_PDF)).toMatch(/lineDetailLabel\(variant, it\?\.configured_options\)/);
     expect(src(QUOTE_FETCHER)).toMatch(/lineDetailLabel\(variantLabels\[item\.id\] \?\? null, item\.configured_options\)/);
+  });
+
+  it("the operator's screen says what the customer's document says", () => {
+    // The PDF prints the options; the order line beside it printed the product name and an empty
+    // variant picker. Same fact, two surfaces — and the one the operator uses to answer "what did
+    // they order?" was the one that did not know.
+    const panel = src('src/modules/finance/components/OrdersPanel.tsx');
+    expect(panel).toMatch(/configuredOptionsLabel\(l\.configured_options\)/);
+    // Read-only on purpose: the price was frozen from these choices, so editing them here would
+    // change what the customer was quoted without re-pricing it.
+    expect(panel).not.toMatch(/onChange=\{[^}]*configured_options/);
+  });
+
+  it('the order-item select carries the columns the screen and the re-price need', () => {
+    // ORDER_ITEM_SELECT is an explicit list — its own comment says a column added later is
+    // invisible until someone adds it. That is the fail-closed default, and also the trap.
+    const orders = src(ORDERS);
+    const list = orders.slice(orders.indexOf('const ORDER_ITEM_SELECT'), orders.indexOf("].join(', ')"));
+    expect(list).toMatch(/'configured_options'/);
+    expect(list).toMatch(/'product_configuration_id'/);
   });
 
   it('the quote fetcher actually selects the column it renders', () => {
@@ -118,7 +139,7 @@ describe('#375 — a configured line does not fall through to the plain price', 
     // The sibling of configuratorMoneyDerivation.test.ts, applied to the line path: the deltas
     // are added by `get_configured_product_price`, and a second sum here would be a second
     // derivation of a money quantity that agrees today and drifts later.
-    for (const file of [ORDERS, INVOICE_PDF, QUOTE_FETCHER, 'supabase/functions/_shared/finance/configured-options.ts']) {
+    for (const file of [ORDERS, INVOICE_PDF, QUOTE_FETCHER, SOURCE]) {
       const text = src(file);
       expect(text, `${file} adds up price_delta`).not.toMatch(/price_delta\s*[)+]/);
       expect(text, `${file} reduces over price_delta`).not.toMatch(/reduce\([^)]*price_delta/);

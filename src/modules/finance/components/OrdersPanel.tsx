@@ -76,6 +76,7 @@ import {
 } from '@/modules/finance/services/ordersService';
 import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
 import { HubEmptyState } from '@/components/core/hub';
+import { configuredOptionsLabel } from '@/modules/finance/invoice-templates/configuredOptions';
 
 /**
  * Orders filter every dimension in SQL (`search_orders` RPC), so NO field carries an accessor —
@@ -540,6 +541,12 @@ export type Line = {
   selected_attributes?: Record<string, string>;
   selected_size?: string | null;
   selected_color?: string | null;
+  /**
+   * What was chosen in the configurator, frozen on the line (#375). NOT a variant — the deltas
+   * are already inside `unit_price`, and the operator has to be able to see what the customer's
+   * document says.
+   */
+  configured_options?: unknown;
 };
 const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null, supplier_company_id: null });
 
@@ -1404,6 +1411,14 @@ export const NewOrderModal: React.FC<{
                       value={l.selected_attributes ?? {}}
                       onChange={(next) => setItem(i, next)}
                     />
+                    {/* #375 — read-only: the choices were made in the configurator and the price
+                        was frozen from them. Editing them here would change what the customer was
+                        quoted without re-pricing it. */}
+                    {configuredOptionsLabel(l.configured_options) && (
+                      <div className="mt-0.5 text-[10px] text-muted-foreground">
+                        Configured · {configuredOptionsLabel(l.configured_options)}
+                      </div>
+                    )}
                     </>
                     )}
                     {activeLine === i && lineProdOpts.length > 0 && (

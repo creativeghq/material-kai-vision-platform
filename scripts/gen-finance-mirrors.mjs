@@ -35,6 +35,13 @@ export const MIRRORS = [
     'src/lib/mydataExemptionCategories.ts',
     'supabase/functions/_shared/finance/vat-exemptions.ts',
   ],
+  [
+    // #375 — the configurator choices on a line, rendered the same way on the customer's PDF
+    // (Deno) and on the operator's screen (Vite). One source, because a document and the screen
+    // that produced it disagreeing about what was configured is the whole defect.
+    'src/modules/finance/invoice-templates/configuredOptions.ts',
+    'supabase/functions/_shared/finance/configured-options.ts',
+  ],
 ];
 
 const banner = (source) => [

@@ -167,6 +167,10 @@ const ORDER_ITEM_SELECT = [
   'measurement_unit_code', 'supplier_company_id', 'discount_pct', 'warehouse_id', 'taric_code',
   'country_of_origin', 'net_mass_kg', 'selected_attributes', 'selected_size', 'selected_color',
   'price_source',
+  // #375 — the configurator choices, frozen on the line. The operator's screen has to be able to
+  // say what the customer's PDF says; the id is here so a line can be re-priced against the same
+  // configuration rather than the plain product.
+  'configured_options', 'product_configuration_id',
 ].join(', ');
 
 export interface OrderListRow extends Order {

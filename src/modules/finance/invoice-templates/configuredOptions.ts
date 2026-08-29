@@ -1,7 +1,3 @@
-// GENERATED MIRROR of src/modules/finance/invoice-templates/configuredOptions.ts — do not edit here.
-// Regenerate: npm run finance:mirror (part of gen:all). Freshness is enforced by
-// tests/unit/financeMirrors.test.ts, which fails the build on any drift.
-
 /**
  * What the customer chose, on the document that charges them for it (#375).
  *
