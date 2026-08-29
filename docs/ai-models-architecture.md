@@ -11,7 +11,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
-| **Anthropic** | Claude Opus 5, Claude Sonnet 4.6, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
+| **Anthropic** | Claude Opus 5, Claude Sonnet 5, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
 | **Google (Modal)** | SigLIP2 base (768D) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
 | **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV2 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
@@ -46,8 +46,8 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ CHUNKING (text)                                                         │
-│ Model: Claude Sonnet 4.6             │
-│ Setting: Settings.chunking_primary_model = 'claude-sonnet-4-6'          │
+│ Model: Claude Sonnet 5             │
+│ Setting: Settings.chunking_primary_model = 'claude-sonnet-5'          │
 │ Why Sonnet: chunking is a text task at the quality ceiling — Sonnet     │
 │             matches Opus output quality at lower cost;
 │             silently 404-ing for months                                 │
@@ -168,9 +168,9 @@ The vision pipeline calls `claude-opus-5` via Anthropic tool use. The tool schem
 
 ---
 
-### 2. **Claude Sonnet 4.6 — Chunking** ✂️
+### 2. **Claude Sonnet 5 — Chunking** ✂️
 
-**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'`
+**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-5'`
 
 Chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing.
 
@@ -295,7 +295,7 @@ The `VisionProvider.vision_provider` still validate. No code path produces new r
 |-------|---------------|-------------|
 | Layout + Page OCR + figure boxes (Stage 1, before discovery) | PaddleOCR-VL 1.6 (Modal) | — |
 | Discovery | Claude Opus 5 | GPT-5 |
-| Chunking | Claude Sonnet 4.6 | — |
+| Chunking | Claude Sonnet 5 | — |
 | Vision (primary) | Claude Opus 5 (tool use) | — |
 | Vision (validation, low-confidence) | Claude Opus 5 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
 | Phase 3 OCR (per-image) | PaddleOCR-VL block OCR | — |
@@ -319,7 +319,7 @@ These numbers are the source of truth; Doc #4's profile cost lines reference thi
 |-------|-------|------|
 | **PaddleOCR-VL 1.6** | Stage 1 layout + page OCR (100 pages, before discovery) | Modal GPU (scale-to-zero) |
 | **Claude Opus 5** | Product discovery (1 call) | ~$0.08 |
-| **Claude Sonnet 4.6** | Chunking (~500 chunks) | ~$0.10 |
+| **Claude Sonnet 5** | Chunking (~500 chunks) | ~$0.10 |
 | **Claude Opus 5** | Vision analysis (50 images, tool use) | ~$0.13 |
 | **PaddleOCR-VL 1.6** | Phase 3 per-image OCR (text-bearing only) | Modal GPU (scale-to-zero) |
 | **SLIG** | Visual embeddings (250 total, 5× per image) | endpoint |

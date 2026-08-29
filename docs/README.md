@@ -53,7 +53,7 @@
 - Phase 1 & 2 complete
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
-- Anthropic: Claude Opus 5 (vision via tool use, agent turns), Sonnet 4.6 (`Settings.chunking_primary_model`), Haiku 4.5 (classifiers, rerank, semantic chunking)
+- Anthropic: Claude Opus 5 (vision via tool use, agent turns), Sonnet 5 (`Settings.chunking_primary_model`), Haiku 4.5 (classifiers, rerank, semantic chunking)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
 - Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
 - Modal: SLIG SigLIP2 (768D visual, 5 specialized types — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
@@ -375,7 +375,7 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 - **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 - **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 - **Database**: PostgreSQL 15, pgvector, Supabase
-- **AI**: Claude Opus 5 (vision tool use) / Sonnet 4.6 (chunking) / Haiku 4.5 (classifiers); Voyage AI voyage-4 (sole text + understanding embedder); PaddleOCR-VL 1.6 (Modal — layout + OCR backbone); SLIG SigLIP2 (5×768D visual); GPT-4o/GPT-5 optional alternatives
+- **AI**: Claude Opus 5 (vision tool use) / Sonnet 5 (chunking) / Haiku 4.5 (classifiers); Voyage AI voyage-4 (sole text + understanding embedder); PaddleOCR-VL 1.6 (Modal — layout + OCR backbone); SLIG SigLIP2 (5×768D visual); GPT-4o/GPT-5 optional alternatives
 
 ### API Categories
 1. PDF Processing (12 endpoints)

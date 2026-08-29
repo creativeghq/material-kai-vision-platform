@@ -28,7 +28,7 @@ Complete technical architecture of Material Kai Vision Platform.
 │ - Real-time SigLIP2 (SLIG) embedding generation            │
 │ - RAG system (Claude Opus 5 + 7-Vector Direct VECS)      │
 │ - Search APIs (Multi-Vector, Semantic, Hybrid)             │
-│ - AI Services (Claude Opus 5 / Sonnet 4.6 / Haiku 4.5,   │
+│ - AI Services (Claude Opus 5 / Sonnet 5 / Haiku 4.5,   │
 │   Voyage AI voyage-4, SLIG/SigLIP2 on Modal, PaddleOCR-VL  │
 │   on Modal, GPT-5)                                         │
 │ - Product Management + Metadata Management                 │
@@ -62,7 +62,7 @@ Frontend (Vercel)
             ↓
             ├─→ Supabase (Data)
             ├─→ Voyage AI (Text + Understanding Embeddings, sole text embedder)
-            ├─→ Anthropic (Claude Opus 5 vision tool use, Sonnet 4.6 chunking, Haiku 4.5 classifiers)
+            ├─→ Anthropic (Claude Opus 5 vision tool use, Sonnet 5 chunking, Haiku 4.5 classifiers)
             ├─→ Modal (SLIG SigLIP2 visual embeddings)
             ├─→ Modal (PaddleOCR-VL structural layout + OCR backbone)
             ├─→ OpenAI (optional alternative — GPT-4o/GPT-5; not vision)
@@ -213,7 +213,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
    - Statistics
 
 9. **Anthropic APIs** (3 endpoints)
-   - Claude integration (Opus 5 vision via tool use, Sonnet 4.6 chunking, Haiku 4.5 classifiers)
+   - Claude integration (Opus 5 vision via tool use, Sonnet 5 chunking, Haiku 4.5 classifiers)
    - Vision analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`)
 
 10. **Model Endpoint APIs**
@@ -242,7 +242,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 **Anthropic**:
 - **Claude Opus 5** — vision analysis (PRIMARY, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`); product discovery; JARVIS agent default
-- **Claude Sonnet 4.6** — chunking
+- **Claude Sonnet 5** — chunking
 - **Claude Haiku 4.5** — fast classification, demo agent, price-monitoring identity classifier
 
 **Voyage AI** (sole text embedder):
@@ -381,7 +381,7 @@ py` code, `Settings. Only the `VisionProvider.
 - Redis (optional)
 
 **AI Services**:
-- Anthropic API (Claude Opus 5 / Sonnet 4.6 / Haiku 4.5 — primary)
+- Anthropic API (Claude Opus 5 / Sonnet 5 / Haiku 4.5 — primary)
 - Voyage AI (text + understanding embeddings, sole text embedder)
 - Modal (SLIG SigLIP2 visual embeddings)
 - Modal (PaddleOCR-VL structural layout + OCR backbone)

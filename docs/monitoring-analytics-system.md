@@ -103,7 +103,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 - Claude Haiku 4.5
 - GPT-4o
 - GPT-5
-- Claude Sonnet 4.6
+- Claude Sonnet 5
 - Voyage AI voyage-4 (updated 2026-04 — replaced OpenAI text-embedding-3-small)
 - PaddleOCR-VL on Modal (layout+OCR backbone post-2026-06-13; replaced Surya-2, which had replaced Chandra v2)
 

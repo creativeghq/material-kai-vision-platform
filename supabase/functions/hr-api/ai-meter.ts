@@ -14,10 +14,16 @@ export interface ClaudeUsage { input_tokens: number; output_tokens: number; }
 export interface ClaudeToolResult { input: any; usage: ClaudeUsage; model: string; }
 
 // Per-1M-token provider pricing, matched by model family. Mirrors ai_model_pricing (token_based)
-// and _shared/ai-client.ts. Family-matched so an HR_JOB_AI_MODEL pin like `claude-sonnet-4-6`
+// and _shared/ai-client.ts. Family-matched so an HR_JOB_AI_MODEL pin like `claude-sonnet-5`
 // still resolves against the `claude-sonnet` row.
+//
+// The Opus row said 15.00/75.00, which is Opus-3-era pricing and 3x the real rate. That was the
+// SIXTH copy of the same wrong number: base-agent.ts, OperationsDashboard MODEL_PRICING and
+// MODEL_CONFIGS, credits.service.ts and ai-pricing-updater were corrected in 0d20b768 and this
+// one was not, because it is family-matched rather than keyed on a model id and so did not turn
+// up in a search for `claude-opus-4-8`. Every HR job run on an Opus pin was billed at 3x.
 const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = [
-  { match: 'claude-opus',   input: 15.0, output: 75.0 },
+  { match: 'claude-opus',   input:  5.0, output: 25.0 },
   { match: 'claude-sonnet', input:  3.0, output: 15.0 },
   { match: 'claude-haiku',  input:  1.0, output:  5.0 },
 ];

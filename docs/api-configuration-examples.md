@@ -2,7 +2,7 @@
 
 **Last Updated**: 2026-05-03
 
-This document provides practical examples of how to use the dynamic AI model configuration system in the MIVAA PDF processing pipeline. All cost figures use current Anthropic pricing (Opus 5 at $5/$25 per 1M, Haiku 4.5 at $1/$5 per 1M, Sonnet 4.6 at $3/$15 per 1M). Per-PDF totals are reconciled against the canonical 100-page / 50-image workload in [AI Models Architecture](./ai-models-architecture.md).
+This document provides practical examples of how to use the dynamic AI model configuration system in the MIVAA PDF processing pipeline. All cost figures use current Anthropic pricing (Opus 5 at $5/$25 per 1M, Haiku 4.5 at $1/$5 per 1M, Sonnet 5 at $3/$15 per 1M). Per-PDF totals are reconciled against the canonical 100-page / 50-image workload in [AI Models Architecture](./ai-models-architecture.md).
 
 ---
 
@@ -159,7 +159,7 @@ These align with the [AI Models Architecture](./ai-models-architecture.md) cost 
 - Classification primary (Claude Opus 5 tool use, 50 images): ~$0.13
 - Classification validation pass (Claude Opus 5, fires only on low-conf primary): ~$0.03
 - Metadata (Claude Opus 5, inline with vision): rolled into classification line
-- Chunking (Claude Sonnet 4.6, ~500 chunks): ~$0.10
+- Chunking (Claude Sonnet 5, ~500 chunks): ~$0.10
 - Visual Embeddings (SLIG endpoint): endpoint-metered (Modal, scale-to-zero)
 - Phase 3 OCR (PaddleOCR-VL on Modal): runtime-metered (scale-to-zero)
 - Text + Understanding Embeddings (Voyage voyage-4): ~$0.05
@@ -169,7 +169,7 @@ These align with the [AI Models Architecture](./ai-models-architecture.md) cost 
 - Discovery (Claude Haiku 4.5): ~$0.02
 - Classification primary (Claude Opus 5): ~$0.13
 - Classification validation pass (Claude Haiku 4.5): ~$0.01
-- Chunking (Claude Sonnet 4.6): ~$0.10
+- Chunking (Claude Sonnet 5): ~$0.10
 - Visual + OCR + Voyage: same as above
 - **Total**: ~$0.31 per PDF (≈20% saving over DEFAULT)
 
@@ -177,7 +177,7 @@ These align with the [AI Models Architecture](./ai-models-architecture.md) cost 
 - Discovery (Claude Opus 5, more tokens): ~$0.13
 - Classification primary (Claude Opus 5): ~$0.13
 - Classification validation pass (Claude Opus 5, fires more often at threshold 0.8): ~$0.10
-- Chunking (Claude Sonnet 4.6): ~$0.10
+- Chunking (Claude Sonnet 5): ~$0.10
 - Visual + OCR + Voyage: same as above
 - **Total**: ~$0.51 per PDF (≈30% more than DEFAULT)
 
@@ -185,7 +185,7 @@ These align with the [AI Models Architecture](./ai-models-architecture.md) cost 
 - Discovery (Claude Haiku 4.5): ~$0.02
 - Classification primary (Claude Opus 5 — primary stays Opus by default): ~$0.13
 - Classification validation pass (Claude Haiku 4.5, threshold 0.6 → rare): ~$0.01
-- Chunking (Claude Sonnet 4.6): ~$0.10
+- Chunking (Claude Sonnet 5): ~$0.10
 - Visual + OCR + Voyage: same as above
 - **Total**: ~$0.31 per PDF (≈20% saving over DEFAULT)
 

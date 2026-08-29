@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
@@ -692,7 +692,7 @@ This analytics layer is a significant standalone upsell — providing market int
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
 | API endpoints | 170+ |
-| AI models integrated | Anthropic (Opus 5 / Sonnet 4.6 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
+| AI models integrated | Anthropic (Opus 5 / Sonnet 5 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
 | Edge functions deployed | 60+ |
 | Database tables | 40+ |
 

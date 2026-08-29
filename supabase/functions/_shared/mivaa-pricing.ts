@@ -24,6 +24,13 @@ export const MIVAA_ACTION_PRICING: Record<string, MivaaRoutePricing> = {
   'rag_search_mmr': { creditCost: 0.5, operationType: 'mmr_search', description: 'MMR diversity search' },
   'rag_search_advanced': { creditCost: 1, operationType: 'advanced_search', description: 'Advanced search query' },
   'kb_search': { creditCost: 0.5, operationType: 'kb_search', description: 'Knowledge base search' },
+  // Both were free by omission, and neither is metered on the MIVAA side (rag_routes.py has no
+  // meter_operation call at all). `search_knowledge_base` runs the SAME 7-vector fusion search as
+  // rag_search and kb_search; `rag_chat` is a Claude completion with conversation context, so it
+  // costs at least what a one-shot rag_query costs. Priced to match their own twins rather than
+  // to a new number nobody can check.
+  'search_knowledge_base': { creditCost: 0.5, operationType: 'kb_search', description: 'Knowledge base fusion search' },
+  'rag_chat': { creditCost: 0.5, operationType: 'rag_chat', description: 'RAG chat completion' },
 
   // --- Visual/Image Search (1 credit) ---
   'images_search': { creditCost: 1, operationType: 'visual_search', description: 'Image-based visual search' },
@@ -33,7 +40,16 @@ export const MIVAA_ACTION_PRICING: Record<string, MivaaRoutePricing> = {
 
 /**
  * Actions that are FREE — no credit deduction.
- * Includes: health checks, admin ops, data retrieval, monitoring, autocomplete.
+ *
+ * EVERY action in mivaa-gateway's ACTION_MAP must appear here or in MIVAA_ACTION_PRICING.
+ * `getMivaaActionCost` returns null for both "free on purpose" and "nobody classified it", so an
+ * unlisted action is billed at zero and looks exactly like a deliberate decision — the silent-zero
+ * shape. 29 of 116 actions were in that state, including `rag_chat` (an LLM completion) and
+ * `search_knowledge_base` (the same 7-vector fusion search two priced actions run).
+ *
+ * Held by tests/unit/mivaaGatewayPricing.test.ts, which reads ACTION_MAP out of the gateway.
+ * Being free is fine; being unclassified is not. Add the action with the group comment that says
+ * WHY, or price it.
  */
 export const FREE_ACTIONS = new Set([
   // Health checks
@@ -72,10 +88,32 @@ export const FREE_ACTIONS = new Set([
 
   // Document management (CRUD — no AI cost)
   'kb_create_document', 'kb_update_document', 'kb_delete_document',
-  'kb_create_from_pdf', 'kb_create_category',
+  'kb_create_from_pdf', 'kb_create_category', 'kb_create_attachment',
+  'rag_delete_document', 'documents_delete',
 
-  // PDF processing — billed separately in the PDF pipeline
-  'rag_process', 'rag_submit_job', 'rag_reprocess_images',
+  // PDF INGESTION — billed by the pipeline, per document, not per gateway call.
+  // `rag_upload` is the entry point; the rest are stages the pipeline drives itself or job
+  // control on a job that has already been paid for. Charging here would bill the same PDF
+  // twice, once at the door and again for every stage it walks through.
+  'rag_upload', 'rag_restart_job', 'rag_resume_job',
+  'ai_process_pdf_enhanced', 'ai_classify_document', 'ai_classify_batch',
+  'ai_detect_boundaries', 'ai_group_by_product', 'ai_validate_product',
+  'ai_consensus_validate',
+  'products_create_from_chunks', 'products_create_from_layout',
+  'anthropic_validate_image', 'anthropic_enrich_product',
+  'process_scraping_session', 'retry_scraping_session',
+
+  // Image analysis — metered INSIDE MIVAA. app/api/images.py calls
+  // meter_operation(current_user, "image-analyze", …) on each of these, so a gateway debit
+  // would be the second charge for one call.
+  'images_analyze_batch', 'images_reclassify',
+
+  // Internal-only routes. Both carry Depends(verify_internal_access) in app/api/embeddings.py —
+  // reachable server-to-server, never by a user session, so there is no one to bill.
+  'embeddings_clip_image', 'embeddings_clip_text',
+
+  // Reads and diagnostics with no upstream cost
+  'ai_is_critical', 'ai_escalation_stats', 'documents_health', 'anthropic_test',
 ]);
 
 /**

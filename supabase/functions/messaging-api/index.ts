@@ -1102,40 +1102,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       // ─────────────────────────────────────────────────────────────
-      // Read receipts, per number.
-      //
-      // Whether the customer sees a blue tick is a business decision and it differs by desk: a
-      // sales team usually wants it, a support desk triaging overnight usually does not, because
-      // "read, no reply" lands worse than silence. Stored on the channel rather than globally —
-      // one workspace can run both kinds of number.
-      // ─────────────────────────────────────────────────────────────
-      case 'set-channel-read-receipts': {
-        const channelId = String(requestBody.channelId || '').trim();
-        const enabled = requestBody.enabled !== false;
-        if (!channelId) throw new HttpError(400, 'channelId is required');
-
-        const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
-        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
-
-        // The channel id comes from the client, so it is bound to the caller's workspace before
-        // anything is written — otherwise one tenant could silence another tenant's receipts.
-        const { data: ch } = await supabaseClient
-          .from('messaging_channels').select('id, config, workspace_id')
-          .eq('id', channelId).maybeSingle();
-        if (!ch || ch.workspace_id !== wsId) throw new HttpError(404, 'No such channel on this workspace');
-
-        const { error } = await supabaseClient.from('messaging_channels')
-          .update({
-            config: { ...((ch.config || {}) as Record<string, unknown>), send_read_receipts: enabled },
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', channelId);
-        if (error) throw new HttpError(500, `Could not save the setting: ${error.message}`);
-
-        return jsonResponse({ success: true, channel_id: channelId, send_read_receipts: enabled });
-      }
-
-      // ─────────────────────────────────────────────────────────────
       // Grant paid channel seats to a workspace.
       //
       // Self-serve seat purchase needs a Stripe price that does not exist yet. This is the half

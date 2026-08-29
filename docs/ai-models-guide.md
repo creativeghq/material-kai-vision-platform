@@ -16,7 +16,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 |-------|----------|---------|-----------|---------------------|
 | **Text Generation** |
 | Claude Opus 5 | Anthropic | **Vision (PRIMARY, tool use)**, product discovery, enrichment, complex reasoning | Highest accuracy + schema-locked vision | $5 input / $25 output |
-| Claude Sonnet 4.6 | Anthropic | **Chunking (PRIMARY)**, mid-tier reasoning | Quality ceiling for chunking | $3 input / $15 output |
+| Claude Sonnet 5 | Anthropic | **Chunking (PRIMARY)**, mid-tier reasoning | Quality ceiling for chunking | $3 input / $15 output |
 | Claude Haiku 4.5 | Anthropic | Fast classification, demo agent, price-monitoring identity, vision validation pass (FAST/COST_OPTIMIZED profiles) | Real-time | $1 input / $5 output |
 | GPT-4o | OpenAI | Alternative discovery (not vision) | 94%+ accuracy | $2.50 input / $10 output |
 | GPT-5 | OpenAI | Alternative discovery / agents (not vision) | Future | TBD |
@@ -64,11 +64,11 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 ---
 
-### 2. Claude Sonnet 4.6 (Anthropic) — PRIMARY CHUNKING MODEL
+### 2. Claude Sonnet 5 (Anthropic) — PRIMARY CHUNKING MODEL
 
 **Purpose**: Document chunking (sole primary chunker post-2026-05-01)
 
-**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'`
+**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-5'`
 
 **Why Sonnet for chunking**: chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing.
 
@@ -278,7 +278,7 @@ The canonical 100-page / 50-image reference workload lands at ~$0.36 — see the
 
 The model configuration maps each task to its designated model:
 - `discovery` → `claude-opus-5` (`AIModelConfig.discovery_model`; `claude-haiku-4-5` in FAST_CONFIG / COST_OPTIMIZED_CONFIG)
-- `chunking` → `claude-sonnet-4-6` (`Settings.chunking_primary_model`) / `claude-haiku-4-5` (`AIModelConfig.chunking_model`)
+- `chunking` → `claude-sonnet-5` (`Settings.chunking_primary_model`) / `claude-haiku-4-5` (`AIModelConfig.chunking_model`)
 - `vision` → `claude-opus-5` (with `VISION_ANALYSIS_TOOL`)
 - `validation` → `claude-haiku-4-5`
 - `text_embeddings` → `voyage-4`
@@ -319,8 +319,8 @@ The model configuration maps each task to its designated model:
    - No fallback. Anthropic-only post-2026-05-01.
 
 ### Chunking
-1. **Claude Sonnet 4.6** (PRIMARY)
-   - `Settings.chunking_primary_model = 'claude-sonnet-4-6'`
+1. **Claude Sonnet 5** (PRIMARY)
+   - `Settings.chunking_primary_model = 'claude-sonnet-5'`
 
 ### Layout + OCR
 1. **PaddleOCR-VL 1.6 structural pass on Modal** (PRIMARY, sole) — PP-DocLayoutV2 RT-DETR + 0.9B VLM, runs before discovery
@@ -337,7 +337,7 @@ The model configuration maps each task to its designated model:
 
 ### Text Generation
 1. **Claude Opus 5** — Vision, complex reasoning, JARVIS agent
-2. **Claude Sonnet 4.6** — Chunking, mid-tier
+2. **Claude Sonnet 5** — Chunking, mid-tier
 3. **Claude Haiku 4.5** — Fast classification, demo agent
 4. **GPT-4o / GPT-5** — Alternative discovery (not vision)
 

@@ -71,8 +71,8 @@ Module slug: `presentation-catalogs`. Disabled by toggling the row in `public.mo
         ▼                              ▼                            ▼
 ┌────────────────────┐  ┌─────────────────────────┐  ┌────────────────────────┐
 │ catalog-extract-   │  │ catalog-translate-pdf   │  │ catalog-image-search   │
-│ from-pdfs          │  │ (Sonnet 4.6 PDF Vision  │  │ (DB visual_search →    │
-│ (Sonnet 4.6 PDF    │  │  whole-catalog pass +   │  │  DataForSEO Images)    │
+│ from-pdfs          │  │ (Sonnet 5 PDF Vision  │  │ (DB visual_search →    │
+│ (Sonnet 5 PDF    │  │  whole-catalog pass +   │  │  DataForSEO Images)    │
 │  Vision per query  │  │  bbox per material)     │  │                        │
 │  + bbox per        │  │  Auto-rasterize → MIVAA │  │                        │
 │  candidate)        │  │                         │  │                        │
@@ -191,7 +191,7 @@ A4 portrait PDF builder using `pdf-lib`. Cover page (full-page template image wi
 
 ### `catalog-extract-from-pdfs`
 
-For every attached `catalog_source_pdfs` row, downloads the PDF, base64-encodes, sends to Claude Sonnet 4.6 with the user's free-form query and the `record_candidates` tool schema. Sonnet returns matched candidates with `name`, `description`, `page_no`, optional `price/currency/specs`, and a normalized [0..1] `bbox`. Then runs a **4-way concurrent worker pool** invoking `catalog-render-pdf-page` for each candidate that has a page_no, populating `image_url` from the bbox crop. Every Anthropic call is logged to `ai_usage_logs` with `feature='presentation_catalogs'` + `sub_feature='extract_from_pdf'`.
+For every attached `catalog_source_pdfs` row, downloads the PDF, base64-encodes, sends to Claude Sonnet 5 with the user's free-form query and the `record_candidates` tool schema. Sonnet returns matched candidates with `name`, `description`, `page_no`, optional `price/currency/specs`, and a normalized [0..1] `bbox`. Then runs a **4-way concurrent worker pool** invoking `catalog-render-pdf-page` for each candidate that has a page_no, populating `image_url` from the bbox crop. Every Anthropic call is logged to `ai_usage_logs` with `feature='presentation_catalogs'` + `sub_feature='extract_from_pdf'`.
 
 ### `catalog-translate-pdf`
 
@@ -356,8 +356,8 @@ Costs are absorbed by the platform (admin tools don't debit user credits). All c
 
 | Operation | Provider | Approx cost |
 |---|---|---|
-| `extract_from_catalog_pdfs` | Anthropic Sonnet 4.6 (PDF Vision) | ~$0.05–0.15 per source PDF (depends on page count) |
-| `translate_pdf_to_catalog` | Anthropic Sonnet 4.6 (PDF Vision) | ~$0.10–0.40 per PDF (whole-doc pass with `max_tokens: 8000`) |
+| `extract_from_catalog_pdfs` | Anthropic Sonnet 5 (PDF Vision) | ~$0.05–0.15 per source PDF (depends on page count) |
+| `translate_pdf_to_catalog` | Anthropic Sonnet 5 (PDF Vision) | ~$0.10–0.40 per PDF (whole-doc pass with `max_tokens: 8000`) |
 | Per-candidate rasterization | MIVAA PyMuPDF | ~free (server CPU) |
 | `find_image_for_material` (DB hit) | MIVAA `/api/rag/search` | ~free |
 | `find_image_for_material` (web fallback) | DataForSEO Images SERP | ~$0.0006 per call |

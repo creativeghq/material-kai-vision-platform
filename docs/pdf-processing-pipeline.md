@@ -18,7 +18,7 @@
 > **Reading note:** older sub-sections below still carry YOLO/Chandra wording inline — wherever
 > this doc says "YOLO detects regions" or "Chandra OCRs the page", that is the **retired** design;
 > read "PaddleOCR-VL does both in one structural pass on Modal". The remaining stages (vision
-> analysis = Claude Opus 5, embeddings, chunking = Sonnet 4.6, products) are unchanged.
+> analysis = Claude Opus 5, embeddings, chunking = Sonnet 5, products) are unchanged.
 
 14-stage intelligent pipeline for transforming material catalogs into searchable knowledge.
 

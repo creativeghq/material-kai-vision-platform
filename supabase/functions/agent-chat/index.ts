@@ -949,7 +949,7 @@ const MAIN_MODEL = 'claude-opus-5';
 const MODEL_OVERRIDE_ALLOWED = new Set([
   'claude-haiku-4-5',
   'claude-opus-5',
-  'claude-sonnet-4-7',
+  'claude-sonnet-5',
 ]);
 
 const _modelByName = new Map<string, ChatAnthropicModel>();

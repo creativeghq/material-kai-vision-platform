@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings (SLIG on Modal), and PaddleOCR-VL structural layout + OCR backbone (on Modal).
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings (SLIG on Modal), and PaddleOCR-VL structural layout + OCR backbone (on Modal).
 
 ---
 
@@ -13,7 +13,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **AI stack**: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 4.6 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on Modal), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
+- **AI stack**: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on Modal), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
 - **170+ API endpoints** across 20 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
@@ -66,7 +66,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 30+ Edge Functions (TypeScript/Deno)
 
 **AI Services**:
-- Anthropic (Claude Opus 5 vision-via-tool-use + chunking via Sonnet 4.6 + Haiku 4.5 classifiers + built-in web_search_20250305)
+- Anthropic (Claude Opus 5 vision-via-tool-use + chunking via Sonnet 5 + Haiku 4.5 classifiers + built-in web_search_20250305)
 - Voyage AI (voyage-4, sole text + understanding embedder, 1024D)
 - SigLIP2 (SLIG) via Modal Endpoint (5 visual embedding types, 768D each)
 - PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone (replaced Surya-2 2026-06-13)
@@ -119,7 +119,7 @@ Real-time updates → Frontend displays results
 - **Vision**: Sole vision engine post-2026-05-01. Sends base64 images with `tool_choice={'type':'tool','name':...}` forcing structured `VisionAnalysis` JSON output. Pre. The migration made the architecture honest.
 - **Pipeline Stages**: Image Analysis (Stages 6, 8, 9), product discovery
 
-**Claude Sonnet 4.6** (Chunking):
+**Claude Sonnet 5** (Chunking):
 - **Use Cases**: Semantic text chunking
 - **Pipeline Stages**: Stage 6 semantic chunking
 

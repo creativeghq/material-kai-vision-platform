@@ -151,7 +151,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[presentation-catalogs.md](presentation-catalogs.md)** - Presentation Catalogs ✨ NEW (2026-05-08)
 - Admin-only catalog builder driven by 8 JARVIS tools: create / attach_pdfs / extract / translate / add_material / find_image / generate_pdf / publish
-- Source PDFs uploaded to `pdf-documents/catalog-source/` (post 2026-05-23 consolidation); Sonnet 4.6 PDF Vision extracts sections + bbox per material
+- Source PDFs uploaded to `pdf-documents/catalog-source/` (post 2026-05-23 consolidation); Sonnet 5 PDF Vision extracts sections + bbox per material
 - Per-candidate page rasterization via MIVAA PyMuPDF (`/api/internal/catalog/rasterize-pdf-page`) — every extracted material has a real cropped image
 - Editable JSONB body renders BOTH as A4 PDF (cover + body + back cover via pdf-lib) AND as live web page at `/c/:slug`
 - Email-gate on public pages: matched against `auth.users` + `crm_contacts` + `crm_companies` + per-catalog allowlist (`catalog_email_grants`); 30-day signed cookie
@@ -397,7 +397,7 @@ Complete documentation for Material Kai Vision Platform.
 ### 🤖 AI & Processing
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
-- Anthropic: Claude Opus 5 (vision via tool use, agent turns), Sonnet 4.6 (`Settings.chunking_primary_model`), Haiku 4.5 (classifiers, rerank, semantic chunking)
+- Anthropic: Claude Opus 5 (vision via tool use, agent turns), Sonnet 5 (`Settings.chunking_primary_model`), Haiku 4.5 (classifiers, rerank, semantic chunking)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
 - Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
 - Modal: SLIG SigLIP2 (5 visual embedding types, 768D each — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
@@ -722,7 +722,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude (Opus 5 vision tool use + Sonnet 4.6 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 5 vision tool use + Sonnet 5 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 

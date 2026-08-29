@@ -24,7 +24,7 @@
 - **Cost**: $5 input / $25 output per 1M tokens
 - **Performance**: Highest accuracy for complex reasoning + vision
 
-#### Claude Sonnet 4.6
+#### Claude Sonnet 5
 - **Use Cases**:
   - **Chunking (PRIMARY)** — `Settings.chunking_primary_model` default since 2026-05-01
   - Mid-tier reasoning where Opus is overkill
@@ -166,7 +166,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 ### PDF Processing Pipeline (named stages — numbers retired)
 - **Layout + Page OCR + figure boxes (Stage 1, structure-first)**: **PaddleOCR-VL** structural pass — one call per page, runs BEFORE discovery
 - **Discovery**: Claude Opus 5 or GPT-5 — reads PaddleOCR's reading-order text from the cache (not raw `get_text`)
-- **Chunking**: **Claude Sonnet 4.6**
+- **Chunking**: **Claude Sonnet 5**
 - **Vision (primary)**: **Claude Opus 5 via tool use**
 - **Vision (validation pass)**: triggered when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY profiles use Claude Opus 5; FAST/COST_OPTIMIZED profiles use Claude Haiku 4.5. Driven by `classification_validation_model` in `ai_config`.
 - **Phase 3 OCR (per-image)**: **PaddleOCR-VL** block OCR, runs AFTER vision. Consumed by icon-metadata extraction + image-search labels (NOT by chunker, NOT a vision_analysis prompt input).
@@ -202,7 +202,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 
 ### High-Volume Operations (Use Cheaper Models)
 - **Quick classification**: Claude Haiku 4.5 ($1/1M input, $5/1M output)
-- **Chunking**: Claude Sonnet 4.6 ($3/1M input, $15/1M output)
+- **Chunking**: Claude Sonnet 5 ($3/1M input, $15/1M output)
 - **Text embeddings**: Voyage AI voyage-4 ($0.06/1M tokens)
 - **Visual embeddings**: SLIG Modal endpoint (scale-to-zero)
 
@@ -226,7 +226,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - Detailed metadata extraction
 - JARVIS agent default
 
-### When to Use Claude Sonnet 4.6
+### When to Use Claude Sonnet 5
 - Chunking (default since 2026-05-01)
 - Mid-tier reasoning where Opus is overkill
 
@@ -253,7 +253,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 |-------|----------|-------|----------|----------------|
 | Claude Opus 5 | Vision analysis (tool use) | 3-8s | schema-locked | $0.02-0.05 |
 | Claude Opus 5 | Product discovery | 3-5s | 95%+ | $0.02-0.05 |
-| Claude Sonnet 4.6 | Chunking | 2-4s | quality ceiling | $0.01-0.04 |
+| Claude Sonnet 5 | Chunking | 2-4s | quality ceiling | $0.01-0.04 |
 | Claude Haiku 4.5 | Classification | 0.5-1s | 90%+ | $0.001-0.006 |
 | GPT-4o | Discovery | 2-4s | 93%+ | $0.04-0.12 |
 | PaddleOCR-VL | Structural pass: layout + OCR + figure boxes (per page) | 1-3s | >90% | endpoint |
