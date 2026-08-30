@@ -28,8 +28,9 @@ const _AI_ENV_KEYS = [
   // process.env when no explicit apiKey is passed; we pass one, but the sync keeps the
   // two paths from disagreeing about which key is in force.
   'ARK_API_KEY',
-  // MiniMax (Hailuo H3 video). Same arrangement as ARK_API_KEY above.
-  'MINIMAX_API_KEY',
+  // fal (H3 Max video). Raw REST rather than a provider — see the note on
+  // generateVideoWithH3Max — but kept in sync for the same reason LUMA_API_KEY is.
+  'FAL_KEY',
   // Luma (Ray3.2 video). Raw REST rather than a provider — see the note on generateVideoWithRay.
   'LUMA_API_KEY',
 ] as const;
@@ -71,10 +72,6 @@ import { createKlingAI } from 'npm:@ai-sdk/klingai@3';
 // `@ai-sdk/bytedance@2` is spec v4. 1.0.38 is spec v3 and speaks the same Ark
 // `/contents/generations/tasks` API.
 import { createByteDance } from 'npm:@ai-sdk/bytedance@1';
-// MiniMax H3 (Hailuo 3.0) video. Major 2 — `@ai-sdk/minimax@3` is spec v4. Checked the
-// same way as the two above: `npm view @ai-sdk/minimax@^2 dependencies.@ai-sdk/provider`
-// answers 3.0.15, which is the major `npm:ai@6` itself carries.
-import { createMiniMax } from 'npm:@ai-sdk/minimax@2';
 // Wan3.0 video over DashScope. Major 1 = spec v3; @ai-sdk/alibaba@2 is spec v4. The
 // provider is named for the VENDOR, not the platform — which is why a search for
 // "@ai-sdk/dashscope" found nothing and this code was hand-written for a year.
@@ -1308,7 +1305,7 @@ export async function generateVideoWithKling(
 
 // ── Wan3.0 (Alibaba) ───────────────────────────────────────────────────────
 //
-// Through `@ai-sdk/alibaba@1` (major 1 for spec v3, same rule as Kling/Seedance/MiniMax).
+// Through `@ai-sdk/alibaba@1` (major 1 for spec v3, same rule as Kling/Seedance).
 // This replaced a hand-written DashScope REST client on 2026-08-29, and the rewrite
 // corrected three things the hand-written version had wrong — none of which could have
 // surfaced as a test failure, because no call had ever been verified against a funded key:
@@ -1329,7 +1326,7 @@ export async function generateVideoWithKling(
 // across the clip — which is the one that matters for a materials platform, because a
 // generated room that does not preserve the ACTUAL product is not a sales asset.
 //
-// FRAMES AND REFERENCES ARE MUTUALLY EXCLUSIVE on wan3 (the same constraint MiniMax H3
+// FRAMES AND REFERENCES ARE MUTUALLY EXCLUSIVE on wan3 (the same constraint H3 Max
 // has). A first/last frame and a reference image cannot travel in the same `media` array;
 // the provider passes an explicit array through verbatim, so nothing local complains and
 // the REJECTION arrives from DashScope. This function decides — frames win — and reports
@@ -1848,148 +1845,190 @@ export async function generateVideoWithRay(
   }
 }
 
-// ── MiniMax H3 / Hailuo 3.0 (video) ────────────────────────────────────────
+// ── H3 Max (video) — fal Research's post-train of MiniMax H3 ───────────────
 //
-// The short-form specialist, and the reason it earns a place next to Wan and Seedance
-// is not length — it is the SHAPE of a social clip. Native 2K at 24fps with STEREO
-// audio, 5-15 seconds, which is the whole of a reel; the 30-second models cost 2-4x
-// as much per clip for a duration nobody watches on a phone. It is the default for
-// `social_reel` for that reason.
+// Replaced `minimax-h3` on 2026-08-30 (#396). Same lineage, different vendor and a very
+// different bill: fal post-trained H3 and optimised inference for it, so a 5-second clip
+// renders in about three seconds where the official endpoint takes minutes, and 768P costs
+// $0.08/s against the $0.13/s MiniMax charges for the 2K its API will only ever serve.
 //
-// TWO CONSTRAINTS THAT ARE THE MODEL'S, NOT OURS, and both fail QUIETLY at the
-// provider (a warning on the response, which nothing reads) rather than raising:
+// WHY THIS IS RAW REST AND NOT `@ai-sdk/fal`. The provider package exists and exposes
+// `video()`, and it CANNOT ADDRESS THIS ENDPOINT. It builds every request as
+// `https://queue.fal.run/fal-ai/${id}`, with the `fal-ai/` owner prefix hardcoded and a
+// leading one stripped off whatever id you hand it — but H3 Max is published under the
+// `minimax` owner, at `https://queue.fal.run/minimax/h3-max/image-to-video`. On top of
+// that it sends `duration` as the string `"15s"` where this endpoint's schema requires an
+// integer, and it knows nothing of `prompt_expansion_mode`, which is REQUIRED. Three
+// overrides deep it maps nothing we want, so it would be a dependency and a pin trap
+// (`@ai-sdk/fal@3` is spec v4 against the v3 `npm:ai@6` carries) bought for nothing. Raw
+// REST for the same reason `generateVideoWithRay` above is.
 //
-//   1. Frame images and reference inputs are MUTUALLY EXCLUSIVE. Give it a first
-//      frame and every reference is dropped. Our video callers pass both routinely,
-//      so this function chooses explicitly and REPORTS the choice back — see
-//      `referencesDropped` — instead of letting the references evaporate.
-//   2. With a frame image, the aspect ratio comes from THAT IMAGE. Asking for 9:16
-//      over a landscape room photo returns a landscape clip. So the ratio is only
-//      sent when there is no frame to derive it from, and a caller that needs a
-//      vertical reel needs a vertical source frame.
+// TWO CONSTRAINTS, both the model's rather than ours:
+//   1. There is NO reference-image input. Standard H3 accepted up to nine and dropped them
+//      silently whenever a frame was present; H3 Max has no such field at all. Callers
+//      still pass them, so this REPORTS `referencesDropped` rather than letting them
+//      evaporate — the same contract H3 had, for the same reason.
+//   2. The aspect ratio comes from the FRAME. This endpoint has no `aspect_ratio` field at
+//      all, so a vertical reel needs a vertical source image. (The text-to-video endpoint
+//      does take one; we do not use it — every caller here animates a room photo.)
 //
-// 768P ($0.08/s against 2K's $0.13/s) is NOT reachable here: the provider package
-// validates `resolution` against a single-value enum and hardcodes the default, so
-// every call is 2K and that is what the pricing row says. If a 768P tier is wanted,
-// it needs the raw MiniMax API, not this provider — do not "save money" by passing a
-// value the enum rejects, which fails validation rather than downgrading.
-const MINIMAX_MODEL_ID = 'MiniMax-H3';
-/** `ai_model_pricing.model_key`. One tier because the provider exposes one. */
-const MINIMAX_PRICING_MODEL_ID = 'minimax-h3';
+// `prompt_expansion_mode` stays 'balanced' deliberately. 'quality' spends up to ~30s
+// rewriting the prompt BEFORE generation starts, which would spend the entire speed
+// advantage this model was chosen for.
+const FAL_QUEUE_BASE = 'https://queue.fal.run';
+/** The fal endpoint id. NO `fal-ai/` prefix — H3 Max sits under the `minimax` owner. */
+const H3MAX_ENDPOINT = 'minimax/h3-max/image-to-video';
+export type H3MaxResolution = '480P' | '768P';
+/** `ai_model_pricing.model_key`, one per tier because the rate differs. */
+const H3MAX_PRICING_MODEL_ID: Record<H3MaxResolution, string> = {
+  '480P': 'h3-max-480p',
+  '768P': 'h3-max-768p',
+};
 
-export interface MinimaxVideoResult {
-  /** Raw bytes, like Seedance — a 15s 2K clip is large and base64 adds a third. */
-  bytes: Uint8Array;
+export interface H3MaxVideoResult {
+  /** fal CDN URL. Callers re-host it through the SSRF guard, exactly as with Ray. */
+  url: string;
   mimeType: string;
   model: string;
   durationSeconds: number;
+  resolution: H3MaxResolution;
   hasAudio: boolean;
   /**
-   * References were supplied AND a frame image was used, so the model never saw
-   * them. Callers surface this; a silently ignored reference is how "why does the
-   * clip not show the product" becomes unanswerable.
+   * References were supplied and this model has nowhere to put them. Callers surface
+   * this; a silently ignored reference is how "why does the clip not show the product"
+   * becomes unanswerable.
    */
   referencesDropped: number;
 }
 
-export async function generateVideoWithMinimax(
+export async function generateVideoWithH3Max(
   prompt: string,
   config?: UnitBillingConfig & {
-    /** First frame. Omit for text-to-video, which is the only way to control the ratio. */
+    /** First frame. Omit it and the endpoint generates from the prompt alone. */
     imageUrl?: string;
-    /** Last-frame guidance. Ignored by the model unless a first frame is present. */
+    /** Last frame — H3 Max interpolates first -> last, as Ray does. */
     lastFrameUrl?: string;
-    /** Reference images — used ONLY when no frame image is given (max 9). */
-    referenceUrls?: string[];
-    /** 5-15. Clamped here and by the caller, which is where the credit price is decided. */
+    /** 5-15. Clamped here to the schema's own bounds. */
     durationSeconds?: number;
-    aspectRatio?: '16:9' | '9:16' | '1:1';
-    /** H3 always scores the clip; kept for signature parity with the other generators. */
-    generateAudio?: boolean;
+    resolution?: H3MaxResolution;
+    /** Passed by callers that also feed reference-taking models. Always dropped. */
+    referenceUrls?: string[];
     pollTimeoutMs?: number;
-    /** See the note on `generateVideoWithSeedance` — false when the caller logs its own row. */
+    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
     logUsage?: boolean;
   },
-): Promise<MinimaxVideoResult> {
+): Promise<H3MaxVideoResult> {
   const _start = Date.now();
-  const seconds = Math.max(5, Math.min(15, Math.round(config?.durationSeconds ?? 10)));
-
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'MINIMAX_API_KEY')).value
-    : Deno.env.get('MINIMAX_API_KEY');
-  if (!apiKey) {
-    throw new Error('MINIMAX_API_KEY is not configured — cannot generate with MiniMax H3');
-  }
-
-  const minimax = createMiniMax({ apiKey });
-
-  const usesFrame = Boolean(config?.imageUrl);
-  const references = config?.referenceUrls ?? [];
-  // Constraint 1, decided here rather than discovered downstream.
-  const referencesDropped = usesFrame ? references.length : 0;
+  const resolution: H3MaxResolution = config?.resolution ?? '768P';
+  const modelKey = H3MAX_PRICING_MODEL_ID[resolution];
+  // The schema's own bounds, clamped UP as well as down: 3 is not a shorter clip, it is a
+  // 422 from fal arriving after the credits have already been debited.
+  const seconds = Math.min(15, Math.max(5, Math.round(config?.durationSeconds ?? 10)));
+  const referencesDropped = config?.referenceUrls?.length ?? 0;
   if (referencesDropped > 0) {
     console.warn(
-      `[ai-client] MiniMax H3: ${referencesDropped} reference image(s) ignored — the model ` +
-      'cannot combine a frame image with references. Drop the source image to use them.',
+      `[ai-client] H3 Max: ${referencesDropped} reference image(s) ignored — this endpoint ` +
+      'has no reference input at all. Standard H3 was the model that took them.',
     );
   }
 
-  const visionPrompt: any = config?.imageUrl
-    ? { image: config.imageUrl, text: prompt }
-    : prompt;
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'FAL_KEY')).value
+    : Deno.env.get('FAL_KEY');
+  if (!apiKey) {
+    throw new Error('FAL_KEY is not configured — cannot generate with H3 Max');
+  }
+  const authHeaders = { Authorization: `Key ${apiKey}` };
+
+  const body: Record<string, unknown> = {
+    prompt,
+    prompt_expansion_mode: 'balanced',
+    duration: seconds,
+    resolution,
+  };
+  if (config?.imageUrl) body.image_url = config.imageUrl;
+  if (config?.lastFrameUrl) body.end_image_url = config.lastFrameUrl;
 
   try {
-    const { video } = await generateVideo({
-      model: minimax.video(MINIMAX_MODEL_ID),
-      prompt: visionPrompt,
-      duration: seconds,
-      // Constraint 2: only meaningful without a frame image, and the provider warns
-      // (and discards) rather than erroring when both are present.
-      ...(usesFrame ? {} : { aspectRatio: config?.aspectRatio ?? '9:16' }),
-      ...(usesFrame && config?.lastFrameUrl
-        ? { frameImages: [
-            { image: config.imageUrl, frameType: 'first_frame' },
-            { image: config.lastFrameUrl, frameType: 'last_frame' },
-          ] }
-        : {}),
-      ...(!usesFrame && references.length
-        ? { inputReferences: references.slice(0, 9).map((url) => ({ data: new URL(url), mediaType: 'image/jpeg' })) }
-        : {}),
-      providerOptions: {
-        minimax: {
-          resolution: '2K',
-          // Sold output, not a demo.
-          aigcWatermark: false,
-        },
-      },
-      pollTimeoutMs: config?.pollTimeoutMs ?? 600_000,
-    } as any);
-
-    const bytes: Uint8Array = (video as any).uint8Array;
-    if (!bytes?.length) throw new Error('MiniMax H3 returned an empty video');
-
-    if (config?.logUsage !== false) void _logUnitCall({
-      task: config?.task ?? 'minimax_video_generation',
-      modelKey: MINIMAX_PRICING_MODEL_ID,
-      units: seconds,
-      latencyMs: Date.now() - _start,
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
+    const submit = await fetch(`${FAL_QUEUE_BASE}/${H3MAX_ENDPOINT}`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
-
-    return {
-      bytes,
-      mimeType: (video as any).mediaType ?? 'video/mp4',
-      model: MINIMAX_MODEL_ID,
-      durationSeconds: seconds,
-      hasAudio: true,
-      referencesDropped,
+    if (!submit.ok) {
+      throw new Error(`fal submit ${submit.status}: ${(await submit.text()).slice(0, 300)}`);
+    }
+    const queued = await submit.json();
+    const statusUrl: string | undefined = queued?.status_url;
+    const responseUrl: string | undefined = queued?.response_url;
+    if (!statusUrl || !responseUrl) {
+      throw new Error('fal accepted the job but returned no status/response URL');
+    }
+    // Both URLs come back in fal's OWN response, and the next two fetches carry the API
+    // key. Handing a credential to whatever host a provider names is how a redirect or a
+    // compromised response becomes a key leak, so they are pinned to the queue origin
+    // before any header goes out. `@ai-sdk/fal` guards its own poll the same way.
+    const onQueueHost = (u: string) => {
+      try { return new URL(u).origin === FAL_QUEUE_BASE; } catch { return false; }
     };
+    if (!onQueueHost(statusUrl) || !onQueueHost(responseUrl)) {
+      throw new Error(
+        'fal returned a status/response URL off its own queue host — refusing to send credentials',
+      );
+    }
+
+    const deadline = Date.now() + (config?.pollTimeoutMs ?? 300_000);
+    for (;;) {
+      if (Date.now() > deadline) {
+        throw new Error(`fal request ${queued?.request_id ?? '?'} timed out`);
+      }
+      // 1.5s, against Luma's 3s. The whole point of this model is that a 5-second clip is
+      // finished in about three, so a slower tick would spend more time waiting than
+      // generating and hand back the speed we switched vendors for.
+      await new Promise((r) => setTimeout(r, 1_500));
+      const poll = await fetch(statusUrl, { headers: authHeaders });
+      if (!poll.ok) {
+        throw new Error(`fal poll ${poll.status}: ${(await poll.text()).slice(0, 300)}`);
+      }
+      const status = (await poll.json())?.status;
+      // IN_QUEUE / IN_PROGRESS / COMPLETED is the whole enum, and a FAILED job surfaces as
+      // a non-2xx on the response fetch below rather than as a status value. So anything
+      // unrecognised is treated as still-running and bounded by the deadline, never read
+      // as success — a status we do not know is not a video.
+      if (status !== 'COMPLETED') continue;
+
+      const result = await fetch(responseUrl, { headers: authHeaders });
+      if (!result.ok) {
+        throw new Error(`fal result ${result.status}: ${(await result.text()).slice(0, 300)}`);
+      }
+      const payload = await result.json();
+      const url: string | undefined = payload?.video?.url;
+      if (!url) throw new Error('fal reported COMPLETED but returned no video URL');
+
+      if (config?.logUsage !== false) void _logUnitCall({
+        task: config?.task ?? 'h3max_video_generation',
+        modelKey,
+        units: seconds,
+        latencyMs: Date.now() - _start,
+        userId: config?.userId,
+        workspaceId: config?.workspaceId,
+      });
+
+      return {
+        url,
+        mimeType: payload?.video?.content_type ?? 'video/mp4',
+        model: H3MAX_ENDPOINT,
+        durationSeconds: seconds,
+        resolution,
+        hasAudio: true,
+        referencesDropped,
+      };
+    }
   } catch (err) {
     // Always logged, even when the caller owns the success row — see the Seedance note.
     void _logUnitCall({
-      task: config?.task ?? 'minimax_video_generation',
-      modelKey: MINIMAX_PRICING_MODEL_ID,
+      task: config?.task ?? 'h3max_video_generation',
+      modelKey,
       units: 0,
       latencyMs: Date.now() - _start,
       errorMessage: err instanceof Error ? err.message : String(err),

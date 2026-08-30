@@ -54,11 +54,14 @@ const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   // If the token rate moves, recompute; do not nudge these until the test passes.
   'seedance-2.5-480p': 0.104,
   'seedance-2.5-720p': 0.232,
-  // MiniMax H3 at 2K. The published 768P rate ($0.08/s) is deliberately NOT the number
-  // here: `@ai-sdk/minimax` validates `resolution` against a one-value enum and defaults
-  // to 2K, so 2K is what every call we make is billed at. A cheaper rate mirrored here
-  // would pass a floor the provider invoice does not.
-  'minimax-h3': 0.13,
+  // H3 Max on fal — fal Research's post-trained H3, which replaced `minimax-h3` on
+  // 2026-08-30 (#396). One row per resolution because fal takes the tier as a real
+  // parameter and bills it differently; `@ai-sdk/minimax` could not request one at all,
+  // which is why the model it replaced was priced at a single 2K rate. These are the
+  // REGULAR rates from 2026-09-01, not the launch promo ($0.04/$0.025): a promo rate
+  // mirrored here would pass a floor the invoice stops clearing a week later.
+  'h3-max-768p': 0.08,
+  'h3-max-480p': 0.05,
   // Luma Ray3.2. Luma prices per CLIP and the curve is not linear — 720p is $0.30 for
   // 5s and $0.90 for 10s. These are the TEN-second per-second rates, which is what the
   // floor has to be measured against: MAX_DURATION_SECONDS is 10, and the 5s rate

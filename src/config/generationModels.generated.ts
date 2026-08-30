@@ -629,6 +629,30 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 196
   },
   {
+    "id": "h3-max-480p",
+    "display_name": "H3 Max 480p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "fal",
+    "slug": "minimax/h3-max/image-to-video",
+    "version": null,
+    "adapter": "fal",
+    "input_requirements": {
+      "max_images": 2,
+      "min_images": 0,
+      "image_roles": [
+        "source",
+        "last_frame"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "h3-max-480p",
+    "tier": "budget",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 197
+  },
+  {
     "id": "seedance-2.5-720p",
     "display_name": "Seedance 2.5 720P",
     "capability": "video",
@@ -654,25 +678,24 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 198
   },
   {
-    "id": "minimax-h3",
-    "display_name": "MiniMax H3 (Hailuo 3.0)",
+    "id": "h3-max-768p",
+    "display_name": "H3 Max 768p",
     "capability": "video",
     "sub_capability": "image-to-video",
-    "provider": "minimax",
-    "slug": "MiniMax-H3",
+    "provider": "fal",
+    "slug": "minimax/h3-max/image-to-video",
     "version": null,
-    "adapter": "minimax",
+    "adapter": "fal",
     "input_requirements": {
-      "needs_prompt": true,
+      "max_images": 2,
       "min_images": 0,
-      "max_images": 9,
       "image_roles": [
         "source",
-        "reference",
         "last_frame"
-      ]
+      ],
+      "needs_prompt": true
     },
-    "pricing_key": "minimax-h3",
+    "pricing_key": "h3-max-768p",
     "tier": "standard",
     "status": "active",
     "enabled": true,
@@ -833,7 +856,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '65b66fce9f21ba75c10122febe9e7c32';
+export const PROJECTION_FINGERPRINT = '58069ed422fe735d6e746079178b9283';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

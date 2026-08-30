@@ -15,9 +15,10 @@
  *     seconds with audio, but generated in ONE pass and with references that carry an
  *     explicit ROLE (first frame / last frame / reference image) rather than an
  *     undifferentiated set — which is what keeps THIS tile in frame rather than one like it.
- *   minimax-h3      → 40 credits (MiniMax Hailuo 3.0). 5-15s at native 2K with stereo
- *     audio — the reel format, at half the credits of a 30-second clip. Default for
- *     `social_reel`. Will not take a frame image and references together.
+ *   h3-max-768p/480p → 25/15 credits (H3 Max, fal's post-train of MiniMax H3).
+ *     5-15s with stereo audio, rendered in seconds rather than minutes — the reel
+ *     format, at well under half the credits of a 30-second clip. Default for
+ *     `social_reel`. Takes a first and last frame; has no reference-image input.
  *   ray-3.2-720p/1080p → 20/70 credits (Luma Ray3.2). 5 or 10 seconds, first-to-last
  *     frame interpolation — the one model here that takes you from THIS room to THAT
  *     room rather than wherever the camera drifts. Silent.
@@ -36,7 +37,7 @@ import {
   generateVideoWithKling,
   generateVideoWithWan,
   generateVideoWithSeedance,
-  generateVideoWithMinimax,
+  generateVideoWithH3Max,
   generateVideoWithRay,
 } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -60,7 +61,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
-  | 'minimax-h3'
+  | 'h3-max-768p' | 'h3-max-480p'
   | 'ray-3.2-720p' | 'ray-3.2-1080p';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
@@ -80,7 +81,8 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 //   wan-3.0-1080p     30s x $0.20/s  = $6.00 -> x1.5 = $9.00  -> >= 106 credits (110 charged)
 //   seedance-2.5-480p 30s x $0.104/s = $3.12 -> x1.5 = $4.68  -> >= 56 credits (60 charged)
 //   seedance-2.5-720p 30s x $0.231/s = $6.93 -> x1.5 = $10.40 -> >= 123 credits (125 charged)
-//   minimax-h3        15s x $0.13/s  = $1.95 -> x1.5 = $2.93  -> >= 35 credits (40 charged)
+//   h3-max-768p       15s x $0.08/s  = $1.20 -> x1.5 = $1.80  -> >= 22 credits (25 charged)
+//   h3-max-480p       15s x $0.05/s  = $0.75 -> x1.5 = $1.13  -> >= 14 credits (15 charged)
 //   ray-3.2-720p      10s x $0.09/s  = $0.90 -> x1.5 = $1.35  -> >= 16 credits (20 charged)
 //   ray-3.2-1080p     10s x $0.36/s  = $3.60 -> x1.5 = $5.40  -> >= 64 credits (70 charged)
 //
@@ -88,9 +90,12 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 // 10s clip costs 3x a 5s clip, not 2x, so the 5s rate would under-price exactly the
 // full-length clip these fees have to cover.
 //
-// MiniMax is the cheapest CLIP here despite a mid-table per-second rate, because its
-// ceiling is 15 seconds — which is the length of a reel. Half the credits of Wan 720p
-// for native 2K with stereo audio, and that is why `social_reel` routes to it.
+// H3 Max is the cheapest CLIP here twice over: its ceiling is 15 seconds, which is the
+// length of a reel rather than a limit, and fal's post-trained inference bills $0.08/s
+// where MiniMax's own H3 API charges $0.13/s for the 2K it will only ever serve. It
+// caps at 768P, which is the right buy for a reel: Instagram and TikTok recompress to
+// ~1080x1920 at low bitrate, so 2K is spent on pixels the platform discards. That is
+// why `social_reel` routes here. (#396 — replaced `minimax-h3` 2026-08-30.)
 //
 // Seedance's rate is DERIVED, not quoted: BytePlus bills it by token at $10.70/M with no
 // video input, and tokens are width x height x fps x seconds / 1024. At 24fps that is
@@ -118,7 +123,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'wan-3.0-1080p':      110,
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
-  'minimax-h3':         40,
+  'h3-max-768p':        25,
+  'h3-max-480p':        15,
   'ray-3.2-720p':       20,
   'ray-3.2-1080p':      70,
 };
@@ -142,8 +148,9 @@ const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   // Seedance's own floor is 4 seconds; the generator clamps up as well as down.
   'seedance-2.5-480p':  30,
   'seedance-2.5-720p':  30,
-  // H3's own range is 5-15s. Not a limitation for a reel — it is the format.
-  'minimax-h3':         15,
+  // H3 Max's own range is 5-15s. Not a limitation for a reel — it is the format.
+  'h3-max-768p':        15,
+  'h3-max-480p':        15,
   // Ray3.2 generates longer, but 10s is the longest clip Luma PUBLISHES A PRICE FOR,
   // and an unpriced duration is one we cannot charge for honestly. The generator sends
   // 5 or 10 and nothing between, for the same reason.
@@ -163,6 +170,16 @@ const WAN_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P' | '1080P'>> = {
 const SEEDANCE_RESOLUTION: Partial<Record<VideoModel, '480P' | '720P'>> = {
   'seedance-2.5-480p': '480P',
   'seedance-2.5-720p': '720P',
+};
+
+/**
+ * And again for H3 Max. Unlike `@ai-sdk/minimax`, whose one-value `resolution` enum made
+ * 768P unreachable and forced every call to 2K, fal takes the tier as a real parameter —
+ * so it has to be priced rather than left free.
+ */
+const H3MAX_RESOLUTION: Partial<Record<VideoModel, '480P' | '768P'>> = {
+  'h3-max-768p': '768P',
+  'h3-max-480p': '480P',
 };
 
 /** And again for Ray, where 720p -> 1080p is a 4x jump in rate. */
@@ -185,10 +202,10 @@ const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
   // read by the Replicate branch alone, and `before_after` has not routed there in
   // months. It now lands as the end frame on every native branch — see `endFrameUrl`.
   before_after:         'ray-3.2-720p',
-  // A reel is 15 seconds on a phone, not 30 on a monitor. MiniMax H3 gives that at
-  // native 2K with stereo audio for 40 credits, where the 30-second model spent 80 to
-  // produce twice the footage nobody watches. Wan stays one explicit `model` away.
-  social_reel:          'minimax-h3',
+  // A reel is 15 seconds on a phone, not 30 on a monitor. H3 Max gives that with stereo
+  // audio for 25 credits, where the 30-second model spent 80 to produce twice the
+  // footage nobody watches. Wan stays one explicit `model` away.
+  social_reel:          'h3-max-768p',
 };
 
 // Replicate model identifiers (Kling now uses native SDK, not Replicate)
@@ -318,8 +335,8 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     before_image_url,
     // Extra images held CONSISTENT across the clip — the product itself, its finish,
     // the room it goes in — which is the whole reason a generated interior is usable
-    // as a sales asset rather than a plausible lookalike. Wan, Seedance and MiniMax
-    // take them; Veo and Ray do not.
+    // as a sales asset rather than a plausible lookalike. Wan and Seedance take them;
+    // Veo, Ray and H3 Max do not.
     reference_image_urls,
     last_frame_url,
     generate_audio,
@@ -729,22 +746,23 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         status: 'completed',
       });
 
-    } else if (resolvedModel === 'minimax-h3') {
-      // MiniMax H3 (Hailuo 3.0) — the reel model: 5-15s, native 2K, stereo audio.
+    } else if (resolvedModel === 'h3-max-768p' || resolvedModel === 'h3-max-480p') {
+      // H3 Max — the reel model: 5-15s with stereo audio, rendered in seconds.
       //
-      // It will not take a frame image AND references in the same call, so the client
-      // is told which one it got rather than left to wonder: `references_dropped` in
-      // the response is the count the model never saw. Same for the ratio — with a
-      // source frame the model derives it, so a vertical reel needs a vertical source.
-      const minimaxPrompt = prompt
+      // It has no reference-image input at all (standard H3 took nine and dropped them
+      // whenever a frame was present), so the client is told what was ignored rather
+      // than left to wonder: `references_dropped` in the response is the count the
+      // model never saw. Same for the ratio — this endpoint has no `aspect_ratio`
+      // field, the frame decides, so a vertical reel needs a vertical source.
+      const h3maxPrompt = prompt
         || 'Professional cinematic interior reel, smooth continuous camera movement';
 
-      const minimaxResult = await generateVideoWithMinimax(minimaxPrompt, {
+      const h3maxResult = await generateVideoWithH3Max(h3maxPrompt, {
         imageUrl: source_image_url,
         lastFrameUrl: endFrameUrl,
         referenceUrls: referenceUrls,
         durationSeconds,
-        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
+        resolution: H3MAX_RESOLUTION[resolvedModel],
         task: 'interior_video_generation_v2',
         userId,
         workspaceId: workspace_id ?? undefined,
@@ -752,8 +770,8 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         logUsage: false,
       });
 
-      const videoUrl = await uploadVideoToStorage(supabase, minimaxResult.bytes, jobId, false, uploadCtx);
-      await logVideoUsage(minimaxResult.durationSeconds);
+      const videoUrl = await uploadVideoToStorage(supabase, h3maxResult.url, jobId, false, uploadCtx);
+      await logVideoUsage(h3maxResult.durationSeconds);
 
       const { error: completeErr } = await supabase.from('generation_videos').update({
         status: 'completed',
@@ -779,9 +797,9 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         model_used: resolvedModel,
         credits_used: creditCost,
         video_type,
-        duration_seconds: minimaxResult.durationSeconds,
-        has_audio: minimaxResult.hasAudio,
-        references_dropped: minimaxResult.referencesDropped,
+        duration_seconds: h3maxResult.durationSeconds,
+        has_audio: h3maxResult.hasAudio,
+        references_dropped: h3maxResult.referencesDropped,
         status: 'completed',
       });
 

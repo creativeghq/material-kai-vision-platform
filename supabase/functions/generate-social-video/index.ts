@@ -3,11 +3,12 @@
  *
  * Generates short-form social media videos.
  *
- * DEFAULT: minimax-h3 → 40 credits (MiniMax Hailuo 3.0). 5-15 seconds at native 2K with
- * stereo audio — the reel format itself, and the only model here designed for it. It is
- * delegated to generate-interior-video-v2 like every other model below.
+ * DEFAULT: h3-max-768p → 25 credits (H3 Max — fal's post-train of MiniMax H3).
+ * 5-15 seconds with stereo audio, rendered in seconds rather than minutes — the reel
+ * format itself, and the only model here designed for it. It is delegated to
+ * generate-interior-video-v2 like every other model below.
  *
- * Also selectable, all delegated: veo-2 (50), wan-3.0-480p/720p/1080p (40/80/155, 30s),
+ * Also selectable, all delegated: veo-2 (50), wan-3.0-480p/720p/1080p (30/55/110, 30s),
  * seedance-2.5-480p/720p (60/125, 30s one-pass).
  *
  * kling-3.0 (20) is the ONE model still run here, through Replicate, and it is the reason
@@ -83,7 +84,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 type VideoModel = 'kling-3.0' | 'veo-2'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
-  | 'minimax-h3'
+  | 'h3-max-768p' | 'h3-max-480p'
   | 'ray-3.2-720p' | 'ray-3.2-1080p';
 
 // `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
@@ -102,7 +103,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'wan-3.0-1080p': 110,
   'seedance-2.5-480p':  60,
   'seedance-2.5-720p':  125,
-  'minimax-h3':         40,
+  'h3-max-768p':        25,
+  'h3-max-480p':        15,
   'ray-3.2-720p':       20,
   'ray-3.2-1080p':      70,
 };
@@ -113,7 +115,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 const DELEGATED_MODELS = new Set<string>([
   'veo-2', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
   'seedance-2.5-480p', 'seedance-2.5-720p',
-  'minimax-h3',
+  'h3-max-768p', 'h3-max-480p',
   'ray-3.2-720p', 'ray-3.2-1080p',
 ]);
 
@@ -183,10 +185,11 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     // this function never fetches them itself.
     reference_image_urls,
     // Was 'kling-3.0', which runs on the Replicate path below — and Replicate answers
+    // Was 'kling-3.0', which runs on the Replicate path below — and Replicate answers
     // auth_failed to every call, so the DEFAULT model was the one model here that
-    // cannot currently produce anything. MiniMax H3 is delegated, runs on its own key,
-    // and is the right shape for a reel besides.
-    model = 'minimax-h3' as VideoModel,
+    // cannot currently produce anything. H3 Max is delegated, runs on fal's key, and is
+    // the right shape for a reel besides: 15s with audio, in seconds, for 25 credits.
+    model = 'h3-max-768p' as VideoModel,
     aspect_ratio = '9:16',
     duration_seconds = 10,
     workspace_id,

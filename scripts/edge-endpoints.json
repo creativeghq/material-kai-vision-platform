@@ -2160,7 +2160,7 @@
     "name": "generate-interior-video-v2",
     "tag": "AI Generation",
     "summary": "Multi-model interior design video generation with async polling fallback",
-    "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (40/80/155cr, 30s with audio), seedance-2.5-480p/720p (60/125cr, 30s one-pass) minimax-h3 (40cr, 15s at native 2K with stereo audio) or ray-3.2-720p/1080p (20/70cr, 5-10s, first-to-last frame interpolation). Model is auto-selected from video_type when not specified; social_reel routes to minimax-h3. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
+    "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (30/55/110cr, 30s with audio), seedance-2.5-480p/720p (60/125cr, 30s one-pass) h3-max-768p/480p (25/15cr, 15s with stereo audio, rendered in seconds) or ray-3.2-720p/1080p (20/70cr, 5-10s, first-to-last frame interpolation). Model is auto-selected from video_type when not specified; social_reel routes to h3-max-768p. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
     "security": [
       "supabaseJwt"
     ],
@@ -2198,7 +2198,8 @@
             "wan-3.0-1080p",
             "seedance-2.5-480p",
             "seedance-2.5-720p",
-            "minimax-h3",
+            "h3-max-768p",
+            "h3-max-480p",
             "ray-3.2-720p",
             "ray-3.2-1080p"
           ],
@@ -2959,7 +2960,7 @@
     "name": "generate-social-video",
     "tag": "Social",
     "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)",
-    "description": "Generates a short-form social video. DEFAULT minimax-h3 (40cr): 5-15s at native 2K with stereo audio, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (40/80/155cr) and seedance-2.5-480p/720p (60/125cr) ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundable.",
+    "description": "Generates a short-form social video. DEFAULT h3-max-768p (25cr): 5-15s with stereo audio, rendered in seconds, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (30/55/110cr) and seedance-2.5-480p/720p (60/125cr) ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundable.",
     "security": [
       "supabaseJwt"
     ],
@@ -2981,7 +2982,8 @@
         "model": {
           "type": "string",
           "enum": [
-            "minimax-h3",
+            "h3-max-768p",
+            "h3-max-480p",
             "kling-3.0",
             "veo-2",
             "wan-3.0-480p",
@@ -2992,7 +2994,7 @@
             "ray-3.2-720p",
             "ray-3.2-1080p"
           ],
-          "default": "minimax-h3"
+          "default": "h3-max-768p"
         },
         "aspect_ratio": {
           "type": "string",

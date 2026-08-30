@@ -95,7 +95,8 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'seedance-2.5-480p':    { cost_per_unit: 0.104,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'seedance-2.5-720p':    { cost_per_unit: 0.232,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // The default model for social video — the one most likely to be running when the DB is not.
-  'minimax-h3':           { cost_per_unit: 0.13,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'h3-max-768p':          { cost_per_unit: 0.08,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'h3-max-480p':          { cost_per_unit: 0.05,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // Ray's rates are the 10-second ones — Luma prices per clip, non-linearly. See the DB notes.
   'ray-3.2-720p':         { cost_per_unit: 0.09,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'ray-3.2-1080p':        { cost_per_unit: 0.36,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
