@@ -626,6 +626,41 @@ shared helper" — was already what both sides had done.
   a shared module exporting a name another shared module already exports.
 
 
+### 20. A migration that verifies its own edit by looking for a STRING
+
+Surgery on a live `pg_proc` definition is the sanctioned way to change a long accumulated function
+here — a wholesale `CREATE OR REPLACE` from a stale copy is how the silent-zero probes were once
+deleted. The pattern comes with a verify block, and on 2026-08-30 four functions shipped broken
+because the verify block asked the wrong question.
+
+Adding `deal_id` to the chain functions (#378 C3) meant editing two lists per INSERT: the column
+list and the VALUES list. Two of the four edits landed on the column list only. The verify block
+asserted `position('deal_id' in def) > 0` — **that the string appears** — which a column list
+naming a value that is not there satisfies perfectly.
+
+`generate_order_from_invoice` and `issue_invoice_from_quote` were then broken outright: every call
+raised `42601 INSERT has more target columns than expressions`. Two more functions in the same
+batch used `min(uuid)`, which does not exist, and would have raised the first time anyone billed
+logged time.
+
+**Every one of the four passed `CREATE`, passed lint, passed typecheck, and passed a full 3,793-test
+suite**, because the suite reads TypeScript and the SQL is never committed. This is the shape
+CLAUDE.md already records for `get_website_rank_summary`: the migration applies clean and the
+function fails the first time a user calls it.
+
+- **What caught it:** `lint_plpgsql_errors()` — the `db.plpgsql-lint` smoke check — run by hand
+  after the migrations rather than waiting for the nightly. All four appeared in one query.
+- **The rule:** a verify block that greps the function's TEXT proves the edit was written, not that
+  it works. **Call the function.** The repaired migration ends with a rolled-back probe that
+  invokes all four end to end and asserts the deal and the job actually arrive on the row.
+- **Corollary for `INSERT` surgery specifically:** anchor on BOTH lists, and make the anchor for
+  the values list a string that could only appear there. An edit to one list and not the other is
+  invisible to any text search for the column name.
+- **Run `lint_plpgsql_errors()` in the same session as the migration.** It is already wired as a
+  post-deploy smoke check, but a defect that reaches a smoke check has already been merged; run at
+  authoring time it costs one query.
+
+
 ## Mechanism inventory
 
 | Mechanism | Runs | Enforces | Self-proving? |
