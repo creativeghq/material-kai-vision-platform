@@ -475,7 +475,14 @@ async function executeAction(
       //    otherwise (no event workspace, or no BYOK — e.g. platform subscription/role emails)
       //    fall back to the platform sender. requireWorkspaceSender is false here, so it degrades
       //    gracefully rather than failing.
-      const emailIsTenant = !!scope?.workspaceId && !scope?.isGlobal;
+      // Hold the id, not just the verdict. `!!scope?.workspaceId && !scope?.isGlobal` was a
+      // boolean TypeScript cannot narrow through, so every use inside the branch needed a
+      // `scope!` assertion — and an assertion is a promise the compiler stops checking.
+      // Both are `const`, so aliased-condition narrowing makes `tenantWorkspaceId`
+      // provably non-null inside `if (emailIsTenant)`. `|| null` (not `?? null`) keeps the
+      // original `!!` semantics, where an empty string is not a workspace.
+      const tenantWorkspaceId = !scope?.isGlobal ? (scope?.workspaceId || null) : null;
+      const emailIsTenant = tenantWorkspaceId !== null;
       let emailWorkspaceId: string | null = null;
       // WHOSE email this is, which is a different question from whose SENDER goes out. An
       // operator flow reacting to a tenant event sends from the platform address (unmetered,
@@ -486,10 +493,10 @@ async function executeAction(
         // connected, FAIL LOUDLY with an actionable reason (stored on flow_runs.error_message)
         // AND raise the seeded email_sender_not_configured bell so the owner knows to fix it —
         // never silently fall back to the platform domain for a tenant's own mail.
-        if (!(await workspaceHasByok(supabase, scope!.workspaceId))) {
+        if (!(await workspaceHasByok(supabase, tenantWorkspaceId))) {
           if (scope!.ownerUserId) {
             await emitFlowEvent('email_sender_not_configured', {
-              workspace_id: scope!.workspaceId,
+              workspace_id: tenantWorkspaceId,
               user_id: scope!.ownerUserId,
               feature: 'automations',
               action_url: '/profile?tab=keys',
@@ -500,7 +507,7 @@ async function executeAction(
           }
           throw new Error('email_sender_not_configured: This automation can\'t send email because your workspace has no email sender connected. Connect your Resend account under Profile → Keys, then re-run this automation.');
         }
-        emailWorkspaceId = scope!.workspaceId; // strict BYOK below
+        emailWorkspaceId = tenantWorkspaceId; // strict BYOK below
       } else {
         // Operator flow: divert to the event's workspace sender ONLY when that workspace has BYOK
         // (so a no-BYOK / platform-level email stays platform-sent AND unmetered — no daily cap).

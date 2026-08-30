@@ -1626,15 +1626,20 @@ async function callPythonAPI(
     } catch (error) {
       const isLastAttempt = attempt === MAX_RETRIES - 1;
       const responseTime = Date.now() - startTime;
+      // `error` is `unknown`. Reading `.message` off a non-Error throw yields undefined, so the
+      // failure was recorded in `webhook_calls.error_message` and in the Sentry extra with NO
+      // REASON — a failed import that cannot say why it failed. Narrow once and use it
+      // everywhere below.
+      const err = error instanceof Error ? error : new Error(String(error));
 
-      console.error(`❌ Attempt ${attempt + 1} failed:`, error.message);
+      console.error(`❌ Attempt ${attempt + 1} failed:`, err.message);
 
       // 🆕 Update webhook_call with error
       if (webhookCallId) {
         await supabase
           .from('webhook_calls')
           .update({
-            error_message: error.message,
+            error_message: err.message,
             response_time_ms: responseTime,
             status: isLastAttempt ? 'failed' : 'retrying',
             retry_count: attempt,
@@ -1655,7 +1660,7 @@ async function callPythonAPI(
           .single();
 
         // 🚨 SENTRY ALERT: Send XML import job failure to Sentry
-        await captureException(error, {
+        await captureException(err, {
           tags: {
             function: 'xml-import-orchestrator',
             error_type: 'xml_import_job_failed',
@@ -1669,7 +1674,7 @@ async function callPythonAPI(
             total_products: jobData?.total_products || 0,
             processed_products: jobData?.processed_products || 0,
             failed_products: jobData?.failed_products || 0,
-            error_message: error.message,
+            error_message: err.message,
             retry_count: MAX_RETRIES,
             timestamp: new Date().toISOString(),
           },
