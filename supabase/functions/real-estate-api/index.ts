@@ -383,6 +383,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         await loadEditable(id);
         const payload = pick(body, PROPERTY_WRITABLE);
         assertHttpUrls(payload);
+        // #376 — the vendor may now be a company, so both halves get the #356 `RE-4` treatment:
+        // an id from the body that is not ours would come back on the next joined read.
+        await assertSameWorkspace(supabase, 'crm_contacts', payload.vendor_contact_id as string | null, workspaceId, 'contact');
+        await assertSameWorkspace(supabase, 'crm_companies', payload.vendor_company_id as string | null, workspaceId, 'company');
+        if (payload.vendor_contact_id && payload.vendor_company_id) {
+          return json({ error: 'A vendor is either a company or a person, not both.' }, 400);
+        }
         // record a price-history row when price changes; flag a drop for buyer-match alerts
         let priceDropped = false;
         if (payload.price !== undefined) {
@@ -1653,11 +1660,21 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const id = String(body.property_id ?? '');
         if (!id || body.amount == null) return json({ error: 'property_id and amount are required' }, 400);
         await loadEditable(id);
-        // #356 `RE-4`: prove the buyer contact is ours before storing it (see upsert-tenancy).
+        // #356 `RE-4`: prove the buyer is ours before storing it (see upsert-tenancy). Both
+        // halves, because #376 gave the buyer a company side and an unchecked company id is
+        // the same cross-tenant read as an unchecked contact id — the joined select below
+        // would return another workspace's name and email.
         await assertSameWorkspace(supabase, 'crm_contacts', body.buyer_contact_id, workspaceId, 'contact');
+        await assertSameWorkspace(supabase, 'crm_companies', body.buyer_company_id, workspaceId, 'company');
+        // A counterparty is ONE thing (`property_offers_buyer_one_party`). Refusing here names
+        // the problem; letting it through returns a raw 23514 the operator cannot act on.
+        if (body.buyer_contact_id && body.buyer_company_id) {
+          return json({ error: 'A buyer is either a company or a person, not both.' }, 400);
+        }
         const { data, error } = await supabase.from('property_offers').insert({
           workspace_id: workspaceId, property_id: id, amount: Number(body.amount), currency: body.currency ?? 'EUR',
-          buyer_contact_id: body.buyer_contact_id ?? null, buyer_name: body.buyer_name ?? null, terms: body.terms ?? null,
+          buyer_contact_id: body.buyer_contact_id ?? null, buyer_company_id: body.buyer_company_id ?? null,
+          buyer_name: body.buyer_name ?? null, terms: body.terms ?? null,
           proof_of_funds: !!body.proof_of_funds, mortgage_in_principle: !!body.mortgage_in_principle, chain_free: !!body.chain_free,
           note: body.note ?? null, agent_id: userId, created_by: userId, status: 'offered',
         }).select('*').single();
@@ -1733,7 +1750,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         let propertyId = String(body.property_id ?? '');
         let acceptedOffer: any = null;
         if (offerId) {
-          const { data: o } = await supabase.from('property_offers').select('id, property_id, amount, currency, buyer_contact_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
+          const { data: o } = await supabase.from('property_offers').select('id, property_id, amount, currency, buyer_contact_id, buyer_company_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
           if (!o) return json({ error: 'offer not found' }, 404);
           acceptedOffer = o; propertyId = o.property_id;
         }
@@ -1748,8 +1765,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const saleRow = {
           workspace_id: workspaceId, property_id: propertyId, offer_id: offerId || null,
           sale_price: salePrice, currency, commission_pct: commissionPct, commission_fixed: commissionFixed, vat_pct: vatPct,
+          // The seller IS the listing's vendor, whichever kind it is; the buyer comes from the
+          // body or from the accepted offer. Copying only the contact half would silently make a
+          // company vendor's sale sellerless (#376).
           seller_contact_id: property.vendor_contact_id ?? null,
+          seller_company_id: property.vendor_company_id ?? null,
           buyer_contact_id: body.buyer_contact_id ?? acceptedOffer?.buyer_contact_id ?? null,
+          buyer_company_id: body.buyer_company_id ?? acceptedOffer?.buyer_company_id ?? null,
           completed_at: body.completed_at ?? new Date().toISOString().slice(0, 10),
           notes: body.notes ?? null, agent_id: userId, created_by: userId,
         };
@@ -2027,7 +2049,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!propertyId) return json({ error: 'property_id is required' }, 400);
         await loadEditable(propertyId); // owner-or-broker on the underlying listing
         if (body.rent_amount == null || !body.start_date) return json({ error: 'rent_amount and start_date are required' }, 400);
-        const payload = pick(body, ['tenant_contact_id', 'landlord_contact_id', 'rent_amount', 'currency', 'rent_frequency', 'deposit', 'start_date', 'end_date', 'status', 'notes']);
+        const payload = pick(body, ['tenant_contact_id', 'tenant_company_id', 'landlord_contact_id', 'landlord_company_id',
+          'rent_amount', 'currency', 'rent_frequency', 'deposit', 'start_date', 'end_date', 'status', 'notes']);
+        // A counterparty is ONE thing (`property_tenancies_{tenant,landlord}_one_party`).
+        if ((payload.tenant_contact_id && payload.tenant_company_id)
+          || (payload.landlord_contact_id && payload.landlord_company_id)) {
+          return json({ error: 'A tenant or landlord is either a company or a person, not both.' }, 400);
+        }
         // #356 `RE-4`: the contacts named in the body must belong to this workspace. Both halves
         // were individually valid — a real workspace, a real contact — and never checked against
         // each other, so a foreign contact's name/email/phone came back on the next joined read.
@@ -2035,6 +2063,11 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           supabase, 'crm_contacts',
           [payload.tenant_contact_id as string | null, payload.landlord_contact_id as string | null],
           workspaceId, 'contact',
+        );
+        await assertAllSameWorkspace(
+          supabase, 'crm_companies',
+          [payload.tenant_company_id as string | null, payload.landlord_company_id as string | null],
+          workspaceId, 'company',
         );
         const tenancyId = String(body.tenancy_id ?? '');
         if (tenancyId) {

@@ -104,7 +104,7 @@ async function callCalendar<T>(workspaceId: string, action: string, extra: Recor
 }
 
 export interface PropertyOffer {
-  id: string; property_id: string; buyer_contact_id: string | null; buyer_name: string | null;
+  id: string; property_id: string; buyer_contact_id: string | null; buyer_company_id: string | null; buyer_name: string | null;
   amount: number; currency: string; status: 'offered' | 'countered' | 'accepted' | 'rejected' | 'withdrawn';
   terms: string | null; proof_of_funds: boolean; mortgage_in_principle: boolean; chain_free: boolean; note: string | null; created_at: string;
   buyer?: { id: string; name: string | null; email: string | null } | null;
@@ -119,7 +119,8 @@ export interface ValuationResult { estimate: number | null; range_low: number | 
 // ── Lettings / property management ──
 export type RentFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export interface Tenancy {
-  id: string; property_id: string; tenant_contact_id: string | null; landlord_contact_id: string | null;
+  id: string; property_id: string; tenant_contact_id: string | null; tenant_company_id: string | null;
+  landlord_contact_id: string | null; landlord_company_id: string | null;
   rent_amount: number; currency: string; rent_frequency: RentFrequency; deposit: number | null;
   start_date: string; end_date: string | null; status: 'pending' | 'active' | 'ended' | 'terminated'; notes: string | null;
   // Lifecycle. `notice_given_at` is stamped server-side — it is the field in a termination someone
@@ -309,7 +310,8 @@ export interface LandlordStatement {
 export interface PropertySale {
   id: string; property_id: string; offer_id: string | null; sale_price: number; currency: string;
   commission_pct: number; commission_fixed: number; vat_pct: number; commission_base: number; commission_total: number;
-  seller_contact_id: string | null; buyer_contact_id: string | null; completed_at: string;
+  seller_contact_id: string | null; seller_company_id: string | null;
+  buyer_contact_id: string | null; buyer_company_id: string | null; completed_at: string;
   invoice_id: string | null; invoice_status: string | null; notes: string | null;
   property?: { id: string; title: string | null; reference_code: string | null; town: string | null } | null;
   seller?: { id: string; name: string | null; email: string | null } | null;
@@ -428,14 +430,14 @@ export const realEstateService = {
     call<{ selling: PropertyListItem[]; interested: (PropertyListItem & { interest_type: string })[] }>(ws, 'contact-properties', { crm_contact_id: crmContactId }),
   // Offers
   listOffers: (ws: string, propertyId: string) => call<{ offers: PropertyOffer[] }>(ws, 'list-offers', { property_id: propertyId }).then((r) => r.offers),
-  createOffer: (ws: string, fields: { property_id: string; amount: number; currency?: string; buyer_contact_id?: string; buyer_name?: string; terms?: string; proof_of_funds?: boolean; mortgage_in_principle?: boolean; chain_free?: boolean; note?: string }) =>
+  createOffer: (ws: string, fields: { property_id: string; amount: number; currency?: string; buyer_contact_id?: string; buyer_company_id?: string; buyer_name?: string; terms?: string; proof_of_funds?: boolean; mortgage_in_principle?: boolean; chain_free?: boolean; note?: string }) =>
     call<{ offer: PropertyOffer }>(ws, 'create-offer', fields).then((r) => r.offer),
   updateOffer: (ws: string, offerId: string, fields: { status?: string; amount?: number; terms?: string; note?: string }) =>
     call<{ offer: PropertyOffer }>(ws, 'update-offer', { offer_id: offerId, ...fields }).then((r) => r.offer),
   acceptOffer: (ws: string, offerId: string) => call<{ ok: true; cancelled_viewings: number }>(ws, 'accept-offer', { offer_id: offerId }),
 
   // Sale completion + commission
-  completeSale: (ws: string, fields: { offer_id?: string; property_id?: string; sale_price: number; currency?: string; commission_pct?: number; commission_fixed?: number; vat_pct?: number; completed_at?: string; buyer_contact_id?: string; notes?: string }) =>
+  completeSale: (ws: string, fields: { offer_id?: string; property_id?: string; sale_price: number; currency?: string; commission_pct?: number; commission_fixed?: number; vat_pct?: number; completed_at?: string; buyer_contact_id?: string; buyer_company_id?: string; notes?: string }) =>
     call<{ sale: PropertySale }>(ws, 'complete-sale', fields).then((r) => r.sale),
   listSales: (ws: string, propertyId?: string) =>
     call<{ sales: PropertySale[] }>(ws, 'list-sales', propertyId ? { property_id: propertyId } : {}).then((r) => r.sales),
@@ -501,7 +503,7 @@ export const realEstateService = {
   // ── Lettings / property management ──
   listTenancies: (ws: string, propertyId?: string) =>
     call<{ tenancies: Tenancy[] }>(ws, 'list-tenancies', propertyId ? { property_id: propertyId } : {}).then((r) => r.tenancies),
-  upsertTenancy: (ws: string, fields: { tenancy_id?: string; property_id: string; tenant_contact_id?: string | null; landlord_contact_id?: string | null; rent_amount: number; currency?: string; rent_frequency?: RentFrequency; deposit?: number | null; start_date: string; end_date?: string | null; status?: string; notes?: string }) =>
+  upsertTenancy: (ws: string, fields: { tenancy_id?: string; property_id: string; tenant_contact_id?: string | null; tenant_company_id?: string | null; landlord_contact_id?: string | null; landlord_company_id?: string | null; rent_amount: number; currency?: string; rent_frequency?: RentFrequency; deposit?: number | null; start_date: string; end_date?: string | null; status?: string; notes?: string }) =>
     call<{ tenancy: Tenancy }>(ws, 'upsert-tenancy', fields).then((r) => r.tenancy),
   listRentCharges: (ws: string, tenancyId: string) =>
     call<{ charges: RentCharge[] }>(ws, 'list-rent-charges', { tenancy_id: tenancyId }).then((r) => r.charges),

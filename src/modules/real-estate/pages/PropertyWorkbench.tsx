@@ -31,7 +31,7 @@ import {
 } from '../services/realEstateService';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { statusTone } from '@/utils/statusTone';
-import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
+import { PartySearchDropdown, partyColumns, partyRefOf } from '@/components/business/crm/PartySearchDropdown';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ListingPerformancePanel } from '../components/ListingPerformancePanel';
@@ -133,7 +133,11 @@ const AMENITIES: readonly (readonly [string, string])[] = [
 
 const FORM_FIELDS = [
   // basics
-  'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status', 'open_for_all', 'vendor_contact_id',
+  // `vendor_company_id` alongside its twin (#376): a vendor is a company as often as a person in
+  // Greek property, and FORM_FIELDS is the allowlist the payload is built from — a column missing
+  // here is silently dropped on save, which is how the company side would have stayed empty.
+  'title', 'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status', 'open_for_all',
+  'vendor_contact_id', 'vendor_company_id',
   // pricing
   'price', 'currency', 'price_period', 'price_on_request', 'common_charges', 'previous_price',
   // location
@@ -422,7 +426,19 @@ export default function PropertyWorkbench() {
                 <F label="Subtype"><Input value={form.subtype ?? ''} onChange={(e) => set('subtype', e.target.value)} placeholder="apartment, warehouse, plot…" /></F>
                 <F label="Transaction"><Sel value={form.transaction_type} opts={TRANSACTION_TYPES} onChange={(v) => set('transaction_type', v)} /></F>
                 <F label="Status"><Sel value={form.listing_status} opts={LISTING_STATUSES} onChange={(v) => set('listing_status', v)} /></F>
-                <F label="Vendor / Owner (CRM)" wide><ContactSearchDropdown selectedContactId={form.vendor_contact_id ?? null} onSelect={(id) => set('vendor_contact_id', id)} placeholder="Link the seller/owner contact…" /></F>
+                <F label="Vendor / Owner (CRM)" wide>
+                  <PartySearchDropdown
+                    value={partyRefOf(form.vendor_company_id, form.vendor_contact_id)}
+                    onSelect={(party) => {
+                      // Both halves together: setting one without clearing the other trips
+                      // `properties_vendor_one_party` with a raw 23514 the operator cannot act on.
+                      const cols = partyColumns('vendor_company_id', 'vendor_contact_id', party);
+                      set('vendor_company_id', cols.vendor_company_id);
+                      set('vendor_contact_id', cols.vendor_contact_id);
+                    }}
+                    placeholder="Link the seller/owner — a company or a person…"
+                  />
+                </F>
                 <Chk label="Open for all agents (visible to the whole team)" checked={!!form.open_for_all} onChange={(v) => set('open_for_all', v)} />
               </FormSection>
             )}
@@ -869,7 +885,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
     const t = list[0] ?? null;
     setTenancy(t);
     if (t) {
-      setF({ tenant_contact_id: t.tenant_contact_id, landlord_contact_id: t.landlord_contact_id, rent_amount: t.rent_amount, currency: t.currency, rent_frequency: t.rent_frequency, deposit: t.deposit, start_date: t.start_date, end_date: t.end_date, status: t.status, notes: t.notes });
+      setF({ tenant_contact_id: t.tenant_contact_id, tenant_company_id: t.tenant_company_id, landlord_contact_id: t.landlord_contact_id, landlord_company_id: t.landlord_company_id, rent_amount: t.rent_amount, currency: t.currency, rent_frequency: t.rent_frequency, deposit: t.deposit, start_date: t.start_date, end_date: t.end_date, status: t.status, notes: t.notes });
       const [c, s] = await Promise.all([
         realEstateService.listRentCharges(ws, t.id).catch(() => []),
         realEstateService.landlordStatement(ws, t.id).catch(() => null),
@@ -884,7 +900,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
     if (!ws || !f.rent_amount || !f.start_date) { toast({ title: 'Rent amount and start date are required', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      await realEstateService.upsertTenancy(ws, { tenancy_id: tenancy?.id, property_id: propertyId, tenant_contact_id: f.tenant_contact_id || null, landlord_contact_id: f.landlord_contact_id || null, rent_amount: Number(f.rent_amount), currency: f.currency || 'EUR', rent_frequency: f.rent_frequency, deposit: f.deposit != null && f.deposit !== '' ? Number(f.deposit) : null, start_date: f.start_date, end_date: f.end_date || null, status: f.status, notes: f.notes });
+      await realEstateService.upsertTenancy(ws, { tenancy_id: tenancy?.id, property_id: propertyId, tenant_contact_id: f.tenant_contact_id || null, tenant_company_id: f.tenant_company_id || null, landlord_contact_id: f.landlord_contact_id || null, landlord_company_id: f.landlord_company_id || null, rent_amount: Number(f.rent_amount), currency: f.currency || 'EUR', rent_frequency: f.rent_frequency, deposit: f.deposit != null && f.deposit !== '' ? Number(f.deposit) : null, start_date: f.start_date, end_date: f.end_date || null, status: f.status, notes: f.notes });
       setEditing(false); await load(); toast({ title: 'Tenancy saved' });
     } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
@@ -954,8 +970,14 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
         <Card><CardContent className="space-y-3 p-4">
           <div className="text-sm font-semibold">{tenancy ? 'Edit tenancy' : 'Set up tenancy'}</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div><Label className="text-xs">Tenant</Label><ContactSearchDropdown selectedContactId={f.tenant_contact_id ?? null} onSelect={(id) => setF((p) => ({ ...p, tenant_contact_id: id }))} placeholder="Link tenant…" /></div>
-            <div><Label className="text-xs">Landlord</Label><ContactSearchDropdown selectedContactId={f.landlord_contact_id ?? null} onSelect={(id) => setF((p) => ({ ...p, landlord_contact_id: id }))} placeholder="Link landlord…" /></div>
+            <div><Label className="text-xs">Tenant</Label><PartySearchDropdown
+              value={partyRefOf(f.tenant_company_id, f.tenant_contact_id)}
+              onSelect={(party) => setF((p) => ({ ...p, ...partyColumns('tenant_company_id', 'tenant_contact_id', party) }))}
+              placeholder="Link tenant — a company or a person…" /></div>
+            <div><Label className="text-xs">Landlord</Label><PartySearchDropdown
+              value={partyRefOf(f.landlord_company_id, f.landlord_contact_id)}
+              onSelect={(party) => setF((p) => ({ ...p, ...partyColumns('landlord_company_id', 'landlord_contact_id', party) }))}
+              placeholder="Link landlord — a company or a person…" /></div>
             <div><Label className="text-xs">Rent</Label><NumInput v={f.rent_amount} on={(x) => setF((p) => ({ ...p, rent_amount: x }))} /></div>
             <div><Label className="text-xs">Frequency</Label><Sel value={f.rent_frequency} opts={['weekly', 'monthly', 'quarterly', 'yearly']} onChange={(v) => setF((p) => ({ ...p, rent_frequency: v }))} /></div>
             <div><Label className="text-xs">Deposit</Label><NumInput v={f.deposit} on={(x) => setF((p) => ({ ...p, deposit: x }))} /></div>
@@ -1349,7 +1371,14 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
     if (!ws || !f.amount) return;
     setBusy(true);
     try {
-      await realEstateService.createOffer(ws, { property_id: propertyId, amount: Number(f.amount), currency: f.currency || 'EUR', buyer_name: f.buyer_name || undefined, terms: f.terms || undefined, proof_of_funds: !!f.proof_of_funds, mortgage_in_principle: !!f.mortgage_in_principle, chain_free: !!f.chain_free });
+      await realEstateService.createOffer(ws, { property_id: propertyId, amount: Number(f.amount), currency: f.currency || 'EUR',
+        // The buyer was a typed STRING and nothing else (#376): `buyer_contact_id` existed and no
+        // surface ever set it, so an accepted offer produced a sale whose buyer was nobody —
+        // `property_sales.buyer_contact_id` reads it from the offer. Now it can be a real party,
+        // company or person, and the free-text name stays for a buyer not in the CRM yet.
+        buyer_contact_id: f.buyer_party?.kind === 'contact' ? f.buyer_party.id : undefined,
+        buyer_company_id: f.buyer_party?.kind === 'company' ? f.buyer_party.id : undefined,
+        buyer_name: f.buyer_name || undefined, terms: f.terms || undefined, proof_of_funds: !!f.proof_of_funds, mortgage_in_principle: !!f.mortgage_in_principle, chain_free: !!f.chain_free });
       setF({ currency: 'EUR' }); setAdding(false); await load(); toast({ title: 'Offer recorded' });
     } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
@@ -1361,7 +1390,12 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
       {canManage && (adding ? (
         <Card><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
           <NumInput v={f.amount} on={(x) => setF((p) => ({ ...p, amount: x }))} />
-          <Input placeholder="Buyer name" value={f.buyer_name ?? ''} onChange={(e) => setF((p) => ({ ...p, buyer_name: e.target.value }))} />
+          <PartySearchDropdown
+            value={f.buyer_party ?? null}
+            onSelect={(party) => setF((p) => ({ ...p, buyer_party: party }))}
+            placeholder="Buyer in CRM (optional)…"
+          />
+          <Input placeholder="Buyer name (if not in CRM)" value={f.buyer_name ?? ''} onChange={(e) => setF((p) => ({ ...p, buyer_name: e.target.value }))} />
           <Input placeholder="Terms (optional)" className="sm:col-span-2" value={f.terms ?? ''} onChange={(e) => setF((p) => ({ ...p, terms: e.target.value }))} />
           <ChkGrid items={[['proof_of_funds', 'Proof of funds'], ['mortgage_in_principle', 'Mortgage in principle'], ['chain_free', 'Chain-free']]} form={f} set={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
           <div className="col-span-full flex gap-2"><Button size="sm" onClick={add} disabled={busy || !f.amount}>Record offer</Button><Button size="sm" variant="ghost" onClick={() => setAdding(false)}>Cancel</Button></div>

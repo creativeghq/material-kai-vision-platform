@@ -27,7 +27,10 @@ export async function resolveRealEstateAccess(
  *  view_count, public_listing_token, published_at, price_per_sqm, days_on_market, text_embedding. */
 export const PROPERTY_WRITABLE = [
   'reference_code', 'property_type', 'subtype', 'transaction_type', 'listing_status',
-  'listing_agent_id', 'parent_development_id', 'open_for_all', 'vendor_contact_id',
+  // `vendor_company_id` beside its twin (#376). This allowlist is what stops mass assignment, so
+  // a column absent from it is silently dropped on every write — which is exactly how the company
+  // side would have stayed permanently NULL while the picker appeared to work.
+  'listing_agent_id', 'parent_development_id', 'open_for_all', 'vendor_contact_id', 'vendor_company_id',
   // pricing (incl. 🔒 internal — writable by managers, just not public)
   'price', 'currency', 'price_period', 'price_on_request', 'common_charges', 'previous_price',
   'cost_basis', 'min_offer', 'commission_pct',
