@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -31,6 +31,8 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { formatDate } from '@/utils/datetime';
+import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
+import { type OrderLinkTarget } from '@/modules/finance/services/ordersService';
 
 interface Props {
   invoiceId: string;
@@ -52,6 +54,19 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
   const [mark, setMark] = useState<string | null>(fiscalMark ?? null);
   const [fStatus, setFStatus] = useState<string | null>(fiscalStatus ?? null);
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * The job this invoice is for (#378 L2).
+   *
+   * `invoices.project_id` was written only from INSIDE a project — the invoice itself, and
+   * `NewInvoiceDialog`, mentioned no project at all. So an invoice raised before the job existed,
+   * which is the normal order of events, could never join it, and `get_project_pnl` reads a job's
+   * revenue off exactly this column. The number was not wrong; the revenue was simply absent, and
+   * an absent revenue on a job that has costs reads as a loss.
+   */
+  const [jobOpen, setJobOpen] = useState(false);
+  const [jobLink, setJobLink] = useState<OrderLinkTarget>({ kind: 'none' });
+  const [jobWorkspaceId, setJobWorkspaceId] = useState<string | null>(null);
 
   // Lazily-loaded full invoice (powers details / history / characterizations).
   const [detail, setDetail] = useState<InvoiceWithItems | null>(null);
@@ -174,6 +189,31 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     setCatValue((inv as any)?.category_id ?? 'none');
     setCatOpen(true);
   };
+  const openJob = async () => {
+    const inv = detail ?? await loadDetail();
+    const projectId = (inv as { project_id?: string | null } | null)?.project_id ?? null;
+    setJobWorkspaceId((inv as { workspace_id?: string } | null)?.workspace_id ?? activeWorkspaceId ?? null);
+    // Seeded from what is stored, so the dialog opens showing the current answer rather than an
+    // empty picker over a field that is set.
+    setJobLink(projectId ? { kind: 'project', projectId, label: '' } : { kind: 'none' });
+    setJobOpen(true);
+  };
+
+  const saveJob = async () => {
+    setSaving(true);
+    try {
+      // Only the project arm is offered, so this is the only shape that can arrive. Clearing is
+      // legitimate — an invoice attached to the wrong job has to be detachable.
+      const projectId = jobLink.kind === 'project' ? jobLink.projectId : null;
+      await financeService.updateInvoice(invoiceId, { project_id: projectId } as never);
+      toast({ title: projectId ? 'Invoice attached to the job' : 'Invoice detached from the job' });
+      setJobOpen(false);
+      onChanged?.();
+    } catch (e) {
+      toast({ title: 'Could not attach', description: (e as Error).message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   const saveCat = async () => {
     setSaving(true);
     try {
@@ -238,6 +278,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuItem onClick={openHistory}><History className="h-4 w-4 mr-2" /> History</DropdownMenuItem>
         {!isAccountant && <DropdownMenuItem onClick={openDesc}><Pencil className="h-4 w-4 mr-2" /> Change description</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openCat}><Tag className="h-4 w-4 mr-2" /> Change category</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={openJob}><Briefcase className="h-4 w-4 mr-2" /> Attach to a job</DropdownMenuItem>}
         <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -285,6 +326,41 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DialogFooter>
           <Button variant="outline" onClick={() => setCatOpen(false)}>Cancel</Button>
           <Button onClick={saveCat} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* The job (#378 L2). Only the project arm: an invoice already knows its customer, and
+        offering merge or "cost of" here would answer a question this document does not ask. */}
+    <Dialog open={jobOpen} onOpenChange={setJobOpen}>
+      <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Attach to a job</DialogTitle>
+          <DialogDescription className="sr-only">Choose the project this invoice belongs to.</DialogDescription>
+        </DialogHeader>
+        {jobWorkspaceId ? (
+          <OrderLinkPicker
+            workspaceId={jobWorkspaceId}
+            value={jobLink}
+            onChange={setJobLink}
+            allowCustomer={false}
+            allowMerge={false}
+            allowRaiseCustomerOrder={false}
+            hint={
+              <p className="text-[11px] text-muted-foreground">
+                The job&apos;s P&amp;L reads its revenue off the invoices attached to it. Clearing
+                this leaves the invoice out of every job.
+              </p>
+            }
+          />
+        ) : (
+          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setJobOpen(false)}>Cancel</Button>
+          <Button onClick={saveJob} disabled={saving || !jobWorkspaceId}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
