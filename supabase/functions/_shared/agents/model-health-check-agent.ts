@@ -39,6 +39,7 @@
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../replicate-token.ts';
+import { resolveSecret } from '../secrets.ts';
 
 /**
  * Only Replicate is probed today. The other providers (Google, xAI, WorldLabs, Kling, proplabs) each
@@ -47,6 +48,28 @@ import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../replicate-to
  * request for it.
  */
 const PROBEABLE_PROVIDERS = ['replicate'];
+
+/**
+ * What each unprobed provider needs before it could be called at all.
+ *
+ * We cannot say whether these providers WORK — nobody has written their submit shape — but we
+ * can always say whether this deployment could even reach them, and that costs no upstream call.
+ * Turning "never probed" into "no token deployed" is the difference between a silence the reader
+ * has to interpret and a sentence they can act on. Where a provider needs BOTH halves of a pair
+ * (Kling signs a JWT), all of them must resolve or the provider is unreachable.
+ */
+const PROVIDER_KEYS: Record<string, string[]> = {
+  google:    ['GEMINI_API_KEY'],
+  alibaba:   ['DASHSCOPE_API_KEY'],
+  bytedance: ['ARK_API_KEY'],
+  fal:       ['FAL_KEY'],
+  luma:      ['LUMA_API_KEY'],
+  klingai:   ['KLINGAI_ACCESS_KEY', 'KLINGAI_SECRET_KEY'],
+  minimax:   ['MINIMAX_API_KEY'],
+  worldlabs: ['WORLDLABS_API_KEY'],
+  proplabs:  ['PROPLABS_API_KEY'],
+  xai:       ['XAI_API_KEY'],
+};
 
 /**
  * What the probe concluded — one source (#391), the generated mirror. The distinction
@@ -137,6 +160,35 @@ export class ModelHealthCheckAgent implements AgentRunner {
     const minIntervalMs = Number(cfg.min_interval_ms ?? 11_000);
     const maxModels  = Number(cfg.max_models ?? 6);
     const deadlineAt = Date.now() + Number(cfg.deadline_ms ?? 120_000);
+
+    /**
+     * Key audit for the providers this agent cannot probe.
+     *
+     * Their models otherwise carry NO verdict at all, and an empty status column reads as
+     * "fine" to everyone who is not looking for the difference. We cannot call these providers
+     * — nobody has written their submit shape — but "this deployment has no token for them" is
+     * knowable for free and is the single most likely reason they would fail.
+     *
+     * Only ever writes `not_configured`, and only over a row that has no verdict or the same
+     * one. It never clears a real result, and it never invents a positive: a provider whose key
+     * IS present is left untouched and honestly unprobed.
+     */
+    for (const [prov, keys] of Object.entries(PROVIDER_KEYS)) {
+      const missing: string[] = [];
+      for (const key of keys) {
+        const r = await resolveSecret(supabase, key);
+        if (!r?.value) missing.push(key);
+      }
+      if (missing.length === 0) continue;
+      const why = `No credential for ${prov}: ${missing.join(' + ')} is not set in this deployment.`;
+      await supabase
+        .from('generation_models')
+        .update({ last_probe_at: new Date().toISOString(), last_probe_status: 'not_configured', last_probe_error: why })
+        .eq('provider', prov)
+        .eq('enabled', true)
+        .neq('status', 'dead')
+        .or('last_probe_status.is.null,last_probe_status.eq.not_configured');
+    }
 
     // The registry is the roster. The hardcoded ALL_MODELS list this used to carry drifted from the
     // real roster in both directions and still named two models that had been deleted upstream.
