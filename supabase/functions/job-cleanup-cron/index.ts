@@ -172,49 +172,51 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       console.log(`[JobCleanupCron] agent_checkpoints: ${stats.agentCheckpoints} deleted`);
     }
 
-    // ── 7. flow_run_steps (delete before parent flow_runs) ──────────────────
+    // ── 7. flow_run_steps — COUNTED here, deleted by cascade below ──────────
     {
-      // AGE IS NOT A REFERENCE CHECK. (#365 AD-28)
+      // TWO BUGS DEEP, so both are worth keeping written down.
       //
-      // The comment here has always said "steps whose parent run is completed/failed and older
-      // than 30 days" and the query did not do that — it matched on `created_at` alone, with no
-      // status filter and no look at the parent. So the steps of a run still in flight after 30
-      // days (a long scheduled flow, a retrying one, anything paused) were deleted out from
-      // under it, and `flow_runs` immediately below — which DOES filter on status — then kept the
-      // parent row pointing at steps that no longer exist.
+      // AGE IS NOT A REFERENCE CHECK (#365 AD-28). This block first matched on `created_at`
+      // alone, with no status filter and no look at the parent — so the steps of a run still in
+      // flight after 30 days (a long scheduled flow, a retrying one, anything paused) were
+      // deleted out from under it. The janitor hazard inverted: not failing to delete, but
+      // deleting something still in use.
       //
-      // This is the janitor hazard inverted: not failing to delete, but deleting something still
-      // in use. Nothing raises either way; the flow simply loses its own history.
-      const { data: finishedRuns, error: runsErr } = await supabase
-        .from('flow_runs')
-        .select('id')
-        .in('status', ['completed', 'failed', 'cancelled'])
-        .lt('created_at', thirtyDaysAgo)
-        .limit(1000);
+      // THEN THE FIX FOR THAT BROKE, in a way only production could show.
+      //
+      // AD-28 resolved the finished parents first and deleted their steps by id — correct in
+      // intent, and it put ~900 uuids into a PostgREST `in.(…)` filter, which travels in the URL.
+      // At 886 finished runs that is roughly 33KB of query string, and the gateway answers
+      // `400 Bad Request`. It worked while the platform had a handful of runs and started failing
+      // the week flows got busy: 200 every Sunday until 2026-08-16, then 500 on 08-23 and 08-30.
+      // pg_cron reported "succeeded" throughout, because it only sees that net.http_post was
+      // enqueued — which is what `ops.cron_reported_success_but_no_effect` exists to catch, and
+      // did.
+      //
+      // The real answer is that this block should not exist. `flow_run_steps.flow_run_id` is
+      // `ON DELETE CASCADE`, so deleting the finished runs below already removes exactly their
+      // steps — atomically, with no id list, no URL limit, and no window in which the parent is
+      // gone and the children are not. Verified live: 21,340 steps, 0 orphaned.
+      //
+      // So the count here is a COUNT, not a delete. It is taken before the runs go, filtered
+      // through the parent with an inner join, so the number reported stays true without
+      // enumerating a single id.
+      const { count, error } = await supabase
+        .from('flow_run_steps')
+        .select('id, flow_runs!inner(status, created_at)', { count: 'exact', head: true })
+        .in('flow_runs.status', ['completed', 'failed', 'cancelled'])
+        .lt('flow_runs.created_at', thirtyDaysAgo);
 
-      if (runsErr) {
-        console.error('[JobCleanupCron] flow_run_steps parent lookup error:', runsErr);
-        failures.push(`flow_run_steps: parent lookup failed — ${runsErr.message}`);
-      } else if ((finishedRuns ?? []).length === 0) {
-        stats.flowRunSteps = 0;
+      if (error) {
+        console.error('[JobCleanupCron] flow_run_steps count error:', error);
+        failures.push(`flow_run_steps: ${error.message}`);
       } else {
-        const { data, error } = await supabase
-          .from('flow_run_steps')
-          .delete()
-          .in('flow_run_id', (finishedRuns ?? []).map((r: { id: string }) => r.id))
-          .limit(2000)
-          .select('id');
-        if (error) {
-          console.error('[JobCleanupCron] flow_run_steps error:', error);
-          failures.push(`flow_run_steps: ${error.message}`);
-        } else {
-          stats.flowRunSteps = data?.length ?? 0;
-        }
+        stats.flowRunSteps = count ?? 0;
       }
-      console.log(`[JobCleanupCron] flow_run_steps: ${stats.flowRunSteps} deleted`);
+      console.log(`[JobCleanupCron] flow_run_steps: ${stats.flowRunSteps} will cascade with their runs`);
     }
 
-    // ── 8. flow_runs ────────────────────────────────────────────────────────
+    // ── 8. flow_runs — and, by cascade, their steps ─────────────────────────
     {
       const { data, error } = await supabase
         .from('flow_runs')
@@ -298,8 +300,13 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         .limit(500)
         .select('id');
 
-      if (delErr) console.error('[JobCleanupCron] generation_3d error:', delErr);
-      else stats.generation3d = deleted?.length ?? 0;
+      // AD-29 applied here too: this was the one table left logging its error and returning
+      // success anyway, so a generation_3d delete could fail every week and the run still
+      // reported clean. Same defect the rest of this function was fixed for.
+      if (delErr) {
+        console.error('[JobCleanupCron] generation_3d error:', delErr);
+        failures.push(`generation_3d: ${delErr.message}`);
+      } else stats.generation3d = deleted?.length ?? 0;
       console.log(`[JobCleanupCron] generation_3d (unsaved >15d): ${stats.generation3d} deleted`);
     }
 
