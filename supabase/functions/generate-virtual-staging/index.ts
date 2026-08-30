@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { replicateToken, REPLICATE_NOT_CONFIGURED } from '../_shared/replicate-token.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
@@ -25,7 +26,6 @@ import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const replicateToken = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 const CREDIT_COST = 20;
 const MODEL = 'proplabs/virtual-staging';
@@ -77,10 +77,11 @@ async function runReplicate(
   furnitureStyle: string,
   furnitureItems?: string,
 ): Promise<string> {
+  const token = await replicateToken();
   const createResp = await fetch(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${replicateToken()}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Prefer': 'wait',
     },
@@ -119,7 +120,7 @@ async function runReplicate(
     await new Promise((r) => setTimeout(r, 4000));
 
     const statusResp = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-      headers: { 'Authorization': `Bearer ${replicateToken()}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     });
 
     if (!statusResp.ok) continue;
@@ -216,8 +217,8 @@ async function handleRequest(
   if (!body.room) {
     return jsonResponse({ success: false, error: 'room is required' }, 400);
   }
-  if (!replicateToken()) {
-    return jsonResponse({ success: false, error: 'REPLICATE_API_TOKEN not configured' }, 500);
+  if (!(await replicateToken())) {
+    return jsonResponse({ success: false, error: REPLICATE_NOT_CONFIGURED }, 500);
   }
 
   const jobId = crypto.randomUUID();

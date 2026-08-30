@@ -13,6 +13,7 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
+import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
@@ -23,7 +24,6 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
 const GEMINI_API_KEY = () => Deno.env.get('GEMINI_API_KEY') || '';
-const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
 type ImageModel = 'aurora' | 'gemini' | 'flux' | 'auto';
 type ImageType = 'lifestyle' | 'product' | 'interior' | 'artistic';
@@ -118,10 +118,11 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
     : aspectRatio === '4:5' ? '4:5'
     : '1:1';
 
+  const token = await replicateToken();
   const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-2-pro/predictions', {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${REPLICATE_API_KEY()}`,
+      'Authorization': `Token ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -148,7 +149,7 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
   while (Date.now() - start < maxMs) {
     await new Promise(r => setTimeout(r, 2000));
     const pollRes = await fetch(pollUrl, {
-      headers: { 'Authorization': `Token ${REPLICATE_API_KEY()}` },
+      headers: { 'Authorization': `Token ${token}` },
     });
     const status = await pollRes.json() as { status: string; output?: string[]; error?: string };
 

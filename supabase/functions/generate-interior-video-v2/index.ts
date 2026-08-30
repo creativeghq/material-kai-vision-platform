@@ -29,6 +29,7 @@
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
+import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   generateVideoWithVeo,
@@ -50,7 +51,6 @@ import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
 // 'wan2.1-i2v-720p' removed 2026-08-12 (issue #4): `wan-video/wan2.1-i2v-720p` returns 404 from
 // GET /v1/models — a read that needs no credit, so this is upstream deletion, NOT our 402
@@ -243,10 +243,11 @@ async function createReplicatePrediction(
   model: string,
   input: Record<string, unknown>,
 ): Promise<{ id: string }> {
+  const token = await replicateToken();
   const res = await fetch(`https://api.replicate.com/v1/models/${model}/predictions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${REPLICATE_API_KEY()}`,
+      'Authorization': `Token ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input }),
@@ -269,9 +270,10 @@ async function pollReplicate(
   const start = Date.now();
   const url = `https://api.replicate.com/v1/predictions/${predictionId}`;
 
+  const token = await replicateToken();
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 5000));
-    const res = await fetch(url, { headers: { 'Authorization': `Token ${REPLICATE_API_KEY()}` } });
+    const res = await fetch(url, { headers: { 'Authorization': `Token ${token}` } });
     const data = await res.json() as { status: string; output?: string | string[]; error?: string };
     if (data.status === 'succeeded' || data.status === 'failed') return data;
   }

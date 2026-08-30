@@ -31,6 +31,7 @@
  */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
+import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../replicate-token.ts';
 
 /**
  * Only Replicate is probed today. The other providers (Google, xAI, WorldLabs, Kling, proplabs) each
@@ -130,23 +131,31 @@ export class ModelHealthCheckAgent implements AgentRunner {
       return { success: true, output: { probed: 0, providers }, inputTokens: 0, outputTokens: 0, creditsDebited: 0 };
     }
 
-    const replicateApiKey = Deno.env.get('REPLICATE_API_TOKEN') || '';
+    const { token: replicateApiKey } = await resolveReplicateToken();
     if (!replicateApiKey) {
       // Record it rather than returning quietly — "the token is missing" and "the account is empty"
       // produce identical user-visible symptoms and must be told apart on the Operations page.
-      await log('error', 'REPLICATE_API_TOKEN not set — cannot probe');
+      //
+      // The STATUS below is still 'auth_failed', which is a third thing again and is wrong: it
+      // says the provider rejected us when in fact it was never called. That mislabel cost a real
+      // investigation on 2026-08-30 — 18 rows read as a rejected key while the account was funded
+      // and the token worked. The honest value is 'not_configured', which is not yet in
+      // generation_models_last_probe_status_check nor in the mirrored probe vocabulary; adding it
+      // is a migration + probeVocabulary.ts + vocab:mirror + the admin status map. Until then the
+      // ERROR TEXT carries the distinction, so read that and not the status.
+      await log('error', REPLICATE_NOT_CONFIGURED);
       await supabase
         .from('generation_models')
         .update({
           last_probe_at: new Date().toISOString(),
           last_probe_status: 'auth_failed',
-          last_probe_error: 'REPLICATE_API_TOKEN not configured in this environment',
+          last_probe_error: REPLICATE_NOT_CONFIGURED,
         })
         .eq('provider', 'replicate')
         .eq('enabled', true);
       return {
         success: false,
-        output: { error: 'REPLICATE_API_TOKEN not configured' },
+        output: { error: REPLICATE_NOT_CONFIGURED },
         inputTokens: 0, outputTokens: 0, creditsDebited: 0,
       };
     }

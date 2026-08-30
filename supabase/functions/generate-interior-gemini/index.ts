@@ -19,6 +19,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../_shared/replicate-token.ts';
 import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import {
   generateImageWithGemini,
@@ -52,7 +53,6 @@ import { assertEditableSource } from '../_shared/image-edit-gate.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
-const REPLICATE_API_TOKEN = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 /**
  * Safe chunked base64 encoder — avoids call-stack overflow on large images.
@@ -189,7 +189,8 @@ async function callFluxDepthPro(
   prompt: string,
   aspectRatio: ImageAspectRatio = '16:9',
 ): Promise<string> {
-  if (!REPLICATE_API_TOKEN()) throw new Error('REPLICATE_API_TOKEN not set');
+  const { token: replicateToken } = await resolveReplicateToken();
+  if (!replicateToken) throw new Error(REPLICATE_NOT_CONFIGURED);
 
   const requestBody = {
     input: {
@@ -211,7 +212,7 @@ async function callFluxDepthPro(
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${REPLICATE_API_TOKEN()}`,
+        Authorization: `Bearer ${replicateToken}`,
         'Content-Type': 'application/json',
         Prefer: 'wait',
       },
@@ -242,7 +243,7 @@ async function callFluxDepthPro(
     await new Promise((r) => setTimeout(r, 3000));
     const statusRes = await fetch(
       `https://api.replicate.com/v1/predictions/${predictionId}`,
-      { headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN()}` } },
+      { headers: { Authorization: `Bearer ${replicateToken}` } },
     );
     const status = await statusRes.json();
     if (status.status === 'succeeded') {

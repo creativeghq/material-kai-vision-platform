@@ -22,6 +22,7 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
+import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { checkCreditBalance, getServicePricing } from '../_shared/credit-utils.ts';
@@ -75,7 +76,6 @@ async function storeVideo(
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
 // 'kling-1.6-pro' removed 2026-08-12 (issue #4): `klingai/kling-1.6-pro` returns 404 from
 // GET /v1/models — a read that needs no credit, so it is deleted upstream, not a symptom of
@@ -126,10 +126,11 @@ async function createReplicatePrediction(
   model: string,
   input: Record<string, unknown>,
 ): Promise<{ id: string; status: string; urls: { get: string } }> {
+  const token = await replicateToken();
   const res = await fetch(`https://api.replicate.com/v1/models/${model}/predictions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${REPLICATE_API_KEY()}`,
+      'Authorization': `Token ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input }),
@@ -150,10 +151,11 @@ async function pollReplicate(
   const start = Date.now();
   const pollUrl = `https://api.replicate.com/v1/predictions/${predictionId}`;
 
+  const token = await replicateToken();
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 5000));
     const res = await fetch(pollUrl, {
-      headers: { 'Authorization': `Token ${REPLICATE_API_KEY()}` },
+      headers: { 'Authorization': `Token ${token}` },
     });
     const data = await res.json() as { status: string; output?: string | string[]; error?: string };
 
