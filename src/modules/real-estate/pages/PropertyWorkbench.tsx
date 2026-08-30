@@ -40,6 +40,7 @@ import { ListingPerformancePanel } from '../components/ListingPerformancePanel';
 import { KycPanel } from '../components/KycPanel';
 import { ShortLetTab } from '../components/ShortLetTab';
 import { PropertyCommercialCard } from '../components/PropertyCommercialCard';
+import { PropertyProjectsCard } from '../components/PropertyProjectsCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
@@ -432,6 +433,11 @@ export default function PropertyWorkbench() {
                 the listing can see what it cost, and the RPC is SECURITY INVOKER, so the real
                 boundary is each table's own RLS rather than this condition. */}
             <PropertyCommercialCard propertyId={id} />
+
+            {/* The read side of `projects.property_id` — the picker that writes it is on the
+                project's Overview tab, so until now the link only worked in one direction.
+                Same rule as the card above: renders nothing until something is linked. */}
+            <PropertyProjectsCard propertyId={id} />
 
             {/* Stepper */}
             <div className="flex flex-wrap gap-1.5">
