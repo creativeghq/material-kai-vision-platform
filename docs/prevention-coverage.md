@@ -1144,6 +1144,105 @@ HOW, and any way to learn when that stops being true.
   could be a no-op and this test would still pass. It also cannot see a route mounted outside the
   `@router` idiom.
 
+## Shapes closed 2026-08-30 — #294, and the edge-typecheck baseline read as a defect list
+
+### `2-definer-authenticated-unscoped` — a function with nothing to scope by and nobody to scope to
+
+`check_security_invariants()`'s invariant-2 branch tested only `has_function_privilege('anon', …)`,
+so the platform's own backstop returned near-clean while two SECURITY DEFINER functions granted to
+`authenticated` returned cross-tenant data to everyone.
+
+- **Why not a blanket branch:** 433 DEFINER functions are executable by `authenticated`, and 87 of
+  those never read the caller — nearly all benign (pricing helpers, public sitemap, published KB).
+  That is the 146-finding shape this document already warns about, and a check nobody reads is
+  worse than no check.
+- **The precise sub-case instead:** zero arguments + DEFINER + executable by `authenticated` +
+  reads a workspace-scoped table + never reads the caller (following ONE hop into another public
+  function) + no publication filter. A function with no parameter to scope BY and no caller to
+  scope TO returns the same answer to every tenant — definitional, not heuristic.
+- **Precision, measured:** selects exactly `tenant_purity_audit` and `get_distinct_factory_names`
+  and nothing else. The one-hop rule is what spares `my_customer_account_summary`, which delegates
+  to `my_customer_scope()` — the same delegation blind spot that made `deliver_order_line` read as
+  unguarded. The publication filter spares `public_sitemap_entries` and `kb_list_brands`.
+- **Proven to fire:** 2026-08-30 — re-granting `tenant_purity_audit` to `authenticated` inside a
+  rolled-back transaction convicted it by name; 0 findings before, 1 after.
+- **Blind spot:** one hop only. A function delegating two levels deep to reach `auth.uid()` would
+  read as unguarded; nothing in the schema does that today.
+
+### `4-entitlement-write-gap` — a paid gate on the read side only
+
+Every `hr_*` SELECT policy carried `AND is_workspace_entitled(workspace_id,'hr')`. The 56
+INSERT/UPDATE/DELETE policies beside them, across 19 tables, did not. A workspace whose HR
+subscription lapsed could no longer READ its HR data but could still write it — the gate existed
+only inside `hr-api`, and PostgREST is reachable without it. Application-side filtering is a
+filter, not a boundary.
+
+- **The rule generalizes past hr:** if the SELECT policy on a table gates on
+  `is_workspace_entitled`, every write policy on that table must too.
+- **Guarded by:** `check_security_invariants()`, wired into the nightly sweep as
+  `security.invariant_violation` at CRITICAL. A repo test cannot see this — the policies live in
+  `pg_policy`, not in any file.
+- **Proven to fire:** 2026-08-30 — reverting `hr_absences_insert` to its pre-fix expression in a
+  rolled-back transaction named that exact policy.
+- **Verified by writing, not by reading:** in a rolled-back transaction a non-operator workspace
+  admin of a NON-entitled workspace was refused `42501` on `hr_departments`, and the same admin of
+  an entitled workspace wrote successfully — so the gate closed without locking out a paying tenant.
+- **Blind spot:** it matches `is_workspace_entitled` by name. A module gating entitlement some
+  other way is invisible to it.
+
+### A successful `authenticate()` is not a user
+
+`_shared/auth.ts` has five success paths and only one populates `user`; `secret`, `anon` and
+`api_key` all return `success: true, user: null`. `requireUser` defaults to false and
+`allowedRoles` is applied only to user tokens, so neither keeps those callers out. Six handlers
+wrote `created_by: user.id` / `email: user.email` and threw a TypeError 500 for exactly the
+callers the helper exists to serve. `api_key` is the sharp case — `userId` IS set, so the author
+was available at every one of those sites.
+
+- **Invisible behaviourally**, because the platform's own traffic is all user-level. It is the
+  partner-key and service-role paths that were broken, and those are the quiet ones.
+- **Guarded by:** [tests/unit/edgeAuthUserNullable.test.ts](../tests/unit/edgeAuthUserNullable.test.ts),
+  which accepts the three correct forms (`requireUser`, an explicit null check, optional chaining)
+  and asserts its own premise against `_shared/auth.ts`, so changing the helper reopens the
+  question instead of silently voiding the rule.
+- **Proven to fire:** 2026-08-30, against all five pre-fix handlers.
+
+### `allowedRoles: ['admin']` is not a platform gate
+
+`authenticate()` matches `allowedRoles` against `workspace_members.role` as well as the global
+role, and grants if either matches — deliberately, so a dealer who owns a workspace is allowed
+business ops. But `'admin'` is also an ordinary WORKSPACE role, handed out by any tenant from
+Profile → Team, so a *platform*-scoped function gated that way is reachable by any tenant's
+workspace admin. `platform-secrets-admin` writes the store every tenant's integrations resolve
+through. `reset-platform` had already been moved off the identical gate.
+
+- **Latent, not live:** the only active workspace-`admin` row belongs to the operator. It arms
+  itself the first time a tenant uses an ordinary product feature.
+- **Guarded by:** [tests/unit/platformScopedAuthGates.test.ts](../tests/unit/platformScopedAuthGates.test.ts),
+  which also pins that `platform_secrets` is UPDATEd rather than upserted (an upsert let a caller
+  invent a key that `resolveSecret()` would then serve) and that the ownership check in
+  `catalog-translate-pdf` precedes the private-bucket download, the credit debit and the model
+  call — a check after the side effect is not a check.
+- **Blind spot:** it names two functions. There is no general list of which edge functions are
+  platform-scoped, so a third one gated the same way would not be caught.
+
+### The edge-typecheck baseline is a defect list, not a debt number
+
+Read rather than lived with, the 50-error baseline yielded two live bugs — `crm-lead-score`, whose
+whole real-estate enrichment block had never run (`interests`/`viewings` bound to the
+PostgrestResponse, `.map` undefined, throwing into a `catch` that only warned), and
+`check-material-alerts`, whose `.insert().select().onConflict().ignore()` is not valid supabase-js
+and threw on the first saved search that matched a product, aborting the run for every user. That
+cron had returned 200 daily for 69 runs because the platform has zero saved searches, so it had
+never reached the line.
+
+- **What separated the bugs from the noise:** TS2339 (property does not exist) and TS18047
+  (possibly null) point at values that are `undefined` at runtime. TS2345 null-vs-undefined,
+  Fontkit, and the many-to-one embed shapes are type artefacts — `hr-checkin-cron` was spared that
+  way, verified against production PostgREST rather than assumed.
+- **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
+  fails the build.
+
 ## Not defects — checked, and deliberately left alone
 
 Recording these so they are not re-raised every time an advisor runs.
