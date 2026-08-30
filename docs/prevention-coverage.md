@@ -1332,6 +1332,89 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## Receiving stock twice, on a path that had never once run — 2026-08-30
+
+Warehouse/Stock is the first module in this round with a large backlog and no output at all:
+**1,733 pending intake lines from 605 supplier documents**, accumulating continuously from
+2026-08-11 to 2026-08-28, and `warehouse_items`, `stock_movements` and `stock_allocations` all
+empty. The approve path had never executed in production.
+
+**The matcher is fine, and nearly got convicted.** Every one of the 1,733 lines carries
+`match_score = 0` and no matched product — the silent-zero silhouette exactly. It is correct:
+`products` is empty, so there is nothing to match against, and `match_reason` says so in words
+("No existing stock matched — will create a new product"). This is the exact-zero trap recorded in
+the audit-traps note; the check that resolves it is one query against the thing being matched
+*to*, not the matcher.
+
+**What a path with zero executions hides.** `_approve_pending_item_core` read the line's status,
+created the product, resolved the supplier, ran the pricing ladder, created the warehouse item,
+recorded the stock movement — and only then stamped the line, with no lock and no predicate:
+
+```
+select * into v from warehouse_pending_items where id = p_id;   -- plain read
+if v.status <> 'pending' then raise …
+…  perform record_stock_movement(v_wi, 'in', v_qty, …)          -- the goods arrive
+update warehouse_pending_items set status='added' … where id = v.id;   -- no predicate
+```
+
+Under READ COMMITTED two concurrent approvals both see `pending`, both record an `in` movement, and
+both stamps succeed — the second blocks on the row lock and then matches anyway, because its WHERE
+never mentions status. `warehouse_items` cannot duplicate (unique on workspace/warehouse/product/
+variant) but `qty_on_hand` is driven by the MOVEMENTS, and there is no unique constraint on
+`stock_movements(source_type, source_id)`. CLAUDE.md rule 4, and the reachable operator paths are a
+double-click on Approve and a retry after a dropped connection — the second of which a client latch
+cannot close. `dismiss_pending_warehouse_item` next door already claimed correctly; approve, the one
+that moves stock, did not.
+
+**Watched on live data, in aborted transactions.** A 23.33-unit line:
+
+| | before | after |
+|---|---|---|
+| one approval | 23.33 | 23.33 |
+| the second worker's tail | **46.66**, 2 movements, stamp reported ROW_COUNT **1** | 23.33, 1 movement, **refused — 0 rows** |
+
+A wrong quantity is a valid numeric, so nothing downstream could have seen it either.
+
+**Two siblings, same shape.** `receive_order_into_warehouse` is idempotent on a *sequential* repeat
+by construction — outstanding is `quantity - quantity_shipped`, so a second call skips every line —
+which is why the codebase cites it as the pattern to copy (#355 WH-3, quoted in `campaign-processor`
+and `inbox-api`). It is not closed concurrently, and being the cited exemplar is exactly why that
+matters: code written by analogy inherits what it actually does, not what the comment says.
+`post_stock_count` is milder because `adjust` SETS rather than adds, so two concurrent posts land
+the same number; what duplicates is the audit trail, and a stock count is a record of who
+reconciled what and when. All three now claim. All three were then CALLED, not merely linted — the
+trap that let four run-time-broken functions through every gate.
+
+**Not changed, deliberately.** `inbound_doc_receive_stock` has no caller anywhere in the repository
+and no status guard at all, so whether it is meant to support partial receipts is unknown; guessing
+at intent on an unused function is how a working thing gets broken. Tenancy is sound throughout —
+`record_stock_movement` derives the workspace from the ITEM, not from caller input, so a foreign
+`warehouse_item_id` is refused; and `bulk_approve_pending_warehouse_items` checks per DISTINCT
+workspace, so a mixed-workspace id array cannot ride in on rights held in one of them.
+
+### Where the guard lives
+
+Repo-file tests cannot see `pg_proc`, and this project keeps no local migration files, so the fix
+is guarded in the database — modelled on `dic_detect__stock_writers_outside_core`, which already
+reads `pg_proc` for shape.
+
+| check | what it catches | watched |
+|---|---|---|
+| `stock.receiver_lost_its_claim` | any of the three receivers losing its `FOR UPDATE`, e.g. a `CREATE OR REPLACE` built from a stale copy — the way three probes were erased from `dic_detect__ops_silent_zero` and went unnoticed for ten days | quiet at HEAD; the claim stripped back out of `post_stock_count` → **fires, naming it** |
+| `stock.line_received_twice` | the FOOTPRINT — one source line with two movements — so a NEW unguarded receiver is caught by what it does, not by someone re-reading these three | quiet at HEAD; a real duplicate → **fires, `movements: 2`, `total_quantity: 46.66`** |
+| `warehouse_intake_never_reviewed` | intake feeding a queue nothing drains, in either direction | **fires: 1,733 lines, 605 documents, 0 actioned**; one dismissal → quiet |
+
+`stock.receiver_lost_its_claim` is a NAMED roster of three functions and one literal token,
+deliberately not a heuristic sweep — text-matching over the live schema is what produced 146
+findings of which every sampled one was benign. Counting a *dismissal* as signal in the intake
+probe is likewise deliberate: deciding not to stock something is a real answer, and a probe that
+only accepted approvals would nag an operator who had already dealt with the queue.
+
+The intake backlog itself is not called a defect here. The operator may simply not have started.
+What was a defect is that an unattended queue, a queue nobody knew existed, and a broken approve
+path were pixel-identical from outside — and the platform had all three readings available with no
+way to choose between them.
+
 ## Two hard bounces nobody was ever going to act on — 2026-08-30
 
 Email Marketing is the first module in this round with real traffic (192 events, 98 logs, 95 sends
