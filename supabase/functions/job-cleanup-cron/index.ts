@@ -12,6 +12,8 @@
  * - agent_checkpoints       > 30 days old  (conversation snapshots, not needed after)
  * - flow_run_steps          steps belonging to completed/failed runs > 30 days old
  * - flow_runs               completed/failed > 30 days old
+ * - generation_3d           unsaved renders > 15 days old (crop files are reaped by the
+ *                           storage GC, not here — see block 10)
  * - vr_worlds (failed)      status=failed > 7 days old
  * - job_progress            (legacy, dropped — progress events now on background_jobs.stage_history)
  * - system_logs             > 30 days old  (operational Python API logs, ~77k rows/day)
@@ -41,7 +43,6 @@ interface CleanupStats {
   flowRuns: number;
   vrWorldsFailed: number;
   generation3d: number;
-  generation3dStorageFiles: number;
   jobProgress: number;
   systemLogs: number;
   aiCallLogs: number;
@@ -89,7 +90,6 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       flowRuns: 0,
       vrWorldsFailed: 0,
       generation3d: 0,
-      generation3dStorageFiles: 0,
       jobProgress: 0,
       systemLogs: 0,
       aiCallLogs: 0,
@@ -249,48 +249,34 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
     }
 
     // ── 10. generation_3d — unsaved renders older than 15 days ───────────────
-    // Collect crop Storage paths BEFORE deleting rows (CASCADE removes segments)
     {
       const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Fetch segment crop URLs so we can delete them from Storage
-      const { data: segRows } = await supabase
-        .from('generation_3d_segments')
-        .select('crop_storage_url, generation_id')
-        .not('crop_storage_url', 'is', null)
-        .in(
-          'generation_id',
-          // Sub-select IDs that will be deleted
-          (await supabase
-            .from('generation_3d')
-            .select('id')
-            .is('saved_to_moodboard_at', null)
-            .lt('created_at', fifteenDaysAgo)
-            .in('generation_status', ['completed', 'failed'])
-          ).data?.map((r: any) => r.id) ?? [],
-        );
-
-      // Delete crop files from Storage
-      if (segRows && segRows.length > 0) {
-        const storagePaths = segRows
-          .map((r: any) => {
-            const url: string = r.crop_storage_url ?? '';
-            const marker = '/generation-images/';
-            const idx = url.indexOf(marker);
-            return idx >= 0 ? url.slice(idx + marker.length) : null;
-          })
-          .filter(Boolean) as string[];
-
-        if (storagePaths.length > 0) {
-          const { data: removed } = await supabase.storage
-            .from('generation-images')
-            .remove(storagePaths);
-          stats.generation3dStorageFiles = removed?.length ?? 0;
-          console.log(`[JobCleanupCron] generation_3d storage files removed: ${stats.generation3dStorageFiles}`);
-        }
-      }
-
-      // Delete the generations (CASCADE removes generation_3d_segments)
+      /**
+       * STORAGE IS NOT DELETED HERE. It used to be, and that hand-rolled block carried three
+       * defects at once — all of them fixed by not having it.
+       *
+       * 1. THE 33KB URL, AGAIN. It collected crop paths by resolving the doomed generations first
+       *    and passing their ids to `.in('generation_id', …)`, which travels in the URL. That is
+       *    the identical shape AD-28 introduced in the flow_run_steps block above and that broke
+       *    this cron from 2026-08-16 (200 every Sunday, then 500) — fixed there this morning and
+       *    left standing here, ten lines below its own post-mortem. A partial sweep is how a
+       *    defect survives its own fix.
+       *
+       * 2. IT DELETED FILES FOR ROWS IT WAS NOT DELETING. The crop collection was unbounded while
+       *    the row delete is `.limit(500)`. Past 500 matches it removed storage for generations
+       *    whose rows remain, so a render still listed in the UI renders broken until the next
+       *    weekly run.
+       *
+       * 3. IT SWALLOWED ITS OWN ERROR. `const { data: segRows } = await …` with no `error`, so a
+       *    failed lookup silently skipped every file, with no console.error either.
+       *
+       * The platform already answers this properly: entity-delete cleanup is GC-based, not
+       * trigger-based (CLAUDE.md, Storage). Deleting the row drops the file out of
+       * `build_storage_reference_set()` — which covers `generation_3d_segments.crop_storage_url`
+       * in `generation-images`, verified — and `storage-orphan-cleanup-cron` reaps it. That path
+       * is bounded, retried, and audited; this one was none of those.
+       */
       const { data: deleted, error: delErr } = await supabase
         .from('generation_3d')
         .delete()
@@ -307,7 +293,7 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
         console.error('[JobCleanupCron] generation_3d error:', delErr);
         failures.push(`generation_3d: ${delErr.message}`);
       } else stats.generation3d = deleted?.length ?? 0;
-      console.log(`[JobCleanupCron] generation_3d (unsaved >15d): ${stats.generation3d} deleted`);
+      console.log(`[JobCleanupCron] generation_3d (unsaved >15d): ${stats.generation3d} deleted — crops reaped by storage GC`);
     }
 
     // ── 11. job_progress — table dropped (Phase 3c). Progress events now
